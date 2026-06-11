@@ -146,13 +146,14 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 event_log = BufferingEventLog()
                 wf_tracer_key = wf_run_id
                 # Payload-pure flush gate: the buffer is populated exclusively by inline
-                # (workflow-thread) emissions — graph events from the tracer when
-                # emit_graph_events is on, and usage events from dry-run inline reporting.
-                # In costs-only LIVE mode neither source exists (every LIVE usage emission
-                # happens activity-side via the per-process runner fallback), so the buffer
-                # is deterministically empty and the flush round-trip is skipped. Both gate
-                # inputs ride in the payload, so the decision replays identically.
-                schedule_flush = trace_context.emit_graph_events or workflow_arg.pipe_run_params.run_mode.is_dry
+                # (workflow-thread) emissions, and since the unified dry run moved leaf
+                # mocking inside the activities, the only inline source left is graph
+                # events from the tracer when emit_graph_events is on. Every usage
+                # emission — LIVE, DRY, or mock-usage — happens activity-side via the
+                # per-process runner fallback, so with graph events off the buffer is
+                # deterministically empty and the flush round-trip is skipped. The gate
+                # input rides in the payload, so the decision replays identically.
+                schedule_flush = trace_context.emit_graph_events
                 wf_trace_context = GraphTracerManager.get_or_create_instance().open_tracer(
                     graph_id=trace_context.graph_id,
                     data_inclusion=trace_context.data_inclusion,
@@ -180,8 +181,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 # Configure the report delegate for usage event emission — only when cost reporting
                 # is on. In graph-only mode no usage context is registered, so usage events are
                 # suppressed (the runner fallback also gates on emit_usage_events). Only emissions
-                # from the workflow thread itself (e.g. dry-run inline reporting) land in this
-                # buffer: ReportingManager routes activity-side emissions to its per-process
+                # from the workflow thread itself would land in this buffer — and since the unified
+                # dry run moved leaf mocking inside the activities, no such inline source currently
+                # exists: ReportingManager routes activity-side emissions to its per-process
                 # fallback even when the activity runs co-located, so the buffer content stays a
                 # deterministic function of inline execution and re-fires identically on replay.
                 if trace_context.emit_usage_events:
@@ -271,14 +273,14 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 #
                 # Determinism (H1): the schedule is a pure function of the payload — the
                 # event_log sentinel (trace_context presence) and schedule_flush
-                # (emit_graph_events or DRY run mode, both payload fields). It must NOT be
-                # gated on the buffer CONTENT: anything written into the buffer from outside
-                # the workflow thread would not be re-written on replay (activities do not
-                # re-execute), so a content-gated schedule recorded in history could vanish
-                # from the replayed command stream after a routine sticky-cache eviction
-                # ([TMPRL1100]). The payload-pure schedule_flush gate only skips costs-only
-                # LIVE runs, where the buffer is deterministically empty (see the tracing
-                # setup block). The activity no-ops on an empty list either way.
+                # (emit_graph_events, a payload field). It must NOT be gated on the buffer
+                # CONTENT: anything written into the buffer from outside the workflow
+                # thread would not be re-written on replay (activities do not re-execute),
+                # so a content-gated schedule recorded in history could vanish from the
+                # replayed command stream after a routine sticky-cache eviction
+                # ([TMPRL1100]). The payload-pure schedule_flush gate only skips
+                # graph-events-off runs, where the buffer is deterministically empty (see
+                # the tracing setup block). The activity no-ops on an empty list either way.
                 if schedule_flush:
                     try:
                         await workflow.execute_activity(
@@ -291,11 +293,11 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         # Best-effort: trace-event flush in the finally block must never fail the workflow — log and continue.
                         workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
                 elif buffered_events:
-                    # Tripwire, not a guard: the costs-only-LIVE buffer is deterministically
+                    # Tripwire, not a guard: with graph events off the buffer is deterministically
                     # empty by the invariant above, so this branch is unreachable today. If a
                     # future inline emission path breaks that invariant, these events would be
                     # silently discarded — turn that into a log line instead.
-                    workflow_log.warning(f"Discarding {len(buffered_events)} buffered trace events: flush skipped by the costs-only LIVE gate")
+                    workflow_log.warning(f"Discarding {len(buffered_events)} buffered trace events: flush skipped by the graph-events-off gate")
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

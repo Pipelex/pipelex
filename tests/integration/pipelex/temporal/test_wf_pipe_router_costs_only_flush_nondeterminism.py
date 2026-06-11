@@ -105,9 +105,10 @@ async def _act_llm_gen_text_reports_usage(llm_assignment: LLMAssignment) -> str:
 def live_leaf_tracing_job() -> Generator[PipeJob, None, None]:
     """LIVE-mode PipeJob for a leaf PipeLLM.
 
-    LIVE mode is required: DRY mode short-circuits the ``act_llm_gen_text`` dispatch
-    (``ContentGeneratorDry`` runs inline), so no activity-side usage emission would
-    ever populate the workflow's buffer.
+    LIVE pins the arm under test: costs-only LIVE is the shape whose flush schedule
+    used to be gated on worker-local buffer content and hung on replay. (Since the
+    unified dry run, DRY also dispatches ``act_llm_gen_text`` and emits activity-side,
+    but the regression being guarded was recorded against LIVE.)
     """
     yield from pipe_job_from_bundle(
         bundle_file=SequenceTracingTestData.BUNDLE_FILE,
