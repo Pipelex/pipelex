@@ -52,7 +52,7 @@ if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 # The MTHDS Protocol version this runtime implements (mthds-protocol.openapi.yaml).
-MTHDS_PROTOCOL_VERSION = "0.1.0"
+MTHDS_PROTOCOL_VERSION = "0.6.0"
 
 
 class PipelexValidationReport(ValidationReport):
