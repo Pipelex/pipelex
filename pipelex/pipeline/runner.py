@@ -59,7 +59,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         library_dirs: list[str] | None = None,
         bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
-        is_mock_inference: bool = False,
+        is_mock_usage: bool = False,
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
@@ -69,7 +69,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.library_dirs = library_dirs
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
-        self.is_mock_inference = is_mock_inference
+        self.is_mock_usage = is_mock_usage
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
@@ -155,7 +155,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 output_multiplicity=output_multiplicity,
                 dynamic_output_concept_ref=dynamic_output_concept_ref,
                 pipe_run_mode=self.pipe_run_mode,
-                is_mock_inference=self.is_mock_inference,
+                is_mock_usage=self.is_mock_usage,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )

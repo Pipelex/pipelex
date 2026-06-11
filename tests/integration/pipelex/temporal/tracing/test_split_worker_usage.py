@@ -69,12 +69,11 @@ class TestSplitWorkerUsageEmission:
     def live_sequence_tracing_job(self, is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
         """Like the class-scoped `sequence_tracing_job` but in LIVE mode.
 
-        DRY mode short-circuits the `act_llm_gen_text` activity dispatch
-        (`ContentGeneratorDry` reports inline inside the workflow), so the
-        cross-worker activity hop never fires. LIVE mode forces the workflow
-        to dispatch `act_llm_gen_text` directly via
-        `ContentGeneratorInWorkflow.make_llm_text`, which is what the
-        runner-side fallback pinned in this suite is supposed to exercise.
+        Since Part B, DRY also dispatches `act_llm_gen_text` (the leaf mocks
+        inside the activity) — but its synthetic usage is zero-token and
+        suppressed by design, so the *reportable*-usage assertions here need
+        LIVE mode, where the fake activity substitute synthesizes non-zero
+        usage on the runner side.
         The fake `act_llm_gen_text` substitute installed by
         `make_split_workers` returns a stub string and synthesizes the
         usage report, so no real LLM call is made.

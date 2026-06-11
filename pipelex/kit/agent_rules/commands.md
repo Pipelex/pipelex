@@ -133,6 +133,12 @@
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
 
+   - **`generate-error-pages`**: Regenerate the per-class error reference pages under `docs/errors/` — one Markdown page per `PipelexError` subclass, which is what each error's `type_uri` dereferences to. Run after adding or renaming an error class. Pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs. Also available as `make generate-error-pages` (alias `make gep`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-pages
+     ```
+
    - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
 
      ```bash

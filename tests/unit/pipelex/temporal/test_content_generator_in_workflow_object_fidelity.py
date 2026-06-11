@@ -1,25 +1,25 @@
-"""Unit tests for the ``--mock-inference`` object-mock fidelity guard on the Temporal arm (review F2).
+"""Unit tests for the dry-run object-mock fidelity guard on the Temporal arm (review F2).
 
 The activity (``act_llm_gen_object*``) builds the mock from the schema-reconstructed class, then
 ``ContentGeneratorInWorkflow.make_object`` re-validates it against the original class. When the original
 class enforces an invariant the JSON-schema round-trip cannot capture (here a custom ``@field_validator``),
-that re-validation fails — and must surface as a clear typed ``MockInferenceObjectFidelityError`` rather than
-an opaque ``pydantic.ValidationError`` mid-workflow. The guard is scoped to ``is_mock_inference`` only: a LIVE
-provider's invalid output keeps its existing ``ValidationError``. ``execute_activity`` is mocked to return the
-synthetic object, so no Temporal server (or real provider) is involved.
+that re-validation fails — and must surface as a clear typed ``DryRunObjectFidelityError`` rather than
+an opaque ``pydantic.ValidationError`` mid-workflow. The guard is armed by ``run_mode=DRY`` only: a LIVE
+provider's invalid output keeps its existing ``ValidationError``. ``execute_activity`` is mocked to return
+the synthetic object, so no Temporal server (or real provider) is involved.
 """
 
 import pytest
 from pydantic import BaseModel, ValidationError, field_validator
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.exceptions import MockInferenceObjectFidelityError
-from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.exceptions import DryRunObjectFidelityError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 
 class ConstrainedName(BaseModel):
@@ -43,11 +43,11 @@ class RawName(BaseModel):
 
 
 def _make_generator() -> ContentGeneratorInWorkflow:
-    return ContentGeneratorInWorkflow(generated_content_factory=GeneratedContentFactory(storage_provider=InMemoryStorageProvider()))
+    return ContentGeneratorInWorkflow()
 
 
-def _mock_job_metadata(*, is_mock_inference: bool) -> JobMetadata:
-    return JobMetadata(user_id="u", pipeline_run_id="run", pipe_code="my_pipe", is_mock_inference=is_mock_inference)
+def _job_metadata() -> JobMetadata:
+    return JobMetadata(user_id="u", pipeline_run_id="run", pipe_code="my_pipe")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -58,12 +58,13 @@ class TestContentGeneratorInWorkflowObjectFidelity:
         mocker.patch("temporalio.workflow.unsafe.is_replaying_history_events", return_value=False)
 
     async def test_make_object_raises_typed_error_on_fidelity_gap(self, mocker: MockerFixture) -> None:
-        """A mock-inference object whose re-validation fails surfaces MockInferenceObjectFidelityError."""
+        """A dry-built object whose re-validation fails surfaces DryRunObjectFidelityError."""
         mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock, return_value=RawName(name="bad"))
 
-        with pytest.raises(MockInferenceObjectFidelityError) as exc_info:
+        with pytest.raises(DryRunObjectFidelityError) as exc_info:
             await _make_generator().make_object(
-                job_metadata=_mock_job_metadata(is_mock_inference=True),
+                job_metadata=_job_metadata(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),
@@ -74,21 +75,23 @@ class TestContentGeneratorInWorkflowObjectFidelity:
         """The list path applies the same per-item guard."""
         mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock, return_value=[RawName(name="bad")])
 
-        with pytest.raises(MockInferenceObjectFidelityError):
+        with pytest.raises(DryRunObjectFidelityError):
             await _make_generator().make_object_list(
-                job_metadata=_mock_job_metadata(is_mock_inference=True),
+                job_metadata=_job_metadata(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
                 object_class=ConstrainedName,
                 llm_setting_for_object_list=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object_list=LLMPrompt(user_text="hello"),
             )
 
-    async def test_non_mock_run_keeps_raw_validation_error(self, mocker: MockerFixture) -> None:
-        """Outside --mock-inference the guard is inert: a re-validation failure stays a raw ValidationError."""
+    async def test_live_run_keeps_raw_validation_error(self, mocker: MockerFixture) -> None:
+        """On a LIVE run the guard is inert: a re-validation failure stays a raw ValidationError."""
         mocker.patch("temporalio.workflow.execute_activity", new_callable=mocker.AsyncMock, return_value=RawName(name="bad"))
 
         with pytest.raises(ValidationError):
             await _make_generator().make_object(
-                job_metadata=_mock_job_metadata(is_mock_inference=False),
+                job_metadata=_job_metadata(),
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 object_class=ConstrainedName,
                 llm_setting_for_object=LLMSetting(model="test-llm", temperature=0.5),
                 llm_prompt_for_object=LLMPrompt(user_text="hello"),

@@ -77,17 +77,6 @@ class JobMetadata(BaseModel):
     unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
 
-    # Interim ``--mock-inference`` trigger: a LIVE run (``run_mode`` stays LIVE, so operators
-    # dispatch normally) whose AI calls are faked at the cogt leaf instead of hitting a provider.
-    # Lives here — not on ``PipeRunParams`` — because ``PipeRunParams.run_mode`` does not reach the
-    # leaf, whereas ``JobMetadata`` rides into every assignment and crosses the Temporal boundary, so
-    # the leaf branch (``llm_generate.py``) and the activity body both see it. Single-writer:
-    # ``prepare_pipe_job`` off the CLI flag. The leaf emits synthetic *non-zero* usage so a cost
-    # report renders (unlike ``run_mode=DRY`` whose zero-token usage is suppressed) — this is the
-    # cheap, deterministic cross-worker cost-report validation affordance. See
-    # ``cogt/content_generation/dry_mock.py`` and ``wip/dry-run-refactor/followup-leaf-run-mode-mock.md``.
-    is_mock_inference: bool = False
-
     started_at: datetime | None = Field(default_factory=datetime.now)
     completed_at: datetime | None = None
 
