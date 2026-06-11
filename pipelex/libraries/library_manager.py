@@ -182,10 +182,23 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def open_fresh_library(self, library_id: str) -> Library:
-        if self._pop_and_teardown_library(library_id=library_id):
+        try:
+            removed_existing = self._pop_and_teardown_library(library_id=library_id)
+        except Exception as stale_teardown_exc:  # noqa: BLE001
+            # Best-effort: the stale library's teardown runs over arbitrary half-built state
+            # from an interrupted execution — its failure must never fail the fresh open
+            # (worker-local leak state deciding setup success would be the M1 class again).
+            # _pop_and_teardown_library forgets the entry pop-first, so the id is free either way.
             log.warning(
-                f"open_fresh_library: tore down pre-existing library '{library_id}' — leftover of an interrupted execution whose cleanup never ran"
+                f"open_fresh_library: stale teardown of pre-existing library '{library_id}' raised; "
+                f"continuing with a fresh library: {stale_teardown_exc}"
             )
+        else:
+            if removed_existing:
+                log.warning(
+                    f"open_fresh_library: tore down pre-existing library '{library_id}' — "
+                    f"leftover of an interrupted execution whose cleanup never ran"
+                )
         _library_id, the_library = self.open_library(library_id=library_id)
         return the_library
 

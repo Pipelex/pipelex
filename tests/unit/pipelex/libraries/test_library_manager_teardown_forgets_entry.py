@@ -32,6 +32,19 @@ class TestLibraryManagerTeardownForgetsEntry:
         with pytest.raises(LibraryError):
             manager.teardown(library_id=_POISONED_LIBRARY_ID)
 
+    def test_open_fresh_library_proceeds_when_stale_teardown_raises(self, mocker: MockerFixture) -> None:
+        """A raising stale teardown must not fail the fresh open itself — worker-local
+        leak state must never decide whether a fresh run's setup succeeds (M1 class).
+        """
+        manager = LibraryManager()
+        _library_id, poisoned_library = manager.open_library(library_id=_POISONED_LIBRARY_ID)
+        mocker.patch.object(Library, "teardown", side_effect=RuntimeError("boom"))
+
+        fresh_library = manager.open_fresh_library(library_id=_POISONED_LIBRARY_ID)
+
+        assert fresh_library is not poisoned_library
+        assert manager.get_library(library_id=_POISONED_LIBRARY_ID) is fresh_library
+
     def test_open_fresh_library_recovers_after_raising_teardown(self, mocker: MockerFixture) -> None:
         """A raising teardown must not poison subsequent ``open_fresh_library`` calls."""
         manager = LibraryManager()

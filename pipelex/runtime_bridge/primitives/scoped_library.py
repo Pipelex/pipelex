@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 
+from pipelex import log
 from pipelex.hub import get_library_manager, scoped_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 
@@ -54,4 +55,11 @@ def scoped_library_for_crate(library_crate: LibraryCrate | None, library_id_pref
             yield library_id
     finally:
         if library_opened:
-            library_manager.teardown(library_id=library_id)
+            try:
+                library_manager.teardown(library_id=library_id)
+            except Exception as teardown_exc:  # noqa: BLE001
+                # Best-effort: teardown in the finally must neither mask the body's in-flight
+                # exception nor fail an otherwise-successful call. LibraryManager forgets the
+                # entry pop-first even when the library's own teardown raises, so no poisoned
+                # state remains.
+                log.warning(f"scoped_library_for_crate: failed to tear down scoped library '{library_id}': {teardown_exc}")
