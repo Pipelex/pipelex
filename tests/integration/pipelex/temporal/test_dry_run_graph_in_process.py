@@ -27,7 +27,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import clear_current_library, get_library_manager, get_pipelex_hub, get_required_pipe
+from pipelex.hub import get_library_manager, get_pipelex_hub, get_required_pipe, scoped_current_library
 from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
@@ -60,13 +60,15 @@ class TestDryRunGraphInProcess:
 
     async def _run_in_process_graph_dry_run(self, library_id: str) -> GraphSpec:
         mthds_content = Path(PipeParallelTemporalTestData.BUNDLE_FILE).read_text(encoding="utf-8")
-        acquire_library(library_id=library_id, mthds_contents=[mthds_content])
-        try:
-            main_pipe = get_required_pipe(pipe_code=_PARALLEL_MAIN_PIPE_REF)
-            return await dry_run_pipe_in_process(pipe=main_pipe, library_id=library_id)
-        finally:
-            get_library_manager().teardown(library_id=library_id)
-            clear_current_library()
+        # scoped_current_library restores any outer current-library binding on exit instead of
+        # clobbering it (acquire_library sets the same id internally; the scope owns the restore).
+        with scoped_current_library(library_id):
+            acquire_library(library_id=library_id, mthds_contents=[mthds_content])
+            try:
+                main_pipe = get_required_pipe(pipe_code=_PARALLEL_MAIN_PIPE_REF)
+                return await dry_run_pipe_in_process(pipe=main_pipe, library_id=library_id)
+            finally:
+                get_library_manager().teardown(library_id=library_id)
 
     async def test_graph_dry_run_zero_dispatch_in_memory(self, mocker: MockerFixture) -> None:
         self._assert_temporal_hub_preconditions()

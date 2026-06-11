@@ -34,7 +34,7 @@ DEFAULT_GRAPH_OUT = "/tmp/tier2d-graph-spec.json"  # noqa: S108
 
 
 async def submit(bundle: str, pipe_code: str | None, allow_signatures: bool, graph_out: str) -> int:
-    bundle_content = Path(bundle).read_text(encoding="utf-8")
+    bundle_content = Path(bundle).expanduser().read_text(encoding="utf-8")
     arg = DryValidateArg(
         mthds_contents=[bundle_content],
         allow_signatures=allow_signatures,
@@ -58,7 +58,7 @@ async def submit(bundle: str, pipe_code: str | None, allow_signatures: bool, gra
     if result.graph_spec is None:
         print("GRAPH: None (best-effort — validation still succeeded)")
     else:
-        graph_path = Path(graph_out)
+        graph_path = Path(graph_out).expanduser()
         graph_path.write_text(result.graph_spec.model_dump_json(indent=2), encoding="utf-8")
         print(f"GRAPH: graph_id={result.graph_spec.graph_id} nodes={len(result.graph_spec.nodes)} edges={len(result.graph_spec.edges)}")
         print(f"GRAPH JSON written to {graph_path}")
