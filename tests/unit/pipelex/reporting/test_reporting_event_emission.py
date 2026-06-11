@@ -219,6 +219,29 @@ class TestReportingEventEmission:
         assert events_b[0].workflow_id == "wf_b"
         assert events_b[0].pipeline_run_id == "run_b"
 
+    def test_set_event_log_silently_overwrites_existing_key(self) -> None:
+        """Re-registering a context key must replace, never raise — the silent overwrite is
+        the load-bearing self-heal for contexts leaked by a prior interrupted execution
+        (see the contract comment on ``ReportingManager.set_event_log``).
+        """
+        stale_log = InMemoryEventLog()
+        fresh_log = InMemoryEventLog()
+        manager = ReportingManager()
+        manager.setup()
+
+        manager.set_event_log(context_key="wf_a", event_log=stale_log, workflow_id="wf_a", pipeline_run_id="run_stale")
+        # Same key again — must not raise, must replace.
+        manager.set_event_log(context_key="wf_a", event_log=fresh_log, workflow_id="wf_a", pipeline_run_id="run_fresh")
+
+        ctx = _make_trace_context(graph_id="run_fresh", tracer_key="wf_a")
+        manager.report_inference_job(_make_test_llm_job("run_fresh", trace_context=ctx))
+
+        fresh_events = [evt for evt in fresh_log.read_events("run_fresh") if isinstance(evt, UsageReportEvent)]
+        assert len(fresh_events) == 1, "emission must route to the newest registered log"
+        assert fresh_events[0].pipeline_run_id == "run_fresh"
+        stale_events = list(stale_log.read_events("run_stale")) + list(stale_log.read_events("run_fresh"))
+        assert len(stale_events) == 0, "the replaced log must no longer receive emissions"
+
     def test_clear_event_log_removes_only_target_context(self) -> None:
         """Clearing one context does not affect another."""
         event_log_a = InMemoryEventLog()

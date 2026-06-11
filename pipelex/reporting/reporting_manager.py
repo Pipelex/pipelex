@@ -1,3 +1,4 @@
+import sys
 from datetime import datetime, timezone
 from typing import NamedTuple, cast
 
@@ -18,6 +19,24 @@ from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
+
+
+def _is_in_temporal_activity() -> bool:
+    """True when the current call stack runs inside a Temporal activity.
+
+    ``sys.modules`` sniff instead of importing temporalio: if ``temporalio.activity`` was never
+    imported in this process, no activity context can exist — the context is set by temporalio's
+    own machinery, which requires the module to be imported. Importing it here would put the
+    entire temporalio extra (Rust bridge, protobuf) on every boot's critical path wherever the
+    ``pipelex[temporal]`` extra is installed, even for processes that never touch Temporal.
+    Worker processes are unaffected: by the time any activity runs, ``temporalio.activity`` is
+    necessarily in ``sys.modules``.
+    """
+    activity_module = sys.modules.get("temporalio.activity")
+    if activity_module is None:
+        return False
+    return cast("bool", activity_module.in_activity())
+
 
 # DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
 # ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
@@ -80,9 +99,19 @@ class ReportingManager(ReportingProtocol):
         Args:
             context_key: Unique key for this context (trace_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
-            workflow_id: Temporal workflow ID or "direct".
+            workflow_id: Run-scoped execution identity stamped into events
+                (Temporal run ID, or "direct" outside Temporal).
             pipeline_run_id: Pipeline run ID for event correlation.
         """
+        # The silent overwrite-on-existing-key below is intentional and load-bearing.
+        # Shared contract: worker-local state keyed by a deterministic per-run id must be
+        # self-healing on open/set, because a leaked entry from a prior interrupted
+        # execution remains possible (deadlock-detector thread abandonment skips finally
+        # entirely; worker kill between set and clear). The same idiom exists in
+        # LibraryManager.open_fresh_library and GraphTracerManager.open_tracer (both
+        # explicit, WARNING); here the bare dict assignment is the healing mechanism.
+        # Adding "context already exists -> raise" collision detection would reintroduce
+        # the eviction-poison class on the cost path (pre-M1 open_tracer did exactly that).
         self._event_log_contexts[context_key] = _EventLogContext(
             event_log=event_log,
             workflow_id=workflow_id,
@@ -150,13 +179,23 @@ class ReportingManager(ReportingProtocol):
         """Emit a UsageReportEvent for this job.
 
         Fast path: when set_event_log was registered for this trace context's
-        lookup_key (router process or direct mode), emit through the cached
+        lookup_key (workflow-thread or direct mode), emit through the cached
         per-context event log.
 
+        Activity path: an emission coming from inside a Temporal activity NEVER
+        takes the fast path, even when the activity runs co-located with the
+        workflow worker. The registered context there is the workflow's
+        in-sandbox BufferingEventLog, and activities do not re-execute on
+        replay — a cross-thread write into that buffer makes the workflow's
+        buffer content depend on whether activities actually ran, breaking
+        replay determinism (audit finding H1). Activities must behave
+        identically whether co-located or remote: per-process fallback.
+
         Fallback: when context lookup misses (runner process — set_event_log
-        was never called here), emit through the per-process activity event
-        log so the event still lands in the same backend partition as the
-        rest of the run. See _emit_usage_event_runner_fallback for details.
+        was never called here) or the emission comes from an activity, emit
+        through the per-process activity event log so the event still lands in
+        the same backend partition as the rest of the run. See
+        _emit_usage_event_runner_fallback for details.
         """
         trace_context = inference_job.job_metadata.trace_context
         if trace_context is None:
@@ -173,10 +212,11 @@ class ReportingManager(ReportingProtocol):
         if not trace_context.emit_usage_events:
             return
 
-        context = self._event_log_contexts.get(trace_context.lookup_key)
-        if context is not None:
-            self._emit_via_registered_context(context, trace_context, tokens_usage)
-            return
+        if not _is_in_temporal_activity():
+            context = self._event_log_contexts.get(trace_context.lookup_key)
+            if context is not None:
+                self._emit_via_registered_context(context, trace_context, tokens_usage)
+                return
 
         self._emit_usage_event_runner_fallback(
             inference_job=inference_job,
@@ -226,12 +266,15 @@ class ReportingManager(ReportingProtocol):
         tokens_usage: AnyTokensUsage,
         trace_context: TraceContext,
     ) -> None:
-        """Emit through a per-process activity event log when no context was registered.
+        """Emit through the per-process activity event log.
 
-        On the runner, ``set_event_log`` was never called — the workflow only
-        registered a context on the router process. We fall back to a
-        process-local event log built from ``tracing_config``, stamped with a
-        stable per-process writer_id of the form ``act_{pid}_{uuid8}``.
+        This is the universal path for activity-side usage emissions (audit finding
+        H1): every emission from inside a Temporal activity routes here, co-located
+        or remote alike, so the workflow's in-sandbox buffer stays a pure function
+        of inline execution. It also covers the original fallback case — a runner
+        process where ``set_event_log`` was never called. The event log is
+        process-local, built from ``tracing_config``, stamped with a stable
+        per-process writer_id of the form ``act_{pid}_{uuid8}``.
 
         Documented over-counting risk (R2): retried activities re-emit a fresh
         event at sequence N+1 instead of overwriting the original at N, so the
@@ -263,7 +306,7 @@ class ReportingManager(ReportingProtocol):
         workflow_id = trace_context.tracer_key or trace_context.graph_id
         node_id = trace_context.parent_node_id or "unknown"
 
-        ActivityEventLogCache.warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(

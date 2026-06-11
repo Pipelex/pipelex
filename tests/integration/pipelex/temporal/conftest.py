@@ -21,6 +21,7 @@ from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 from pipelex.temporal.tprl.namespace_check import RegistrationFailure, ensure_required_search_attributes_registered
 from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
+from pipelex.tracing.activity_event_log import ActivityEventLogCache
 
 TEMPORAL_SERVER_NONE = "none"
 TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
@@ -156,6 +157,23 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
 
     get_inference_manager().teardown()
     get_plugin_manager().plugin_sdk_registry.teardown()
+
+
+@pytest.fixture(autouse=True)
+def reset_activity_event_log_cache() -> Generator[None, None, None]:
+    """Reset the per-process activity event log cache around every temporal test.
+
+    ReportingManager routes every activity-side usage emission through the per-process
+    fallback (even co-located activities — see audit finding H1), and the fallback's
+    event log is process-cached on ``ActivityEventLogCache`` with the traces_dir it was
+    first built with. Without this reset, a cache created by an earlier test would keep
+    writing into that test's directory and the current test's events would silently
+    land elsewhere. Hoisted to this conftest because any temporal test whose activities
+    report usage engages the cache, not just the ones under ``tracing/``.
+    """
+    ActivityEventLogCache.reset_for_tests()
+    yield
+    ActivityEventLogCache.reset_for_tests()
 
 
 @pytest_asyncio.fixture(scope="session")  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

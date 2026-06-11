@@ -31,6 +31,17 @@ class LibraryManagerAbstract(ABC):
         """Open a library with the given library_id. Creates it if it doesn't exist. If no library_id is provided, it creates one."""
 
     @abstractmethod
+    def open_fresh_library(self, library_id: str) -> "Library":
+        """Open a library guaranteed to be empty, tearing down any pre-existing library under this id.
+
+        For callers that reuse a deterministic library_id across executions (e.g. a Temporal
+        workflow keyed by its workflow id): a pre-existing library under such an id can only be
+        the leftover of an interrupted predecessor execution whose cleanup never ran. Reusing it
+        is poison — its crate fingerprints would dedup-skip a fresh crate load while a freshly
+        attached ClassRegistry no longer holds the crate's dynamic classes.
+        """
+
+    @abstractmethod
     def get_library(self, library_id: str) -> "Library":
         """Get the Library object for a specific library_id."""
 

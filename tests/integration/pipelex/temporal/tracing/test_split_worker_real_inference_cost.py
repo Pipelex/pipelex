@@ -8,10 +8,10 @@ eyeballing. This test closes that blind spot end-to-end.
 
 It is marked ``inference``/``llm`` so the default (no-spend) lanes skip it; run
 it explicitly when validating real-inference cost capture in distributed mode.
-The runner activity clears the in-process event-log context cache (cold-runner
-simulation) and then runs the genuine ``llm_gen_text`` — so the real LLM call
-happens on the runner queue and its usage report takes the fallback path, just
-as a physically separate runner process would.
+The runner activity runs the genuine ``llm_gen_text`` — the real LLM call happens
+on the runner queue and its usage report takes the per-process activity event log
+unconditionally (in-activity emissions never touch a workflow's registered
+context), just as a physically separate runner process would.
 """
 
 import uuid
@@ -28,14 +28,11 @@ from pipelex.cogt.content_generation.llm_generate import llm_gen_text
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
-from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
@@ -50,15 +47,14 @@ if TYPE_CHECKING:
 
 @activity.defn(name="act_llm_gen_text")
 async def _real_runner_act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    """Cold-runner real-inference substitute: clear contexts, then run the genuine LLM call.
+    """Real-inference substitute: run the genuine LLM call from the activity.
 
-    Clearing ``_event_log_contexts`` makes the synchronous usage report take the runner-side
-    fallback (the router's registered context lives in the same process during a single-process
-    test); ``llm_gen_text`` performs the real provider call so the captured token counts are real.
+    The synchronous usage report takes the per-process activity event log
+    unconditionally — ``_emit_usage_event`` checks ``_is_in_temporal_activity()``
+    before any context lookup, so the router's registered context (which lives in
+    the same process during a single-process test) is never touched; ``llm_gen_text``
+    performs the real provider call so the captured token counts are real.
     """
-    delegate = get_report_delegate()
-    if isinstance(delegate, ReportingManager):
-        delegate._event_log_contexts.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
     return await llm_gen_text(llm_assignment=llm_assignment)
 
 
@@ -94,12 +90,6 @@ class TestSplitWorkerRealInferenceCost:
             worker_config.activity_queues.pop(activity_name, None)
         else:
             worker_config.activity_queues[activity_name] = original_entry
-
-    @pytest.fixture(autouse=True)
-    def reset_activity_event_log(self) -> Generator[None, None, None]:
-        ActivityEventLogCache.reset_for_tests()
-        yield
-        ActivityEventLogCache.reset_for_tests()
 
     async def test_real_provider_usage_aggregates_to_nonzero_cost(
         self,
