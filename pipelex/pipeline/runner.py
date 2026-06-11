@@ -5,6 +5,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from mthds.client.exceptions import PipelineRequestError
 from mthds.client.pipeline import RunState
 from mthds.client.protocol import MTHDSProtocol
 from mthds.client.protocol_models import ModelCategory as MthdsModelCategory
@@ -96,6 +97,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
+        extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipelexRunResult:
         """Execute a pipeline and wait for its completion.
@@ -126,6 +128,12 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             Output multiplicity specification.
         dynamic_output_concept_ref:
             Override the dynamic output concept ref.
+        extra:
+            Rejected — the local runtime defines no extension args. Extension
+            args are server-specific; pass them to the server that defines them.
+        delivery_assignment:
+            Internal delivery hook used by the API layer (in-process, not a
+            wire extension).
 
         Returns:
         -------
@@ -136,6 +144,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             ``graph_spec``.
 
         """
+        if extra:
+            msg = f"The local runtime defines no extension args; got {sorted(extra)}."
+            raise PipelineRequestError(msg)
+
         created_at = datetime.now(timezone.utc).isoformat()
 
         # Use provided config or get default
@@ -268,14 +280,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         pipeline_run_id: str | None = None,
-        callback_urls: list[str] | None = None,
-        method_id: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> StartAck[PipeOutput]:
         """Start a method asynchronously — not implemented by the local runtime.
 
-        Asynchronous fire-and-callback execution is owned by the API layer
-        (pipelex-api overrides this with Temporal dispatch) and the hosted
-        platform; locally, use `execute`.
+        Asynchronous execution is owned by the API layer (pipelex-api overrides
+        this with Temporal dispatch) and the hosted platform; locally, use
+        `execute`.
         """
         _ = (
             pipe_code,
@@ -285,8 +296,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             output_multiplicity,
             dynamic_output_concept_ref,
             pipeline_run_id,
-            callback_urls,
-            method_id,
+            extra,
         )
         msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."
         raise NotImplementedError(msg)
