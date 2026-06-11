@@ -12,15 +12,21 @@ import asyncio
 
 import pytest
 
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.hub import get_content_generator, scoped_content_generator
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+
+
+def _make_inline_generator() -> ContentGenerator:
+    return ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=InMemoryStorageProvider()))
 
 
 class TestScopedContentGenerator:
     def test_override_set_and_restored(self):
         """Inside the scope the resolved generator is the override; outside it is the hub default."""
-        generator = ContentGeneratorDry()
+        generator = _make_inline_generator()
         assert get_content_generator() is not generator
         with scoped_content_generator(generator):
             assert get_content_generator() is generator
@@ -28,8 +34,8 @@ class TestScopedContentGenerator:
 
     def test_nesting_restores_outer_override(self):
         """An inner scope shadows the outer one and restores it on exit."""
-        outer_generator = ContentGeneratorDry()
-        inner_generator = ContentGeneratorDry()
+        outer_generator = _make_inline_generator()
+        inner_generator = _make_inline_generator()
         with scoped_content_generator(outer_generator):
             assert get_content_generator() is outer_generator
             with scoped_content_generator(inner_generator):
@@ -39,7 +45,7 @@ class TestScopedContentGenerator:
 
     def test_override_restored_on_exception(self):
         """The override is restored even when the scoped block raises."""
-        generator = ContentGeneratorDry()
+        generator = _make_inline_generator()
 
         def raise_inside_scope() -> None:
             with scoped_content_generator(generator):
@@ -54,8 +60,8 @@ class TestScopedContentGenerator:
     @pytest.mark.asyncio
     async def test_concurrent_scopes_do_not_cross_contaminate(self):
         """Two concurrently-scoped tasks each see their own override (ContextVar isolation)."""
-        generator_alpha = ContentGeneratorDry()
-        generator_beta = ContentGeneratorDry()
+        generator_alpha = _make_inline_generator()
+        generator_beta = _make_inline_generator()
         observed: dict[str, ContentGeneratorProtocol] = {}
 
         async def scope_and_observe(content_generator: ContentGeneratorProtocol, key: str) -> None:

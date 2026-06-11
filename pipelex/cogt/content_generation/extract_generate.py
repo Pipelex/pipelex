@@ -1,5 +1,5 @@
 from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
-from pipelex.cogt.content_generation.exceptions import MockInferenceUnsupportedError
+from pipelex.cogt.content_generation.dry_mock import dry_extract_page_contents
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -8,9 +8,6 @@ from pipelex.hub import get_extract_worker
 
 
 async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOutput:
-    if extract_assignment.job_metadata.is_mock_inference:
-        error = MockInferenceUnsupportedError.for_operation("document extraction (PipeExtract)")
-        raise error
     extract_worker = get_extract_worker(extract_handle=extract_assignment.extract_handle)
     extract_job = ExtractJobFactory.make_extract_job(
         extract_input=extract_assignment.extract_input,
@@ -25,7 +22,14 @@ async def extract_gen_pages_and_store(
     extract_assignment: ExtractAssignment,
     generated_content_factory: GeneratedContentFactory,
 ) -> list[PageContent]:
-    """Extract pages and store extracted images, returning PageContent with URLs (no raw binary data)."""
+    """Extract pages and store extracted images, returning PageContent with URLs (no raw binary data).
+
+    The DRY branch sits at the ``*_and_store`` layer, above the raw provider leaf, so a dry run
+    performs no storage IO — see the ``dry_mock`` module docstring (eng review D10). Do not
+    "unify" it downward into the raw leaf.
+    """
+    if extract_assignment.cogt_run_params.run_mode.is_dry:
+        return dry_extract_page_contents(extract_assignment)
     extract_output = await extract_gen_pages(extract_assignment)
     return await generated_content_factory.make_page_contents(
         primary_id=extract_assignment.job_metadata.user_id,

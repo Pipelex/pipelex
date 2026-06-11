@@ -13,9 +13,9 @@ Contract asserted (TODOS.md Phase 2):
 - (b) ZERO workflows/activities are dispatched (spy on ``WorkflowExecutor.execute_workflow``);
 - (c) no file/DDB transport is touched (``make_event_log`` is forbidden — the scoped in-memory
   instance is the single transport);
-- the zero-dispatch guarantee holds with the DRY mock at the LEAF (Part-B simulation: the leaf
-  resolves its content generator through ``get_content_generator()`` instead of constructing
-  ``ContentGeneratorDry`` inline) — this is what ``scoped_content_generator`` exists for;
+- the zero-dispatch guarantee holds with the DRY mock at the LEAF (Part B): DRY routes through
+  the hub-resolved content generator, so the scoped inline generator is what keeps the run
+  in-process — this is what ``scoped_content_generator`` exists for;
 - tracer-key alignment: emit and assemble share the ``pipeline_run_id`` partition by
   construction (a divergent key would yield an empty graph, so the non-empty assertion pins it).
 """
@@ -25,18 +25,16 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import clear_current_library, get_library_manager, get_pipelex_hub, get_required_pipe
-from pipelex.pipe_operators.llm.pipe_llm import PipeLLM, PipeLLMOutput
 from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.execution_seams import acquire_library
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 from pipelex.temporal.tprl_pipe.temporal_pipe_router import TemporalPipeRouter
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+from pipelex.tracing.trace_events import UsageReportEvent
 from tests.integration.pipelex.temporal.test_data import PipeParallelTemporalTestData
 
 _PARALLEL_MAIN_PIPE_REF = f"{PipeParallelTemporalTestData.DOMAIN}.{PipeParallelTemporalTestData.PIPE_CODE}"
@@ -74,6 +72,7 @@ class TestDryRunGraphInProcess:
         self._assert_temporal_hub_preconditions()
         execute_workflow_spy = mocker.spy(WorkflowExecutor, "execute_workflow")
         self._forbid_event_log_factory(mocker)
+        emit_spy = mocker.spy(InMemoryEventLog, "emit")
 
         graph_spec = await self._run_in_process_graph_dry_run(library_id="dry_run_graph_in_process_lib")
 
@@ -88,42 +87,28 @@ class TestDryRunGraphInProcess:
         # (b) zero Temporal dispatch during the whole dry-run.
         execute_workflow_spy.assert_not_called()
 
+        # (d) usage-event isolation (pre-flight decision 3): the dry leaves report synthetic
+        # zero-token jobs, but the run's trace context has emit_usage_events=False, so no
+        # UsageReportEvent ever reaches the (scoped, in-memory) transport — nothing leaks to any
+        # ambient registry, and the events die with the run.
+        emitted_events = [call.args[1] for call in emit_spy.call_args_list]
+        assert emitted_events, "the dry-run must emit graph events through the scoped log"
+        assert not [event for event in emitted_events if isinstance(event, UsageReportEvent)]
+
     async def test_leaf_level_mock_stays_in_process(self, mocker: MockerFixture) -> None:
-        """Part-B simulation: with the DRY mock relocated to the leaf (the leaf resolves
-        ``get_content_generator()`` instead of constructing ``ContentGeneratorDry`` inline),
-        the scoped inline generator must keep the run in-process — without
-        ``scoped_content_generator`` the leaf would reach the hub's
+        """Leaf-level DRY (Part B, now the real path): DRY routes through the hub-resolved
+        generator and the cogt leaf mocks, so the scoped inline generator must keep the run
+        in-process — without ``scoped_content_generator`` the leaf would reach the hub's
         ``ContentGeneratorInWorkflow`` and try to dispatch activities.
         """
         self._assert_temporal_hub_preconditions()
         execute_workflow_spy = mocker.spy(WorkflowExecutor, "execute_workflow")
         self._forbid_event_log_factory(mocker)
-        # Future-leaf shape: DRY delegates to the hub-resolved generator (content_generator=None
-        # → get_content_generator()), exactly what Part B will do at the leaf.
-        original_live_run = PipeLLM._live_run_operator_pipe  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
-
-        async def dry_run_via_hub_generator(
-            self: PipeLLM,
-            job_metadata: JobMetadata,
-            working_memory: WorkingMemory,
-            pipe_run_params: PipeRunParams,
-            output_name: str | None = None,
-        ) -> PipeLLMOutput:
-            return await original_live_run(
-                self,
-                job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=pipe_run_params,
-                output_name=output_name,
-                content_generator=None,
-            )
-
-        mocker.patch.object(PipeLLM, "_dry_run_operator_pipe", dry_run_via_hub_generator)
-        # Prove the leaf actually used the scoped inline dry generator (not the hub default).
-        dry_text_spy = mocker.spy(ContentGeneratorDry, "make_llm_text")
+        # Prove the run actually used the scoped inline generator (not the hub default).
+        inline_text_spy = mocker.spy(ContentGenerator, "make_llm_text")
 
         graph_spec = await self._run_in_process_graph_dry_run(library_id="dry_run_graph_leaf_mock_lib")
 
         assert graph_spec.nodes
-        assert dry_text_spy.call_count >= 1
+        assert inline_text_spy.call_count >= 1
         execute_workflow_spy.assert_not_called()

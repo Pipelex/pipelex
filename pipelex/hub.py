@@ -75,6 +75,10 @@ class PipelexHub:
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
+        # Keyless boot (``Pipelex.make(needs_inference=False)``) forces every run to DRY (eng
+        # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
+        # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
+        self._is_dry_run_forced: bool = False
 
         # pipelex
         self._library_manager: LibraryManagerAbstract | None = None
@@ -182,6 +186,12 @@ class PipelexHub:
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
+
+    def set_dry_run_forced(self, is_forced: bool) -> None:
+        self._is_dry_run_forced = is_forced
+
+    def is_dry_run_forced(self) -> bool:
+        return self._is_dry_run_forced
 
     # pipelex
 
@@ -471,13 +481,13 @@ _content_generator_override: ContextVar[ContentGeneratorProtocol | None] = Conte
 def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Generator[None, None, None]:
     """Set ``content_generator`` as the active generator for the scope, then restore the prior value on exit.
 
-    Inference leaves (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeCompose) resolve
-    :func:`get_content_generator` when no explicit generator is passed; under a Temporal-enabled
-    hub that default is ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process
-    run (e.g. the dry-run/validation activity body) wraps itself in this scope with an inline
-    generator so its leaves never dispatch — regardless of where the DRY mock lives (pipe level
-    today, leaf level after Part B). ContextVar-scoped like :func:`scoped_pipe_router`, so
-    concurrent runs don't cross-contaminate.
+    Inference operators (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeStructure) resolve
+    :func:`get_content_generator`; under a Temporal-enabled hub that default is
+    ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
+    dry-run/validation activity body) wraps itself in this scope with an inline generator so its
+    leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
+    mock without dispatching and without storage IO. ContextVar-scoped like
+    :func:`scoped_pipe_router`, so concurrent runs don't cross-contaminate.
     """
     prev = _content_generator_override.get()
     _content_generator_override.set(content_generator)
@@ -485,6 +495,11 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
         yield
     finally:
         _content_generator_override.set(prev)
+
+
+def is_dry_run_forced() -> bool:
+    """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
+    return get_pipelex_hub().is_dry_run_forced()
 
 
 def get_content_generator() -> ContentGeneratorProtocol:

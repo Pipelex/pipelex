@@ -131,8 +131,7 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     # 1. Sub-pipes dispatch as child workflows (not inline in the sandbox)
     # 2. Inference calls (LLM, img_gen, etc.) dispatch as activities (not inline)
     # This mirrors what a full Temporal-enabled Pipelex.make() would set up.
-    from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory  # noqa: PLC0415
-    from pipelex.hub import get_pipelex_hub, get_storage_provider  # noqa: PLC0415
+    from pipelex.hub import get_pipelex_hub  # noqa: PLC0415
     from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
         ContentGeneratorInWorkflowFactory,
     )
@@ -141,12 +140,7 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     pipelex_hub = get_pipelex_hub()
     pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
-    generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
-    pipelex_hub.set_content_generator(
-        ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-            generated_content_factory=generated_content_factory,
-        )
-    )
+    pipelex_hub.set_content_generator(ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow())
 
     yield
     manager.teardown()

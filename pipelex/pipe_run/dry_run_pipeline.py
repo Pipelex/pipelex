@@ -4,8 +4,7 @@ Provides a single entrypoint to dry-run an entire pipeline from MTHDS content,
 producing a GraphSpec. Used by both the CLI graph commands and the API.
 """
 
-from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
@@ -15,6 +14,7 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import scoped_content_generator, scoped_event_log, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
+from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -48,7 +48,7 @@ async def dry_run_pipeline(
 
     Raises:
         PipelexInterpreterError: If content parsing fails or main_pipe is missing.
-        PipelexError: If pipeline execution does not produce a graph spec.
+        DryRunGraphNotProducedError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
     if not mthds_contents:
@@ -84,15 +84,21 @@ async def dry_run_pipeline(
         execution_config=execution_config,
         library_dirs=library_dirs or [],
     )
-    response = await runner.execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_contents=mthds_contents,
-    )
+    # This function's whole purpose is the graph, so it owns the graph transport: the scoped
+    # in-memory event log is the run's emit AND assemble channel (see hub.scoped_event_log, D1),
+    # making graph generation independent of the host's tracing_config — a host with tracing
+    # disabled (e.g. pipelex-api's /validate in direct mode) still gets its graph, and a host
+    # with a configured backend doesn't get trace files written as a side effect of validation.
+    with scoped_event_log(InMemoryEventLog()):
+        response = await runner.execute_pipeline(
+            pipe_code=pipe_code,
+            mthds_contents=mthds_contents,
+        )
     pipe_output = response.pipe_output
 
     if not pipe_output.graph_spec:
         msg = "Pipeline execution did not produce a graph spec"
-        raise PipelexError(msg)
+        raise DryRunGraphNotProducedError(msg)
 
     return pipe_output.graph_spec, pipe_code
 
@@ -109,10 +115,9 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
       (no NDJSON file, no DynamoDB round-trip); the ``GraphSpec`` rides back on ``PipeOutput``.
     - ``scoped_pipe_router(local PipeRouter)`` — nested controller sub-pipes resolve the local
       router instead of the hub's ``TemporalPipeRouter`` (mirrors ``BundleValidator``).
-    - ``scoped_content_generator(ContentGeneratorDry())`` — inference leaves resolve the inline
-      dry generator instead of the hub's ``ContentGeneratorInWorkflow``, so the in-process
-      guarantee holds regardless of where the DRY mock lives (pipe level today, leaf level after
-      Part B).
+    - ``scoped_content_generator(inline ContentGenerator)`` — inference leaves resolve an inline
+      generator instead of the hub's ``ContentGeneratorInWorkflow``, so nothing dispatches; the
+      DRY mock lives at the cogt leaf (Part B), which also skips all storage IO.
 
     The tracer is opened at ``graph_id=pipeline_run_id`` and closed by ``pipeline_run_id`` (in
     ``PipeRun.run``'s ``finally``) — emit and assemble keys are aligned by construction (D-C7).
@@ -130,7 +135,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
         The assembled GraphSpec.
 
     Raises:
-        PipelexError: If the dry-run fails or did not produce a graph spec.
+        DryRunGraphNotProducedError: If the dry-run completes without producing a graph spec.
     """
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
@@ -146,7 +151,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
     # must never outlive this call.
     pipe_router = PipeRouter(observer=ObserverNoOp())
     pipe_run = PipeRun(pipe_router=pipe_router)
-    content_generator = ContentGeneratorDry()
+    content_generator = ContentGenerator.make_inline()
 
     graph_tracer_manager = GraphTracerManager.get_or_create_instance()
     trace_context = graph_tracer_manager.open_tracer(
@@ -181,6 +186,6 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
 
     if not pipe_output.graph_spec:
         msg = f"In-process dry-run of pipe '{pipe.pipe_ref}' did not produce a graph spec"
-        raise PipelexError(msg)
+        raise DryRunGraphNotProducedError(msg)
 
     return pipe_output.graph_spec

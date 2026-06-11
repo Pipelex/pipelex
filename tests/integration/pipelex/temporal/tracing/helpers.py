@@ -1,7 +1,7 @@
 """Shared test helpers for Temporal graph tracing integration tests."""
 
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Iterable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
@@ -209,13 +209,11 @@ async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> st
     - Returns a fixed string so the calling workflow can finish without
       attempting a real LLM call.
 
-    This avoids the LIVE/DRY-mode dilemma: the existing `pipe_job_from_bundle`
-    fixture defaults to DRY mode, where the LLM activity is normally bypassed
-    by `ContentGeneratorDry` reporting inline inside the workflow. Subbing
-    `act_llm_gen_text` with this version forces the activity to fire from the
-    workflow's `start_activity` call (because we route `act_llm_gen_text` to
-    `q_runner` via `worker_config.activity_queues`), exercising the
-    cross-worker path even in DRY mode and keeping the test hermetic.
+    Note: since Part B (leaf-level dry mock), DRY mode also dispatches
+    `act_llm_gen_text` (the leaf mocks inside the activity with zero-token,
+    suppressed usage), so this substitute is what guarantees a *reportable*
+    non-zero usage event lands on the runner regardless of the fixture's run
+    mode — keeping the cross-worker assertion hermetic and deterministic.
     """
     delegate = get_report_delegate()
     if isinstance(delegate, ReportingManager):
@@ -316,3 +314,30 @@ async def make_split_workers(
         ),
     ):
         yield
+
+
+async def collect_scheduled_activity_counts(temporal_client: TemporalClient, workflow_id: str) -> "Counter[str]":
+    """Walk a workflow tree (parent + child workflows, pinned by run_id) and count every scheduled activity.
+
+    Counts ``ActivityTaskScheduled`` events by activity-type name across the parent history and every
+    child workflow it started — the leaf-dispatch evidence Tier 17 asserts on. Children are fetched by
+    ``(workflow_id, run_id)`` so a retried/continued run under the same id cannot substitute a history
+    the parent never observed.
+    """
+    scheduled_counts: Counter[str] = Counter()
+    pending_runs: list[tuple[str, str | None]] = [(workflow_id, None)]
+    visited_runs: set[tuple[str, str | None]] = set()
+    while pending_runs:
+        current_run = pending_runs.pop()
+        if current_run in visited_runs:
+            continue
+        visited_runs.add(current_run)
+        current_id, current_run_id = current_run
+        history = await temporal_client.get_workflow_handle(current_id, run_id=current_run_id).fetch_history()
+        for event in history.events:
+            if event.HasField("activity_task_scheduled_event_attributes"):
+                scheduled_counts[event.activity_task_scheduled_event_attributes.activity_type.name] += 1
+            elif event.HasField("child_workflow_execution_started_event_attributes"):
+                child_execution = event.child_workflow_execution_started_event_attributes.workflow_execution
+                pending_runs.append((child_execution.workflow_id, child_execution.run_id))
+    return scheduled_counts

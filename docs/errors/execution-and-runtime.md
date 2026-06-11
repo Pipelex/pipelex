@@ -16,6 +16,7 @@ own page. Classes are grouped by subsystem.
 - [`BatchParamsError`](batch-params-error.md) — Batch params
 - [`DeliveryError`](delivery-error.md) — Delivery
 - [`DryRunError`](dry-run-error.md) — Dry run
+- [`DryRunGraphNotProducedError`](dry-run-graph-not-produced-error.md) — Dry run graph not produced
 - [`PipeJobError`](pipe-job-error.md) — Pipe job
 - [`PipeRouterError`](pipe-router-error.md) — Pipe router
 - [`PipeRunError`](pipe-run-error.md) — Pipe run
