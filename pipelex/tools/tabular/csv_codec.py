@@ -46,7 +46,7 @@ DEFAULT_ENCODING = "utf-8"
 DEFAULT_READ_ENCODING = "utf-8-sig"
 
 _NONE_TYPE = type(None)
-_UNION_TYPE = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
+_UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
 # Scalar python types a CSV cell can round-trip. `bool` precedes `int` semantically
 # (bool is an int subclass) but membership here is by identity, so both are accepted.
 _FLAT_SCALAR_TYPES: frozenset[type] = frozenset({str, int, float, bool, date, datetime})
@@ -65,7 +65,7 @@ def _is_flat_annotation(annotation: Any) -> bool:
     containers, nested models, and ``Any``.
     """
     origin = get_origin(annotation)
-    if origin in {Union, _UNION_TYPE}:
+    if origin in {Union, _UnionType}:
         non_none_args = [arg for arg in get_args(annotation) if arg is not _NONE_TYPE]
         if len(non_none_args) != 1:
             # A genuine multi-type union (e.g. int | str) is not flat.
@@ -85,7 +85,7 @@ def _is_flat_annotation(annotation: Any) -> bool:
 
 def _annotation_allows_none(annotation: Any) -> bool:
     """Whether a field annotation accepts ``None`` (an ``Optional`` / ``... | None`` field)."""
-    if get_origin(annotation) in {Union, _UNION_TYPE}:
+    if get_origin(annotation) in {Union, _UnionType}:
         return any(arg is _NONE_TYPE for arg in get_args(annotation))
     return annotation is _NONE_TYPE
 

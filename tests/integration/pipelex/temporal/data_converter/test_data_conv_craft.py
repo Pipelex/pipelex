@@ -2,8 +2,10 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_model_deck
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.temporal_data_converter import BaseModelPayloadConverter
 from pipelex.temporal.test_extras.temporal_registry_test_models import Person
@@ -22,6 +24,7 @@ class TestDataConverterForCrafting:
         llm_prompt_for_text = LLMPrompt(user_text=user_text)
         llm_assignment = LLMAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
             llm_setting=llm_setting,
             llm_prompt=llm_prompt_for_text,
         )
@@ -33,6 +36,8 @@ class TestDataConverterForCrafting:
         pretty_print(restored, title="restored LLMAssignment")
         assert restored
         assert llm_assignment == restored
+        # The run-mode contract must survive the wire: the leaf inside the activity keys on it.
+        assert restored.cogt_run_params.run_mode.is_dry
 
     def test_data_converter_for_make_object(
         self,
@@ -43,6 +48,7 @@ class TestDataConverterForCrafting:
         llm_prompt_for_object = LLMPrompt(user_text=user_text)
         llm_assignment_for_object = LLMAssignment(
             job_metadata=JobMetadata(user_id="test", pipeline_run_id="test"),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_setting=llm_setting_for_object,
             llm_prompt=llm_prompt_for_object,
         )

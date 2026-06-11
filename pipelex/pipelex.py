@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -367,18 +366,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
+        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
+        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
+        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
+        self.pipelex_hub.set_dry_run_forced(not needs_inference)
         if content_generator is None:
-            if not needs_inference:
-                content_generator = ContentGeneratorDry()
-            elif get_config().temporal.is_enabled:
+            if get_config().temporal.is_enabled:
                 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
                     ContentGeneratorInWorkflowFactory,
                 )
 
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                    generated_content_factory=generated_content_factory,
-                )
+                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
@@ -538,10 +538,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            needs_inference: When False, disables inference functionality by using a mock
-                content generator and loading backends leniently (skipping those with missing
-                credentials). This skips gateway terms check and model deck validation.
-                Useful for commands like validate/show that don't call inference APIs.
+            needs_inference: When False, forces every run THIS process initiates to DRY mode
+                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
+                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (skipping those with missing credentials). This skips gateway terms check and model
+                deck validation. Useful for commands like validate/show that don't call inference
+                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
+                not constrain work this process executes as a Temporal worker.
             temporal_enabled: When provided, overrides the temporal.is_enabled config value.
                 True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference

@@ -15,11 +15,10 @@ proves the routing feature works as advertised when operators actually configure
 it: each activity (and, in Tier 10b, each model handle) lands on its dedicated
 worker pool, never on the fallback runner.
 
-Step 8 is **live-only**. The routing decision happens in the workflow regardless
-of dry/live, but the only way to prove a routed activity wasn't picked up by the
-wrong worker is to actually dispatch it and watch where it executes. Dry-run
-short-circuits LLM calls inside the workflow process (`ContentGeneratorDry`),
-so no `act_*` ever gets scheduled and the routing assertion is meaningless.
+Step 8 is **live-only** for its spend-bearing assertions. Since Part B, dry-run
+also dispatches `act_*` activities (the cogt leaf mocks inside them), so routing
+CAN be observed dry — but this battery predates that and its arms assert on real
+provider effects (model handles, spend), so run it live as written.
 
 **Step 8.0 — Preflight + setup**
 
