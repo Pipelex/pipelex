@@ -2525,6 +2525,8 @@ List specific pipe codes in `pipelex.dry_run_config.allowed_to_fail_pipes` so dr
 
 For configuration details, see [Dry Run Configuration](../configuration/config-pipeline-validation/dry-run-config.md).
 
+Dry run is one of two run modes (live, dry run), each of which works in-process or distributed on Temporal — see [Run Modes & Backends](../building-methods/pipes/run-modes-and-backends.md) for the full matrix.
+
 
 ## Telemetry & Observability
 
@@ -4953,7 +4955,7 @@ These three components together form what we call a **Pipelex Bundle** (the cont
 
 ## Understanding Library Scope
 
-When you execute pipelines using `execute_pipeline` or `start_pipeline`, a library is created to hold all the necessary definitions. This library:
+When you execute pipelines using `execute` or `start`, a library is created to hold all the necessary definitions. This library:
 
 - Contains the pipes and concepts available for execution
 - Provides isolation between different pipeline runs when using different library IDs
@@ -4979,17 +4981,18 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 
 Currently, all libraries are **local**, meaning they are loaded from:
 
-- Directories on your filesystem (using `library_dirs` parameter)
-- MTHDS content strings (using `mthds_content` parameter)
+- Directories on your filesystem (using the `library_dirs` constructor parameter)
+- MTHDS content strings (using the `mthds_contents` parameter)
 - The current working directory (default behavior)
 
 ```python
 # Loading from local directories
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_dirs=["./pipelines", "./shared_pipes"])
+response = await runner.execute(
     pipe_code="generate_tagline",
-    library_dirs=["./pipelines", "./shared_pipes"],
     inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 ### Remote Libraries (Coming Soon)
@@ -5004,20 +5007,20 @@ In the future, you'll be able to import and use remote libraries, enabling:
 
 ### 1. Library Creation
 
-When you call `execute_pipeline` or `start_pipeline`, a library is created with a unique `library_id`:
+When the runner executes a method, a library is created with a unique `library_id`. Pipelex-specific configuration (library id, directories) is provided on the `PipelexMTHDSProtocol` constructor:
 
 ```python
 # Explicit library ID
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_id="my_custom_library")
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_id="my_custom_library",  # Custom ID
     inputs={...},
 )
 
 # Automatic library ID (defaults to pipeline_run_id)
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="my_pipe",
-    # library_id not specified - uses pipeline_run_id
     inputs={...},
 )
 ```
@@ -5030,9 +5033,9 @@ The library is populated based on the parameters you provide:
 
 ```python
 # Loads all .mthds files from specified directories
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_dirs=["./pipelines"])
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_dirs=["./pipelines"],
     inputs={...},
 )
 ```
@@ -5054,8 +5057,9 @@ output = "Tagline"
 prompt = "Generate a tagline for: @desc"
 """
 
-pipe_output = await execute_pipeline(
-    mthds_content=mthds_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[mthds_content],
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -5075,18 +5079,16 @@ You can manage multiple libraries simultaneously by using different `library_id`
 
 ```python
 # Library for marketing pipelines
-marketing_output = await execute_pipeline(
+marketing_runner = PipelexMTHDSProtocol(library_id="marketing_lib", library_dirs=["./marketing_pipes"])
+marketing_response = await marketing_runner.execute(
     pipe_code="generate_tagline",
-    library_id="marketing_lib",
-    library_dirs=["./marketing_pipes"],
     inputs={...},
 )
 
 # Library for analytics pipelines
-analytics_output = await execute_pipeline(
+analytics_runner = PipelexMTHDSProtocol(library_id="analytics_lib", library_dirs=["./analytics_pipes"])
+analytics_response = await analytics_runner.execute(
     pipe_code="analyze_data",
-    library_id="analytics_lib",
-    library_dirs=["./analytics_pipes"],
     inputs={...},
 )
 ```
@@ -5097,23 +5099,24 @@ analytics_output = await execute_pipeline(
 
 ```python
 # Good: Explicit ID for maintaining state
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_id="app_library")
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_id="app_library",
     inputs={...},
 )
 ```
 
 ### 2. Use MTHDS Content for Dynamic Pipelines
 
-When generating or modifying pipelines dynamically, use `mthds_content`:
+When generating or modifying pipelines dynamically, use `mthds_contents`:
 
 ```python
 # Generate MTHDS content dynamically
 mthds_content = generate_custom_pipeline(user_requirements)
 
-pipe_output = await execute_pipeline(
-    mthds_content=mthds_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[mthds_content],
     inputs={...},
 )
 ```
@@ -5125,21 +5128,17 @@ A temporary library will be created holding the Pipelex bundle, and the library_
 If multiple pipeline runs should share the same library context:
 
 ```python
-library_id = "shared_context"
+runner = PipelexMTHDSProtocol(library_id="shared_context", library_dirs=["./pipes"])
 
 # First execution
-output1 = await execute_pipeline(
+response1 = await runner.execute(
     pipe_code="pipe1",
-    library_id=library_id,
-    library_dirs=["./pipes"],
     inputs={...},
 )
 
 # Second execution with same library
-output2 = await execute_pipeline(
+response2 = await runner.execute(
     pipe_code="pipe2",
-    library_id=library_id,
-    library_dirs=["./pipes"],
     inputs={...},
 )
 ```
@@ -5354,15 +5353,15 @@ pipelex run bundle path/to/my_bundle.mthds --inputs inputs.json
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 Pipelex.make()
 
 # Run the bundle's main_pipe
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     inputs={
         "my_input": {
             "concept": "Text",
@@ -5373,10 +5372,10 @@ response = await runner.execute_pipeline(
 pipe_output = response.pipe_output
 
 # Or run a specific pipe from the bundle
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_specific_pipe",
     inputs={...},
 )
@@ -5406,13 +5405,13 @@ When executing pipelines programmatically, Pipelex can load pipe **libraries** -
 
 #### Library Parameters
 
-When using `PipelexRunner`, you can control library behavior with these parameters:
+When using `PipelexMTHDSProtocol`, you can control library behavior with these parameters:
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
 - **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
-- **`mthds_content`**: When provided to `PipelexRunner.execute_pipeline()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_contents`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -5431,14 +5430,14 @@ This approach loads pipe definitions from directories and executes a specific pi
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # First, initialize Pipelex (this loads all pipeline definitions)
 Pipelex.make()
 
 # Execute the pipeline and wait for the result
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -5454,10 +5453,10 @@ pipe_output = response.pipe_output
 
 ```python
 # Load pipes from specific directories
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_dirs=["./pipelines", "./shared_pipes"],
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -5473,11 +5472,11 @@ pipe_output = response.pipe_output
 
 ```python
 # Use a custom library ID for managing multiple library instances
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_id="my_marketing_library",
     library_dirs=["./marketing_pipes"],
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -5494,11 +5493,11 @@ pipe_output = response.pipe_output
 
 ### Using MTHDS Content Directly
 
-You can directly pass MTHDS content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
+You can directly pass MTHDS content as a string to `PipelexMTHDSProtocol.execute()`, useful for dynamic pipeline execution without file-based definitions.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 my_pipe_content = """
 domain = "marketing"
@@ -5523,9 +5522,9 @@ Generate a catchy tagline based on the above description. The tagline should be 
 
 Pipelex.make()
 
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
-    mthds_content=my_pipe_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[my_pipe_content],
     inputs={
         "description": {
             "concept": "ProductDescription",
@@ -5553,9 +5552,101 @@ Pipelex has a REST API for executing pipelines. See more about it [here](https:/
 
 ## Background Execution
 
-<!-- start_pipeline exists on PipelexRunner as a protocol stub (raises NotImplementedError).
-     The public entry point is execute_pipeline(). Keep this note so reviewers don't flag the stub as contradictory. -->
-The public Python entry point is `PipelexRunner.execute_pipeline()`. The older standalone `start_pipeline` function is no longer a documented entry point.
+<!-- start exists on PipelexMTHDSProtocol as a protocol stub (raises NotImplementedError).
+     The public entry point is execute(). Keep this note so reviewers don't flag the stub as contradictory. -->
+The public Python entry point is `PipelexMTHDSProtocol.execute()`. The older standalone `start` function is no longer a documented entry point.
+
+---
+
+## Run Modes & Backends
+
+Every execution method above accepts a run mode (live or dry run) and a backend (in-process or Temporal). See [Run Modes & Backends](run-modes-and-backends.md) for the full matrix and when to use each combination.
+
+
+## Run Modes & Backends
+
+# Run Modes & Backends
+
+Pipelex separates **what the inference leaves do** (the run mode) from **where the work executes** (the backend). The two axes are independent: any run mode works on any backend, because the run mode travels with every inference job and is honored at the leaf — the last stop before a provider would actually be called.
+
+## Axis 1: Run Mode
+
+| Run mode | CLI trigger | Python trigger | AI providers | Usage & cost report |
+|---|---|---|---|---|
+| **Live** (default) | — | — | Real calls | Real usage, report rendered |
+| **Dry run** | `--dry-run` | `pipe_run_mode=PipeRunMode.DRY` | Never called — leaves build mocks | Zero tokens, report suppressed |
+
+**Live** runs call the configured AI providers for real: real cost, real latency, and storage IO for generated images and extracted pages.
+
+**Dry run** exercises the full pipeline — controllers, working memory, data flow, execution-graph tracing — with no AI cost. Each inference leaf branches to a format-compliant mock instead of calling the provider (see [Dry Run Mock Generation](../../under-the-hood/dry-run-mock-generation.md)). A dry run needs no API keys, performs no storage IO (mocked images and pages never touch the storage provider), reports zero-token usage, and suppresses the end-of-run cost report. Add `--mock-inputs` to also synthesize any missing required inputs (it requires `--dry-run`).
+
+## Axis 2: Backend
+
+| Backend | Trigger | What runs where |
+|---|---|---|
+| **Direct** (default) | — | Everything in your process |
+| **Temporal** | `--temporal`, or config `[temporal] is_enabled = true` | Controllers as child workflows, inference leaves as activities on workers |
+
+The run mode rides across the wire with every inference job, so the backend never changes *what* a leaf does — only *where* it does it. In particular, when you run a **pipeline** in dry mode on Temporal, the real inference activities are still dispatched and mock **inside** them on the worker. That's by design: it lets you test the entire distribution machinery — dispatch, scheduling, serialization, task-queue routing, cross-worker graph tracing — with zero AI spend and no credentials.
+
+One job type deliberately opts out of this fan-out: a **validation sweep** submitted through the runner API runs as a single in-process activity instead of dispatching nested activities — see [Validation Sweeps](#validation-sweeps) below for how that fits the model.
+
+## The Matrix
+
+All cells below describe **pipeline runs** — `pipelex run ...` or `PipelexRunner.execute_pipeline()`. Validation sweeps have their own distribution shape, covered in the next section.
+
+| Run mode \ Backend | Direct (in-process) | Temporal |
+|---|---|---|
+| **Live** | Standard local run. | Durable distributed run; real inference executes on workers. |
+| **Dry run** | Leaves mock inline. Validates pipeline logic and data flow at zero cost. | Activities are genuinely dispatched and mock inside the worker — proves out the distribution machinery with no API keys, no spend, no storage IO. |
+
+```bash
+# Live + direct (the default)
+pipelex run bundle my_bundle.mthds
+
+# Dry run + direct
+pipelex run bundle my_bundle.mthds --dry-run --mock-inputs
+
+# Live + Temporal
+pipelex run bundle my_bundle.mthds --temporal
+
+# Dry run + Temporal — dispatches real activities, mocks inside them
+pipelex run bundle my_bundle.mthds --temporal --dry-run --mock-inputs
+```
+
+From Python, the same knobs live on the runner — the backend comes from config:
+
+```python
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexRunner
+
+runner = PipelexRunner(
+    bundle_uri="path/to/my_bundle.mthds",
+    pipe_run_mode=PipeRunMode.DRY,
+)
+response = await runner.execute_pipeline()
+```
+
+## Validation Sweeps
+
+`pipelex validate` (see the [validate commands](../../tools/cli/validate.md)) combines static validation with a dry run of every pipe. It relates to the matrix in two specific ways:
+
+- **The CLI sweep always runs in-process**, even when Temporal is enabled. The `--temporal` flag on `pipelex validate` exists precisely to verify that: it flips the boot config so you can confirm a validation sweep does not dispatch anything under a Temporal-enabled setup.
+- **The runner API's `/validate` route ships the sweep to a worker — as one activity**: with Temporal enabled, it offloads the *whole* sweep as a single activity (`act_dry_validate`, wrapped in the `WfDryValidate` workflow). Inside that activity, the pipe router and the content generator are scoped to their in-process variants, so nothing nested is dispatched: every dry run in the sweep behaves exactly like the dry × direct cell of the matrix, just hosted on a worker instead of your machine. The per-pipe statuses plus the execution graph come back in one round-trip. See [Temporal integration](../../under-the-hood/temporal-integration.md) for the mechanics.
+
+This is not a contradiction of "the run mode never changes the backend" — it's the same leaf-mock foundation with a different *backend choice* for the nested work. A `--temporal --dry-run` pipeline run picks the Temporal backend all the way down, fanning out for real to test the distribution machinery. A Temporal validation sweep picks the Temporal backend for exactly one hop (get the sweep onto a worker) and the in-process backend for everything inside, because its goal is a cheap interactive answer, not distribution testing. Two deliberate opposites built from the same parts.
+
+## Forced Dry Mode
+
+When a process boots without inference configured — `Pipelex.make(needs_inference=False)`, e.g. no AI provider set up — every run that process initiates is forced to dry-run mode. This is a property of the run, not of the backend: under a Temporal-enabled boot the forced-dry run still dispatches activities and mocks inside them, like any other dry run. A warning logs whenever a live-requested run is forced dry.
+
+## See Also
+
+- [Validation & Dry Run](../../features/validation-dry-run.md) — feature overview
+- [Dry Run Configuration](../../configuration/config-pipeline-validation/dry-run-config.md) — mock list sizes, allowed-to-fail pipes
+- [Cost Tracking & Reporting](../../features/cost-tracking.md) — what the usage reports contain
+- [Distributed Execution](../../distributed-execution/index.md) — running on Temporal
+- [Dry Run Mock Generation](../../under-the-hood/dry-run-mock-generation.md) — how format-compliant mocks are built
 
 
 ## Providing Inputs to Pipelines
@@ -5941,7 +6032,7 @@ from pipelex.core.stuffs.stuff import DictStuff
 client = PipelexClient(api_token="YOUR_API_KEY")
 
 # Using DictStuff instance with dict content
-response = await client.execute_pipeline(
+response = await client.execute(
     pipe_code="process_invoice",
     inputs={
         "invoice": DictStuff(
@@ -5956,7 +6047,7 @@ response = await client.execute_pipeline(
 )
 
 # Using DictStuff instance with list of dicts
-response = await client.execute_pipeline(
+response = await client.execute(
     pipe_code="process_invoices",
     inputs={
         "invoices": DictStuff(
@@ -6288,10 +6379,12 @@ The **main_stuff** is the final output produced by the last pipe in your pipelin
 When you execute a pipeline, you receive a `PipeOutput` object:
 
 ```python
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="process_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 The `PipeOutput` object provides methods to extract and work with the main output.
@@ -6307,10 +6400,12 @@ If the output concept was defined as a Python class (inheriting from `Structured
 ```python
 from my_project.finance.finance_struct import Invoice
 
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 
 # Extract with type safety
 invoice = pipe_output.main_stuff_as(content_type=Invoice)
@@ -6322,10 +6417,12 @@ invoice = pipe_output.main_stuff_as(content_type=Invoice)
 If the output concept was defined with [inline structures](../concepts/inline-structures.md) directly in the `.mthds` file, the generated class is not importable. Use the `PipeOutput` accessor methods instead:
 
 ```python
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 
 # Access as dictionary-like structure
 main_stuff = pipe_output.main_stuff
@@ -6828,11 +6925,11 @@ Use fixed input multiplicity when:
 When a pipe produces multiple outputs, Pipelex automatically wraps them in a `ListContent` container. This container maintains the type information:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Execute a pipe with multiple outputs
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_line_items",
     inputs={"invoice_text": "Your invoice text here..."}
 )
@@ -6850,11 +6947,11 @@ line_items_container = pipe_output.main_stuff_as_list(item_type=LineItem)
 Similarly, when providing multiple inputs, you can use lists:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.core.stuffs.text_content import TextContent
 
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="summarize_all_documents",
     inputs={
         "documents": [
@@ -10793,7 +10890,6 @@ The `DryRunConfig` class controls how Pipelex behaves during dry runs.
 
 ```python
 class DryRunConfig(ConfigModel):
-    apply_to_jinja2_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
     nb_extract_pages: int
@@ -10803,7 +10899,6 @@ class DryRunConfig(ConfigModel):
 
 ### Fields
 
-- `apply_to_jinja2_rendering`: When true, simulates Jinja2 template rendering during dry runs
 - `text_gen_truncate_length`: Maximum length of generated text during dry runs
 - `nb_list_items`: Number of items to generate for list content during dry runs
 - `nb_extract_pages`: Number of pages to simulate for OCR operations during dry runs
@@ -10814,7 +10909,6 @@ class DryRunConfig(ConfigModel):
 
 ```toml
 [pipelex.dry_run_config]
-apply_to_jinja2_rendering = true
 text_gen_truncate_length = 100
 nb_list_items = 3
 nb_extract_pages = 2
@@ -10824,14 +10918,7 @@ allowed_to_fail_pipes = ["optional_pipe", "experimental_pipe"]
 
 ## Dry Run Behavior
 
-### Template Rendering
-
-When `apply_to_jinja2_rendering` is true:
-
-- Templates are processed but not actually rendered
-- Variables are validated
-- Template syntax is checked
-- No actual content is generated
+During a dry run, no AI provider is ever called and no storage IO is performed: each inference leaf (LLM text/object generation, image generation, document extraction, web search, templating) produces a synthetic mock instead. Jinja2 templates are still parse-checked, so a broken template fails loudly even in a dry run.
 
 ### Text Generation
 
@@ -10865,7 +10952,6 @@ The `text_gen_truncate_length` controls:
 
 - Use dry runs for testing before production
 - Set appropriate truncation lengths
-- Enable template validation when testing templates
 - Review dry run logs for potential issues
 
 ## Related Documentation
@@ -12475,22 +12561,22 @@ pipelex run bundle path/to/my_bundle.mthds --pipe my_pipe
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: run the bundle's main_pipe
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     inputs={...},
 )
 pipe_output = response.pipe_output
 
 # Python: run a specific pipe from the bundle
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -12594,33 +12680,33 @@ pipelex which my_pipe -L /path/to/pipelines/dir
 
 ### Setting Instance Defaults with `Pipelex.make()`
 
-For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `PipelexRunner.execute_pipeline()` calls unless overridden.
+For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `PipelexMTHDSProtocol.execute()` calls unless overridden.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Set instance-level defaults at initialization
 Pipelex.make(
     library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
 )
 
-# All PipelexRunner.execute_pipeline() calls will use these directories by default
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+# All PipelexMTHDSProtocol.execute() calls will use these directories by default
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={"input": "value"},
 )
 pipe_output = response.pipe_output
 ```
 
-### Per-Runner Override with `PipelexRunner`
+### Per-Runner Override with `PipelexMTHDSProtocol`
 
-For maximum flexibility, you can override library directories on each `PipelexRunner` instance:
+For maximum flexibility, you can override library directories on each `PipelexMTHDSProtocol` instance:
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Initialize with default directories
 Pipelex.make(
@@ -12628,28 +12714,28 @@ Pipelex.make(
 )
 
 # Use the default directories
-runner1 = PipelexRunner()
-response1 = await runner1.execute_pipeline(
+runner1 = PipelexMTHDSProtocol()
+response1 = await runner1.execute(
     pipe_code="default_pipe",
     inputs={"input": "value"},
 )
 pipe_output1 = response1.pipe_output
 
 # Override for a specific execution
-runner2 = PipelexRunner(
+runner2 = PipelexMTHDSProtocol(
     library_dirs=["/path/to/special_pipes"],  # Overrides instance default
 )
-response2 = await runner2.execute_pipeline(
+response2 = await runner2.execute(
     pipe_code="special_pipe",
     inputs={"input": "value"},
 )
 pipe_output2 = response2.pipe_output
 
 # Disable directory loading (use only mthds_content)
-runner3 = PipelexRunner(
+runner3 = PipelexMTHDSProtocol(
     library_dirs=[],  # Empty list disables directory-based loading
 )
-response3 = await runner3.execute_pipeline(
+response3 = await runner3.execute(
     mthds_content=my_mthds_string,
     inputs={"input": "value"},
 )
@@ -12666,14 +12752,14 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: No library_dirs specified anywhere
 Pipelex.make()  # No library_dirs
 
 # Uses PIPELEXPATH: /shared/pipes
-runner = PipelexRunner()
-response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(pipe_code="my_pipe", inputs={...})
 pipe_output = response.pipe_output
 ```
 
@@ -12685,29 +12771,29 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: Instance default set
 Pipelex.make(library_dirs=["/project/pipes"])
 
 # Uses instance default: /project/pipes (PIPELEXPATH ignored)
-runner = PipelexRunner()
-response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(pipe_code="my_pipe", inputs={...})
 pipe_output = response.pipe_output
 ```
 
 **Example 3: Per-call override takes highest priority**
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 Pipelex.make(library_dirs=["/default/pipes"])
 
 # Uses per-runner value: /special/pipes
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     library_dirs=["/special/pipes"],  # Highest priority
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -14198,7 +14284,7 @@ flowchart TD
     C --> D[DryRunFactory.make_dry_run_factory]
     D --> E[Polyfactory with custom providers]
 
-    F[PipeLLM dry run] --> G[ContentGeneratorDry.make_object_direct]
+    F[PipeLLM dry run] --> G[cogt leaf: dry_llm_gen_object in dry_mock.py]
     G --> H[DryRunFactory.make_dry_run_factory]
     H --> E
 
@@ -14206,10 +14292,12 @@ flowchart TD
     J --> K[model_validate with resolved values]
 ```
 
+A dry run does not swap in a special content generator: `run_mode=DRY` rides `CogtRunParams` on every cogt assignment, and each inference leaf (`llm_generate`, the `*_and_store` image/extract leaves, search, templating) branches to its `dry_*` mock helper in `dry_mock.py` — identically whether the leaf runs inline or inside a Temporal activity.
+
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
-| `pipelex validate` | `dry_run_pipe()` | `WorkingMemoryFactory.make_mock_inputs()` |
-| `PipeLLM` output in dry mode | `ContentGeneratorDry.make_object_direct()` | `DryRunFactory` (auto-detects from field definitions) |
+| `pipelex validate` | `BundleValidator.validate_pipes()` | `WorkingMemoryFactory.make_mock_inputs()` |
+| `PipeLLM` output in dry mode | `dry_llm_gen_object()` / `dry_llm_gen_object_list()` (cogt leaf, `dry_mock.py`) | `DryRunFactory` via the schema-reconstructed class |
 | `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
 | `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory (no mocks) |
 
@@ -14377,14 +14465,14 @@ The `factory_use_construct=True` flag bypasses `field_validator` and `model_vali
 
 ### LLM Output Generation
 
-When `ContentGeneratorDry.make_object_direct()` generates mock LLM outputs:
+When the dry LLM leaf (`dry_llm_gen_object` in `dry_mock.py`) generates mock outputs, it reconstructs the output class from the JSON schema carried on the assignment (the same class on any backend), then builds via `build_mock_object()`:
 
 ```python
-object_factory = DryRunFactory.make_dry_run_factory(object_class)
-return object_factory.build(factory_use_construct=True)
+item_class = SchemaToModelFactory.make_from_json_schema(schema=..., class_name=...)
+return build_mock_object(item_class)
 ```
 
-No explicit field constraints are passed—the factory auto-detects `MockFormat` from field definitions.
+No explicit field constraints are passed — the factory auto-detects `MockFormat` from field definitions. Note that `json_schema_extra` hints can be dropped by the schema round-trip: classes with exotic format constraints should declare `examples` / `mock_format`, otherwise re-validation against the original class raises a typed `DryRunObjectFidelityError`.
 
 ### PipeCompose Resolution
 
@@ -14410,7 +14498,7 @@ In dry run mode, the working memory already contains properly formatted mock val
 | Scenario | Format Constraints | Validators Bypassed |
 |----------|-------------------|---------------------|
 | `WorkingMemoryFactory.make_mock_content()` | Yes (from `json_schema_extra` + explicit params) | Yes (`factory_use_construct`) |
-| `ContentGeneratorDry.make_object_direct()` | Yes (from `json_schema_extra` only) | Yes (`factory_use_construct`) |
+| `dry_llm_gen_object()` (cogt leaf) | Yes (from `json_schema_extra` surviving the schema round-trip) | No (validators run; failures raise typed `DryRunMockBuildError`) |
 | `StructuredContentComposer.compose()` | N/A (uses resolved values) | No (validates) |
 
 ---
@@ -14464,10 +14552,10 @@ class MySpec(StructuredContent):
 | File | Purpose |
 |------|---------|
 | `pipelex/cogt/content_generation/dry_run_factory.py` | `DryRunFactory` class with `MockFormat` enum and generators |
-| `pipelex/cogt/content_generation/content_generator_dry.py` | `ContentGeneratorDry` for mock LLM/image outputs |
+| `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`, `stamp_mock_main_coordination`) |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
 | `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
-| `pipelex/pipe_run/dry_run.py` | `dry_run_pipe()` orchestration |
+| `pipelex/pipe_run/dry_run_pipeline.py` | `dry_run_pipeline()` / `dry_run_pipe_in_process()` orchestration |
 
 ---
 
@@ -14506,10 +14594,10 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexMTHDSProtocol(execution_config=...).execute(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
+| Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
     The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
@@ -14537,29 +14625,29 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 ### API
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
-runner = PipelexRunner(
+runner = PipelexMTHDSProtocol(
     execution_config=config.with_execution_overrides(generate_graph=True),
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
 )
 pipe_output = response.pipe_output
 
 # Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
-dry_runner = PipelexRunner(
+dry_runner = PipelexMTHDSProtocol(
     pipe_run_mode=PipeRunMode.DRY,
     execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
 )
-response = await dry_runner.execute_pipeline(pipe_code="my_pipe")
+response = await dry_runner.execute(pipe_code="my_pipe")
 graph_spec = response.pipe_output.graph_spec
 ```
 
 !!! tip "Dry run from MTHDS content"
-    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you.
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipe_run/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you. It owns its graph transport (a scoped in-memory event log), so it produces the graph regardless of the host's `tracing_config` and never writes trace files as a side effect.
 
 ### Outputs
 
@@ -14724,6 +14812,28 @@ manager.on_pipe_end_success(
 # 5. Manager closes tracer and returns GraphSpec
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
+
+### Event-Log Transport and the Scoped Override
+
+Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
+
+For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
+
+```python
+from pipelex.hub import scoped_event_log
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+
+with scoped_event_log(InMemoryEventLog()):
+    response = await runner.execute_pipeline(...)  # graph assembles in memory
+```
+
+Semantics:
+
+- The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
+- A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
+- Lifecycle: the read side does not `close()` the scoped instance and the machinery never calls `cleanup()` on it — but the write-side tracer DOES call `close()` on its event log at teardown, before the read side assembles. A scoped event log's `close()` must therefore be idempotent or a no-op (as `InMemoryEventLog`'s is); scoping a backend whose `close()` releases a real resource would break its own assembly read.
+
+This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints in `pipelex/pipe_run/dry_run_pipeline.py` rely on it: `dry_run_pipe_in_process` (validation and graph dry-run hosted inside a single Temporal activity) and `dry_run_pipeline` itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `tracing_config.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
 
 ### TraceContext Propagation
 
@@ -17445,7 +17555,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 |-------|------|--------------------------|
 | **5 — CLI entry points** | `pipelex` / `pipelex-agent` commands | Catch, format for human (Rich) / agent (JSON·MD) / HTTP |
 | **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
-| **3 — Pipeline runner** | `PipelexRunner.execute_pipeline()` | Catch + wrap as `PipelineExecutionError` |
+| **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError` |
 | **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
 | **1 — Workers / SDK calls** | `pipelex/plugins/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
@@ -17988,11 +18098,11 @@ Each `WfPipeRouter.run()` creates its own scoped state:
 
 1. **ClassRegistry**: A new `ClassRegistry` pre-seeded from the global registry (which has base classes from `PIPELEXPATH`). Dynamic classes from the crate are registered here — not in the global registry.
 
-2. **Library**: A new `Library` instance opened via `library_manager.open_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`.
+2. **Library**: A new `Library` instance opened via `library_manager.open_fresh_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`. The library id is keyed by the run id (`wf_{run_id}`) — replay-stable but unique per run. Keying by workflow id would collide across runs of a reused workflow id (workflow-level retry policy, Temporal reset, resubmission of the same `pipeline_run_id`): a closed predecessor run's late eviction cleanup could tear down a live successor run's library on the same worker. With run-id keying, a pre-existing library under the id can only be this same run's own leftover (an interrupted execution whose cleanup never ran), so `open_fresh_library` tears it down before opening: reusing it would fingerprint-skip the crate load against the fresh registry — the crate's dynamic classes would never land in it. The stale teardown is best-effort: the manager forgets the entry pop-first, and a raising teardown is logged and never fails the fresh open (worker-local leak state must not decide setup success). The same run-id keying applies to the rest of the per-run worker-local state: the graph tracer key and the report-delegate event-log context key.
 
 3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
 
-4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`.
+4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`. In the workflow's `finally` block, this worker-local cleanup runs BEFORE the awaited `act_flush_trace_events` activity: the await is a suspension point where an eviction-time `BaseException` can abort the rest of the block, so ordering cleanup first guarantees an eviction can only skip the flush itself, never the teardown.
 
 ### Kajson integration
 
@@ -18054,6 +18164,21 @@ Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRo
 
 ---
 
+## Validation Dispatch: One In-Process Activity
+
+Pipeline *execution* fans out across workflows and activities as described above — but *validation* deliberately does the opposite. When Temporal is enabled, a `/validate` job (validation sweep + graph-producing dry-run) dispatches as the one-step wrapper workflow `wf_dry_validate`, which runs a single `act_dry_validate` activity and returns `{per-pipe status map, GraphSpec | None}` in one round-trip.
+
+Inside the activity everything is in-process and in-memory:
+
+- The library is loaded once: the sweep half is `validate_bundle` itself (the same function the direct-mode route calls, so both backends share the categorized `ValidateBundleError` contract), which leaves the library loaded; the graph dry-run (`dry_run_pipe_in_process`) runs against that same library; teardown happens once in the activity's `finally`.
+- ContextVar scopes pin the run in-process: `scoped_pipe_router` (nested controller sub-pipes resolve a local router, not the `TemporalPipeRouter`), `scoped_content_generator` (inference leaves resolve an inline dry generator, not `ContentGeneratorInWorkflow`), and `scoped_event_log` (the graph traces into a shared `InMemoryEventLog` — no NDJSON file, no DynamoDB round-trip; the `GraphSpec` rides back on the activity result). No usage/cost events are emitted.
+- The graph is best-effort: an expected dry-run failure (the run-failure wrappers, or a mock-input mint failure) returns `graph_spec=None` with validation still successful; any other error propagates and fails the activity.
+- Validation failures cross the boundary as structured `ErrorReport`s via the activity error boundary — a strict-mode `SignaturesNotAllowedError` keeps its offending-pipe and signature refs, so the API can render a meaningful 422.
+
+Submitters call `dispatch_dry_validate` (`pipelex/temporal/tprl_pipe/dry_validate_dispatch.py`) for the whole round-trip. The wrapper workflow exists so the dispatch works on the current `temporalio` SDK; replacing it with a true standalone activity is a deferred optimization.
+
+---
+
 ## Known Limitation: StuffArtefact Serialization in Dry-Run
 
 In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal templating activities that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
@@ -18110,7 +18235,7 @@ This page is for contributors working on Pipelex internals. If you're deploying 
 This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction, web search) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
 
 !!! note "Every inference leaf goes through the same seam"
-    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction: direct inline (`ContentGenerator`), as a Temporal activity (`ContentGeneratorInWorkflow`), or as a dry mock (`ContentGeneratorDry`). Web search (`PipeSearch`) joined this seam last — its `act_search_gen_*` activities make search-on-Temporal replay-safe (the result is recorded in workflow history) and let search failures cross the workflow boundary as classified errors. An operator that runs its leaf inline instead would re-execute it on every replay and, on failure, hang the submitter with an unclassified workflow-task error.
+    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction: direct inline (`ContentGenerator`) or as a Temporal activity (`ContentGeneratorInWorkflow`); the backend choice is independent of the run mode — under `run_mode=DRY` the chosen backend still dispatches and the cogt leaf mocks inside it. Web search (`PipeSearch`) joined this seam last — its `act_search_gen_*` activities make search-on-Temporal replay-safe (the result is recorded in workflow history) and let search failures cross the workflow boundary as classified errors. An operator that runs its leaf inline instead would re-execute it on every replay and, on failure, hang the submitter with an unclassified workflow-task error.
 
 ---
 
