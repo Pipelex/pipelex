@@ -73,6 +73,17 @@ class DryRunError(PipelexError):
     """Raised when a dry run fails due to missing inputs or other validation issues."""
 
 
+class DryRunGraphNotProducedError(DryRunError):
+    """Raised when a graph-producing dry run completes but no ``GraphSpec`` was assembled onto the pipe output.
+
+    The dry-run entrypoints (``dry_run_pipeline`` / ``dry_run_pipe_in_process``) exist to produce a
+    graph, so a run that finishes without one is a contract violation on their side — not a
+    validation failure of the bundle. Distinct from the bare ``PipelexError`` it replaces so that
+    hosts logging only the exception type (e.g. pipelex-api's best-effort ``/validate`` graph step)
+    get an unambiguous signal.
+    """
+
+
 class PipeRouterError(PipelexError):
     def __init__(
         self,
