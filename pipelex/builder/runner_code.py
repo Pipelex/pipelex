@@ -232,7 +232,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         [
             "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.runner import PipelexRunner",
+            "from pipelex.pipeline.runner import PipelexMTHDSProtocol",
         ]
     )
 
@@ -268,8 +268,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         "",
         "",
         f"async def run_{pipe.code}() -> {return_type}:",
-        "    runner = PipelexRunner()",
-        "    response = await runner.execute_pipeline(",
+        "    runner = PipelexMTHDSProtocol()",
+        "    response = await runner.execute(",
         f'        pipe_code="{pipe.code}",',
     ]
 

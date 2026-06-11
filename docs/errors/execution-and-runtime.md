@@ -16,6 +16,7 @@ own page. Classes are grouped by subsystem.
 - [`BatchParamsError`](batch-params-error.md) — Batch params
 - [`DeliveryError`](delivery-error.md) — Delivery
 - [`DryRunError`](dry-run-error.md) — Dry run
+- [`DryRunGraphNotProducedError`](dry-run-graph-not-produced-error.md) — Dry run graph not produced
 - [`PipeJobError`](pipe-job-error.md) — Pipe job
 - [`PipeRouterError`](pipe-router-error.md) — Pipe router
 - [`PipeRunError`](pipe-run-error.md) — Pipe run
@@ -29,6 +30,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
+- [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
 - [`PipelineManagerAlreadyExistsError`](pipeline-manager-already-exists-error.md) — Pipeline manager already exists
 - [`PipelineManagerNotFoundError`](pipeline-manager-not-found-error.md) — Pipeline manager not found
 - [`ValidateBundleError`](validate-bundle-error.md) — Validate bundle

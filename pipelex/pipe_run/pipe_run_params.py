@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex import log
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode  # noqa: TC001 — pydantic resolves the field annotation at runtime
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.types import Self, StrEnum
 
@@ -135,7 +136,26 @@ class BatchParams(BaseModel):
 
 
 class PipeRunParams(BaseModel):
-    run_mode: PipeRunMode = PipeRunMode.LIVE
+    # `extra="forbid"` so a stale `PipeRunParams(cogt_run_params=...)` constructor fails loudly
+    # instead of silently building a LIVE-mode instance (cogt_run_params is derived now, not a field).
+    model_config = ConfigDict(extra="forbid")
+
+    # REQUIRED (no default): a payload missing the run mode must fail loud instead of silently
+    # running LIVE (the spending direction) or DRY (the mock direction). `frozen=True` because a
+    # post-construction DRY→LIVE flip would bypass the validator below and flow straight into
+    # real provider spend via the derived carrier — written once at construction by
+    # `PipeRunParamsFactory.make_run_params`; operators slice the derived `cogt_run_params` off
+    # and thread it into the content-generator protocol so the cogt leaf sees the same mode on
+    # any backend.
+    run_mode: PipeRunMode = Field(frozen=True)
+
+    # Internal sub-flag of DRY — only CLI access is the hidden `--mock-usage` test trigger
+    # (requires `--dry-run`, not shown in --help): when True, the dry LLM leaves report
+    # *non-zero* synthetic usage so the end-of-run cost report renders — the cheap, deterministic
+    # cross-worker cost-report validation affordance. Rejected on a LIVE run (validator below);
+    # frozen for the same reason as `run_mode`.
+    is_mock_usage: bool = Field(default=False, frozen=True)
+
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None
@@ -145,6 +165,21 @@ class PipeRunParams(BaseModel):
     pipe_stack_limit: int
     pipe_stack: list[str] = Field(default_factory=list)
     pipe_layers: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_mock_usage_requires_dry(self) -> Self:
+        check_mock_usage_requires_dry(run_mode=self.run_mode, is_mock_usage=self.is_mock_usage)
+        return self
+
+    @property
+    def cogt_run_params(self) -> CogtRunParams:
+        """Mint the cogt-tier slice of these params — what generators stamp on every assignment.
+
+        Derived (not stored) from the run-mode fields above, so there is exactly one copy of the
+        facts; the carrier exists because the cogt layer must stay pipe-agnostic and the assignment
+        payloads cross the Temporal activity boundary.
+        """
+        return CogtRunParams(run_mode=self.run_mode, is_mock_usage=self.is_mock_usage)
 
     @property
     def pipe_stack_str(self) -> str:

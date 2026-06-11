@@ -5,14 +5,12 @@ from typing import Any, Union, cast, get_args, get_origin
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
 from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerTypeError,
@@ -39,7 +37,6 @@ class StructuredContentComposer:
         output_class: The StructuredContent subclass to instantiate
         runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
         extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
-        content_generator: The content generator to use for template rendering (supports dry run mode)
         pipe_run_params: The pipe run parameters (used to check if we're in dry run mode)
     """
 
@@ -50,7 +47,6 @@ class StructuredContentComposer:
         output_class: type[StuffContent],
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
         pipe_run_params: PipeRunParams | None = None,
     ):
         self.construct_blueprint = construct_blueprint
@@ -58,7 +54,6 @@ class StructuredContentComposer:
         self.output_class = output_class
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
-        self.content_generator = content_generator or get_content_generator()
         self.pipe_run_params = pipe_run_params
         # Per-field record of how each field was built. Populated as fields resolve.
         # Shape per entry: {"method": ConstructFieldMethod, "rendered": str (templates only)}.
@@ -688,7 +683,6 @@ class StructuredContentComposer:
             output_class=nested_class,
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
-            content_generator=self.content_generator,
             pipe_run_params=self.pipe_run_params,
         )
 

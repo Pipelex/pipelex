@@ -5,7 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.cases import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_compose.cv_job_matching_itvw_sheet import InterviewSheet
 
@@ -20,11 +20,11 @@ class TestPipeComposeAfterInference:
 
     async def test_pipe_compose_after_inference(self, pipe_run_mode: PipeRunMode):
         """Test a pipe which uses inference to analyze stuff and then uses PipeCompose to compose a structured content."""
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators/pipe_compose"],
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="cv_job_matcher",
             inputs={
                 "cv_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_CV),

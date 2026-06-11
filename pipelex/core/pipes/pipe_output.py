@@ -1,6 +1,6 @@
 from typing import Any, TypeVar
 
-from mthds.models.pipe_output import PipeOutputAbstract
+from mthds.protocol.pipe_output import PipeOutputAbstract
 from pydantic import Field
 
 from pipelex.core.memory.working_memory import WorkingMemory

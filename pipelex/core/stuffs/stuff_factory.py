@@ -3,7 +3,7 @@ from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import shortuuid
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.protocol.pipeline_inputs import StuffContentOrData
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept

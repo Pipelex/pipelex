@@ -7,7 +7,7 @@ equivalent :class:`PipeJob` against an already-open library.
 """
 
 import pytest
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config

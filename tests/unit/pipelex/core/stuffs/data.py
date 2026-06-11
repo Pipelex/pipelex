@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from markupsafe import escape
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.protocol.pipeline_inputs import StuffContentOrData
 from pydantic import Field
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -36,7 +36,7 @@ class AnotherConcept(StructuredContent):
     value: int = Field(description="Value field")
 
 
-TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
+TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stuff]] = [
     # Case 1.1: Content is a string
     (
         "case-1.1-string",
@@ -481,7 +481,7 @@ TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, Stuff]] = [
 
 
 # Test cases with search_domains - format: (test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_stuff)
-SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, list[str], Stuff]] = [
+SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, list[str], Stuff]] = [
     # Case with search_domains: StuffContent object
     (
         "search-domain-stuff-content",
@@ -583,7 +583,7 @@ SEARCH_DOMAIN_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, l
 
 
 # Error test cases - these should raise exceptions
-ERROR_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, list[str] | None, type[Exception], str]] = [
+ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, list[str] | None, type[Exception], str]] = [
     # Format: (test_name, stuff_content_or_data, stuff_name, stuff_code, search_domains, expected_exception, error_match)
     # Empty list - should fail
     (

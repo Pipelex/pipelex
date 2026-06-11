@@ -52,10 +52,10 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
         )
 
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=mock_console)
-        mock_runner_cls = mocker.patch("pipelex.cli.commands.run._run_core.PipelexRunner")
+        mock_runner_cls = mocker.patch("pipelex.cli.commands.run._run_core.PipelexMTHDSProtocol")
 
         mock_runner = mocker.MagicMock()
-        mock_runner.execute_pipeline = mocker.MagicMock(side_effect=exc)
+        mock_runner.execute = mocker.MagicMock(side_effect=exc)
         mock_runner_cls.return_value = mock_runner
 
         # Patch get_config to provide a minimal execution config
@@ -83,7 +83,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                             graph_full_data=None,
                             output_dir=OUTPUT_DIR,
                             dry_run=False,
-                            mock_inference=False,
+                            mock_usage=False,
                             mock_inputs=False,
                             library_dir=None,
                         )
@@ -113,7 +113,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
-                    mock_inference=False,
+                    mock_usage=False,
                     mock_inputs=False,
                     library_dir=None,
                 )
@@ -142,7 +142,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
-                    mock_inference=False,
+                    mock_usage=False,
                     mock_inputs=False,
                     library_dir=None,
                 )
@@ -171,7 +171,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
                     graph_full_data=None,
                     output_dir=OUTPUT_DIR,
                     dry_run=False,
-                    mock_inference=False,
+                    mock_usage=False,
                     mock_inputs=False,
                     library_dir=None,
                 )

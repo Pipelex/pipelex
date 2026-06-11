@@ -119,7 +119,7 @@ async def _dry_run_bundle(
     mthds_content = bundle_path.read_text(encoding="utf-8")
 
     # Ensure the bundle's parent directory is included in library_dirs
-    # so PipelexRunner can resolve sibling dependencies
+    # so PipelexMTHDSProtocol can resolve sibling dependencies
     bundle_parent_dir = str(bundle_path.parent.resolve())
     effective_library_dirs: list[str]
     if library_dirs:

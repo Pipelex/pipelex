@@ -2,19 +2,18 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from pipelex import pretty_print
-    from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+    from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
     from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
-    from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
     from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.hub import get_model_deck
+    from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.test_extras.temporal_registry_test_models import Person
     from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import ContentGeneratorInWorkflowFactory
-    from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
     from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
 
@@ -46,23 +45,21 @@ class WfTestContentGeneratorChild:
     @workflow.run
     async def run(self, is_dry_run: bool = False):
         workflow_log.debug("Workflow start")
-        content_generator: ContentGeneratorProtocol
-        if is_dry_run:
-            content_generator = ContentGeneratorDry()
-        else:
-            generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-            content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                generated_content_factory=generated_content_factory,
-            )
+        # One generator for both arms: under is_dry_run the activities are still dispatched and
+        # the cogt leaf mocks inside them (run_mode=DRY rides cogt_run_params — Part B).
+        content_generator: ContentGeneratorProtocol = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
 
         job_metadata = JobMetadata(
             user_id="temporal-test",
             pipeline_run_id=workflow.info().workflow_id,
         )
+        run_mode = PipeRunMode.DRY if is_dry_run else PipeRunMode.LIVE
+        cogt_run_params = CogtRunParams(run_mode=run_mode)
 
         llm_setting_for_text = get_model_deck().get_llm_setting(llm_choice="$testing-text")
         crafted_text = await content_generator.make_llm_text(
             job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
             llm_setting_main=llm_setting_for_text,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
         )
@@ -71,6 +68,7 @@ class WfTestContentGeneratorChild:
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
         crafted_object_direct = await content_generator.make_object(
             job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
             object_class=Person,
             llm_setting_for_object=llm_setting_for_object,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
@@ -79,6 +77,7 @@ class WfTestContentGeneratorChild:
 
         crafted_object_list_direct = await content_generator.make_object_list(
             job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
             object_class=Person,
             llm_setting_for_object_list=llm_setting_for_object,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
@@ -88,6 +87,7 @@ class WfTestContentGeneratorChild:
         crafted_image = await content_generator.make_single_image(
             img_gen_handle="gpt-image-1-mini",
             job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
             img_gen_prompt=ImgGenPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
         )
         pretty_print(crafted_image, title="make_single_image")
@@ -97,6 +97,7 @@ class WfTestContentGeneratorChild:
         }
         jinja2_text = await content_generator.make_templated_text(
             job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
             context=context,
             template="♦️♦️ {{ the_answer }} ♦️♦️",
         )
@@ -106,6 +107,7 @@ class WfTestContentGeneratorChild:
             extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
             ),
+            cogt_run_params=cogt_run_params,
             extract_handle="azure-document-intelligence",
             job_metadata=job_metadata,
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),

@@ -24,7 +24,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.tools.tabular.exceptions import CsvError
 
 if TYPE_CHECKING:
-    from mthds.models.pipeline_inputs import PipelineInputs
+    from mthds.protocol.pipeline_inputs import PipelineInputs
 
     from pipelex.core.stuffs.stuff_content import StuffContent
 

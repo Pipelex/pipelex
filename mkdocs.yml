@@ -239,6 +239,7 @@ plugins:
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
         - building-methods/pipes/executing-pipelines.md: "Executing Pipelines"
+        - building-methods/pipes/run-modes-and-backends.md: "Run Modes & Backends"
         - building-methods/pipes/provide-inputs.md: "Providing Inputs to Pipelines"
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
@@ -454,6 +455,7 @@ nav:
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
+        - Run Modes & Backends: building-methods/pipes/run-modes-and-backends.md
         - Providing Inputs to Pipelines: building-methods/pipes/provide-inputs.md
         - Working Memory: building-methods/pipes/working-memory.md
         - Pipe Output: building-methods/pipes/pipe-output.md

@@ -1,6 +1,6 @@
 """Integration tests for the Phase-2 DIRECT tracing assembly onto PipeOutput.
 
-A real (dry, no-spend) run through :meth:`PipelexRunner.execute_pipeline` must ride the assembled
+A real (dry, no-spend) run through :meth:`PipelexMTHDSProtocol.execute` must ride the assembled
 artifacts back on ``pipe_output``:
 
 - **costs on:** ``pipe_output.tokens_usages`` is populated from the run's emitted usage events.
@@ -20,7 +20,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 
 _DIRECT_DOMAIN = "direct_tracing_assembly"
@@ -61,8 +61,8 @@ class TestDirectTracingAssembly:
         mocker.patch.object(cfg, "ndjson", NdjsonTracingConfig(traces_dir=traces_dir))
 
     async def _run(self, execution_config: PipelineExecutionConfig) -> PipeOutput:
-        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
-        response = await runner.execute_pipeline(pipe_code="echo_topic", mthds_contents=[_DIRECT_MTHDS])
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=execution_config)
+        response = await runner.execute(pipe_code="echo_topic", mthds_contents=[_DIRECT_MTHDS])
         return response.pipe_output
 
     async def test_costs_on_populates_tokens_usages(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:

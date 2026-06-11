@@ -9,7 +9,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from tests.cases.images import ImageTestCases
 
 if TYPE_CHECKING:
-    from mthds.models.pipeline_inputs import PipelineInputs
+    from mthds.protocol.pipeline_inputs import PipelineInputs
 
 
 class TestWorkingMemoryFactory:
