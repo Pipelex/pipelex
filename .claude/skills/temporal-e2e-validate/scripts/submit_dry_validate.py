@@ -58,10 +58,16 @@ async def submit(bundle: str, pipe_code: str | None, allow_signatures: bool, gra
     if result.graph_spec is None:
         print("GRAPH: None (best-effort — validation still succeeded)")
     else:
-        graph_path = Path(graph_out).expanduser()
-        graph_path.write_text(result.graph_spec.model_dump_json(indent=2), encoding="utf-8")
         print(f"GRAPH: graph_id={result.graph_spec.graph_id} nodes={len(result.graph_spec.nodes)} edges={len(result.graph_spec.edges)}")
-        print(f"GRAPH JSON written to {graph_path}")
+        graph_path = Path(graph_out).expanduser()
+        try:
+            graph_path.parent.mkdir(parents=True, exist_ok=True)
+            graph_path.write_text(result.graph_spec.model_dump_json(indent=2), encoding="utf-8")
+        except OSError as exc:
+            # The graph file is a best-effort artifact: an IO failure must not be reported as a validation failure (exit 1)
+            print(f"GRAPH JSON write to {graph_path} failed: {exc}")
+        else:
+            print(f"GRAPH JSON written to {graph_path}")
     return 0
 
 
