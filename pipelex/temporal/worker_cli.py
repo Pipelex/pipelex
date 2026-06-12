@@ -31,7 +31,7 @@ async def run_worker(
     profile_name: str | None = None,
 ):
     if project is None:
-        log.info(f"Starting worker for current project '{project}', from {os.path.relpath(__file__)}")
+        log.info(f"Starting worker for current project, from {os.path.relpath(__file__)}")
     else:
         log.info(f"Starting worker for chosen project '{project}', from {os.path.relpath(__file__)}")
     await get_task_manager().run_worker(

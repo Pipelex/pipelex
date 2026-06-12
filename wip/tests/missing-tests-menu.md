@@ -13,13 +13,13 @@ Scope note: the spec'd CLI *interface* (arg parsing, `--help` surfaces, `init` b
 - [x] `cli/readiness.py` (20% → **97%**) — venv detection, dev-install detection, and the readiness gate.
 - [x] `cli/error_handlers.py` (51% → **99%**, ~290 stmts) — every handler incl. gateway/telemetry/signature ones, panel rendering, validation-error detail sections.
 
-## B. Temporal distributed execution — operational risk
+## B. Temporal distributed execution — DONE (2026-06-12, see TODOS.md Phase B for the as-built notes)
 
 Never shipped to prod yet, but these are the deploy-critical entry points; bugs here only surface inside a live cluster.
 
-- `temporal/worker_cli.py` (0%) — the worker process entry point; a broken arg parse = fleet-wide dead workers.
-- `temporal/codec/codec_server.py` (0%) — payload codec HTTP server; failure corrupts/blocks all payload decoding in the UI.
-- `temporal/temporal_connect.py` (24%) — connection/TLS/API-key wiring; the kind of code that only fails at deploy time.
+- [x] `temporal/worker_cli.py` (0% → **100%**) — project resolution from pyproject, fast-fail task-queue validation before library load, worker-base library loading, forced `is_enabled`, full Typer arg wiring into the worker loop.
+- [x] `temporal/codec/codec_server.py` (0% → **96%**) — encode/decode round-trip over real HTTP, CORS preflight/origin gating, content-type and malformed-payload guards, storage-failure → HTTP status mapping; remainder = the `TYPE_CHECKING` import block. NB: `codec_server_cli.py` stays at 0% — it's the thin arg-parse + `run_app` wrapper around `build_codec_server`, same interface-layer category as the Typer wrappers left out in section A.
+- [x] `temporal/temporal_connect.py` (24% → **98%**) — API-key resolution per secret method, TLS/RPC-metadata wiring, payload-codec converter selection, named server-config selection, SDK error wrapping; remainder = the `TYPE_CHECKING` import block.
 
 ## C. Inference plumbing (offline-testable parts)
 
@@ -57,6 +57,6 @@ Not the live calls — the factories, arg-builders, and config logic around them
 ## Suggested grind order
 
 1. ~~**A (CLI)**~~ — DONE 2026-06-12 (branch `feature/Add-tests`; plan + as-built notes in TODOS.md).
-2. **C (inference plumbing)** — pure-function factories, fast unit tests, protects the money path. ← NEXT
-3. **B (Temporal)** — before the integration ships to prod.
+2. ~~**B (Temporal)**~~ — DONE 2026-06-12 (user-prioritized ahead of C; same branch, TODOS.md Phase B).
+3. **C (inference plumbing)** — pure-function factories, fast unit tests, protects the money path. ← NEXT
 4. **D then E** — fill-in work, good for small sessions.

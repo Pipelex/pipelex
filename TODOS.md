@@ -1,6 +1,6 @@
-# TODOS — Test coverage grind: Section A (CLI internal logic)
+# TODOS — Test coverage grind
 
-Source plan: [wip/tests/missing-tests-menu.md](wip/tests/missing-tests-menu.md) section A (lines 5–14). This file is the working plan; when section A is done, update the menu doc's section A with the evolved coverage percentages.
+Source plan: [wip/tests/missing-tests-menu.md](wip/tests/missing-tests-menu.md). This file is the working plan; when a section is done, update the menu doc's matching section with the evolved coverage percentages. Section A (CLI internal logic) is complete — see Checkpoint 3. Current work: Phase B = menu section B (Temporal distributed execution).
 
 ## Context for cold start
 
@@ -104,3 +104,44 @@ New files under `tests/unit/pipelex/cli/commands/build/`. Existing reference: `t
 ### CHECKPOINT 3 — section A complete
 
 Status: **CLEARED 2026-06-12 — SECTION A COMPLETE.** Full non-inference suite green with `--cov` (same marker expression as `make agent-test`, run without `--exitfirst` — strictly stronger); `make agent-check` clean; changelog [Unreleased] entry added. Final full-suite coverage (written into the menu doc): doctor_cmd 21→92, _run_core 32→94, show_cmd 27→73, which_cmd 27→66, _output_core 41→74, _runner_core 21→76, _inputs_core 21→72, structures_cmd 41→69, readiness 20→97, error_handlers 51→99; overall pipelex ~72→75%. **Bug found & fixed along the way:** pytest's default `norecursedirs` includes `build`, so everything under `tests/unit/pipelex/cli/commands/build/` was silently skipped in full runs — including the pre-existing cross-package refines regression test, which had never been running. Fixed via a `norecursedirs` override in pyproject.toml `[tool.pytest]` (defaults minus `build`). Phase 6 build-core tests mock the registry getters at the module namespace so the module-scoped Pipelex's real class/func registries are never torn down. NEXT menu section: **C — inference plumbing** (pure-function factories: img_gen_args_factory, llm/img_gen worker factories, structured_output, backend_credentials, model_deck_check, gateway/mistral completions factories).
+
+## Phase B — Temporal distributed execution (menu section B)
+
+User-prioritized ahead of section C. Deploy-critical entry points: bugs here only surface inside a live cluster. All offline unit tests in `tests/unit/pipelex/temporal/` (existing dir, no conftest; reference style: `test_storage_payload_codec.py` with class-level `@pytest.mark.asyncio(loop_scope="class")`).
+
+### B1 — `temporal/codec/codec_server.py` (baseline 0%)
+
+New file `tests/unit/pipelex/temporal/test_codec_server.py`. Drive the real aiohttp app via `aiohttp.test_utils.TestClient(TestServer(app))` (no pytest-aiohttp plugin needed). Real `StoragePayloadCodec` + `InMemoryStorageProvider` for happy paths; raising stub codec (cast) for error branches.
+
+- [x] CORS preflight (`OPTIONS /encode`, `/decode`): allowed origin → headers set; disallowed/missing origin → no CORS headers
+- [x] Content-type guard: non-JSON POST → 415 (with CORS headers when origin allowed)
+- [x] Malformed Payloads JSON → 400
+- [x] Happy `/encode` → large payload becomes storage-ref payload (JSON parse of response proto); `/decode` of that response restores original bytes (full HTTP round-trip)
+- [x] Codec raising `StorageFileNotFoundError` → 404; `OSError` → 502
+- [x] Success response: content-type JSON + CORS headers on allowed origin
+
+### B2 — `temporal/temporal_connect.py` (baseline 24%)
+
+New file `tests/unit/pipelex/temporal/test_temporal_connect.py`. Mock at the `temporal_connect` module namespace: `TemporalClient` (class replaced, `.connect` AsyncMock), `get_config`, `get_secret`, `get_required_env`, `make_codec_from_config`, `make_data_converter`. Real `TemporalServerConfig` instances.
+
+- [x] `connect_to_temporal_server()` api_key matrix: NONE → api_key=None/tls=False/empty metadata; ENV_VAR → `get_required_env(api_key_id)`, tls=True, `{"temporal-namespace": ns}`; SECRET_PROVIDER → `get_secret(secret_id=...)`; ENV_VAR/SECRET_PROVIDER with empty api_key_id → `TemporalConfigError`
+- [x] Payload codec wiring: enabled → `make_codec_from_config()` + `make_data_converter(payload_codec=...)` passed as converter; disabled → module-level `data_converter`
+- [x] `TemporalClient.connect` raising `RuntimeError` → `TemporalServerError` carrying `full_description`
+- [x] `connect_to_temporal_selected_server()`: known name → connects with that config; unknown name → `TemporalConfigError`
+- [x] `connect_to_temporal()`: uses `temporal_config.selected_server`
+
+### B3 — `temporal/worker_cli.py` (baseline 0%)
+
+New file `tests/unit/pipelex/temporal/test_worker_cli.py`. Test `configure()` directly (sync; mock `Pipelex.make`, `get_config`, `load_toml_from_path`, hub getters at `pipelex.hub`, `run_worker` AsyncMock — `asyncio.run` consumes its coroutine) plus a Typer `CliRunner` pass for arg wiring. `run_worker()` tested async with `get_task_manager` mocked.
+
+- [x] `run_worker()`: forwards all kwargs to `get_task_manager().run_worker`; both project None and explicit project log paths
+- [x] Project resolution: explicit arg skips pyproject; `project.name`; `tool.poetry.name` fallback; neither → `ValueError`
+- [x] `--is-unit-testing` → `runtime_manager.set_run_mode(RunMode.UNIT_TEST)`; not set → no call
+- [x] Fast-fail task-queue check: explicit `--task-queue` vs `worker_config.default_task_queue` fallback passed to `validate_task_queue_known`; validation error propagates before library load
+- [x] Library load: dirs resolved → `load_libraries` with them; empty → not called; `open_library`/`set_current_library` with `worker_base`
+- [x] `temporal.is_enabled` False → forced on via `model_copy(update={"is_enabled": True})` and reassigned
+- [x] CliRunner arg wiring: `--task-queue/--scope/--profile/--is-unit-testing/--is-not-sandboxed` reach `run_worker` positionally correct
+
+### CHECKPOINT 4 — Phase B (Temporal entry points) done
+
+Status: **CLEARED 2026-06-12 — PHASE B COMPLETE.** New files: `test_codec_server.py`, `test_temporal_connect.py`, `test_worker_cli.py` in `tests/unit/pipelex/temporal/`. Full non-inference suite green with `--cov` (same marker expression as `make agent-test`, run without `--exitfirst` — strictly stronger); `make agent-check` clean; targeted temporal unit+integration dirs green; changelog [Unreleased] entry added. Final full-suite coverage (written into the menu doc): worker_cli 0→100, codec_server 0→96, temporal_connect 24→98 — the only missed lines in all three are `TYPE_CHECKING` import blocks. Decisions: codec server driven over real HTTP with `aiohttp.test_utils.TestClient(TestServer(app))` (no pytest-aiohttp plugin needed) — real `StoragePayloadCodec` + `InMemoryStorageProvider` for happy paths, a raising stub codec (cast) for the 404/502 error mapping; temporal_connect mocked entirely at its module namespace (whole `TemporalClient` class replaced so `.connect` is an AsyncMock — never touches the real SDK class), real `TemporalServerConfig` instances; worker_cli's `configure()` tested directly as a sync function (its `asyncio.run` consumes a patched `run_worker` AsyncMock's coroutine) plus Typer `CliRunner` passes for arg wiring — hub getters patched at `pipelex.hub` (they're imported inside the function), `runtime_manager.set_run_mode` patched on the CLASS (pydantic model instances reject attribute patching). Adjacent gap noted, deliberately skipped: `codec/codec_server_cli.py` (0%) is the thin arg-parse + `run_app` wrapper — interface layer, same category as the Typer wrappers excluded in section A. NEXT menu section: **C — inference plumbing** (pure-function factories: img_gen_args_factory, llm/img_gen worker factories, structured_output, backend_credentials, model_deck_check, gateway/mistral completions factories).

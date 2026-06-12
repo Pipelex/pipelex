@@ -5,9 +5,11 @@
 ### Added
 
 - **Unit tests for CLI internal logic.** New offline test coverage for the pipelex-internal logic behind the CLI commands (the spec'd CLI *interface* remains owned by the conformance suite): the doctor diagnostic checks (config files, telemetry, backend credentials/files, deck sync, model checks, fix mode, health-report rendering), the `pipelex run` core execution and its sync wrapper (bundle/main_pipe resolution, inputs loading, output/graph/working-memory/CSV saving, error-handler dispatch), the `build structures|inputs|output|runner` codegen cores, the readiness gate, the `show`/`which` report logic, and the gateway/telemetry/signature error handlers.
+- **Unit tests for the Temporal deploy-critical entry points.** Offline coverage for the operational surfaces that previously only failed inside a live cluster: the worker CLI (project resolution from pyproject, fast-fail task-queue validation before library load, worker-base library loading, forced `temporal.is_enabled`, full Typer arg wiring into the worker loop), the codec HTTP server for the Temporal Web UI (encode/decode round-trip over real HTTP, CORS preflight and origin gating, content-type/malformed-payload guards, storage-failure → HTTP status mapping), and the server connection logic (API-key resolution per secret method, TLS/RPC-metadata wiring, payload-codec converter selection, named server-config selection, SDK error wrapping).
 
 ### Fixed
 
+- **Temporal worker startup no longer logs a misleading project name.** When the worker is started for the current project (no explicit project argument), the startup log said `Starting worker for current project 'None'`; it now omits the name instead of interpolating the unresolved value.
 - **Tests under `tests/**/build/` directories were silently skipped.** pytest's default `norecursedirs` includes `build`, so the whole `tests/unit/pipelex/cli/commands/build/` directory (mirroring the source layout) was never collected in full runs — including a pre-existing cross-package refines regression test. The pytest config now overrides `norecursedirs` to the defaults minus `build`.
 
 ## [v0.33.0] - 2026-06-11
