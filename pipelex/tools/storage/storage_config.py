@@ -58,6 +58,9 @@ class StorageMethodConfig(ConfigModel):
                 hash_field_found = True
                 if field_name == "hash" and not format_spec and not conversion:
                     plain_hash_found = True
+            elif field_name != base_name:
+                # Attribute/index access on a str path component can only fail at render time — reject it here
+                unsupported_names.add(field_name)
         supported_list = ", ".join("{" + name + "}" for name in sorted(self.URI_FORMAT_SUPPORTED_FIELDS))
         for unsupported_name in sorted(unsupported_names):
             error_msgs.append(f"- uri_format placeholder '{{{unsupported_name}}}' is not supported (supported: {supported_list})")
@@ -70,7 +73,8 @@ class StorageMethodConfig(ConfigModel):
             # "{primary_id!x}") — a test rendering with the real keyword set proves format() will succeed.
             try:
                 self.uri_format.format(**dict.fromkeys(self.URI_FORMAT_SUPPORTED_FIELDS, "test"))
-            except (KeyError, IndexError, ValueError) as exc:
+            except (KeyError, IndexError, ValueError, TypeError, AttributeError) as exc:
+                # The full set str.format raises — the backstop must never let a raw formatting error escape
                 error_msgs.append(f"- uri_format failed a test rendering ({exc})")
         return error_msgs
 
