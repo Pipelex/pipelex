@@ -32,6 +32,8 @@ class TestStorageS3Config:
         [
             pytest.param("", "my-bucket", "eu-west-1", "- set a value for uri_format", id="empty-uri-format"),
             pytest.param("assets/myhash/file", "my-bucket", "eu-west-1", "- uri_format must contain a {hash} placeholder", id="uri-no-braced-hash"),
+            pytest.param("assets/{{hash}}", "my-bucket", "eu-west-1", "- uri_format must contain a {hash} placeholder", id="uri-escaped-hash"),
+            pytest.param("assets/{hash", "my-bucket", "eu-west-1", "- uri_format is not a valid format string", id="uri-malformed-format"),
             pytest.param("s3-assets/{hash}", "", "eu-west-1", "- set a value for bucket_name", id="empty-bucket-name"),
             pytest.param("s3-assets/{hash}", "my.bucket", "eu-west-1", "- bucket_name cannot contain a dot", id="bucket-with-dot"),
             pytest.param("s3-assets/{hash}", "my/bucket", "eu-west-1", "- bucket_name cannot contain a slash", id="bucket-with-slash"),

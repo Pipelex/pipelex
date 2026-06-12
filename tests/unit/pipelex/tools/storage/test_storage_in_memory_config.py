@@ -17,6 +17,8 @@ class TestStorageInMemoryConfig:
             pytest.param("", "- set a value for uri_format", id="empty-uri-format"),
             pytest.param("assets/no-placeholder/file", "- uri_format must contain a {hash} placeholder", id="uri-no-hash"),
             pytest.param("assets/myhash/file", "- uri_format must contain a {hash} placeholder", id="uri-bare-hash"),
+            pytest.param("assets/{{hash}}/file", "- uri_format must contain a {hash} placeholder", id="uri-escaped-hash"),
+            pytest.param("assets/{hash/file", "- uri_format is not a valid format string", id="uri-malformed-format"),
         ],
     )
     def test_lazy_validate_single_fault(

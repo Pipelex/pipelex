@@ -1,3 +1,4 @@
+from string import Formatter
 from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
@@ -30,8 +31,16 @@ class StorageMethodConfig(ConfigModel):
         error_msgs: list[str] = []
         if self.uri_format == "":
             error_msgs.append("- set a value for uri_format")
-        elif "{hash}" not in self.uri_format:
-            error_msgs.append("- uri_format must contain a {hash} placeholder")
+        else:
+            try:
+                # A substring check would accept the escaped literal "{{hash}}", which str.format renders
+                # as the constant "{hash}" — same URI for every object. Require a real replacement field.
+                field_names = {field_name for _, field_name, _, _ in Formatter().parse(self.uri_format)}
+            except ValueError as exc:
+                error_msgs.append(f"- uri_format is not a valid format string ({exc})")
+            else:
+                if "hash" not in field_names:
+                    error_msgs.append("- uri_format must contain a {hash} placeholder")
         return error_msgs
 
     def lazy_validate(self) -> None:
