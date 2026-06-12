@@ -2,10 +2,13 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence, TypedDict
+from typing import Literal, NamedTuple, Sequence
 
 from pydantic import BaseModel, ValidationError
-from typing_extensions import assert_never
+
+# TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
+# field on Python < 3.12, and ValidatedPipeEntry is a field of PipelexValidationReport.
+from typing_extensions import TypedDict, assert_never
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -19,6 +22,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
     categorize_pipe_validation_with_libraries_error,
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import (
@@ -54,12 +58,11 @@ class ValidateBundleResult(BaseModel):
 class ValidatedPipeEntry(TypedDict):
     """One entry in the ``validated_pipes`` JSON envelope returned by the validate surfaces.
 
-    The ``pipe_code`` key carries the namespaced ``pipe_ref`` (``domain.code``) — the key name is
-    kept for the published JSON contract, but the value is the qualified ref, never the bare code.
+    The ``pipe_ref`` key carries the namespaced ``pipe_ref`` (``domain.code``) — never the bare code.
     ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.
     """
 
-    pipe_code: str
+    pipe_ref: str
     status: DryRunStatus
 
 
@@ -71,7 +74,36 @@ def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[Valid
     ``pipe_ref`` (``domain.code``) on every surface — one unambiguous identity that cannot collide
     across domains, so the same pipe is never reported under two identifiers by different commands.
     """
-    return [ValidatedPipeEntry(pipe_code=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
+    return [ValidatedPipeEntry(pipe_ref=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
+
+
+class PrimaryBlueprintSelection(NamedTuple):
+    """The primary blueprint of a validated batch and its domain-qualified main-pipe ref (if any)."""
+
+    blueprint: PipelexBundleBlueprint
+    main_pipe_ref: str | None
+
+
+def select_primary_blueprint(blueprints: Sequence[PipelexBundleBlueprint]) -> PrimaryBlueprintSelection:
+    """Select the primary blueprint of a batch: first declaring ``main_pipe``, else first.
+
+    The single selection rule shared by every validate surface (the canonical report's
+    ``bundle_blueprint``, the graph arm's target derivation, the Temporal activity) — one
+    rule, one implementation. ``main_pipe_ref`` is the domain-qualified ref of the primary
+    blueprint's ``main_pipe``, or ``None`` when no blueprint in the batch declares one.
+
+    Args:
+        blueprints: The batch's blueprints, in declaration order. Must be non-empty
+            (``validate_bundle`` always yields at least one).
+
+    Returns:
+        The primary blueprint and its qualified main-pipe ref.
+    """
+    for blueprint in blueprints:
+        if blueprint.main_pipe:
+            main_pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
+            return PrimaryBlueprintSelection(blueprint=blueprint, main_pipe_ref=main_pipe_ref)
+    return PrimaryBlueprintSelection(blueprint=blueprints[0], main_pipe_ref=None)
 
 
 def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]:

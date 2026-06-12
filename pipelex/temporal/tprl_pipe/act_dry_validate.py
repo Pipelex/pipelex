@@ -42,8 +42,6 @@ from temporalio import activity
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import (
     clear_current_library,
@@ -54,7 +52,7 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import select_primary_blueprint, validate_bundle
 from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
 
@@ -100,7 +98,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         # the catch on purpose: an unknown explicit pipe_code degrades to graph_spec=None just
         # like any other graph-arm domain failure — same answer the direct route gives.
         graph_spec: GraphSpec | None = None
-        graph_pipe_ref = arg.pipe_code or _qualified_main_pipe(validate_result.blueprints)
+        graph_pipe_ref = arg.pipe_code or select_primary_blueprint(validate_result.blueprints).main_pipe_ref
         if graph_pipe_ref and library_id:
             try:
                 main_pipe = get_required_pipe(pipe_code=graph_pipe_ref)
@@ -134,11 +132,3 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
                     f"act_dry_validate: library teardown also failed after a body error; "
                     f"raising the original error. Suppressed teardown error: {teardown_error}"
                 )
-
-
-def _qualified_main_pipe(blueprints: list[PipelexBundleBlueprint]) -> str | None:
-    """Return the domain-qualified main_pipe of the first blueprint declaring one, else None."""
-    for blueprint in blueprints:
-        if blueprint.main_pipe:
-            return PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-    return None

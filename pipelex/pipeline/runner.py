@@ -30,9 +30,11 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
+from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validation_report import build_validation_report
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -53,18 +55,6 @@ if TYPE_CHECKING:
 
 # The MTHDS Protocol version this runtime implements (mthds-protocol.openapi.yaml).
 MTHDS_PROTOCOL_VERSION = "0.6.0"
-
-
-class PipelexValidationReport(ValidationReport):
-    """Pipelex's validation artifacts — this implementation's extensions on the
-    protocol's `ValidationReport` (which declares no body fields).
-    """
-
-    blueprint: Any = None
-    graph_spec: Any = None
-    pipe_structures: Any = None
-    pending_signatures: list[str] = Field(default_factory=list)
-    is_runnable: bool = True
 
 
 class PipelexModelDeck(MthdsModelDeck):
@@ -348,16 +338,18 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     ) -> ValidationReport:
         """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
 
-        Wraps `validate_bundle` and maps its result onto the protocol's
-        `ValidationReport`: the parsed blueprint(s) and per-pipe structures are
-        reported; `graph_spec` stays None (the dry run validates the graph
-        without materializing a spec artifact). The runnability verdict is
-        reported as `pending_signatures` (qualified refs of pipes still
-        declared as `PipeSignature` in the assembled library) plus
-        `is_runnable = not pending_signatures` — the same convention as the
-        agent-CLI / builder validate envelopes. It only matters on the lenient
-        `allow_signatures=True` path: in strict mode an unsatisfied signature
-        makes `validate_bundle` raise instead.
+        Wraps `validate_bundle` and assembles its result into the canonical
+        `PipelexValidationReport` via `build_validation_report`: the primary
+        `bundle_blueprint`, `pipe_structures` keyed by namespaced `pipe_ref`,
+        the per-pipe `validated_pipes` sweep outcomes, and the runnability
+        verdict — `pending_signatures` (qualified refs of pipes still declared
+        as `PipeSignature` in the assembled library) plus
+        `is_runnable = not pending_signatures`, the same convention as the
+        agent-CLI / builder validate envelopes. The verdict only matters on the
+        lenient `allow_signatures=True` path: in strict mode an unsatisfied
+        signature makes `validate_bundle` raise instead. `graph_spec` stays
+        None for now (the dry run validates the graph without materializing a
+        spec artifact).
 
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
@@ -375,7 +367,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # This protocol wrapper is a long-lived entry point, so restore the
         # caller's current-library and tear the validation library down on the
         # way out — on failure `validate_bundle` already did both, making the
-        # cleanup below a no-op.
+        # cleanup below a no-op. Artifacts that need the open validation library
+        # (`pipe_structures`'s JSON-Schema rendering resolves bundle-defined
+        # structure classes through the class registry) are built INSIDE the
+        # window, before the `finally` tears the library down.
         prev_library_id = get_current_library_id_or_none()
         try:
             result = await validate_bundle(
@@ -383,6 +378,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
+            pipe_structures: dict[str, PipeIOContract] = build_pipe_structures(result.pipes)
         finally:
             validation_library_id = get_current_library_id_or_none()
             if validation_library_id is not None and validation_library_id != prev_library_id:
@@ -391,14 +387,12 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 else:
                     clear_current_library()
                 get_library_manager().teardown(library_id=validation_library_id)
-        blueprints_dump: list[dict[str, Any]] = [blueprint.model_dump(mode="json") for blueprint in result.blueprints]
-        pipe_structures: dict[str, Any] = {pipe.code: pipe.model_dump(mode="json") for pipe in result.pipes}
-        return PipelexValidationReport(
-            blueprint=blueprints_dump[0] if len(blueprints_dump) == 1 else blueprints_dump,
-            graph_spec=None,
+        return build_validation_report(
+            blueprints=result.blueprints,
             pipe_structures=pipe_structures,
+            dry_run_result=result.dry_run_result,
             pending_signatures=result.pending_signatures,
-            is_runnable=not result.pending_signatures,
+            graph_spec=None,
         )
 
     @override

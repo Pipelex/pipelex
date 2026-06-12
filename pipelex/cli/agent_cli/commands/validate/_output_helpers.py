@@ -9,7 +9,7 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     """Render a validation result dict as agent-readable markdown.
 
     Covers the success-path shape produced by the ``validate`` core helpers:
-    ``validated_pipes`` (a list of ``{pipe_code, status}``), ``total_pipes``,
+    ``validated_pipes`` (a list of ``{pipe_ref, status}``), ``total_pipes``,
     and an optional ``bundle_path``. ``validate bundle --graph`` / ``--view``
     also merge ``graph_files`` / ``graphspec`` into the result — those are
     surfaced too so markdown mode does not silently drop them.
@@ -31,7 +31,7 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     lines.append(f"Validated {total_pipes} pipe(s):")
     lines.append("")
     for entry in validated_pipes:
-        lines.append(f"- `{entry.get('pipe_code')}` — {entry.get('status')}")
+        lines.append(f"- `{entry.get('pipe_ref')}` — {entry.get('status')}")
 
     # Runnability verdict — gated on key *presence*, not truthiness. Only the bundle-validate
     # surfaces put `pending_signatures` in the result; `validate all` / `validate pipe` omit the key,

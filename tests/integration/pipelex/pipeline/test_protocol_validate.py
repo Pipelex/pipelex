@@ -17,8 +17,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.runner import PipelexMTHDSProtocol, PipelexValidationReport
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validation_report import PipelexValidationReport
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -62,8 +64,13 @@ class TestProtocolValidate:
             assert isinstance(report, PipelexValidationReport)
             assert report.pending_signatures == []
             assert report.is_runnable is True
-            assert report.blueprint is not None
-            assert "summarize" in report.pipe_structures
+            assert report.bundle_blueprint.domain == "protocol_validate"
+            # `pipe_structures` and `validated_pipes` are keyed/identified by namespaced pipe_ref.
+            assert report.pipe_structures["protocol_validate.summarize"].output.concept_code == "protocol_validate.Summary"
+            assert {(entry["pipe_ref"], entry["status"]) for entry in report.validated_pipes} == {
+                ("protocol_validate.summarize", DryRunStatus.SUCCESS)
+            }
+            assert report.graph_spec is None
         finally:
             clear_current_library()
 

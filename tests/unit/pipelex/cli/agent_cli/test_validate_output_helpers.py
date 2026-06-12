@@ -15,7 +15,7 @@ class TestFormatValidateMarkdown:
         result: dict[str, Any] = {
             "success": True,
             "bundle_path": "/fake/method.mthds",
-            "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
+            "validated_pipes": [{"pipe_ref": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
             "pending_signatures": ["research.find_key_findings", "research.rank_findings"],
             "is_runnable": False,
@@ -41,7 +41,7 @@ class TestFormatValidateMarkdown:
         result: dict[str, Any] = {
             "success": True,
             "bundle_path": "/fake/method.mthds",
-            "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
+            "validated_pipes": [{"pipe_ref": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
             "pending_signatures": [],
             "is_runnable": True,
@@ -60,7 +60,7 @@ class TestFormatValidateMarkdown:
         """
         without_key: dict[str, Any] = {
             "success": True,
-            "validated_pipes": [{"pipe_code": "research.research_brief", "status": "SUCCESS"}],
+            "validated_pipes": [{"pipe_ref": "research.research_brief", "status": "SUCCESS"}],
             "total_pipes": 1,
         }
 
