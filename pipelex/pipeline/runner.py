@@ -63,6 +63,8 @@ class PipelexValidationReport(ValidationReport):
     blueprint: Any = None
     graph_spec: Any = None
     pipe_structures: Any = None
+    pending_signatures: list[str] = Field(default_factory=list)
+    is_runnable: bool = True
 
 
 class PipelexModelDeck(MthdsModelDeck):
@@ -349,7 +351,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         Wraps `validate_bundle` and maps its result onto the protocol's
         `ValidationReport`: the parsed blueprint(s) and per-pipe structures are
         reported; `graph_spec` stays None (the dry run validates the graph
-        without materializing a spec artifact).
+        without materializing a spec artifact). The runnability verdict is
+        reported as `pending_signatures` (qualified refs of pipes still
+        declared as `PipeSignature` in the assembled library) plus
+        `is_runnable = not pending_signatures` — the same convention as the
+        agent-CLI / builder validate envelopes. It only matters on the lenient
+        `allow_signatures=True` path: in strict mode an unsatisfied signature
+        makes `validate_bundle` raise instead.
 
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
@@ -389,6 +397,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             blueprint=blueprints_dump[0] if len(blueprints_dump) == 1 else blueprints_dump,
             graph_spec=None,
             pipe_structures=pipe_structures,
+            pending_signatures=result.pending_signatures,
+            is_runnable=not result.pending_signatures,
         )
 
     @override
