@@ -60,11 +60,15 @@ if TYPE_CHECKING:
 
 class PipelexModelDeck(MthdsModelDeck):
     """Pipelex's model deck — the protocol base plus this implementation's
-    routing metadata (aliases, waterfalls).
+    routing metadata (aliases, waterfalls), keyed by model category.
+
+    The routing extensions are category-scoped on purpose: the same alias name
+    (e.g. `default-small`) legitimately exists in several categories pointing at
+    different models, so a flat map would silently lose entries on collision.
     """
 
-    aliases: dict[str, str] = Field(default_factory=dict)
-    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    aliases: dict[str, dict[str, str]] = Field(default_factory=dict)
+    waterfalls: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
 
 
 class PipelexVersionInfo(VersionInfo):
@@ -434,31 +438,29 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     async def models(self, category: MthdsModelCategory | None = None) -> PipelexModelDeck:
         """The model deck this runtime can route to — protocol `models`.
 
-        Wraps the builder's `list_models` and shapes its per-category payload
-        into the protocol `ModelDeck`.
+        Wraps the builder's `list_models`: presets project into the protocol's flat
+        `models` list (each entry carries its category as `type`); the aliases and
+        waterfalls routing extensions stay keyed by category — the same alias name
+        exists in several categories pointing at different models, so flattening
+        them would silently drop entries on collision.
 
         Args:
             category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
 
         Returns:
-            PipelexModelDeck with the flat model list, aliases, and routing waterfalls.
+            PipelexModelDeck with the flat model list and the category-keyed
+            aliases and routing waterfalls.
         """
         categories = [ModelCategory(category)] if category is not None else None
         deck_raw = list_models(categories=categories)
         models: list[MthdsModelInfo] = []
-        aliases: dict[str, str] = {}
-        waterfalls: dict[str, list[str]] = {}
         presets_by_category: dict[str, list[dict[str, Any]]] = deck_raw["presets"]
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
             for preset in category_presets:
                 models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
-        for category_aliases in aliases_by_category.values():
-            aliases.update(category_aliases)
-        for category_waterfalls in waterfalls_by_category.values():
-            waterfalls.update(category_waterfalls)
-        return PipelexModelDeck(models=models, aliases=aliases, waterfalls=waterfalls)
+        return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)
 
     @override
     async def version(self) -> VersionInfo:
