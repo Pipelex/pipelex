@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -358,8 +357,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         (primary-selection rule: first blueprint declaring one), it is dry-run
         in-process via `dry_run_pipe_in_process` against the validation library
         and the resulting graph rides on the report. A graph-arm domain failure
-        (`PipelexError`, pydantic `ValidationError`, polyfactory
-        `FactoryException` — the mock-input mint shapes) degrades to
+        (`PipelexError`, polyfactory `FactoryException`, or any `ValueError` —
+        covering pydantic `ValidationError` and the ValueError-family domain
+        errors of the mock-input mint and schema resolution) degrades to
         `graph_spec=None` with validation still successful — the same contract
         as the Temporal validate activity, so every backend answers identically
         for the same bundle. No declared `main_pipe` means no graph.
@@ -388,6 +388,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # dry-runs the main pipe against the loaded library.
         prev_library_id = get_current_library_id_or_none()
         validation_library_id: str | None = None
+        # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
+        # exception the CALLER is currently handling (validate awaited inside an except block)
+        # and would wrongly suppress a genuine teardown failure after a successful body.
+        body_succeeded = False
         try:
             result = await validate_bundle(
                 mthds_contents=mthds_contents,
@@ -404,8 +408,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 library_id=validation_library_id,
                 log_context="Protocol validate",
             )
+            body_succeeded = True
         finally:
-            primary_error = sys.exc_info()[1]
             if validation_library_id is not None and validation_library_id != prev_library_id:
                 # Restore the caller's outer current-library FIRST so the guarantee
                 # survives a teardown raise — mirrors act_dry_validate.
@@ -420,7 +424,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                     # caller's error would name the teardown instead of the actual problem) —
                     # suppress it and let the primary propagate; raise it only when the body
                     # succeeded. Mirrors act_dry_validate's finally.
-                    if primary_error is None:
+                    if body_succeeded:
                         raise
                     log.error(
                         f"Protocol validate: library teardown also failed after a body error; "

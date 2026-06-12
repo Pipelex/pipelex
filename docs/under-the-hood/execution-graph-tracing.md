@@ -83,7 +83,7 @@ graph_spec = response.pipe_output.graph_spec
 ```
 
 !!! tip "Dry run from MTHDS content"
-    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipeline/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands and the API, which wires the same DRY-mode runner for you. It owns its graph transport (a scoped in-memory event log), so it produces the graph regardless of the host's `tracing_config` and never writes trace files as a side effect.
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipeline/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands, which wires the same DRY-mode runner for you. It owns its graph transport (a scoped in-memory event log), so it produces the graph regardless of the host's `tracing_config` and never writes trace files as a side effect.
 
 ### Outputs
 

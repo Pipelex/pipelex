@@ -33,6 +33,7 @@ from pipelex.config import get_config
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
+from pipelex.pipeline.exceptions import PipeStructuresError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
@@ -293,6 +294,21 @@ class TestDryValidateActivityInMemory:
         with pytest.raises(WorkflowFailureError):
             await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=False))
         assert sweep_spy.call_count == 1
+
+    async def test_pipe_structures_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
+        """PipeStructuresError is non-retryable at the workflow tier, like ValidateBundleError —
+        a deterministic schema-render failure must run the activity exactly once. Pins the
+        string match on the ApplicationError type name in wf_dry_validate's retry policy: if
+        the class is renamed without updating the policy, the sweep silently re-runs and only
+        this assertion catches it.
+        """
+        structures_mock = mocker.patch(
+            "pipelex.temporal.tprl_pipe.act_dry_validate.build_pipe_structures",
+            side_effect=PipeStructuresError(message="simulated schema render failure"),
+        )
+        with pytest.raises(WorkflowFailureError):
+            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_ALPHA_MTHDS]))
+        assert structures_mock.call_count == 1
 
     async def test_no_main_pipe_and_no_pipe_code_yields_no_graph(self, temporal_client: TemporalClient) -> None:
         """Without a declared main_pipe and without an explicit pipe_code, the graph arm is

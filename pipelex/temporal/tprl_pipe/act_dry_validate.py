@@ -39,8 +39,6 @@ same bundle. Only non-Pipelex programming bugs propagate and fail the activity, 
 ``assemble_tracing``'s bug-propagation policy.
 """
 
-import sys
-
 from pydantic import BaseModel
 from temporalio import activity
 
@@ -116,6 +114,10 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         allow_signatures=arg.allow_signatures,
     )
     library_id = get_current_library_id_or_none()
+    # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
+    # exception the CALLER is currently handling and would wrongly suppress a genuine
+    # teardown failure after a successful body.
+    body_succeeded = False
     try:
         # Pipe structures: built INSIDE the library window (D10) — the JSON-Schema rendering
         # resolves bundle-defined structure classes through the loaded library's class registry.
@@ -130,16 +132,17 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
             log_context="act_dry_validate",
         )
 
-        return DryValidateResult(
+        result = DryValidateResult(
             dry_run_outputs=validate_result.dry_run_result,
             graph_spec=graph_spec,
             pending_signatures=validate_result.pending_signatures,
             pipe_structures=pipe_structures,
         )
+        body_succeeded = True
+        return result
     finally:
         # Restore the caller's outer current-library FIRST so the guarantee survives a teardown
         # raise, then tear the validated library down once — mirrors acquire_and_validate.
-        primary_error = sys.exc_info()[1]
         if prev_library_id is not None and prev_library_id != library_id:
             set_current_library(library_id=prev_library_id)
         else:
@@ -152,7 +155,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
                 # 422 would name the teardown instead of the user's actual problem) — suppress
                 # it and let the primary propagate; raise it only when the body succeeded.
                 # Mirrors PipeRun.run's close_tracer handling.
-                if primary_error is None:
+                if body_succeeded:
                     raise
                 log.error(
                     f"act_dry_validate: library teardown also failed after a body error; "

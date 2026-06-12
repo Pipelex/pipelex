@@ -17,9 +17,10 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import PipeStructuresError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validation_report import PipelexValidationReport
 
@@ -246,3 +247,56 @@ class TestProtocolValidate:
         runner = PipelexMTHDSProtocol()
         await runner.validate(mthds_contents=[_COMPLETE_MTHDS])
         assert get_current_library_id_or_none() is None
+
+    async def test_teardown_failure_after_success_propagates(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """A teardown raise after a SUCCESSFUL body propagates to the caller (never silently
+        suppressed), with the caller's current-library already restored first.
+
+        Also a regression pin for the body-success detection: the wrapper must key suppression
+        on its OWN body outcome, not on ``sys.exc_info()`` — which also sees an exception the
+        caller happens to be handling and would wrongly swallow the teardown failure here.
+        """
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            library_manager = get_library_manager()
+            mocker.patch.object(library_manager, "teardown", side_effect=LibraryError("simulated teardown failure"))
+
+            runner = PipelexMTHDSProtocol()
+            with pytest.raises(LibraryError, match="simulated teardown failure"):
+                await runner.validate(mthds_contents=[_COMPLETE_MTHDS])
+
+            assert get_current_library_id_or_none() == outer_library_id
+        finally:
+            clear_current_library()
+
+    async def test_body_failure_mid_window_propagates_over_teardown_failure(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """When the body fails INSIDE the library window and teardown ALSO fails, the BODY's
+        error reaches the caller (the teardown error is suppressed and logged) and the caller's
+        current-library is restored — the failure path of the wrapper's lifecycle contract.
+        """
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            library_manager = get_library_manager()
+            mocker.patch(
+                "pipelex.pipeline.runner.build_pipe_structures",
+                side_effect=PipeStructuresError(message="simulated render failure"),
+            )
+            mocker.patch.object(library_manager, "teardown", side_effect=LibraryError("simulated teardown failure"))
+
+            runner = PipelexMTHDSProtocol()
+            with pytest.raises(PipeStructuresError, match="simulated render failure"):
+                await runner.validate(mthds_contents=[_COMPLETE_MTHDS])
+
+            assert get_current_library_id_or_none() == outer_library_id
+        finally:
+            clear_current_library()

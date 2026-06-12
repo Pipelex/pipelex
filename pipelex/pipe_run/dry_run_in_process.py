@@ -10,7 +10,6 @@ an import cycle through `runner`.
 """
 
 from polyfactory.exceptions import FactoryException
-from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
@@ -19,7 +18,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import get_required_pipe, scoped_content_generator, scoped_event_log, scoped_pipe_router
+from pipelex.hub import get_library_manager, scoped_content_generator, scoped_event_log, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -37,12 +36,14 @@ async def best_effort_graph_spec(pipe_ref: str | None, *, library_id: str | None
     The ONE implementation of the validate graph-arm contract, shared by every backend
     (`PipelexMTHDSProtocol.validate` and the Temporal validate activity) so they answer
     identically for the same bundle: no target or no library means no graph; pipe
-    resolution sits INSIDE the catch on purpose (an unknown ``pipe_ref`` degrades like
-    any other graph-arm domain failure); an expected dry-run domain failure —
-    ``PipelexError``, pydantic ``ValidationError``, polyfactory ``FactoryException``
-    (the mock-input mint shapes, the same tuple ``BundleValidator._classify_pipe``
-    catches) — degrades to ``None`` with a warning. Only non-Pipelex programming bugs
-    propagate.
+    resolution targets the EXPLICIT ``library_id`` (never the ambient current-library
+    contextvar — the caller captured the validation library once and the graph must come
+    from that same library) and sits INSIDE the catch on purpose (an unknown ``pipe_ref``
+    degrades like any other graph-arm domain failure); an expected dry-run domain
+    failure — ``PipelexError``, polyfactory ``FactoryException``, or any ``ValueError``
+    (covers pydantic ``ValidationError`` and the ValueError-family domain errors such as
+    ``ConceptValueError``, all reachable from the mock-input mint and schema resolution) —
+    degrades to ``None`` with a warning. Only non-Pipelex programming bugs propagate.
 
     Args:
         pipe_ref: The namespaced ref of the pipe to dry-run, or ``None`` for no graph.
@@ -55,12 +56,12 @@ async def best_effort_graph_spec(pipe_ref: str | None, *, library_id: str | None
     if not pipe_ref or not library_id:
         return None
     try:
-        pipe = get_required_pipe(pipe_code=pipe_ref)
+        pipe = get_library_manager().get_library(library_id=library_id).pipe_library.get_required_pipe(pipe_code=pipe_ref)
         return await dry_run_pipe_in_process(pipe=pipe, library_id=library_id)
-    except (PipelexError, ValidationError, FactoryException) as graph_error:
+    except (PipelexError, FactoryException, ValueError) as graph_error:
         log.warning(
             f"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph "
-            f"({type(graph_error).__name__}); returning validation result without graph_spec"
+            f"({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec"
         )
         return None
 

@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUser
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
+from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipeline.exceptions import PipeStructuresError, ValidateBundleError
@@ -118,9 +119,10 @@ def build_pipe_structures(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCont
         `pipe_ref` → `PipeIOContract` for every given pipe.
 
     Raises:
-        PipeStructuresError: When a pipe input's JSON-Schema rendering fails (a pydantic
-            schema-generation error on a structure class) — converted here so every
-            validate surface reports the same structured error.
+        PipeStructuresError: When a pipe input's JSON-Schema rendering fails — a pydantic
+            schema-generation error on a structure class, a structure class missing from
+            the registry (`ConceptValueError`), or a render-shape drift — converted here
+            so every validate surface reports the same structured error.
     """
     # Per-call memo: pipes routinely share input concepts, and the JSON-Schema rendering
     # (pydantic's model_json_schema, uncached) would otherwise be regenerated once per
@@ -132,20 +134,23 @@ def build_pipe_structures(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCont
         pipe_inputs: dict[str, PipeInputContract] = {}
         for var_name, stuff_spec in pipe.inputs.root.items():
             memo_key = (stuff_spec.concept.concept_ref, stuff_spec.is_multiple())
-            schema_repr = schema_memo.get(memo_key)
-            if schema_repr is None:
+            json_schema = schema_memo.get(memo_key)
+            if json_schema is None:
                 try:
-                    schema_repr = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)
-                except (PydanticUserError, PydanticUndefinedAnnotation) as exc:
+                    # Indexing (not .get with a default) is deliberate: a render-shape drift
+                    # must surface as the structured error below, never ship a silently
+                    # empty schema on the wire.
+                    json_schema = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)["content"]
+                except (ConceptValueError, KeyError, PydanticUserError, PydanticUndefinedAnnotation) as exc:
                     msg = (
                         f"Failed to render the JSON Schema for input '{var_name}' of pipe "
                         f"'{pipe.pipe_ref}' (concept '{stuff_spec.concept.concept_ref}'): {exc}"
                     )
                     raise PipeStructuresError(message=msg) from exc
-                schema_memo[memo_key] = schema_repr
+                schema_memo[memo_key] = json_schema
             pipe_inputs[var_name] = PipeInputContract(
-                concept_code=schema_repr.get("concept", ""),
-                json_schema=schema_repr.get("content", {}),
+                concept_code=stuff_spec.concept.concept_ref,
+                json_schema=json_schema,
             )
         pipe_output = PipeOutputContract(
             concept_code=pipe.output.concept.concept_ref,
