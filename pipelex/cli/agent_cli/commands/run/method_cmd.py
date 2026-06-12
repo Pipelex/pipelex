@@ -124,7 +124,8 @@ def run_method_cmd(
             if mock_inputs:
                 agent_error("--mock-inputs is not supported with --runner api", "ArgumentError")
 
-            from mthds.client.exceptions import ClientAuthenticationError, PipelineRequestError  # noqa: PLC0415
+            from mthds.protocol.exceptions import PipelineRequestError  # noqa: PLC0415
+            from mthds.runners.api.exceptions import ClientAuthenticationError  # noqa: PLC0415
 
             try:
                 result = asyncio.run(

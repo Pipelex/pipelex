@@ -6,7 +6,7 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_extract.test_data import PipeExtractTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_extract"]
@@ -32,11 +32,11 @@ class TestPipeExtract:
         bot-block HEAD requests with 403, and the pre-flight check must NOT abort
         the pipeline — the downstream extractor is the source of truth.
         """
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        pipeline_response = await runner.execute_pipeline(
+        pipeline_response = await runner.execute(
             pipe_code="extract_web_page_e2e",
             inputs={
                 "document": DocumentContent(url=url),

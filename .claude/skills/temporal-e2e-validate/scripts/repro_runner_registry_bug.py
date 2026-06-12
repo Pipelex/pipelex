@@ -27,7 +27,7 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 DEFAULT_BUNDLE = "tests/integration/pipelex/temporal/library_crate/dynamic_concept_sequence.mthds"
 DEFAULT_PIPE = "dynamic_greeting_sequence"
@@ -35,7 +35,7 @@ DEFAULT_PIPE = "dynamic_greeting_sequence"
 
 async def submit(bundle: str, pipe_code: str) -> None:
     bundle_content = Path(bundle).read_text(encoding="utf-8")
-    runner = PipelexRunner(
+    runner = PipelexMTHDSProtocol(
         bundle_uris=[bundle],
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=None,
@@ -43,13 +43,13 @@ async def submit(bundle: str, pipe_code: str) -> None:
     )
     delivery = DeliveryAssignment(storage=StorageTarget())
     print(f"Submitting pipe='{pipe_code}' with delivery_assignment={delivery!r}")
-    response = await runner.execute_pipeline(
+    response = await runner.execute(
         pipe_code=pipe_code,
         mthds_contents=[bundle_content],
         inputs=None,
         delivery_assignment=delivery,
     )
-    print(f"OK: pipeline_run_id={response.pipeline_run_id} state={response.pipeline_state}")
+    print(f"OK: pipeline_run_id={response.pipeline_run_id} state={response.state}")
 
 
 def main() -> None:

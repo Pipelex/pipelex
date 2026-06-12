@@ -72,6 +72,8 @@ class TestDeliveryExecutor:
         call_kwargs = mock_client.post.call_args
         payload = call_kwargs.kwargs["json"]
         assert payload["pipeline_run_id"] == "plr-456"
+        assert payload["state"] == "COMPLETED"
+        # Transitional legacy spelling rides along for one release (master D1/D7).
         assert payload["status"] == "COMPLETED"
         assert "result_url" not in payload
 

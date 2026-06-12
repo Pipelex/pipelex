@@ -69,7 +69,7 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 # Why silence everything? The agent CLI is machine-consumed. Its contract is:
 # stdout = structured success envelope (JSON or markdown), stderr = structured error
 # envelope. ANY log line on stderr — DEBUG, INFO, WARNING, anything — corrupts the
-# error-envelope channel for downstream parsers (e.g. mthds-js's ``PipelexRunner``
+# error-envelope channel for downstream parsers (e.g. mthds-js's ``PipelexMTHDSProtocol``
 # doing ``JSON.parse(stderr)``). This is not a verbosity setting; it's the design.
 # There is no ``--log-level`` escape hatch on ``pipelex-agent``: when debugging is
 # needed, use the human ``pipelex`` CLI instead.

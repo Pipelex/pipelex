@@ -58,8 +58,8 @@ class TestAgentRunCostReport:
         response = mocker.MagicMock()
         response.pipe_output = pipe_output
         runner = mocker.MagicMock()
-        runner.execute_pipeline = mocker.AsyncMock(return_value=response)
-        mocker.patch(f"{_RUN_CORE_MODULE}.PipelexRunner", return_value=runner)
+        runner.execute = mocker.AsyncMock(return_value=response)
+        mocker.patch(f"{_RUN_CORE_MODULE}.PipelexMTHDSProtocol", return_value=runner)
 
     async def test_cost_report_in_with_memory_json(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         pipe_output = PipeOutput(

@@ -11,7 +11,6 @@ from typing import Any, cast
 
 import shortuuid
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -19,6 +18,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_storage_provider
+from pipelex.pipeline.exceptions import PipelineInputContentError
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -194,6 +194,10 @@ async def _normalize_url_content(
         The original content if no normalization needed, or a new instance
         with the normalized URL.
     """
+    if not content.url.strip():
+        msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
+        raise PipelineInputContentError(msg)
+
     resolved_uri = resolve_uri(content.url)
 
     if isinstance(resolved_uri, ResolvedBase64DataUrl):
@@ -217,12 +221,15 @@ async def _normalize_url_content(
         if not get_config().pipelex.storage_config.is_upload_local_content_enabled:
             return content
 
-        # Read local file, detect type, upload to storage
+        # Read local file, detect type, upload to storage. OSError covers
+        # the whole caller-controllable failure surface (FileNotFoundError,
+        # IsADirectoryError, PermissionError, name-too-long, ...) — all of
+        # them mean the supplied path is unusable, an INPUT fault.
         try:
             raw_bytes = await load_binary_async(Path(resolved_uri.path))
-        except FileNotFoundError as exc:
-            msg = f"Input file not found: '{resolved_uri.path}'"
-            raise PipelexError(msg) from exc
+        except OSError as exc:
+            msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
+            raise PipelineInputContentError(msg) from exc
         file_type = detect_file_type_from_bytes(raw_bytes)
         key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
         storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)

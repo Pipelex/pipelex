@@ -23,7 +23,7 @@ from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_run_cost_report
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 
@@ -76,8 +76,8 @@ class TestMockUsageDirect:
 
     async def _run_mock_usage(self, pipe_code: str) -> PipeOutput:
         # A DRY run; is_mock_usage switches the leaf reporting to non-zero synthetic usage.
-        runner = PipelexRunner(pipe_run_mode=PipeRunMode.DRY, is_mock_usage=True, execution_config=self._config())
-        response = await runner.execute_pipeline(pipe_code=pipe_code, mthds_contents=[_MTHDS])
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, is_mock_usage=True, execution_config=self._config())
+        response = await runner.execute(pipe_code=pipe_code, mthds_contents=[_MTHDS])
         return response.pipe_output
 
     async def test_text_pipe_mocks_leaf_and_assembles_reportable_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:

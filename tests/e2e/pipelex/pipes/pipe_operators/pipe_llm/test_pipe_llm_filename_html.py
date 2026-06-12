@@ -5,7 +5,7 @@ import pytest
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.urls import URLs
 from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases
@@ -33,11 +33,11 @@ class TestFilenameHtmlE2E:
         assert ImageContent(url=URLs.png_example_1).filename is None
         assert DocumentContent(url=URLs.pdf_example_1).filename is None
 
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="describe_with_filenames_e2e",
             inputs={
                 "image": image_content,

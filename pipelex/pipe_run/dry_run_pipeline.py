@@ -20,7 +20,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
@@ -78,7 +78,7 @@ async def dry_run_pipeline(
         mock_inputs=True,
     )
 
-    runner = PipelexRunner(
+    runner = PipelexMTHDSProtocol(
         bundle_uris=bundle_uris,
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=execution_config,
@@ -90,7 +90,7 @@ async def dry_run_pipeline(
     # disabled (e.g. pipelex-api's /validate in direct mode) still gets its graph, and a host
     # with a configured backend doesn't get trace files written as a side effect of validation.
     with scoped_event_log(InMemoryEventLog()):
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code=pipe_code,
             mthds_contents=mthds_contents,
         )

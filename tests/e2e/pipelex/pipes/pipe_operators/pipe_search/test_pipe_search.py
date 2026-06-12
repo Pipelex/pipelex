@@ -6,7 +6,7 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_search.test_data import PipeSearchTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_search"]
@@ -32,11 +32,11 @@ class TestPipeSearch:
         input_value: str,
     ) -> None:
         """Test a sourced web search that returns an answer with sources."""
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
-        pipeline_response = await runner.execute_pipeline(
+        pipeline_response = await runner.execute(
             pipe_code=pipe_code,
             inputs={
                 input_name: TextContent(text=input_value),

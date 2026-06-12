@@ -1,6 +1,6 @@
 """E2E test that the agent CLI's stdout stays clean for JSON-emitting commands.
 
-Downstream tooling (e.g. ``mthds-js``'s ``PipelexRunner``) calls ``JSON.parse(stdout)``
+Downstream tooling (e.g. ``mthds-js``'s ``PipelexMTHDSProtocol``) calls ``JSON.parse(stdout)``
 on commands like ``pipelex-agent models --format json``. The package-default
 ``console_log_target`` / ``console_print_target`` must therefore route logs and rich
 prints to stderr — otherwise a single log line on a setup code path will break every

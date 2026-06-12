@@ -54,7 +54,7 @@ def _config(*, generate_graph: bool, generate_usage: bool) -> PipelineExecutionC
 def _cleanup(pipeline_run_id: str, library_id: str) -> None:
     """Tear down the per-run state pipeline_run_setup leaves open on the success path.
 
-    The success path intentionally does NOT close the tracer / event-log context; execute_pipeline
+    The success path intentionally does NOT close the tracer / event-log context; execute
     normally owns this teardown. Since this test calls pipeline_run_setup directly, it cleans up itself.
     """
     get_report_delegate().clear_event_log(context_key=pipeline_run_id)

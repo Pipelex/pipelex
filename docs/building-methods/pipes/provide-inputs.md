@@ -383,7 +383,7 @@ from pipelex.core.stuffs.stuff import DictStuff
 client = PipelexClient(api_token="YOUR_API_KEY")
 
 # Using DictStuff instance with dict content
-response = await client.execute_pipeline(
+response = await client.execute(
     pipe_code="process_invoice",
     inputs={
         "invoice": DictStuff(
@@ -398,7 +398,7 @@ response = await client.execute_pipeline(
 )
 
 # Using DictStuff instance with list of dicts
-response = await client.execute_pipeline(
+response = await client.execute(
     pipe_code="process_invoices",
     inputs={
         "invoices": DictStuff(

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
 from pipelex.config import get_config
@@ -60,8 +60,8 @@ async def pipeline_run_setup(
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
-    This function handles all the common setup logic for both ``execute_pipeline``
-    and ``start_pipeline``, including library setup, pipe loading, working memory
+    This function handles all the common setup logic for both ``execute``
+    and ``start``, including library setup, pipe loading, working memory
     initialization, and pipe job creation.
 
     Parameters
