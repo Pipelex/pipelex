@@ -10,10 +10,12 @@ from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
 from mthds.protocol.models import ValidationReport, VersionInfo
-from mthds.protocol.protocol import MTHDSProtocol
+from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
+from polyfactory.exceptions import FactoryException
 from pydantic import Field, ValidationError
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.builder.operations.models_ops import ModelCategory, list_models
 from pipelex.config import get_config
@@ -25,12 +27,14 @@ from pipelex.hub import (
     get_pipe_run,
     get_pipeline_manager,
     get_report_delegate,
+    get_required_pipe,
     get_telemetry_manager,
     set_current_library,
 )
+from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures
+from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures, select_primary_blueprint
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -47,14 +51,18 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
-# The MTHDS Protocol version this runtime implements (mthds-protocol.openapi.yaml).
-MTHDS_PROTOCOL_VERSION = "0.6.0"
+# The MTHDS Protocol version this runtime implements — the SDK's PROTOCOL_VERSION is the
+# single source of truth; runners do not override or interpret it. Kept as a re-export only
+# because pipelex-api's /version route still imports it from here at module load; it goes
+# away once pipelex-api imports the SDK constant directly.
+MTHDS_PROTOCOL_VERSION = PROTOCOL_VERSION
 
 
 class PipelexModelDeck(MthdsModelDeck):
@@ -347,9 +355,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         `is_runnable = not pending_signatures`, the same convention as the
         agent-CLI / builder validate envelopes. The verdict only matters on the
         lenient `allow_signatures=True` path: in strict mode an unsatisfied
-        signature makes `validate_bundle` raise instead. `graph_spec` stays
-        None for now (the dry run validates the graph without materializing a
-        spec artifact).
+        signature makes `validate_bundle` raise instead.
+
+        `graph_spec` is best-effort: when the batch declares a `main_pipe`
+        (primary-selection rule: first blueprint declaring one), it is dry-run
+        in-process via `dry_run_pipe_in_process` against the validation library
+        and the resulting graph rides on the report. A graph-arm domain failure
+        (`PipelexError`, pydantic `ValidationError`, polyfactory
+        `FactoryException` — the mock-input mint shapes) degrades to
+        `graph_spec=None` with validation still successful — the same contract
+        as the Temporal validate activity, so every backend answers identically
+        for the same bundle. No declared `main_pipe` means no graph.
 
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
@@ -368,9 +384,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # caller's current-library and tear the validation library down on the
         # way out — on failure `validate_bundle` already did both, making the
         # cleanup below a no-op. Artifacts that need the open validation library
-        # (`pipe_structures`'s JSON-Schema rendering resolves bundle-defined
-        # structure classes through the class registry) are built INSIDE the
-        # window, before the `finally` tears the library down.
+        # are built INSIDE the window, before the `finally` tears the library
+        # down: `pipe_structures`'s JSON-Schema rendering resolves bundle-defined
+        # structure classes through the class registry, and the graph arm
+        # dry-runs the main pipe against the loaded library.
         prev_library_id = get_current_library_id_or_none()
         try:
             result = await validate_bundle(
@@ -379,6 +396,22 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 allow_signatures=allow_signatures,
             )
             pipe_structures: dict[str, PipeIOContract] = build_pipe_structures(result.pipes)
+
+            # Graph arm: best-effort, against the SAME loaded library — mirrors the Temporal
+            # validate activity's contract. Pipe resolution sits INSIDE the catch on purpose:
+            # any graph-arm domain failure degrades to graph_spec=None, never a failed validate.
+            graph_spec: GraphSpec | None = None
+            main_pipe_ref = select_primary_blueprint(result.blueprints).main_pipe_ref
+            open_library_id = get_current_library_id_or_none()
+            if main_pipe_ref and open_library_id:
+                try:
+                    main_pipe = get_required_pipe(pipe_code=main_pipe_ref)
+                    graph_spec = await dry_run_pipe_in_process(pipe=main_pipe, library_id=open_library_id)
+                except (PipelexError, ValidationError, FactoryException) as graph_error:
+                    log.warning(
+                        f"Protocol validate: graph dry-run of '{main_pipe_ref}' did not produce a graph "
+                        f"({type(graph_error).__name__}); returning validation report without graph_spec"
+                    )
         finally:
             validation_library_id = get_current_library_id_or_none()
             if validation_library_id is not None and validation_library_id != prev_library_id:
@@ -392,7 +425,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             pipe_structures=pipe_structures,
             dry_run_result=result.dry_run_result,
             pending_signatures=result.pending_signatures,
-            graph_spec=None,
+            graph_spec=graph_spec,
         )
 
     @override

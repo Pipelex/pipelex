@@ -309,7 +309,8 @@ class MySpec(StructuredContent):
 | `pipelex/cogt/content_generation/dry_mock.py` | Leaf-level dry/mock helpers (`dry_llm_gen_*`, `build_mock_object`, `stamp_mock_main_coordination`) |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
 | `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
-| `pipelex/pipe_run/dry_run_pipeline.py` | `dry_run_pipeline()` / `dry_run_pipe_in_process()` orchestration |
+| `pipelex/pipe_run/dry_run_pipeline.py` | `dry_run_pipeline()` orchestration |
+| `pipelex/pipe_run/dry_run_in_process.py` | `dry_run_pipe_in_process()` — the in-process, never-dispatching twin |
 
 ---
 

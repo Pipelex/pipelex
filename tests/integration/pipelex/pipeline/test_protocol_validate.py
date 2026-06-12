@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -42,6 +43,39 @@ description = "Summarize a text"
 inputs = { doc = "Text" }
 output = "Summary"
 prompt = "Summarize $doc"
+"""
+
+_MAIN_PIPE_MTHDS = """
+domain = "protocol_validate_graph"
+description = "Bundle declaring a main_pipe, for the graph arm"
+main_pipe = "outline_then_summarize"
+
+[concept.Summary]
+description = "A summary"
+
+[pipe.outline_then_summarize]
+type = "PipeSequence"
+description = "Outline then summarize"
+inputs = { doc = "Text" }
+output = "Summary"
+steps = [
+  { pipe = "outline", result = "outline_text" },
+  { pipe = "summarize", result = "summary" },
+]
+
+[pipe.outline]
+type = "PipeLLM"
+description = "Outline a text"
+inputs = { doc = "Text" }
+output = "Text"
+prompt = "Outline $doc"
+
+[pipe.summarize]
+type = "PipeLLM"
+description = "Summarize an outline"
+inputs = { outline_text = "Text" }
+output = "Summary"
+prompt = "Summarize $outline_text"
 """
 
 
@@ -70,6 +104,7 @@ class TestProtocolValidate:
             assert {(entry["pipe_ref"], entry["status"]) for entry in report.validated_pipes} == {
                 ("protocol_validate.summarize", DryRunStatus.SUCCESS)
             }
+            # No main_pipe declared → no graph.
             assert report.graph_spec is None
         finally:
             clear_current_library()
@@ -84,6 +119,58 @@ class TestProtocolValidate:
             assert isinstance(report, PipelexValidationReport)
             assert report.pending_signatures == ["research.find_key_findings"]
             assert report.is_runnable is False
+        finally:
+            clear_current_library()
+
+    async def test_graph_populated_on_main_pipe_bundle(self, load_empty_library: Callable[[], str]) -> None:
+        """A bundle declaring a main_pipe gets a best-effort graph_spec covering the controller topology (D4)."""
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_MAIN_PIPE_MTHDS])
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.graph_spec is not None
+            traced_pipe_codes = {node.pipe_code for node in report.graph_spec.nodes if node.pipe_code}
+            assert {"outline_then_summarize", "outline", "summarize"} <= traced_pipe_codes
+            # The graph arm does not disturb the rest of the report.
+            assert report.is_runnable is True
+            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_structures
+        finally:
+            clear_current_library()
+
+    async def test_graph_failure_mid_window_degrades_and_lifecycle_holds(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """A graph-arm domain failure INSIDE the library window degrades to graph_spec=None with
+        validation still successful, and the wrapper's restore/teardown guarantee still holds (D4).
+        """
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
+        try:
+            library_manager = get_library_manager()
+            open_library_spy = mocker.spy(library_manager, "open_library")
+            teardown_spy = mocker.spy(library_manager, "teardown")
+            mocker.patch(
+                "pipelex.pipeline.runner.dry_run_pipe_in_process",
+                side_effect=DryRunError("simulated graph dry-run failure"),
+            )
+
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_MAIN_PIPE_MTHDS])
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.graph_spec is None
+            assert report.is_runnable is True
+            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_structures
+
+            # Lifecycle: the caller's current-library is restored and the validation library torn down.
+            assert get_current_library_id_or_none() == outer_library_id
+            validation_library_id, _ = open_library_spy.spy_return
+            latest_teardown = teardown_spy.call_args_list[-1]
+            assert latest_teardown.kwargs["library_id"] == validation_library_id
         finally:
             clear_current_library()
 

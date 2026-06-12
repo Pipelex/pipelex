@@ -28,7 +28,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_library_manager, get_pipelex_hub, get_required_pipe, scoped_current_library
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
+from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow

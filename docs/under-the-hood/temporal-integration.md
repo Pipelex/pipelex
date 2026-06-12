@@ -216,7 +216,7 @@ Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRo
 
 ## Validation Dispatch: One In-Process Activity
 
-Pipeline *execution* fans out across workflows and activities as described above — but *validation* deliberately does the opposite. When Temporal is enabled, a `/validate` job (validation sweep + graph-producing dry-run) dispatches as the one-step wrapper workflow `wf_dry_validate`, which runs a single `act_dry_validate` activity and returns `{per-pipe status map, GraphSpec | None}` in one round-trip.
+Pipeline *execution* fans out across workflows and activities as described above — but *validation* deliberately does the opposite. When Temporal is enabled, a `/validate` job (validation sweep + graph-producing dry-run) dispatches as the one-step wrapper workflow `wf_dry_validate`, which runs a single `act_dry_validate` activity and returns everything the canonical validation report needs that must be computed worker-side, in one round-trip: the per-pipe status map, the best-effort `GraphSpec`, the library-wide `pending_signatures`, and the `pipe_structures` IO contracts (built inside the worker's library window — their JSON-Schema rendering resolves bundle-defined structure classes through the loaded library's class registry, so the API side never re-acquires a library).
 
 Inside the activity everything is in-process and in-memory:
 

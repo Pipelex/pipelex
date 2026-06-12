@@ -213,6 +213,19 @@ class TestDryValidateActivityInMemory:
         traced_pipe_codes = {node.pipe_code for node in result.graph_spec.nodes if node.pipe_code}
         assert {"alpha_sequence", "alpha_first", "alpha_second"} <= traced_pipe_codes
 
+        # D10: the worker-computed wire fields cross the boundary — pipe_structures keyed by
+        # namespaced pipe_ref with typed entries surviving (de)serialization, and a complete
+        # bundle reporting nothing pending.
+        assert result.pending_signatures == []
+        assert set(result.pipe_structures) == {
+            "dry_validate_alpha.alpha_sequence",
+            "dry_validate_alpha.alpha_first",
+            "dry_validate_alpha.alpha_second",
+        }
+        sequence_contract = result.pipe_structures["dry_validate_alpha.alpha_sequence"]
+        assert sequence_contract.inputs["subject"].concept_code == "native.Text"
+        assert sequence_contract.output.concept_code == "native.Text"
+
     async def test_graph_failure_is_best_effort(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D5: an expected dry-run failure in the graph arm yields graph_spec=None, validation still OK."""
         mocker.patch(
@@ -255,11 +268,17 @@ class TestDryValidateActivityInMemory:
         assert "dry_validate_sig.unimplemented_sig" in error_report.message
 
     async def test_signatures_allowed_in_lenient_mode(self, temporal_client: TemporalClient) -> None:
-        """The same signature bundle validates in lenient mode (allow_signatures=True)."""
+        """The same signature bundle validates in lenient mode (allow_signatures=True), and the
+        runnability verdict's input crosses the boundary (D10/F5): the unsatisfied header is
+        reported in pending_signatures, with a structures entry like any concrete pipe.
+        """
         result = await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=True))
 
         assert result.dry_run_outputs["dry_validate_sig.sig_caller"].status == DryRunStatus.SUCCESS
         assert result.graph_spec is not None
+        assert result.pending_signatures == ["dry_validate_sig.unimplemented_sig"]
+        assert "dry_validate_sig.unimplemented_sig" in result.pipe_structures
+        assert result.pipe_structures["dry_validate_sig.unimplemented_sig"].output.concept_code == "native.Text"
 
     async def test_validation_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D-C5 regression: a deterministic validation failure must run the activity exactly once.
