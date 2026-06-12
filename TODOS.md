@@ -1,6 +1,15 @@
-# PR guide — additive multi-file MTHDS libraries (recursive design)
+# PR guide — additive multi-file MTHDS libraries (recursive design) + canonical MTHDS-protocol validate surface
 
-> **For reviewers.** This branch (`feature/Support-recursive-design`) makes a same-domain `.mthds` library buildable as **separate, additive files** instead of one monolithic file. That unblocks **parallel, top-down method construction**: a header file forward-declares the pipes (and the concepts they need), and definition files fill them in independently — no in-place overwrites, no transient collisions. This document describes *what changed and why* so the diff can be reviewed against intent.
+> **For reviewers.** This branch (`feature/Support-recursive-design`) carries two related bodies of work, in landing order:
+>
+> 1. **Additive multi-file libraries** (Part I below): a same-domain `.mthds` library becomes buildable as **separate, additive files** instead of one monolithic file. That unblocks **parallel, top-down method construction**: a header file forward-declares the pipes (and the concepts they need), and definition files fill them in independently — no in-place overwrites, no transient collisions.
+> 2. **Canonical MTHDS-protocol validate surface** (Part II below): the runnability verdict from Part I is promoted onto the protocol level, and `PipelexMTHDSProtocol.validate`/`models` are reworked to produce ONE canonical, typed artifact shape that the hosted API (`pipelex-api`) and the Temporal worker arm reuse instead of re-implementing. Spec: workspace `docs/specs/pipelex-mthds-protocol.md`; plan + decision register: workspace `wip/mthds-protocol-surface-alignment.md` (decisions D1–D14).
+>
+> This document describes *what changed and why* so the diff can be reviewed against intent.
+
+---
+
+# Part I — additive multi-file MTHDS libraries
 
 ## What "additive" means
 
@@ -70,7 +79,7 @@ A successful `validate bundle` (notably `--allow-signatures`) reports the librar
 
 ---
 
-## Test coverage (what proves it)
+## Part I test coverage (what proves it)
 
 - `tests/unit/pipelex/libraries/test_library_crate.py` (+ `test_library_crate_data.py`) — signature/concrete reconciliation matrix (both orders, signature+signature match/mismatch, contract mismatch).
 - `tests/unit/pipelex/libraries/test_concept_reference_validation.py` — the pure validator, incl. the cross-batch (`already_loaded_concept_refs`) case and message format.
@@ -108,15 +117,61 @@ See `wip/recursivity/` for the deeper records:
 
 ---
 
+---
+
+# Part II — canonical MTHDS-protocol validate surface
+
+The MTHDS Protocol (five routes: `execute`/`start`/`validate`/`models`/`version`) had **diverged between the local implementation and the hosted API**: same protocol operation, unrelated artifact shapes (the hosted `/validate` never called `PipelexMTHDSProtocol.validate` at all). This part makes pipelex the single owner of the canonical artifact shapes; the hosted `pipelex-api` rewires its routes through them in a companion branch (`pipelex-api@feature/Recursivity-and-protocols`). Principle: **backend overrides change backend, never shape; routes are thin wrappers adding wire-only extras** — exactly how `/execute`/`/start` already worked.
+
+## The canonical validation report
+
+`PipelexValidationReport` moved to its own module `pipelex/pipeline/validation_report.py` and is now fully **typed** (no `Any` dumps — the typed schemas flow into pipelex-api's committed OpenAPI artifact):
+
+- `bundle_blueprint: PipelexBundleBlueprint` — the batch's PRIMARY blueprint (first declaring `main_pipe`, else first). Renamed from the hosted side's `pipelex_bundle_blueprint`: blueprints are MTHDS-language artifacts, so no `pipelex_` prefix inside an already-Pipelex-branded envelope (the brand-boundaries principle in the workspace `CLAUDE.md`).
+- `pipe_structures: dict[str, PipeIOContract]` — per-pipe IO contracts keyed by **namespaced `pipe_ref`** (`domain.code`), never bare code. The builder (`build_pipe_structures`) is **ported from pipelex-api's route-local `_build_pipe_structures`** — it is runtime logic over `PipeAbstract`/`StuffSpec` the API repo should never have owned. New module `pipelex/pipeline/pipe_structures.py` (`PipeIOContract`/`PipeInputContract`/`PipeOutputContract`, `IOMultiplicity = single|variable`); JSON-Schema rendering memoized per `(concept_ref, is_multiple)` within a call (deliberately not cross-call — stale-class hazard). A pydantic schema-generation failure raises a structured `PipeStructuresError` with pipe/input context (it must not cross the Temporal boundary as a raw retryable third-party error).
+- `graph_spec: GraphSpec | None` — **best-effort real graph on the local protocol too** (was always `None`): one shared `best_effort_graph_spec(pipe_ref, *, library_id, log_context)` in `pipelex/pipe_run/dry_run_in_process.py` runs `dry_run_pipe_in_process` against the **already-open validation library, before the lifecycle teardown** — the same single-load pattern as the Temporal activity, used by both backends. Degrade catch `(PipelexError, ValidationError, FactoryException)` → `None` with a warning.
+- `validated_pipes: list[ValidatedPipeEntry]` — per-pipe sweep outcomes, same entries as the agent-CLI envelope. **`ValidatedPipeEntry` key renamed `pipe_code` → `pipe_ref`** (the value always WAS the namespaced ref — a documented misnomer, fixed before the key gets canonized onto a protocol surface). `typing_extensions.TypedDict`, not `typing.TypedDict` (pydantic rejects the latter as a model field on Python < 3.12).
+- `pending_signatures: list[str]` + `is_runnable: bool` — the Part I runnability verdict, promoted onto the protocol report.
+
+One selection rule, one constructor, every backend: `select_primary_blueprint` (in `pipe_structures.py`; also folds the previously-duplicated first-declaring-main_pipe loops in `execution_seams.py`, `dry_run_pipeline.py`, `inputs_ops.py`) and `build_validation_report(...)` (in `validation_report.py`) are the only way reports are assembled — `PipelexMTHDSProtocol.validate` locally, `ApiRunner.validate` hosted (companion branch).
+
+- `pipelex/pipeline/runner.py` — `validate` reworked: artifacts built inside the library window (the validation library id captured ONCE after `validate_bundle`; graph arm + `finally` target the same library; a teardown raise is suppressed while a body error propagates, mirroring the Temporal activity). Return annotations narrowed to the concrete `PipelexValidationReport`/`PipelexModelDeck` so typed consumers (ApiRunner, routes) get typed access. An empty `mthds_contents` list is a structured `ValidateBundleError`, not a raw `IndexError`.
+
+## Temporal wire (`DryValidateResult`)
+
+The worker computes everything with its already-loaded library and ships it across the boundary, so the API side never re-acquires a library: `DryValidateResult` gains `pending_signatures` and `pipe_structures` as **required** wire fields (version-skewed workers fail loudly instead of silently yielding `is_runnable=True`). `PipeStructuresError` is non-retryable at the `wf_dry_validate` tier alongside `ValidateBundleError`. Integration test pins both fields crossing the in-process Temporal boundary. Size sanity-checked on a large structured bundle: `pipe_structures` is an order of magnitude smaller than the `graph_spec` that already crossed the wire; the payload cap is far away.
+
+## Model deck
+
+`PipelexModelDeck.aliases`/`waterfalls` are now **keyed by category** (`{category: {alias: model}}`): the old flat maps were built by `update()`-ing per-category maps and silently dropped cross-category alias collisions (e.g. `default-small`/`best-gpt` exist per category — proven against captured baselines). The protocol's flat `models` list is unchanged.
+
+## Module moves (import-cycle breaks, mechanical)
+
+- `dry_run_pipe_in_process` → NEW `pipelex/pipe_run/dry_run_in_process.py` (its old home `dry_run_pipeline.py` imports the runner; the runner importing the graph arm from it would close a cycle).
+- `dry_run_pipeline` → `pipelex/pipeline/dry_run_pipeline.py` (layering follow-up; importers + docs re-pointed).
+- `select_primary_blueprint` lives in `pipe_structures.py`, NOT `validate_bundle.py` — importing from `validate_bundle` in `execution_seams` closed a cycle through `bundle_validator`.
+- `MTHDS_PROTOCOL_VERSION` deleted: `version()` reports the SDK's `PROTOCOL_VERSION` directly ("single source of truth … runners do not get to override it"); the temporary re-export staged for pipelex-api's import was removed once the companion branch imports the SDK constant.
+
+## Part II test coverage
+
+- `tests/unit/pipelex/pipeline/test_pipe_structures.py` — the D6 builder: `PipeSignature` pipes in lenient batches, multiplicity entry shapes, memoization, the `PipeStructuresError` wrap; `select_primary_blueprint` first-declaring / none / multiple.
+- `tests/integration/pipelex/pipeline/test_protocol_validate.py` — the canonical report shape + lifecycle: graph populated on main-pipe bundles, graph-failure-mid-window degrades to `None` while restore/teardown holds (asserted WITHOUT mocks on the real-graph case), strict-raise, empty-contents guard.
+- `tests/integration/pipelex/temporal/` — both new `DryValidateResult` fields cross the boundary.
+- Downstream proof (not in this repo): pipelex-api's suite runs against this branch via an editable pin — local↔hosted byte-identity per fixture class is pinned by its `tests/unit/test_protocol_parity.py`; the conformance repo pins the agent-CLI envelope against workspace `docs/specs/pipelex-mthds-protocol.md`.
+
+---
+
 ## Downstream (separate effort, NOT in this PR)
 
 The pipelex runtime support is complete here. The recursive **orchestrator** (`mthds-vibe`) + **worker** (`mthds-signature-expander`) + the `--allow-signatures` hook change live in the sibling `mthds-plugins` repo, prescribed by its `wip/recursive/design.md` (flipped to the additive model). Those artifacts don't exist yet; building them is a fresh effort and depends on the pipelex release carrying this branch.
+
+On the protocol side (Part II), the companion consumers ship after this branch releases: `pipelex-api@feature/Recursivity-and-protocols` (routes through the canonical report; restores its PyPI pin at the release carrying this branch), `pipelex-app@feature/protocol-alignment` (renamed wire field + `pipe_ref` lookups), `conformance@feature/Pending-signatures` (envelope conformance tests — red against `dev` pipelex until this merges).
 
 ---
 
 ## CHANGELOG (under `[Unreleased]`)
 
-The `[Unreleased]` entry in `CHANGELOG.md` covers the additive multi-file construction (reconciliation, cross-file concept resolution, domain-metadata merge, `pending_signatures`) and the `PipeSignature` taxonomy eviction (removed `PipeType`/`PipeCategory.PIPE_SIGNATURE`).
+The `[Unreleased]` entry in `CHANGELOG.md` covers the additive multi-file construction (reconciliation, cross-file concept resolution, domain-metadata merge, `pending_signatures`), the `PipeSignature` taxonomy eviction (removed `PipeType`/`PipeCategory.PIPE_SIGNATURE`), and the Part II protocol rework (canonical typed report, `pipe_ref` re-keying + D7 rename, graph arm, Temporal wire fields, category-keyed deck extensions, module moves). It also corrects the v0.33.0 entry's `protocol_version` claim (0.1.0 → 0.6.0, a factual error).
 
 ---
 
