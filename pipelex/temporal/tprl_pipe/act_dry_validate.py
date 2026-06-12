@@ -52,7 +52,8 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.validate_bundle import select_primary_blueprint, validate_bundle
+from pipelex.pipeline.pipe_structures import select_primary_blueprint
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
 

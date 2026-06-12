@@ -8,9 +8,12 @@ that was selected, and be ``None`` when nothing in the batch declares a ``main_p
 Pure parsing test (no Pipelex boot, no library): blueprints come straight from the interpreter.
 """
 
+import pytest
+
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.pipeline.validate_bundle import select_primary_blueprint
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.pipe_structures import select_primary_blueprint
 
 _NO_MAIN_PIPE_MTHDS = """
 domain = "alpha"
@@ -78,3 +81,8 @@ class TestSelectPrimaryBlueprint:
 
         assert selection.blueprint is blueprints[0]
         assert selection.main_pipe_ref == "beta.do_it"
+
+    def test_empty_batch_raises_structured_error(self) -> None:
+        """An empty batch raises a ValidateBundleError, never a raw IndexError."""
+        with pytest.raises(ValidateBundleError, match="empty batch"):
+            select_primary_blueprint([])

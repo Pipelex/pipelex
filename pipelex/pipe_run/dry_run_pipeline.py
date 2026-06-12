@@ -9,7 +9,6 @@ from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import scoped_content_generator, scoped_event_log, scoped_pipe_router
@@ -19,6 +18,7 @@ from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import prepare_pipe_job
+from pipelex.pipeline.pipe_structures import select_primary_blueprint
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -55,17 +55,12 @@ async def dry_run_pipeline(
         msg = "mthds_contents must be provided"
         raise ValueError(msg)
 
-    # Pre-parse contents to extract main_pipe_code.
+    # Pre-parse contents to extract main_pipe_code via the one shared selection rule.
     # Note: pipeline_run_setup will re-parse these contents. The double-parse is
     # accepted because the runner interface requires pipe_code upfront and does not
     # expose the internally-resolved pipe code in its response.
-    main_pipe_code: str | None = None
-
-    for content in mthds_contents:
-        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content)
-        if bundle_blueprint.main_pipe and main_pipe_code is None:
-            # Domain-qualify to avoid ambiguity across multiple domains
-            main_pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=bundle_blueprint.main_pipe)
+    blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+    main_pipe_code = select_primary_blueprint(blueprints).main_pipe_ref
 
     if not main_pipe_code:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"

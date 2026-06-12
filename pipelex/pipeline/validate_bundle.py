@@ -2,7 +2,7 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, NamedTuple, Sequence
+from typing import Literal, Sequence
 
 from pydantic import BaseModel, ValidationError
 
@@ -22,7 +22,6 @@ from pipelex.core.pipes.handle_pipe_errors import (
     categorize_pipe_validation_with_libraries_error,
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import (
@@ -75,35 +74,6 @@ def build_validated_pipes(dry_run_result: dict[str, DryRunOutput]) -> list[Valid
     across domains, so the same pipe is never reported under two identifiers by different commands.
     """
     return [ValidatedPipeEntry(pipe_ref=output.pipe_ref, status=output.status) for output in dry_run_result.values()]
-
-
-class PrimaryBlueprintSelection(NamedTuple):
-    """The primary blueprint of a validated batch and its domain-qualified main-pipe ref (if any)."""
-
-    blueprint: PipelexBundleBlueprint
-    main_pipe_ref: str | None
-
-
-def select_primary_blueprint(blueprints: Sequence[PipelexBundleBlueprint]) -> PrimaryBlueprintSelection:
-    """Select the primary blueprint of a batch: first declaring ``main_pipe``, else first.
-
-    The single selection rule shared by every validate surface (the canonical report's
-    ``bundle_blueprint``, the graph arm's target derivation, the Temporal activity) — one
-    rule, one implementation. ``main_pipe_ref`` is the domain-qualified ref of the primary
-    blueprint's ``main_pipe``, or ``None`` when no blueprint in the batch declares one.
-
-    Args:
-        blueprints: The batch's blueprints, in declaration order. Must be non-empty
-            (``validate_bundle`` always yields at least one).
-
-    Returns:
-        The primary blueprint and its qualified main-pipe ref.
-    """
-    for blueprint in blueprints:
-        if blueprint.main_pipe:
-            main_pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-            return PrimaryBlueprintSelection(blueprint=blueprint, main_pipe_ref=main_pipe_ref)
-    return PrimaryBlueprintSelection(blueprint=blueprints[0], main_pipe_ref=None)
 
 
 def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]:
@@ -275,6 +245,12 @@ async def validate_bundle(
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
         msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
+        raise ValidateBundleError(message=msg)
+    if mthds_contents is not None and not mthds_contents:
+        # An EMPTY list is not None, so it passes the provided-params check above — without this
+        # guard it would yield a blueprint-less result that downstream consumers (the canonical
+        # report's primary-blueprint selection) cannot represent.
+        msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()

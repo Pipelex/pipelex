@@ -19,8 +19,8 @@ from pydantic import Field
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.pipe_structures import PipeIOContract
-from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes, select_primary_blueprint
+from pipelex.pipeline.pipe_structures import PipeIOContract, select_primary_blueprint
+from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 

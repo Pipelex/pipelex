@@ -87,6 +87,16 @@ class TestProtocolValidate:
         finally:
             clear_current_library()
 
+    async def test_empty_contents_raises_structured_error(self) -> None:
+        """An EMPTY mthds_contents list (not None) raises a structured ValidateBundleError, never a raw IndexError.
+
+        Regression pin: the empty list passes ``validate_bundle``'s ``is not None`` param check, and
+        pre-guard it flowed into ``select_primary_blueprint([])`` → ``IndexError`` on the protocol surface.
+        """
+        runner = PipelexMTHDSProtocol()
+        with pytest.raises(ValidateBundleError, match="must not be empty"):
+            await runner.validate(mthds_contents=[])
+
     async def test_strict_mode_raises_on_unsatisfied_signature(self, load_empty_library: Callable[[], str]) -> None:
         """With the strict default (``allow_signatures=False``), an unsatisfied signature raises instead of reporting."""
         load_empty_library()

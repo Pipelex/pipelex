@@ -29,7 +29,6 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -44,6 +43,7 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
+from pipelex.pipeline.pipe_structures import select_primary_blueprint
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
@@ -112,12 +112,9 @@ def acquire_library(
             if blueprints_to_load:
                 library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
-            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the
-            # same code. main_pipe is validated as snake_case (no dots), so it is always a bare code.
-            for blueprint in all_blueprints:
-                if blueprint.main_pipe:
-                    qualified_main_pipe = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-                    break
+            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
+            # the same code — via the one shared selection rule (first declaring main_pipe, else first).
+            qualified_main_pipe = select_primary_blueprint(all_blueprints).main_pipe_ref
 
         success = True
         return library_id, qualified_main_pipe
