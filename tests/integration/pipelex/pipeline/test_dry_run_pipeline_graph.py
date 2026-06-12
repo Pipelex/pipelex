@@ -15,7 +15,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipeline
+from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 
 _DRY_RUN_GRAPH_DOMAIN = "dry_run_pipeline_graph"

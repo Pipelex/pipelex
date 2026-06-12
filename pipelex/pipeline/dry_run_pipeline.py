@@ -1,12 +1,14 @@
 """Pipeline-level dry run with graph generation.
 
 Provides a single entrypoint to dry-run an entire pipeline from MTHDS content,
-producing a GraphSpec. Used by both the CLI graph commands and the API.
+producing a GraphSpec. Used by the CLI graph commands.
 
-The in-process twin — `dry_run_pipe_in_process`, which dry-runs ONE pipe against an
-already-open library without dispatching — lives in `pipelex.pipe_run.dry_run_in_process`:
-this module imports the protocol runner, and the twin's callers (the protocol `validate`
-graph arm among them) cannot share a module with that import without a cycle.
+It lives at the pipeline altitude — it instantiates the protocol runner
+(`PipelexMTHDSProtocol`) and runs a whole bundle — unlike its in-process twin
+`dry_run_pipe_in_process` (`pipelex.pipe_run.dry_run_in_process`), which dry-runs ONE pipe
+against an already-open library without dispatching. The twin's callers (the protocol
+`validate` graph arm among them) cannot share a module with the runner import without a
+cycle, which is why the two entrypoints are separate modules at separate altitudes.
 """
 
 from pipelex.config import get_config

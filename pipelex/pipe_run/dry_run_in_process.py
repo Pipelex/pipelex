@@ -1,11 +1,12 @@
 """In-process, in-memory graph-producing dry run against an already-open library.
 
-`dry_run_pipe_in_process` is the in-process twin of `dry_run_pipeline`: it dry-runs ONE pipe
-against a library the caller already opened, never dispatches (even under a Temporal-enabled
-hub), and traces the graph into an in-memory event log. It lives in its own module — not in
-`dry_run_pipeline` — because `dry_run_pipeline` imports `PipelexMTHDSProtocol` from
-`pipelex.pipeline.runner`, and the protocol's `validate` graph arm calls this function: sharing
-a module would close an import cycle through `runner`.
+`dry_run_pipe_in_process` is the in-process twin of `dry_run_pipeline`
+(`pipelex.pipeline.dry_run_pipeline`): it dry-runs ONE pipe against a library the caller
+already opened, never dispatches (even under a Temporal-enabled hub), and traces the graph
+into an in-memory event log. It lives in its own module — not in `dry_run_pipeline` —
+because `dry_run_pipeline` imports `PipelexMTHDSProtocol` from `pipelex.pipeline.runner`,
+and the protocol's `validate` graph arm calls this function: sharing a module would close
+an import cycle through `runner`.
 """
 
 from polyfactory.exceptions import FactoryException
@@ -67,7 +68,7 @@ async def best_effort_graph_spec(pipe_ref: str | None, *, library_id: str | None
 async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> GraphSpec:
     """Dry-run ``pipe`` against an already-open library fully in-process, tracing the graph in memory.
 
-    The in-process twin of :func:`pipelex.pipe_run.dry_run_pipeline.dry_run_pipeline` for hosts
+    The in-process twin of :func:`pipelex.pipeline.dry_run_pipeline.dry_run_pipeline` for hosts
     where the hub is Temporal-enabled but the run must NOT dispatch anything — e.g. the body of
     the dry-run/validation Temporal activity, or the protocol `validate` graph arm. Three
     contextvar scopes pin the whole run (root pipe + nested controller sub-pipes + inference

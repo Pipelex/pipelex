@@ -10,7 +10,7 @@ from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
-from mthds.protocol.models import ValidationReport, VersionInfo
+from mthds.protocol.models import VersionInfo
 from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
@@ -37,7 +37,7 @@ from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structur
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.pipeline.validation_report import build_validation_report
+from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -56,12 +56,6 @@ if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
-
-# Compat re-export, referenced NOWHERE in this repo: pipelex-api's /version route still
-# imports it from here at module load. The SDK's PROTOCOL_VERSION is the single source of
-# truth (runners do not override or interpret it); this alias is deleted once pipelex-api
-# imports the SDK constant directly.
-MTHDS_PROTOCOL_VERSION = PROTOCOL_VERSION
 
 
 class PipelexModelDeck(MthdsModelDeck):
@@ -342,7 +336,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self,
         mthds_contents: list[str],
         allow_signatures: bool = False,
-    ) -> ValidationReport:
+    ) -> PipelexValidationReport:
         """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
 
         Wraps `validate_bundle` and assembles its result into the canonical
@@ -371,7 +365,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
 
         Returns:
-            ValidationReport with the structural artifacts of a valid bundle.
+            PipelexValidationReport with the structural artifacts of a valid bundle.
 
         Raises:
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
@@ -437,7 +431,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         )
 
     @override
-    async def models(self, category: MthdsModelCategory | None = None) -> MthdsModelDeck:
+    async def models(self, category: MthdsModelCategory | None = None) -> PipelexModelDeck:
         """The model deck this runtime can route to — protocol `models`.
 
         Wraps the builder's `list_models` and shapes its per-category payload
@@ -447,7 +441,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
 
         Returns:
-            ModelDeck with presets, aliases, and routing waterfalls.
+            PipelexModelDeck with the flat model list, aliases, and routing waterfalls.
         """
         categories = [ModelCategory(category)] if category is not None else None
         deck_raw = list_models(categories=categories)
