@@ -268,6 +268,18 @@ typeCheckingMode = "strict"
 
 [tool.pytest]
 minversion = "9.0"
+# pytest's default norecursedirs includes `build`, which silently skipped every test under
+# tests/unit/pipelex/cli/commands/build/ (mirroring the source layout). Override = defaults minus `build`.
+norecursedirs = [
+  "*.egg",
+  ".*",
+  "_darcs",
+  "CVS",
+  "dist",
+  "node_modules",
+  "venv",
+  "{arch}",
+]
 addopts = [
   "--import-mode=importlib",
   "-ra",                                                                   # Show all test outcomes (including skips)

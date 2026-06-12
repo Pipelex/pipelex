@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Unit tests for CLI internal logic.** New offline test coverage for the pipelex-internal logic behind the CLI commands (the spec'd CLI *interface* remains owned by the conformance suite): the doctor diagnostic checks (config files, telemetry, backend credentials/files, deck sync, model checks, fix mode, health-report rendering), the `pipelex run` core execution and its sync wrapper (bundle/main_pipe resolution, inputs loading, output/graph/working-memory/CSV saving, error-handler dispatch), the `build structures|inputs|output|runner` codegen cores, the readiness gate, the `show`/`which` report logic, and the gateway/telemetry/signature error handlers.
+
+### Fixed
+
+- **Tests under `tests/**/build/` directories were silently skipped.** pytest's default `norecursedirs` includes `build`, so the whole `tests/unit/pipelex/cli/commands/build/` directory (mirroring the source layout) was never collected in full runs — including a pre-existing cross-package refines regression test. The pytest config now overrides `norecursedirs` to the defaults minus `build`.
+
 ## [v0.33.0] - 2026-06-11
 
 ### Breaking Changes

@@ -1,17 +1,17 @@
 # Missing Tests Menu
 
-Source: full non-inference suite run with `--cov=pipelex` (overall ~72% line coverage) plus a structural sweep of `pipelex/` vs `tests/`. This is a curated menu of the gaps that matter, not an exhaustive list. Caveat: plugin inference workers' live-call paths are exercised by `inference`-marked tests that don't run in this measurement, so their numbers understate real coverage — only their offline-testable logic (factories, arg builders, error mapping) is listed here.
+Source: full non-inference suite run with `--cov=pipelex` (overall ~75% line coverage after section A was ground down — was ~72%) plus a structural sweep of `pipelex/` vs `tests/`. This is a curated menu of the gaps that matter, not an exhaustive list. Caveat: plugin inference workers' live-call paths are exercised by `inference`-marked tests that don't run in this measurement, so their numbers understate real coverage — only their offline-testable logic (factories, arg builders, error mapping) is listed here.
 
-## A. CLI internal logic — highest leverage
+## A. CLI internal logic — DONE (2026-06-12, see TODOS.md for the as-built notes)
 
 Scope note: the spec'd CLI *interface* (arg parsing, `--help` surfaces, `init` behavior, `validate --all`, agent JSON output shapes) is owned by `../conformance` (paired with `docs/specs/`) — not duplicated here. This section is only the pipelex-internal logic those commands run, which conformance's subprocess-level tests never reach (and which doesn't count toward conformance coverage anyway). All testable offline with Typer's `CliRunner` or direct calls into the `_core` modules.
 
-- `cli/commands/doctor_cmd.py` (21%, ~600 stmts) — the diagnostic *checks* themselves (conformance only smoke-tests `--help`); if doctor breaks, users are stranded when things go wrong.
-- `cli/commands/run/_run_core.py` (32%) — the main `pipelex run` execution logic; happy path + error paths barely covered.
-- `cli/commands/show_cmd.py` (27%) and `which_cmd.py` (27%) — the report *content* (not the interface); cheap to test, pure output formatting.
-- `cli/commands/build/*` internals (`_output_core`, `_runner_core`, `_inputs_core`, `structures_cmd` — 21–41%) — the codegen logic behind the spec'd build interface; silent breakage corrupts generated projects.
-- `cli/readiness.py` (20%) — gates whether the CLI considers itself usable; wrong answer blocks everything.
-- `cli/error_handlers.py` (51%, ~290 stmts) — how every CLI error is shaped for the user; untested branches mean ugly tracebacks instead of friendly messages.
+- [x] `cli/commands/doctor_cmd.py` (21% → **92%**, ~600 stmts) — all diagnostic checks, fix mode, health-report rendering covered; remainder ≈ `setup_doctor_runtime` (once-per-process log.configure side effects, deliberately untested).
+- [x] `cli/commands/run/_run_core.py` (32% → **94%**) — happy path, bundle/inputs resolution, output saving (graphs/main_stuff/working-memory/CSV), wrapper error dispatch.
+- [x] `cli/commands/show_cmd.py` (27% → **73%**) and `which_cmd.py` (27% → **66%**) — the `do_*` report logic is fully covered; the remainder is the Typer wrappers that boot Pipelex (interface layer, conformance-owned).
+- [x] `cli/commands/build/*` internals (`_output_core` 41→**74%**, `_runner_core` 21→**76%**, `_inputs_core` 21→**72%**, `structures_cmd` 41→**69%**) — codegen cores covered; remainder is the Typer command wrappers. NB: these tests live in `tests/unit/pipelex/cli/commands/build/`, which pytest's default `norecursedirs` silently skipped until the pyproject override (defaults minus `build`) — the pre-existing cross-package refines regression test there had never been running.
+- [x] `cli/readiness.py` (20% → **97%**) — venv detection, dev-install detection, and the readiness gate.
+- [x] `cli/error_handlers.py` (51% → **99%**, ~290 stmts) — every handler incl. gateway/telemetry/signature ones, panel rendering, validation-error detail sections.
 
 ## B. Temporal distributed execution — operational risk
 
@@ -56,7 +56,7 @@ Not the live calls — the factories, arg-builders, and config logic around them
 
 ## Suggested grind order
 
-1. **A (CLI)** — biggest user-facing risk, cheapest to write (CliRunner, no inference), huge statement count payoff.
-2. **C (inference plumbing)** — pure-function factories, fast unit tests, protects the money path.
+1. ~~**A (CLI)**~~ — DONE 2026-06-12 (branch `feature/Add-tests`; plan + as-built notes in TODOS.md).
+2. **C (inference plumbing)** — pure-function factories, fast unit tests, protects the money path. ← NEXT
 3. **B (Temporal)** — before the integration ships to prod.
 4. **D then E** — fill-in work, good for small sessions.
