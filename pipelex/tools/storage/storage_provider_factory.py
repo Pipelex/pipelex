@@ -21,7 +21,7 @@ def make_storage_provider_from_config(storage_provider_config: StorageProviderCo
         A configured storage provider instance.
 
     Raises:
-        PipelexConfigError: If required provider-specific config is missing.
+        StorageConfigError: If the required provider-specific config is missing or fails its lazy_validate checks.
     """
     match storage_provider_config.method:
         case StorageMethod.LOCAL:

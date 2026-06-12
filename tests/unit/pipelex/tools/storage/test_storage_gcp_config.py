@@ -75,7 +75,6 @@ class TestStorageGcpConfig:
         ("lifespan_setting", "expected_lifespan"),
         [
             pytest.param(3600, 3600, id="int-passthrough"),
-            pytest.param(0, 0, id="zero-passthrough"),
             pytest.param("disabled", None, id="disabled-maps-to-none"),
         ],
     )
@@ -87,3 +86,11 @@ class TestStorageGcpConfig:
         """signed_urls_lifespan passes integers through and maps the 'disabled' literal to None."""
         config = make_gcp_config(signed_urls_lifespan_seconds=lifespan_setting)
         assert config.signed_urls_lifespan == expected_lifespan
+
+    @pytest.mark.parametrize("lifespan_setting", [pytest.param(0, id="zero"), pytest.param(-300, id="negative")])
+    def test_lazy_validate_rejects_non_positive_signed_urls_lifespan(self, lifespan_setting: int):
+        """A zero or negative lifespan produces immediately-dead signed URLs, so lazy_validate must reject it."""
+        config = make_gcp_config(signed_urls_lifespan_seconds=lifespan_setting)
+        with pytest.raises(StorageConfigError) as exc_info:
+            config.lazy_validate()
+        assert "- signed_urls_lifespan_seconds must be a positive number of seconds, or 'disabled'" in str(exc_info.value)

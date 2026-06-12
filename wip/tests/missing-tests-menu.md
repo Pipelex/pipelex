@@ -29,26 +29,26 @@ Not the live calls — the factories, arg-builders, and config logic around them
 - [x] `cogt/llm/llm_worker_factory.py` (28% → **100%**) and `img_gen/img_gen_worker_factory.py` (40% → **99%**) — full SDK routing matrices, client-instance caching, missing-dependency errors; remainder = a `TYPE_CHECKING` import.
 - [x] `cogt/llm/structured_output.py` (55% → **99%**) — every `StructureMethod` → instructor mode pinned with a completeness guard; remainder = a `TYPE_CHECKING` import.
 - [x] `cogt/model_backends/backend_credentials.py` (30% → **100%**) — env vs generic-provider error messages, missing/placeholder var aggregation, report models.
-- [x] `cogt/models/model_deck_check.py` (42% → **100%**) — all four check functions x all four reference kinds (found/not-found), fuzzy suggestions, wrong-sigil hints, setting short-circuits.
+- [x] `cogt/models/model_deck_check.py` (42% → **100%**) — every check function x every reference kind (found/not-found), fuzzy suggestions, wrong-sigil hints, setting short-circuits.
 - [x] `plugins/gateway/gateway_completions_factory.py` (21% → **96%**) and `mistral_factory.py` (27% → **99%**) — client construction, message shaping, and the extract-output parsers (Azure/Mistral/Deepseek/Linkup; OCR responses, image cleanup, document prep/upload). Remainders = `TYPE_CHECKING` blocks, a defensive `except` reachable only if `model_dump` itself throws, and mistral's `make_mistral_client` retry wiring (already pinned by `test_transport_retry_wiring.py`).
 
 ## D. Core runtime odds and ends — DONE (2026-06-12, see TODOS.md Phase D for the as-built notes)
 
-- [x] `observer/local_observer.py` (0% → **100%**) — constructor dir resolution, all three observe methods, JSONL append semantics, event-type collision behavior pinned (payload's own `event_type` wins over the event name).
-- [x] `core/pipes/output/output_renderer.py` (33% → **98%**) — Anything-output resolution through PipeCondition/PipeSequence (incl. recursion), operator arms, all three Anything render formats; remainder = the `TYPE_CHECKING` import block.
+- [x] `observer/local_observer.py` (0% → **100%**) — constructor dir resolution, every observe method, JSONL append semantics, event-type collision behavior (originally pinned as payload-wins; the source was then fixed on this same branch so the lifecycle event name wins, and the pinning test flipped with it).
+- [x] `core/pipes/output/output_renderer.py` (33% → **98%**) — Anything-output resolution through PipeCondition/PipeSequence (incl. recursion), operator arms, every Anything render format; remainder = the `TYPE_CHECKING` import block.
 - [x] `graph/graph_rendering.py` (40% → **100%**) — `_dry_run_bundle` library-dirs matrix, format dispatch, the sanitized-rename branch, `generate_view_for_bundle` direction precedence.
-- [x] `builder/bundle_spec.py` (34% → **100%**) and `builder/operations/inputs_ops.py` (20% → **98%**) — spec validation, `to_blueprint()` ordering/error wrapping, pretty rendering; all three `build_inputs_for_pipe` branches. Remainder = a `TYPE_CHECKING` import. NB: real source bug found (not fixed in the test phase): `ConceptSpec.model_validate_spec` lacks an `isinstance(values, dict)` guard, so a plain-string concept value raises `AttributeError` instead of falling through the `ConceptSpec | str` union — string concept references can't be constructed via normal validation.
+- [x] `builder/bundle_spec.py` (34% → **100%**) and `builder/operations/inputs_ops.py` (20% → **98%**) — spec validation, `to_blueprint()` ordering/error wrapping, pretty rendering; every `build_inputs_for_pipe` branch. Remainder = a `TYPE_CHECKING` import. NB: the test phase surfaced a real source bug here (`ConceptSpec.model_validate_spec` crashed on plain-string concept values); it was fixed later on this same branch with the pinning tests flipped — see `deferred-source-bugs-pinned-by-tests.md` and the CHANGELOG `[Unreleased]` entry.
 - [x] `pipeline/runner.py` (65% → **93%**) — `extra` rejection, both `except PipelexError` arms, `except ValidationError`, `start()`, and the protocol surfaces `validate()` (incl. the finally restore matrix), `models()`, `version()`. Remainder = the `TYPE_CHECKING` block plus the happy-path/`PipeRouterError`/tracer-close lines already pinned by the integration suite.
 
 ## E. Tools / config — DONE (2026-06-12, see TODOS.md Phase E for the as-built notes)
 
 - [x] `tools/misc/toml_sync.py` (0% → **98%**) and `tools/misc/document_utils.py` (0% → **97%**) — toml_sync's full read/set/sync surface incl. the destroy-config guards (never creates keys, comment/structure preservation, dry-run, no-op write guard, idempotency); document format enum matrix. Remainders = a `TYPE_CHECKING` import, an unreachable defensive `continue`, and the type-checker-appeasement trailing `raise`.
-- [x] `tools/storage/storage_config.py` (45% → **100%**) — S3/GCP `lazy_validate` fault matrices (incl. the pinned `{hash}` vs bare-`hash` asymmetry), provider-config validator, `uri_format`/`storage_path` properties.
+- [x] `tools/storage/storage_config.py` (45% → **100%**) — per-provider `lazy_validate` fault matrices, provider-config validator, `uri_format`/`storage_path` properties. (The originally-pinned S3-vs-GCP `{hash}` asymmetry was then eliminated on this same branch: a shared config base validates every provider, local/in-memory included, each pinned by its own test module.)
 - [x] `tools/misc/image_utils.py` (52% → **98%**) — format enum matrix, both unsupported-MIME message branches, PIL conversion round-trips; remainder = the unreachable trailing `raise`.
 
 ## Deliberately not on the menu
 
-- CLI interface surfaces owned by `../conformance`: `init` (six dedicated modules there), `validate` command wrappers, `--help` smoke tests, agent JSON output shapes. Rule of thumb: cross-repo contract behavior → conformance test paired with a spec section; pipelex-internal logic → here.
+- CLI interface surfaces owned by `../conformance`: `init` (dedicated modules there), `validate` command wrappers, `--help` smoke tests, agent JSON output shapes. Rule of thumb: cross-repo contract behavior → conformance test paired with a spec section; pipelex-internal logic → here.
 - `cli/dev_cli/*` (mostly 0%) — internal dev tooling, not shipped; low value per test.
 - `plugins/*_list.py`, `huggingface_factory` (0%) — model-listing scripts hitting live APIs; belongs to inference-marked tests if anything.
 - `pipelex.py` / `hub.py` (84%/83%) — already decent; remaining lines are teardown/edge accessors.

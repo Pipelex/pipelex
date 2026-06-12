@@ -23,25 +23,59 @@ class StorageMethodConfig(ConfigModel):
     Subclasses declare `provider_label` and extend `_collect_error_msgs()` with their own checks.
     """
 
+    # The exact keyword arguments GeneratedContentFactory._build_storage_key supplies to uri_format.format();
+    # any other placeholder would raise KeyError/IndexError at content-store time, so reject it at config time.
+    URI_FORMAT_SUPPORTED_FIELDS: ClassVar[frozenset[str]] = frozenset({"primary_id", "secondary_id", "hash", "extension"})
+
     provider_label: ClassVar[str]
 
     uri_format: str
 
-    def _collect_error_msgs(self) -> list[str]:
-        error_msgs: list[str] = []
+    def _collect_uri_format_error_msgs(self) -> list[str]:
         if self.uri_format == "":
-            error_msgs.append("- set a value for uri_format")
-        else:
+            return ["- set a value for uri_format"]
+        try:
+            # Parse instead of substring-checking: the escaped literal "{{hash}}" renders as the constant
+            # "{hash}" (same URI for every object), and a format spec like "{hash:.0}" truncates the digest
+            # to a constant/colliding key. Only a plain {hash} replacement field guarantees unique keys.
+            parsed_fields = [
+                (field_name, format_spec, conversion)
+                for _, field_name, format_spec, conversion in Formatter().parse(self.uri_format)
+                if field_name is not None
+            ]
+        except ValueError as exc:
+            return [f"- uri_format is not a valid format string ({exc})"]
+        error_msgs: list[str] = []
+        unsupported_names: set[str] = set()
+        hash_field_found = False
+        plain_hash_found = False
+        for field_name, format_spec, conversion in parsed_fields:
+            base_name = field_name.split(".")[0].split("[")[0]
+            if base_name not in self.URI_FORMAT_SUPPORTED_FIELDS:
+                unsupported_names.add(field_name)
+                continue
+            if base_name == "hash":
+                hash_field_found = True
+                if field_name == "hash" and not format_spec and not conversion:
+                    plain_hash_found = True
+        supported_list = ", ".join("{" + name + "}" for name in sorted(self.URI_FORMAT_SUPPORTED_FIELDS))
+        for unsupported_name in sorted(unsupported_names):
+            error_msgs.append(f"- uri_format placeholder '{{{unsupported_name}}}' is not supported (supported: {supported_list})")
+        if not hash_field_found:
+            error_msgs.append("- uri_format must contain a {hash} placeholder")
+        elif not plain_hash_found:
+            error_msgs.append("- the {hash} placeholder must be plain: no format spec, conversion, or attribute/index access")
+        if not error_msgs:
+            # Parsing can't catch everything (e.g. an invalid conversion on a supported field like
+            # "{primary_id!x}") — a test rendering with the real keyword set proves format() will succeed.
             try:
-                # A substring check would accept the escaped literal "{{hash}}", which str.format renders
-                # as the constant "{hash}" — same URI for every object. Require a real replacement field.
-                field_names = {field_name for _, field_name, _, _ in Formatter().parse(self.uri_format)}
-            except ValueError as exc:
-                error_msgs.append(f"- uri_format is not a valid format string ({exc})")
-            else:
-                if "hash" not in field_names:
-                    error_msgs.append("- uri_format must contain a {hash} placeholder")
+                self.uri_format.format(**dict.fromkeys(self.URI_FORMAT_SUPPORTED_FIELDS, "test"))
+            except (KeyError, IndexError, ValueError) as exc:
+                error_msgs.append(f"- uri_format failed a test rendering ({exc})")
         return error_msgs
+
+    def _collect_error_msgs(self) -> list[str]:
+        return self._collect_uri_format_error_msgs()
 
     def lazy_validate(self) -> None:
         error_msgs = self._collect_error_msgs()
@@ -93,6 +127,8 @@ class StorageBucketConfig(StorageMethodConfig):
             error_msgs.append("- bucket_name cannot contain a dot")
         elif "/" in self.bucket_name:
             error_msgs.append("- bucket_name cannot contain a slash")
+        if isinstance(self.signed_urls_lifespan_seconds, int) and self.signed_urls_lifespan_seconds <= 0:
+            error_msgs.append("- signed_urls_lifespan_seconds must be a positive number of seconds, or 'disabled'")
         return error_msgs
 
 

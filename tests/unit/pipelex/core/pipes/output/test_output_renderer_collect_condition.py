@@ -50,6 +50,24 @@ class TestCollectPossibleOutputsCondition:
         get_pipe_mock.assert_called_once_with(pipe_code="make_summary")
         mapped_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.JSON)
 
+    def test_multiple_mapped_pipes_are_ordered_deterministically(self, mocker: MockerFixture) -> None:
+        """With several mapped pipes, outputs come back sorted by pipe code regardless of set iteration order."""
+        condition_pipe = _make_condition_pipe(mocker, {"zeta_branch", "alpha_branch", "mid_branch"})
+        mapped_pipes: dict[str, Any] = {}
+        for pipe_code in ("alpha_branch", "mid_branch", "zeta_branch"):
+            mapped_pipe = _make_mapped_pipe(mocker, f"test.{pipe_code.title().replace('_', '')}")
+            mapped_pipe.output.render_stuff_spec.return_value = {"content": {"from": pipe_code}}
+            mapped_pipes[pipe_code] = mapped_pipe
+
+        def resolve_pipe(pipe_code: str) -> Any:
+            return mapped_pipes[pipe_code]
+
+        mocker.patch(GET_REQUIRED_PIPE_TARGET, side_effect=resolve_pipe)
+
+        result = _collect_possible_outputs(condition_pipe, ConceptRepresentationFormat.JSON)
+
+        assert [entry["content"]["from"] for entry in result] == ["alpha_branch", "mid_branch", "zeta_branch"]
+
     def test_single_mapped_pipe_falls_back_to_whole_dict(self, mocker: MockerFixture) -> None:
         """When the rendered dict has no 'content' key, the whole dict is used as the content."""
         condition_pipe = _make_condition_pipe(mocker, {"build_schema"})

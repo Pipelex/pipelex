@@ -178,24 +178,28 @@ class TestStructuresCmd:
         """With existing-class checking on, a registered class suppresses generation."""
         manual_class: type = type("ManualDoctorTestConcept", (TextContent,), {})
         get_class_registry().register_class(manual_class, name="ManualDoctorTestConcept", should_warn_if_already_registered=False)
-        blueprints = [
-            PipelexBundleBlueprint(
-                domain="notes",
-                description="notes",
-                concept={"ManualDoctorTestConcept": ConceptBlueprint(description="Manually owned")},
-            ),
-        ]
+        try:
+            blueprints = [
+                PipelexBundleBlueprint(
+                    domain="notes",
+                    description="notes",
+                    concept={"ManualDoctorTestConcept": ConceptBlueprint(description="Manually owned")},
+                ),
+            ]
 
-        generated = generate_structures_from_blueprints(
-            blueprints,
-            tmp_path,
-            target_path=tmp_path,
-            skip_existing_check=False,
-            quiet=True,
-        )
+            generated = generate_structures_from_blueprints(
+                blueprints,
+                tmp_path,
+                target_path=tmp_path,
+                skip_existing_check=False,
+                quiet=True,
+            )
 
-        assert generated == []
-        assert not (tmp_path / "notes__manual_doctor_test_concept.py").exists()
+            assert generated == []
+            assert not (tmp_path / "notes__manual_doctor_test_concept.py").exists()
+        finally:
+            # The class registry is process-global — leaving the class registered would make later tests order-dependent
+            get_class_registry().unregister_class_by_name("ManualDoctorTestConcept")
 
     def test_generate_non_quiet_echoes_progress(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Without quiet, progress is echoed through typer."""

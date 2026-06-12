@@ -36,8 +36,8 @@ class PipelexBundleSpec(StructuredContent):
                       unless overridden at the pipe level.
         main_pipe: The main pipe of the bundle.
         concept: Dictionary of concept definitions used in this domain. Keys are concept
-                codes in PascalCase format, values are ConceptBlueprint instances or
-                string references to existing concepts.
+                codes in PascalCase format, values are ConceptSpec instances or plain
+                strings used as the concept's description.
         pipe: Dictionary of pipe definitions for data transformation. Keys are pipe
              codes in snake_case format, values are specific pipe spec types
              (PipeLLM, PipeImgGen, PipeSequence, etc.).
@@ -147,7 +147,7 @@ class PipelexBundleSpec(StructuredContent):
                     concept_rendered = concept_spec_or_name.rendered_pretty()
                     concepts_table.add_row(concept_rendered)
                 else:
-                    # Simple string concept reference
+                    # Plain string concept value: the string is the concept's description
                     concepts_table.add_row(Text.from_markup(f"[green]{concept_code}[/green]: {concept_spec_or_name}"))
 
             bundle_group.renderables.append(concepts_table)

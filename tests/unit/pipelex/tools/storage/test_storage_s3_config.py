@@ -34,6 +34,10 @@ class TestStorageS3Config:
             pytest.param("assets/myhash/file", "my-bucket", "eu-west-1", "- uri_format must contain a {hash} placeholder", id="uri-no-braced-hash"),
             pytest.param("assets/{{hash}}", "my-bucket", "eu-west-1", "- uri_format must contain a {hash} placeholder", id="uri-escaped-hash"),
             pytest.param("assets/{hash", "my-bucket", "eu-west-1", "- uri_format is not a valid format string", id="uri-malformed-format"),
+            pytest.param(
+                "assets/{hash}/{tenant}", "my-bucket", "eu-west-1", "- uri_format placeholder '{tenant}' is not supported", id="uri-unsupported"
+            ),
+            pytest.param("assets/{hash:.0}", "my-bucket", "eu-west-1", "- the {hash} placeholder must be plain", id="uri-hash-format-spec"),
             pytest.param("s3-assets/{hash}", "", "eu-west-1", "- set a value for bucket_name", id="empty-bucket-name"),
             pytest.param("s3-assets/{hash}", "my.bucket", "eu-west-1", "- bucket_name cannot contain a dot", id="bucket-with-dot"),
             pytest.param("s3-assets/{hash}", "my/bucket", "eu-west-1", "- bucket_name cannot contain a slash", id="bucket-with-slash"),
@@ -71,7 +75,6 @@ class TestStorageS3Config:
         ("lifespan_setting", "expected_lifespan"),
         [
             pytest.param(3600, 3600, id="int-passthrough"),
-            pytest.param(0, 0, id="zero-passthrough"),
             pytest.param("disabled", None, id="disabled-maps-to-none"),
         ],
     )
@@ -83,3 +86,11 @@ class TestStorageS3Config:
         """signed_urls_lifespan passes integers through and maps the 'disabled' literal to None."""
         config = make_s3_config(signed_urls_lifespan_seconds=lifespan_setting)
         assert config.signed_urls_lifespan == expected_lifespan
+
+    @pytest.mark.parametrize("lifespan_setting", [pytest.param(0, id="zero"), pytest.param(-300, id="negative")])
+    def test_lazy_validate_rejects_non_positive_signed_urls_lifespan(self, lifespan_setting: int):
+        """A zero or negative lifespan produces immediately-dead signed URLs, so lazy_validate must reject it."""
+        config = make_s3_config(signed_urls_lifespan_seconds=lifespan_setting)
+        with pytest.raises(StorageConfigError) as exc_info:
+            config.lazy_validate()
+        assert "- signed_urls_lifespan_seconds must be a positive number of seconds, or 'disabled'" in str(exc_info.value)
