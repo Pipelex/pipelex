@@ -229,7 +229,7 @@ class TestDryValidateActivityInMemory:
     async def test_graph_failure_is_best_effort(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D5: an expected dry-run failure in the graph arm yields graph_spec=None, validation still OK."""
         mocker.patch(
-            "pipelex.temporal.tprl_pipe.act_dry_validate.dry_run_pipe_in_process",
+            "pipelex.pipe_run.dry_run_in_process.dry_run_pipe_in_process",
             side_effect=DryRunError("simulated graph dry-run failure"),
         )
 
@@ -241,7 +241,7 @@ class TestDryValidateActivityInMemory:
     async def test_graph_bug_propagates(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D5 (bug-propagates arm): a non-Pipelex programming bug in the graph arm fails the run."""
         mocker.patch(
-            "pipelex.temporal.tprl_pipe.act_dry_validate.dry_run_pipe_in_process",
+            "pipelex.pipe_run.dry_run_in_process.dry_run_pipe_in_process",
             side_effect=KeyError("simulated programming bug"),
         )
 

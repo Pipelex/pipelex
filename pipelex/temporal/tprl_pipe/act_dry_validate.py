@@ -22,7 +22,7 @@ The activity result carries everything the canonical validation report needs tha
 computed worker-side, against the worker's loaded library (D10): the success-only status map,
 the best-effort ``GraphSpec``, the library-wide ``pending_signatures``, and the
 ``pipe_structures`` IO contracts (built inside the library window — their JSON-Schema rendering
-needs the loaded library's class registry, so the API side never re-acquires a library).
+needs the loaded library's class registry, so the API side never needs to re-acquire one).
 
 Error contract (D3): validation failures (blueprint/factory/wiring errors, unexpected pipe failures,
 strict-mode signature refusals) RAISE out of ``validate_bundle`` as ``ValidateBundleError`` and
@@ -41,8 +41,7 @@ same bundle. Only non-Pipelex programming bugs propagate and fail the activity, 
 
 import sys
 
-from polyfactory.exceptions import FactoryException
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel
 from temporalio import activity
 
 from pipelex import log
@@ -52,10 +51,9 @@ from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
-    get_required_pipe,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
+from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipeline.bundle_validator import DryRunOutput
 from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures, select_primary_blueprint
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -90,8 +88,11 @@ class DryValidateResult(BaseModel):
 
     dry_run_outputs: dict[str, DryRunOutput]
     graph_spec: GraphSpec | None = None
-    pending_signatures: list[str] = Field(default_factory=list)
-    pipe_structures: dict[str, PipeIOContract] = Field(default_factory=dict)
+    # Deliberately REQUIRED (no wire default): a version-skewed worker that doesn't emit
+    # these fields must fail loudly at deserialization, not default to "nothing pending"
+    # and yield a silently wrong is_runnable verdict.
+    pending_signatures: list[str]
+    pipe_structures: dict[str, PipeIOContract]
 
 
 @activity.defn(name="act_dry_validate")
@@ -103,6 +104,8 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         ValidateBundleError: any validation failure — blueprint/factory/wiring errors, unexpected
             dry-run pipe failures, strict-mode signature refusals (the same categorized cascade
             the direct-mode route surfaces).
+        PipeStructuresError: a JSON-Schema rendering failure while building `pipe_structures`
+            (non-retryable at the workflow tier, like ValidateBundleError — deterministic).
         PipelexError: non-validation failures (config, library, tracing infra).
     """
     prev_library_id = get_current_library_id_or_none()
@@ -118,20 +121,14 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         # resolves bundle-defined structure classes through the loaded library's class registry.
         pipe_structures = build_pipe_structures(validate_result.pipes)
 
-        # Graph: best-effort (D5), against the SAME loaded library. Pipe resolution sits INSIDE
-        # the catch on purpose: an unknown explicit pipe_code degrades to graph_spec=None just
-        # like any other graph-arm domain failure — same answer the direct route gives.
-        graph_spec: GraphSpec | None = None
-        graph_pipe_ref = arg.pipe_code or select_primary_blueprint(validate_result.blueprints).main_pipe_ref
-        if graph_pipe_ref and library_id:
-            try:
-                main_pipe = get_required_pipe(pipe_code=graph_pipe_ref)
-                graph_spec = await dry_run_pipe_in_process(pipe=main_pipe, library_id=library_id)
-            except (PipelexError, ValidationError, FactoryException) as graph_error:
-                log.warning(
-                    f"act_dry_validate: graph dry-run of '{graph_pipe_ref}' did not produce a graph "
-                    f"({type(graph_error).__name__}); returning validation result without graph_spec"
-                )
+        # Graph: best-effort (D5), against the SAME loaded library, via the ONE shared
+        # graph-arm implementation — an unknown explicit pipe_code degrades to
+        # graph_spec=None just like any other graph-arm domain failure.
+        graph_spec: GraphSpec | None = await best_effort_graph_spec(
+            pipe_ref=arg.pipe_code or select_primary_blueprint(validate_result.blueprints).main_pipe_ref,
+            library_id=library_id,
+            log_context="act_dry_validate",
+        )
 
         return DryValidateResult(
             dry_run_outputs=validate_result.dry_run_result,

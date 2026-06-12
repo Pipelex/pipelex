@@ -19,13 +19,13 @@ workspace-root `wip/library-lifecycle-hygiene.md`.)
 
 from typing import Any, NamedTuple, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUserError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import PipeStructuresError, ValidateBundleError
 from pipelex.types import StrEnum
 
 
@@ -116,6 +116,11 @@ def build_pipe_structures(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCont
 
     Returns:
         `pipe_ref` → `PipeIOContract` for every given pipe.
+
+    Raises:
+        PipeStructuresError: When a pipe input's JSON-Schema rendering fails (a pydantic
+            schema-generation error on a structure class) — converted here so every
+            validate surface reports the same structured error.
     """
     # Per-call memo: pipes routinely share input concepts, and the JSON-Schema rendering
     # (pydantic's model_json_schema, uncached) would otherwise be regenerated once per
@@ -129,7 +134,14 @@ def build_pipe_structures(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCont
             memo_key = (stuff_spec.concept.concept_ref, stuff_spec.is_multiple())
             schema_repr = schema_memo.get(memo_key)
             if schema_repr is None:
-                schema_repr = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)
+                try:
+                    schema_repr = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)
+                except (PydanticUserError, PydanticUndefinedAnnotation) as exc:
+                    msg = (
+                        f"Failed to render the JSON Schema for input '{var_name}' of pipe "
+                        f"'{pipe.pipe_ref}' (concept '{stuff_spec.concept.concept_ref}'): {exc}"
+                    )
+                    raise PipeStructuresError(message=msg) from exc
                 schema_memo[memo_key] = schema_repr
             pipe_inputs[var_name] = PipeInputContract(
                 concept_code=schema_repr.get("concept", ""),

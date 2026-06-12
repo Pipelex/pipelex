@@ -19,13 +19,17 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from pydantic import PydanticUserError
 
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.pipeline.exceptions import PipeStructuresError
 from pipelex.pipeline.pipe_structures import IOMultiplicity, build_pipe_structures
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+
+    from pytest_mock import MockerFixture
 
 
 def _teardown_validation_library(outer_library_id: str) -> None:
@@ -86,6 +90,27 @@ class TestBuildPipeStructures:
         assert make_many.output.multiplicity == IOMultiplicity.VARIABLE
         # A list-typed input renders an array JSON Schema.
         assert make_many.inputs["docs"].json_schema.get("type") == "array"
+
+    async def test_schema_render_failure_converts_to_structured_error(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """A pydantic schema-generation failure converts to PipeStructuresError with pipe/input
+        context — never a raw third-party error (which the Temporal boundary would not convert
+        and Temporal would pointlessly retry).
+        """
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_MULTIPLICITY_MTHDS])
+            mocker.patch(
+                "pipelex.core.pipes.stuff_spec.stuff_spec.StuffSpec.render_stuff_spec",
+                side_effect=PydanticUserError("simulated schema-generation failure", code=None),
+            )
+            with pytest.raises(PipeStructuresError, match="Failed to render the JSON Schema"):
+                build_pipe_structures(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
 
     async def test_signature_pipes_in_lenient_batch(self, load_empty_library: Callable[[], str]) -> None:
         """A PipeSignature header in a lenient batch gets a contract entry like any concrete pipe."""

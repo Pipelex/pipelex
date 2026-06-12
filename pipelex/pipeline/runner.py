@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from importlib import metadata
 from pathlib import Path
@@ -11,7 +12,6 @@ from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
 from mthds.protocol.models import ValidationReport, VersionInfo
 from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
-from polyfactory.exceptions import FactoryException
 from pydantic import Field, ValidationError
 from typing_extensions import override
 
@@ -27,11 +27,10 @@ from pipelex.hub import (
     get_pipe_run,
     get_pipeline_manager,
     get_report_delegate,
-    get_required_pipe,
     get_telemetry_manager,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run_in_process import dry_run_pipe_in_process
+from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures, select_primary_blueprint
@@ -58,10 +57,10 @@ if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
-# The MTHDS Protocol version this runtime implements — the SDK's PROTOCOL_VERSION is the
-# single source of truth; runners do not override or interpret it. Kept as a re-export only
-# because pipelex-api's /version route still imports it from here at module load; it goes
-# away once pipelex-api imports the SDK constant directly.
+# Compat re-export, referenced NOWHERE in this repo: pipelex-api's /version route still
+# imports it from here at module load. The SDK's PROTOCOL_VERSION is the single source of
+# truth (runners do not override or interpret it); this alias is deleted once pipelex-api
+# imports the SDK constant directly.
 MTHDS_PROTOCOL_VERSION = PROTOCOL_VERSION
 
 
@@ -382,44 +381,53 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # current on success (the CLI surfaces consume it before process exit).
         # This protocol wrapper is a long-lived entry point, so restore the
         # caller's current-library and tear the validation library down on the
-        # way out — on failure `validate_bundle` already did both, making the
-        # cleanup below a no-op. Artifacts that need the open validation library
-        # are built INSIDE the window, before the `finally` tears the library
-        # down: `pipe_structures`'s JSON-Schema rendering resolves bundle-defined
+        # way out — on failure `validate_bundle` already did both, so
+        # `validation_library_id` stays None and the cleanup below is a no-op.
+        # Artifacts that need the open validation library are built INSIDE the
+        # window, before the `finally` tears the library down:
+        # `pipe_structures`'s JSON-Schema rendering resolves bundle-defined
         # structure classes through the class registry, and the graph arm
         # dry-runs the main pipe against the loaded library.
         prev_library_id = get_current_library_id_or_none()
+        validation_library_id: str | None = None
         try:
             result = await validate_bundle(
                 mthds_contents=mthds_contents,
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
-            pipe_structures: dict[str, PipeIOContract] = build_pipe_structures(result.pipes)
-
-            # Graph arm: best-effort, against the SAME loaded library — mirrors the Temporal
-            # validate activity's contract. Pipe resolution sits INSIDE the catch on purpose:
-            # any graph-arm domain failure degrades to graph_spec=None, never a failed validate.
-            graph_spec: GraphSpec | None = None
-            main_pipe_ref = select_primary_blueprint(result.blueprints).main_pipe_ref
-            open_library_id = get_current_library_id_or_none()
-            if main_pipe_ref and open_library_id:
-                try:
-                    main_pipe = get_required_pipe(pipe_code=main_pipe_ref)
-                    graph_spec = await dry_run_pipe_in_process(pipe=main_pipe, library_id=open_library_id)
-                except (PipelexError, ValidationError, FactoryException) as graph_error:
-                    log.warning(
-                        f"Protocol validate: graph dry-run of '{main_pipe_ref}' did not produce a graph "
-                        f"({type(graph_error).__name__}); returning validation report without graph_spec"
-                    )
-        finally:
+            # Capture the validation library id ONCE, right after validate_bundle leaves
+            # it current — the graph arm and the finally must target the SAME library
+            # even if something inside the window later moves the contextvar.
             validation_library_id = get_current_library_id_or_none()
+            pipe_structures: dict[str, PipeIOContract] = build_pipe_structures(result.pipes)
+            graph_spec: GraphSpec | None = await best_effort_graph_spec(
+                pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
+                library_id=validation_library_id,
+                log_context="Protocol validate",
+            )
+        finally:
+            primary_error = sys.exc_info()[1]
             if validation_library_id is not None and validation_library_id != prev_library_id:
+                # Restore the caller's outer current-library FIRST so the guarantee
+                # survives a teardown raise — mirrors act_dry_validate.
                 if prev_library_id is not None:
                     set_current_library(library_id=prev_library_id)
                 else:
                     clear_current_library()
-                get_library_manager().teardown(library_id=validation_library_id)
+                try:
+                    get_library_manager().teardown(library_id=validation_library_id)
+                except PipelexError as teardown_error:
+                    # A teardown failure must not REPLACE the body's in-flight error (the
+                    # caller's error would name the teardown instead of the actual problem) —
+                    # suppress it and let the primary propagate; raise it only when the body
+                    # succeeded. Mirrors act_dry_validate's finally.
+                    if primary_error is None:
+                        raise
+                    log.error(
+                        f"Protocol validate: library teardown also failed after a body error; "
+                        f"raising the original error. Suppressed teardown error: {teardown_error}"
+                    )
         return build_validation_report(
             blueprints=result.blueprints,
             pipe_structures=pipe_structures,
@@ -474,7 +482,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # the runtime still works, so version() must not fail.
             pipelex_version = "unknown"
         return PipelexVersionInfo(
-            protocol_version=MTHDS_PROTOCOL_VERSION,
+            protocol_version=PROTOCOL_VERSION,
             runner_version=pipelex_version,
             implementation="pipelex",
             implementation_version=pipelex_version,

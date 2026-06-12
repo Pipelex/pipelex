@@ -122,10 +122,22 @@ class TestProtocolValidate:
         finally:
             clear_current_library()
 
-    async def test_graph_populated_on_main_pipe_bundle(self, load_empty_library: Callable[[], str]) -> None:
-        """A bundle declaring a main_pipe gets a best-effort graph_spec covering the controller topology (D4)."""
-        load_empty_library()
+    async def test_graph_populated_on_main_pipe_bundle(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """A bundle declaring a main_pipe gets a best-effort graph_spec covering the controller
+        topology (D4) — and the REAL graph run leaves the library lifecycle intact (no mock here:
+        pins that the in-process dry-run does not move the current-library under the wrapper).
+        """
+        outer_library_id = load_empty_library()
+        set_current_library(library_id=outer_library_id)
         try:
+            library_manager = get_library_manager()
+            open_library_spy = mocker.spy(library_manager, "open_library")
+            teardown_spy = mocker.spy(library_manager, "teardown")
+
             runner = PipelexMTHDSProtocol()
             report = await runner.validate(mthds_contents=[_MAIN_PIPE_MTHDS])
 
@@ -136,6 +148,13 @@ class TestProtocolValidate:
             # The graph arm does not disturb the rest of the report.
             assert report.is_runnable is True
             assert "protocol_validate_graph.outline_then_summarize" in report.pipe_structures
+
+            # Lifecycle with the real graph run: outer current-library restored, validation
+            # library torn down.
+            assert get_current_library_id_or_none() == outer_library_id
+            validation_library_id, _ = open_library_spy.spy_return
+            latest_teardown = teardown_spy.call_args_list[-1]
+            assert latest_teardown.kwargs["library_id"] == validation_library_id
         finally:
             clear_current_library()
 
@@ -154,7 +173,7 @@ class TestProtocolValidate:
             open_library_spy = mocker.spy(library_manager, "open_library")
             teardown_spy = mocker.spy(library_manager, "teardown")
             mocker.patch(
-                "pipelex.pipeline.runner.dry_run_pipe_in_process",
+                "pipelex.pipe_run.dry_run_in_process.dry_run_pipe_in_process",
                 side_effect=DryRunError("simulated graph dry-run failure"),
             )
 

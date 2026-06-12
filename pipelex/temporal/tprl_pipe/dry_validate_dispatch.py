@@ -2,8 +2,10 @@
 
 The single round-trip a Temporal-enabled ``/validate`` caller awaits: dispatch
 ``WfDryValidate`` (which runs the one ``act_dry_validate`` activity in-process on a worker)
-and get back the per-pipe status map + the best-effort ``GraphSpec``. Used by the API route
-(cross-repo, ``pipelex-api``) and by the Tier-2d e2e submitter script.
+and get back the full worker-computed ``DryValidateResult`` — per-pipe status map,
+best-effort ``GraphSpec``, ``pending_signatures``, and the ``pipe_structures`` IO contracts
+(D10). Used by the API route (cross-repo, ``pipelex-api``) and by the Tier-2d e2e
+submitter script.
 """
 
 from datetime import timedelta
@@ -23,7 +25,7 @@ async def dispatch_dry_validate(
     task_queue: str | None = None,
     should_auto_connect_temporal: bool = True,
 ) -> DryValidateResult:
-    """Dispatch ``WfDryValidate`` to a worker and await ``{status map, GraphSpec}``.
+    """Dispatch ``WfDryValidate`` to a worker and await the full ``DryValidateResult``.
 
     A validation failure (strict-mode signature refusal, unexpected pipe failure) comes back
     as ``WorkflowExecutionError`` carrying the structured ``ErrorReport`` recovered by
@@ -36,7 +38,9 @@ async def dispatch_dry_validate(
         should_auto_connect_temporal: Whether the executor may auto-connect the Temporal client.
 
     Returns:
-        The activity result: per-pipe status map + best-effort GraphSpec.
+        The activity result: per-pipe status map, best-effort GraphSpec, pending_signatures,
+        and the pipe_structures IO contracts — everything the canonical validation report
+        needs that must be computed worker-side (D10).
     """
     worker_config = get_config().temporal.worker_config
     executor = WorkflowExecutorFactory[DryValidateArg, DryValidateResult]().create_executor(
