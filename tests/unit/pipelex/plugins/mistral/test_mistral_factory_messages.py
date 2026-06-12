@@ -57,19 +57,16 @@ class TestMistralFactoryMessages:
         assert isinstance(text_chunk, TextChunk)
         assert text_chunk.text == "Describe the picture"
 
-    async def test_make_simple_messages_system_appended_after_user(self, mocker: MockerFixture) -> None:
-        """Pins current behavior AS-IS: make_simple_messages() appends the SystemMessage AFTER the UserMessage.
-
-        If this ordering is ever deemed a bug, fixing it is a separate source change, not a test-phase change.
-        """
+    async def test_make_simple_messages_system_first_then_user(self, mocker: MockerFixture) -> None:
+        """The SystemMessage comes FIRST, followed by the UserMessage, matching the docstring and the OpenAI-typed sibling."""
         factory = MistralFactory()
         messages = await factory.make_simple_messages(llm_job=_make_llm_job(mocker, user_text="user words", system_text="system words"))
 
         assert len(messages) == 2
-        assert isinstance(messages[0], UserMessage)
-        system_message = messages[1]
+        system_message = messages[0]
         assert isinstance(system_message, SystemMessage)
         assert system_message.content == "system words"
+        assert isinstance(messages[1], UserMessage)
 
     @pytest.mark.parametrize(
         ("system_text", "expected_count"),

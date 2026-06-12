@@ -21,10 +21,7 @@ def make_llm_spec(pipe_code: str) -> PipeLLMSpec:
 
 
 def make_full_bundle_spec() -> PipelexBundleSpec:
-    # model_construct: validating a string against the `ConceptSpec | str` union crashes in
-    # ConceptSpec.model_validate_spec (mode="before" validator assumes dict input), so a bundle
-    # spec holding a string-reference concept can only be built by bypassing validation.
-    return PipelexBundleSpec.model_construct(
+    return PipelexBundleSpec(
         domain="test_domain",
         description="A bundle that writes articles",
         system_prompt="You are a concise writer",

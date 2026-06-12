@@ -311,8 +311,8 @@ class ConceptSpec(StructuredContent):
 
     @model_validator(mode="before")
     @classmethod
-    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
-        if values.get("refines") and values.get("structure"):
+    def model_validate_spec(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
+        if isinstance(values, dict) and values.get("refines") and values.get("structure"):
             msg = (
                 f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
                 f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"

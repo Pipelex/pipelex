@@ -94,8 +94,8 @@ class TestLocalObserver:
             {"event_type": str(LocalObserverEventType.BEFORE_RUN), "pipeline_run_id": "run-2"},
         ]
 
-    async def test_payload_event_type_key_wins_over_event_name(self, tmp_path: Path) -> None:
-        """A payload carrying its own event_type overrides the event name in the written record (merge order)."""
+    async def test_event_name_wins_over_payload_event_type_key(self, tmp_path: Path) -> None:
+        """A payload carrying its own event_type cannot overwrite the lifecycle event name in the written record."""
         observer = LocalObserver(storage_dir=tmp_path / "obs")
         payload: dict[str, Any] = {"event_type": "custom_override", "pipeline_run_id": "run-9"}
 
@@ -103,4 +103,4 @@ class TestLocalObserver:
 
         jsonl_path = tmp_path / "obs" / f"{LocalObserverEventType.AFTER_FAILING_RUN}.jsonl"
         records = _read_jsonl_lines(jsonl_path)
-        assert records == [{"event_type": "custom_override", "pipeline_run_id": "run-9"}]
+        assert records == [{"event_type": str(LocalObserverEventType.AFTER_FAILING_RUN), "pipeline_run_id": "run-9"}]

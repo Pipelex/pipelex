@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic import ConfigDict, Field, ValidationError, field_validator, model_validator
 from rich.console import Group
 from rich.table import Table
@@ -9,12 +11,14 @@ from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 
 
 class PipelexBundleSpec(StructuredContent):
@@ -84,7 +88,8 @@ class PipelexBundleSpec(StructuredContent):
                 if isinstance(concept_spec_or_name, ConceptSpec):
                     concept[concept_code] = concept_spec_or_name.to_blueprint()
                 else:
-                    concept[concept_code] = ConceptBlueprint(description=concept_code, structure=concept_spec_or_name)
+                    # A bare string is a concept description — the blueprint layer accepts it as-is
+                    concept[concept_code] = concept_spec_or_name
 
         pipe: dict[str, PipeBlueprintUnion] | None = None
         if self.pipe:

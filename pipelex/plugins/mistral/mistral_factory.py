@@ -73,6 +73,9 @@ class MistralFactory:
     async def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         messages: list[Messages] = []
+        if system_text := llm_job.llm_prompt.system_text:
+            messages.append(SystemMessage(content=system_text))
+
         user_content: list[ContentChunk] = []
         if user_text := llm_job.llm_prompt.user_text:
             user_content.append(TextChunk(text=user_text))
@@ -84,9 +87,6 @@ class MistralFactory:
             user_content.extend(document_chunks)
         if user_content:
             messages.append(UserMessage(content=user_content))
-
-        if system_text := llm_job.llm_prompt.system_text:
-            messages.append(SystemMessage(content=system_text))
 
         return messages
 

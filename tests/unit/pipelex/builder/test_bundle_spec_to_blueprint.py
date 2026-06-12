@@ -84,12 +84,9 @@ class TestPipelexBundleSpecToBlueprint:
         )
         assert blueprint.concept["Person"] == ConceptBlueprint(description="A person", structure={"full_name": expected_field}, refines=None)
 
-    def test_string_concept_value_maps_key_to_description_and_value_to_structure(self) -> None:
-        """A string concept value yields ConceptBlueprint(description=<concept KEY>, structure=<string VALUE>)."""
-        # model_construct: validating a string against the `ConceptSpec | str` union crashes in
-        # ConceptSpec.model_validate_spec (mode="before" validator assumes dict input), so the
-        # string-concept arm of to_blueprint is only reachable by bypassing validation.
-        bundle_spec = PipelexBundleSpec.model_construct(
+    def test_string_concept_value_passes_through_as_description(self) -> None:
+        """A string concept value passes through to the blueprint dict unchanged, where it means the concept's description."""
+        bundle_spec = PipelexBundleSpec(
             domain="test_domain",
             main_pipe="write_text",
             concept={"Summary": "A short summary of a document"},
@@ -99,11 +96,21 @@ class TestPipelexBundleSpecToBlueprint:
         blueprint = bundle_spec.to_blueprint()
 
         assert blueprint.concept is not None
-        assert blueprint.concept["Summary"] == ConceptBlueprint(
-            description="Summary",
-            structure="A short summary of a document",
-            refines=None,
+        assert blueprint.concept["Summary"] == "A short summary of a document"
+
+    def test_string_concept_value_survives_normal_validation(self) -> None:
+        """model_validate on a dict payload keeps a string concept value as a plain str via the `ConceptSpec | str` union."""
+        bundle_spec = PipelexBundleSpec.model_validate(
+            {
+                "domain": "test_domain",
+                "main_pipe": "write_text",
+                "concept": {"Summary": "A short summary of a document"},
+                "pipe": {"write_text": make_llm_spec("write_text").model_dump()},
+            }
         )
+
+        assert bundle_spec.concept is not None
+        assert bundle_spec.concept["Summary"] == "A short summary of a document"
 
     @pytest.mark.parametrize("empty_concepts", [None, {}])
     def test_no_concepts_yields_none_concept_on_blueprint(self, empty_concepts: dict[str, Any] | None) -> None:
@@ -160,8 +167,7 @@ class TestPipelexBundleSpecToBlueprint:
 
     def test_bundle_blueprint_construction_failure_wrapped(self) -> None:
         """A spec that yields an invalid bundle blueprint (native concept shadowing) raises the wrapped error."""
-        # model_construct: see test_string_concept_value_maps_key_to_description_and_value_to_structure.
-        bundle_spec = PipelexBundleSpec.model_construct(
+        bundle_spec = PipelexBundleSpec(
             domain="test_domain",
             main_pipe="write_text",
             concept={"Text": "Shadowing a native concept"},

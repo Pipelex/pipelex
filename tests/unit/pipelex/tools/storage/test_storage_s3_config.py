@@ -53,17 +53,6 @@ class TestStorageS3Config:
         assert expected_fragment in message
         assert URLs.documentation in message
 
-    def test_lazy_validate_requires_braced_hash_placeholder(self):
-        """S3 validation requires the literal '{hash}' placeholder: a bare 'hash' substring without braces is rejected.
-
-        Note the asymmetry with GCP, whose lazy_validate only checks for the 'hash' substring and therefore
-        accepts the same uri_format (pinned in test_storage_gcp_config.py).
-        """
-        config = make_s3_config(uri_format="assets/hash/file")
-        with pytest.raises(StorageConfigError) as exc_info:
-            config.lazy_validate()
-        assert "- uri_format must contain a {hash} placeholder" in str(exc_info.value)
-
     def test_lazy_validate_multiple_faults_raise_one_error_listing_all(self):
         """All faults must be aggregated into a single StorageConfigError that lists every fix line and the docs URL."""
         config = make_s3_config(uri_format="", bucket_name="", region="")

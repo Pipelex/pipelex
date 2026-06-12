@@ -223,12 +223,14 @@ class TestImgGenArgsInferenceSafety:
         ("is_moderated", "expected_args"),
         [
             (None, {}),
-            (True, {"moderation": "low"}),
-            (False, {"moderation": "auto"}),
+            (True, {"moderation": "auto"}),
+            (False, {"moderation": "low"}),
         ],
     )
     def test_safety_openai_moderation_mapping(self, is_moderated: bool | None, expected_args: dict[str, Any]) -> None:
-        """OPENAI_MODERATION maps is_moderated to a moderation level, skipping the omit sentinel when unset."""
+        """OPENAI_MODERATION maps moderation enabled to standard filtering ("auto") and disabled to less restrictive ("low"),
+        skipping the omit sentinel when unset.
+        """
         result = ImgGenArgsFactory.make_args_from_safety_checker(
             safety_checker_taxonomy=SafetyCheckerTaxonomy.OPENAI_MODERATION,
             is_moderated=is_moderated,

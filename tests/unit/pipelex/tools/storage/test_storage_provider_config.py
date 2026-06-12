@@ -142,21 +142,25 @@ class TestStorageProviderConfig:
         provider_config = StorageProviderConfig(method=StorageMethod.LOCAL, local=make_local_config())
         assert provider_config.storage_path == LOCAL_STORAGE_PATH
 
-    def test_storage_path_ignores_method_and_only_requires_local_config(self):
-        """storage_path never checks method: it works even when method is S3, as long as the local config is set."""
+    def test_storage_path_raises_for_non_local_method_even_with_local_config(self):
+        """storage_path dispatches on method: a non-local method raises even when a local sub-config is set."""
         provider_config = StorageProviderConfig(
             method=StorageMethod.S3,
             s3=make_s3_config(),
             local=make_local_config(),
         )
-        assert provider_config.storage_path == LOCAL_STORAGE_PATH
-
-    def test_storage_path_raises_when_local_config_is_none(self):
-        """storage_path raises a StorageConfigError when no local sub-config is set."""
-        provider_config = StorageProviderConfig(method=StorageMethod.S3, s3=make_s3_config())
         with pytest.raises(StorageConfigError) as exc_info:
             _ = provider_config.storage_path
-        assert "local config is required when method is local" in str(exc_info.value)
+        assert "storage_path is only available when method is local" in str(exc_info.value)
+
+    def test_storage_path_raises_when_local_config_is_none(self):
+        """The missing-local-config branch is normally unreachable (the model validator guards construction),
+        so we build via model_construct to bypass validation and pin its error message.
+        """
+        provider_config = StorageProviderConfig.model_construct(method=StorageMethod.LOCAL)
+        with pytest.raises(StorageConfigError) as exc_info:
+            _ = provider_config.storage_path
+        assert "local config is required to access storage_path" in str(exc_info.value)
 
     def test_storage_config_boolean_flags_are_required(self):
         """StorageConfig requires both boolean flags: omitting them fails validation with 'missing' errors."""

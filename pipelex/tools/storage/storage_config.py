@@ -1,6 +1,7 @@
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
+from typing_extensions import override
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.storage.exceptions import StorageConfigError
@@ -15,19 +16,56 @@ class StorageMethod(StrEnum):
     GCP = "gcp"
 
 
-class StorageLocalConfig(ConfigModel):
+class StorageMethodConfig(ConfigModel):
+    """Base for per-method storage configs: shared uri_format rules and operator-facing error reporting.
+
+    Subclasses declare `provider_label` and extend `_collect_error_msgs()` with their own checks.
+    """
+
+    provider_label: ClassVar[str]
+
     uri_format: str
+
+    def _collect_error_msgs(self) -> list[str]:
+        error_msgs: list[str] = []
+        if self.uri_format == "":
+            error_msgs.append("- set a value for uri_format")
+        elif "{hash}" not in self.uri_format:
+            error_msgs.append("- uri_format must contain a {hash} placeholder")
+        return error_msgs
+
+    def lazy_validate(self) -> None:
+        error_msgs = self._collect_error_msgs()
+        if not error_msgs:
+            return
+        msg = f"You have enabled storage on {self.provider_label} so you need a proper {self.provider_label} config.\n\n"
+        msg += f"To fix your {self.provider_label} config:\n"
+        msg += "\n".join(error_msgs)
+        msg += f"\nThis can be done in the .pipelex/pipelex.toml file. More details can be found in the documentation: {URLs.documentation}"
+        raise StorageConfigError(msg)
+
+
+class StorageLocalConfig(StorageMethodConfig):
+    provider_label: ClassVar[str] = "local"
+
     local_storage_path: str
 
+    @override
+    def _collect_error_msgs(self) -> list[str]:
+        error_msgs = super()._collect_error_msgs()
+        if self.local_storage_path == "":
+            error_msgs.append("- set a value for local_storage_path")
+        return error_msgs
 
-class StorageInMemoryConfig(ConfigModel):
-    uri_format: str
+
+class StorageInMemoryConfig(StorageMethodConfig):
+    provider_label: ClassVar[str] = "in_memory"
 
 
-class StorageS3Config(ConfigModel):
-    uri_format: str
+class StorageBucketConfig(StorageMethodConfig):
+    """Shared shape for bucket-based remote providers: bucket naming rules and signed-URL lifespan."""
+
     bucket_name: str
-    region: str
     signed_urls_lifespan_seconds: int | Literal["disabled"]
 
     @property
@@ -37,66 +75,42 @@ class StorageS3Config(ConfigModel):
             return None
         return self.signed_urls_lifespan_seconds
 
-    def lazy_validate(self):
-        error_msgs: list[str] = []
-
-        if self.uri_format == "":
-            error_msgs.append("- set a value for uri_format")
-        elif "{hash}" not in self.uri_format:
-            error_msgs.append("- uri_format must contain a {hash} placeholder")
-
+    @override
+    def _collect_error_msgs(self) -> list[str]:
+        error_msgs = super()._collect_error_msgs()
         if self.bucket_name == "":
             error_msgs.append("- set a value for bucket_name")
         elif "." in self.bucket_name:
             error_msgs.append("- bucket_name cannot contain a dot")
         elif "/" in self.bucket_name:
             error_msgs.append("- bucket_name cannot contain a slash")
+        return error_msgs
 
+
+class StorageS3Config(StorageBucketConfig):
+    provider_label: ClassVar[str] = "S3"
+
+    region: str
+
+    @override
+    def _collect_error_msgs(self) -> list[str]:
+        error_msgs = super()._collect_error_msgs()
         if self.region == "":
             error_msgs.append("- set a value for region")
-
-        if error_msgs:
-            msg = "You have enabled storage on S3 so you need a proper S3 config.\n\nTo fix you S3 config:\n"
-            msg += "\n".join(error_msgs)
-            msg += f"\nThis can be done in the .pipelex/pipelex.toml file. More details can be found in the documentation: {URLs.documentation}"
-            raise StorageConfigError(msg)
+        return error_msgs
 
 
-class StorageGcpConfig(ConfigModel):
-    uri_format: str
-    bucket_name: str
+class StorageGcpConfig(StorageBucketConfig):
+    provider_label: ClassVar[str] = "GCP"
+
     project_id: str
-    signed_urls_lifespan_seconds: int | Literal["disabled"]
 
-    @property
-    def signed_urls_lifespan(self) -> int | None:
-        """Return signed URL lifespan in seconds, or None if disabled."""
-        if self.signed_urls_lifespan_seconds == "disabled":
-            return None
-        return self.signed_urls_lifespan_seconds
-
-    def lazy_validate(self):
-        error_msgs: list[str] = []
-
-        if self.uri_format == "":
-            error_msgs.append("set a value for uri_format")
-        elif "hash" not in self.uri_format:
-            error_msgs.append("uri_format must contain a {hash} placeholder")
-
-        if self.bucket_name == "":
-            error_msgs.append("set a value for bucket_name")
-        elif "." in self.bucket_name:
-            error_msgs.append("bucket_name cannot contain a dot")
-        elif "/" in self.bucket_name:
-            error_msgs.append("bucket_name cannot contain a slash")
-
+    @override
+    def _collect_error_msgs(self) -> list[str]:
+        error_msgs = super()._collect_error_msgs()
         if self.project_id == "":
-            error_msgs.append("set a value for project_id")
-
-        if error_msgs:
-            msg = "You have enabled storage on GCP so you need a proper GCP config:\n"
-            msg += "\n".join(error_msgs)
-            raise StorageConfigError(msg)
+            error_msgs.append("- set a value for project_id")
+        return error_msgs
 
 
 class StorageProviderConfig(ConfigModel):
@@ -131,10 +145,15 @@ class StorageProviderConfig(ConfigModel):
 
     @property
     def storage_path(self) -> str:
-        if not self.local:
-            msg = "local config is required when method is local"
-            raise StorageConfigError(msg)
-        return self.local.local_storage_path
+        match self.method:
+            case StorageMethod.LOCAL:
+                if not self.local:
+                    msg = "local config is required to access storage_path"
+                    raise StorageConfigError(msg)
+                return self.local.local_storage_path
+            case StorageMethod.IN_MEMORY | StorageMethod.S3 | StorageMethod.GCP:
+                msg = f"storage_path is only available when method is local, but method is '{self.method}'"
+                raise StorageConfigError(msg)
 
     @property
     def uri_format(self) -> str:
