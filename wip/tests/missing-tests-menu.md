@@ -1,6 +1,6 @@
 # Missing Tests Menu
 
-Source: full non-inference suite run with `--cov=pipelex` (overall ~75% line coverage after section A was ground down — was ~72%) plus a structural sweep of `pipelex/` vs `tests/`. This is a curated menu of the gaps that matter, not an exhaustive list. Caveat: plugin inference workers' live-call paths are exercised by `inference`-marked tests that don't run in this measurement, so their numbers understate real coverage — only their offline-testable logic (factories, arg builders, error mapping) is listed here.
+Source: full non-inference suite run with `--cov=pipelex` (overall ~78% line coverage after sections A–E were ground down — was ~72%) plus a structural sweep of `pipelex/` vs `tests/`. This is a curated menu of the gaps that matter, not an exhaustive list. Caveat: plugin inference workers' live-call paths are exercised by `inference`-marked tests that don't run in this measurement, so their numbers understate real coverage — only their offline-testable logic (factories, arg builders, error mapping) is listed here.
 
 ## A. CLI internal logic — DONE (2026-06-12, see TODOS.md for the as-built notes)
 
@@ -21,30 +21,30 @@ Never shipped to prod yet, but these are the deploy-critical entry points; bugs 
 - [x] `temporal/codec/codec_server.py` (0% → **96%**) — encode/decode round-trip over real HTTP, CORS preflight/origin gating, content-type and malformed-payload guards, storage-failure → HTTP status mapping; remainder = the `TYPE_CHECKING` import block. NB: `codec_server_cli.py` stays at 0% — it's the thin arg-parse + `run_app` wrapper around `build_codec_server`, same interface-layer category as the Typer wrappers left out in section A.
 - [x] `temporal/temporal_connect.py` (24% → **98%**) — API-key resolution per secret method, TLS/RPC-metadata wiring, payload-codec converter selection, named server-config selection, SDK error wrapping; remainder = the `TYPE_CHECKING` import block.
 
-## C. Inference plumbing (offline-testable parts)
+## C. Inference plumbing (offline-testable parts) — DONE (2026-06-12, see TODOS.md Phase C for the as-built notes)
 
 Not the live calls — the factories, arg-builders, and config logic around them, which can break independently of any provider.
 
-- `cogt/img_gen/img_gen_args_factory.py` (58%, ~320 stmts) — maps user settings to per-provider image-gen args; wrong mapping = silently wrong generations or API rejects.
-- `cogt/llm/llm_worker_factory.py` (28%) and `img_gen/img_gen_worker_factory.py` (40%) — worker selection/dispatch; wrong route = wrong backend.
-- `cogt/llm/structured_output.py` (55%) — structured-output schema handling; errors here corrupt every structured generation.
-- `cogt/model_backends/backend_credentials.py` (30%) — credential resolution; failure modes should be tested, not discovered by users.
-- `cogt/models/model_deck_check.py` (42%) — deck validation; the guard that catches bad model configs.
-- `plugins/gateway/gateway_completions_factory.py` (21%) and `mistral_factory.py` (27%) — request-shaping for our recommended (gateway) and a major BYOK backend; pure functions, easy to unit test.
+- [x] `cogt/img_gen/img_gen_args_factory.py` (58% → **100%**, ~320 stmts) — all provider taxonomies (Flux, Flux-1.1 Ultra, Qwen, SDXL/Lightning, GPT-image, BFL Flux 2) across aspect-ratio, prompt, inference, safety, output-format, input-images, and input-fidelity arg-building.
+- [x] `cogt/llm/llm_worker_factory.py` (28% → **100%**) and `img_gen/img_gen_worker_factory.py` (40% → **99%**) — full SDK routing matrices, client-instance caching, missing-dependency errors; remainder = a `TYPE_CHECKING` import.
+- [x] `cogt/llm/structured_output.py` (55% → **99%**) — every `StructureMethod` → instructor mode pinned with a completeness guard; remainder = a `TYPE_CHECKING` import.
+- [x] `cogt/model_backends/backend_credentials.py` (30% → **100%**) — env vs generic-provider error messages, missing/placeholder var aggregation, report models.
+- [x] `cogt/models/model_deck_check.py` (42% → **100%**) — all four check functions x all four reference kinds (found/not-found), fuzzy suggestions, wrong-sigil hints, setting short-circuits.
+- [x] `plugins/gateway/gateway_completions_factory.py` (21% → **96%**) and `mistral_factory.py` (27% → **99%**) — client construction, message shaping, and the extract-output parsers (Azure/Mistral/Deepseek/Linkup; OCR responses, image cleanup, document prep/upload). Remainders = `TYPE_CHECKING` blocks, a defensive `except` reachable only if `model_dump` itself throws, and mistral's `make_mistral_client` retry wiring (already pinned by `test_transport_retry_wiring.py`).
 
-## D. Core runtime odds and ends
+## D. Core runtime odds and ends — DONE (2026-06-12, see TODOS.md Phase D for the as-built notes)
 
-- `observer/local_observer.py` (0%) — the only fully untested observer implementation; observers run inside every pipeline execution, a raise here breaks runs.
-- `core/pipes/output/output_renderer.py` (33%) — renders final pipe outputs; wrong rendering = users see wrong results even when execution was correct.
-- `graph/graph_rendering.py` (40%) — top-level graph render dispatch (the mermaid/reactflow internals are covered; this orchestrator isn't).
-- `builder/bundle_spec.py` (34%) and `builder/operations/inputs_ops.py` (20%) — agent-authoring spec layer; `to_blueprint()` transforms feed everything the builder emits.
-- `pipeline/runner.py` (65%) — uncovered branches are mostly error/edge paths in the main execution loop; worth targeted (not blanket) tests.
+- [x] `observer/local_observer.py` (0% → **100%**) — constructor dir resolution, all three observe methods, JSONL append semantics, event-type collision behavior pinned (payload's own `event_type` wins over the event name).
+- [x] `core/pipes/output/output_renderer.py` (33% → **98%**) — Anything-output resolution through PipeCondition/PipeSequence (incl. recursion), operator arms, all three Anything render formats; remainder = the `TYPE_CHECKING` import block.
+- [x] `graph/graph_rendering.py` (40% → **100%**) — `_dry_run_bundle` library-dirs matrix, format dispatch, the sanitized-rename branch, `generate_view_for_bundle` direction precedence.
+- [x] `builder/bundle_spec.py` (34% → **100%**) and `builder/operations/inputs_ops.py` (20% → **98%**) — spec validation, `to_blueprint()` ordering/error wrapping, pretty rendering; all three `build_inputs_for_pipe` branches. Remainder = a `TYPE_CHECKING` import. NB: real source bug found (not fixed in the test phase): `ConceptSpec.model_validate_spec` lacks an `isinstance(values, dict)` guard, so a plain-string concept value raises `AttributeError` instead of falling through the `ConceptSpec | str` union — string concept references can't be constructed via normal validation.
+- [x] `pipeline/runner.py` (65% → **93%**) — `extra` rejection, both `except PipelexError` arms, `except ValidationError`, `start()`, and the protocol surfaces `validate()` (incl. the finally restore matrix), `models()`, `version()`. Remainder = the `TYPE_CHECKING` block plus the happy-path/`PipeRouterError`/tracer-close lines already pinned by the integration suite.
 
-## E. Tools / config
+## E. Tools / config — DONE (2026-06-12, see TODOS.md Phase E for the as-built notes)
 
-- `tools/misc/toml_sync.py` (0%) and `tools/misc/document_utils.py` (0%) — completely untested utilities; toml_sync edits config files, a bug destroys user config.
-- `tools/storage/storage_config.py` (45%) — storage backend selection (local/S3); misconfig paths untested.
-- `tools/misc/image_utils.py` (52%) — image conversion used across pipe operators.
+- [x] `tools/misc/toml_sync.py` (0% → **98%**) and `tools/misc/document_utils.py` (0% → **97%**) — toml_sync's full read/set/sync surface incl. the destroy-config guards (never creates keys, comment/structure preservation, dry-run, no-op write guard, idempotency); document format enum matrix. Remainders = a `TYPE_CHECKING` import, an unreachable defensive `continue`, and the type-checker-appeasement trailing `raise`.
+- [x] `tools/storage/storage_config.py` (45% → **100%**) — S3/GCP `lazy_validate` fault matrices (incl. the pinned `{hash}` vs bare-`hash` asymmetry), provider-config validator, `uri_format`/`storage_path` properties.
+- [x] `tools/misc/image_utils.py` (52% → **98%**) — format enum matrix, both unsupported-MIME message branches, PIL conversion round-trips; remainder = the unreachable trailing `raise`.
 
 ## Deliberately not on the menu
 
@@ -58,5 +58,7 @@ Not the live calls — the factories, arg-builders, and config logic around them
 
 1. ~~**A (CLI)**~~ — DONE 2026-06-12 (branch `feature/Add-tests`; plan + as-built notes in TODOS.md).
 2. ~~**B (Temporal)**~~ — DONE 2026-06-12 (user-prioritized ahead of C; same branch, TODOS.md Phase B).
-3. **C (inference plumbing)** — pure-function factories, fast unit tests, protects the money path. ← NEXT
-4. **D then E** — fill-in work, good for small sessions.
+3. ~~**C (inference plumbing)**~~ — DONE 2026-06-12 (same branch, TODOS.md Phase C).
+4. ~~**D then E**~~ — DONE 2026-06-12 (same branch, TODOS.md Phases D and E).
+
+All menu sections are complete. Remaining gaps are deliberate (see "Deliberately not on the menu") plus the per-module remainders noted inline above (TYPE_CHECKING blocks, interface-layer wrappers, integration-pinned lines).
