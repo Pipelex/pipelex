@@ -1,0 +1,13 @@
+domain      = "research"
+description = "Research root referencing a library concept by bare code"
+
+# `KeyFinding` is declared in `library/concepts.mthds`, loaded as a separate `-L` library directory
+# (a separate load batch). Concept references resolve against the merged library, so the bare code
+# resolves here even though no sibling in this bundle's own batch declares it.
+[pipe.extract_finding]
+type        = "PipeLLM"
+description = "Extract a key finding from a document."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"
+model       = "$quick-reasoning"
+prompt      = "Extract a key finding from $doc."

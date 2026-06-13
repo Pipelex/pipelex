@@ -13,6 +13,7 @@ GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.output.output_renderer.get_requir
 def _make_sequence_pipe(mocker: MockerFixture, sub_pipe_codes: list[str]) -> Any:
     sequence_pipe = mocker.MagicMock()
     sequence_pipe.type = "PipeSequence"
+    sequence_pipe.is_signature = False
     sub_pipes: list[Any] = []
     for sub_pipe_code in sub_pipe_codes:
         sub_pipe = mocker.MagicMock()
@@ -25,6 +26,7 @@ def _make_sequence_pipe(mocker: MockerFixture, sub_pipe_codes: list[str]) -> Any
 def _make_concrete_pipe(mocker: MockerFixture, concept_ref: str) -> Any:
     concrete_pipe = mocker.MagicMock()
     concrete_pipe.type = "PipeLLM"
+    concrete_pipe.is_signature = False
     concrete_pipe.output.concept.code = "Text"
     concrete_pipe.output.concept.concept_ref = concept_ref
     return concrete_pipe

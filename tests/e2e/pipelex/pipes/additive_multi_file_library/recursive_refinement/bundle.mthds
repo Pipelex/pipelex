@@ -1,0 +1,23 @@
+domain      = "market_research"
+description = "Turn a source document into a concise research brief"
+main_pipe   = "write_research_brief"
+
+# Boundary (client-facing) concept, specified fully at Layer 0. Intermediate concepts are introduced
+# later, each by the controller that owns it.
+[concept.ResearchBrief]
+description = "A concise brief distilled from a source document"
+
+[concept.ResearchBrief.structure]
+title        = { type = "text", description = "Short title of the brief", required = true }
+summary      = { type = "text", description = "One-paragraph summary", required = true }
+key_findings = { type = "list", item_type = "text", description = "Bullet list of the key findings", required = true }
+
+# Layer 0: the whole job captured as ONE signature. The concrete main pipe is added in its own
+# `write_research_brief.mthds` file — `main_pipe` is a reference, not the implementation. This root
+# file is written once and never rewritten.
+[pipe.write_research_brief]
+type          = "PipeSignature"
+description   = "Read a source document and produce a concise research brief capturing its key findings."
+inputs        = { document = "Document" }
+output        = "ResearchBrief"
+signature_for = "PipeSequence"

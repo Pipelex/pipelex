@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.hub import get_library_manager
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (
     LoadConceptsOnlyResult,
     load_concepts_only,
@@ -238,6 +239,63 @@ address = { type = "concept", concept_ref = "shared.Address", description = "The
             assert address is not None
             assert customer is not None
 
+    def test_load_concepts_only_library_dir_sibling_cross_reference(self, load_empty_library: Callable[[], str]):
+        """Sibling files in a library dir resolve same-domain concept refs regardless of load order.
+
+        The referencing file (``a_refers.mthds``) sorts before the declaring file (``b_declares.mthds``),
+        so loading each file as its own one-file batch would validate the reference before its
+        declaration is present and fail. Batching the directory's files together resolves it.
+        """
+        load_empty_library()
+        refers_mthds = """
+domain = "libdom"
+description = "Library domain"
+
+[concept.Order]
+description = "An order"
+
+[concept.Order.structure]
+line_item = { type = "concept", concept_ref = "libdom.LineItem", description = "A line item" }
+"""
+        declares_mthds = """
+domain = "libdom"
+description = "Library domain"
+
+[concept.LineItem]
+description = "A line item"
+
+[concept.LineItem.structure]
+sku = { type = "text", description = "SKU" }
+"""
+        main_mthds = """
+domain = "main"
+description = "Main domain"
+
+[concept.Customer]
+description = "A customer"
+
+[concept.Customer.structure]
+name = { type = "text", description = "Name" }
+"""
+
+        with tempfile.TemporaryDirectory() as lib_dir, tempfile.TemporaryDirectory() as main_dir:
+            # a_refers sorts before b_declares, so a one-file-batch loader would load the
+            # reference before its declaration and raise.
+            (Path(lib_dir) / "a_refers.mthds").write_text(refers_mthds, encoding="utf-8")
+            (Path(lib_dir) / "b_declares.mthds").write_text(declares_mthds, encoding="utf-8")
+            main_mthds_path = Path(main_dir) / "main.mthds"
+            main_mthds_path.write_text(main_mthds, encoding="utf-8")
+
+            result = load_concepts_only(mthds_file_path=main_mthds_path, library_dirs=[Path(lib_dir)])
+
+            assert result.concepts[0].code == "Customer"
+
+            library_manager = get_library_manager()
+            library = library_manager.get_current_library()
+
+            assert library.concept_library.get_required_concept("libdom.Order") is not None
+            assert library.concept_library.get_required_concept("libdom.LineItem") is not None
+
     def test_load_concepts_only_with_mthds_content(self, load_empty_library: Callable[[], str]):
         """Test loading concepts from MTHDS content string."""
         load_empty_library()
@@ -287,6 +345,40 @@ refines = "Customer"
             concept_codes = [concept.code for concept in result.concepts]
             assert "Customer" in concept_codes
             assert "VIPCustomer" in concept_codes
+
+    def test_load_concepts_only_rejects_dangling_concept_ref(self, load_empty_library: Callable[[], str]):
+        """A dangling concept_ref in a structure field is rejected, matching the full-load path."""
+        load_empty_library()
+        mthds_content = """
+domain = "testapp"
+description = "Test domain with a dangling concept_ref"
+
+[concept.Invoice]
+description = "An invoice"
+
+[concept.Invoice.structure]
+customer = { type = "concept", concept_ref = "testapp.MissingCustomer", description = "The customer" }
+"""
+
+        with pytest.raises(ValidateBundleError, match="MissingCustomer"):
+            load_concepts_only(mthds_contents=[mthds_content])
+
+    def test_load_concepts_only_rejects_dangling_item_concept_ref(self, load_empty_library: Callable[[], str]):
+        """A dangling item_concept_ref in a list structure field is rejected, matching the full-load path."""
+        load_empty_library()
+        mthds_content = """
+domain = "testapp"
+description = "Test domain with a dangling item_concept_ref"
+
+[concept.Order]
+description = "An order"
+
+[concept.Order.structure]
+items = { type = "list", item_type = "concept", item_concept_ref = "testapp.MissingLineItem", description = "Line items" }
+"""
+
+        with pytest.raises(ValidateBundleError, match="MissingLineItem"):
+            load_concepts_only(mthds_contents=[mthds_content])
 
     def test_load_concepts_only_directory_skips_pipes(self, load_empty_library: Callable[[], str]):
         """Test that pipes are skipped when loading from directory."""

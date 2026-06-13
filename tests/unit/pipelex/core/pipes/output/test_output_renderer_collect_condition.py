@@ -13,12 +13,14 @@ GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.output.output_renderer.get_requir
 def _make_condition_pipe(mocker: MockerFixture, dependencies: set[str]) -> Any:
     condition_pipe = mocker.MagicMock()
     condition_pipe.type = "PipeCondition"
+    condition_pipe.is_signature = False
     condition_pipe.pipe_dependencies.return_value = dependencies
     return condition_pipe
 
 
 def _make_mapped_pipe(mocker: MockerFixture, concept_ref: str) -> Any:
     mapped_pipe = mocker.MagicMock()
+    mapped_pipe.is_signature = False
     mapped_pipe.output.concept.concept_ref = concept_ref
     return mapped_pipe
 
@@ -104,6 +106,7 @@ class TestCollectPossibleOutputsCondition:
         """Operator pipe types have no mapped outputs to collect."""
         operator_pipe = mocker.MagicMock()
         operator_pipe.type = pipe_type
+        operator_pipe.is_signature = False
         get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET)
 
         result = _collect_possible_outputs(operator_pipe)

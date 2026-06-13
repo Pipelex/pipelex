@@ -1,0 +1,5 @@
+domain      = "research"
+description = "Research method domain"
+
+[concept]
+KeyFinding = "A key finding extracted from a source document"

@@ -11,7 +11,7 @@ from pipelex.config import get_config
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipeline
+from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 

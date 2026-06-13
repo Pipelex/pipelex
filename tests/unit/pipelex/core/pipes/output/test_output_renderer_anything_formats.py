@@ -13,6 +13,7 @@ GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.output.output_renderer.get_requir
 def _make_anything_condition_pipe(mocker: MockerFixture, mapped_pipe_code: str) -> Any:
     condition_pipe = mocker.MagicMock()
     condition_pipe.type = "PipeCondition"
+    condition_pipe.is_signature = False
     condition_pipe.output.concept.code = "Anything"
     condition_pipe.pipe_dependencies.return_value = {mapped_pipe_code}
     return condition_pipe
@@ -20,6 +21,7 @@ def _make_anything_condition_pipe(mocker: MockerFixture, mapped_pipe_code: str) 
 
 def _make_mapped_pipe(mocker: MockerFixture, concept_ref: str, rendered: dict[str, Any]) -> Any:
     mapped_pipe = mocker.MagicMock()
+    mapped_pipe.is_signature = False
     mapped_pipe.output.concept.concept_ref = concept_ref
     mapped_pipe.output.render_stuff_spec.return_value = rendered
     return mapped_pipe
@@ -38,6 +40,7 @@ class TestRenderOutputAnythingFormats:
         """An Anything output with no determinable possible outputs raises a ValueError naming native.Anything."""
         anything_pipe = mocker.MagicMock()
         anything_pipe.type = "PipeLLM"
+        anything_pipe.is_signature = False
         anything_pipe.output.concept.code = "Anything"
 
         with pytest.raises(ValueError, match=r"native\.Anything"):

@@ -18,8 +18,13 @@ Library lifecycle (D4): the library is loaded ONCE — ``validate_bundle`` loads
 current on success (its D6 loaded-on-success contract; it owns teardown on failure), the graph
 runs against the same library, and this activity tears it down once in its ``finally``.
 
-Error contract (D3): the output carries the success-only status map + the best-effort
-``GraphSpec``. Validation failures (blueprint/factory/wiring errors, unexpected pipe failures,
+The activity result carries everything the canonical validation report needs that must be
+computed worker-side, against the worker's loaded library (D10): the success-only status map,
+the best-effort ``GraphSpec``, the library-wide ``pending_signatures``, and the
+``pipe_io_contracts`` IO contracts (built inside the library window — their JSON-Schema rendering
+needs the loaded library's class registry, so the API side never needs to re-acquire one).
+
+Error contract (D3): validation failures (blueprint/factory/wiring errors, unexpected pipe failures,
 strict-mode signature refusals) RAISE out of ``validate_bundle`` as ``ValidateBundleError`` and
 cross the boundary as structured ``ErrorReport``s via ``convert_pipelex_errors`` — the API
 renders them as the same RFC 7807 422 the direct path produces (identical ``error_type``,
@@ -34,26 +39,22 @@ same bundle. Only non-Pipelex programming bugs propagate and fail the activity, 
 ``assemble_tracing``'s bug-propagation policy.
 """
 
-import sys
-
-from polyfactory.exceptions import FactoryException
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 from temporalio import activity
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
-    get_required_pipe,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipe_in_process
+from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
@@ -70,10 +71,27 @@ class DryValidateArg(BaseModel):
 
 
 class DryValidateResult(BaseModel):
-    """Output of the dry-run+validation activity: success-only status map + best-effort graph (D3)."""
+    """Output of the dry-run+validation activity — everything the canonical validation report
+    needs that must be computed worker-side, against the worker's loaded library (D10):
+
+    - ``dry_run_outputs``: the success-only per-pipe status map (D3) that
+      ``build_validated_pipes`` projects into ``validated_pipes``.
+    - ``graph_spec``: the best-effort graph of the main pipe.
+    - ``pending_signatures``: qualified refs of pipes still declared as ``PipeSignature`` in
+      the assembled library — the runnability verdict's input.
+    - ``pipe_io_contracts``: per-pipe IO contracts keyed by ``pipe_ref``, built via
+      ``build_pipe_io_contracts`` inside the worker's library window (JSON-Schema rendering
+      resolves bundle-defined structure classes through the loaded library's class registry,
+      so the API side never needs to re-acquire a library).
+    """
 
     dry_run_outputs: dict[str, DryRunOutput]
     graph_spec: GraphSpec | None = None
+    # Deliberately REQUIRED (no wire default): a version-skewed worker that doesn't emit
+    # these fields must fail loudly at deserialization, not default to "nothing pending"
+    # and yield a silently wrong is_runnable verdict.
+    pending_signatures: list[str]
+    pipe_io_contracts: dict[str, PipeIOContract]
 
 
 @activity.defn(name="act_dry_validate")
@@ -85,6 +103,8 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         ValidateBundleError: any validation failure — blueprint/factory/wiring errors, unexpected
             dry-run pipe failures, strict-mode signature refusals (the same categorized cascade
             the direct-mode route surfaces).
+        PipeIOContractError: a JSON-Schema rendering failure while building `pipe_io_contracts`
+            (non-retryable at the workflow tier, like ValidateBundleError — deterministic).
         PipelexError: non-validation failures (config, library, tracing infra).
     """
     prev_library_id = get_current_library_id_or_none()
@@ -95,27 +115,35 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         allow_signatures=arg.allow_signatures,
     )
     library_id = get_current_library_id_or_none()
+    # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
+    # exception the CALLER is currently handling and would wrongly suppress a genuine
+    # teardown failure after a successful body.
+    body_succeeded = False
     try:
-        # Graph: best-effort (D5), against the SAME loaded library. Pipe resolution sits INSIDE
-        # the catch on purpose: an unknown explicit pipe_code degrades to graph_spec=None just
-        # like any other graph-arm domain failure — same answer the direct route gives.
-        graph_spec: GraphSpec | None = None
-        graph_pipe_ref = arg.pipe_code or _qualified_main_pipe(validate_result.blueprints)
-        if graph_pipe_ref and library_id:
-            try:
-                main_pipe = get_required_pipe(pipe_code=graph_pipe_ref)
-                graph_spec = await dry_run_pipe_in_process(pipe=main_pipe, library_id=library_id)
-            except (PipelexError, ValidationError, FactoryException) as graph_error:
-                log.warning(
-                    f"act_dry_validate: graph dry-run of '{graph_pipe_ref}' did not produce a graph "
-                    f"({type(graph_error).__name__}); returning validation result without graph_spec"
-                )
+        # Pipe IO contracts: built INSIDE the library window (D10) — the JSON-Schema rendering
+        # resolves bundle-defined structure classes through the loaded library's class registry.
+        pipe_io_contracts = build_pipe_io_contracts(validate_result.pipes)
 
-        return DryValidateResult(dry_run_outputs=validate_result.dry_run_result, graph_spec=graph_spec)
+        # Graph: best-effort (D5), against the SAME loaded library, via the ONE shared
+        # graph-arm implementation — an unknown explicit pipe_code degrades to
+        # graph_spec=None just like any other graph-arm domain failure.
+        graph_spec: GraphSpec | None = await best_effort_graph_spec(
+            pipe_ref=arg.pipe_code or select_primary_blueprint(validate_result.blueprints).main_pipe_ref,
+            library_id=library_id,
+            log_context="act_dry_validate",
+        )
+
+        result = DryValidateResult(
+            dry_run_outputs=validate_result.dry_run_result,
+            graph_spec=graph_spec,
+            pending_signatures=validate_result.pending_signatures,
+            pipe_io_contracts=pipe_io_contracts,
+        )
+        body_succeeded = True
+        return result
     finally:
         # Restore the caller's outer current-library FIRST so the guarantee survives a teardown
         # raise, then tear the validated library down once — mirrors acquire_and_validate.
-        primary_error = sys.exc_info()[1]
         if prev_library_id is not None and prev_library_id != library_id:
             set_current_library(library_id=prev_library_id)
         else:
@@ -128,17 +156,9 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
                 # 422 would name the teardown instead of the user's actual problem) — suppress
                 # it and let the primary propagate; raise it only when the body succeeded.
                 # Mirrors PipeRun.run's close_tracer handling.
-                if primary_error is None:
+                if body_succeeded:
                     raise
                 log.error(
                     f"act_dry_validate: library teardown also failed after a body error; "
                     f"raising the original error. Suppressed teardown error: {teardown_error}"
                 )
-
-
-def _qualified_main_pipe(blueprints: list[PipelexBundleBlueprint]) -> str | None:
-    """Return the domain-qualified main_pipe of the first blueprint declaring one, else None."""
-    for blueprint in blueprints:
-        if blueprint.main_pipe:
-            return PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-    return None

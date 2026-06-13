@@ -9,11 +9,12 @@ from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
-from mthds.protocol.models import ValidationReport, VersionInfo
-from mthds.protocol.protocol import MTHDSProtocol
+from mthds.protocol.models import VersionInfo
+from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.builder.operations.models_ops import ModelCategory, list_models
 from pipelex.config import get_config
@@ -28,11 +29,15 @@ from pipelex.hub import (
     get_telemetry_manager,
     set_current_library,
 )
+from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -45,33 +50,25 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
-# The MTHDS Protocol version this runtime implements (mthds-protocol.openapi.yaml).
-MTHDS_PROTOCOL_VERSION = "0.6.0"
-
-
-class PipelexValidationReport(ValidationReport):
-    """Pipelex's validation artifacts — this implementation's extensions on the
-    protocol's `ValidationReport` (which declares no body fields).
-    """
-
-    blueprint: Any = None
-    graph_spec: Any = None
-    pipe_structures: Any = None
-
 
 class PipelexModelDeck(MthdsModelDeck):
     """Pipelex's model deck — the protocol base plus this implementation's
-    routing metadata (aliases, waterfalls).
+    routing metadata (aliases, waterfalls), keyed by model category.
+
+    The routing extensions are category-scoped on purpose: the same alias name
+    (e.g. `default-small`) legitimately exists in several categories pointing at
+    different models, so a flat map would silently lose entries on collision.
     """
 
-    aliases: dict[str, str] = Field(default_factory=dict)
-    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    aliases: dict[str, dict[str, str]] = Field(default_factory=dict)
+    waterfalls: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
 
 
 class PipelexVersionInfo(VersionInfo):
@@ -343,20 +340,37 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self,
         mthds_contents: list[str],
         allow_signatures: bool = False,
-    ) -> ValidationReport:
+    ) -> PipelexValidationReport:
         """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
 
-        Wraps `validate_bundle` and maps its result onto the protocol's
-        `ValidationReport`: the parsed blueprint(s) and per-pipe structures are
-        reported; `graph_spec` stays None (the dry run validates the graph
-        without materializing a spec artifact).
+        Wraps `validate_bundle` and assembles its result into the canonical
+        `PipelexValidationReport` via `build_validation_report`: the primary
+        `bundle_blueprint`, `pipe_io_contracts` keyed by namespaced `pipe_ref`,
+        the per-pipe `validated_pipes` sweep outcomes, and the runnability
+        verdict — `pending_signatures` (qualified refs of pipes still declared
+        as `PipeSignature` in the assembled library) plus
+        `is_runnable = not pending_signatures`, the same convention as the
+        agent-CLI / builder validate envelopes. The verdict only matters on the
+        lenient `allow_signatures=True` path: in strict mode an unsatisfied
+        signature makes `validate_bundle` raise instead.
+
+        `graph_spec` is best-effort: when the batch declares a `main_pipe`
+        (primary-selection rule: first blueprint declaring one), it is dry-run
+        in-process via `dry_run_pipe_in_process` against the validation library
+        and the resulting graph rides on the report. A graph-arm domain failure
+        (`PipelexError`, polyfactory `FactoryException`, or any `ValueError` —
+        covering pydantic `ValidationError` and the ValueError-family domain
+        errors of the mock-input mint and schema resolution) degrades to
+        `graph_spec=None` with validation still successful — the same contract
+        as the Temporal validate activity, so every backend answers identically
+        for the same bundle. No declared `main_pipe` means no graph.
 
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
             allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
 
         Returns:
-            ValidationReport with the structural artifacts of a valid bundle.
+            PipelexValidationReport with the structural artifacts of a valid bundle.
 
         Raises:
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
@@ -366,60 +380,92 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # current on success (the CLI surfaces consume it before process exit).
         # This protocol wrapper is a long-lived entry point, so restore the
         # caller's current-library and tear the validation library down on the
-        # way out — on failure `validate_bundle` already did both, making the
-        # cleanup below a no-op.
+        # way out — on failure `validate_bundle` already did both, so
+        # `validation_library_id` stays None and the cleanup below is a no-op.
+        # Artifacts that need the open validation library are built INSIDE the
+        # window, before the `finally` tears the library down:
+        # `pipe_io_contracts`'s JSON-Schema rendering resolves bundle-defined
+        # structure classes through the class registry, and the graph arm
+        # dry-runs the main pipe against the loaded library.
         prev_library_id = get_current_library_id_or_none()
+        validation_library_id: str | None = None
+        # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
+        # exception the CALLER is currently handling (validate awaited inside an except block)
+        # and would wrongly suppress a genuine teardown failure after a successful body.
+        body_succeeded = False
         try:
             result = await validate_bundle(
                 mthds_contents=mthds_contents,
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
-        finally:
+            # Capture the validation library id ONCE, right after validate_bundle leaves
+            # it current — the graph arm and the finally must target the SAME library
+            # even if something inside the window later moves the contextvar.
             validation_library_id = get_current_library_id_or_none()
+            pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
+            graph_spec: GraphSpec | None = await best_effort_graph_spec(
+                pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
+                library_id=validation_library_id,
+                log_context="Protocol validate",
+            )
+            body_succeeded = True
+        finally:
             if validation_library_id is not None and validation_library_id != prev_library_id:
+                # Restore the caller's outer current-library FIRST so the guarantee
+                # survives a teardown raise — mirrors act_dry_validate.
                 if prev_library_id is not None:
                     set_current_library(library_id=prev_library_id)
                 else:
                     clear_current_library()
-                get_library_manager().teardown(library_id=validation_library_id)
-        blueprints_dump: list[dict[str, Any]] = [blueprint.model_dump(mode="json") for blueprint in result.blueprints]
-        pipe_structures: dict[str, Any] = {pipe.code: pipe.model_dump(mode="json") for pipe in result.pipes}
-        return PipelexValidationReport(
-            blueprint=blueprints_dump[0] if len(blueprints_dump) == 1 else blueprints_dump,
-            graph_spec=None,
-            pipe_structures=pipe_structures,
+                try:
+                    get_library_manager().teardown(library_id=validation_library_id)
+                except PipelexError as teardown_error:
+                    # A teardown failure must not REPLACE the body's in-flight error (the
+                    # caller's error would name the teardown instead of the actual problem) —
+                    # suppress it and let the primary propagate; raise it only when the body
+                    # succeeded. Mirrors act_dry_validate's finally.
+                    if body_succeeded:
+                        raise
+                    log.error(
+                        f"Protocol validate: library teardown also failed after a body error; "
+                        f"raising the original error. Suppressed teardown error: {teardown_error}"
+                    )
+        return build_validation_report(
+            blueprints=result.blueprints,
+            pipe_io_contracts=pipe_io_contracts,
+            dry_run_result=result.dry_run_result,
+            pending_signatures=result.pending_signatures,
+            graph_spec=graph_spec,
         )
 
     @override
-    async def models(self, category: MthdsModelCategory | None = None) -> MthdsModelDeck:
+    async def models(self, category: MthdsModelCategory | None = None) -> PipelexModelDeck:
         """The model deck this runtime can route to — protocol `models`.
 
-        Wraps the builder's `list_models` and shapes its per-category payload
-        into the protocol `ModelDeck`.
+        Wraps the builder's `list_models`: presets project into the protocol's flat
+        `models` list (each entry carries its category as `type`); the aliases and
+        waterfalls routing extensions stay keyed by category — the same alias name
+        exists in several categories pointing at different models, so flattening
+        them would silently drop entries on collision.
 
         Args:
             category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
 
         Returns:
-            ModelDeck with presets, aliases, and routing waterfalls.
+            PipelexModelDeck with the flat model list and the category-keyed
+            aliases and routing waterfalls.
         """
         categories = [ModelCategory(category)] if category is not None else None
         deck_raw = list_models(categories=categories)
         models: list[MthdsModelInfo] = []
-        aliases: dict[str, str] = {}
-        waterfalls: dict[str, list[str]] = {}
         presets_by_category: dict[str, list[dict[str, Any]]] = deck_raw["presets"]
         aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
         waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
         for category_key, category_presets in presets_by_category.items():
             for preset in category_presets:
                 models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
-        for category_aliases in aliases_by_category.values():
-            aliases.update(category_aliases)
-        for category_waterfalls in waterfalls_by_category.values():
-            waterfalls.update(category_waterfalls)
-        return PipelexModelDeck(models=models, aliases=aliases, waterfalls=waterfalls)
+        return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)
 
     @override
     async def version(self) -> VersionInfo:
@@ -437,7 +483,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # the runtime still works, so version() must not fail.
             pipelex_version = "unknown"
         return PipelexVersionInfo(
-            protocol_version=MTHDS_PROTOCOL_VERSION,
+            protocol_version=PROTOCOL_VERSION,
             runner_version=pipelex_version,
             implementation="pipelex",
             implementation_version=pipelex_version,

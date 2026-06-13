@@ -116,6 +116,56 @@ class TestCliPipeCmd:
         assert "step_one" in toml
         assert "step_two" in toml
 
+    def test_search_fields_appear_in_toml(self) -> None:
+        """PipeSearch type-specific fields (prompt, model, filters) must round-trip to TOML."""
+        spec = parse_pipe_spec(
+            "PipeSearch",
+            {
+                "pipe_code": "my_search",
+                "description": "Search pipe",
+                "inputs": {"topic": "Text"},
+                "output": "Text",
+                "model": "$search-default",
+                "prompt": "Latest news about $topic",
+                "from_date": "2025-01-01",
+                "to_date": "2025-06-01",
+                "include_domains": ["reuters.com", "bbc.com"],
+                "exclude_domains": ["example.com"],
+                "max_results": 5,
+            },
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert 'type = "PipeSearch"' in toml
+        assert 'model = "$search-default"' in toml
+        assert 'prompt = "Latest news about $topic"' in toml
+        assert 'from_date = "2025-01-01"' in toml
+        assert 'to_date = "2025-06-01"' in toml
+        assert "reuters.com" in toml
+        assert "bbc.com" in toml
+        assert "example.com" in toml
+        assert "max_results = 5" in toml
+
+    def test_search_optional_filters_omitted_in_toml(self) -> None:
+        """Unset PipeSearch filters must not appear in the TOML (only prompt is required)."""
+        spec = parse_pipe_spec(
+            "PipeSearch",
+            {
+                "pipe_code": "bare_search",
+                "description": "Minimal search pipe",
+                "inputs": {"topic": "Text"},
+                "output": "Text",
+                "prompt": "About $topic",
+            },
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert 'prompt = "About $topic"' in toml
+        assert "model =" not in toml
+        assert "from_date" not in toml
+        assert "to_date" not in toml
+        assert "include_domains" not in toml
+        assert "exclude_domains" not in toml
+        assert "max_results" not in toml
+
     def test_llm_no_model_omits_model_in_toml(self) -> None:
         """When model is None, no model line should appear in the TOML."""
         spec = parse_pipe_spec(

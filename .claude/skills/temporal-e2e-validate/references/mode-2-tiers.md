@@ -213,7 +213,7 @@ exit 0 with distinct `graph_id`s / status maps — no shared or merged trace eve
 
 RED (prove it bites) — the fix is committed, so neutralize it in the working tree. Either arm:
 
-- **Drop the content-generator scope:** in `pipelex/pipe_run/dry_run_pipeline.py`
+- **Drop the content-generator scope:** in `pipelex/pipe_run/dry_run_in_process.py`
   (`dry_run_pipe_in_process`), remove `scoped_content_generator(content_generator)` from the
   `with` line. The DRY mock lives at the cogt leaf, so the leaf resolves the hub
   `ContentGeneratorInWorkflow` and dies with `_NotInWorkflowEventLoopError` / the strong check shows
@@ -228,7 +228,7 @@ RED (prove it bites) — the fix is committed, so neutralize it in the working t
   same regression is the Mode-1 companion `test_dry_run_graph_in_process.py` (it calls
   `dry_run_pipe_in_process` directly and asserts a non-empty graph).
 
-**Restore immediately:** `git checkout -- pipelex/pipe_run/dry_run_pipeline.py`.
+**Restore immediately:** `git checkout -- pipelex/pipe_run/dry_run_in_process.py`.
 
 **API arm (after Phase 4 — the real `/validate` route in `../pipelex-api`).** With the server +
 split workers up, exercise the actual route code performing the real dispatch (the sibling repo's
