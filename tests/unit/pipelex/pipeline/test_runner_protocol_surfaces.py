@@ -1,8 +1,8 @@
 """Coverage for the small protocol surfaces of :class:`PipelexMTHDSProtocol`.
 
 Pins the ``extra`` rejection guard on ``execute``, the ``start`` not-implemented
-contract, the ``models`` deck shaping (presets to ModelInfo, aliases/waterfalls merged
-across categories, category filter passthrough), and the ``version`` handshake
+contract, the ``models`` deck shaping (presets to ModelInfo, aliases/waterfalls kept
+keyed by category, category filter passthrough), and the ``version`` handshake
 including the missing-distribution fallback.
 """
 
@@ -14,10 +14,10 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.protocol import PROTOCOL_VERSION
 
 from pipelex.builder.operations.models_ops import ModelCategory
 from pipelex.pipeline.runner import (
-    MTHDS_PROTOCOL_VERSION,
     PipelexModelDeck,
     PipelexMTHDSProtocol,
     PipelexVersionInfo,
@@ -65,9 +65,10 @@ class TestRunnerProtocolSurfaces:
         assert "execute" in str(exc_info.value)
         assert "not implemented by the local runtime" in str(exc_info.value)
 
-    async def test_models_shapes_deck_and_merges_aliases_and_waterfalls(self, mocker: MockerFixture) -> None:
+    async def test_models_shapes_deck_and_keeps_aliases_and_waterfalls_keyed_by_category(self, mocker: MockerFixture) -> None:
         """Each preset becomes one ModelInfo typed by its category; aliases and
-        waterfalls are merged across categories; no filter = categories None.
+        waterfalls stay keyed by category (no flattening, so the same alias name in
+        two categories can't collide); no filter = categories None.
         """
         list_models_mock = mocker.patch("pipelex.pipeline.runner.list_models", return_value=_MODELS_PAYLOAD)
         runner = PipelexMTHDSProtocol()
@@ -81,8 +82,8 @@ class TestRunnerProtocolSurfaces:
             ("cheap_llm", MthdsModelCategory.LLM),
             ("doc_extractor", MthdsModelCategory.EXTRACT),
         }
-        assert deck.aliases == {"best": "smart_llm", "ocr": "doc_extractor"}
-        assert deck.waterfalls == {"main_chain": ["smart_llm", "cheap_llm"]}
+        assert deck.aliases == {"llm": {"best": "smart_llm"}, "extract": {"ocr": "doc_extractor"}}
+        assert deck.waterfalls == {"llm": {"main_chain": ["smart_llm", "cheap_llm"]}, "extract": {}}
         list_models_mock.assert_called_once_with(categories=None)
 
     async def test_models_category_filter_translates_to_builder_enum(self, mocker: MockerFixture) -> None:
@@ -100,8 +101,8 @@ class TestRunnerProtocolSurfaces:
         list_models_mock.assert_called_once_with(categories=[ModelCategory.LLM])
         assert isinstance(deck, PipelexModelDeck)
         assert [(model_info.name, model_info.type) for model_info in deck.models] == [("smart_llm", MthdsModelCategory.LLM)]
-        assert deck.aliases == {"best": "smart_llm"}
-        assert deck.waterfalls == {}
+        assert deck.aliases == {"llm": {"best": "smart_llm"}}
+        assert deck.waterfalls == {"llm": {}}
 
     async def test_version_reports_installed_distribution(self, mocker: MockerFixture) -> None:
         """All three implementation version fields carry the installed pipelex version,
@@ -113,7 +114,7 @@ class TestRunnerProtocolSurfaces:
         version_info = await runner.version()
 
         assert isinstance(version_info, PipelexVersionInfo)
-        assert version_info.protocol_version == MTHDS_PROTOCOL_VERSION
+        assert version_info.protocol_version == PROTOCOL_VERSION
         assert version_info.runner_version == "9.8.7"
         assert version_info.implementation == "pipelex"
         assert version_info.implementation_version == "9.8.7"
@@ -128,7 +129,7 @@ class TestRunnerProtocolSurfaces:
         version_info = await runner.version()
 
         assert isinstance(version_info, PipelexVersionInfo)
-        assert version_info.protocol_version == MTHDS_PROTOCOL_VERSION
+        assert version_info.protocol_version == PROTOCOL_VERSION
         assert version_info.runner_version == "unknown"
         assert version_info.implementation == "pipelex"
         assert version_info.implementation_version == "unknown"
