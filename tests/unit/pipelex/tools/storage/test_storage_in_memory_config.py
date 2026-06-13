@@ -23,13 +23,13 @@ class TestStorageInMemoryConfig:
             pytest.param("assets/{}/{hash}", "- uri_format placeholder '{}' is not supported", id="uri-positional-placeholder"),
             pytest.param("assets/{hash:.0}", "- the {hash} placeholder must be plain", id="uri-hash-format-spec"),
             pytest.param("assets/{hash[0]}", "- the {hash} placeholder must be plain", id="uri-hash-index-access"),
-            pytest.param("assets/{primary_id!x}/{hash}", "- uri_format failed a test rendering", id="uri-bad-conversion-on-supported-field"),
+            # A format spec, conversion, or attribute/index access on any supported field is rejected uniformly
+            # as "must be plain" (a str path component carrying one of these renders a constant/colliding key).
+            pytest.param("assets/{primary_id!x}/{hash}", "- uri_format placeholder '{primary_id}' must be plain", id="uri-conversion-on-field"),
             pytest.param(
-                "assets/{primary_id.foo}/{hash}", "- uri_format placeholder '{primary_id.foo}' is not supported", id="uri-attr-access-on-field"
+                "assets/{primary_id.foo}/{hash}", "- uri_format placeholder '{primary_id.foo}' must be plain", id="uri-attr-access-on-field"
             ),
-            pytest.param(
-                "assets/{extension[0]}/{hash}", "- uri_format placeholder '{extension[0]}' is not supported", id="uri-index-access-on-field"
-            ),
+            pytest.param("assets/{extension[0]}/{hash}", "- uri_format placeholder '{extension[0]}' must be plain", id="uri-index-access-on-field"),
         ],
     )
     def test_lazy_validate_single_fault(

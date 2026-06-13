@@ -38,6 +38,44 @@ class TestStorageS3Config:
                 "assets/{hash}/{tenant}", "my-bucket", "eu-west-1", "- uri_format placeholder '{tenant}' is not supported", id="uri-unsupported"
             ),
             pytest.param("assets/{hash:.0}", "my-bucket", "eu-west-1", "- the {hash} placeholder must be plain", id="uri-hash-format-spec"),
+            # A format spec on a non-hash field is just as dangerous: {primary_id:.0} truncates to "" (collisions),
+            # and a huge width like {primary_id:1000000000} would allocate a ~1GB string if it ever reached a
+            # test rendering — so it must be rejected at parse time, before any format() call.
+            pytest.param(
+                "assets/{hash}/{primary_id:.0}",
+                "my-bucket",
+                "eu-west-1",
+                "- uri_format placeholder '{primary_id}' must be plain",
+                id="uri-field-truncate-spec",
+            ),
+            pytest.param(
+                "assets/{hash}/{primary_id:1000000000}",
+                "my-bucket",
+                "eu-west-1",
+                "- uri_format placeholder '{primary_id}' must be plain",
+                id="uri-field-huge-width",
+            ),
+            pytest.param(
+                "assets/{hash}/{secondary_id!r}",
+                "my-bucket",
+                "eu-west-1",
+                "- uri_format placeholder '{secondary_id}' must be plain",
+                id="uri-field-conversion",
+            ),
+            pytest.param(
+                "assets/{hash}/{primary_id.foo}",
+                "my-bucket",
+                "eu-west-1",
+                "- uri_format placeholder '{primary_id.foo}' must be plain",
+                id="uri-field-attr-access",
+            ),
+            pytest.param(
+                "assets/{hash}/{extension[0]}",
+                "my-bucket",
+                "eu-west-1",
+                "- uri_format placeholder '{extension[0]}' must be plain",
+                id="uri-field-index-access",
+            ),
             pytest.param("s3-assets/{hash}", "", "eu-west-1", "- set a value for bucket_name", id="empty-bucket-name"),
             pytest.param("s3-assets/{hash}", "my.bucket", "eu-west-1", "- bucket_name cannot contain a dot", id="bucket-with-dot"),
             pytest.param("s3-assets/{hash}", "my/bucket", "eu-west-1", "- bucket_name cannot contain a slash", id="bucket-with-slash"),

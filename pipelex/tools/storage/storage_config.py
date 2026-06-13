@@ -47,6 +47,7 @@ class StorageMethodConfig(ConfigModel):
             return [f"- uri_format is not a valid format string ({exc})"]
         error_msgs: list[str] = []
         unsupported_names: set[str] = set()
+        nonplain_names: set[str] = set()
         hash_field_found = False
         plain_hash_found = False
         for field_name, format_spec, conversion in parsed_fields:
@@ -58,19 +59,24 @@ class StorageMethodConfig(ConfigModel):
                 hash_field_found = True
                 if field_name == "hash" and not format_spec and not conversion:
                     plain_hash_found = True
-            elif field_name != base_name:
-                # Attribute/index access on a str path component can only fail at render time — reject it here
-                unsupported_names.add(field_name)
+            elif field_name != base_name or format_spec or conversion:
+                # Every supported field is a str path component, so a format spec, conversion, or
+                # attribute/index access renders a constant, colliding, or oversized key ({primary_id:.0}
+                # truncates to "" → every object shares one URI; {primary_id:1000000000} would allocate a
+                # ~1GB string at render time) — the same silent-overwrite/OOM hazard we reject on {hash}.
+                nonplain_names.add(field_name)
         supported_list = ", ".join("{" + name + "}" for name in sorted(self.URI_FORMAT_SUPPORTED_FIELDS))
         for unsupported_name in sorted(unsupported_names):
             error_msgs.append(f"- uri_format placeholder '{{{unsupported_name}}}' is not supported (supported: {supported_list})")
+        for nonplain_name in sorted(nonplain_names):
+            error_msgs.append(f"- uri_format placeholder '{{{nonplain_name}}}' must be plain: no format spec, conversion, or attribute/index access")
         if not hash_field_found:
             error_msgs.append("- uri_format must contain a {hash} placeholder")
         elif not plain_hash_found:
             error_msgs.append("- the {hash} placeholder must be plain: no format spec, conversion, or attribute/index access")
         if not error_msgs:
-            # Parsing can't catch everything (e.g. an invalid conversion on a supported field like
-            # "{primary_id!x}") — a test rendering with the real keyword set proves format() will succeed.
+            # Defensive backstop: only plain {supported} placeholders reach here, so format() with the real
+            # keyword set is cheap and cannot allocate — it just proves nothing slipped past the parse checks.
             try:
                 self.uri_format.format(**dict.fromkeys(self.URI_FORMAT_SUPPORTED_FIELDS, "test"))
             except (KeyError, IndexError, ValueError, TypeError, AttributeError) as exc:
