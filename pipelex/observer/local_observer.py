@@ -20,9 +20,10 @@ class LocalObserver(ObserverProtocol):
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:
+        # event_type goes last so a payload key cannot overwrite the lifecycle event name
         payload = {
-            "event_type": event_type,
             **payload,
+            "event_type": event_type,
         }
 
         file_path = self.storage_dir / f"{event_type}.jsonl"
