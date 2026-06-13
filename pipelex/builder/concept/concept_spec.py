@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
@@ -311,14 +311,19 @@ class ConceptSpec(StructuredContent):
 
     @model_validator(mode="before")
     @classmethod
-    def model_validate_spec(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
-        if isinstance(values, dict) and values.get("refines") and values.get("structure"):
+    def model_validate_spec(cls, values: Any) -> Any:
+        # mode="before" receives raw, unvalidated input — a non-dict (e.g. a plain string in a
+        # `ConceptSpec | str` union) must fall through untouched rather than crash on dict access
+        if not isinstance(values, dict):
+            return values
+        fields = cast("dict[str, Any]", values)
+        if fields.get("refines") and fields.get("structure"):
             msg = (
-                f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"
+                f"Forbidden to have refines and structure at the same time: `{fields.get('refines')}` "
+                f"and `{fields.get('structure')}` for concept that has the description `{fields.get('description')}`"
             )
             raise ConceptSpecError(msg)
-        return values
+        return fields
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
