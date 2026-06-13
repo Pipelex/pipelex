@@ -1,55 +1,50 @@
-# Burn down the nondeterminism review follow-ups
+# Reviewer's guide — `feature/Add-tests`
 
-> **Cold-start brief for a new session.** Mission: go through every item in [`wip/distributed-execution/nondeterminism-fix-review-follow-ups.md`](wip/distributed-execution/nondeterminism-fix-review-follow-ups.md), re-verify each against the current code, **fix the obvious ones**, **dismiss the wrong ones** (record the dismissal + reason in the follow-ups doc, don't silently delete), and **surface the judgment-call ones** in a new `.md` for discussion with the user. Do not start new feature work.
+This branch is a test-coverage grind over the offline-testable layers of pipelex, plus the source bugs that writing those tests surfaced. The diff is almost entirely new unit tests; the source changes are a small, deliberate set of bug fixes, each pinned by a test in the same branch. Overall coverage went from ~72% to ~78% (per-module before/after numbers live in [wip/tests/missing-tests-menu.md](wip/tests/missing-tests-menu.md)).
 
-## Context (read first, in this order)
+## How to review this PR
 
-1. `wip/distributed-execution/workflow-nondeterminism-audit.md` — the verified audit. H1, H2, M1 are FIXED; the MEDIUM/LOW drift table is open but **out of scope for this session** (it has its own fix-order, steps 3–5).
-2. `wip/distributed-execution/nondeterminism-fix-review-follow-ups.md` — the work list. Items came from two recall-biased multi-agent review rounds: round 1 reviewed the committed H1/M1 fixes, round 2 reviewed the H2 fix. Every item was verified once by a review agent, but **re-verify before acting** — line numbers drift and some verdicts may not survive contact with the current code.
+Start with the source changes (next section) — they are the only behavior changes. Then sample the test modules with the conventions section in mind: several patterns that look unusual are deliberate and documented below, so check there before flagging.
 
-Branch state when this brief was written: `fix/Config`, H1/M1 fixes committed; the H2 fix (new `LibraryManager.open_fresh_library` + eviction-safe `finally` reorder in `WfPipeRouter`) was uncommitted in the working tree. **Check `git status` first** — the user may have committed it since. Full suite was green (`make agent-test`) and `make agent-check` clean at that point.
+## Source changes (the behavior diff)
 
-## Triage protocol
+Every fix below was found by writing a pinning test first, judging the pinned behavior wrong in a review pass, then fixing source and flipping the test. The investigation record is [wip/tests/deferred-source-bugs-pinned-by-tests.md](wip/tests/deferred-source-bugs-pinned-by-tests.md); user-facing wording is in `CHANGELOG.md` under `[Unreleased]`.
 
-For each item: re-verify → then one of:
+- `pipelex/plugins/openai/openai_img_gen_factory.py` + `pipelex/cogt/img_gen/img_gen_setting.py` — the image-moderation mapping was inverted: `is_moderated=true` sent OpenAI's *less* restrictive `"low"` and `false` sent `"auto"`. Now enabled → `"auto"`, disabled → `"low"`. To keep the corrected mapping from silently downgrading default runs (deck alias/handle resolution builds settings without the field, and the old `False` default would have started sending `"low"`), `ImgGenSetting.is_moderated` now defaults to `None` — workers omit the parameter and the provider default applies.
+- `pipelex/tools/storage/storage_config.py` + `storage_provider_factory.py` — the biggest source diff. GCP's `lazy_validate` accepted any `uri_format` containing the bare substring `hash` (no substitution slot → every object renders the same URI → silent storage-wide overwrites), and the local/in-memory configs had no validation at all. The per-provider checks and error-message assembly now live on a shared `StorageMethodConfig` base that parses the format string: every placeholder must be a plain `{name}` (a format spec, conversion, or attribute/index access is rejected on *any* supported field, not just `{hash}` — `{primary_id:.0}` truncates to a colliding key and `{primary_id:1000000000}` would balloon the test render, same hazard class as `{hash:.0}`), a `{hash}` placeholder is required, unknown placeholders are rejected against the supported set, a test rendering as backstop, positive signed-URL lifespans on bucket configs; the factory validates every method; `storage_path` dispatches on the configured method instead of blaming a missing local config.
+- `pipelex/builder/bundle_spec.py` + `pipelex/builder/concept/concept_spec.py` + `pipelex/core/concepts/concept_blueprint.py` — string concept values in bundle specs were unconstructible (a `mode="before"` validator assumed dict input and crashed on the `ConceptSpec | str` union) and `to_blueprint()` mapped the string into `structure`, where the loader rejects anything that isn't a registered structure class. Both before-validators (`ConceptSpec` and `ConceptBlueprint`) now fall through untouched on non-dict input, and the string passes through as the concept's description (matching `ConceptFactory.make_from_blueprint`, which treats a bare string as `ConceptDeclarationType.STRING`).
+- `pipelex/plugins/mistral/mistral_factory.py` — `make_simple_messages` appended the system message *after* the user message, contradicting its own docstring and the OpenAI-typed sibling. System now comes first.
+- `pipelex/observer/local_observer.py` — a payload carrying its own `event_type` key silently overwrote the lifecycle event name in the JSONL record; merge order flipped so the event name wins.
+- `pipelex/temporal/worker_cli.py` — startup log said `Starting worker for current project 'None'` when no project was given; it now omits the name.
+- `pipelex/core/pipes/output/output_renderer.py` — a `PipeCondition`'s possible outputs were collected by iterating a dependency *set*, so the user-facing `output_option_N` numbering was nondeterministic with two or more mapped pipes; now sorted by pipe code.
+- `pyproject.toml` — **pytest's default `norecursedirs` includes `build`**, so everything under `tests/unit/pipelex/cli/commands/build/` (mirroring the source layout) was silently never collected — including a pre-existing regression test. The config now overrides `norecursedirs` to the defaults minus `build`, plus `testpaths = ["tests"]` so bare runs never scan outside the test tree. This is load-bearing for the whole branch: without it a chunk of the new tests wouldn't run in CI.
 
-- **FIX** — obvious, low-risk, verdict holds: implement, with tests where the repo's TDD norm applies (red first for behavior changes; no tests for trivial comment/message fixes).
-- **DISMISS** — wrong, stale, or unreachable: edit the follow-ups doc to mark it dismissed with the evidence (file:line), so it doesn't get re-chased.
-- **SURFACE** — real but a judgment call (design tradeoff, behavior change with ripple, multiple defensible shapes): write it up in a new `wip/distributed-execution/nondeterminism-follow-ups-decisions-needed.md` with the options and a recommendation, and leave the code alone.
+## Test layout
 
-## The items, with expected triage (verify anyway)
+Tests mirror the source tree under `tests/unit/pipelex/`. The grind covered five areas:
 
-Check the box when the item reaches its terminal state (FIXED / DISMISSED / SURFACED), and append the outcome to the line — e.g. `→ FIXED (commit abc123)`, `→ DISMISSED (unreachable, see follow-ups doc)`, `→ SURFACED (decisions doc §2)`.
+- **CLI internals** — `tests/unit/pipelex/cli/` and `tests/unit/pipelex/cli/commands/build/`: doctor checks, run core + wrapper, build codegen cores, readiness gate, show/which, error handlers.
+- **Temporal entry points** — `tests/unit/pipelex/temporal/`: worker CLI, codec HTTP server (driven over real HTTP via `aiohttp.test_utils`), server connection logic. These are deploy-critical surfaces whose bugs previously only showed inside a live cluster.
+- **Inference plumbing** — `tests/unit/pipelex/cogt/{llm,img_gen,models,model_backends}/` and `tests/unit/pipelex/plugins/{gateway,mistral}/`: structured-output mode mapping, credentials messages, model-deck reference checks, the per-provider img-gen args factory, both worker-routing factories, gateway request shaping + extract-output parsing, the Mistral factory. None of these tests touch a provider.
+- **Core runtime** — `tests/unit/pipelex/{observer,core/pipes/output,graph,builder,pipeline}/`: local observer JSONL sink, output renderer Anything-resolution, bundle-level graph dispatch, bundle-spec validation/`to_blueprint()`/pretty rendering, inputs ops, pipeline runner error paths and MTHDS protocol surfaces.
+- **Tools/config** — `tests/unit/pipelex/tools/{misc,storage}/`: the TOML config-sync engine (rewrites user config in place — tests pin the destroy-config guards: never creates keys, preserves comments/structure, dry-run is byte-identical, idempotent), format enums, PIL conversion, storage config validators.
 
-- [x] **0 — PRIORITY: rekey per-run worker-local state by `run_id`, not `workflow_id`** → FIXED. `wf_run_id` keys library/tracer/event-log context (and event/node-id stamps — one identity); `open_fresh_library` made pop-based (atomic, concurrent-teardown tolerant). New RED-first guard `test_wf_pipe_router_run_scoped_state_keying.py`; eviction-leak test converted to start-then-install under `wf_{run_id}`; `temporal-integration.md` keying story updated.
-- [x] **0bis — cancellation test pinning the `finally`-ordering invariant** → FIXED, premise corrected: cancellation at an activity await surfaces as `ActivityError` (an `Exception`, swallowed by the best-effort except) — it CANNOT abort the finally. The guard instead forces eviction via worker shutdown: `test_wf_pipe_router_eviction_cleanup_ordering.py`, verified RED against a reordered finally.
-- [x] **1 — stale runner-fallback warning message** → FIXED. Renamed `log_once_runner_fallback_engaged`, INFO level, message states the post-H1 contract; module docstring + the two unit tests updated.
-- [x] **2 — dead `_event_log_contexts.clear()`** → FIXED. Deleted in `tracing/helpers.py` AND the same dead clear in `test_split_worker_real_inference_cost.py`; docstrings rewritten.
-- [x] **3 — test-scaffolding dedup** → FIXED (two sub-points DISMISSED with evidence in the follow-ups doc: the enable-tracing fixture has only one copy; the extract-pages scan needs `(name, activity_id)` pairs). Shared: `make_synthetic_usage_llm_job`, `act_flush_noop`, `scheduled_activity_names` in `tracing/helpers.py`; `make_prepared_greeting_job` in `library_crate/helpers.py`.
-- [x] **4 — `open_tracer` stale-eviction → delegate to `close_tracer`** → FIXED with the membership-gated warning.
-- [x] **5 — skip the guaranteed-empty flush activity in costs-only LIVE** → FIXED. Determinism argument re-derived (gate inputs payload-pure; costs-only LIVE buffer provably empty; Temporal unshipped). `schedule_flush` computed in setup, consumed in finally; costs-only test arm now asserts flush ABSENT + clean replay.
-- [x] **6 — trim redundant null conjuncts in the `finally`** → FIXED (folded into 5/9 rewrite; sentinels kept).
-- [x] **8 — document `set_event_log` overwrite as load-bearing** → FIXED (contract comment naming the three idioms).
-- [x] **9 — single-block `finally` simplification** → FIXED (sentinel + TYPE_CHECKING import gone; temporal suite green).
-- [x] **10 — shared scoped-library helper for the two uuid-keyed `runtime_bridge` copies** → FIXED. Sync `scoped_library_for_crate` in `runtime_bridge/primitives/scoped_library.py`; `wf_pipe_router` left bespoke.
-- [x] **11 — `LibraryManager.teardown`: forget the entry even if `library.teardown()` raises** → FIXED (`_pop_and_teardown_library`, RED-first unit tests).
-- [x] **7 — graph events lack an H1-style guard** (design note) → SURFACED (decisions doc §1, with options + recommendation; ties into T3).
+## Conventions the tests follow (read before flagging)
 
-## Constraints and gotchas
+- **One test class per module** (house pytest standard) — that's why e.g. doctor coverage is split across several `test_doctor_*.py` files. pytest-mock (`MockerFixture`) only, never `unittest.mock` imports; strong value asserts; parametrization over copy-paste.
+- **The CLI *interface* is deliberately untested here.** Arg parsing, `--help`, Typer wrappers, agent JSON shapes are owned by the sibling `conformance` repo's spec suite. This branch tests the `do_*`/`_core` functions beneath them. Low coverage remaining on `*_cmd.py` wrapper lines is by design.
+- **Module-namespace patching, source-module patching for call-time imports.** Collaborators imported at a module's top are patched at the consuming module's namespace; classes imported *inside* functions (the deferred-import pattern in worker factories) are patched at their source module. Worker-factory tests use a fresh real `PluginSdkRegistry()` per test so the booted singleton is never mutated.
+- **Real collaborators where cheap, mocks where not:** real TOML files in `tmp_path`, real PIL images, real pydantic SDK models (Mistral OCR, Portkey `GenericResponse`), a real aiohttp server for the codec; AsyncMocks for inference/network/Temporal SDK boundaries.
+- **Recorded Rich consoles** (`Console(record=True, color_system=None)` + `export_text()`) for output-rendering asserts.
+- **Remaining uncovered lines are deliberate:** `TYPE_CHECKING` blocks, interface-layer wrappers (conformance-owned), lines already pinned by the integration suite (e.g. pipeline runner happy path), and live-call worker paths.
 
-- **Do not modify** `tests/integration/pipelex/temporal/test_wf_pipe_router_eviction_library_leak.py` to make anything pass — it's the H2 regression guard. Extending it (item 0's successor-direction case) is fine.
-- Repo error-handling rules apply (`.claude/rules/python-standards.md`): no new bare `except Exception`, `try/finally` for required cleanup.
-- The `finally` block in `wf_pipe_router.py` is the determinism boundary: any edit there must keep ALL synchronous worker-local cleanup before the single flush await, and the flush gate payload-pure. Re-read the block's comments before touching it.
-- Items 5, 6, 9 (and 0 partially) all edit that same block — do them as one coherent change, not three diffs.
-- `worker_scopes` live only in base `pipelex.toml` — a recurring false-positive bot finding; don't "fix" it.
+## Known deferred items (not in this PR)
 
-## Acceptance
+[wip/tests/deferred-source-bugs-pinned-by-tests.md](wip/tests/deferred-source-bugs-pinned-by-tests.md) keeps two intentionally-deferred lists: a design tradeoff (LocalObserver's flat record namespace — nesting the payload is a breaking JSONL-shape change to decide deliberately) and test-quality cleanups (a Pipelex-boot opt-out conftest for pure test dirs, hoisting a few duplicated test scaffolds, minor in-file dedup). Don't treat their absence as gaps.
 
-- [x] Every checklist item above is checked with its outcome appended (**FIXED** / **DISMISSED (reason)** / **SURFACED → decisions doc**), and the follow-ups doc reflects the same status per item.
-- [x] `wip/distributed-execution/nondeterminism-follow-ups-decisions-needed.md` exists iff anything was surfaced, and the track `README.md` links it.
-- [x] Targeted suites green along the way (temporal integration + unit libraries/reporting/tracing/graph + runtime_bridge).
-- [x] `make agent-check` clean at the end.
-- [x] Full `make agent-test` green at the end.
-- [x] CHANGELOG `[Unreleased]` updated for any behavior change; `docs/under-the-hood/temporal-integration.md` updated if item 0 changes the keying story.
+## Verifying locally
 
-Update THIS file as you go (checkpoint style): check boxes and append outcomes as each item lands, so a further session can resume cold.
+```bash
+make agent-check   # lint + typecheck gate
+make agent-test    # full offline suite (the new build/ dirs collect thanks to the norecursedirs fix)
+```

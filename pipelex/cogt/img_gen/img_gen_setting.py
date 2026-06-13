@@ -17,7 +17,9 @@ class ImgGenSetting(ConfigModel):
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float | None = Field(default=None, gt=0)
-    is_moderated: bool = False
+    # None means "no explicit choice": workers omit the moderation/safety-checker param so the provider's
+    # own default applies (OpenAI gpt-image defaults to "auto", i.e. standard filtering)
+    is_moderated: bool | None = None
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
     description: str | None = None
 
