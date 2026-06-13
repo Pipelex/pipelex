@@ -33,7 +33,7 @@ from pipelex.config import get_config
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
-from pipelex.pipeline.exceptions import PipeStructuresError
+from pipelex.pipeline.exceptions import PipeIOContractError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
@@ -214,16 +214,16 @@ class TestDryValidateActivityInMemory:
         traced_pipe_codes = {node.pipe_code for node in result.graph_spec.nodes if node.pipe_code}
         assert {"alpha_sequence", "alpha_first", "alpha_second"} <= traced_pipe_codes
 
-        # D10: the worker-computed wire fields cross the boundary — pipe_structures keyed by
+        # D10: the worker-computed wire fields cross the boundary — pipe_io_contracts keyed by
         # namespaced pipe_ref with typed entries surviving (de)serialization, and a complete
         # bundle reporting nothing pending.
         assert result.pending_signatures == []
-        assert set(result.pipe_structures) == {
+        assert set(result.pipe_io_contracts) == {
             "dry_validate_alpha.alpha_sequence",
             "dry_validate_alpha.alpha_first",
             "dry_validate_alpha.alpha_second",
         }
-        sequence_contract = result.pipe_structures["dry_validate_alpha.alpha_sequence"]
+        sequence_contract = result.pipe_io_contracts["dry_validate_alpha.alpha_sequence"]
         assert sequence_contract.inputs["subject"].concept_code == "native.Text"
         assert sequence_contract.output.concept_code == "native.Text"
 
@@ -278,8 +278,8 @@ class TestDryValidateActivityInMemory:
         assert result.dry_run_outputs["dry_validate_sig.sig_caller"].status == DryRunStatus.SUCCESS
         assert result.graph_spec is not None
         assert result.pending_signatures == ["dry_validate_sig.unimplemented_sig"]
-        assert "dry_validate_sig.unimplemented_sig" in result.pipe_structures
-        assert result.pipe_structures["dry_validate_sig.unimplemented_sig"].output.concept_code == "native.Text"
+        assert "dry_validate_sig.unimplemented_sig" in result.pipe_io_contracts
+        assert result.pipe_io_contracts["dry_validate_sig.unimplemented_sig"].output.concept_code == "native.Text"
 
     async def test_validation_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D-C5 regression: a deterministic validation failure must run the activity exactly once.
@@ -295,20 +295,20 @@ class TestDryValidateActivityInMemory:
             await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=False))
         assert sweep_spy.call_count == 1
 
-    async def test_pipe_structures_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
-        """PipeStructuresError is non-retryable at the workflow tier, like ValidateBundleError —
+    async def test_pipe_io_contracts_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
+        """PipeIOContractError is non-retryable at the workflow tier, like ValidateBundleError —
         a deterministic schema-render failure must run the activity exactly once. Pins the
         string match on the ApplicationError type name in wf_dry_validate's retry policy: if
         the class is renamed without updating the policy, the sweep silently re-runs and only
         this assertion catches it.
         """
-        structures_mock = mocker.patch(
-            "pipelex.temporal.tprl_pipe.act_dry_validate.build_pipe_structures",
-            side_effect=PipeStructuresError(message="simulated schema render failure"),
+        io_contracts_mock = mocker.patch(
+            "pipelex.temporal.tprl_pipe.act_dry_validate.build_pipe_io_contracts",
+            side_effect=PipeIOContractError(message="simulated schema render failure"),
         )
         with pytest.raises(WorkflowFailureError):
             await self._execute(temporal_client, DryValidateArg(mthds_contents=[_ALPHA_MTHDS]))
-        assert structures_mock.call_count == 1
+        assert io_contracts_mock.call_count == 1
 
     async def test_no_main_pipe_and_no_pipe_code_yields_no_graph(self, temporal_client: TemporalClient) -> None:
         """Without a declared main_pipe and without an explicit pipe_code, the graph arm is

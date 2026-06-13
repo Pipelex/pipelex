@@ -23,7 +23,7 @@ from pipelex.temporal.tprl_pipe.wf_dry_validate import WfDryValidate
 class TestDryValidateDispatch:
     @pytest.mark.asyncio
     async def test_dispatch_pins_no_workflow_retry_and_interactive_timeout(self, mocker: MockerFixture) -> None:
-        expected_result = DryValidateResult(dry_run_outputs={}, pending_signatures=[], pipe_structures={})
+        expected_result = DryValidateResult(dry_run_outputs={}, pending_signatures=[], pipe_io_contracts={})
         fake_executor = mocker.Mock()
         fake_executor.make_workflow_id.return_value = "wf_dry_validate_test"
         fake_executor.execute_workflow = mocker.AsyncMock(return_value=expected_result)

@@ -29,8 +29,8 @@ class WfDryValidate(WorkflowClass[DryValidateArg, DryValidateResult]):
         # Validation is deterministic — its failures must NOT retry. The deterministic-failure
         # surface crosses the boundary as TWO types: validate_bundle wraps
         # SignaturesNotAllowedError / DryRunError / PipelexInterpreterError into
-        # ValidateBundleError before they escape, and build_pipe_structures wraps a
-        # JSON-Schema rendering failure into PipeStructuresError; the activity-boundary
+        # ValidateBundleError before they escape, and build_pipe_io_contracts wraps a
+        # JSON-Schema rendering failure into PipeIOContractError; the activity-boundary
         # TemporalError carries the OUTER PipelexError class name as the ApplicationError
         # type (which is what non_retryable_error_types matches). The graph arm never raises
         # domain errors (it degrades to graph_spec=None). Everything else (worker crash,
@@ -41,6 +41,6 @@ class WfDryValidate(WorkflowClass[DryValidateArg, DryValidateResult]):
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=RetryPolicy(
                 maximum_attempts=2,
-                non_retryable_error_types=["ValidateBundleError", "PipeStructuresError"],
+                non_retryable_error_types=["ValidateBundleError", "PipeIOContractError"],
             ),
         )

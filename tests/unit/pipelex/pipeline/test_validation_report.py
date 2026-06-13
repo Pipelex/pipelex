@@ -11,7 +11,7 @@ Pure unit test (no Pipelex boot): blueprints from the interpreter, hand-built st
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
-from pipelex.pipeline.pipe_structures import IOMultiplicity, PipeIOContract, PipeOutputContract
+from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, PipeIOContract, PipeOutputContract
 from pipelex.pipeline.validation_report import build_validation_report
 
 _NO_MAIN_PIPE_MTHDS = """
@@ -42,7 +42,7 @@ class TestBuildValidationReport:
             PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_NO_MAIN_PIPE_MTHDS),
             PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS),
         ]
-        pipe_structures = {
+        pipe_io_contracts = {
             "beta.do_it": PipeIOContract(
                 inputs={},
                 output=PipeOutputContract(concept_code="native.Text", multiplicity=IOMultiplicity.SINGLE),
@@ -54,14 +54,14 @@ class TestBuildValidationReport:
 
         report = build_validation_report(
             blueprints=blueprints,
-            pipe_structures=pipe_structures,
+            pipe_io_contracts=pipe_io_contracts,
             dry_run_result=dry_run_result,
             pending_signatures=["beta.still_pending"],
         )
 
         # Primary selection: the first blueprint declaring main_pipe wins, not the first in the batch.
         assert report.bundle_blueprint is blueprints[1]
-        assert report.pipe_structures == pipe_structures
+        assert report.pipe_io_contracts == pipe_io_contracts
         assert report.validated_pipes == [{"pipe_ref": "beta.do_it", "status": DryRunStatus.SUCCESS}]
         assert report.pending_signatures == ["beta.still_pending"]
         assert report.is_runnable is False
@@ -72,7 +72,7 @@ class TestBuildValidationReport:
 
         report = build_validation_report(
             blueprints=blueprints,
-            pipe_structures={},
+            pipe_io_contracts={},
             dry_run_result={},
             pending_signatures=[],
         )

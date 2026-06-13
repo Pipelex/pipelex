@@ -12,8 +12,8 @@ import pytest
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.pipe_structures import select_primary_blueprint
 
 _NO_MAIN_PIPE_MTHDS = """
 domain = "alpha"

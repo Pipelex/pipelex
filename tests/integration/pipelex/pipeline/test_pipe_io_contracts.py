@@ -1,9 +1,9 @@
-"""Pin the D6 `build_pipe_structures` builder: typed `PipeIOContract` entries keyed by `pipe_ref`.
+"""Pin the D6 `build_pipe_io_contracts` builder: typed `PipeIOContract` entries keyed by `pipe_ref`.
 
 Covers the two combinations the hosted builder it was ported from never saw:
 
 - **`PipeSignature` pipes in a lenient batch** — a forward-declared header validated with
-  ``allow_signatures=True`` gets a structures entry like any concrete pipe (its declared
+  ``allow_signatures=True`` gets an IO-contract entry like any concrete pipe (its declared
   contract is exactly what a top-down build needs), keyed by its namespaced ``pipe_ref``.
 - **Multiplicity entry shapes** — a single output reports ``multiplicity="single"``, a
   list output (``Concept[]``) reports ``multiplicity="variable"`` with an array JSON Schema
@@ -22,8 +22,8 @@ import pytest
 from pydantic import PydanticUserError
 
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
-from pipelex.pipeline.exceptions import PipeStructuresError
-from pipelex.pipeline.pipe_structures import IOMultiplicity, build_pipe_structures
+from pipelex.pipeline.exceptions import PipeIOContractError
+from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
@@ -67,25 +67,25 @@ prompt = "Make items from:\\n@docs"
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestBuildPipeStructures:
+class TestBuildPipeIOContracts:
     async def test_multiplicity_entry_shapes(self, load_empty_library: Callable[[], str]) -> None:
         """Entries are keyed by namespaced pipe_ref; output multiplicity is single vs variable."""
         outer_library_id = load_empty_library()
         try:
             result = await validate_bundle(mthds_contents=[_MULTIPLICITY_MTHDS])
-            structures = build_pipe_structures(result.pipes)
+            io_contracts = build_pipe_io_contracts(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
-        assert set(structures) == {"structures_test.make_one", "structures_test.make_many"}
+        assert set(io_contracts) == {"structures_test.make_one", "structures_test.make_many"}
 
-        make_one = structures["structures_test.make_one"]
+        make_one = io_contracts["structures_test.make_one"]
         assert make_one.output.concept_code == "structures_test.Item"
         assert make_one.output.multiplicity == IOMultiplicity.SINGLE
         assert make_one.inputs["doc"].concept_code == "native.Text"
         assert make_one.inputs["doc"].json_schema
 
-        make_many = structures["structures_test.make_many"]
+        make_many = io_contracts["structures_test.make_many"]
         assert make_many.output.concept_code == "structures_test.Item"
         assert make_many.output.multiplicity == IOMultiplicity.VARIABLE
         # A list-typed input renders an array JSON Schema.
@@ -96,7 +96,7 @@ class TestBuildPipeStructures:
         load_empty_library: Callable[[], str],
         mocker: MockerFixture,
     ) -> None:
-        """A pydantic schema-generation failure converts to PipeStructuresError with pipe/input
+        """A pydantic schema-generation failure converts to PipeIOContractError with pipe/input
         context — never a raw third-party error (which the Temporal boundary would not convert
         and Temporal would pointlessly retry).
         """
@@ -107,8 +107,8 @@ class TestBuildPipeStructures:
                 "pipelex.core.pipes.stuff_spec.stuff_spec.StuffSpec.render_stuff_spec",
                 side_effect=PydanticUserError("simulated schema-generation failure", code=None),
             )
-            with pytest.raises(PipeStructuresError, match="Failed to render the JSON Schema"):
-                build_pipe_structures(result.pipes)
+            with pytest.raises(PipeIOContractError, match="Failed to render the JSON Schema"):
+                build_pipe_io_contracts(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
@@ -121,15 +121,15 @@ class TestBuildPipeStructures:
                 (_SIGNATURE_ONLY_DIR / "header.mthds").read_text(encoding="utf-8"),
             ]
             result = await validate_bundle(mthds_contents=mthds_contents, allow_signatures=True)
-            structures = build_pipe_structures(result.pipes)
+            io_contracts = build_pipe_io_contracts(result.pipes)
         finally:
             _teardown_validation_library(outer_library_id)
 
         # The signature (forward declaration) and the controller referencing it both report contracts.
-        signature_contract = structures["research.find_key_findings"]
+        signature_contract = io_contracts["research.find_key_findings"]
         assert signature_contract.output.concept_code == "research.KeyFinding"
         assert signature_contract.output.multiplicity == IOMultiplicity.SINGLE
         assert signature_contract.inputs["doc"].concept_code == "native.Text"
 
-        controller_contract = structures["research.research_brief"]
+        controller_contract = io_contracts["research.research_brief"]
         assert controller_contract.output.concept_code == "research.KeyFinding"

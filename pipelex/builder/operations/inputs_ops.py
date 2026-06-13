@@ -13,7 +13,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipeline.pipe_structures import select_primary_blueprint
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:

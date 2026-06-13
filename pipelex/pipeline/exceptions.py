@@ -127,8 +127,8 @@ class ValidateBundleError(PipelexError):
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
 
 
-class PipeStructuresError(PipelexError):
-    """Raised when projecting a validated pipe into its `pipe_structures` IO contract fails.
+class PipeIOContractError(PipelexError):
+    """Raised when projecting a validated pipe into its `pipe_io_contracts` IO contract fails.
 
     Wraps a JSON-Schema rendering failure (a pydantic schema-generation error on a
     structure class) into a structured Pipelex error, so every validate surface —

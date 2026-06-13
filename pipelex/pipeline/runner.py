@@ -31,8 +31,9 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures, select_primary_blueprint
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -344,7 +345,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         Wraps `validate_bundle` and assembles its result into the canonical
         `PipelexValidationReport` via `build_validation_report`: the primary
-        `bundle_blueprint`, `pipe_structures` keyed by namespaced `pipe_ref`,
+        `bundle_blueprint`, `pipe_io_contracts` keyed by namespaced `pipe_ref`,
         the per-pipe `validated_pipes` sweep outcomes, and the runnability
         verdict — `pending_signatures` (qualified refs of pipes still declared
         as `PipeSignature` in the assembled library) plus
@@ -383,7 +384,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # `validation_library_id` stays None and the cleanup below is a no-op.
         # Artifacts that need the open validation library are built INSIDE the
         # window, before the `finally` tears the library down:
-        # `pipe_structures`'s JSON-Schema rendering resolves bundle-defined
+        # `pipe_io_contracts`'s JSON-Schema rendering resolves bundle-defined
         # structure classes through the class registry, and the graph arm
         # dry-runs the main pipe against the loaded library.
         prev_library_id = get_current_library_id_or_none()
@@ -402,7 +403,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # it current — the graph arm and the finally must target the SAME library
             # even if something inside the window later moves the contextvar.
             validation_library_id = get_current_library_id_or_none()
-            pipe_structures: dict[str, PipeIOContract] = build_pipe_structures(result.pipes)
+            pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
             graph_spec: GraphSpec | None = await best_effort_graph_spec(
                 pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
                 library_id=validation_library_id,
@@ -432,7 +433,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                     )
         return build_validation_report(
             blueprints=result.blueprints,
-            pipe_structures=pipe_structures,
+            pipe_io_contracts=pipe_io_contracts,
             dry_run_result=result.dry_run_result,
             pending_signatures=result.pending_signatures,
             graph_spec=graph_spec,

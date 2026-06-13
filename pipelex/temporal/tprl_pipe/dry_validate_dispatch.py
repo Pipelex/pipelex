@@ -3,7 +3,7 @@
 The single round-trip a Temporal-enabled ``/validate`` caller awaits: dispatch
 ``WfDryValidate`` (which runs the one ``act_dry_validate`` activity in-process on a worker)
 and get back the full worker-computed ``DryValidateResult`` — per-pipe status map,
-best-effort ``GraphSpec``, ``pending_signatures``, and the ``pipe_structures`` IO contracts
+best-effort ``GraphSpec``, ``pending_signatures``, and the ``pipe_io_contracts`` IO contracts
 (D10). Used by the API route (cross-repo, ``pipelex-api``) and by the Tier-2d e2e
 submitter script.
 """
@@ -39,7 +39,7 @@ async def dispatch_dry_validate(
 
     Returns:
         The activity result: per-pipe status map, best-effort GraphSpec, pending_signatures,
-        and the pipe_structures IO contracts — everything the canonical validation report
+        and the pipe_io_contracts IO contracts — everything the canonical validation report
         needs that must be computed worker-side (D10).
     """
     worker_config = get_config().temporal.worker_config

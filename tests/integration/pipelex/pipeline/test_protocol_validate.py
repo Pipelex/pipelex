@@ -20,7 +20,7 @@ from pipelex.hub import clear_current_library, get_current_library_id_or_none, g
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.bundle_validator import DryRunStatus
-from pipelex.pipeline.exceptions import PipeStructuresError, ValidateBundleError
+from pipelex.pipeline.exceptions import PipeIOContractError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validation_report import PipelexValidationReport
 
@@ -100,8 +100,8 @@ class TestProtocolValidate:
             assert report.pending_signatures == []
             assert report.is_runnable is True
             assert report.bundle_blueprint.domain == "protocol_validate"
-            # `pipe_structures` and `validated_pipes` are keyed/identified by namespaced pipe_ref.
-            assert report.pipe_structures["protocol_validate.summarize"].output.concept_code == "protocol_validate.Summary"
+            # `pipe_io_contracts` and `validated_pipes` are keyed/identified by namespaced pipe_ref.
+            assert report.pipe_io_contracts["protocol_validate.summarize"].output.concept_code == "protocol_validate.Summary"
             assert {(entry["pipe_ref"], entry["status"]) for entry in report.validated_pipes} == {
                 ("protocol_validate.summarize", DryRunStatus.SUCCESS)
             }
@@ -148,7 +148,7 @@ class TestProtocolValidate:
             assert {"outline_then_summarize", "outline", "summarize"} <= traced_pipe_codes
             # The graph arm does not disturb the rest of the report.
             assert report.is_runnable is True
-            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_structures
+            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_io_contracts
 
             # Lifecycle with the real graph run: outer current-library restored, validation
             # library torn down.
@@ -184,7 +184,7 @@ class TestProtocolValidate:
             assert isinstance(report, PipelexValidationReport)
             assert report.graph_spec is None
             assert report.is_runnable is True
-            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_structures
+            assert "protocol_validate_graph.outline_then_summarize" in report.pipe_io_contracts
 
             # Lifecycle: the caller's current-library is restored and the validation library torn down.
             assert get_current_library_id_or_none() == outer_library_id
@@ -288,13 +288,13 @@ class TestProtocolValidate:
         try:
             library_manager = get_library_manager()
             mocker.patch(
-                "pipelex.pipeline.runner.build_pipe_structures",
-                side_effect=PipeStructuresError(message="simulated render failure"),
+                "pipelex.pipeline.runner.build_pipe_io_contracts",
+                side_effect=PipeIOContractError(message="simulated render failure"),
             )
             mocker.patch.object(library_manager, "teardown", side_effect=LibraryError("simulated teardown failure"))
 
             runner = PipelexMTHDSProtocol()
-            with pytest.raises(PipeStructuresError, match="simulated render failure"):
+            with pytest.raises(PipeIOContractError, match="simulated render failure"):
                 await runner.validate(mthds_contents=[_COMPLETE_MTHDS])
 
             assert get_current_library_id_or_none() == outer_library_id

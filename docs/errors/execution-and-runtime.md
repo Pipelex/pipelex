@@ -28,8 +28,8 @@ own page. Classes are grouped by subsystem.
 
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
+- [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract
 - [`PipeStackOverflowError`](pipe-stack-overflow-error.md) — Pipe stack overflow
-- [`PipeStructuresError`](pipe-structures-error.md) — Pipe structures
 - [`PipelineExecutionError`](pipeline-execution-error.md) — Pipeline execution
 - [`PipelineInputContentError`](pipeline-input-content-error.md) — Pipeline input content
 - [`PipelineManagerAlreadyExistsError`](pipeline-manager-already-exists-error.md) — Pipeline manager already exists

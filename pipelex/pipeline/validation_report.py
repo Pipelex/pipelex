@@ -18,8 +18,9 @@ from pydantic import Field
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.pipe_structures import PipeIOContract, select_primary_blueprint
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract
 from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -36,7 +37,7 @@ class PipelexValidationReport(ValidationReport):
     bundle_blueprint: PipelexBundleBlueprint
     """The batch's primary blueprint: first declaring `main_pipe`, else first."""
 
-    pipe_structures: dict[str, PipeIOContract] = Field(default_factory=dict)
+    pipe_io_contracts: dict[str, PipeIOContract] = Field(default_factory=dict)
     """Per-pipe input/output contracts, keyed by namespaced `pipe_ref` (`domain.code`)."""
 
     graph_spec: GraphSpec | None = None
@@ -56,7 +57,7 @@ class PipelexValidationReport(ValidationReport):
 def build_validation_report(
     *,
     blueprints: Sequence[PipelexBundleBlueprint],
-    pipe_structures: dict[str, PipeIOContract],
+    pipe_io_contracts: dict[str, PipeIOContract],
     dry_run_result: dict[str, DryRunOutput],
     pending_signatures: list[str],
     graph_spec: GraphSpec | None = None,
@@ -69,7 +70,7 @@ def build_validation_report(
 
     Args:
         blueprints: The validated batch's blueprints, in declaration order (non-empty).
-        pipe_structures: Per-pipe contracts from `build_pipe_structures`, keyed by `pipe_ref`.
+        pipe_io_contracts: Per-pipe contracts from `build_pipe_io_contracts`, keyed by `pipe_ref`.
         dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`).
         pending_signatures: Library-wide unsatisfied signature refs.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
@@ -79,7 +80,7 @@ def build_validation_report(
     """
     return PipelexValidationReport(
         bundle_blueprint=select_primary_blueprint(blueprints).blueprint,
-        pipe_structures=pipe_structures,
+        pipe_io_contracts=pipe_io_contracts,
         graph_spec=graph_spec,
         validated_pipes=build_validated_pipes(dry_run_result),
         pending_signatures=pending_signatures,

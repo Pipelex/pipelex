@@ -21,7 +21,7 @@ runs against the same library, and this activity tears it down once in its ``fin
 The activity result carries everything the canonical validation report needs that must be
 computed worker-side, against the worker's loaded library (D10): the success-only status map,
 the best-effort ``GraphSpec``, the library-wide ``pending_signatures``, and the
-``pipe_structures`` IO contracts (built inside the library window — their JSON-Schema rendering
+``pipe_io_contracts`` IO contracts (built inside the library window — their JSON-Schema rendering
 needs the loaded library's class registry, so the API side never needs to re-acquire one).
 
 Error contract (D3): validation failures (blueprint/factory/wiring errors, unexpected pipe failures,
@@ -52,8 +52,9 @@ from pipelex.hub import (
     set_current_library,
 )
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
-from pipelex.pipeline.pipe_structures import PipeIOContract, build_pipe_structures, select_primary_blueprint
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.temporal.tprl.activity_error_boundary import convert_pipelex_errors
 
@@ -78,8 +79,8 @@ class DryValidateResult(BaseModel):
     - ``graph_spec``: the best-effort graph of the main pipe.
     - ``pending_signatures``: qualified refs of pipes still declared as ``PipeSignature`` in
       the assembled library — the runnability verdict's input.
-    - ``pipe_structures``: per-pipe IO contracts keyed by ``pipe_ref``, built via
-      ``build_pipe_structures`` inside the worker's library window (JSON-Schema rendering
+    - ``pipe_io_contracts``: per-pipe IO contracts keyed by ``pipe_ref``, built via
+      ``build_pipe_io_contracts`` inside the worker's library window (JSON-Schema rendering
       resolves bundle-defined structure classes through the loaded library's class registry,
       so the API side never needs to re-acquire a library).
     """
@@ -90,7 +91,7 @@ class DryValidateResult(BaseModel):
     # these fields must fail loudly at deserialization, not default to "nothing pending"
     # and yield a silently wrong is_runnable verdict.
     pending_signatures: list[str]
-    pipe_structures: dict[str, PipeIOContract]
+    pipe_io_contracts: dict[str, PipeIOContract]
 
 
 @activity.defn(name="act_dry_validate")
@@ -102,7 +103,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
         ValidateBundleError: any validation failure — blueprint/factory/wiring errors, unexpected
             dry-run pipe failures, strict-mode signature refusals (the same categorized cascade
             the direct-mode route surfaces).
-        PipeStructuresError: a JSON-Schema rendering failure while building `pipe_structures`
+        PipeIOContractError: a JSON-Schema rendering failure while building `pipe_io_contracts`
             (non-retryable at the workflow tier, like ValidateBundleError — deterministic).
         PipelexError: non-validation failures (config, library, tracing infra).
     """
@@ -119,9 +120,9 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     # teardown failure after a successful body.
     body_succeeded = False
     try:
-        # Pipe structures: built INSIDE the library window (D10) — the JSON-Schema rendering
+        # Pipe IO contracts: built INSIDE the library window (D10) — the JSON-Schema rendering
         # resolves bundle-defined structure classes through the loaded library's class registry.
-        pipe_structures = build_pipe_structures(validate_result.pipes)
+        pipe_io_contracts = build_pipe_io_contracts(validate_result.pipes)
 
         # Graph: best-effort (D5), against the SAME loaded library, via the ONE shared
         # graph-arm implementation — an unknown explicit pipe_code degrades to
@@ -136,7 +137,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
             dry_run_outputs=validate_result.dry_run_result,
             graph_spec=graph_spec,
             pending_signatures=validate_result.pending_signatures,
-            pipe_structures=pipe_structures,
+            pipe_io_contracts=pipe_io_contracts,
         )
         body_succeeded = True
         return result
