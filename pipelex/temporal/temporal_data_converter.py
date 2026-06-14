@@ -61,7 +61,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         """
         return isinstance(value, BaseModel) or is_pydantic_dataclass(type(value))
 
-    def _kajson_to_payload(self, value: object, source_type_holder: object) -> Payload:
+    def _kajson_to_payload(self, value: object, *, source_type_holder: object) -> Payload:
         """Serialize a kajson wire value (or list of them) to a Payload.
 
         ``source_type_holder`` is the object whose type may carry a dynamic-class ``__kajson_class_source__``
@@ -94,7 +94,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
             return self._kajson_to_payload(value, source_type_holder=list_head)
         return super().to_payload(value)
 
-    def _restore_class_source(self, value: BaseModel, class_source_code: str) -> None:
+    def _restore_class_source(self, value: BaseModel, *, class_source_code: str) -> None:
         value_class = cast("Any", type(value))
         value_class.__kajson_class_source__ = class_source_code
 
@@ -121,11 +121,11 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
 
         if class_source_code is not None:
             if isinstance(pydantic_gizmo, BaseModel):
-                self._restore_class_source(pydantic_gizmo, class_source_code)
+                self._restore_class_source(pydantic_gizmo, class_source_code=class_source_code)
             elif isinstance(pydantic_gizmo, list):
                 for item in cast("list[Any]", pydantic_gizmo):
                     if isinstance(item, BaseModel):
-                        self._restore_class_source(item, class_source_code)
+                        self._restore_class_source(item, class_source_code=class_source_code)
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
         return cast("Any", pydantic_gizmo)
 

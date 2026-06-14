@@ -49,6 +49,7 @@ def _compute_relative_path_from_output_dir(output_directory: Path) -> Path | Non
 
 def _build_concept_ref_to_class_info(
     blueprints: list["PipelexBundleBlueprint"],
+    *,
     output_directory: Path,
 ) -> dict[str, ConceptClassInfo]:
     """Build a mapping from concept refs to their class info including module paths.
@@ -103,6 +104,7 @@ def _build_concept_ref_to_class_info(
 
 def generate_structures_from_blueprints(
     blueprints: list["PipelexBundleBlueprint"],
+    *,
     output_directory: Path,
     target_path: Path | None = None,
     skip_existing_check: bool = False,
@@ -123,7 +125,7 @@ def generate_structures_from_blueprints(
     output_directory.mkdir(parents=True, exist_ok=True)
 
     # Build concept_ref_to_class_info mapping for all concepts
-    concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory)
+    concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory=output_directory)
     class_registry = get_class_registry()
 
     # Only check for existing classes if we're not skipping and have a target path

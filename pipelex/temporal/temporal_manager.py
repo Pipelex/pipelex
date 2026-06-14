@@ -47,6 +47,7 @@ class TemporalManager:
     async def connect_temporal(
         self,
         temporal_client: TemporalClient | None = None,
+        *,
         temporal_server_config: TemporalServerConfig | None = None,
         temporal_selected_server: str | None = None,
     ) -> TemporalClient:

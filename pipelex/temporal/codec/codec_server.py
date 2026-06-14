@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
 
 
-def _set_cors_headers(response: web.Response, request_origin: str, cors_origins: list[str]) -> None:
+def _set_cors_headers(response: web.Response, *, request_origin: str, cors_origins: list[str]) -> None:
     """Set CORS headers on the response if the request origin is allowed."""
     if request_origin in cors_origins:
         response.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = request_origin
@@ -41,52 +41,52 @@ def _make_cors_handler(cors_origins: list[str]) -> Callable[[web.Request], Await
 
     async def cors_options(request: web.Request) -> web.Response:  # noqa: RUF029 — must be async for aiohttp
         response = web.Response()
-        _set_cors_headers(response, request.headers.get(hdrs.ORIGIN, ""), cors_origins)
+        _set_cors_headers(response, request_origin=request.headers.get(hdrs.ORIGIN, ""), cors_origins=cors_origins)
         return response
 
     return cors_options
 
 
-def _error_response(request: web.Request, cors_origins: list[str], status: int, text: str) -> web.Response:
+def _error_response(request: web.Request, *, cors_origins: list[str], status: int, text: str) -> web.Response:
     """Build an error response with CORS headers so browsers see the diagnostic message."""
     response = web.Response(status=status, text=text)
-    _set_cors_headers(response, request.headers.get(hdrs.ORIGIN, ""), cors_origins)
+    _set_cors_headers(response, request_origin=request.headers.get(hdrs.ORIGIN, ""), cors_origins=cors_origins)
     return response
 
 
-async def _apply(
+async def _apply(  # kw-only: ignore — aiohttp route handler; aiohttp passes `request` positionally via partial(_apply, codec_fn, cors_origins)
     codec_fn: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
     cors_origins: list[str],
     request: web.Request,
 ) -> web.Response:
     """Generic handler: parse Payloads JSON, apply codec function, return Payloads JSON."""
     if request.content_type != "application/json":
-        return _error_response(request, cors_origins, 415, "Expected application/json")
+        return _error_response(request, cors_origins=cors_origins, status=415, text="Expected application/json")
 
     try:
         payloads_proto = json_format.Parse(await request.read(), Payloads())
     except json_format.ParseError:
-        return _error_response(request, cors_origins, 400, "Malformed Payloads JSON")
+        return _error_response(request, cors_origins=cors_origins, status=400, text="Malformed Payloads JSON")
 
     try:
         result_payloads = await codec_fn(payloads_proto.payloads)
     except StorageFileNotFoundError as exc:
         log.error(f"Codec storage lookup failed: {exc}")
-        return _error_response(request, cors_origins, 404, "Storage object not found")
+        return _error_response(request, cors_origins=cors_origins, status=404, text="Storage object not found")
     except (OSError, FileNotFoundError) as exc:
         log.error(f"Codec I/O error: {exc}")
-        return _error_response(request, cors_origins, 502, "Storage I/O error")
+        return _error_response(request, cors_origins=cors_origins, status=502, text="Storage I/O error")
 
     result_proto = Payloads(payloads=result_payloads)
 
     response = web.Response()
-    _set_cors_headers(response, request.headers.get(hdrs.ORIGIN, ""), cors_origins)
+    _set_cors_headers(response, request_origin=request.headers.get(hdrs.ORIGIN, ""), cors_origins=cors_origins)
     response.content_type = "application/json"
     response.text = json_format.MessageToJson(result_proto)
     return response
 
 
-def build_codec_server(codec: StoragePayloadCodec, cors_origins: list[str]) -> web.Application:
+def build_codec_server(codec: StoragePayloadCodec, *, cors_origins: list[str]) -> web.Application:
     """Build an aiohttp application implementing the Temporal codec server protocol.
 
     Args:

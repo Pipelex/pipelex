@@ -194,22 +194,23 @@ Order: `pipe_operators/` → `pipe_controllers/` → `pipe_run/` → `pipeline/`
 
 Order: `builder/` → `temporal/` → `system/` → `cli/` → top-level `hub.py`, `config.py`, `pipelex.py`.
 
-- [ ] `builder/` — honor `pipelex/builder/CLAUDE.md` spec-vs-blueprint layering; decide which layer each new keyword-only rule belongs to.
-- [ ] `temporal/` — **carve out** activity/workflow/signal/query entrypoints (framework-called); only touch plain helpers. Cross-check with the temporal e2e validation before merging.
-- [ ] `system/` — `ConfigModel` / boot path; run `make tb` (boot test) after, since config loading is signature-sensitive.
-- [ ] `cli/` — **carve out** Typer command functions; only touch plain helpers.
-- [ ] Public API surface: `hub.py`, `config.py`, `pipelex.py` — these break downstream consumers (`pipelex-api`, `pipelex-worker`, `n8n-nodes-pipelex`, cookbook/starter). Enumerate the changed public signatures and call them out explicitly in the changelog.
-- [ ] Changelog under `[Unreleased]` with a clear breaking-change note for public signatures; leave the wave uncommitted for the user to review and push.
+- [x] `builder/` — 21 cleared (honored the spec-vs-blueprint layering; these are `operations/` ops + `runner_code`, the authoring-convenience layer).
+- [x] `temporal/` — 38 cleared. Activity/workflow/signal/query entrypoints stayed carved out by the guard; only plain helpers touched. **One framework-callback casualty pre-handled:** `codec/codec_server.py::_apply` (aiohttp route handler) carved out `# kw-only: ignore`.
+- [x] `system/` — 43 cleared; `make tb` (boot path) green after. **Three callback casualties pre-handled:** `telemetry/exception_capture.py::_exception_handler` (`sys.excepthook`) + the two `telemetry/telemetry_manager.py` PostHog `on_error` callbacks, all carved out.
+- [x] `cli/` — 110 cleared; Typer commands stayed carved out by the guard. `serve_until_callback` (a `threading.Thread` target) kept convention-compliant by passing its bound arg via `kwargs=` at the call site (not carved out — we own that call).
+- [x] Public API surface: `hub.py` (1) + `pipelex.py` (3) cleared. The breaking public signatures — `Pipelex.make()`, `Pipelex.setup()`, `PipelexHub.setup_config()` (subject positional, all later args keyword-only) — are enumerated in the changelog with the downstream-consumer list. (`config.py` had no violations.) Plus `test_extras`'s lone pytest hookimpl carved out, bringing the baseline to empty.
+- [x] Changelog under `[Unreleased]` with the public-API breaking-change note; left uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT F — Wave 5 landed, codebase clean
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint F reached & verified (2026-06-14):**
 
-- What landed this wave (files changed, left uncommitted in the working tree):
-- Baseline should now be **empty** — confirm:
-- List of breaking public-API signature changes (for changelog / downstream repos):
-- Decisions / edge cases this wave (temporal/cli/builder carve-outs):
-- Next action:
+- **What landed (all uncommitted on `refactor/Function-calling-4`):** Wave 5 converted the framework-sensitive packages `builder/` + `temporal/` + `system/` + `cli/` + the public surface `hub.py`/`pipelex.py` + the lone `test_extras` pytest hookimpl — baseline **220 → 0**. The burn-down is complete: **every `pipelex/` source package is keyword-only compliant and the guard baseline file is empty.** Working-tree diff (~128 tracked files + 2 new wip scripts): the source files in the Wave 5 packages (bare `*` after subject), their call sites tree-wide (incl. `tests/`), the `@override` impls forced by the now-keyword-only `TelemetryManagerAbstract` (`track_event`, `handle_trace_start`) and other system/cli bases, the six framework-callback carve-outs (`# kw-only: ignore`), the `serve_until_callback` Thread-call fix, five test mock-assertion updates (`test_worker_cli.py` ×2, `test_plxt_passthrough.py` ×2, `test_run_core_execution.py` ×1), `CHANGELOG.md`, the regenerated empty `violations-baseline.txt` + `inventory.json`, the new workflow scripts `wip/keyword-only-args/workflows/scripts/kw-only-wave5-signatures.js` + `kw-only-fix-callsites.js`, `wip/keyword-only-args/state.md`, and this file.
+- **Verification:** `make agent-check` green (pyright 0, mypy 2191 ok, guard PASSED against the **empty baseline**); `make tb` (boot path) green; full `make agent-test` GREEN (clean re-run after fixing the 5 mock-assertion mismatches).
+- **Baseline is empty — confirmed:** `wc -l wip/keyword-only-args/violations-baseline.txt` → 0; `inventory.json` total 0; `make cko` PASSED.
+- **Breaking public-API signature changes (changelog / downstream `pipelex-api`, `pipelex-worker`, `n8n-nodes-pipelex`, cookbook, starter):** `Pipelex.make()`, `Pipelex.setup()`, and `PipelexHub.setup_config()` keep their first parameter positional (`integration_mode` / `config_cls`) and make every later argument keyword-only. Only a caller passing a second-or-later argument positionally breaks (e.g. `Pipelex.make(IntegrationMode.PYTHON, False)` → `Pipelex.make(needs_inference=False)`); the common no-arg / all-keyword calls are unaffected.
+- **Decisions / edge cases this wave:** (1) **Six framework-positional carve-outs found PROACTIVELY** by grepping for callback-registration patterns before the fan-out (no agent-test casualty this wave as a result): aiohttp `_apply`, `sys.excepthook` `_exception_handler`, two PostHog `on_error` callbacks, pytest hookimpl `pytest_collection_modifyitems` — all `# kw-only: ignore`. (2) **`serve_until_callback`** (a `threading.Thread` target, pyright-blind) stayed convention-compliant via `kwargs=` at the call site — carve out only when a *framework* does the positional call. (3) **`# kw-only: ignore` must sit after the open paren on the def's first line** — a trailing comment on a long single-line def gets wrapped by `ruff format` off `node.lineno`, silently disabling the carve-out (surfaced as "guard PASSED (3 known-debt)" post-format). (4) **Signature barrier tripped the server-side rate limit** at 14 concurrent editors — fixed by chunking editors into sequential sub-barriers of 4 (peak concurrency ¼); reused for the converge fixers. (5) **`make agent-test` caught 5 pyright-blind mock-assertion mismatches** — the recurring "the suite is the only net for `Any`-typed/dynamic call surfaces" lesson.
+- **Next action:** Begin **Phase 7 / Checkpoint G** — flip the guard to hard-block on ANY violation (the empty baseline already makes any new violation fail; remove the baseline scaffolding or keep an empty-baseline-must-stay-empty comment), confirm `check-keyword-only` is in the `make check` aggregate + CI, document the convention as a standing rule in `CLAUDE.md` linking `wip/keyword-only-args/convention.md` (or promote the doc to a permanent home), add the final summary changelog entry, and fold/retire the `wip/keyword-only-args/` track per the wip-docs convention. **Nothing is committed; the user reviews the working tree and pushes before Phase 7 cold-starts.**
 
 ---
 

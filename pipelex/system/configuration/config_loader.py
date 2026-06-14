@@ -87,7 +87,7 @@ class ConfigLoader:
             return project_dir
         return self.global_config_dir
 
-    def resolve_config_file(self, relative_path: str, config_dir: Path | None = None) -> Path:
+    def resolve_config_file(self, relative_path: str, *, config_dir: Path | None = None) -> Path:
         """Resolve a config file path with layered resolution.
 
         When config_dir is provided (e.g. for --global override), the file is
@@ -147,7 +147,7 @@ class ConfigLoader:
         config_template_dir = Path(str(get_kit_configs_dir()))
         global_dir.mkdir(parents=True, exist_ok=True)
 
-        def copy_directory_structure(src_dir: Path, dst_dir: Path) -> None:
+        def copy_directory_structure(src_dir: Path, *, dst_dir: Path) -> None:
             """Recursively copy directory structure from kit templates."""
             for item in src_dir.iterdir():
                 if item.name in GIT_IGNORED_CONFIG_FILES or item.name == ".DS_Store":
@@ -155,7 +155,7 @@ class ConfigLoader:
                 dst_item = dst_dir / item.name
                 if item.is_dir():
                     dst_item.mkdir(parents=True, exist_ok=True)
-                    copy_directory_structure(item, dst_item)
+                    copy_directory_structure(item, dst_dir=dst_item)
                 else:
                     shutil.copy2(item, dst_item)
 
@@ -168,7 +168,7 @@ class ConfigLoader:
         write_manifest(global_dir / "inference" / "deck", manifest=compute_kit_manifest())
 
     @classmethod
-    def _override_files_for_dir(cls, config_dir: Path, include_run_mode: bool) -> list[Path]:
+    def _override_files_for_dir(cls, config_dir: Path, *, include_run_mode: bool) -> list[Path]:
         """Build the override file sequence for a single config dir.
 
         Order matters: later files win on key collisions during deep-merge.
@@ -192,7 +192,7 @@ class ConfigLoader:
         files.append(config_dir / "pipelex_temporary_override.toml")
         return files
 
-    def load_config(self, extra_overrides: dict[str, Any] | None = None, config_dir: Path | None = None) -> dict[str, Any]:
+    def load_config(self, extra_overrides: dict[str, Any] | None = None, *, config_dir: Path | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         When ``config_dir`` is provided, the load is scoped to a single directory

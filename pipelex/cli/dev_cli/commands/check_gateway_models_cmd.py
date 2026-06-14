@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> None:
+def check_gateway_models_cmd(show_diff: bool = True, *, quiet: bool = False) -> None:
     """Verify that the Pipelex Gateway models reference files are up-to-date.
 
     Compares the existing reference files — both the .pipelex/ copies and the
@@ -164,7 +164,7 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
             if show_diff:
                 for path_str, existing_content, expected_content in pending_diffs:
                     console.print(f"[bold]Differences in {path_str}:[/bold]")
-                    _display_diff(existing_content, expected_content, console)
+                    _display_diff(existing_content, expected=expected_content, console=console)
 
             console.print("[bold yellow]Recommended Action:[/bold yellow]")
             console.print("  Run: [cyan]make update-gateway-models[/cyan] or [cyan]make ugm[/cyan]")
@@ -173,7 +173,7 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         sys.exit(1)
 
 
-def _display_diff(existing: str, expected: str, console: Console) -> None:
+def _display_diff(existing: str, *, expected: str, console: Console) -> None:
     """Display a simplified diff between existing and expected content.
 
     Args:

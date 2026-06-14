@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
+def check_mthds_schema_cmd(show_diff: bool = True, *, quiet: bool = False) -> None:
     """Verify that the MTHDS JSON Schema file is up-to-date.
 
     Regenerates the schema in memory and compares it against the on-disk file.
@@ -117,7 +117,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
             console.print()
 
             if show_diff:
-                _display_diff(existing_content, expected_content, console)
+                _display_diff(existing_content, expected=expected_content, console=console)
 
             console.print("[bold yellow]Recommended Action:[/bold yellow]")
             console.print("  Run: [cyan]make generate-mthds-schema[/cyan] or [cyan]make gms[/cyan]")
@@ -126,7 +126,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
         sys.exit(1)
 
 
-def _display_diff(existing: str, expected: str, console: Console) -> None:
+def _display_diff(existing: str, *, expected: str, console: Console) -> None:
     """Display a simplified diff between existing and expected content.
 
     Args:

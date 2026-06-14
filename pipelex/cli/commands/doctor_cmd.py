@@ -288,7 +288,7 @@ def check_kit_template_exists(backend_name: str) -> bool:
         return False
 
 
-def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: Path | None = None) -> bool:
+def replace_backend_file(backend_name: str, *, dry_run: bool = False, config_dir: Path | None = None) -> bool:
     """Replace a backend configuration file with the kit template.
 
     Args:
@@ -437,6 +437,7 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
 
 def display_health_report(
     config_healthy: bool,
+    *,
     config_message: str,
     config_missing_count: int,
     telemetry_healthy: bool,
@@ -739,6 +740,7 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
 
 def setup_doctor_runtime(
     log_config_overrides: Mapping[str, Any] | None = None,
+    *,
     config_dir: Path | None = None,
 ) -> None:
     """Spin up a fresh PipelexHub and configure logging for doctor checks.

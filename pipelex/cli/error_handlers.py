@@ -122,7 +122,7 @@ def display_error_panel(
     console.print()
 
 
-def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
+def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelChoiceError with formatted output.
 
     Args:
@@ -153,7 +153,7 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
     raise typer.Exit(1) from exc
 
 
-def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, context: ErrorContext) -> NoReturn:
+def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelAvailabilityError with formatted output.
 
     Args:
@@ -190,7 +190,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
     raise typer.Exit(1) from exc
 
 
-def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: ErrorContext) -> NoReturn:
+def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:
     """Handle and display ModelDeckPresetValidatonError with formatted output.
 
     Args:
@@ -245,7 +245,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def _display_validation_error_details(console: Console, exc: ValidateBundleError) -> None:
+def _display_validation_error_details(console: Console, *, exc: ValidateBundleError) -> None:
     """Display the detailed validation error information from a ValidateBundleError.
 
     Args:
@@ -340,7 +340,7 @@ def handle_signatures_not_allowed_error(exc: SignaturesNotAllowedError, *, conte
     raise typer.Exit(1) from exc
 
 
-def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
+def handle_validate_bundle_error(exc: ValidateBundleError, *, bundle_path: Path | None = None) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
     Args:

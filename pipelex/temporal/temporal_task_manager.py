@@ -69,6 +69,7 @@ class TemporalTaskManager(TaskManager):
     def complement_catalog(
         self,
         extra_catalog: dict[str, TaskPack],
+        *,
         extra_workflows: list[WorkflowType],
         extra_activities: list[ActivityType],
     ):
@@ -82,6 +83,7 @@ class TemporalTaskManager(TaskManager):
     def make_worker(
         self,
         temporal_client: TemporalClient,
+        *,
         task_queue: str,
         is_not_sandboxed: bool = False,
         scope: WorkerScope | None = None,
@@ -163,6 +165,7 @@ class TemporalTaskManager(TaskManager):
     async def run_worker(
         self,
         is_not_sandboxed: bool,
+        *,
         is_unit_testing: bool,
         task_queue: str | None = None,
         scope_name: str | None = None,
@@ -255,6 +258,7 @@ class TemporalTaskManager(TaskManager):
     def workflows_and_activities(
         self,
         scope: WorkerScope | None = None,
+        *,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,

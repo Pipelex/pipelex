@@ -73,6 +73,7 @@ def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_input
 
 async def _execute_run(
     pipe_code: str | None,
+    *,
     bundle_path: str | None,
     inputs: str | None,
     save_working_memory: bool,
@@ -88,7 +89,6 @@ async def _execute_run(
     library_dir: list[str] | None,
     costs: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
-    *,
     save_csv: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
@@ -152,7 +152,7 @@ async def _execute_run(
                 pipeline_inputs = load_json_dict_from_path(Path(inputs))
                 # Resolve relative url paths against the inputs file's parent directory
                 base_dir = Path(inputs).parent.resolve()
-                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir)
+                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
                 print_traceback_if_requested(get_console())
@@ -343,6 +343,7 @@ async def _execute_run(
 
 def execute_run(
     pipe_code: str | None,
+    *,
     bundle_path: str | None,
     inputs: str | None,
     save_working_memory: bool,
@@ -360,7 +361,6 @@ def execute_run(
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
-    *,
     save_csv: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.

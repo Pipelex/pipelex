@@ -91,6 +91,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def execute_workflow(
         self,
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
+        *,
         workflow_arg: WorkflowInput,
         workflow_id: str,
         search_attributes: TypedSearchAttributes | None = None,
@@ -139,6 +140,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def start_workflow(
         self,
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
+        *,
         workflow_arg: WorkflowInput,
         workflow_id: str,
         callbacks: Sequence[Callback] | None = None,
@@ -178,6 +180,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def execute_child_workflow(
         self,
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
+        *,
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
@@ -243,6 +246,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
     async def start_child_workflow(
         self,
         workflow_class: type[WorkflowClass[WorkflowInput, WorkflowOutput]],
+        *,
         workflow_arg: WorkflowInput,
         workflow_id: str,
         child_task_queue: str | None = None,
@@ -294,6 +298,7 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
     def create_executor(
         cls,
         task_queue: str | None = None,
+        *,
         workflow_execution_timeout: timedelta | None = None,
         retry_policy: RetryPolicy | None = None,
         run_timeout: timedelta | None = None,

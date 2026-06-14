@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 COMMAND = "which"
 
 
-def do_which_pipe(pipe_code: str, library_dirs: list[Path], source_label: str) -> bool:
+def do_which_pipe(pipe_code: str, *, library_dirs: list[Path], source_label: str) -> bool:
     """Locate where a pipe is defined."""
     console = get_console()
 

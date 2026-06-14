@@ -19,6 +19,7 @@ class TemporalTasks:
     def complement_catalog(
         self,
         extra_catalog: dict[str, TaskPack],
+        *,
         extra_workflows: list[WorkflowType],
         extra_activities: list[ActivityType],
     ):
@@ -37,6 +38,7 @@ class TemporalTasks:
     def replace_catalog(
         self,
         new_catalog: dict[str, TaskPack],
+        *,
         new_workflows: list[WorkflowType],
         new_activities: list[ActivityType],
     ):
@@ -63,7 +65,7 @@ class TemporalTasks:
         return all_workflows, all_activities
 
     @classmethod
-    def _register_workflow(cls, all_workflows: dict[str, WorkflowType], workflow: WorkflowType, source: str) -> None:
+    def _register_workflow(cls, all_workflows: dict[str, WorkflowType], *, workflow: WorkflowType, source: str) -> None:
         existing = all_workflows.get(workflow.__name__)
         if existing is not None and existing is not workflow:
             msg = (
@@ -74,7 +76,7 @@ class TemporalTasks:
         all_workflows[workflow.__name__] = workflow
 
     @classmethod
-    def _register_activity(cls, all_activities: dict[str, ActivityType], activity: ActivityType, source: str) -> None:
+    def _register_activity(cls, all_activities: dict[str, ActivityType], *, activity: ActivityType, source: str) -> None:
         existing = all_activities.get(activity.__name__)
         if existing is not None and existing is not activity:
             msg = (
@@ -87,6 +89,7 @@ class TemporalTasks:
     def workflows_and_activities(
         self,
         scope: WorkerScope | None = None,
+        *,
         test_workflows: WorkflowList | None = None,
         test_activities: ActivityList | None = None,
         substitute_activities: dict[ActivityType, ActivityType] | None = None,
@@ -119,6 +122,7 @@ class TemporalTasks:
     def _resolve_scope(
         self,
         scope: WorkerScope,
+        *,
         all_workflows: dict[str, WorkflowType],
         all_activities: dict[str, ActivityType],
     ) -> tuple[set[WorkflowType], set[ActivityType]]:

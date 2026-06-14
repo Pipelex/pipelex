@@ -215,7 +215,7 @@ def _build_error_source(exc: BaseException) -> list[str]:
     return sources
 
 
-def _assemble_error_payload(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
+def _assemble_error_payload(message: str, *, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
     """Build the structured error payload shared by the JSON and markdown renderers.
 
     Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_category`` /
@@ -308,14 +308,14 @@ def _render_error_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _agent_error_json(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> NoReturn:
+def _agent_error_json(message: str, *, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> NoReturn:
     """Print a structured JSON error to stderr and exit with code 1."""
-    payload = _assemble_error_payload(message, error_type, cause, extra)
+    payload = _assemble_error_payload(message, error_type=error_type, cause=cause, extra=extra)
     print(clean_json_dumps(payload, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause
 
 
-def agent_error_markdown(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+def agent_error_markdown(message: str, *, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Print a markdown-rendered error to stderr and exit with code 1.
 
     The markdown sibling of :func:`agent_error`'s JSON path: an error-type
@@ -330,12 +330,12 @@ def agent_error_markdown(message: str, error_type: str, cause: BaseException | N
         cause: Optional exception to chain with ``raise ... from``.
         **extra: Additional fields merged into the payload.
     """
-    payload = _assemble_error_payload(message, error_type, cause, extra)
+    payload = _assemble_error_payload(message, error_type=error_type, cause=cause, extra=extra)
     print(_render_error_markdown(payload), file=sys.stderr)
     raise typer.Exit(1) from cause
 
 
-def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+def agent_error(message: str, *, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Emit a structured error to stderr and exit with code 1.
 
     Dispatches on the active error format (see :func:`set_agent_cli_error_format`):
@@ -353,9 +353,9 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     """
     match get_agent_cli_error_format():
         case CliOutputFormat.JSON:
-            _agent_error_json(message, error_type, cause, extra)
+            _agent_error_json(message, error_type=error_type, cause=cause, extra=extra)
         case CliOutputFormat.MARKDOWN:
-            agent_error_markdown(message, error_type, cause, **extra)
+            agent_error_markdown(message, error_type=error_type, cause=cause, **extra)
 
 
 def agent_success(result: dict[str, Any]) -> None:
@@ -381,6 +381,7 @@ def agent_success(result: dict[str, Any]) -> None:
 
 def agent_success_formatted(
     result: dict[str, Any],
+    *,
     markdown_renderer: Callable[[dict[str, Any]], str],
     output_format: CliOutputFormat,
 ) -> None:

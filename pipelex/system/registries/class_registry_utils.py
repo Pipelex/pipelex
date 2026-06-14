@@ -21,6 +21,7 @@ class ClassRegistryUtils:
     def register_classes_in_file(
         cls,
         file_path: Path,
+        *,
         base_class: type[Any] | None,
         is_include_imported: bool,
     ) -> None:
@@ -40,6 +41,7 @@ class ClassRegistryUtils:
     def register_classes_in_folder(
         cls,
         folder_path: Path,
+        *,
         base_class: type[Any] | None = None,
         is_recursive: bool = True,
         is_include_imported: bool = False,
@@ -75,6 +77,7 @@ class ClassRegistryUtils:
     def import_modules_in_folder(
         cls,
         folder_path: Path,
+        *,
         force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
         base_class_names: list[str] | None = None,

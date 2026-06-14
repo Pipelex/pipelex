@@ -43,25 +43,25 @@ class TestCliPipeCmd:
             "prompt": "Write about $text",
         }
         pipe_type = spec.pop("type")
-        result = parse_pipe_spec(pipe_type, spec)
+        result = parse_pipe_spec(pipe_type, spec_data=spec)
         assert result.pipe_code == "test"
 
     # -- CLI TOML serialization (uses format_toml_string) -----------------
 
     def test_llm_model_appears_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "$writing-creative"' in toml
 
     def test_llm_different_model_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM, "model": "$engineering-structured"})
+        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM, "model": "$engineering-structured"})
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "$engineering-structured"' in toml
 
     def test_extract_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
             "PipeExtract",
-            {
+            spec_data={
                 "pipe_code": "my_extract",
                 "description": "Extract pipe",
                 "inputs": {"doc": "Document"},
@@ -75,7 +75,7 @@ class TestCliPipeCmd:
     def test_img_gen_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
             "PipeImgGen",
-            {
+            spec_data={
                 "pipe_code": "my_img_gen",
                 "description": "Image gen pipe",
                 "inputs": {"prompt_text": "ImgGenPrompt"},
@@ -88,20 +88,20 @@ class TestCliPipeCmd:
         assert 'model = "$gen-image"' in toml
 
     def test_toml_contains_pipe_section(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
         toml = _pipe_spec_to_toml(spec)
         assert "[pipe.my_llm_pipe]" in toml
         assert 'type = "PipeLLM"' in toml
 
     def test_toml_contains_prompt(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
         toml = _pipe_spec_to_toml(spec)
         assert 'prompt = "Write about $text"' in toml
 
     def test_sequence_toml_has_steps(self) -> None:
         spec = parse_pipe_spec(
             "PipeSequence",
-            {
+            spec_data={
                 "pipe_code": "my_seq",
                 "description": "A sequence",
                 "inputs": {"doc": "Document"},
@@ -120,7 +120,7 @@ class TestCliPipeCmd:
         """PipeSearch type-specific fields (prompt, model, filters) must round-trip to TOML."""
         spec = parse_pipe_spec(
             "PipeSearch",
-            {
+            spec_data={
                 "pipe_code": "my_search",
                 "description": "Search pipe",
                 "inputs": {"topic": "Text"},
@@ -149,7 +149,7 @@ class TestCliPipeCmd:
         """Unset PipeSearch filters must not appear in the TOML (only prompt is required)."""
         spec = parse_pipe_spec(
             "PipeSearch",
-            {
+            spec_data={
                 "pipe_code": "bare_search",
                 "description": "Minimal search pipe",
                 "inputs": {"topic": "Text"},
@@ -170,7 +170,7 @@ class TestCliPipeCmd:
         """When model is None, no model line should appear in the TOML."""
         spec = parse_pipe_spec(
             "PipeLLM",
-            {
+            spec_data={
                 "pipe_code": "my_pipe",
                 "description": "No model specified",
                 "inputs": {"text": "Text"},
@@ -193,7 +193,7 @@ class TestCliPipeCmd:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec_data=spec)
         assert result.model == "$writing-creative"  # type: ignore[attr-defined]
         assert result.output == "ImgGenPrompt"
 
@@ -207,7 +207,7 @@ class TestCliPipeCmd:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec_data=spec)
         toml = _pipe_spec_to_toml(result)
         assert 'model = "$writing-creative"' in toml
         assert 'output = "ImgGenPrompt"' in toml

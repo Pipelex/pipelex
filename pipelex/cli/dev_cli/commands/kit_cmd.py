@@ -30,6 +30,7 @@ kit_app = typer.Typer(no_args_is_help=True)
 
 def _sync_agent_rules(
     repo_root: Path | None,
+    *,
     agent_set: str | None,
     cleanup: bool,
     kit_index: KitIndex | None = None,
@@ -89,6 +90,7 @@ def _sync_agent_rules(
 
 def _cleanup_other_targets(
     repo_root: Path,
+    *,
     kit_index: KitIndex,
     preferred_targets: list[AgentTarget],
 ) -> None:

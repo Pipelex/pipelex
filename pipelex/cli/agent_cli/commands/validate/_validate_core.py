@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 async def validate_all_core(
     library_dirs: list[Path] | None = None,
+    *,
     allow_signatures: bool = False,
 ) -> dict[str, Any]:
     """Validate all pipes in all libraries.
@@ -55,6 +56,7 @@ async def validate_all_core(
 
 async def validate_bundle_core(
     bundle_path: Path,
+    *,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,
 ) -> dict[str, Any]:
@@ -94,6 +96,7 @@ async def validate_bundle_core(
 
 async def validate_pipe_core(
     pipe_code: str,
+    *,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,
 ) -> dict[str, Any]:
@@ -146,6 +149,7 @@ async def validate_pipe_core(
 
 async def validate_pipe_in_bundle_core(
     bundle_path: Path,
+    *,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,

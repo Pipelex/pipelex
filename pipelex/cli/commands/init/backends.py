@@ -28,7 +28,7 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import update_serv
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
 
-def update_backends_in_toml(toml_doc: Any, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
+def update_backends_in_toml(toml_doc: Any, *, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
     """Update the backends.toml document with selected backends.
 
     Args:
@@ -89,7 +89,7 @@ def disable_gateway_backend(backends_toml_path: Path) -> None:
         save_toml_to_path(toml_doc, path=backends_toml_path)
 
 
-def customize_backends_config(is_first_time_setup: bool = False, target_config_dir: Path | None = None) -> None:
+def customize_backends_config(is_first_time_setup: bool = False, *, target_config_dir: Path | None = None) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
     Args:
@@ -108,10 +108,10 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
     try:
         # Get backend options from template and existing config
         existing_path = backends_toml_path if backends_toml_path.exists() else None
-        backend_options = get_backend_options_from_toml(template_backends_path, existing_path)
+        backend_options = get_backend_options_from_toml(template_backends_path, existing_path=existing_path)
 
         # Get currently enabled backends to show user their current selection
-        currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options)
+        currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options=backend_options)
 
         # If this is first-time setup, ignore what's in the template (all enabled)
         # and use only pipelex_gateway as the default
@@ -123,7 +123,7 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
         console.print()
 
         # UI: Display panel and get user selection
-        console.print(build_backend_selection_panel(backend_options, currently_enabled, is_first_time_setup))
+        console.print(build_backend_selection_panel(backend_options, currently_enabled=currently_enabled, is_first_time_setup=is_first_time_setup))
         selected_indices, selected_backends = prompt_backend_select(
             console=console,
             backend_options=backend_options,
@@ -154,11 +154,11 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
                 selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
 
         # Business logic: Update and save backends.toml first (local operation)
-        update_backends_in_toml(toml_doc, selected_indices, backend_options)
+        update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)
         save_toml_to_path(toml_doc, path=backends_toml_path)
 
         # UI: Display confirmation
-        display_selected_backends(console, selected_indices, backend_options)
+        display_selected_backends(console, selected_indices=selected_indices, backend_options=backend_options)
 
         # Save gateway terms acceptance to global config (separate from backends save)
         if gateway_terms_accepted is not None:

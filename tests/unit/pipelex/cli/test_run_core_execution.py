@@ -177,7 +177,7 @@ class TestRunCoreExecution:
 
         _run_async(_call_execute_run(inputs=str(inputs_file)))
 
-        resolver_mock.assert_called_once_with({"topic": "dogs"}, tmp_path.resolve())
+        resolver_mock.assert_called_once_with({"topic": "dogs"}, base_dir=tmp_path.resolve())
         execute_kwargs = runner_class_mock.return_value.execute.call_args.kwargs
         assert execute_kwargs["inputs"] == {"topic": "dogs", "resolved": True}
 

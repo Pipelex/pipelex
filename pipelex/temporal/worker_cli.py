@@ -24,6 +24,7 @@ app = typer.Typer()
 
 async def run_worker(
     project: str | None = None,
+    *,
     is_not_sandboxed: bool = False,
     is_unit_testing: bool = False,
     task_queue: str | None = None,
@@ -94,7 +95,16 @@ def configure(
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
         get_config().temporal = updated_temporal
 
-    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope, profile))
+    asyncio.run(
+        run_worker(
+            project,
+            is_not_sandboxed=is_not_sandboxed,
+            is_unit_testing=is_unit_testing,
+            task_queue=task_queue,
+            scope_name=scope,
+            profile_name=profile,
+        )
+    )
 
 
 if __name__ == "__main__":

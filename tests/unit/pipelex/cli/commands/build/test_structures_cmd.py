@@ -67,7 +67,7 @@ class TestStructuresCmd:
             ),
         ]
 
-        mapping = _build_concept_ref_to_class_info(blueprints, output_directory)
+        mapping = _build_concept_ref_to_class_info(blueprints, output_directory=output_directory)
 
         assert set(mapping.keys()) == {"billing.Invoice", "billing.CustomName"}
         assert mapping["billing.Invoice"].class_name == "billing__Invoice"
@@ -90,7 +90,7 @@ class TestStructuresCmd:
             ),
         ]
 
-        mapping = _build_concept_ref_to_class_info(blueprints, outside_dir)
+        mapping = _build_concept_ref_to_class_info(blueprints, output_directory=outside_dir)
 
         assert mapping["billing.Invoice"].module_path is None
 
@@ -100,7 +100,7 @@ class TestStructuresCmd:
             PipelexBundleBlueprint(domain="notes", description="notes", concept={"QuickNote": "A short note"}),
         ]
 
-        generated = generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=True)
+        generated = generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=True)
 
         assert generated == [("notes", "QuickNote")]
         generated_code = (tmp_path / "notes__quick_note.py").read_text(encoding="utf-8")
@@ -122,7 +122,7 @@ class TestStructuresCmd:
             ),
         ]
 
-        generated = generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=True)
+        generated = generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=True)
 
         assert generated == [("billing", "Invoice")]
         generated_code = (tmp_path / "billing__invoice.py").read_text(encoding="utf-8")
@@ -140,7 +140,7 @@ class TestStructuresCmd:
             ),
         ]
 
-        generated = generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=True)
+        generated = generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=True)
 
         assert generated == [("notes", "FancyText")]
         generated_code = (tmp_path / "notes__fancy_text.py").read_text(encoding="utf-8")
@@ -156,7 +156,7 @@ class TestStructuresCmd:
             ),
         ]
 
-        generated = generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=True)
+        generated = generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=True)
 
         assert generated == [("notes", "PlainThing")]
         generated_code = (tmp_path / "notes__plain_thing.py").read_text(encoding="utf-8")
@@ -168,7 +168,7 @@ class TestStructuresCmd:
             PipelexBundleBlueprint(domain="native", description="native stub", concept={"NativeStub": "native stub concept"}),
         ]
 
-        generated = generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=True)
+        generated = generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=True)
 
         assert generated == []
         assert not (tmp_path / "__init__.py").exists()
@@ -189,7 +189,7 @@ class TestStructuresCmd:
 
             generated = generate_structures_from_blueprints(
                 blueprints,
-                tmp_path,
+                output_directory=tmp_path,
                 target_path=tmp_path,
                 skip_existing_check=False,
                 quiet=True,
@@ -209,7 +209,7 @@ class TestStructuresCmd:
             PipelexBundleBlueprint(domain="notes", description="notes", concept={"LoudNote": "A loud note"}),
         ]
 
-        generate_structures_from_blueprints(blueprints, tmp_path, skip_existing_check=True, quiet=False)
+        generate_structures_from_blueprints(blueprints, output_directory=tmp_path, skip_existing_check=True, quiet=False)
 
         echo_mock.assert_called_once()
         secho_calls = [str(call.args[0]) for call in secho_mock.call_args_list]

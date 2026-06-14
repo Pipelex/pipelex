@@ -167,6 +167,7 @@ class RemoteConfigFetcher:
     def _build_unavailable_error(
         cls,
         fetch_error: RemoteConfigFetchError,
+        *,
         cache_refused: bool = False,
     ) -> RemoteConfigUnavailableError:
         """Build the user-facing offline-mode error with a clear remediation hint.

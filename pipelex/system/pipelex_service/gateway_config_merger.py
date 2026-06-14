@@ -21,6 +21,7 @@ class GatewayConfigMerger:
     def merge(
         cls,
         gateway_model_specs: BackendModelSpecs,
+        *,
         local_overrides: BackendModelSpecs,
     ) -> dict[str, Any]:
         """Merge remote config with local overrides.
@@ -68,6 +69,7 @@ class GatewayConfigMerger:
     def _apply_overrides_to_model(
         cls,
         model_name: str,
+        *,
         gateway_model_specs: BackendModelSpecs,
         local_model_config: BackendModelSpecs,
     ) -> None:

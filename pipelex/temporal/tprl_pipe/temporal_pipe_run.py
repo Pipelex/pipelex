@@ -92,6 +92,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
     async def start(
         self,
         pipe_job: PipeJob,
+        *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeRunArg, PipeOutput], PipeOutput]]:
         """Start a pipe run without waiting for completion.
@@ -129,6 +130,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
 
 def make_temporal_pipe_run(
     task_queue: str | None = None,
+    *,
     workflow_execution_timeout: timedelta | None = None,
     retry_policy: RetryPolicy | None = None,
     should_auto_connect_temporal: bool = True,

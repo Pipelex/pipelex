@@ -178,7 +178,7 @@ class TestWorkerCli:
         assert boot_mocks["config"].temporal is temporal_mock
 
     def test_cli_arg_wiring_reaches_run_worker(self, boot_mocks: dict[str, Any]) -> None:
-        """All CLI options travel through Typer parsing into run_worker, positionally correct."""
+        """All CLI options travel through Typer parsing into run_worker, with the correct keyword wiring."""
         runner = CliRunner()
 
         result = runner.invoke(
@@ -197,7 +197,14 @@ class TestWorkerCli:
         )
 
         assert result.exit_code == 0, result.output
-        boot_mocks["run_worker"].assert_called_once_with("cli-project", True, True, "queue_from_cli", "router", "anthropic-tier4")
+        boot_mocks["run_worker"].assert_called_once_with(
+            "cli-project",
+            is_not_sandboxed=True,
+            is_unit_testing=True,
+            task_queue="queue_from_cli",
+            scope_name="router",
+            profile_name="anthropic-tier4",
+        )
 
     def test_cli_defaults_reach_run_worker(self, boot_mocks: dict[str, Any]) -> None:
         """Invoking with no arguments resolves the project from pyproject and passes default options."""
@@ -206,4 +213,11 @@ class TestWorkerCli:
         result = runner.invoke(worker_cli.app, [])
 
         assert result.exit_code == 0, result.output
-        boot_mocks["run_worker"].assert_called_once_with("my-project", False, False, None, None, None)
+        boot_mocks["run_worker"].assert_called_once_with(
+            "my-project",
+            is_not_sandboxed=False,
+            is_unit_testing=False,
+            task_queue=None,
+            scope_name=None,
+            profile_name=None,
+        )

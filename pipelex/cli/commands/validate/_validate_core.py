@@ -58,6 +58,7 @@ def _format_signatures_summary_suffix(signature_count: int) -> str:
 
 def do_validate_all_libraries_and_dry_run(
     library_dirs: list[Path] | None = None,
+    *,
     allow_signatures: bool = False,
 ) -> None:
     try:
@@ -97,6 +98,7 @@ def do_validate_all_libraries_and_dry_run(
 
 async def _validate_pipe_or_bundle(
     pipe_code: str | None = None,
+    *,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,
@@ -159,6 +161,7 @@ async def _validate_pipe_or_bundle(
 
 def execute_validate(
     pipe_code: str | None,
+    *,
     bundle_path: Path | None,
     library_dirs: list[Path] | None,
     telemetry_command_label: str = COMMAND,

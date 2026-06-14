@@ -37,6 +37,7 @@ def _format_value(value: object) -> str:
 
 def _display_sync_result(
     result: TomlSyncResult,
+    *,
     target_label: str,
     show_diff: bool,
     quiet: bool,
@@ -75,6 +76,7 @@ def _display_sync_result(
 
 def sync_main_config_cmd(
     target: SyncTarget = SyncTarget.ALL,
+    *,
     dry_run: bool = False,
     quiet: bool = False,
     show_diff: bool = True,
@@ -152,7 +154,7 @@ def sync_main_config_cmd(
     total_updated = 0
     for label, result, path in results:
         if result is not None:
-            _display_sync_result(result, f"{label} ({path})", show_diff=show_diff, quiet=quiet)
+            _display_sync_result(result, target_label=f"{label} ({path})", show_diff=show_diff, quiet=quiet)
             total_updated += result.updated_count
 
     if not quiet:

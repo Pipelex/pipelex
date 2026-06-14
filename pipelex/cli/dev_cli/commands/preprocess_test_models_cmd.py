@@ -246,6 +246,7 @@ def _load_test_profile(profile_name: str) -> dict[str, Any]:
 
 def _process_collections_from_toml(
     collections_raw: Any,  # pyright: ignore[reportExplicitAny]
+    *,
     collections: dict[str, dict[str, list[str]]],
 ) -> None:
     """Process raw TOML collections data into typed collections dict.
@@ -283,13 +284,14 @@ def _load_collections() -> dict[str, dict[str, list[str]]]:
         return {}
 
     # Process TOML collections (untyped data at boundary)
-    _process_collections_from_toml(collections_raw, collections)
+    _process_collections_from_toml(collections_raw, collections=collections)
 
     return collections
 
 
 def _resolve_model_list(
     raw_list: list[str],
+    *,
     collections: dict[str, list[str]],
     backend_models: dict[str, list[str]],
     all_known_models: list[str],
@@ -364,6 +366,7 @@ def _resolve_model_list(
 
 def _filter_models_by_profile(
     availability: dict[str, Any],
+    *,
     profile: dict[str, Any],
     collections: dict[str, dict[str, list[str]]],
 ) -> dict[str, list[tuple[str, str]]]:
@@ -494,6 +497,7 @@ def _filter_models_by_profile(
 
 def _generate_fixtures_python(
     combo_pairs: dict[str, list[tuple[str, str]]],
+    *,
     profile_name: str,
 ) -> str:
     """Generate Python module content with pre-computed model/backend pairs.
@@ -556,6 +560,7 @@ def _generate_fixtures_python(
 
 def _display_summary(
     availability: dict[str, Any],
+    *,
     combo_pairs: dict[str, list[tuple[str, str]]],
     profile_name: str,
     console: Console,
@@ -605,6 +610,7 @@ def _display_summary(
 
 def preprocess_test_models_cmd(
     profile: str = "dev",
+    *,
     generate_fixtures: bool = False,
     output_json: bool = False,
     quiet: bool = False,
@@ -784,11 +790,11 @@ def preprocess_test_models_cmd(
         sys.exit(1)
 
     collections = _load_collections()
-    combo_pairs = _filter_models_by_profile(availability, test_profile, collections)
+    combo_pairs = _filter_models_by_profile(availability, profile=test_profile, collections=collections)
 
     # Generate fixtures if requested
     if generate_fixtures:
-        fixtures_content = _generate_fixtures_python(combo_pairs, profile)
+        fixtures_content = _generate_fixtures_python(combo_pairs, profile_name=profile)
         GENERATED_FIXTURES_PATH.parent.mkdir(parents=True, exist_ok=True)
         GENERATED_FIXTURES_PATH.write_text(fixtures_content, encoding="utf-8")
 
@@ -798,7 +804,7 @@ def preprocess_test_models_cmd(
     # Display summary
     if not quiet:
         console.print()
-        _display_summary(availability, combo_pairs, profile, console)
+        _display_summary(availability, combo_pairs=combo_pairs, profile_name=profile, console=console)
         console.print()
 
         # Show profile info

@@ -76,7 +76,7 @@ class StoragePayloadCodec(PayloadCodec):
         """Sanitize a path segment to prevent traversal and encoding issues."""
         return re.sub(r"[^A-Za-z0-9_\-]", "_", segment)
 
-    def _build_storage_key(self, payload: Payload, hash_hex: str) -> str:
+    def _build_storage_key(self, payload: Payload, *, hash_hex: str) -> str:
         """Build a storage key, structured by job routing when available."""
         routing = self._extract_job_routing(payload)
         if routing:
@@ -95,7 +95,7 @@ class StoragePayloadCodec(PayloadCodec):
                 encoded.append(payload)
                 continue
             hash_hex = sha256(serialized).hexdigest()
-            key = self._build_storage_key(payload, hash_hex)
+            key = self._build_storage_key(payload, hash_hex=hash_hex)
             uri = await self._storage.store(data=serialized, key=key)
             log.dev(f"Payload offloaded to storage: key='{key}'")
             ref_payload = Payload(

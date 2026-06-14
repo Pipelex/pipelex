@@ -53,7 +53,7 @@ class TestAgentOutput:
     def test_agent_error_outputs_json_to_stderr(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should print valid JSON to stderr and exit with code 1."""
         with pytest.raises(typer.Exit) as exc_info:
-            agent_error("something went wrong", "TestError")
+            agent_error("something went wrong", error_type="TestError")
         assert exc_info.value.exit_code == 1
 
         captured = capsys.readouterr()
@@ -66,7 +66,7 @@ class TestAgentOutput:
     def test_agent_error_includes_hint_for_known_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should auto-add a hint for known error types."""
         with pytest.raises(typer.Exit):
-            agent_error("model issue", "PipeOperatorModelChoiceError")
+            agent_error("model issue", error_type="PipeOperatorModelChoiceError")
 
         parsed = json.loads(capsys.readouterr().err)
         assert "hint" in parsed
@@ -82,7 +82,7 @@ class TestAgentOutput:
         """
         cause = SignaturesNotAllowedError(offending_pipe_refs={"d.caller"}, signature_refs={"d.summary_sig"}, dep_paths={})
         with pytest.raises(typer.Exit):
-            agent_error("strict validation reached a PipeSignature", "SignaturesNotAllowedError", cause=cause)
+            agent_error("strict validation reached a PipeSignature", error_type="SignaturesNotAllowedError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == AGENT_ERROR_HINTS["SignaturesNotAllowedError"]
@@ -93,7 +93,7 @@ class TestAgentOutput:
     def test_agent_error_no_hint_for_unknown_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should not include hint for unregistered error types."""
         with pytest.raises(typer.Exit):
-            agent_error("oops", "CompletelyUnknownError")
+            agent_error("oops", error_type="CompletelyUnknownError")
 
         parsed = json.loads(capsys.readouterr().err)
         assert "hint" not in parsed
@@ -101,7 +101,7 @@ class TestAgentOutput:
     def test_agent_error_includes_extra_fields(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Extra kwargs should appear as top-level fields in the JSON output."""
         with pytest.raises(typer.Exit):
-            agent_error("fail", "SomeError", pipe_code="my_pipe", custom_data=[1, 2])
+            agent_error("fail", error_type="SomeError", pipe_code="my_pipe", custom_data=[1, 2])
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["pipe_code"] == "my_pipe"
@@ -110,7 +110,7 @@ class TestAgentOutput:
     def test_agent_error_extra_can_override_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
         """An explicit hint kwarg should override the auto-looked-up hint."""
         with pytest.raises(typer.Exit):
-            agent_error("fail", "ValidateBundleError", hint="custom hint")
+            agent_error("fail", error_type="ValidateBundleError", hint="custom hint")
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "custom hint"
@@ -225,7 +225,7 @@ class TestAgentOutput:
         with pytest.raises(typer.Exit):
             agent_error(
                 "pipeline failed",
-                "PipelineExecutionError",
+                error_type="PipelineExecutionError",
                 failed_at=datetime.datetime(2026, 2, 9, 14, 0, 0),
             )
 
@@ -287,7 +287,7 @@ class TestAgentOutput:
         assert cause.__traceback__ is None
 
         with pytest.raises(typer.Exit) as exc_info:
-            agent_error("something broke", "RuntimeError", cause=cause)
+            agent_error("something broke", error_type="RuntimeError", cause=cause)
         assert exc_info.value.exit_code == 1
 
         parsed = json.loads(capsys.readouterr().err)
@@ -307,7 +307,7 @@ class TestAgentOutput:
             user_action=UserAction(kind=UserActionKind.CHECK_CREDENTIALS, detail="Check your API key and try again"),
         )
         with pytest.raises(typer.Exit):
-            agent_error("inference failed", "CogtError", cause=cause)
+            agent_error("inference failed", error_type="CogtError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "Check your API key and try again"
@@ -316,7 +316,7 @@ class TestAgentOutput:
         """agent_error should set retryable=True when error_category is TRANSIENT."""
         cause = CogtError("rate limited", error_category=InferenceErrorCategory.TRANSIENT)
         with pytest.raises(typer.Exit):
-            agent_error("rate limited", "CogtError", cause=cause)
+            agent_error("rate limited", error_type="CogtError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["retryable"] is True
@@ -325,7 +325,7 @@ class TestAgentOutput:
         """agent_error should include error_category from to_error_report()."""
         cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
         with pytest.raises(typer.Exit):
-            agent_error("bad config", "CogtError", cause=cause)
+            agent_error("bad config", error_type="CogtError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_category"] == "configuration"
@@ -334,7 +334,7 @@ class TestAgentOutput:
         """agent_error should use lookup dicts when cause is not a PipelexError."""
         cause = FileNotFoundError("missing.mthds")
         with pytest.raises(typer.Exit):
-            agent_error("file not found", "FileNotFoundError", cause=cause)
+            agent_error("file not found", error_type="FileNotFoundError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == AGENT_ERROR_HINTS["FileNotFoundError"]
@@ -344,7 +344,7 @@ class TestAgentOutput:
         """agent_error should fall back to lookup when PipelexError has no category/user_action."""
         cause = PipelexError("something failed")
         with pytest.raises(typer.Exit):
-            agent_error("something failed", "PipeExecutionError", cause=cause)
+            agent_error("something failed", error_type="PipeExecutionError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
@@ -358,7 +358,7 @@ class TestAgentOutput:
             user_action=UserAction(kind=UserActionKind.CHANGE_MODEL, detail="Use pipelex-agent models to list available models"),
         )
         with pytest.raises(typer.Exit):
-            agent_error("model not found", "ModelChoiceNotFoundError", cause=cause)
+            agent_error("model not found", error_type="ModelChoiceNotFoundError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "Use pipelex-agent models to list available models"
@@ -371,7 +371,7 @@ class TestAgentOutput:
             user_action=UserAction(kind=UserActionKind.UNKNOWN, detail="from report"),
         )
         with pytest.raises(typer.Exit):
-            agent_error("failed", "CogtError", cause=cause, hint="custom override")
+            agent_error("failed", error_type="CogtError", cause=cause, hint="custom override")
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "custom override"
@@ -385,7 +385,7 @@ class TestAgentOutput:
             key_name="OPENAI_API_KEY",
         )
         with pytest.raises(typer.Exit):
-            agent_error("OPENAI_API_KEY not set", "InferenceBackendCredentialsError", cause=cause)
+            agent_error("OPENAI_API_KEY not set", error_type="InferenceBackendCredentialsError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["provider"] == "openai"
@@ -394,7 +394,7 @@ class TestAgentOutput:
         """Non-retryable errors should not include retryable field in JSON output."""
         cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
         with pytest.raises(typer.Exit):
-            agent_error("bad config", "CogtError", cause=cause)
+            agent_error("bad config", error_type="CogtError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert "retryable" not in parsed
@@ -407,7 +407,7 @@ class TestAgentOutput:
 
         cause = CogtError("model not found", error_category=InferenceErrorCategory.CONFIGURATION)
         with pytest.raises(typer.Exit):
-            agent_error("model not found", error_type, cause=cause)
+            agent_error("model not found", error_type=error_type, cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
@@ -417,7 +417,7 @@ class TestAgentOutput:
         """agent_error should include error_domain from to_error_report() for a PipelexError cause."""
         cause = PipelexConfigError("bad config")
         with pytest.raises(typer.Exit):
-            agent_error("bad config", "PipelexConfigError", cause=cause)
+            agent_error("bad config", error_type="PipelexConfigError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == "config"
@@ -426,7 +426,7 @@ class TestAgentOutput:
         """agent_error should read error_domain from the lookup dict for a non-PipelexError cause."""
         cause = FileNotFoundError("missing.mthds")
         with pytest.raises(typer.Exit):
-            agent_error("file not found", "FileNotFoundError", cause=cause)
+            agent_error("file not found", error_type="FileNotFoundError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == "input"

@@ -50,8 +50,8 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 def _revalidate_against_object_class(
     raw_obj: BaseModel,
-    object_class: type[BaseModelTypeVar],
     *,
+    object_class: type[BaseModelTypeVar],
     is_mock_built: bool,
 ) -> BaseModelTypeVar:
     """Re-validate an activity-boundary object against the original ``object_class``.
@@ -121,7 +121,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             generated_text: str = await workflow.execute_activity(
                 act_llm_gen_text,
                 arg=llm_assignment,
-                summary=build_activity_summary("LLM text", job_metadata, extras={"model": llm_assignment.llm_handle}),
+                summary=build_activity_summary("LLM text", job_metadata=job_metadata, extras={"model": llm_assignment.llm_handle}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -165,7 +165,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             obj: BaseModel = await workflow.execute_activity(
                 act_llm_gen_object,
                 arg=object_assignment,
-                summary=build_activity_summary("LLM object", job_metadata, extras={"class": object_class.__name__}),
+                summary=build_activity_summary("LLM object", job_metadata=job_metadata, extras={"class": object_class.__name__}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -174,7 +174,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object direct: {obj}")
-        return _revalidate_against_object_class(obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        return _revalidate_against_object_class(obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
@@ -210,7 +210,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             obj_list: list[BaseModel] = await workflow.execute_activity(
                 act_llm_gen_object_list,
                 arg=object_assignment,
-                summary=build_activity_summary("LLM object list", job_metadata, extras={"class": object_class.__name__}),
+                summary=build_activity_summary("LLM object list", job_metadata=job_metadata, extras={"class": object_class.__name__}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -219,7 +219,10 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorInWorkflow generated object list direct: {obj_list}")
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in obj_list]
+        return [
+            _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+            for raw_obj in obj_list
+        ]
 
     @override
     @update_job_metadata
@@ -254,7 +257,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
-                summary=build_activity_summary("Img gen 1×", job_metadata, extras={"model": img_gen_handle}),
+                summary=build_activity_summary("Img gen 1×", job_metadata=job_metadata, extras={"model": img_gen_handle}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -303,7 +306,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_img_gen_images,
                 arg=img_gen_assignment,
-                summary=build_activity_summary("Img gen N×", job_metadata, extras={"model": img_gen_handle, "n": str(nb_images)}),
+                summary=build_activity_summary("Img gen N×", job_metadata=job_metadata, extras={"model": img_gen_handle, "n": str(nb_images)}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -344,7 +347,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             jinja2_text: str = await workflow.execute_activity(
                 act_jinja2_gen_text,
                 arg=templating_assignment,
-                summary=build_activity_summary("Templated text", job_metadata),
+                summary=build_activity_summary("Templated text", job_metadata=job_metadata),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -388,7 +391,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             image_content_list: list[ImageContent] = await workflow.execute_activity(
                 act_render_page_views,
                 arg=render_assignment,
-                summary=build_activity_summary("Render page views", job_metadata),
+                summary=build_activity_summary("Render page views", job_metadata=job_metadata),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -430,7 +433,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
             page_contents: list[PageContent] = await workflow.execute_activity(
                 act_extract_gen_extract_pages,
                 arg=extract_assignment,
-                summary=build_activity_summary("Extract pages", job_metadata, extras={"handle": extract_handle}),
+                summary=build_activity_summary("Extract pages", job_metadata=job_metadata, extras={"handle": extract_handle}),
                 **dispatch_kwargs,
             )
         except ActivityError as exc:
@@ -459,7 +462,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                     page_view_contents = await workflow.execute_activity(
                         act_render_page_views,
                         arg=render_assignment,
-                        summary=build_activity_summary("Render page views (extract)", job_metadata),
+                        summary=build_activity_summary("Render page views (extract)", job_metadata=job_metadata),
                         **render_dispatch_kwargs,
                     )
                 except ActivityError as exc:
@@ -494,7 +497,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 act_search_gen_sourced_answer,
                 arg=search_assignment,
                 summary=build_activity_summary(
-                    "Search sourced answer", search_assignment.job_metadata, extras={"model": search_assignment.search_handle}
+                    "Search sourced answer", job_metadata=search_assignment.job_metadata, extras={"model": search_assignment.search_handle}
                 ),
                 **dispatch_kwargs,
             )
@@ -529,7 +532,7 @@ class ContentGeneratorInWorkflow(ContentGeneratorProtocol):
                 act_search_gen_structured,
                 arg=search_object_assignment,
                 summary=build_activity_summary(
-                    "Search structured", search_assignment.job_metadata, extras={"class": output_structure_class.__name__}
+                    "Search structured", job_metadata=search_assignment.job_metadata, extras={"class": output_structure_class.__name__}
                 ),
                 **dispatch_kwargs,
             )

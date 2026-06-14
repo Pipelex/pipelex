@@ -13,6 +13,7 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 
 async def build_output_for_pipe(
     mthds_contents: list[str],
+    *,
     pipe_code: str,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.SCHEMA,
 ) -> dict[str, Any]:

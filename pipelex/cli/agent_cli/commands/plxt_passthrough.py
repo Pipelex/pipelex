@@ -8,7 +8,7 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 
 
-def run_plxt(subcommand: str, file_path: str) -> None:
+def run_plxt(subcommand: str, *, file_path: str) -> None:
     """Execute a plxt subcommand with full stdin/stdout/stderr passthrough.
 
     Locates the plxt binary, runs ``plxt <subcommand> <file_path>``,

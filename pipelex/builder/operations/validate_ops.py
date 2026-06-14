@@ -52,6 +52,7 @@ async def validate_all(
 
 async def validate_bundle_file(
     bundle_path: Path,
+    *,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:
     """Validate a bundle file.
@@ -108,6 +109,7 @@ async def validate_bundle_content(
 
 async def validate_pipe(
     pipe_code: str,
+    *,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:
     """Validate a single pipe.
@@ -157,6 +159,7 @@ async def validate_pipe(
 
 async def validate_pipe_in_bundle(
     bundle_path: Path,
+    *,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:

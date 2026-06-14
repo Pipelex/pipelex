@@ -118,7 +118,7 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None, config_dir: Path | None = None):
+    def setup_config(self, config_cls: type[ConfigRoot], *, config_overrides: dict[str, Any] | None = None, config_dir: Path | None = None):
         """Set the global configuration instance.
 
         Args:

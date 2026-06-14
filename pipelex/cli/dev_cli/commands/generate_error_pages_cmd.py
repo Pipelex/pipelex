@@ -13,7 +13,7 @@ from pipelex.pipelex import Pipelex
 ERROR_PAGES_DIR = Path("docs/errors")
 
 
-def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) -> None:
+def generate_error_pages_cmd(output: Path | None = None, *, quiet: bool = False) -> None:
     """Generate per-class error documentation pages.
 
     Bootstraps Pipelex with ``needs_inference=False`` (kept for parity with other

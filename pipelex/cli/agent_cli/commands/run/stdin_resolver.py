@@ -77,12 +77,12 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 
     working_memory_raw: Any = stdin_data[WORKING_MEMORY_KEY]
     if not isinstance(working_memory_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory': expected a dict", "JSONDecodeError")
+        agent_error("stdin envelope has invalid 'working_memory': expected a dict", error_type="JSONDecodeError")
     working_memory = cast("dict[str, Any]", working_memory_raw)
 
     root_raw: Any = working_memory.get("root", {})
     if not isinstance(root_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory.root': expected a dict", "JSONDecodeError")
+        agent_error("stdin envelope has invalid 'working_memory.root': expected a dict", error_type="JSONDecodeError")
     root = cast("dict[str, Any]", root_raw)
 
     aliases_raw: Any = working_memory.get("aliases", {})
@@ -115,6 +115,7 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 
 def parse_cli_inputs(
     inputs_arg: str | None,
+    *,
     stdin_fallback: bool = True,
     auto_inputs_path: str | None = None,
 ) -> dict[str, Any] | None:
@@ -165,17 +166,17 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             result: dict[str, Any] = json.loads(inputs_arg)
             return result
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
+            agent_error(f"Failed to parse inline JSON inputs: {exc}", error_type="JSONDecodeError", cause=exc)
     else:
         try:
             loaded = load_json_dict_from_path(Path(inputs_arg))
             # Resolve relative url paths against the inputs file's parent directory
             base_dir = Path(inputs_arg).parent.resolve()
-            return resolve_inputs_paths(loaded, base_dir)
+            return resolve_inputs_paths(loaded, base_dir=base_dir)
         except FileNotFoundError as exc:
-            agent_error(f"Input file not found: {inputs_arg}", "FileNotFoundError", cause=exc)
+            agent_error(f"Input file not found: {inputs_arg}", error_type="FileNotFoundError", cause=exc)
         except JsonTypeError as exc:
-            agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", "JsonTypeError", cause=exc)
+            agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", error_type="JsonTypeError", cause=exc)
     return None
 
 
@@ -196,10 +197,10 @@ def _read_stdin_inputs() -> dict[str, Any] | None:
     try:
         parsed: Any = json.loads(stdin_raw)
     except json.JSONDecodeError as exc:
-        agent_error(f"Failed to parse stdin JSON: {exc}", "JSONDecodeError", cause=exc)
+        agent_error(f"Failed to parse stdin JSON: {exc}", error_type="JSONDecodeError", cause=exc)
 
     if not isinstance(parsed, dict):
-        agent_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, "JSONDecodeError")
+        agent_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, error_type="JSONDecodeError")
 
     parsed_dict = cast("dict[str, Any]", parsed)
     return resolve_stdin_inputs(parsed_dict)
