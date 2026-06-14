@@ -80,13 +80,13 @@ class TestBuildPipeIOContracts:
         assert set(io_contracts) == {"structures_test.make_one", "structures_test.make_many"}
 
         make_one = io_contracts["structures_test.make_one"]
-        assert make_one.output.concept_code == "structures_test.Item"
+        assert make_one.output.concept_ref == "structures_test.Item"
         assert make_one.output.multiplicity == IOMultiplicity.SINGLE
-        assert make_one.inputs["doc"].concept_code == "native.Text"
+        assert make_one.inputs["doc"].concept_ref == "native.Text"
         assert make_one.inputs["doc"].json_schema
 
         make_many = io_contracts["structures_test.make_many"]
-        assert make_many.output.concept_code == "structures_test.Item"
+        assert make_many.output.concept_ref == "structures_test.Item"
         assert make_many.output.multiplicity == IOMultiplicity.VARIABLE
         # A list-typed input renders an array JSON Schema.
         assert make_many.inputs["docs"].json_schema.get("type") == "array"
@@ -127,9 +127,9 @@ class TestBuildPipeIOContracts:
 
         # The signature (forward declaration) and the controller referencing it both report contracts.
         signature_contract = io_contracts["research.find_key_findings"]
-        assert signature_contract.output.concept_code == "research.KeyFinding"
+        assert signature_contract.output.concept_ref == "research.KeyFinding"
         assert signature_contract.output.multiplicity == IOMultiplicity.SINGLE
-        assert signature_contract.inputs["doc"].concept_code == "native.Text"
+        assert signature_contract.inputs["doc"].concept_ref == "native.Text"
 
         controller_contract = io_contracts["research.research_brief"]
-        assert controller_contract.output.concept_code == "research.KeyFinding"
+        assert controller_contract.output.concept_ref == "research.KeyFinding"
