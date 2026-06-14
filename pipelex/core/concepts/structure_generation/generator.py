@@ -473,7 +473,7 @@ class StructureGenerator:
         # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
-            qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code=concept_code)
+            qualified_name = make_qualified_structure_class_name(domain_code=parsed_ref.domain_path, concept_code=concept_code)
             return f'"{qualified_name}"'
         return f'"{concept_code}"'
 

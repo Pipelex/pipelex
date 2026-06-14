@@ -16,7 +16,7 @@ class BoundingBox(BaseModel):
     bottom_left_y: float = Field(description="Y coordinate of bottom-left corner")
 
     @classmethod
-    def make_from_two_corners(cls, top_left_x: float, *, top_left_y: float, bottom_right_x: float, bottom_right_y: float) -> BoundingBox:
+    def make_from_two_corners(cls, *, top_left_x: float, top_left_y: float, bottom_right_x: float, bottom_right_y: float) -> BoundingBox:
         return BoundingBox(
             top_left_x=top_left_x,
             top_left_y=top_left_y,

@@ -37,7 +37,7 @@ def init_config(reset: bool = False, *, dry_run: bool = False, target_dir: Path 
         copied_files: list[str] = []
         existing_files: list[str] = []
 
-        def copy_directory_structure(src_dir: Path, *, dst_dir: Path, relative_path: Path | None = None, dry_run: bool = False) -> None:
+        def copy_directory_structure(*, src_dir: Path, dst_dir: Path, relative_path: Path | None = None, dry_run: bool = False) -> None:
             """Recursively copy directory structure, handling existing files."""
             for src_item in src_dir.iterdir():
                 item = src_item.name
@@ -53,7 +53,7 @@ def init_config(reset: bool = False, *, dry_run: bool = False, target_dir: Path 
                         continue
                     if not dry_run:
                         dst_item.mkdir(parents=True, exist_ok=True)
-                    copy_directory_structure(src_item, dst_dir=dst_item, relative_path=relative_item, dry_run=dry_run)
+                    copy_directory_structure(src_dir=src_item, dst_dir=dst_item, relative_path=relative_item, dry_run=dry_run)
                 elif dst_item.exists() and not reset:
                     existing_files.append(relative_item.as_posix())
                 else:

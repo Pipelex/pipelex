@@ -24,7 +24,7 @@ class TemplateRegistry:
 
     Usage:
         # At module import time (outside sandbox):
-        TemplateRegistry.register("myapp/base.html.jinja2", template_source)
+        TemplateRegistry.register(key="myapp/base.html.jinja2", template_source=template_source)
 
         # At render time (inside sandbox):
         template_source = TemplateRegistry.get("myapp/base.html.jinja2")
@@ -34,7 +34,7 @@ class TemplateRegistry:
     _templates: ClassVar[dict[str, str]] = {}
 
     @classmethod
-    def register(cls, key: str, *, template_source: str) -> None:
+    def register(cls, *, key: str, template_source: str) -> None:
         """Register a template string under a key.
 
         Args:

@@ -211,7 +211,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             writer.writerows(records)
 
     @classmethod
-    def compute_total_cost(cls, input_non_cached_cost: float, *, input_cached_cost: float, output_cost: float) -> float:
+    def compute_total_cost(cls, *, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:
         return input_non_cached_cost + input_cached_cost + output_cost
 
     @classmethod

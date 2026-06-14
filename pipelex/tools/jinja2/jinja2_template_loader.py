@@ -93,8 +93,8 @@ class TemplateLoader:
     @classmethod
     def register_set(
         cls,
-        name: str,
         *,
+        name: str,
         package: str,
         templates: list[tuple[str, str]],
     ) -> None:
@@ -140,7 +140,7 @@ class TemplateLoader:
         for filename, registry_key in templates:
             template_path = package_files / filename
             template_source = template_path.read_text(encoding="utf-8")
-            TemplateRegistry.register(registry_key, template_source=template_source)
+            TemplateRegistry.register(key=registry_key, template_source=template_source)
 
         cls._loaded.add(name)
 

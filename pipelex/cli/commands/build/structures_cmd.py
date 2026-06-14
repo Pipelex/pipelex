@@ -81,7 +81,7 @@ def _build_concept_ref_to_class_info(
             # class definitions emitted below.
             raw_class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_ref_or_code=concept_code)
             if raw_class_name == concept_code:
-                class_name = make_qualified_structure_class_name(blueprint.domain, concept_code=concept_code)
+                class_name = make_qualified_structure_class_name(domain_code=blueprint.domain, concept_code=concept_code)
                 file_stem_snake_case = pascal_case_to_snake_case(concept_code)
             else:
                 class_name = raw_class_name
@@ -169,7 +169,7 @@ def generate_structures_from_blueprints(
                     generated_code, _ = StructureGenerator(
                         concept_ref_to_class_info=concept_ref_to_class_info, local_domain=blueprint.domain
                     ).generate_from_structure_blueprint(
-                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code=concept_code),
+                        class_name=make_qualified_structure_class_name(domain_code=blueprint.domain, concept_code=concept_code),
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
                         description=concept_blueprint,
@@ -199,7 +199,7 @@ def generate_structures_from_blueprints(
                         concept_ref_to_class_info=concept_ref_to_class_info,
                         local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
-                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code=concept_code),
+                        class_name=make_qualified_structure_class_name(domain_code=blueprint.domain, concept_code=concept_code),
                         structure_blueprint=normalized_structure,
                         description=concept_blueprint.description,
                     )
@@ -233,7 +233,9 @@ def generate_structures_from_blueprints(
                         refined_structure_class_name = refined_concept_code + "Content"
                     else:
                         refined_domain_code = refined_ref.domain_path or blueprint.domain
-                        refined_structure_class_name = make_qualified_structure_class_name(refined_domain_code, concept_code=refined_concept_code)
+                        refined_structure_class_name = make_qualified_structure_class_name(
+                            domain_code=refined_domain_code, concept_code=refined_concept_code
+                        )
                 else:
                     refined_structure_class_name = TextContent.__name__
 
@@ -242,7 +244,7 @@ def generate_structures_from_blueprints(
                         concept_ref_to_class_info=concept_ref_to_class_info,
                         local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
-                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code=concept_code),
+                        class_name=make_qualified_structure_class_name(domain_code=blueprint.domain, concept_code=concept_code),
                         structure_blueprint={},
                         base_class_name=refined_structure_class_name,
                         description=concept_blueprint.description,
@@ -273,7 +275,7 @@ def generate_structures_from_blueprints(
                         concept_ref_to_class_info=concept_ref_to_class_info,
                         local_domain=blueprint.domain,
                     ).generate_from_structure_blueprint(
-                        class_name=make_qualified_structure_class_name(blueprint.domain, concept_code=concept_code),
+                        class_name=make_qualified_structure_class_name(domain_code=blueprint.domain, concept_code=concept_code),
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
                         description=concept_blueprint.description,

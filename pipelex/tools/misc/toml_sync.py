@@ -145,7 +145,7 @@ def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], *, prefix
     return paths
 
 
-def sync_toml_values(source_path: Path, *, target_path: Path, dry_run: bool = False) -> TomlSyncResult:
+def sync_toml_values(*, source_path: Path, target_path: Path, dry_run: bool = False) -> TomlSyncResult:
     """Sync values from source TOML to target TOML, preserving target's structure and comments.
 
     For each leaf key in the target:

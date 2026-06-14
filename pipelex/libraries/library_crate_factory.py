@@ -182,7 +182,7 @@ class LibraryCrateFactory:
             )
 
         # At least one is a signature: the declarations' contracts must match (normalized identity).
-        if not contracts_match(existing.blueprint, incoming=incoming.blueprint, domain_code=domain_code):
+        if not contracts_match(existing=existing.blueprint, incoming=incoming.blueprint, domain_code=domain_code):
             raise PipeLibraryError(cls._contract_mismatch_msg(pipe_ref=pipe_ref, existing=existing, incoming=incoming))
 
         # A concrete definition beats a forward declaration.

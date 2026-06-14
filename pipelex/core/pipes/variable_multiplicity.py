@@ -19,7 +19,7 @@ class VariableMultiplicityResolution(BaseModel):
     specific_output_count: int | None = Field(default=None, description="Exact number of items to expect/generate, if specified")
 
 
-def make_variable_multiplicity(nb_items: int | None, *, multiple_items: bool | None) -> VariableMultiplicity | None:
+def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | None) -> VariableMultiplicity | None:
     """This function takes two mutually exclusive parameters that control how many items a variable can have
     and converts them into a single VariableMultiplicity type.
 
@@ -110,7 +110,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
 
 
-def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, *, target_multiplicity: VariableMultiplicity | None) -> bool:
+def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
     """Check if a source multiplicity is compatible with a target multiplicity.
 
     This is used to validate that a pipe's output multiplicity can fulfill a required output multiplicity.
@@ -131,19 +131,19 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
         True if source_multiplicity can fulfill target_multiplicity, False otherwise
 
     Examples:
-        >>> is_multiplicity_compatible(None, None)
+        >>> is_multiplicity_compatible(source_multiplicity=None, target_multiplicity=None)
         True
-        >>> is_multiplicity_compatible(True, True)
+        >>> is_multiplicity_compatible(source_multiplicity=True, target_multiplicity=True)
         True
-        >>> is_multiplicity_compatible(3, True)  # Fixed count fulfills variable expectation
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=True)  # Fixed count fulfills variable expectation
         True
-        >>> is_multiplicity_compatible(True, 3)  # Variable cannot fulfill fixed expectation
+        >>> is_multiplicity_compatible(source_multiplicity=True, target_multiplicity=3)  # Variable cannot fulfill fixed expectation
         False
-        >>> is_multiplicity_compatible(3, 3)
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=3)
         True
-        >>> is_multiplicity_compatible(3, 5)  # Different fixed counts are incompatible
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=5)  # Different fixed counts are incompatible
         False
-        >>> is_multiplicity_compatible(None, True)  # Single cannot fulfill list expectation
+        >>> is_multiplicity_compatible(source_multiplicity=None, target_multiplicity=True)  # Single cannot fulfill list expectation
         False
     """
     # Case 1: Target expects single item (None)

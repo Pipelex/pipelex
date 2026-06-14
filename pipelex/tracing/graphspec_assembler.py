@@ -359,8 +359,8 @@ class _AssemblerState:
 
     def _add_generated_edge(
         self,
-        source_node_id: str,
         *,
+        source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,

@@ -88,7 +88,7 @@ def normalize_structure_blueprint(structure_dict: dict[str, str | ConceptStructu
     return normalized
 
 
-def make_qualified_structure_class_name(domain_code: str, *, concept_code: str) -> str:
+def make_qualified_structure_class_name(*, domain_code: str, concept_code: str) -> str:
     """Build a domain-qualified class name for dynamically generated structure classes.
 
     Uses double underscore as separator to produce a valid Python identifier

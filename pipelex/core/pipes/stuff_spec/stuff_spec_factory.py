@@ -11,8 +11,8 @@ class StuffSpecFactory:
     @classmethod
     def make_from_blueprint(
         cls,
-        domain_code: str,
         *,
+        domain_code: str,
         output_string: str,
     ) -> StuffSpec:
         """Parse an output string and return a StuffSpec with concept and multiplicity.

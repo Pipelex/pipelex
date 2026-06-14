@@ -180,7 +180,7 @@ class TestHasCompatibleField:
         class Outer(BaseModel):
             data: Inner
 
-        assert has_compatible_field(Outer, class_2=Inner) is True
+        assert has_compatible_field(Outer, target_type=Inner) is True
 
     def test_subclass_match(self):
         """Test that a field with subclass type is found."""
@@ -194,7 +194,7 @@ class TestHasCompatibleField:
         class Container(BaseModel):
             item: Child
 
-        assert has_compatible_field(Container, class_2=Parent) is True
+        assert has_compatible_field(Container, target_type=Parent) is True
 
     def test_no_match(self):
         """Test that no match is found when field types don't match."""
@@ -208,7 +208,7 @@ class TestHasCompatibleField:
         class Container(BaseModel):
             data: TypeA
 
-        assert has_compatible_field(Container, class_2=TypeB) is False
+        assert has_compatible_field(Container, target_type=TypeB) is False
 
     def test_structural_equivalence_match(self):
         """Test that structurally equivalent types are found."""
@@ -225,7 +225,7 @@ class TestHasCompatibleField:
             data: StructureA
 
         # StructureA and StructureB have the same structure
-        assert has_compatible_field(Container, class_2=StructureB) is True
+        assert has_compatible_field(Container, target_type=StructureB) is True
 
     def test_optional_field_match(self):
         """Test that optional fields are checked correctly."""
@@ -236,7 +236,7 @@ class TestHasCompatibleField:
         class Outer(BaseModel):
             data: Inner | None = None
 
-        assert has_compatible_field(Outer, class_2=Inner) is True
+        assert has_compatible_field(Outer, target_type=Inner) is True
 
     def test_non_pydantic_class(self):
         """Test that non-Pydantic classes return False."""
@@ -247,7 +247,7 @@ class TestHasCompatibleField:
         class PydanticClass(BaseModel):
             name: str
 
-        assert has_compatible_field(RegularClass, class_2=PydanticClass) is False  # type: ignore[arg-type]
+        assert has_compatible_field(RegularClass, target_type=PydanticClass) is False  # type: ignore[arg-type]
 
 
 class TestAreClassesEquivalentWithOptionalFields:

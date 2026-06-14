@@ -117,7 +117,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, *, quiet: bool = False) -> No
             console.print()
 
             if show_diff:
-                _display_diff(existing_content, expected=expected_content, console=console)
+                _display_diff(existing=existing_content, expected=expected_content, console=console)
 
             console.print("[bold yellow]Recommended Action:[/bold yellow]")
             console.print("  Run: [cyan]make generate-mthds-schema[/cyan] or [cyan]make gms[/cyan]")
@@ -126,7 +126,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, *, quiet: bool = False) -> No
         sys.exit(1)
 
 
-def _display_diff(existing: str, *, expected: str, console: Console) -> None:
+def _display_diff(*, existing: str, expected: str, console: Console) -> None:
     """Display a simplified diff between existing and expected content.
 
     Args:

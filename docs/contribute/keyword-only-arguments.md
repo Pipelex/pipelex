@@ -34,21 +34,16 @@ The curated allowlist is intentionally short. Each entry is a genuine ordered tu
 - `pipelex.kit.single_file_agent_rules.unified_diff` — `unified_diff(before: str, after: str, path: str)`. `before`/`after` is the canonical ordered diff pair; `path` is the diff header. Reads as the universally-known diff convention.
 - `pipelex.tools.misc.diff.diff_files` — `diff_files(path1, path2)`. Symmetric two-operand comparison; the `1`/`2` suffixes self-label ordering and there is no old/new semantics that keywords could clarify.
 - `pipelex.tools.misc.diff.diff_dirs` — `diff_dirs(dir1, dir2)`. Same symmetric two-directory comparison; `dir1`/`dir2` is a self-labelling ordered pair.
+- `pipelex.tools.typing.class_utils.are_classes_equivalent` — `are_classes_equivalent(class_1, class_2)`. Symmetric structural-equivalence check; order is irrelevant (equivalence is commutative) and the `1`/`2` suffixes self-label the operands. No trailing options.
 
-Three further candidates surfaced in the survey were deliberately left OFF the allowlist:
+The operating rule for two-operand functions — when only one of the operand-positional and the all-keyword form should win:
 
-- `has_diff_dirs(dir1, dir2, exclude_files=None, exclude_dirs=None)`
-- `copy_file(source_path, target_path, overwrite=True)`
-- `sync_toml_values(source_path, target_path, dry_run=False)`
+- **A clean symmetric/ordered pair with NO trailing options** may go on the allowlist and stay fully positional (the entries above). Order is either irrelevant (`are_classes_equivalent`) or universally understood (`diff_files`'s `1`/`2`).
+- **A pair that also carries trailing options** is reshaped to fully keyword-only instead — the whole-function allowlist is all-or-nothing, so it cannot keep the pair positional while forcing the options keyword, and letting the options go positional is exactly the unreadable case this refactor targets. Examples now keyword-only: `copy_file(*, source_path, target_path, overwrite=True)`, `mirror_dir(*, source_dir, target_dir, …)`, `sync_toml_values(*, source_path, target_path, dry_run=False)`, `has_diff_dirs(*, dir1, dir2, exclude_files=None, exclude_dirs=None)`, `is_multiplicity_compatible(*, source_multiplicity, target_multiplicity)`, the graph tracer's `add_edge(*, source_node_id, target_node_id, edge_kind, …)`.
 
-Each has a genuine ordered leading pair (`dir1`/`dir2`, `source`/`target`) but also carries trailing options. A whole-function allowlist exemption would let those options be passed positionally too — exactly the unreadable case the refactor targets — so they stay off the allowlist and are flagged as violations, to be resolved during their package's burn-down.
+This deliberately keeps the allowlist whole-function (no per-entry "leading positional count" machinery): the handful of pairs that would benefit from staying positional-with-keyword-options are rare enough that reshaping to all-keyword is the simpler, uniform answer.
 
-Open question for burn-down (the strict rule forces this): the allowlist is currently whole-function, so it cannot express "the leading directional pair may be positional, but the trailing options must be keyword". Under the strict rule, `copy_file(source_path, target_path, *, overwrite=True)` is itself still a violation, because `target_path` is a second positional. Two ways to resolve, decided per-function when its package is migrated:
-
-- Reshape to a positional subject plus keyword-only rest: `copy_file(source_path, *, target_path, overwrite=True)`. Simple and fully compliant, at the cost of splitting the `src`/`dst` pair at the call site.
-- Extend the allowlist to carry a per-entry *leading positional count* (e.g. `copy_file: 2`), so the genuine pair stays positional while the bare `*` still forces the options keyword. More faithful to directional-pair readability; a small guard enhancement.
-
-Adding to the allowlist is a deliberate act: the entry must name a genuine ordered tuple under a recognized convention (key/value, x/y, min/max/clamp, before/after, src/dst, geometric coordinates, interpolation operands), justified in the same conservative spirit as the entries above. When in doubt, leave it off and let the function be keyword-only — that is the safe default.
+Adding to the allowlist is a deliberate act: the entry must name a genuine ordered tuple under a recognized convention (key/value, x/y, min/max/clamp, before/after, src/dst, geometric coordinates, interpolation operands) with no trailing options, justified in the same conservative spirit as the entries above. When in doubt, leave it off and let the function be keyword-only — that is the safe default.
 
 ## Carve-outs (skipped entirely)
 
@@ -137,16 +132,16 @@ A symmetric tuple on the allowlist — exempt entirely, stays positional:
 def set_env(key: str, value: str) -> None: ...   # set_env("PIPELEX_ENV", "prod")
 ```
 
-A directional pair with a trailing option — under the strict rule only the subject may stay positional, so the second operand and the option both become keyword-only:
+A directional pair with a trailing option — neither operand is "the object", and a whole-function allowlist exemption would let the option go positional too, so the whole signature becomes keyword-only:
 
 ```python
 # before — copy_file(src, dst, True): what does True mean?
 def copy_file(source_path, target_path, overwrite=True): ...
-# after — copy_file(src, target_path=dst, overwrite=False); only the subject stays positional
-def copy_file(source_path, *, target_path, overwrite=True): ...
+# after — copy_file(source_path=src, target_path=dst, overwrite=False); every argument is named
+def copy_file(*, source_path, target_path, overwrite=True): ...
 ```
 
-Keeping the `source_path`/`target_path` pair positional while still forcing `overwrite` keyword is not expressible today; it would need the per-entry leading-positional-count allowlist extension described in the Exception 2 open question for burn-down.
+A clean symmetric pair with no trailing options is the opposite case — it goes on the Exception 2 allowlist and stays fully positional (`are_classes_equivalent(class_1, class_2)`).
 
 An override — skipped because of `@override`; fix the base signature instead:
 

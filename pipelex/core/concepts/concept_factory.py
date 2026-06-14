@@ -224,11 +224,11 @@ class ConceptFactory:
             raise ConceptFactoryError(msg)
 
     @classmethod
-    def make_concept_ref_with_domain(cls, domain_code: str, *, concept_code: str) -> str:
+    def make_concept_ref_with_domain(cls, *, domain_code: str, concept_code: str) -> str:
         return f"{domain_code}.{concept_code}"
 
     @classmethod
-    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, *, concept_ref_or_code: str) -> str:
+    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, *, domain_code: str, concept_ref_or_code: str) -> str:
         input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
             concept_ref_or_code=concept_ref_or_code,
             domain_code=domain_code,
@@ -325,7 +325,7 @@ class ConceptFactory:
         # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
 
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code=concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
         try:
             _, the_generated_class = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
                 class_name=qualified_class_name,
@@ -350,7 +350,7 @@ class ConceptFactory:
         description: str,
     ) -> StructureNameAndRefine:
         """Handle BASIC_BLUEPRINT declaration type."""
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code=concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
         # Check if a valid structure class already exists — first by bare concept_code
         # (for pre-existing Python classes registered under their own name), then by
@@ -405,7 +405,7 @@ class ConceptFactory:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code=concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
         # Cross-package refines: base class isn't available locally, so generate
         # a standalone TextContent subclass. The refinement relationship is tracked
@@ -436,7 +436,7 @@ class ConceptFactory:
             refined_structure_class_name = refined_concept_code + "Content"
         else:
             refined_domain_code = refined_ref.domain_path or domain_code
-            refined_structure_class_name = make_qualified_structure_class_name(refined_domain_code, concept_code=refined_concept_code)
+            refined_structure_class_name = make_qualified_structure_class_name(domain_code=refined_domain_code, concept_code=refined_concept_code)
 
         # Generate a new class that inherits from the refined structure class
         # This creates an empty class that can be extended with additional fields in the future
@@ -462,8 +462,8 @@ class ConceptFactory:
     @classmethod
     def make_from_blueprint(
         cls,
-        domain_code: str,
         *,
+        domain_code: str,
         concept_code: str,
         blueprint_or_string_description: ConceptBlueprint | str,
     ) -> Concept:

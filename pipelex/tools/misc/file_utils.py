@@ -130,7 +130,7 @@ async def load_binary_async(path: Path) -> bytes:
 ########################################################
 
 
-def copy_file(source_path: Path, *, target_path: Path, overwrite: bool = True) -> None:
+def copy_file(*, source_path: Path, target_path: Path, overwrite: bool = True) -> None:
     """Copies a file from the source path to the target path.
 
     Creates any necessary parent directories for the target path if they don't exist.
@@ -276,8 +276,8 @@ def _reraise_walk_error(walk_error: OSError) -> None:
 
 
 def mirror_dir(
-    source_dir: Path,
     *,
+    source_dir: Path,
     target_dir: Path,
     exclude_files: frozenset[str] | None = None,
     exclude_dirs: frozenset[str] | None = None,

@@ -134,8 +134,8 @@ class GraphTracerProtocol(Protocol):
 
     def add_edge(
         self,
-        source_node_id: str,
         *,
+        source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
@@ -331,8 +331,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def add_edge(
         self,
-        source_node_id: str,
         *,
+        source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,

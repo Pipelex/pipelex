@@ -21,7 +21,7 @@ class TestMirrorDir:
             _write(source / "config.toml", "value = 1")
             target.mkdir()
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.copied_files == ["config.toml"]
             assert result.deleted_files == []
@@ -35,7 +35,7 @@ class TestMirrorDir:
             _write(source / "config.toml", "value = 2")
             _write(target / "config.toml", "value = 1")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.copied_files == ["config.toml"]
             assert (target / "config.toml").read_text(encoding="utf-8") == "value = 2"
@@ -48,7 +48,7 @@ class TestMirrorDir:
             _write(source / "config.toml", "value = 1")
             _write(target / "config.toml", "value = 1")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.has_changes is False
             assert result.copied_files == []
@@ -61,7 +61,7 @@ class TestMirrorDir:
             source.mkdir()
             _write(target / "stale.toml", "obsolete")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.deleted_files == ["stale.toml"]
             assert not (target / "stale.toml").exists()
@@ -74,7 +74,7 @@ class TestMirrorDir:
             source.mkdir()
             _write(target / "stale_dir" / "nested" / "file.toml", "obsolete")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.deleted_dirs == ["stale_dir"]
             assert result.deleted_files == []
@@ -89,7 +89,7 @@ class TestMirrorDir:
             _write(source / "inference" / "deck" / "llm.toml", "llm")
             target.mkdir()
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.copied_files == ["inference/backends/openai.toml", "inference/deck/llm.toml"]
             assert (target / "inference" / "backends" / "openai.toml").read_text(encoding="utf-8") == "openai"
@@ -103,7 +103,7 @@ class TestMirrorDir:
             (source / "empty_dir").mkdir(parents=True)
             target.mkdir()
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.created_dirs == ["empty_dir"]
             assert result.has_changes is True
@@ -117,7 +117,7 @@ class TestMirrorDir:
             (source / "empty_dir").mkdir(parents=True)
             target.mkdir()
 
-            result = mirror_dir(source, target_dir=target, dry_run=True)
+            result = mirror_dir(source_dir=source, target_dir=target, dry_run=True)
 
             assert result.created_dirs == ["empty_dir"]
             assert result.has_changes is True
@@ -131,7 +131,7 @@ class TestMirrorDir:
             source.mkdir()
             _write(target / "telemetry.project.toml", "kit-only template")
 
-            result = mirror_dir(source, target_dir=target, exclude_files=frozenset({"telemetry.project.toml"}))
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_files=frozenset({"telemetry.project.toml"}))
 
             assert result.deleted_files == []
             assert (target / "telemetry.project.toml").exists()
@@ -144,7 +144,7 @@ class TestMirrorDir:
             _write(source / "telemetry.toml", "dogfood override")
             target.mkdir()
 
-            result = mirror_dir(source, target_dir=target, exclude_files=frozenset({"telemetry.toml"}))
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_files=frozenset({"telemetry.toml"}))
 
             assert result.copied_files == []
             assert not (target / "telemetry.toml").exists()
@@ -157,7 +157,7 @@ class TestMirrorDir:
             source.mkdir()
             _write(target / "storage" / "cached.bin", "runtime data")
 
-            result = mirror_dir(source, target_dir=target, exclude_dirs=frozenset({"storage"}))
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_dirs=frozenset({"storage"}))
 
             assert result.deleted_dirs == []
             assert (target / "storage" / "cached.bin").exists()
@@ -170,7 +170,7 @@ class TestMirrorDir:
             _write(source / "inference" / "backends.toml", "backends")
             _write(target / "inference" / "traces" / "run.log", "trace")
 
-            result = mirror_dir(source, target_dir=target, exclude_dirs=frozenset({"traces"}))
+            result = mirror_dir(source_dir=source, target_dir=target, exclude_dirs=frozenset({"traces"}))
 
             assert result.deleted_dirs == []
             assert (target / "inference" / "traces" / "run.log").exists()
@@ -183,7 +183,7 @@ class TestMirrorDir:
             _write(source / "new.toml", "fresh")
             _write(target / "stale.toml", "obsolete")
 
-            result = mirror_dir(source, target_dir=target, dry_run=True)
+            result = mirror_dir(source_dir=source, target_dir=target, dry_run=True)
 
             assert result.dry_run is True
             assert result.copied_files == ["new.toml"]
@@ -198,7 +198,7 @@ class TestMirrorDir:
             target = Path(temp_dir) / "target"
             _write(source / "config.toml", "value = 1")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.copied_files == ["config.toml"]
             assert (target / "config.toml").read_text(encoding="utf-8") == "value = 1"
@@ -211,7 +211,7 @@ class TestMirrorDir:
             _write(source / "item", "now a file")
             _write(target / "item" / "nested.toml", "was a directory")
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.deleted_dirs == ["item"]
             assert result.copied_files == ["item"]
@@ -234,13 +234,13 @@ class TestMirrorDir:
             _write(target / "storage" / "cached.bin", "runtime data")
             _write(target / "stale.toml", "obsolete")
 
-            first = mirror_dir(source, target_dir=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs)
+            first = mirror_dir(source_dir=source, target_dir=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs)
             assert first.has_changes is True
 
-            second = mirror_dir(source, target_dir=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs)
+            second = mirror_dir(source_dir=source, target_dir=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs)
             assert second.has_changes is False
 
-            assert has_diff_dirs(source, dir2=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs) is False
+            assert has_diff_dirs(dir1=source, dir2=target, exclude_files=exclude_files, exclude_dirs=exclude_dirs) is False
             assert (target / "telemetry.toml").read_text(encoding="utf-8") == "target-side excluded"
             assert (target / "storage" / "cached.bin").exists()
             assert not (target / "stale.toml").exists()
@@ -253,7 +253,7 @@ class TestMirrorDir:
             _write(target / "keep.toml", "precious")
 
             with pytest.raises(FileNotFoundError):
-                mirror_dir(source, target_dir=target)
+                mirror_dir(source_dir=source, target_dir=target)
 
             assert (target / "keep.toml").read_text(encoding="utf-8") == "precious"
 
@@ -266,7 +266,7 @@ class TestMirrorDir:
             _write(target / "keep.toml", "precious")
 
             with pytest.raises(NotADirectoryError):
-                mirror_dir(source, target_dir=target)
+                mirror_dir(source_dir=source, target_dir=target)
 
             assert (target / "keep.toml").read_text(encoding="utf-8") == "precious"
 
@@ -281,7 +281,7 @@ class TestMirrorDir:
             target.mkdir()
             (target / "config.toml").symlink_to(external)
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.copied_files == ["config.toml"]
             assert not (target / "config.toml").is_symlink()
@@ -300,7 +300,7 @@ class TestMirrorDir:
             target.mkdir()
             (target / "config.toml").symlink_to(external)
 
-            result = mirror_dir(source, target_dir=target, dry_run=True)
+            result = mirror_dir(source_dir=source, target_dir=target, dry_run=True)
 
             assert result.copied_files == ["config.toml"]
             assert (target / "config.toml").is_symlink()
@@ -319,7 +319,7 @@ class TestMirrorDir:
             # Make the symlink broken by removing the target it points to.
             external.unlink()
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.deleted_files == ["stale_link.toml"]
             # The broken symlink itself must actually be gone from the target tree.
@@ -337,7 +337,7 @@ class TestMirrorDir:
             target.mkdir()
             (target / "linked_dir").symlink_to(real_dir, target_is_directory=True)
 
-            result = mirror_dir(source, target_dir=target)
+            result = mirror_dir(source_dir=source, target_dir=target)
 
             assert result.deleted_dirs == ["linked_dir"]
             assert not (target / "linked_dir").exists()

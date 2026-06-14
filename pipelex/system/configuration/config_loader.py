@@ -147,7 +147,7 @@ class ConfigLoader:
         config_template_dir = Path(str(get_kit_configs_dir()))
         global_dir.mkdir(parents=True, exist_ok=True)
 
-        def copy_directory_structure(src_dir: Path, *, dst_dir: Path) -> None:
+        def copy_directory_structure(*, src_dir: Path, dst_dir: Path) -> None:
             """Recursively copy directory structure from kit templates."""
             for item in src_dir.iterdir():
                 if item.name in GIT_IGNORED_CONFIG_FILES or item.name == ".DS_Store":
@@ -155,7 +155,7 @@ class ConfigLoader:
                 dst_item = dst_dir / item.name
                 if item.is_dir():
                     dst_item.mkdir(parents=True, exist_ok=True)
-                    copy_directory_structure(item, dst_dir=dst_item)
+                    copy_directory_structure(src_dir=item, dst_dir=dst_item)
                 else:
                     shutil.copy2(item, dst_item)
 

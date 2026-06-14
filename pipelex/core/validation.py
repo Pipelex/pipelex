@@ -5,7 +5,7 @@ from pipelex.system.configuration.configs import MigrationConfig, PipelexConfig
 from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_error
 
 
-def report_validation_error(category: str, *, validation_error: ValidationError) -> str:
+def report_validation_error(*, category: str, validation_error: ValidationError) -> str:
     validation_error_analysis = analyze_pydantic_validation_error(validation_error)
 
     # Doctor calls this from inside its bootstrap, where setup_config may have raised

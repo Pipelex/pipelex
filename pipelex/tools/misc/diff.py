@@ -19,8 +19,8 @@ if TYPE_CHECKING:
 
 
 def has_diff_dirs(
-    dir1: str | Path,
     *,
+    dir1: str | Path,
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
@@ -209,8 +209,8 @@ def _generate_diff_summary(diff_content: str, *, left_is_newer: bool) -> str | N
 
 
 def make_diff_dirs_pretty(
-    dir1: str | Path,
     *,
+    dir1: str | Path,
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
@@ -362,7 +362,7 @@ def diff_dirs(dir1: str | Path, dir2: str | Path) -> None:
     dir1 = Path(dir1)
     dir2 = Path(dir2)
 
-    pretty_diff = make_diff_dirs_pretty(dir1, dir2=dir2)
+    pretty_diff = make_diff_dirs_pretty(dir1=dir1, dir2=dir2)
     PrettyPrinter.pretty_print(
         content=pretty_diff,
         title=f"Directory Diff: {dir1} ↔ {dir2}",

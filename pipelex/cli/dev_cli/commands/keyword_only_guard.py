@@ -92,6 +92,7 @@ SYMMETRIC_ALLOWLIST: frozenset[tuple[str, str]] = frozenset(
         ("pipelex.kit.single_file_agent_rules.unified_diff", "pipelex/kit/single_file_agent_rules.py"),
         ("pipelex.tools.misc.diff.diff_files", "pipelex/tools/misc/diff.py"),
         ("pipelex.tools.misc.diff.diff_dirs", "pipelex/tools/misc/diff.py"),
+        ("pipelex.tools.typing.class_utils.are_classes_equivalent", "pipelex/tools/typing/class_utils.py"),
     }
 )
 
