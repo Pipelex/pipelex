@@ -32,13 +32,14 @@ A function/method must mark parameters keyword-only (place a bare `*` before the
 Adding `*` to a signature is the easy 5%. The moment `def f(a, *, b, c)` exists, every caller passing `b`/`c` positionally **breaks** — at type-check time and runtime. So ~90% of the diff is keywordizing call sites, which is also the actual value. Consequences baked into the plan:
 
 - **pyright/mypy is the oracle.** Per-package loop: apply `*`, run `make agent-check`, fix every flagged call site to keyword form, then run targeted tests. Dynamic calls (`getattr`, `**kwargs` forwarding, `functools.partial`) won't be caught by the type checker — the test suite is the second net.
-- **Land per-package, not big-bang.** A single cross-cutting PR is unreviewable and a merge-conflict magnet (there are in-flight refactor branches). Each wave below is one or a few small PRs.
+- **Burn down per-package, not big-bang.** A single cross-cutting change is unreviewable and a merge-conflict magnet (there are in-flight refactor branches). Each wave below is a self-contained working-tree diff the user reviews and pushes before the next phase starts (no PR per wave — see Branch & landing strategy).
 - **Public API is downstream-breaking.** Top-level surfaces (`pipelex.py`, `hub.py`, anything imported by `pipelex-api`, `pipelex-worker`, `n8n-nodes-pipelex`, cookbook/starter) changing signature is a breaking change for those consumers. Allowed under our "no backward compatibility" rule, but must be called out in the changelog and handled in the last, most careful wave.
 
 ## Branch & landing strategy
 
-- [x] Branch `refactor/Function-calling-1` created (off `refactor/Function-calling`) for this work. Each wave still lands as its own PR.
-- [ ] Each burn-down **wave** is its own PR (or a couple of small PRs), reviewed and merged before the next, to keep diffs reviewable and rebases cheap.
+- [x] Branch `refactor/Function-calling-1` created (off `refactor/Function-calling`) for this work.
+- **No PR per wave/checkpoint.** The agent does **not** commit, stage, or open PRs. Each wave's changes are left **uncommitted and unstaged** in the working tree at its checkpoint. The user reviews the working tree and commits/pushes the changes themselves before cold-starting the next phase.
+- Land each wave as a coherent, reviewable unit anyway: keep the working-tree diff scoped to one wave so the user's review and push stay clean.
 - [ ] Changelog entries go under the `[Unreleased]` section as waves land.
 
 ## Tooling approach
@@ -55,8 +56,8 @@ At each `🛑 CHECKPOINT`, the running agent **must stop** and, before ending th
 
 1. Run `make agent-check` and `make agent-test` — both must pass. Record the result.
 2. Run the guard in report mode and record the **remaining baseline count per package** in `wip/keyword-only-args/state.md`.
-3. Update this file's checkboxes and fill in the matching **Cold-start snapshot** block below with: what landed (commits/PRs), current package position, decisions & edge cases hit this session, any deferred items, and the exact next action.
-4. Commit the doc updates. The next session must be able to resume from `wip/keyword-only-args/state.md` + this tracker alone, with zero lost context.
+3. Update this file's checkboxes and fill in the matching **Cold-start snapshot** block below with: what landed (files changed, left uncommitted in the working tree), current package position, decisions & edge cases hit this session, any deferred items, and the exact next action.
+4. Update the doc but **leave everything uncommitted and unstaged** — including these doc updates. Do **not** commit, stage, or open a PR. The user reviews the whole working tree and commits/pushes before the next phase cold-starts. The next session must be able to resume from `wip/keyword-only-args/state.md` + this tracker alone, with zero lost context.
 
 ---
 
@@ -97,20 +98,20 @@ At each `🛑 CHECKPOINT`, the running agent **must stop** and, before ending th
 
 Order: `tools/` → (`types.py`, `config.py`, `urls.py`, `errors/`, `base_exceptions.py`, `exceptions.py`) → `reporting/` → `observer/` → `tracing/`.
 
-Per-package loop for each: apply `*` per the convention → `make agent-check` → fix flagged call sites to keyword form → run targeted tests → delete the package's baseline entries → `make agent-test` → commit.
+Per-package loop for each: apply `*` per the convention → `make agent-check` → fix flagged call sites to keyword form → run targeted tests → delete the package's baseline entries → `make agent-test`. Leave all changes uncommitted (no per-package commit) — the user reviews and pushes the whole wave at the checkpoint.
 
 - [ ] `tools/`
 - [ ] root modules: `types.py`, `config.py`, `urls.py`, `errors/`, `base_exceptions.py`, `exceptions.py`
 - [ ] `reporting/`
 - [ ] `observer/`
 - [ ] `tracing/`
-- [ ] Open Wave 1 PR(s); changelog under `[Unreleased]`.
+- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT B — Wave 1 landed
 
 **Cold-start snapshot (fill in at checkpoint):**
 
-- PR(s) merged:
+- What landed this wave (files changed, left uncommitted in the working tree):
 - Remaining baseline count (link to `state.md`):
 - Decisions / edge cases this wave:
 - Deferred / surprises:
@@ -120,19 +121,19 @@ Per-package loop for each: apply `*` per the convention → `make agent-check` �
 
 ## Phase 3 — Wave 2: domain core
 
-Order: `core/` → `language/` → `kit/` → `libraries/`. Same per-package loop. `core/` has many call sites — expect the largest call-site diff here; consider splitting `core/` into its own PR.
+Order: `core/` → `language/` → `kit/` → `libraries/`. Same per-package loop. `core/` has many call sites — expect the largest call-site diff here; consider handling `core/` as its own reviewable working-tree slice (its own checkpoint) so the user can review and push it on its own.
 
 - [ ] `core/`
 - [ ] `language/`
 - [ ] `kit/`
 - [ ] `libraries/`
-- [ ] Open Wave 2 PR(s); changelog under `[Unreleased]`.
+- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT C — Wave 2 landed
 
 **Cold-start snapshot (fill in at checkpoint):**
 
-- PR(s) merged:
+- What landed this wave (files changed, left uncommitted in the working tree):
 - Remaining baseline count (link to `state.md`):
 - Decisions / edge cases this wave:
 - Deferred / surprises:
@@ -146,13 +147,13 @@ Order: `cogt/` → `plugins/`. `plugins/` wraps external LLM SDKs — watch for 
 
 - [ ] `cogt/`
 - [ ] `plugins/`
-- [ ] Open Wave 3 PR(s); changelog under `[Unreleased]`.
+- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT D — Wave 3 landed
 
 **Cold-start snapshot (fill in at checkpoint):**
 
-- PR(s) merged:
+- What landed this wave (files changed, left uncommitted in the working tree):
 - Remaining baseline count (link to `state.md`):
 - Decisions / edge cases this wave (esp. plugin/SDK callback signatures):
 - Deferred / surprises:
@@ -169,13 +170,13 @@ Order: `pipe_operators/` → `pipe_controllers/` → `pipe_run/` → `pipeline/`
 - [ ] `pipe_run/`
 - [ ] `pipeline/`
 - [ ] `graph/`
-- [ ] Open Wave 4 PR(s); changelog under `[Unreleased]`.
+- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT E — Wave 4 landed
 
 **Cold-start snapshot (fill in at checkpoint):**
 
-- PR(s) merged:
+- What landed this wave (files changed, left uncommitted in the working tree):
 - Remaining baseline count (link to `state.md`):
 - Decisions / edge cases this wave:
 - Deferred / surprises:
@@ -192,13 +193,13 @@ Order: `builder/` → `temporal/` → `system/` → `cli/` → top-level `hub.py
 - [ ] `system/` — `ConfigModel` / boot path; run `make tb` (boot test) after, since config loading is signature-sensitive.
 - [ ] `cli/` — **carve out** Typer command functions; only touch plain helpers.
 - [ ] Public API surface: `hub.py`, `config.py`, `pipelex.py` — these break downstream consumers (`pipelex-api`, `pipelex-worker`, `n8n-nodes-pipelex`, cookbook/starter). Enumerate the changed public signatures and call them out explicitly in the changelog.
-- [ ] Open Wave 5 PR(s); changelog under `[Unreleased]` with a clear breaking-change note for public signatures.
+- [ ] Changelog under `[Unreleased]` with a clear breaking-change note for public signatures; leave the wave uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT F — Wave 5 landed, codebase clean
 
 **Cold-start snapshot (fill in at checkpoint):**
 
-- PR(s) merged:
+- What landed this wave (files changed, left uncommitted in the working tree):
 - Baseline should now be **empty** — confirm:
 - List of breaking public-API signature changes (for changelog / downstream repos):
 - Decisions / edge cases this wave (temporal/cli/builder carve-outs):
