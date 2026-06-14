@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import textwrap
 
-from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import (
+from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     Violation,
     find_violations_in_source,
 )

@@ -170,11 +170,12 @@ def normalize(cls, value, info): ...
 
 ## Enforcement
 
-The entire `pipelex/` source tree is compliant, so the guard hard-blocks on **any** violation — there is no baseline and no tolerated debt. The guard runs in three places:
+The entire `pipelex/` source tree is compliant, so the guard hard-blocks on **any** violation — there is no baseline and no tolerated debt. The guard runs at several gates:
 
-- `make agent-check` — the fast everyday gate, so a new violation surfaces in the tight edit loop.
+- A Claude Code `PostToolUse` hook (`.claude/hooks/check-keyword-only.sh`, wired in `.claude/settings.json`) — the tightest loop. After every `Edit`/`Write`/`MultiEdit` of a `pipelex/**/*.py` file it checks just that file and blocks with the offending signatures if it regressed, so an agent learns at edit time rather than at the end of the session. It runs the stdlib-only core by file path (no Typer/hub import), so it costs a few tens of milliseconds.
+- `make agent-check` — the fast everyday gate, so a new violation surfaces even outside Claude Code.
 - `make check` — the heavy aggregate gate.
-- CI — a dedicated lint job (`lint-keyword-only` in `.github/workflows/lint-check.yml`) gated by the required `Lint (all)` status check, so no non-compliant signature can merge.
+- CI — a dedicated lint job (`lint-keyword-only` in `.github/workflows/lint-check.yml`) gated by the required `Lint (all)` status check, so no non-compliant signature can merge. This is the hard guarantee; the hook and `make` gates are local conveniences layered on top.
 
 When you add or change a signature, place the bare `*` after the subject. If the type checker is blind to how a function is called (a framework or the interpreter invokes it positionally — a Jinja2 filter, an `__import__` hook, an aiohttp route handler, a PostHog `on_error` callback), the guard cannot detect that statically; the carve-outs above cover the known cases, and a genuinely justified one-off uses the `# kw-only: ignore` escape hatch. `make agent-test` is the safety net for these dynamic call surfaces — pyright/mypy will pass a wrongly-keywordized callback that the suite then catches at runtime.
 
@@ -183,4 +184,8 @@ Run the guard directly to see the full picture:
 ```bash
 make check-keyword-only            # alias: make cko — one line on pass, the full violation list on fail
 .venv/bin/pipelex-dev check-keyword-only --report   # full inventory grouped by package
+
+# Lean single-file check (what the PostToolUse hook runs): stdlib only, invoked by file path so it
+# skips the pipelex package import chain. Prints violations to stderr and exits 2, else exits 0.
+.venv/bin/python pipelex/cli/dev_cli/commands/keyword_only_guard.py pipelex/some/edited_file.py
 ```
