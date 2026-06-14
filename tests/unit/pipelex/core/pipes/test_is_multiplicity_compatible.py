@@ -36,7 +36,7 @@ class TestIsMultiplicityCompatible:
         expected: bool,
     ):
         """Test various multiplicity compatibility scenarios."""
-        result = is_multiplicity_compatible(source_multiplicity, target_multiplicity)
+        result = is_multiplicity_compatible(source_multiplicity, target_multiplicity=target_multiplicity)
         assert result == expected
 
     def test_false_is_not_compatible_with_variable_list(self):
@@ -46,11 +46,11 @@ class TestIsMultiplicityCompatible:
         because bool is a subclass of int in Python.
         """
         # False should be treated as "force single output", not as a valid multiplicity
-        assert is_multiplicity_compatible(False, True) is False
+        assert is_multiplicity_compatible(False, target_multiplicity=True) is False
 
     def test_false_is_compatible_with_none(self):
         """Test that False matches None semantically (both mean single item)."""
         # Note: The type system allows False as VariableMultiplicity, and semantically
         # False should mean "force single", which is compatible with None (single item)
         # This test documents the current behavior - False == None as integers
-        assert is_multiplicity_compatible(False, None) is False
+        assert is_multiplicity_compatible(False, target_multiplicity=None) is False

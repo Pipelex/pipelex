@@ -78,6 +78,7 @@ class StructureGenerator:
     def generate_from_structure_blueprint(
         self,
         class_name: str,
+        *,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
         description: str = "",
@@ -98,7 +99,9 @@ class StructureGenerator:
 
         """
         # Generate the class
-        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name, description)
+        class_code = self._generate_class_source_code_from_blueprint(
+            class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
+        )
 
         # Generate the complete module with a header comment
         imports_section = "\n".join(sorted(self.imports))
@@ -141,6 +144,7 @@ class StructureGenerator:
     def validate_generated_code(
         self,
         python_code: str,
+        *,
         expected_class_name: str,
         base_class_name: str | None = None,
     ) -> type:
@@ -204,7 +208,7 @@ class StructureGenerator:
             return self._escape_string_for_python(value)
         return repr(value)
 
-    def _format_class_docstring(self, docstring: str, indent: str = "    ") -> str:
+    def _format_class_docstring(self, docstring: str, *, indent: str = "    ") -> str:
         """Render a class docstring, wrapping it across multiple lines when the single-line
         form would exceed _MAX_LINE_LENGTH.
         """
@@ -245,6 +249,7 @@ class StructureGenerator:
     def _generate_class_source_code_from_blueprint(
         self,
         class_name: str,
+        *,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
         description: str = "",
@@ -293,7 +298,7 @@ class StructureGenerator:
         # Generate fields
         field_definitions: list[str] = []
         for field_name, field_blueprint in structure_blueprint.items():
-            field_code = self._generate_field_from_blueprint(field_name, field_blueprint)
+            field_code = self._generate_field_from_blueprint(field_name, field_blueprint=field_blueprint)
             field_definitions.append(field_code)
 
         if not field_definitions:
@@ -303,7 +308,7 @@ class StructureGenerator:
         fields_code = "\n".join(field_definitions)
         return class_header + "\n" + fields_code
 
-    def _generate_field_from_blueprint(self, field_name: str, field_blueprint: ConceptStructureBlueprint) -> str:
+    def _generate_field_from_blueprint(self, field_name: str, *, field_blueprint: ConceptStructureBlueprint) -> str:
         """Generate a field definition from ConceptStructureBlueprint.
 
         Args:
@@ -468,11 +473,11 @@ class StructureGenerator:
         # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
-            qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code)
+            qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code=concept_code)
             return f'"{qualified_name}"'
         return f'"{concept_code}"'
 
-    def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
+    def _generate_field(self, field_name: str, *, field_def: dict[str, Any] | str) -> str:
         """Generate a single field definition.
 
         Args:
@@ -499,7 +504,7 @@ class StructureGenerator:
             python_type = f"Literal[{', '.join(repr(c) for c in choices)}]"
         else:
             # Handle complex types or enum references
-            python_type = self._get_python_type(field_type, field_def)
+            python_type = self._get_python_type(field_type, field_def=field_def)
 
         # Make optional if not required
         if not required:
@@ -522,7 +527,7 @@ class StructureGenerator:
 
         return f"    {field_name}: {python_type} = {field_call}"
 
-    def _get_python_type(self, field_type: Any, field_def: dict[str, Any]) -> str:
+    def _get_python_type(self, field_type: Any, *, field_def: dict[str, Any]) -> str:
         """Convert high-level type to Python type annotation.
 
         Args:
@@ -583,7 +588,7 @@ class StructureGenerator:
                 if isinstance(item_type, str):
                     try:
                         item_type_enum = ConceptStructureBlueprintFieldType(item_type)
-                        item_type = self._get_python_type(item_type_enum, {})
+                        item_type = self._get_python_type(item_type_enum, field_def={})
                     except ValueError:
                         # Keep as string if not a known FieldType
                         pass
@@ -595,13 +600,13 @@ class StructureGenerator:
                 if isinstance(key_type, str):
                     try:
                         key_type_enum = ConceptStructureBlueprintFieldType(key_type)
-                        key_type = self._get_python_type(key_type_enum, {})
+                        key_type = self._get_python_type(key_type_enum, field_def={})
                     except ValueError:
                         pass
                 if isinstance(value_type, str):
                     try:
                         value_type_enum = ConceptStructureBlueprintFieldType(value_type)
-                        value_type = self._get_python_type(value_type_enum, {})
+                        value_type = self._get_python_type(value_type_enum, field_def={})
                     except ValueError:
                         pass
                 return f"Dict[{key_type}, {value_type}]"
@@ -609,6 +614,7 @@ class StructureGenerator:
     def _validate_execution(
         self,
         python_code: str,
+        *,
         expected_class_name: str,
         base_class_name: str | None = None,
     ) -> type:

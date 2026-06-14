@@ -1,6 +1,8 @@
 # Keyword-only arguments — cold-start state
 
-Status: **Checkpoint B VERIFIED — Wave 1 landed** (branch `refactor/Function-calling-3`, all uncommitted). Guard built (Checkpoint A); rule strictness + gate placement confirmed; `convention.md` correct. Phase 1 committed earlier (`d18a63fc`, `a58456f3`); `dev` merged twice (v0.31.0, v0.33.0 at `fc23505c8`), baseline reconciled at each (812 → 822 → 844). **Wave 1 (`tools/` + `errors/` + `reporting/` + `observer/` + `tracing/`) now converted: 844 → 690.** `make agent-check` clean (pyright 0, mypy 2190 ok, guard PASSED 690 known-debt); full `make agent-test` GREEN; guard unit tests 32/32. Baseline regenerated (690 entries, all Wave 1 packages pruned). Next: Wave 2 (domain core: `core/` → `language/` → `kit/` → `libraries/`).
+Status: **Checkpoint C VERIFIED — Wave 2 landed** (branch `refactor/Function-calling-4`, all uncommitted). Guard built (Checkpoint A); Wave 1 committed by the user (`5ea35a319 Phase 2 — Wave 1`). **Wave 2 (`core/` + `language/` + `kit/` + `libraries/`) now converted: 690 → 540** (150 cleared = the exact Wave 2 target core 110 + language 4 + kit 8 + libraries 28). `make agent-check` clean (pyright 0, mypy 2190 ok, guard PASSED 540 known-debt); full `make agent-test` GREEN (exit 0). Baseline regenerated (540 entries, all four Wave 2 packages pruned to 0). Next: Wave 3 (inference layer: `cogt/` → `plugins/`).
+
+**Wave 2 was executed via a Workflow** (user requested multi-agent orchestration). Approach that worked: (1) a guard-driven signature-edit fan-out — file-disjoint editors add the bare `*` to all 150 flagged funcs in one barrier; (2) a pyright-driven converge step — I run whole-repo pyright myself in the main loop (the global oracle stays deterministic and in my hands), then a Workflow fans out one batched fixer per broken file (call sites → keyword form; `@override` impls → matching `*`). See the "Workflow execution notes" section below for the rate-limit lesson.
 
 This is the running cold-start log for the keyword-only-arguments refactor. Read this file plus [`../../TODOS.md`](../../TODOS.md) and you have everything needed to resume with zero lost context. The convention itself lives in [`convention.md`](convention.md).
 
@@ -21,31 +23,30 @@ The guard currently passes against its own baseline (all current violations know
 
 ## Per-package violation inventory (baseline)
 
-Current baseline total after Wave 1: **690** (down from the 844 waterline; Wave 1 removed `tools` 136 + `errors` 5 + `reporting` 5 + `observer` 2 + `tracing` 6 = 154). Wave 1 packages are fully pruned from the baseline.
+Current baseline total after Wave 2: **540** (down from the 690 Wave-1 waterline; Wave 2 removed `core` 110 + `language` 4 + `kit` 8 + `libraries` 28 = 150). Wave 1 + Wave 2 packages are fully pruned from the baseline.
 
 | Package | Violations | Wave |
 | --- | --- | --- |
 | `cogt` | 139 | 3 |
 | `cli` | 111 | 5 |
-| `core` | 110 | 2 |
 | `plugins` | 50 | 3 |
 | `system` | 44 | 5 |
 | `pipe_operators` | 40 | 4 |
 | `graph` | 39 | 4 |
 | `temporal` | 39 | 5 |
-| `libraries` | 28 | 2 |
 | `builder` | 21 | 5 |
 | `pipe_run` | 16 | 4 |
 | `pipeline` | 15 | 4 |
 | `runtime_bridge` | 13 | 4 (with pipe_run/pipeline helpers) |
-| `kit` | 8 | 2 |
 | `pipe_controllers` | 6 | 4 |
 | `<root>` (`hub.py` ×1, `pipelex.py` ×3) | 4 | 5 (public API) |
-| `language` | 4 | 2 |
 | `pipe_signature` | 2 | (its own / Wave 4) |
 | `test_extras` | 1 | (shipped pytest plugin) |
 
-**Wave 1 DONE (was, now 0):** `tools` 136→0, `errors` 5→0, `reporting` 5→0, `observer` 2→0, `tracing` 6→0.
+**Wave 1 DONE (now 0):** `tools` 136→0, `errors` 5→0, `reporting` 5→0, `observer` 2→0, `tracing` 6→0.
+**Wave 2 DONE (now 0):** `core` 110→0, `language` 4→0, `kit` 8→0, `libraries` 28→0.
+
+Note `pipe_operators` (40), `pipe_controllers` (6), and `pipe_signature` (2) still show their full counts: Wave 2 touched only the `@override` impls in those packages (forced to match the now-keyword-only `core/` bases — `@override` defs are guard-carved-out, so they never counted toward the baseline). Their own non-override signatures remain Wave 4 debt.
 
 Note the `<root>` 4 are all public-API (`hub.py`, `pipelex.py`) — Wave 1's nominal "root modules" (`types.py`, `config.py`, `urls.py`, `base_exceptions.py`, `exceptions.py`) had **zero** violations, so the only root-level work is the public surface, correctly deferred to Wave 5.
 
@@ -73,11 +74,11 @@ These are the burn-down targets ordered into waves in [`README.md`](README.md). 
 
 ## Current position
 
-**Checkpoint B VERIFIED — Wave 1 landed, all uncommitted on `refactor/Function-calling-3`.** Wave 1 converted `tools/`, `errors/`, `reporting/`, `observer/`, `tracing/` (baseline 844 → 690). `make agent-check` and full `make agent-test` both green; guard unit tests 32/32. Files changed in the working tree: the ~40 source files in those packages (signatures), their call sites tree-wide (incl. `tests/` and a handful of cross-package callers in `cli/`, `cogt/`, `core/`, `system/`, `libraries/`), the `@override` impl signatures forced by the base changes (`core/stuffs/*`, `builder/pipe/*`, `builder/*` `rendered_pretty`; `core/memory/working_memory.py`; `tools/secrets/env_secrets_provider.py`), the guard (`check_keyword_only_cmd.py` — jinja2 carve-out) + its tests, `convention.md`, `CHANGELOG.md`, the regenerated `violations-baseline.txt` (690) + `inventory.json`, this file, and `TODOS.md`. **Next: Wave 2** — domain core `core/` → `language/` → `kit/` → `libraries/` (Phase 3). `core/` (110) is the biggest call-site diff in the project; consider giving it its own reviewable slice.
+**Checkpoint C VERIFIED — Wave 2 landed, all uncommitted on `refactor/Function-calling-4`.** Wave 2 converted `core/`, `language/`, `kit/`, `libraries/` (baseline 690 → 540, 150 cleared). `make agent-check` (pyright 0, mypy 2190 ok, guard PASSED 540) and full `make agent-test` (exit 0) both green. Working-tree diff (~108 files): the 50 source files in those four packages (signatures), their call sites tree-wide (incl. `tests/`), the `@override` impl signatures forced by the now-keyword-only `core/` bases (`pipe_operators/*` ×16, `pipe_controllers/*` ×9, `pipe_signature/*` ×2, plus `core/stuffs/*` content impls and the `StructureGenerator` codegen surface), the two `render_with_images` docs (`docs/under-the-hood/image-handling-in-llm-prompts.md`, `stuffartefact-and-image-rendering.md`), `CHANGELOG.md`, the regenerated `violations-baseline.txt` (540), this file, and `TODOS.md`. **Next: Wave 3** — inference layer `cogt/` (139) → `plugins/` (50) (Phase 4). `plugins/` wraps external LLM SDKs — watch for adapter functions handed to SDK callbacks (carve out / allowlist as needed).
 
-**Exception-2 directional-pair resolution (decided in Wave 1):** `copy_file`, `has_diff_dirs`, `sync_toml_values` were all resolved by the simple reshape — subject stays positional, the second operand and all options become keyword-only (`copy_file(source_path, *, target_path, overwrite=True)`). We did NOT extend the allowlist with a per-entry leading-positional-count; the reshape is fully compliant and the src/dst split at call sites reads fine. Apply the same reshape to any future directional-pair-plus-options helper.
+**Exception-2 directional-pair resolution (decided in Wave 1):** `copy_file`, `has_diff_dirs`, `sync_toml_values` were all resolved by the simple reshape — subject stays positional, the second operand and all options become keyword-only (`copy_file(source_path, *, target_path, overwrite=True)`). We did NOT extend the allowlist with a per-entry leading-positional-count; the reshape is fully compliant and the src/dst split at call sites reads fine. Apply the same reshape to any future directional-pair-plus-options helper. **Wave 2 hit the recurrence:** `LibraryManager._load_address_based_dependency` already carried a `*` but with two params before it (`library`, `full_address`) — the existing-`*` trap. The single call site was already all-keyword, so the fix was to move the `*` up to right after the `library` subject.
 
-**Wave 2 pre-flagged gotcha — `render_with_images` Protocol/impl split:** the `ImageRenderable` Protocol (`tools/jinja2/image_renderable.py`, Wave 1) is already keyword-only on `text_format`, but its five concrete impls (`core/stuffs/{structured,list,image,text_and_images}_content.py`, `stuff_artefact.py`) are still positional and sit in the baseline as Wave 2 debt — this is expected drift, not a bug, and it does NOT touch the Jinja2 filters (`render_with_images` is called by our own code, always with `text_format=`, never invoked positionally by Jinja2). When Wave 2 adds the bare `*` to those impls, also fix the positional callers that live OUTSIDE the guard's scope: the positional `render_with_images(registry, TextFormat.PLAIN)` calls in `tests/unit/pipelex/core/stuffs/test_structured_content_render_with_images.py` (these `agent-test` will catch), and the positional examples in `docs/under-the-hood/image-handling-in-llm-prompts.md` and `docs/under-the-hood/stuffartefact-and-image-rendering.md` (NOTHING catches these — docs are invisible to both the guard and the suite).
+**Wave 2 pre-flagged gotcha — `render_with_images` Protocol/impl split (RESOLVED):** the five concrete impls (`core/stuffs/{structured,list,image,text_and_images}_content.py`, `stuff_artefact.py`) now match the already-keyword-only `ImageRenderable` Protocol (`render_with_images(self, registry, *, text_format)`). Positional callers in `tests/unit/pipelex/core/stuffs/test_structured_content_render_with_images.py` were keywordized by the converge loop (`agent-test` confirms green); the positional examples in the two `docs/under-the-hood/*.md` files — which nothing automated catches — were fixed by hand to the `text_format=` keyword form. Lesson for future waves: any function whose Protocol/base was made keyword-only in an earlier wave will have doc examples that only a manual grep (`grep -rn '<func_name>' docs/`) will catch.
 
 **Execution recipe that worked for Wave 1 (reuse for later waves):**
 
@@ -88,6 +89,15 @@ These are the burn-down targets ordered into waves in [`README.md`](README.md). 
 5. `make agent-check` until clean (pyright + mypy + guard).
 6. **`make agent-test` is non-negotiable** — pyright/mypy are BLIND to dynamic positional invocation (Jinja2 filters, `getattr`, `**kwargs` forwarding, `functools.partial`). Wave 1's 513-failure regression came entirely from the Jinja2 filter path and would have shipped on a green agent-check. Marker: `-m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"`.
 7. `.venv/bin/pipelex-dev check-keyword-only --regen-baseline` to prune the now-fixed entries, then `make cko` to confirm the guard is green against the shrunk baseline.
+
+## Workflow execution notes (Wave 2 — reuse for the big remaining waves)
+
+Wave 2 was run as a Workflow at the user's request, and the pattern is worth reusing for the large waves (Wave 3 = `cogt` 139 + `plugins` 50 = 189; Wave 5 = `cli` 111 + `system` 44 + `temporal` 39 + `builder` 21 + root 4). What worked:
+
+- **Phase split: guard-driven signatures, then pyright-driven fixes.** One barrier of file-disjoint signature editors (each owns a fixed set of files, adds the bare `*` to the funcs the guard flags — pure signature edits, no call-site changes). Then the converge.
+- **Keep pyright (the global oracle) in the MAIN loop, not inside the workflow.** Run `.venv/bin/pyright -p <ROOT> --outputjson` yourself, bucket actionable errors by file (drop `reportUnknown*` / missing-stub noise — it clears once calls type-check), write the buckets to a file, and launch a Workflow that ONLY fans out batched fixers over those buckets. Re-run pyright yourself; repeat until 0 actionable. This makes each workflow invocation a single bounded fan-out and lets you decide convergence deterministically. The reusable fixer script is saved at `…/workflows/scripts/kw-only-fix-step-*.js` (re-invoke with `{scriptPath, args:{bucketsPath, batchSize}}`).
+- **RATE LIMIT — the one real lesson.** The first attempt put the whole converge loop *inside* one workflow (pyright agent + one-fixer-per-file, looping internally). That produced a 97-agent / 2.4M-token burst in ~8 min and tripped a **server-side** rate limit ("Server is temporarily limiting requests · not your usage limit", distinct from the user usage limit) — round-2 pyright and ~70 fixers died. It was NOT wasted: signature edits + partial round-1 fixes persisted on disk (294 → 153 actionable), and the work resumed cleanly. Mitigation that fixed it: (1) drive the loop from the main loop (bursts separated by your own pyright run), and (2) **batch ~5 files per fixer agent** instead of one-per-file — cut the fan-out from ~73 agents to ~14. Batched fixers stay file-disjoint (partition the broken-file list into disjoint groups), so still race-free. A single gentle wave of ~14 batched fixers fixed 149/153 in one shot with 0 failed batches.
+- **The 1 that slips through.** After the converge, the guard may still show a tiny remainder (Wave 2: 1 `libraries` func). It is the existing-`*` trap — a function pyright never flagged (its call site already type-checked) so no fixer touched it, and the signature editor mis-skipped it on a naive "already has a `*`" check. Always finish with `--report` and hand-fix the residual.
 
 ## Resume commands
 

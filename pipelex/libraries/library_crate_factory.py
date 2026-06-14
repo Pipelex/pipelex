@@ -150,6 +150,7 @@ class LibraryCrateFactory:
     def _reconcile_pipe_collision(
         cls,
         pipe_ref: str,
+        *,
         existing: PipeDeclaration,
         incoming: PipeDeclaration,
         domain_code: str,
@@ -181,7 +182,7 @@ class LibraryCrateFactory:
             )
 
         # At least one is a signature: the declarations' contracts must match (normalized identity).
-        if not contracts_match(existing.blueprint, incoming.blueprint, domain_code=domain_code):
+        if not contracts_match(existing.blueprint, incoming=incoming.blueprint, domain_code=domain_code):
             raise PipeLibraryError(cls._contract_mismatch_msg(pipe_ref=pipe_ref, existing=existing, incoming=incoming))
 
         # A concrete definition beats a forward declaration.
@@ -200,7 +201,7 @@ class LibraryCrateFactory:
         return (declaration.blueprint.model_dump_json(), declaration.source or "")
 
     @staticmethod
-    def _contract_mismatch_msg(pipe_ref: str, existing: PipeDeclaration, incoming: PipeDeclaration) -> str:
+    def _contract_mismatch_msg(pipe_ref: str, *, existing: PipeDeclaration, incoming: PipeDeclaration) -> str:
         return (
             f"Pipe '{pipe_ref}' is declared with mismatched contracts: "
             f"'{existing.source or 'unknown'}' has inputs={existing.blueprint.inputs or {}}, output='{existing.blueprint.output}' "

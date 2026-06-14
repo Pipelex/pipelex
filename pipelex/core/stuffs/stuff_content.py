@@ -61,7 +61,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         """
         return f"<pre>{self.rendered_json()}</pre>"
 
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:  # noqa: ARG002
         """Render content as Markdown for documentation or LLM prompts.
 
         Defaults to JSON in a code block. Override in subclasses for custom Markdown output.
@@ -110,7 +110,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         """Default HTML rendering - subclasses can override for custom rendering."""
         return self.rendered_html()
 
-    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, level: int = 1, *, is_pretty: bool = False) -> str:
         """Default Markdown rendering - subclasses can override for custom rendering."""
         return self.rendered_markdown(level=level, is_pretty=is_pretty)
 

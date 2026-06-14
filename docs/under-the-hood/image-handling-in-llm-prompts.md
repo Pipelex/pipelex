@@ -332,11 +332,11 @@ The `with_images` filter uses the `ImageRenderable` protocol to handle StuffArte
 ```python
 # StuffArtefact implements ImageRenderable
 if isinstance(value, ImageRenderable):
-    return value.render_with_images(registry, text_format)
+    return value.render_with_images(registry, text_format=text_format)
 
 # StuffArtefact.render_with_images() delegates to content
-def render_with_images(self, registry, text_format) -> str:
-    return self._stuff.content.render_with_images(registry, text_format)
+def render_with_images(self, registry, *, text_format) -> str:
+    return self._stuff.content.render_with_images(registry, text_format=text_format)
 ```
 
 !!! note "ImageRenderable Protocol"

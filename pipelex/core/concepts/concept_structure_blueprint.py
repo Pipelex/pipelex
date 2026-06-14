@@ -161,30 +161,30 @@ class ConceptStructureBlueprint(BaseModel):
         match self.type:
             case ConceptStructureBlueprintFieldType.TEXT:
                 if not isinstance(self.default_value, str):
-                    self._raise_type_mismatch_error("str", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("str", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.INTEGER:
                 if not isinstance(self.default_value, int):
-                    self._raise_type_mismatch_error("int", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("int", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 if not isinstance(self.default_value, bool):
-                    self._raise_type_mismatch_error("bool", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("bool", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
-                    self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("number (int or float)", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.LIST:
                 if not isinstance(self.default_value, list):
-                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("list", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.DICT:
                 if not isinstance(self.default_value, dict):
-                    self._raise_type_mismatch_error("dict", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("dict", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
-                    self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("date", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 # This case is here for exhaustiveness
                 pass
 
-    def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
+    def _raise_type_mismatch_error(self, expected_type_name: str, *, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         raise ValueError(msg)

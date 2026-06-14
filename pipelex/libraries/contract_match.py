@@ -56,7 +56,7 @@ def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:
     return f"{ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=ref.local_code)}{suffix}"
 
 
-def contracts_match(existing: PipeBlueprint, incoming: PipeBlueprint, *, domain_code: str) -> bool:
+def contracts_match(existing: PipeBlueprint, *, incoming: PipeBlueprint, domain_code: str) -> bool:
     """True if two declarations of the same pipe denote the same contract after normalization.
 
     Both declarations share ``domain_code`` (they collided on the same qualified ``pipe_ref``), so

@@ -100,4 +100,4 @@ class TestRefinesCustomConcept:
         vip_customer_concept = library.concept_library.get_required_concept("refines_custom_test.VIPCustomer")
 
         # VIPCustomer should be compatible with Customer (it refines Customer)
-        assert Concept.are_concept_compatible(vip_customer_concept, customer_concept)
+        assert Concept.are_concept_compatible(vip_customer_concept, concept_2=customer_concept)

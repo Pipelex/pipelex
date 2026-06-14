@@ -93,7 +93,7 @@ class TestMakeVariableMultiplicity:
         assert result == 3
 
         # Test with positional arguments
-        result = make_variable_multiplicity(5, False)
+        result = make_variable_multiplicity(5, multiple_items=False)
         assert result == 5
 
         # Test with mixed arguments

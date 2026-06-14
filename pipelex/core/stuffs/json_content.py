@@ -38,7 +38,7 @@ class JSONContent(StuffContent):
         return html
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
         return convert_to_markdown(data=self.json_obj, level=level, is_pretty=is_pretty)
 
     @override

@@ -116,13 +116,13 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         if MAIN_STUFF_NAME in self.root:
             del self.root[MAIN_STUFF_NAME]
 
-    def set_stuff(self, name: str, stuff: Stuff):
+    def set_stuff(self, name: str, *, stuff: Stuff):
         self.root[name] = stuff
 
     def is_stuff_exists(self, name: str) -> bool:
         return name in self.root or name in self.aliases
 
-    def add_new_stuff(self, name: str, stuff: Stuff, aliases: list[str] | None = None):
+    def add_new_stuff(self, name: str, *, stuff: Stuff, aliases: list[str] | None = None):
         # TODO: Add unit tests for this method
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
             msg = f"Stuff code '{stuff.stuff_code}' is already used by another stuff"
@@ -141,9 +141,9 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         self.set_stuff(name=name, stuff=stuff)
         if aliases:
             for alias in aliases:
-                self.set_alias(alias, name)
+                self.set_alias(alias, target=name)
 
-    def set_new_main_stuff(self, stuff: Stuff, name: str | None = None):
+    def set_new_main_stuff(self, stuff: Stuff, *, name: str | None = None):
         # TODO: Add unit tests for this method
         if name:
             self.remove_main_stuff()
@@ -154,7 +154,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
             log.verbose(f"Setting new main stuff (unnamed): {stuff.concept.code} = '{stuff.short_desc}'")
 
-    def set_alias(self, alias: str, target: str) -> None:
+    def set_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias == target:
             msg = f"Cannot create alias '{alias}' pointing to itself"
@@ -164,7 +164,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             raise WorkingMemoryConsistencyError(msg)
         self.aliases[alias] = target
 
-    def add_alias(self, alias: str, target: str) -> None:
+    def add_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias in self.root:
             msg = f"Cannot add alias '{alias}' as it already exists"
@@ -326,7 +326,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
         return top_level_content
 
-    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], wanted_type: type[Any] | None) -> list[Any] | None:
+    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], *, wanted_type: type[Any] | None) -> list[Any] | None:
         """Extract items from ListContent with optional type validation.
 
         Used to collect specific content types (e.g., Images, Documents) from lists
@@ -367,17 +367,17 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     # Stuff accessors
     ################################################################################################
 
-    def get_stuff_as(self, name: str, content_type: type[StuffContentType]) -> StuffContentType:
+    def get_stuff_as(self, name: str, *, content_type: type[StuffContentType]) -> StuffContentType:
         """Get stuff content as StuffContentType."""
         return self.get_stuff(name=name).content_as(content_type=content_type)
 
-    def get_stuff_as_list(self, name: str, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+    def get_stuff_as_list(self, name: str, *, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
         """Get stuff content as ListContent with items of type StuffContentType.
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.get_stuff(name=name).as_list_of_fixed_content_type(item_type=item_type)
 
-    def get_list_stuff_first_item_as(self, name: str, item_type: type[StuffContentType]) -> StuffContentType:
+    def get_list_stuff_first_item_as(self, name: str, *, item_type: type[StuffContentType]) -> StuffContentType:
         """Get stuff content as ListContent with items of type StuffContentType then return the first item."""
         return self.get_stuff_as_list(name=name, item_type=item_type).items[0]
 

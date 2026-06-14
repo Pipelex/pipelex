@@ -96,7 +96,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                 del self.root[concept_ref]
 
     @override
-    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
+    def is_compatible(self, tested_concept: Concept, *, wanted_concept: Concept, strict: bool = False) -> bool:
         return Concept.are_concept_compatible(
             concept_1=tested_concept,
             concept_2=wanted_concept,
@@ -145,7 +145,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         return [self.get_native_concept(native_concept=native_concept) for native_concept in NativeConceptCode.values_list()]
 
     @override
-    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, search_domain_codes: list[str] | None = None) -> Concept:
+    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, *, search_domain_codes: list[str] | None = None) -> Concept:
         try:
             validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
@@ -188,7 +188,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
 
-    def add_dependency_concept(self, alias: str, concept: Concept) -> None:
+    def add_dependency_concept(self, alias: str, *, concept: Concept) -> None:
         """Add a concept from a dependency package with an aliased key.
 
         Args:

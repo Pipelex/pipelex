@@ -212,7 +212,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             "compose_mode": "template",
             "rendered_text": rendered_template_text,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeComposeOutput(
             working_memory=working_memory,
@@ -264,7 +264,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             "compose_mode": "construct",
             "fields": composer.field_resolutions,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeComposeOutput(
             working_memory=working_memory,
@@ -333,12 +333,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

@@ -46,7 +46,7 @@ class TestCollectPossibleOutputsCondition:
         }
         get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET, return_value=mapped_pipe)
 
-        result = _collect_possible_outputs(condition_pipe, ConceptRepresentationFormat.JSON)
+        result = _collect_possible_outputs(condition_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert result == [{"concept_ref": "test.Summary", "content": {"text": "summary text"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="make_summary")
@@ -66,7 +66,7 @@ class TestCollectPossibleOutputsCondition:
 
         mocker.patch(GET_REQUIRED_PIPE_TARGET, side_effect=resolve_pipe)
 
-        result = _collect_possible_outputs(condition_pipe, ConceptRepresentationFormat.JSON)
+        result = _collect_possible_outputs(condition_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert [entry["content"]["from"] for entry in result] == ["alpha_branch", "mid_branch", "zeta_branch"]
 
@@ -78,7 +78,7 @@ class TestCollectPossibleOutputsCondition:
         mapped_pipe.output.render_stuff_spec.return_value = rendered_dict
         mocker.patch(GET_REQUIRED_PIPE_TARGET, return_value=mapped_pipe)
 
-        result = _collect_possible_outputs(condition_pipe, ConceptRepresentationFormat.SCHEMA)
+        result = _collect_possible_outputs(condition_pipe, output_format=ConceptRepresentationFormat.SCHEMA)
 
         assert result == [{"concept_ref": "test.Schema", "content": rendered_dict}]
 

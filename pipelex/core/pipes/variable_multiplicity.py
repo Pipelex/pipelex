@@ -19,7 +19,7 @@ class VariableMultiplicityResolution(BaseModel):
     specific_output_count: int | None = Field(default=None, description="Exact number of items to expect/generate, if specified")
 
 
-def make_variable_multiplicity(nb_items: int | None, multiple_items: bool | None) -> VariableMultiplicity | None:
+def make_variable_multiplicity(nb_items: int | None, *, multiple_items: bool | None) -> VariableMultiplicity | None:
     """This function takes two mutually exclusive parameters that control how many items a variable can have
     and converts them into a single VariableMultiplicity type.
 
@@ -110,7 +110,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
     return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
 
 
-def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
+def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, *, target_multiplicity: VariableMultiplicity | None) -> bool:
     """Check if a source multiplicity is compatible with a target multiplicity.
 
     This is used to validate that a pipe's output multiplicity can fulfill a required output multiplicity.
@@ -167,7 +167,7 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
     return source_multiplicity == target_multiplicity
 
 
-def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: VariableMultiplicity | None) -> str:
+def format_concept_with_multiplicity(concept_code_or_string: str, *, multiplicity: VariableMultiplicity | None) -> str:
     """Format a concept code or string with multiplicity notation.
 
     This is the reverse operation of parse_concept_with_multiplicity.

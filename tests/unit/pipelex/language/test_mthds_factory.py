@@ -129,7 +129,7 @@ class TestMthdsFactoryUnit:
 
         input_dict = {"key2": "value2", "key1": "value1", "key3": "value3"}
         field_ordering = ["key1", "key3"]
-        result = MthdsFactory.convert_dicts_to_inline_tables(input_dict, field_ordering)
+        result = MthdsFactory.convert_dicts_to_inline_tables(input_dict, field_ordering=field_ordering)
 
         assert isinstance(result, tomlkit.items.InlineTable)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         # All input keys must be present in the result
@@ -181,7 +181,7 @@ class TestMthdsFactoryUnit:
         """Test that all input fields are preserved in the output regardless of field_ordering."""
         _mock_config = mocker.patch.object(MthdsFactory, "_mthds_config", return_value=mock_mthds_config)
 
-        result = MthdsFactory.convert_dicts_to_inline_tables(input_dict, field_ordering or None)
+        result = MthdsFactory.convert_dicts_to_inline_tables(input_dict, field_ordering=field_ordering or None)
 
         assert isinstance(result, tomlkit.items.InlineTable)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         result_keys = set(result.keys())
@@ -250,7 +250,7 @@ class TestMthdsFactoryUnit:
         mapping = {"field3": "value3", "field1": "value1", "field2": "value2"}
         field_ordering = ["field1", "field2"]
 
-        result = MthdsFactory.convert_mapping_to_table(mapping, field_ordering)
+        result = MthdsFactory.convert_mapping_to_table(mapping, field_ordering=field_ordering)
 
         assert isinstance(result, tomlkit.items.Table)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
         # Check ordering (note: tomlkit preserves insertion order)

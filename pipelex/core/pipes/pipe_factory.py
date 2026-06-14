@@ -27,6 +27,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
     def make(
         cls,
         pipe_category: Any,
+        *,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
@@ -39,13 +40,14 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
 
 class PipeFactory(Generic[PipeAbstractType]):
     @classmethod
-    def make_pipe_ref_with_domain(cls, domain_code: str, pipe_code: str) -> str:
+    def make_pipe_ref_with_domain(cls, domain_code: str, *, pipe_code: str) -> str:
         return f"{domain_code}.{pipe_code}"
 
     @classmethod
     def make_from_blueprint(
         cls,
         domain_code: str,
+        *,
         pipe_code: str,
         blueprint: PipeBlueprint,
         concept_codes_from_the_same_domain: list[str] | None = None,

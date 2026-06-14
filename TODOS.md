@@ -124,21 +124,22 @@ Per-package loop for each: apply `*` per the convention → `make agent-check` �
 
 Order: `core/` → `language/` → `kit/` → `libraries/`. Same per-package loop. `core/` has many call sites — expect the largest call-site diff here; consider handling `core/` as its own reviewable working-tree slice (its own checkpoint) so the user can review and push it on its own.
 
-- [ ] `core/`
-- [ ] `language/`
-- [ ] `kit/`
-- [ ] `libraries/`
-- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
+- [x] `core/` — 110 cleared.
+- [x] `language/` — 4 cleared.
+- [x] `kit/` — 8 cleared.
+- [x] `libraries/` — 28 cleared.
+- [x] Changelog under `[Unreleased]` (Changed section); left uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT C — Wave 2 landed
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint C reached & verified (2026-06-14):**
 
-- What landed this wave (files changed, left uncommitted in the working tree):
-- Remaining baseline count (link to `state.md`):
-- Decisions / edge cases this wave:
-- Deferred / surprises:
-- Next action:
+- **What landed (all uncommitted on `refactor/Function-calling-4`):** Wave 2 converted `core/` + `language/` + `kit/` + `libraries/` to keyword-only — baseline **690 → 540** (150 cleared, the exact Wave 2 target). Working-tree diff (~108 files): the 50 source files in those four packages (bare `*` after subject), their call sites tree-wide (incl. `tests/`), the `@override` impl signatures forced by the now-keyword-only `core/` bases (`pipe_operators/*` ×16, `pipe_controllers/*` ×9, `pipe_signature/*` ×2 — all guard-carved-out, so they don't move the baseline but need the `*` for pyright parity; plus `core/stuffs/*` content impls and the `StructureGenerator` codegen surface), the five `render_with_images` impls aligned to the already-keyword-only `ImageRenderable` Protocol, the two `render_with_images` docs (`docs/under-the-hood/{image-handling-in-llm-prompts,stuffartefact-and-image-rendering}.md`), `CHANGELOG.md`, regenerated `violations-baseline.txt` (540), `wip/keyword-only-args/state.md`, and this file.
+- **Verification:** `make agent-check` green (pyright 0, mypy 2190 ok, guard PASSED 540 known-debt); full `make agent-test` GREEN (exit 0).
+- **Remaining baseline:** 540 — per-package table in [`state.md`](wip/keyword-only-args/state.md). All four Wave 2 packages fully pruned to 0.
+- **Decisions / edge cases this wave:** (1) **Executed via a Workflow** (user request) — guard-driven signature fan-out, then a pyright-driven converge with pyright kept in the main loop and batched fixers fanned out per step. The full rate-limit lesson (a 97-agent in-workflow loop tripped a *server-side* rate limit; mitigation = main-loop-driven loop + ~5-files-per-fixer batching) is recorded in `state.md` → "Workflow execution notes". (2) **Override cascade is the bulk of the cross-package diff** — making `PipeAbstract._validate_*` / `_register_execution_data`, `StuffContent.rendered_markdown(_async)`, `LibraryManagerAbstract` loaders, and `PipeFactoryProtocol` keyword-only forced matching `*` on every `@override` impl in `pipe_operators/`, `pipe_controllers/`, `pipe_signature/`; correct and expected (those packages' own non-override sigs stay Wave 4). (3) **existing-`*` trap recurred** — `LibraryManager._load_address_based_dependency` had a `*` after two positionals; moved it up (call site was already all-keyword).
+- **Deferred / surprises:** the `render_with_images` doc examples (invisible to both guard and suite) were the only thing nothing automated caught — fixed by hand. No deferred design tradeoffs this wave.
+- **Next action:** Begin **Wave 3 / Phase 4** — inference layer `cogt/` (139) → `plugins/` (50). `plugins/` wraps external LLM SDKs — watch for adapter functions handed to SDK callbacks (carve out / allowlist as needed). Reuse the "Workflow execution notes" recipe in `state.md` (it scales to Wave 3's 189-violation size). **Nothing is committed; the user reviews the working tree and pushes before Wave 3 cold-starts.**
 
 ---
 

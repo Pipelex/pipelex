@@ -34,6 +34,7 @@ def _blueprint_to_metadata(blueprint: PipelexBundleBlueprint) -> BundleMetadata:
 
 def make_visibility_checker(
     manifest: MethodsManifest | None,
+    *,
     blueprints: list[PipelexBundleBlueprint],
 ) -> PackageVisibilityChecker:
     """Create a PackageVisibilityChecker from pipelex blueprints.
@@ -51,6 +52,7 @@ def make_visibility_checker(
 
 def check_visibility_for_blueprints(
     manifest: MethodsManifest | None,
+    *,
     blueprints: list[PipelexBundleBlueprint],
 ) -> list[VisibilityError]:
     """Convenience function: check visibility for pipelex blueprints.

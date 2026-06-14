@@ -68,25 +68,25 @@ def _remove_internal_fields(schema: dict[str, Any]) -> dict[str, Any]:
     root_props = schema.get("properties", {})
     for field_name in _INTERNAL_FIELDS:
         root_props.pop(field_name, None)
-    _remove_from_required(schema, _INTERNAL_FIELDS)
+    _remove_from_required(schema, field_names=_INTERNAL_FIELDS)
 
     # Remove internal fields from all definitions
     for def_name, def_schema in definitions.items():
         props = def_schema.get("properties", {})
         for field_name in _INTERNAL_FIELDS:
             props.pop(field_name, None)
-        _remove_from_required(def_schema, _INTERNAL_FIELDS)
+        _remove_from_required(def_schema, field_names=_INTERNAL_FIELDS)
 
         # Remove pipe_category only from pipe blueprint definitions
         if def_name in _PIPE_DEFINITION_NAMES:
             for field_name in _PIPE_INTERNAL_FIELDS:
                 props.pop(field_name, None)
-            _remove_from_required(def_schema, _PIPE_INTERNAL_FIELDS)
+            _remove_from_required(def_schema, field_names=_PIPE_INTERNAL_FIELDS)
 
     return schema
 
 
-def _remove_from_required(schema_obj: dict[str, Any], field_names: set[str]) -> None:
+def _remove_from_required(schema_obj: dict[str, Any], *, field_names: set[str]) -> None:
     """Remove field names from a schema object's 'required' list."""
     required = schema_obj.get("required")
     if required is not None:
@@ -165,7 +165,7 @@ def _convert_to_draft4(schema: dict[str, Any]) -> dict[str, Any]:
         schema["definitions"] = schema.pop("$defs")
 
     # Walk the schema tree to apply conversions
-    _walk_schema(schema, _draft4_visitor)
+    _walk_schema(schema, visitor=_draft4_visitor)
 
     return schema
 
@@ -307,7 +307,7 @@ def _add_taplo_metadata(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def _walk_schema(node: dict[str, Any] | list[Any] | Any, visitor: Callable[[dict[str, Any]], None]) -> None:
+def _walk_schema(node: dict[str, Any] | list[Any] | Any, *, visitor: Callable[[dict[str, Any]], None]) -> None:
     """Recursively walk a JSON Schema tree, calling visitor on each dict node.
 
     Args:
@@ -318,8 +318,8 @@ def _walk_schema(node: dict[str, Any] | list[Any] | Any, visitor: Callable[[dict
         typed_node = cast("dict[str, Any]", node)
         visitor(typed_node)
         for child_value in typed_node.values():
-            _walk_schema(child_value, visitor)
+            _walk_schema(child_value, visitor=visitor)
     elif isinstance(node, list):
         typed_list = cast("list[Any]", node)
         for child_item in typed_list:
-            _walk_schema(child_item, visitor)
+            _walk_schema(child_item, visitor=visitor)

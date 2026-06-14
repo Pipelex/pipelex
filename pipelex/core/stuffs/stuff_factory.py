@@ -48,7 +48,7 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept=concept)
 
     @classmethod
-    def make_from_str(cls, str_value: str, name: str) -> Stuff:
+    def make_from_str(cls, str_value: str, *, name: str) -> Stuff:
         return cls.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text=str_value),
@@ -56,7 +56,7 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_concept_ref(cls, concept_ref: str, name: str, content: StuffContent) -> Stuff:
+    def make_from_concept_ref(cls, concept_ref: str, *, name: str, content: StuffContent) -> Stuff:
         validate_concept_ref(concept_ref)
         concept = get_required_concept(concept_ref=concept_ref)
         return cls.make_stuff(
@@ -69,6 +69,7 @@ class StuffFactory:
     def make_stuff(
         cls,
         concept: Concept,
+        *,
         content: StuffContent,
         name: str | None = None,
         code: str | None = None,
@@ -114,6 +115,7 @@ class StuffFactory:
     def combine_stuffs(
         cls,
         concept: Concept,
+        *,
         stuff_contents: dict[str, StuffContent],
         name: str | None = None,
     ) -> Stuff:
@@ -134,6 +136,7 @@ class StuffFactory:
     def _try_make_csv_list_stuff(
         cls,
         concept: Concept,
+        *,
         content: dict[str, Any],
         name: str | None,
         code: str | None,
@@ -224,6 +227,7 @@ class StuffFactory:
     def make_stuff_from_stuff_content_or_data(
         cls,
         stuff_content_or_data: StuffContentOrData,
+        *,
         name: str | None = None,
         code: str | None = None,
         search_domain_codes: list[str] | None = None,

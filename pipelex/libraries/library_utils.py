@@ -21,7 +21,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
     mthds_files: list[Path] = []
     pipelex_package = files("pipelex")
 
-    def _find_mthds_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
+    def _find_mthds_in_traversable(traversable: Traversable, *, collected: list[Path]) -> None:
         """Recursively find .mthds files in a Traversable."""
         excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
         try:
@@ -36,11 +36,11 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:
-                        _find_mthds_in_traversable(child, collected)
+                        _find_mthds_in_traversable(child, collected=collected)
         except (PermissionError, OSError) as exc:
             log.warning(f"Could not access {traversable}: {exc}")
 
-    _find_mthds_in_traversable(pipelex_package, mthds_files)
+    _find_mthds_in_traversable(pipelex_package, collected=mthds_files)
     log.verbose(f"Found {len(mthds_files)} MTHDS files in pipelex package")
     return mthds_files
 

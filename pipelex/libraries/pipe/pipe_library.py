@@ -94,7 +94,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
         return None
 
-    def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
+    def add_dependency_pipe(self, alias: str, *, pipe: PipeAbstract) -> None:
         """Add a pipe from a dependency package with an aliased key.
 
         Args:
@@ -134,7 +134,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def pretty_list_pipes(self) -> None:
-        def _format_concept_code(concept_code: str | None, current_domain: str) -> str:
+        def _format_concept_code(concept_code: str | None, *, current_domain: str) -> str:
             """Format concept code by removing domain prefix if it matches current domain."""
             if not concept_code:
                 return ""
@@ -172,9 +172,11 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
             for pipe in domain_pipes:
                 inputs = pipe.inputs
-                formatted_inputs = [f"{name}: {_format_concept_code(stuff_spec.concept.code, domain_code)}" for name, stuff_spec in inputs.items]
+                formatted_inputs = [
+                    f"{name}: {_format_concept_code(stuff_spec.concept.code, current_domain=domain_code)}" for name, stuff_spec in inputs.items
+                ]
                 formatted_inputs_str = ", ".join(formatted_inputs)
-                output_code = _format_concept_code(pipe.output.concept.code, domain_code)
+                output_code = _format_concept_code(pipe.output.concept.code, current_domain=domain_code)
 
                 table.add_row(
                     pipe.code,

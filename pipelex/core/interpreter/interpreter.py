@@ -19,7 +19,7 @@ class PipelexInterpreter(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
     @classmethod
-    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, mthds_content: str | None = None) -> PipelexBundleBlueprint:
+    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, *, mthds_content: str | None = None) -> PipelexBundleBlueprint:
         blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:

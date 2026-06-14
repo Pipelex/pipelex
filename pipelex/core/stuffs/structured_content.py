@@ -110,7 +110,7 @@ class StructuredContent(StuffContent):
                 return html_module.escape(str(value))
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
         dict_dump = clean_model_to_dict(obj=self)
         return convert_to_markdown(data=dict_dump, level=level, is_pretty=is_pretty)
 
@@ -121,6 +121,7 @@ class StructuredContent(StuffContent):
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,
     ) -> str:
         """Render with image extraction - recursively handles nested structures.
@@ -141,7 +142,7 @@ class StructuredContent(StuffContent):
             field_value = getattr(self, field_name)
             if field_value is None:
                 continue
-            rendered = self._render_value_with_images(field_value, registry, text_format)
+            rendered = self._render_value_with_images(field_value, registry=registry, text_format=text_format)
             if rendered:
                 parts.append(f"{field_name}: {rendered}")
         return "\n".join(parts)
@@ -149,6 +150,7 @@ class StructuredContent(StuffContent):
     def _render_value_with_images(
         self,
         value: Any,
+        *,
         registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
@@ -170,7 +172,7 @@ class StructuredContent(StuffContent):
             parts: list[str] = []
             list_value = cast("list[Any]", value)
             for item in list_value:
-                rendered = self._render_value_with_images(item, registry, text_format)
+                rendered = self._render_value_with_images(item, registry=registry, text_format=text_format)
                 if rendered:
                     parts.append(rendered)
             return "\n".join(parts)
@@ -178,7 +180,7 @@ class StructuredContent(StuffContent):
             dict_parts: list[str] = []
             dict_value = cast("dict[str, Any]", value)
             for key, val in dict_value.items():
-                rendered = self._render_value_with_images(val, registry, text_format)
+                rendered = self._render_value_with_images(val, registry=registry, text_format=text_format)
                 if rendered:
                     dict_parts.append(f"{key}: {rendered}")
             return "\n".join(dict_parts)

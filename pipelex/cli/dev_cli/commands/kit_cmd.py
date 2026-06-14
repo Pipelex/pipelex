@@ -55,7 +55,7 @@ def _sync_agent_rules(
     # so a simple membership check is enough to pick the branch.
     if AgentTarget.CURSOR in targets_to_update:
         typer.echo("Updating Cursor rules...")
-        update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
+        update_cursor_rules(resolved_repo_root, kit_index=loaded_kit_index, agent_set=agent_set)
     else:
         all_targets = loaded_kit_index.agent_rules.targets
         filtered_targets: dict[str, Target] = {}

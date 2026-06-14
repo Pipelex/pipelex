@@ -173,7 +173,7 @@ class PipeCondition(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         evaluated_expression = await render_template(
             template=self.expression,
@@ -190,7 +190,7 @@ class PipeCondition(PipeController):
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
@@ -243,11 +243,11 @@ class PipeCondition(PipeController):
         # Handle continue case
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
-            self._register_execution_data(job_metadata, execution_data_dict)
+            self._register_execution_data(job_metadata, execution_data=execution_data_dict)
             return PipeOutput(working_memory=working_memory)
 
         if SpecialOutcome.is_fail(outcome):
-            self._register_execution_data(job_metadata, execution_data_dict)
+            self._register_execution_data(job_metadata, execution_data=execution_data_dict)
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
@@ -277,7 +277,7 @@ class PipeCondition(PipeController):
                 library_crate=library_crate,
             ),
         )
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return pipe_output
 
     @override
@@ -334,5 +334,5 @@ class PipeCondition(PipeController):
             "evaluated_expression": "dry_run",
             "selected_outcome": "all_outcomes",
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return PipeOutput(working_memory=working_memory)

@@ -100,7 +100,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
-    def _register_execution_data(self, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
+    def _register_execution_data(self, job_metadata: JobMetadata, *, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
@@ -212,7 +212,7 @@ class PipeAbstract(ABC, BaseModel):
         # First validate required variables are in the inputs (using prefix-based matching)
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
+            if not is_variable_satisfied_by_inputs(required_variable_path, input_names=input_names):
                 msg = (
                     f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
                     f"Current inputs: {self.inputs.format_for_display()}"
@@ -316,6 +316,7 @@ class PipeAbstract(ABC, BaseModel):
     async def validate_before_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -368,6 +369,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _validate_before_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -378,6 +380,7 @@ class PipeAbstract(ABC, BaseModel):
     async def validate_after_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -390,6 +393,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _validate_after_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -437,6 +441,7 @@ class PipeAbstract(ABC, BaseModel):
     async def run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -462,6 +467,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _run_pipe_traced(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -624,6 +630,7 @@ class PipeAbstract(ABC, BaseModel):
     async def live_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -696,6 +703,7 @@ class PipeAbstract(ABC, BaseModel):
     async def dry_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -715,6 +723,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _live_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -726,6 +735,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _dry_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -736,6 +746,7 @@ class PipeAbstract(ABC, BaseModel):
     def _start_pipe_span(
         self,
         parent_otel_context: OtelContext,
+        *,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:
@@ -848,7 +859,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return span, is_root_span
 
-    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput, is_root_span: bool) -> None:
+    def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
         """End the pipe's OTel span with success status. Safe to call if span is None.
 
         Args:
@@ -882,7 +893,7 @@ class PipeAbstract(ABC, BaseModel):
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: Exception, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:

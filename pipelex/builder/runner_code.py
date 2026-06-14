@@ -140,7 +140,7 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict
 
         # Get imports from the representation generator
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        generator.generate_representation(concept.concept_ref, structure_class)
+        generator.generate_representation(concept.concept_ref, structure_class=structure_class)
 
         for class_name in generator.imports_needed:
             if NativeConceptCode.is_native_structure_class(class_name):

@@ -94,6 +94,7 @@ class Concept(ConceptAbstract):
     def are_concept_compatible(
         cls,
         concept_1: "Concept",
+        *,
         concept_2: "Concept",
         strict: bool = False,
         concept_resolver: Callable[[str], "Concept | None"] | None = None,
@@ -193,6 +194,7 @@ class Concept(ConceptAbstract):
     def render_concept_representation(
         self,
         output_format: ConceptRepresentationFormat,
+        *,
         is_multiple: bool = False,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.
@@ -213,7 +215,7 @@ class Concept(ConceptAbstract):
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
                 generator = ConceptRepresentationGenerator(output_format)
                 # For inputs, we only want required fields (not optional ones)
-                result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
+                result = generator.generate_representation(self.concept_ref, structure_class=self.get_structure_class(), include_optional=False)
 
                 # If multiple and JSON format, wrap content in a list
                 # For Python format, the caller handles wrapping since content is a string

@@ -2,7 +2,7 @@ from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 
-def render_inputs(the_pipe: PipeAbstract, indent: int = 2) -> str:
+def render_inputs(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
     """Render a JSON representation of the pipe's inputs.
 
     Args:

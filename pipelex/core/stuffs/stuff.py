@@ -94,10 +94,10 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
 
     def content_as(self, content_type: type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
-        return self.verify_content_type(self.content, content_type)
+        return self.verify_content_type(self.content, content_type=content_type)
 
     @classmethod
-    def verify_content_type(cls, content: StuffContent, content_type: type[StuffContentType]) -> StuffContentType:
+    def verify_content_type(cls, content: StuffContent, *, content_type: type[StuffContentType]) -> StuffContentType:
         """Verify and convert content to the expected type."""
         # First try the direct isinstance check for performance
         if isinstance(content, content_type):
@@ -184,7 +184,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
 
         converted_items: list[StuffContentType] = []
         for item in list_content.items:
-            converted_item = self.verify_content_type(item, item_type)
+            converted_item = self.verify_content_type(item, content_type=item_type)
             converted_items.append(converted_item)
 
         return ListContent[StuffContentType](items=converted_items)

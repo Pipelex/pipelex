@@ -49,7 +49,7 @@ class MthdsFactory:
         )
 
     @classmethod
-    def convert_dicts_to_inline_tables(cls, value: Any, field_ordering: list[str] | None = None) -> Any:  # Can't type this because of tomlkit
+    def convert_dicts_to_inline_tables(cls, value: Any, *, field_ordering: list[str] | None = None) -> Any:  # Can't type this because of tomlkit
         """Recursively convert Python values; dicts -> inline tables; lists kept as arrays."""
         if isinstance(value, Mapping):
             value = cast("Mapping[str, Any]", value)
@@ -89,7 +89,7 @@ class MthdsFactory:
 
     @classmethod
     def convert_mapping_to_table(
-        cls, mapping: Mapping[str, Any], field_ordering: list[str] | None = None
+        cls, mapping: Mapping[str, Any], *, field_ordering: list[str] | None = None
     ) -> Any:  # Can't type this because of tomlkit
         """Convert a mapping into a TOML Table where any nested mappings (third level+)
         are converted to inline tables.
