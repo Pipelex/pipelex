@@ -230,7 +230,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
         return self.content_as(MermaidContent)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         """Render stuff for pretty printing.
 
         Args:

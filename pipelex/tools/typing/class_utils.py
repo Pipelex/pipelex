@@ -66,7 +66,7 @@ def normalize_properties_for_comparison(properties: dict[str, Any]) -> dict[str,
     return {name: normalize_property_for_comparison(prop) for name, prop in properties.items()}
 
 
-def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
+def are_classes_equivalent(class_1: type[Any], *, class_2: type[Any]) -> bool:
     """Check if two Pydantic classes are structurally equivalent (same fields, types).
 
     This compares the structural parts of the JSON schema (properties, required fields, type)
@@ -119,7 +119,7 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
         return True
 
 
-def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
+def has_compatible_field(class_1: type[Any], *, class_2: type[Any]) -> bool:
     """Check if class_1 has a field whose (possibly wrapped) type matches/subclasses class_2 or is structurally equivalent."""
     if not hasattr(class_1, "model_fields"):
         return False
@@ -152,7 +152,7 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Also check for structural equivalence (same JSON schema)
         if isinstance(type_param, type) and hasattr(type_param, "model_fields"):
-            if are_classes_equivalent(type_param, class_2):
+            if are_classes_equivalent(type_param, class_2=class_2):
                 return True
 
         return False

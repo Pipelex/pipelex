@@ -54,7 +54,7 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway
         if PipelexBackend.GATEWAY in selected_backend_keys:
             toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
-            save_toml_to_path(toml_doc, routing_profiles_toml_path)
+            save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
             display_routing_profile_result(console, PipelexRoutingProfile.ALL_PIPELEX_GATEWAY, created=False)
             return
 
@@ -88,7 +88,7 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
 
             # Set as active profile
             toml_doc["active"] = profile_name
-            save_toml_to_path(toml_doc, routing_profiles_toml_path)
+            save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
             display_routing_profile_result(console, profile_name, created=not profile_exists)
             return
 
@@ -144,7 +144,7 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         toml_doc["profiles"] = new_profiles  # type: ignore[assignment]
         toml_doc["active"] = "custom_routing"
 
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         display_routing_profile_result(console, "custom_routing", created=True)
 
         # Inform user about customization options

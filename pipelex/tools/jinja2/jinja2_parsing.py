@@ -7,6 +7,7 @@ from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_load
 
 def check_jinja2_parsing(
     template_source: str,
+    *,
     template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
 ):
     jinja2_env = make_jinja2_env_without_loader(template_category=template_category)

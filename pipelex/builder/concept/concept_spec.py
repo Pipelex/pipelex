@@ -355,7 +355,7 @@ class ConceptSpec(StructuredContent):
                 return field_spec.type
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))

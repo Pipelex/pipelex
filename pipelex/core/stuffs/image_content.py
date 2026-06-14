@@ -78,7 +78,7 @@ class ImageContent(StuffContent):
         return f"[Image {image_index + 1}]"
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         group = Group()
 
         # title indicating it's an image:

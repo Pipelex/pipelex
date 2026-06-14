@@ -100,22 +100,23 @@ Order: `tools/` → (`types.py`, `config.py`, `urls.py`, `errors/`, `base_except
 
 Per-package loop for each: apply `*` per the convention → `make agent-check` → fix flagged call sites to keyword form → run targeted tests → delete the package's baseline entries → `make agent-test`. Leave all changes uncommitted (no per-package commit) — the user reviews and pushes the whole wave at the checkpoint.
 
-- [ ] `tools/`
-- [ ] root modules: `types.py`, `config.py`, `urls.py`, `errors/`, `base_exceptions.py`, `exceptions.py`
-- [ ] `reporting/`
-- [ ] `observer/`
-- [ ] `tracing/`
-- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
+- [x] `tools/` — 136 violations cleared.
+- [x] root modules: `types.py`, `config.py`, `urls.py`, `errors/`, `base_exceptions.py`, `exceptions.py` — only `errors/` (5) had violations; `types.py`/`config.py`/`urls.py`/`base_exceptions.py`/`exceptions.py` were already compliant. (`config.py`, `hub.py`, `pipelex.py` public-API violations deferred to Wave 5 as planned.)
+- [x] `reporting/` — 5 cleared.
+- [x] `observer/` — 2 cleared.
+- [x] `tracing/` — 6 cleared.
+- [x] Changelog under `[Unreleased]` (Changed section); left uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT B — Wave 1 landed
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint B reached & verified (2026-06-14):**
 
-- What landed this wave (files changed, left uncommitted in the working tree):
-- Remaining baseline count (link to `state.md`):
-- Decisions / edge cases this wave:
-- Deferred / surprises:
-- Next action:
+- **What landed (all uncommitted on `refactor/Function-calling-3`):** Wave 1 converted `tools/` + `errors/` + `reporting/` + `observer/` + `tracing/` to keyword-only — baseline **844 → 690** (154 removed). Working-tree diff: the ~40 source files in those packages (bare `*` after subject), their call sites tree-wide (incl. `tests/` and cross-package callers in `cli/`, `cogt/`, `core/`, `system/`, `libraries/`), the `@override` impl signatures forced by base/Protocol changes (`core/stuffs/*` + `builder/pipe/*` + `builder/*` `rendered_pretty` ×~25; `core/memory/working_memory.py`; `tools/secrets/env_secrets_provider.py`), the guard (`pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py` — new Jinja2 `@pass_context`/`@pass_environment`/`@pass_eval_context` carve-out) + 2 new guard tests, `wip/keyword-only-args/convention.md`, `CHANGELOG.md`, regenerated `violations-baseline.txt` (690) + `inventory.json`, `wip/keyword-only-args/state.md`, and this file.
+- **Verification:** `make agent-check` green (pyright 0, mypy 2190 ok, guard PASSED 690 known-debt); full `make agent-test` GREEN; guard unit tests 32/32.
+- **Remaining baseline:** 690 — per-package table in [`state.md`](wip/keyword-only-args/state.md). Wave 1 packages fully pruned.
+- **Decisions / edge cases this wave:** (1) **Jinja2 filter carve-out** — `@pass_context`/`@pass_environment`/`@pass_eval_context` filters are invoked POSITIONALLY by the engine; added to the guard's framework carve-out, reverted the `*` on `text_format`/`tag`/`with_images`. Found via `make agent-test` (513 e2e failures), NOT agent-check — type checkers are blind to the engine's dynamic call. (2) **Existing-`*` trap** — a function with a `*` can still violate when 2+ positionals precede it; move the `*`, don't skip (six functions mis-skipped then hand-fixed). (3) **Exception-2 directional pairs** (`copy_file`/`has_diff_dirs`/`sync_toml_values`) resolved by reshape (subject positional, rest keyword), not an allowlist extension. (4) Override cascades are deep — fix tree-wide in one pass.
+- **Deferred / surprises:** Wave 1's "root modules" had no violations except the public surface (`hub.py`/`pipelex.py`), correctly left for Wave 5. The 513-failure regression (all from one Jinja2 filter on the prompt-render path) is the headline lesson — `make agent-test` is mandatory per wave.
+- **Next action:** Begin **Wave 2 / Phase 3** — domain core `core/` → `language/` → `kit/` → `libraries/`. Use the step-by-step recipe now recorded in `state.md` ("Execution recipe that worked for Wave 1"). `core/` (110) is the project's largest call-site diff — give it its own reviewable slice. **Nothing is committed; the user reviews the working tree and pushes before Wave 2 cold-starts.**
 
 ---
 

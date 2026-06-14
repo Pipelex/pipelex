@@ -97,7 +97,7 @@ def convert_file_path_to_module_path(file_path: Path) -> str:
     return result
 
 
-def find_class_names_in_file(file_path: Path, base_class_names: list[str] | None = None) -> list[str]:
+def find_class_names_in_file(file_path: Path, *, base_class_names: list[str] | None = None) -> list[str]:
     """Find class names in a Python file without executing it using AST parsing.
 
     This is useful when you want to discover classes without running module-level code.
@@ -160,6 +160,7 @@ def find_class_names_in_file(file_path: Path, base_class_names: list[str] | None
 
 def find_decorated_function_names_in_file(
     file_path: Path,
+    *,
     decorator_names: list[str],
 ) -> list[str]:
     """Find function names decorated with specific decorators without executing the file.
@@ -224,6 +225,7 @@ def find_decorated_function_names_in_file(
 
 def import_module_from_file_if_has_decorated_functions(
     file_path: Path,
+    *,
     decorator_names: list[str],
 ) -> Any | None:
     """Import a module only if it contains functions with specific decorators.
@@ -244,7 +246,7 @@ def import_module_from_file_if_has_decorated_functions(
 
     """
     # First, use AST to check if file has decorated functions
-    function_names = find_decorated_function_names_in_file(file_path, decorator_names)
+    function_names = find_decorated_function_names_in_file(file_path, decorator_names=decorator_names)
 
     # If no decorated functions found, skip import
     if not function_names:
@@ -256,6 +258,7 @@ def import_module_from_file_if_has_decorated_functions(
 
 def import_module_from_file_if_has_classes(
     file_path: Path,
+    *,
     base_class_names: list[str] | None = None,
 ) -> Any | None:
     """Import a module only if it contains classes (optionally filtered by base class).
@@ -278,7 +281,7 @@ def import_module_from_file_if_has_classes(
 
     """
     # First, use AST to check if file has relevant classes
-    class_names = find_class_names_in_file(file_path, base_class_names)
+    class_names = find_class_names_in_file(file_path, base_class_names=base_class_names)
 
     # If no relevant classes found, skip import
     if not class_names:
@@ -290,6 +293,7 @@ def import_module_from_file_if_has_classes(
 
 def find_classes_in_module(
     module: Any,
+    *,
     base_class: type[Any] | None,
     include_imported: bool,
 ) -> list[type[Any]]:

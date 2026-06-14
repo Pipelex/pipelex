@@ -201,7 +201,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return artefact_dict
 
     @override
-    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
+    def get_typed_object_or_attribute(self, name: str, *, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         """Retrieve a typed object or nested attribute from working memory.
 
         This method is primarily used to:

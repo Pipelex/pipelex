@@ -39,7 +39,7 @@ class TomlSyncResult(BaseModel):
         return len(self.unchanged_keys)
 
 
-def get_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str) -> tuple[bool, Any]:
+def get_nested_value(doc: TOMLDocument | Table | dict[str, Any], *, key_path: str) -> tuple[bool, Any]:
     """Traverse TOML document by key path (dot-separated).
 
     Args:
@@ -66,7 +66,7 @@ def get_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str) 
     return True, result_value  # pyright: ignore[reportUnknownVariableType]
 
 
-def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str, value: Any) -> bool:
+def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], *, key_path: str, value: Any) -> bool:
     """Set value in TOML document by key path (dot-separated).
 
     Only sets the value if the key already exists. Preserves inline comments
@@ -117,7 +117,7 @@ def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str, 
     return False
 
 
-def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], prefix: str = "") -> list[str]:
+def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], *, prefix: str = "") -> list[str]:
     """Collect all leaf node key paths from a TOML document.
 
     Args:
@@ -137,7 +137,7 @@ def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], prefix: s
         if isinstance(value, (dict, Table)):
             # Recurse into nested tables
             nested_doc: dict[str, Any] = cast("dict[str, Any]", value)
-            paths.extend(collect_leaf_key_paths(nested_doc, current_path))
+            paths.extend(collect_leaf_key_paths(nested_doc, prefix=current_path))
         else:
             # This is a leaf node
             paths.append(current_path)
@@ -145,7 +145,7 @@ def collect_leaf_key_paths(doc: TOMLDocument | Table | dict[str, Any], prefix: s
     return paths
 
 
-def sync_toml_values(source_path: Path, target_path: Path, dry_run: bool = False) -> TomlSyncResult:
+def sync_toml_values(source_path: Path, *, target_path: Path, dry_run: bool = False) -> TomlSyncResult:
     """Sync values from source TOML to target TOML, preserving target's structure and comments.
 
     For each leaf key in the target:
@@ -169,8 +169,8 @@ def sync_toml_values(source_path: Path, target_path: Path, dry_run: bool = False
     target_keys = collect_leaf_key_paths(target_doc)
 
     for key_path in target_keys:
-        source_found, source_value = get_nested_value(source_doc, key_path)
-        target_found, target_value = get_nested_value(target_doc, key_path)
+        source_found, source_value = get_nested_value(source_doc, key_path=key_path)
+        target_found, target_value = get_nested_value(target_doc, key_path=key_path)
 
         if not target_found:
             # Should not happen since we got keys from target, but be safe
@@ -180,7 +180,7 @@ def sync_toml_values(source_path: Path, target_path: Path, dry_run: bool = False
             if source_value != target_value:
                 # Value differs, update it
                 if not dry_run:
-                    set_nested_value(target_doc, key_path, source_value)
+                    set_nested_value(target_doc, key_path=key_path, value=source_value)
                 result.updated_keys.append(key_path)
                 result.changes.append(
                     TomlKeyChange(
@@ -198,6 +198,6 @@ def sync_toml_values(source_path: Path, target_path: Path, dry_run: bool = False
 
     # Save if not dry run and there were changes
     if not dry_run and result.updated_keys:
-        save_toml_to_path(target_doc, target_path)
+        save_toml_to_path(target_doc, path=target_path)
 
     return result

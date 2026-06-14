@@ -6,6 +6,7 @@ from pipelex.tools.misc.http_utils import get_user_agent
 
 async def fetch_file_from_url_httpx(
     url: str,
+    *,
     request_timeout: int | None = None,
 ) -> bytes:
     user_agent = get_user_agent()

@@ -101,7 +101,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue
             try:
-                inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars_with_provider)
+                inference_backend_blueprint_dict = apply_to_strings_recursive(
+                    inference_backend_blueprint_dict_raw, transform_func=substitute_vars_with_provider
+                )
             except VarFallbackPatternError as var_fallback_pattern_exc:
                 if lenient:
                     log.verbose(f"Skipping backend '{backend_name}': variable fallback pattern error")
@@ -253,7 +255,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Apply variable substitution (in case remote config has any variables)
         try:
-            model_specs_dict = apply_to_strings_recursive(model_specs_dict, substitute_vars_with_provider)
+            model_specs_dict = apply_to_strings_recursive(model_specs_dict, transform_func=substitute_vars_with_provider)
         except (VarNotFoundError, UnknownVarPrefixError) as exc:
             msg = f"Variable substitution failed in remote gateway config: {exc}"
             raise InferenceModelSpecError(msg) from exc
@@ -283,7 +285,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         try:
             model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
             try:
-                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars_with_provider)
+                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, transform_func=substitute_vars_with_provider)
             except (VarNotFoundError, UnknownVarPrefixError) as exc:
                 msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
                 raise InferenceModelSpecError(msg) from exc

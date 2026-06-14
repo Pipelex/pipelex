@@ -31,7 +31,7 @@ class TestLoadConfig:
         # Load and apply the kit config
         kit_config_path = "pipelex/kit/configs/pipelex.toml"
         kit_config = load_toml_from_path(kit_config_path)
-        deep_update(base_config_copy, kit_config)
+        deep_update(base_config_copy, updates=kit_config)
 
         # The kit config should not change anything - all values should match defaults
         assert base_config_copy == base_config, (

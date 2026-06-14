@@ -53,7 +53,7 @@ class RoutingProfile(ConfigModel):
         for pattern, backend in possible_routes.items():
             if backend not in enabled_backends:
                 continue
-            if matches_wildcard_pattern(model_name, pattern):
+            if matches_wildcard_pattern(model_name, pattern=pattern):
                 return BackendMatchForModel(
                     model_name=model_name,
                     backend_name=backend,

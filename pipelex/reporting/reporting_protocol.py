@@ -16,6 +16,7 @@ class ReportingProtocol(Protocol):
     def set_event_log(
         self,
         context_key: str,
+        *,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
@@ -41,6 +42,7 @@ class ReportingNoOp(ReportingProtocol):
     def set_event_log(
         self,
         context_key: str,
+        *,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,

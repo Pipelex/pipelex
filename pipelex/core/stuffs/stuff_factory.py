@@ -217,7 +217,7 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
-        list_content = list_content_from_csv(Path(resolved.path), row_model)
+        list_content = list_content_from_csv(Path(resolved.path), row_model=row_model)
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
 
     @classmethod

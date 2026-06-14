@@ -332,7 +332,7 @@ def get_root_from_dotted_path(dotted_path: str) -> str:
     return dotted_path.split(".", 1)[0]
 
 
-def matches_wildcard_pattern(text: str, pattern: str) -> bool:
+def matches_wildcard_pattern(text: str, *, pattern: str) -> bool:
     """Check if a text matches a wildcard pattern.
 
     Supports wildcards (*) at the beginning, end, or both.

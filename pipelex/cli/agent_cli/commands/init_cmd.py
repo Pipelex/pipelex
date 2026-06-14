@@ -212,7 +212,7 @@ def _configure_backends(
     # Update backends.toml
     toml_doc = load_toml_with_tomlkit(backends_toml_path)
     update_backends_in_toml(toml_doc, selected_indices, backend_options)
-    save_toml_to_path(toml_doc, backends_toml_path)
+    save_toml_to_path(toml_doc, path=backends_toml_path)
 
     # Handle pipelex_gateway terms acceptance (only when explicitly provided)
     if PipelexBackend.GATEWAY in requested_backends:
@@ -245,7 +245,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     # Case 1: pipelex_gateway is enabled → use all_pipelex_gateway
     if PipelexBackend.GATEWAY in selected_backend_keys:
         toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         return PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
 
     # Case 2: Only one backend → use all_{backend_key}
@@ -265,7 +265,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
             toml_doc["profiles"][profile_name] = profile_data  # type: ignore[index]
 
         toml_doc["active"] = profile_name
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         return profile_name
 
     # Case 3: Multiple backends (no pipelex_gateway) → need primary_backend
@@ -309,7 +309,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     toml_doc["profiles"] = new_profiles  # type: ignore[assignment]
     toml_doc["active"] = "custom_routing"
 
-    save_toml_to_path(toml_doc, routing_profiles_toml_path)
+    save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
     return "custom_routing"
 
 

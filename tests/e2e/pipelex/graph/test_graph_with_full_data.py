@@ -33,7 +33,7 @@ def _get_next_output_folder() -> Path:
     Creates folders like: temp/test_outputs/graph_full_data/run_01, run_02, etc.
     """
     base_dir = Path(TEST_OUTPUTS_DIR) / "graph_full_data"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[str, int]:
@@ -55,7 +55,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     # Save graph.json
     graph_json_path = output_dir / "graph.json"
     graph_json = graph_spec.to_json()
-    save_text_to_path(graph_json, graph_json_path)
+    save_text_to_path(graph_json, path=graph_json_path)
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files

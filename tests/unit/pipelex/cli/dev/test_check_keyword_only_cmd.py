@@ -252,6 +252,28 @@ class TestCheckKeywordOnly:
         )
         assert violations == []
 
+    def test_carveout_jinja2_pass_context_skipped(self) -> None:
+        """@pass_context filters are invoked positionally by the Jinja2 engine — skipped."""
+        violations = _violate(
+            """
+            @pass_context
+            async def text_format(context, value, text_format=None):
+                ...
+            """
+        )
+        assert violations == []
+
+    def test_carveout_jinja2_attributed_pass_environment_skipped(self) -> None:
+        """The attributed @jinja2.pass_environment form is skipped like the bare form."""
+        violations = _violate(
+            """
+            @jinja2.pass_environment
+            def my_filter(environment, value, arg):
+                ...
+            """
+        )
+        assert violations == []
+
     def test_carveout_override_skipped(self) -> None:
         """@override defs are skipped — the convention lives on the base."""
         violations = _violate(

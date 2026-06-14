@@ -90,6 +90,7 @@ class ReportingManager(ReportingProtocol):
     def set_event_log(
         self,
         context_key: str,
+        *,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
@@ -146,7 +147,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        self._emit_usage_event(llm_job, llm_tokens_usage)
+        self._emit_usage_event(llm_job, tokens_usage=llm_tokens_usage)
 
     def _report_img_gen_job(self, img_gen_job: ImgGenJob):
         img_gen_tokens_usage = img_gen_job.job_report.img_gen_tokens_usage
@@ -155,7 +156,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("ImgGen job has no img_gen_tokens_usage")
             return
 
-        self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
+        self._emit_usage_event(img_gen_job, tokens_usage=img_gen_tokens_usage)
 
     def _report_extract_job(self, extract_job: ExtractJob):
         extract_tokens_usage = extract_job.job_report.extract_tokens_usage
@@ -164,7 +165,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("Extract job has no extract_tokens_usage")
             return
 
-        self._emit_usage_event(extract_job, extract_tokens_usage)
+        self._emit_usage_event(extract_job, tokens_usage=extract_tokens_usage)
 
     def _report_search_job(self, search_job: SearchJob):
         search_tokens_usage = search_job.job_report.search_tokens_usage
@@ -173,9 +174,9 @@ class ReportingManager(ReportingProtocol):
             log.warning("Search job has no search_tokens_usage")
             return
 
-        self._emit_usage_event(search_job, search_tokens_usage)
+        self._emit_usage_event(search_job, tokens_usage=search_tokens_usage)
 
-    def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
+    def _emit_usage_event(self, inference_job: InferenceJobAbstract, *, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
 
         Fast path: when set_event_log was registered for this trace context's
@@ -215,7 +216,7 @@ class ReportingManager(ReportingProtocol):
         if not _is_in_temporal_activity():
             context = self._event_log_contexts.get(trace_context.lookup_key)
             if context is not None:
-                self._emit_via_registered_context(context, trace_context, tokens_usage)
+                self._emit_via_registered_context(context, trace_context=trace_context, tokens_usage=tokens_usage)
                 return
 
         self._emit_usage_event_runner_fallback(
@@ -227,6 +228,7 @@ class ReportingManager(ReportingProtocol):
     @staticmethod
     def _emit_via_registered_context(
         context: _EventLogContext,
+        *,
         trace_context: TraceContext,
         tokens_usage: AnyTokensUsage,
     ) -> None:
@@ -246,7 +248,7 @@ class ReportingManager(ReportingProtocol):
         ReportingManager._emit_best_effort(event_log=context.event_log, event=event)
 
     @staticmethod
-    def _emit_best_effort(event_log: EventLogProtocol, event: UsageReportEvent) -> None:
+    def _emit_best_effort(event_log: EventLogProtocol, *, event: UsageReportEvent) -> None:
         """Emit a usage event, dropping infra-level backend failures with a WARNING.
 
         Shared by both emit paths (the registered-context fast path and the runner fallback).
@@ -263,6 +265,7 @@ class ReportingManager(ReportingProtocol):
     def _emit_usage_event_runner_fallback(
         self,
         inference_job: InferenceJobAbstract,
+        *,
         tokens_usage: AnyTokensUsage,
         trace_context: TraceContext,
     ) -> None:

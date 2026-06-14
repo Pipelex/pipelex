@@ -59,7 +59,11 @@ TYPER_DECORATOR_ATTRS = frozenset({"command", "callback"})
 
 #: Framework decorators matched on their bare name, so both ``@receiver.name`` and bare ``@name`` forms hit.
 #: pytest's ``fixture`` is written both as ``@pytest.fixture`` and as bare ``@fixture`` (``from pytest import fixture``).
-BARE_FRAMEWORK_DECORATOR_NAMES = frozenset({"fixture"})
+#: Jinja2's ``pass_context`` / ``pass_environment`` / ``pass_eval_context`` mark a filter/test/global whose
+#: wrapped callable is invoked POSITIONALLY by the Jinja2 engine (``{{ x|filter(arg) }}``), so its arguments
+#: cannot be made keyword-only — same framework-entrypoint category as Typer/Temporal/pytest. Written bare
+#: (``@pass_context``, ``from jinja2 import pass_context``) or attributed (``@jinja2.pass_context``).
+BARE_FRAMEWORK_DECORATOR_NAMES = frozenset({"fixture", "pass_context", "pass_environment", "pass_eval_context"})
 
 #: Temporal handler decorators matched on their trailing two attribute segments.
 TEMPORAL_DECORATOR_TAILS = frozenset(

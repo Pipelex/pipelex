@@ -22,7 +22,7 @@ class TestDiff:
             (dir1 / "file1.txt").write_text("content")
             (dir2 / "file1.txt").write_text("content")
 
-            assert has_diff_dirs(dir1, dir2) is False
+            assert has_diff_dirs(dir1, dir2=dir2) is False
 
     def test_has_diff_dirs_file_only_in_left(self):
         """Test that file only in left directory returns True."""
@@ -36,7 +36,7 @@ class TestDiff:
             (dir1 / "common.txt").write_text("content")
             (dir2 / "common.txt").write_text("content")
 
-            assert has_diff_dirs(dir1, dir2) is True
+            assert has_diff_dirs(dir1, dir2=dir2) is True
 
     def test_has_diff_dirs_file_only_in_right(self):
         """Test that file only in right directory returns True."""
@@ -50,7 +50,7 @@ class TestDiff:
             (dir1 / "common.txt").write_text("content")
             (dir2 / "common.txt").write_text("content")
 
-            assert has_diff_dirs(dir1, dir2) is True
+            assert has_diff_dirs(dir1, dir2=dir2) is True
 
     def test_has_diff_dirs_different_content(self):
         """Test that files with different content return True."""
@@ -63,7 +63,7 @@ class TestDiff:
             (dir1 / "file.txt").write_text("content1")
             (dir2 / "file.txt").write_text("content2")
 
-            assert has_diff_dirs(dir1, dir2) is True
+            assert has_diff_dirs(dir1, dir2=dir2) is True
 
     def test_has_diff_dirs_recursive(self):
         """Test that subdirectory differences are detected."""
@@ -83,7 +83,7 @@ class TestDiff:
             (dir1 / "subdir" / "different.txt").write_text("content1")
             (dir2 / "subdir" / "different.txt").write_text("content2")
 
-            assert has_diff_dirs(dir1, dir2) is True
+            assert has_diff_dirs(dir1, dir2=dir2) is True
 
     def test_has_diff_dirs_empty_directories(self):
         """Test that two empty directories return False."""
@@ -93,7 +93,7 @@ class TestDiff:
             dir1.mkdir()
             dir2.mkdir()
 
-            assert has_diff_dirs(dir1, dir2) is False
+            assert has_diff_dirs(dir1, dir2=dir2) is False
 
     def test_diff_files_basic(self):
         """Test basic file diff functionality."""
@@ -135,7 +135,7 @@ class TestDiff:
             (dir1 / "file.txt").write_text("content")
             (dir2 / "file.txt").write_text("content")
 
-            result = make_diff_dirs_pretty(dir1, dir2)
+            result = make_diff_dirs_pretty(dir1, dir2=dir2)
 
             assert isinstance(result, Text)
             assert "No differences found" in str(result)
@@ -153,7 +153,7 @@ class TestDiff:
             (dir1 / "different.txt").write_text("content1")
             (dir2 / "different.txt").write_text("content2")
 
-            result = make_diff_dirs_pretty(dir1, dir2)
+            result = make_diff_dirs_pretty(dir1, dir2=dir2)
 
             assert isinstance(result, Group)
 
@@ -169,7 +169,7 @@ class TestDiff:
             (dir1 / "binary.bin").write_bytes(b"\x00\x01\x02\x03")
             (dir2 / "binary.bin").write_bytes(b"\x04\x05\x06\x07")
 
-            result = make_diff_dirs_pretty(dir1, dir2)
+            result = make_diff_dirs_pretty(dir1, dir2=dir2)
 
             # Should return Group with binary file note
             assert isinstance(result, Group)
@@ -188,7 +188,7 @@ class TestDiff:
             (dir1 / "subdir" / "file.txt").write_text("content1")
             (dir2 / "subdir" / "file.txt").write_text("content2")
 
-            result = make_diff_dirs_pretty(dir1, dir2)
+            result = make_diff_dirs_pretty(dir1, dir2=dir2)
 
             assert isinstance(result, Group)
 
@@ -204,7 +204,7 @@ class TestDiff:
             (dir2 / "file.txt").write_text("content2")
 
             # Pass as strings
-            result = make_diff_dirs_pretty(str(dir1), str(dir2))
+            result = make_diff_dirs_pretty(str(dir1), dir2=str(dir2))
 
             assert isinstance(result, Group)
 
@@ -257,7 +257,7 @@ class TestDiff:
             (dir2 / "file.txt").write_text("content")
 
             # Pass as strings
-            result = has_diff_dirs(str(dir1), str(dir2))
+            result = has_diff_dirs(str(dir1), dir2=str(dir2))
 
             assert result is False
 
@@ -290,7 +290,7 @@ class TestDiff:
             # Create file in dir2 (newer)
             (dir2 / "file.txt").write_text("content2")
 
-            result = make_diff_dirs_pretty(dir1, dir2)
+            result = make_diff_dirs_pretty(dir1, dir2=dir2)
 
             # Result should be a Group containing the diff
             assert isinstance(result, Group)

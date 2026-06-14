@@ -261,7 +261,7 @@ class ConfigLoader:
 
         merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
         if extra_overrides:
-            deep_update(merged, extra_overrides)
+            deep_update(merged, updates=extra_overrides)
         return merged
 
 

@@ -214,7 +214,7 @@ def _load_merged_profiles_config() -> dict[str, Any]:
     # Merge override file if it exists
     if TEST_PROFILES_OVERRIDE_PATH.exists():
         override_config = load_toml_from_path(str(TEST_PROFILES_OVERRIDE_PATH))
-        deep_update(config, override_config)
+        deep_update(config, updates=override_config)
 
     return dict(config)
 

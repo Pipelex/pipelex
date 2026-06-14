@@ -9,14 +9,14 @@ class AttributePolisher:
     truncate_suffix: ClassVar[str] = "…"
 
     @classmethod
-    def _truncate_string(cls, value: str, max_length: int) -> str:
+    def _truncate_string(cls, value: str, *, max_length: int) -> str:
         """Truncate a string to the specified maximum length and append the truncate suffix."""
         if len(value) > max_length:
             return value[:max_length] + cls.truncate_suffix
         return value
 
     @classmethod
-    def _truncate_bytes(cls, value: bytes, max_length: int) -> bytes:
+    def _truncate_bytes(cls, value: bytes, *, max_length: int) -> bytes:
         """Truncate a bytes to the specified maximum length and append the truncate suffix."""
         if len(value) > max_length:
             return value[:max_length]
@@ -39,14 +39,14 @@ class AttributePolisher:
     def get_truncated_value(cls, value: Any) -> Any:
         """Get the truncated value based on the field name and value type."""
         if isinstance(value, bytes):
-            return cls._truncate_bytes(value, cls.bytes_truncate_length)
+            return cls._truncate_bytes(value, max_length=cls.bytes_truncate_length)
         elif isinstance(value, str):
             if value.startswith("http"):
-                return cls._truncate_string(value, cls.url_truncate_length)
+                return cls._truncate_string(value, max_length=cls.url_truncate_length)
             elif value.startswith("data:") or cls._looks_like_base64(value):
-                return cls._truncate_string(value, cls.base64_truncate_length)
+                return cls._truncate_string(value, max_length=cls.base64_truncate_length)
             else:
-                return cls._truncate_string(value, cls.text_truncate_length)
+                return cls._truncate_string(value, max_length=cls.text_truncate_length)
         return value
 
     @classmethod
@@ -62,7 +62,7 @@ class AttributePolisher:
         return non_base64_count < len(sample) * 0.05
 
     @classmethod
-    def apply_truncation_recursive(cls, obj: Any, name: str | None = None) -> Any:
+    def apply_truncation_recursive(cls, obj: Any, *, name: str | None = None) -> Any:
         """Recursively apply truncation logic to a data structure.
 
         Args:

@@ -165,7 +165,7 @@ class StructuredContent(StuffContent):
         if value is None:
             return ""
         if isinstance(value, ImageRenderable):
-            return value.render_with_images(registry, text_format)
+            return value.render_with_images(registry, text_format=text_format)
         if isinstance(value, (list, tuple)):
             parts: list[str] = []
             list_value = cast("list[Any]", value)
@@ -191,7 +191,7 @@ class StructuredContent(StuffContent):
     # -------------------------------------------------------------------------
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Check if we've exceeded maximum depth - fall back to Pretty rendering
         # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
         if depth >= MAX_RENDER_DEPTH:

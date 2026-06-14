@@ -11,7 +11,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 
 
-def insert_before(dictionary: dict[K, V], target_key: K, new_key: K, new_value: V) -> dict[K, V]:
+def insert_before(dictionary: dict[K, V], *, target_key: K, new_key: K, new_value: V) -> dict[K, V]:
     """Insert a new key-value pair before a target key in a dictionary.
 
     Creates a new dictionary with the new item positioned before the target key.
@@ -48,7 +48,7 @@ def insert_before(dictionary: dict[K, V], target_key: K, new_key: K, new_value: 
     return result
 
 
-def apply_to_strings_recursive(data: Any, transform_func: Callable[[str], str]) -> dict[str, Any]:
+def apply_to_strings_recursive(data: Any, *, transform_func: Callable[[str], str]) -> dict[str, Any]:
     """Recursively traverse a data structure and apply a transformation function to all string values.
 
     This function walks through dictionaries, lists, and other nested structures,
@@ -71,10 +71,10 @@ def apply_to_strings_recursive(data: Any, transform_func: Callable[[str], str]) 
     result: dict[str, Any] = {}
     for key, value in data.items():
         if isinstance(value, dict):
-            result[key] = apply_to_strings_recursive(value, transform_func)
+            result[key] = apply_to_strings_recursive(value, transform_func=transform_func)
         elif isinstance(value, list):
             list_value: list[Any] = cast("list[Any]", value)
-            result[key] = apply_to_strings_in_list(list_value, transform_func)
+            result[key] = apply_to_strings_in_list(list_value, transform_func=transform_func)
         elif isinstance(value, str):
             result[key] = transform_func(value)
         else:
@@ -83,15 +83,15 @@ def apply_to_strings_recursive(data: Any, transform_func: Callable[[str], str]) 
     return result
 
 
-def apply_to_strings_in_list(data: list[Any], transform_func: Callable[[str], str]) -> list[Any]:
+def apply_to_strings_in_list(data: list[Any], *, transform_func: Callable[[str], str]) -> list[Any]:
     """Helper function to apply string transformation to items in a list."""
     result: list[Any] = []
     for item in data:
         if isinstance(item, dict):
-            result.append(apply_to_strings_recursive(item, transform_func))
+            result.append(apply_to_strings_recursive(item, transform_func=transform_func))
         elif isinstance(item, list):
             list_item: list[Any] = cast("list[Any]", item)
-            result.append(apply_to_strings_in_list(list_item, transform_func))
+            result.append(apply_to_strings_in_list(list_item, transform_func=transform_func))
         elif isinstance(item, str):
             result.append(transform_func(item))
         else:
@@ -99,7 +99,7 @@ def apply_to_strings_in_list(data: list[Any], transform_func: Callable[[str], st
     return result
 
 
-def substitute_nested_in_context(context: dict[str, Any], extra_params: dict[str, Any] | None = None) -> dict[str, Any]:
+def substitute_nested_in_context(context: dict[str, Any], *, extra_params: dict[str, Any] | None = None) -> dict[str, Any]:
     """Substitute nested values in context dict using dotted key notation.
 
     This function processes keys from extra_params that contain dots (e.g., "foo.bar.blip")

@@ -121,7 +121,7 @@ class PipelexBundleSpec(StructuredContent):
             raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
 
         # Bundle header info

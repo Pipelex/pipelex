@@ -147,7 +147,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         parts: list[str] = []
         for item in self.items:
             if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
-                rendered = item.render_with_images(registry, text_format)
+                rendered = item.render_with_images(registry, text_format=text_format)
             else:
                 rendered = item.rendered_markdown()
             if rendered:
@@ -155,7 +155,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return "\n".join(parts)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Check if we've exceeded maximum depth - fall back to Pretty rendering
         # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
         if depth >= MAX_RENDER_DEPTH:

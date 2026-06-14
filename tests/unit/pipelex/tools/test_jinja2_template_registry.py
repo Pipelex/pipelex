@@ -23,7 +23,7 @@ class TestTemplateRegistry:
         template_key = "test/template.html.jinja2"
         template_content = "<html>{{ title }}</html>"
 
-        TemplateRegistry.register(template_key, template_content)
+        TemplateRegistry.register(template_key, template_source=template_content)
         retrieved = TemplateRegistry.get(template_key)
 
         assert retrieved == template_content
@@ -43,15 +43,15 @@ class TestTemplateRegistry:
 
         assert not TemplateRegistry.is_registered(template_key)
 
-        TemplateRegistry.register(template_key, template_content)
+        TemplateRegistry.register(template_key, template_source=template_content)
 
         assert TemplateRegistry.is_registered(template_key)
 
     def test_keys(self) -> None:
         """Test listing all registered template keys."""
-        TemplateRegistry.register("key1", "content1")
-        TemplateRegistry.register("key2", "content2")
-        TemplateRegistry.register("key3", "content3")
+        TemplateRegistry.register("key1", template_source="content1")
+        TemplateRegistry.register("key2", template_source="content2")
+        TemplateRegistry.register("key3", template_source="content3")
 
         keys = TemplateRegistry.keys()
 
@@ -62,8 +62,8 @@ class TestTemplateRegistry:
 
     def test_clear(self) -> None:
         """Test clearing the registry."""
-        TemplateRegistry.register("key1", "content1")
-        TemplateRegistry.register("key2", "content2")
+        TemplateRegistry.register("key1", template_source="content1")
+        TemplateRegistry.register("key2", template_source="content2")
 
         assert len(TemplateRegistry.keys()) == 2
 
@@ -73,8 +73,8 @@ class TestTemplateRegistry:
 
     def test_get_dict_loader(self) -> None:
         """Test that DictLoader is created from registry."""
-        TemplateRegistry.register("base.html", "<html>{% block content %}{% endblock %}</html>")
-        TemplateRegistry.register("child.html", "{% extends 'base.html' %}{% block content %}Hello{% endblock %}")
+        TemplateRegistry.register("base.html", template_source="<html>{% block content %}{% endblock %}</html>")
+        TemplateRegistry.register("child.html", template_source="{% extends 'base.html' %}{% block content %}Hello{% endblock %}")
 
         loader = TemplateRegistry.get_dict_loader()
 
@@ -87,8 +87,8 @@ class TestTemplateRegistry:
     def test_dict_loader_supports_includes(self) -> None:
         """Test that DictLoader enables {% include %} statements."""
         # Register templates
-        TemplateRegistry.register("_partial.html", "<div>Partial content</div>")
-        TemplateRegistry.register("main.html", "<html>{% include '_partial.html' %}</html>")
+        TemplateRegistry.register("_partial.html", template_source="<div>Partial content</div>")
+        TemplateRegistry.register("main.html", template_source="<html>{% include '_partial.html' %}</html>")
 
         # Create environment with DictLoader
         loader = TemplateRegistry.get_dict_loader()
@@ -105,10 +105,10 @@ class TestTemplateRegistry:
         """Test that registering with same key overwrites."""
         template_key = "test/overwrite.jinja2"
 
-        TemplateRegistry.register(template_key, "original content")
+        TemplateRegistry.register(template_key, template_source="original content")
         assert TemplateRegistry.get(template_key) == "original content"
 
-        TemplateRegistry.register(template_key, "new content")
+        TemplateRegistry.register(template_key, template_source="new content")
         assert TemplateRegistry.get(template_key) == "new content"
 
 

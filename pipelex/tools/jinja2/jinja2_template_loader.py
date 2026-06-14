@@ -31,7 +31,7 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 _template_cache: dict[str, str] = {}
 
 
-def load_template(package: str, template_name: str) -> str:
+def load_template(package: str, *, template_name: str) -> str:
     """Load a template file from a Python package.
 
     Uses importlib.resources.files() for package-safe file access.
@@ -94,6 +94,7 @@ class TemplateLoader:
     def register_set(
         cls,
         name: str,
+        *,
         package: str,
         templates: list[tuple[str, str]],
     ) -> None:
@@ -139,7 +140,7 @@ class TemplateLoader:
         for filename, registry_key in templates:
             template_path = package_files / filename
             template_source = template_path.read_text(encoding="utf-8")
-            TemplateRegistry.register(registry_key, template_source)
+            TemplateRegistry.register(registry_key, template_source=template_source)
 
         cls._loaded.add(name)
 

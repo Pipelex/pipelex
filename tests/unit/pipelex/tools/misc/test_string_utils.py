@@ -368,31 +368,31 @@ class TestMatchesWildcardPattern:
         ],
     )
     def test_matches_wildcard_pattern(self, text: str, pattern: str, expected: bool) -> None:
-        assert matches_wildcard_pattern(text, pattern) is expected
+        assert matches_wildcard_pattern(text, pattern=pattern) is expected
 
     def test_matches_wildcard_pattern_model_routing_examples(self) -> None:
         """Test with real-world model routing examples."""
         # Claude models
-        assert matches_wildcard_pattern("claude-3-sonnet", "claude-*") is True
-        assert matches_wildcard_pattern("claude-3-haiku", "claude-*") is True
-        assert matches_wildcard_pattern("claude-3.5-sonnet", "claude-*") is True
+        assert matches_wildcard_pattern("claude-3-sonnet", pattern="claude-*") is True
+        assert matches_wildcard_pattern("claude-3-haiku", pattern="claude-*") is True
+        assert matches_wildcard_pattern("claude-3.5-sonnet", pattern="claude-*") is True
 
         # GPT models
-        assert matches_wildcard_pattern("gpt-4o-mini", "gpt-*") is True
-        assert matches_wildcard_pattern("gpt-4", "gpt-*") is True
-        assert matches_wildcard_pattern("gpt-3.5-turbo", "gpt-*") is True
+        assert matches_wildcard_pattern("gpt-4o-mini", pattern="gpt-*") is True
+        assert matches_wildcard_pattern("gpt-4", pattern="gpt-*") is True
+        assert matches_wildcard_pattern("gpt-3.5-turbo", pattern="gpt-*") is True
 
         # Mistral models
-        assert matches_wildcard_pattern("mistral-large", "*large") is True
-        assert matches_wildcard_pattern("mistral-medium", "*medium") is True
-        assert matches_wildcard_pattern("mistral-small", "*small") is True
+        assert matches_wildcard_pattern("mistral-large", pattern="*large") is True
+        assert matches_wildcard_pattern("mistral-medium", pattern="*medium") is True
+        assert matches_wildcard_pattern("mistral-small", pattern="*small") is True
 
         # Contains patterns
-        assert matches_wildcard_pattern("claude-3-sonnet", "*sonnet*") is True
-        assert matches_wildcard_pattern("gpt-4o-mini", "*4o*") is True
-        assert matches_wildcard_pattern("mistral-large-instruct", "*large*") is True
+        assert matches_wildcard_pattern("claude-3-sonnet", pattern="*sonnet*") is True
+        assert matches_wildcard_pattern("gpt-4o-mini", pattern="*4o*") is True
+        assert matches_wildcard_pattern("mistral-large-instruct", pattern="*large*") is True
 
         # Negative cases
-        assert matches_wildcard_pattern("gemini-pro", "claude-*") is False
-        assert matches_wildcard_pattern("llama-2", "*gpt*") is False
-        assert matches_wildcard_pattern("anthropic-claude", "*sonnet") is False
+        assert matches_wildcard_pattern("gemini-pro", pattern="claude-*") is False
+        assert matches_wildcard_pattern("llama-2", pattern="*gpt*") is False
+        assert matches_wildcard_pattern("anthropic-claude", pattern="*sonnet") is False

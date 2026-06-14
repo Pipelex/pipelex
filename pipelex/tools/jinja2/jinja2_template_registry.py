@@ -34,7 +34,7 @@ class TemplateRegistry:
     _templates: ClassVar[dict[str, str]] = {}
 
     @classmethod
-    def register(cls, key: str, template_source: str) -> None:
+    def register(cls, key: str, *, template_source: str) -> None:
         """Register a template string under a key.
 
         Args:

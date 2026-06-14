@@ -50,5 +50,5 @@ class JSONContent(StuffContent):
         return json.dumps(self.json_obj, indent=4)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         return JSON.from_data(self.json_obj, indent=4)

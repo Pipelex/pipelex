@@ -60,10 +60,10 @@ PrettyPrintable = Markdown | Text | JSON | Table | Group | Syntax | Pretty
 
 class PrettyRenderable(ABC):
     @abstractmethod
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pass
 
-    def rendered_pretty_text(self, title: str | None = None, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+    def rendered_pretty_text(self, *, title: str | None = None, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
         """Render as plain ASCII text string.
 
         Args:
@@ -76,7 +76,7 @@ class PrettyRenderable(ABC):
         pretty = self.rendered_pretty(title=title, depth=0)
         return PrettyPrinter.pretty_text(pretty, width=width)
 
-    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+    def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:
         """Render as HTML string.
 
         Args:
@@ -98,6 +98,7 @@ class PrettyPrintMode(StrEnum):
 
 def pretty_print(
     content: str | Any,
+    *,
     title: TextType | None = None,
     subtitle: TextType | None = None,
     inner_title: str | None = None,
@@ -118,6 +119,7 @@ def pretty_print(
 
 def pretty_print_md(
     content: str,
+    *,
     title: TextType | None = None,
     subtitle: TextType | None = None,
     inner_title: str | None = None,
@@ -140,6 +142,7 @@ def pretty_print_md(
 
 def pretty_print_url(
     url: str,
+    *,
     title: TextType | None = None,
     subtitle: TextType | None = None,
     inner_title: str | None = None,
@@ -167,6 +170,7 @@ class PrettyPrinter:
     def pretty_print(
         cls,
         content: str | Any,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
         inner_title: str | None = None,
@@ -194,6 +198,7 @@ class PrettyPrinter:
     def pretty_print_using_rich(
         cls,
         content: str | Any,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
         inner_title: str | None = None,
@@ -214,7 +219,7 @@ class PrettyPrinter:
         Console(width=console_width).print("", panel, "", sep="\n")
 
     @classmethod
-    def pretty_width(cls, width: int | None = None, depth: int | None = None) -> int:
+    def pretty_width(cls, width: int | None = None, *, depth: int | None = None) -> int:
         terminal_width = shutil.get_terminal_size().columns
         absolute_width = width or min(max(PRETTY_WIDTH_MIN, terminal_width // 2), terminal_width)
         if depth is not None:
@@ -229,6 +234,7 @@ class PrettyPrinter:
     def make_pretty_panel(
         cls,
         content: str | Any,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
         inner_title: str | None = None,
@@ -253,6 +259,7 @@ class PrettyPrinter:
     def wrap_in_panel(
         cls,
         pretty: PrettyPrintable,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
         border_style: StyleType | None = None,
@@ -275,6 +282,7 @@ class PrettyPrinter:
     def pretty_text(
         cls,
         pretty: PrettyPrintable,
+        *,
         width: int = PRETTY_WIDTH_FOR_EXPORT,
     ) -> str:
         """Export a PrettyPrintable as plain ASCII text without styling.
@@ -295,6 +303,7 @@ class PrettyPrinter:
     def pretty_html(
         cls,
         pretty: PrettyPrintable,
+        *,
         width: int = PRETTY_WIDTH_FOR_EXPORT,
     ) -> str:
         buf = StringIO()
@@ -303,14 +312,14 @@ class PrettyPrinter:
         return console.export_html(inline_styles=False, clear=False, theme=EXPORT_THEME)
 
     @classmethod
-    def pretty_svg(cls, pretty: PrettyPrintable, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+    def pretty_svg(cls, pretty: PrettyPrintable, *, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
         buf = StringIO()
         console = Console(record=True, file=buf, width=width, force_terminal=False)
         console.print(pretty)
         return console.export_svg()
 
     @classmethod
-    def make_pretty(cls, value: Any, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def make_pretty(cls, value: Any, *, inner_title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pretty: PrettyPrintable
         # Format the value
         if isinstance(value, PrettyPrintable):
@@ -372,6 +381,7 @@ class PrettyPrinter:
     def pretty_print_without_rich(
         cls,
         content: str | Any,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
         inner_title: str | None = None,
@@ -428,6 +438,7 @@ class PrettyPrinter:
     def pretty_print_url_without_rich(
         cls,
         content: str | Any,
+        *,
         title: TextType | None = None,
         subtitle: TextType | None = None,
     ):

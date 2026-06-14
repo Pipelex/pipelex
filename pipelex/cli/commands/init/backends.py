@@ -86,7 +86,7 @@ def disable_gateway_backend(backends_toml_path: Path) -> None:
 
     if PipelexBackend.GATEWAY in toml_doc:
         toml_doc[PipelexBackend.GATEWAY]["enabled"] = False  # type: ignore[index]
-        save_toml_to_path(toml_doc, backends_toml_path)
+        save_toml_to_path(toml_doc, path=backends_toml_path)
 
 
 def customize_backends_config(is_first_time_setup: bool = False, target_config_dir: Path | None = None) -> None:
@@ -155,7 +155,7 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
 
         # Business logic: Update and save backends.toml first (local operation)
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
-        save_toml_to_path(toml_doc, backends_toml_path)
+        save_toml_to_path(toml_doc, path=backends_toml_path)
 
         # UI: Display confirmation
         display_selected_backends(console, selected_indices, backend_options)

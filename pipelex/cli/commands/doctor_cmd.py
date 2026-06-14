@@ -785,7 +785,7 @@ def setup_doctor_runtime(
     log_config = get_config().pipelex.log_config
     if log_config_overrides is not None:
         merged = log_config.model_dump()
-        deep_update(merged, log_config_overrides)
+        deep_update(merged, updates=log_config_overrides)
         log_config = LogConfig.model_validate(merged)
     pipelex_hub.set_console_print_target(target=log_config.console_print_target)
     log.configure_if_unset(log_config=log_config)

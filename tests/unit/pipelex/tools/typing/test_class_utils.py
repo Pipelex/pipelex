@@ -98,7 +98,7 @@ class TestAreClassesEquivalent:
             name: str
             age: int
 
-        assert are_classes_equivalent(MyModel, MyModel) is True
+        assert are_classes_equivalent(MyModel, class_2=MyModel) is True
 
     def test_classes_with_same_structure_are_equivalent(self):
         """Test that two classes with the same fields are equivalent."""
@@ -111,7 +111,7 @@ class TestAreClassesEquivalent:
             name: str
             value: int
 
-        assert are_classes_equivalent(ModelA, ModelB) is True
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is True
 
     def test_classes_with_different_fields_are_not_equivalent(self):
         """Test that classes with different field names are not equivalent."""
@@ -122,7 +122,7 @@ class TestAreClassesEquivalent:
         class ModelB(BaseModel):
             title: str
 
-        assert are_classes_equivalent(ModelA, ModelB) is False
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is False
 
     def test_classes_with_different_types_are_not_equivalent(self):
         """Test that classes with different field types are not equivalent."""
@@ -133,7 +133,7 @@ class TestAreClassesEquivalent:
         class ModelB(BaseModel):
             value: str
 
-        assert are_classes_equivalent(ModelA, ModelB) is False
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is False
 
     def test_classes_with_different_descriptions_are_equivalent(self):
         """Test that field descriptions don't affect equivalence."""
@@ -144,7 +144,7 @@ class TestAreClassesEquivalent:
         class ModelB(BaseModel):
             name: str = Field(description="A completely different description")
 
-        assert are_classes_equivalent(ModelA, ModelB) is True
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is True
 
     def test_classes_with_different_required_fields_are_not_equivalent(self):
         """Test that required vs optional fields matter."""
@@ -155,7 +155,7 @@ class TestAreClassesEquivalent:
         class ModelB(BaseModel):
             name: str | None = None
 
-        assert are_classes_equivalent(ModelA, ModelB) is False
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is False
 
     def test_non_pydantic_classes(self):
         """Test that non-Pydantic classes are compared by identity."""
@@ -163,9 +163,9 @@ class TestAreClassesEquivalent:
         class RegularClass:
             pass
 
-        assert are_classes_equivalent(RegularClass, RegularClass) is True
-        assert are_classes_equivalent(str, str) is True
-        assert are_classes_equivalent(str, int) is False
+        assert are_classes_equivalent(RegularClass, class_2=RegularClass) is True
+        assert are_classes_equivalent(str, class_2=str) is True
+        assert are_classes_equivalent(str, class_2=int) is False
 
 
 class TestHasCompatibleField:
@@ -180,7 +180,7 @@ class TestHasCompatibleField:
         class Outer(BaseModel):
             data: Inner
 
-        assert has_compatible_field(Outer, Inner) is True
+        assert has_compatible_field(Outer, class_2=Inner) is True
 
     def test_subclass_match(self):
         """Test that a field with subclass type is found."""
@@ -194,7 +194,7 @@ class TestHasCompatibleField:
         class Container(BaseModel):
             item: Child
 
-        assert has_compatible_field(Container, Parent) is True
+        assert has_compatible_field(Container, class_2=Parent) is True
 
     def test_no_match(self):
         """Test that no match is found when field types don't match."""
@@ -208,7 +208,7 @@ class TestHasCompatibleField:
         class Container(BaseModel):
             data: TypeA
 
-        assert has_compatible_field(Container, TypeB) is False
+        assert has_compatible_field(Container, class_2=TypeB) is False
 
     def test_structural_equivalence_match(self):
         """Test that structurally equivalent types are found."""
@@ -225,7 +225,7 @@ class TestHasCompatibleField:
             data: StructureA
 
         # StructureA and StructureB have the same structure
-        assert has_compatible_field(Container, StructureB) is True
+        assert has_compatible_field(Container, class_2=StructureB) is True
 
     def test_optional_field_match(self):
         """Test that optional fields are checked correctly."""
@@ -236,7 +236,7 @@ class TestHasCompatibleField:
         class Outer(BaseModel):
             data: Inner | None = None
 
-        assert has_compatible_field(Outer, Inner) is True
+        assert has_compatible_field(Outer, class_2=Inner) is True
 
     def test_non_pydantic_class(self):
         """Test that non-Pydantic classes return False."""
@@ -247,7 +247,7 @@ class TestHasCompatibleField:
         class PydanticClass(BaseModel):
             name: str
 
-        assert has_compatible_field(RegularClass, PydanticClass) is False  # type: ignore[arg-type]
+        assert has_compatible_field(RegularClass, class_2=PydanticClass) is False  # type: ignore[arg-type]
 
 
 class TestAreClassesEquivalentWithOptionalFields:
@@ -264,7 +264,7 @@ class TestAreClassesEquivalentWithOptionalFields:
             name: str
             nickname: str | None = None
 
-        assert are_classes_equivalent(ModelA, ModelB) is True
+        assert are_classes_equivalent(ModelA, class_2=ModelB) is True
 
     def test_classes_with_same_fields_different_defaults_may_differ(self):
         """Test that default values don't affect JSON schema equivalence (they're in 'default' key)."""
@@ -278,6 +278,6 @@ class TestAreClassesEquivalentWithOptionalFields:
         # JSON schema includes 'default' key, so these may or may not be equivalent
         # depending on whether defaults are in the schema properties
         # This test documents the actual behavior
-        result = are_classes_equivalent(ModelA, ModelB)
+        result = are_classes_equivalent(ModelA, class_2=ModelB)
         # The behavior depends on Pydantic's schema generation
         assert isinstance(result, bool)

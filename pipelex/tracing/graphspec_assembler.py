@@ -115,6 +115,7 @@ class GraphSpecAssembler:
     @staticmethod
     def assemble(
         events: Sequence[TraceEvent],
+        *,
         graph_id: str,
         pipeline_ref: PipelineRef | None = None,
     ) -> GraphSpec:
@@ -359,6 +360,7 @@ class _AssemblerState:
     def _add_generated_edge(
         self,
         source_node_id: str,
+        *,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,

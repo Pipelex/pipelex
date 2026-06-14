@@ -1,6 +1,6 @@
 # Keyword-only arguments — cold-start state
 
-Status: Checkpoint A VERIFIED — guard built; `make agent-check` clean; full `make agent-test` green; rule strictness + gate placement confirmed with the user; `convention.md` corrected to match the enforced rule. Phase 1 committed (`d18a63fc`, `a58456f3`). `dev` has since been merged twice into this branch (v0.31.0, then v0.33.0 at `fc23505c8`) and the guard baseline reconciled at each merge (812 → 822 → 844 — see Per-package inventory). Ready to start Wave 1.
+Status: **Checkpoint B VERIFIED — Wave 1 landed** (branch `refactor/Function-calling-3`, all uncommitted). Guard built (Checkpoint A); rule strictness + gate placement confirmed; `convention.md` correct. Phase 1 committed earlier (`d18a63fc`, `a58456f3`); `dev` merged twice (v0.31.0, v0.33.0 at `fc23505c8`), baseline reconciled at each (812 → 822 → 844). **Wave 1 (`tools/` + `errors/` + `reporting/` + `observer/` + `tracing/`) now converted: 844 → 690.** `make agent-check` clean (pyright 0, mypy 2190 ok, guard PASSED 690 known-debt); full `make agent-test` GREEN; guard unit tests 32/32. Baseline regenerated (690 entries, all Wave 1 packages pruned). Next: Wave 2 (domain core: `core/` → `language/` → `kit/` → `libraries/`).
 
 This is the running cold-start log for the keyword-only-arguments refactor. Read this file plus [`../../TODOS.md`](../../TODOS.md) and you have everything needed to resume with zero lost context. The convention itself lives in [`convention.md`](convention.md).
 
@@ -21,34 +21,33 @@ The guard currently passes against its own baseline (all current violations know
 
 ## Per-package violation inventory (baseline)
 
-These are tracked data mirrored from `inventory.json` (`per_package_counts`). Total: 844 — reconciled after the second `dev` merge (Checkpoint A was 812; the first `dev` merge took it to 822).
+Current baseline total after Wave 1: **690** (down from the 844 waterline; Wave 1 removed `tools` 136 + `errors` 5 + `reporting` 5 + `observer` 2 + `tracing` 6 = 154). Wave 1 packages are fully pruned from the baseline.
 
-| Package | Violations |
-| --- | --- |
-| `cogt` | 139 |
-| `tools` | 136 |
-| `cli` | 111 |
-| `core` | 110 |
-| `plugins` | 50 |
-| `system` | 44 |
-| `pipe_operators` | 40 |
-| `temporal` | 39 |
-| `graph` | 39 |
-| `libraries` | 28 |
-| `builder` | 21 |
-| `pipe_run` | 16 |
-| `pipeline` | 15 |
-| `runtime_bridge` | 13 |
-| `kit` | 8 |
-| `pipe_controllers` | 6 |
-| `tracing` | 6 |
-| `errors` | 5 |
-| `reporting` | 5 |
-| `<root>` (`pipelex.py`, `hub.py`, `config.py`, `types.py`, `urls.py`, `base_exceptions.py`, `exceptions.py`) | 4 |
-| `language` | 4 |
-| `observer` | 2 |
-| `pipe_signature` | 2 |
-| `test_extras` | 1 |
+| Package | Violations | Wave |
+| --- | --- | --- |
+| `cogt` | 139 | 3 |
+| `cli` | 111 | 5 |
+| `core` | 110 | 2 |
+| `plugins` | 50 | 3 |
+| `system` | 44 | 5 |
+| `pipe_operators` | 40 | 4 |
+| `graph` | 39 | 4 |
+| `temporal` | 39 | 5 |
+| `libraries` | 28 | 2 |
+| `builder` | 21 | 5 |
+| `pipe_run` | 16 | 4 |
+| `pipeline` | 15 | 4 |
+| `runtime_bridge` | 13 | 4 (with pipe_run/pipeline helpers) |
+| `kit` | 8 | 2 |
+| `pipe_controllers` | 6 | 4 |
+| `<root>` (`hub.py` ×1, `pipelex.py` ×3) | 4 | 5 (public API) |
+| `language` | 4 | 2 |
+| `pipe_signature` | 2 | (its own / Wave 4) |
+| `test_extras` | 1 | (shipped pytest plugin) |
+
+**Wave 1 DONE (was, now 0):** `tools` 136→0, `errors` 5→0, `reporting` 5→0, `observer` 2→0, `tracing` 6→0.
+
+Note the `<root>` 4 are all public-API (`hub.py`, `pipelex.py`) — Wave 1's nominal "root modules" (`types.py`, `config.py`, `urls.py`, `base_exceptions.py`, `exceptions.py`) had **zero** violations, so the only root-level work is the public surface, correctly deferred to Wave 5.
 
 **Growth at each `dev` merge.** Merging `dev` imports code written before the guard existed, so the baseline grows at each merge (it strictly shrinks only *between* merges, as waves land):
 
@@ -68,12 +67,25 @@ These are the burn-down targets ordered into waves in [`README.md`](README.md). 
 - The rule itself — after dropping a leading `self`/`cls` and the single allowed subject parameter, a def is a VIOLATION iff one or more positional-or-keyword params remain (i.e. two or more non-self/cls positional-or-keyword params total and no bare `*` already separating them). Keyword-only params (already past a bare `*`), `*args`, and `**kwargs` do not count as violations. Single-param / subject-only defs are compliant under Exception 1.
 - Rule strictness (confirmed with user) — STRICT: only the subject may be positional; every other parameter must be keyword-only, so `def f(a, b)` and `def truncate(text, max_length=80)` are violations. The subject exception is a *permission* (the Swift `_` readability case), never a requirement — making the subject keyword-only too (`def f(*, a, b)`) is always compliant and often preferable. The guard already enforces this; `convention.md` was corrected to match (it had drifted to a looser "one trailing positional is fine" reading that contradicted both the code and the 812 baseline).
 - Gate placement (confirmed with user) — `check-keyword-only` runs in BOTH `make agent-check` (fast everyday gate) and `make check` (heavy gate + CI), so a new violation is caught in the tight edit loop, not only at `make check`.
+- **Jinja2 filter carve-out (added in Wave 1).** Jinja2 filter/test/global callables carrying `@pass_context` / `@pass_environment` / `@pass_eval_context` are invoked POSITIONALLY by the Jinja2 engine from template syntax (`{{ value | tag("name") }}` → `tag(context, value, "name")`), so their arguments cannot be keyword-only — the same framework-entrypoint category as Typer/Temporal/pytest. Added those three decorator names to `BARE_FRAMEWORK_DECORATOR_NAMES` in the guard (matched bare or attributed, like `fixture`), reverted the `*` on `text_format` / `tag` / `with_images`, added two guard tests, and documented it in `convention.md`. This was discovered the hard way: the type checkers are blind to the engine's dynamic positional invocation, so the breakage only surfaced in `make agent-test` (513 e2e failures, all the prompt-render path through the `format` filter). Single-arg filters (`escape_script_tag`) are compliant anyway; a future multi-arg filter without one of these decorators falls back to the `# kw-only: ignore` hatch.
+- **The existing-`*` trap (Wave 1 mechanical learning).** A function can carry a bare `*` and STILL be a violation when two-or-more positional-or-keyword params sit BEFORE it (`def f(a, b, *, c)` — `b` is a second positional). The fix is to MOVE the `*` to right after the subject, not skip the function. Six functions were initially mis-skipped by the signature agents on a naive "already has a `*`" check (`render_jinja2_sync/async`, `_compile_jinja2_template`, `make_jinja2_env_from_loader`, `_register_filters`, and three csv_codec writers) and fixed by hand. Instruct signature-editing agents to move an existing-but-too-late `*`, not skip.
+- **Override cascades are deep — fix tree-wide in one pass.** Changing a base/Protocol signature (`PrettyRenderable.rendered_pretty`, `ContextProviderAbstract.get_typed_object_or_attribute`, `SecretsProviderAbstract.*`, `ReportingProtocol.set_event_log`) forces every `@override` impl to match (pyright `reportIncompatibleMethodOverride`). `rendered_pretty` had ~25 impls across `core/stuffs/` and `builder/` in a multi-level inheritance tree where pyright only surfaces the next level after the current one is fixed — so a single tree-wide replacement of the identical signature is far faster than chasing pyright level by level. These impls are `@override` (guard-carved-out), so they don't affect baseline counts but DO require the `*` for type-checker parity.
 
 ## Current position
 
-Checkpoint A is VERIFIED and snapshotted in `TODOS.md`. Phase 1 is committed on branch `refactor/Function-calling-2` (`d18a63fc` add guard, `a58456f3` PR-review fixes). `dev` has since been merged into this branch (CSV #955, dry-run-with-signatures #953, `--traceback` #937, security deps #958); the merge's only conflict was `TODOS.md` (kept the keyword-only tracker over `dev`'s deletion), and the guard baseline was regenerated to absorb the incoming code's violations and prune stale entries (812 → 822). Next: Phase 2 / Wave 1 burn-down (`tools/` → root modules → `reporting/` → `observer/` → `tracing/`).
+**Checkpoint B VERIFIED — Wave 1 landed, all uncommitted on `refactor/Function-calling-3`.** Wave 1 converted `tools/`, `errors/`, `reporting/`, `observer/`, `tracing/` (baseline 844 → 690). `make agent-check` and full `make agent-test` both green; guard unit tests 32/32. Files changed in the working tree: the ~40 source files in those packages (signatures), their call sites tree-wide (incl. `tests/` and a handful of cross-package callers in `cli/`, `cogt/`, `core/`, `system/`, `libraries/`), the `@override` impl signatures forced by the base changes (`core/stuffs/*`, `builder/pipe/*`, `builder/*` `rendered_pretty`; `core/memory/working_memory.py`; `tools/secrets/env_secrets_provider.py`), the guard (`check_keyword_only_cmd.py` — jinja2 carve-out) + its tests, `convention.md`, `CHANGELOG.md`, the regenerated `violations-baseline.txt` (690) + `inventory.json`, this file, and `TODOS.md`. **Next: Wave 2** — domain core `core/` → `language/` → `kit/` → `libraries/` (Phase 3). `core/` (110) is the biggest call-site diff in the project; consider giving it its own reviewable slice.
 
-Open question carried into burn-down (Exception 2): the symmetric allowlist is whole-function, so it cannot express "leading directional pair positional, trailing options keyword". Under the strict rule, `copy_file(source_path, target_path, *, overwrite=True)` is still a violation (`target_path` is a second positional). Resolve per-function when its package is migrated: either reshape to `copy_file(source_path, *, target_path, overwrite=True)`, or extend the allowlist with a per-entry leading-positional-count so a genuine pair stays positional while `*` still forces the options keyword. Affects `copy_file`, `has_diff_dirs`, `sync_toml_values` (and any future directional-pair-plus-options helper).
+**Exception-2 directional-pair resolution (decided in Wave 1):** `copy_file`, `has_diff_dirs`, `sync_toml_values` were all resolved by the simple reshape — subject stays positional, the second operand and all options become keyword-only (`copy_file(source_path, *, target_path, overwrite=True)`). We did NOT extend the allowlist with a per-entry leading-positional-count; the reshape is fully compliant and the src/dst split at call sites reads fine. Apply the same reshape to any future directional-pair-plus-options helper.
+
+**Execution recipe that worked for Wave 1 (reuse for later waves):**
+
+1. Get the package's violations: `.venv/bin/pipelex-dev check-keyword-only --report` (writes to stderr; grep the package section).
+2. Add the bare `*` after the subject param of each flagged function — parallelizable across conflict-free subagents partitioned by file (signature edits only; warn them about the existing-`*` trap above). For a big package do this in file-disjoint groups.
+3. Run `.venv/bin/pyright --outputjson` and bucket errors by rule: `reportCallIssue` (broken call sites) + `reportIncompatibleMethodOverride` (base/Protocol changes cascading to `@override` impls). The `reportUnknown*` errors are downstream noise that clears once the calls type-check — ignore them.
+4. Fix override impls tree-wide first (one replacement per identical signature), then fix call sites — parallelizable across subagents partitioned by CALLER file (disjoint → conflict-free). Map positional→keyword by reading each callee's new signature; the `*` position tells you which args must be named. Caveat: agents must call pyright with ABSOLUTE venv paths (a `cd && .venv/bin/pyright` resets cwd between bash calls and silently returns "0 errors" — false green).
+5. `make agent-check` until clean (pyright + mypy + guard).
+6. **`make agent-test` is non-negotiable** — pyright/mypy are BLIND to dynamic positional invocation (Jinja2 filters, `getattr`, `**kwargs` forwarding, `functools.partial`). Wave 1's 513-failure regression came entirely from the Jinja2 filter path and would have shipped on a green agent-check. Marker: `-m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"`.
+7. `.venv/bin/pipelex-dev check-keyword-only --regen-baseline` to prune the now-fixed entries, then `make cko` to confirm the guard is green against the shrunk baseline.
 
 ## Resume commands
 

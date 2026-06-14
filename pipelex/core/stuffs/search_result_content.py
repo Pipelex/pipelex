@@ -51,7 +51,7 @@ class SearchResultContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         group = Group()
 
         # Title

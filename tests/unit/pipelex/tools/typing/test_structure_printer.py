@@ -189,8 +189,8 @@ class TestStructurePrinter:
             '    LOW = "LOW"',
         ]
 
-        pretty_print(result, "results")
-        pretty_print(expected, "expected")
+        pretty_print(result, title="results")
+        pretty_print(expected, title="expected")
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
     def test_list_content(self):

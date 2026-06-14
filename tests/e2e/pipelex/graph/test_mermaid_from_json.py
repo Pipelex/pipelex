@@ -28,7 +28,7 @@ def _get_next_output_folder() -> Path:
     Creates folders like: temp/test_outputs/mermaid_from_json/run_01, run_02, etc.
     """
     base_dir = Path(TEST_OUTPUTS_DIR) / "mermaid_from_json"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 @pytest.mark.asyncio(loop_scope="class")

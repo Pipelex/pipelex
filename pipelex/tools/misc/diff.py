@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 
 def has_diff_dirs(
     dir1: str | Path,
+    *,
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
@@ -93,7 +94,7 @@ def diff_files(path1: str | Path, path2: str | Path) -> str:
 
 
 # TODO: improve using toml reader/writer?
-def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None:
+def _generate_diff_summary(diff_content: str, *, left_is_newer: bool) -> str | None:
     """Generate a concise summary of what changes would be applied to sync files.
 
     Parses unified diff content and generates a human-readable summary explaining
@@ -209,6 +210,7 @@ def _generate_diff_summary(diff_content: str, left_is_newer: bool) -> str | None
 
 def make_diff_dirs_pretty(
     dir1: str | Path,
+    *,
     dir2: str | Path,
     exclude_files: AbstractSet[str] | None = None,
     exclude_dirs: AbstractSet[str] | None = None,
@@ -236,7 +238,7 @@ def make_diff_dirs_pretty(
     def _filter_excluded_files(file_list: list[str]) -> list[str]:
         return [file for file in file_list if file not in exclude_files]
 
-    def _collect_diffs(dir_comparison: filecmp.dircmp[str], relative_path: str = "") -> None:
+    def _collect_diffs(dir_comparison: filecmp.dircmp[str], *, relative_path: str = "") -> None:
         # Files only in left directory (excluding excluded files and directories)
         left_only_filtered = _filter_excluded_files([item for item in dir_comparison.left_only if item not in exclude_dirs])
         if left_only_filtered:
@@ -323,7 +325,7 @@ def make_diff_dirs_pretty(
 
                 if diff_content:
                     # Parse the diff to provide a summary
-                    summary = _generate_diff_summary(diff_content, left_is_newer)
+                    summary = _generate_diff_summary(diff_content, left_is_newer=left_is_newer)
                     if summary:
                         summary_text = Text(summary, style="dim yellow")
                         sections.append(summary_text)
@@ -341,7 +343,7 @@ def make_diff_dirs_pretty(
             if subdir_name in exclude_dirs:
                 continue
             new_relative_path = str(Path(relative_path, subdir_name)) if relative_path else subdir_name
-            _collect_diffs(sub, new_relative_path)
+            _collect_diffs(sub, relative_path=new_relative_path)
 
     _collect_diffs(filecmp.dircmp(str(dir1), str(dir2)))
 
@@ -360,7 +362,7 @@ def diff_dirs(dir1: str | Path, dir2: str | Path) -> None:
     dir1 = Path(dir1)
     dir2 = Path(dir2)
 
-    pretty_diff = make_diff_dirs_pretty(dir1, dir2)
+    pretty_diff = make_diff_dirs_pretty(dir1, dir2=dir2)
     PrettyPrinter.pretty_print(
         content=pretty_diff,
         title=f"Directory Diff: {dir1} ↔ {dir2}",

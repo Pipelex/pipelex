@@ -214,7 +214,7 @@ class TestCsvCodec:
         # The headline use case: a BOM-prefixed file (from Excel) binds to a concept without a column error.
         path = tmp_path / "bom_required.csv"
         path.write_bytes(b"\xef\xbb\xbftext\nhello\n")
-        item = list_content_from_csv(path, RequiredTextRow).items[0]
+        item = list_content_from_csv(path, row_model=RequiredTextRow).items[0]
         assert item.text == "hello"
 
     def test_read_empty_file_raises(self, tmp_path: Path) -> None:
@@ -228,14 +228,14 @@ class TestCsvCodec:
     def test_read_header_only_into_empty_list_content(self, tmp_path: Path) -> None:
         # A valid header with zero data rows reads as an empty ListContent (the read-side empty path).
         path = write_csv_file(tmp_path, "name,age,height,active,born\n")
-        result = list_content_from_csv(path, FlatRow)
+        result = list_content_from_csv(path, row_model=FlatRow)
         assert result.items == []
 
     def test_short_row_pads_missing_trailing_cell_to_none(self, tmp_path: Path) -> None:
         # A data row with FEWER cells than the header pads the missing trailing column → None on an
         # optional field (exercises _row_to_dict's padding branch, not just an explicit empty cell).
         path = write_csv_file(tmp_path, "name,age,height,active,born,nickname\nAda,36,1.7,true,1815-12-10\n")
-        item = list_content_from_csv(path, FlatRow).items[0]
+        item = list_content_from_csv(path, row_model=FlatRow).items[0]
         assert item.nickname is None
         assert item.name == "Ada"
 
@@ -327,7 +327,7 @@ class TestCsvCodec:
             tmp_path,
             "name,age,height,active,born,nickname\nAda,36,1.7,true,1815-12-10,Countess\n",
         )
-        list_content = list_content_from_csv(path, FlatRow)
+        list_content = list_content_from_csv(path, row_model=FlatRow)
         assert isinstance(list_content, ListContent)
         assert len(list_content.items) == 1
         item = list_content.items[0]
@@ -344,14 +344,14 @@ class TestCsvCodec:
             tmp_path,
             "name,age,height,active,born,nickname\nVint,82,1.8,true,1943-06-23,\n",
         )
-        item = list_content_from_csv(path, FlatRow).items[0]
+        item = list_content_from_csv(path, row_model=FlatRow).items[0]
         assert item.nickname is None
 
     def test_empty_cell_on_required_field_raises(self, tmp_path: Path) -> None:
         # A genuine quoted-empty cell (not a blank line) -> None -> required int fails coercion.
         path = write_value_csv(tmp_path, "", name="req.csv")
         with pytest.raises(CsvCoercionError):
-            list_content_from_csv(path, IntRow)
+            list_content_from_csv(path, row_model=IntRow)
 
     @pytest.mark.parametrize(
         ("row_model", "cell", "expected"),
@@ -371,7 +371,7 @@ class TestCsvCodec:
     )
     def test_coercion_accept_table(self, tmp_path: Path, row_model: type[StructuredContent], cell: str, expected: object) -> None:
         path = write_value_csv(tmp_path, cell)
-        item = list_content_from_csv(path, row_model).items[0]
+        item = list_content_from_csv(path, row_model=row_model).items[0]
         assert item.model_dump()["value"] == expected
 
     @pytest.mark.parametrize(
@@ -385,12 +385,12 @@ class TestCsvCodec:
     def test_coercion_reject_table(self, tmp_path: Path, row_model: type[StructuredContent], cell: str) -> None:
         path = write_value_csv(tmp_path, cell)
         with pytest.raises(CsvCoercionError):
-            list_content_from_csv(path, row_model)
+            list_content_from_csv(path, row_model=row_model)
 
     def test_coercion_failure_names_row_and_field(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "value\n42\noops\n")
         with pytest.raises(CsvCoercionError) as exc_info:
-            list_content_from_csv(path, IntRow)
+            list_content_from_csv(path, row_model=IntRow)
         message = str(exc_info.value)
         assert "value" in message
         assert "row 3" in message  # 'oops' is on physical CSV line 3 (header=1, '42'=2, 'oops'=3)
@@ -400,7 +400,7 @@ class TestCsvCodec:
         # the raw offending cell content — only row/field identifiers and the expected-type reason.
         path = write_csv_file(tmp_path, "value\nSUPERSECRET_TOKEN_xyz\n")
         with pytest.raises(CsvCoercionError) as exc_info:
-            list_content_from_csv(path, IntRow)
+            list_content_from_csv(path, row_model=IntRow)
         message = str(exc_info.value)
         assert "SUPERSECRET_TOKEN_xyz" not in message
         assert "value" in message  # the field is still named so the author can locate it
@@ -408,16 +408,16 @@ class TestCsvCodec:
     def test_string_literal_and_str_enum_round_trip_on_read(self, tmp_path: Path) -> None:
         # The read-side coercion of accepted string Literal / StrEnum cells (flat_field_names accepts
         # them; this confirms the cell actually coerces to the member through list_content_from_csv).
-        literal_item = list_content_from_csv(write_csv_file(tmp_path, "name,rating\nAda,high\n", name="lit.csv"), LiteralRow).items[0]
+        literal_item = list_content_from_csv(write_csv_file(tmp_path, "name,rating\nAda,high\n", name="lit.csv"), row_model=LiteralRow).items[0]
         assert literal_item.rating == "high"
-        enum_item = list_content_from_csv(write_csv_file(tmp_path, "name,grade\nAda,pass\n", name="enum.csv"), StrEnumRow).items[0]
+        enum_item = list_content_from_csv(write_csv_file(tmp_path, "name,grade\nAda,pass\n", name="enum.csv"), row_model=StrEnumRow).items[0]
         assert enum_item.grade == Grade.PASS
 
     @pytest.mark.parametrize(("row_model", "bad_cell"), [(LiteralRow, "name,rating\nAda,medium\n"), (StrEnumRow, "name,grade\nAda,unknown\n")])
     def test_out_of_choice_value_raises_coercion(self, tmp_path: Path, row_model: type[StructuredContent], bad_cell: str) -> None:
         # An out-of-choice value for a Literal/StrEnum column fails coercion with a typed error.
         with pytest.raises(CsvCoercionError):
-            list_content_from_csv(write_csv_file(tmp_path, bad_cell), row_model)
+            list_content_from_csv(write_csv_file(tmp_path, bad_cell), row_model=row_model)
 
     # ----------------------------------------------------------------------------------
     # Strict columns
@@ -426,18 +426,18 @@ class TestCsvCodec:
     def test_extra_column_raises(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "value,surprise\n42,boom\n")
         with pytest.raises(CsvColumnError):
-            list_content_from_csv(path, IntRow)
+            list_content_from_csv(path, row_model=IntRow)
 
     def test_missing_required_column_raises(self, tmp_path: Path) -> None:
         # 'nickname' is optional so its absence is fine; drop a REQUIRED column ('name') instead.
         path = write_csv_file(tmp_path, "age,height,active,born,nickname\n36,1.7,true,1815-12-10,x\n", name="missing_req.csv")
         with pytest.raises(CsvColumnError):
-            list_content_from_csv(path, FlatRow)
+            list_content_from_csv(path, row_model=FlatRow)
 
     def test_missing_optional_column_sets_field_none(self, tmp_path: Path) -> None:
         # 'nickname' (optional) column omitted entirely → None for every row (CT2 lenient).
         path = write_csv_file(tmp_path, "name,age,height,active,born\nAda,36,1.7,true,1815-12-10\n")
-        item = list_content_from_csv(path, FlatRow).items[0]
+        item = list_content_from_csv(path, row_model=FlatRow).items[0]
         assert item.nickname is None
         assert item.name == "Ada"
 
@@ -445,14 +445,14 @@ class TestCsvCodec:
         # CT2: an omitted NULLABLE column is None for every row even when the field has a NON-None
         # default ('anon') — the CSV is the source of truth, not the row model's construction default.
         path = write_csv_file(tmp_path, "name\nAda\n")
-        item = list_content_from_csv(path, OptDefaultRow).items[0]
+        item = list_content_from_csv(path, row_model=OptDefaultRow).items[0]
         assert item.nickname is None
 
     def test_missing_non_nullable_defaulted_column_keeps_default(self, tmp_path: Path) -> None:
         # A non-required but NON-nullable field (count: int = 0) keeps its own default when its column
         # is omitted — forcing None there would fail validation rather than honor the absence.
         path = write_csv_file(tmp_path, "name\nAda\n")
-        item = list_content_from_csv(path, IntDefaultRow).items[0]
+        item = list_content_from_csv(path, row_model=IntDefaultRow).items[0]
         assert item.count == 0
 
     # ----------------------------------------------------------------------------------
@@ -493,7 +493,7 @@ class TestCsvCodec:
             ]
         )
         csv_from_list_content(original, row_model=FlatRow, path=path)
-        reloaded = list_content_from_csv(path, FlatRow)
+        reloaded = list_content_from_csv(path, row_model=FlatRow)
         assert reloaded.items == original.items
 
     # ----------------------------------------------------------------------------------
@@ -504,14 +504,14 @@ class TestCsvCodec:
         path = tmp_path / "opt.csv"
         list_content: ListContent[OptionalTextRow] = ListContent(items=[OptionalTextRow(text=None), OptionalTextRow(text="")])
         csv_from_list_content(list_content, row_model=OptionalTextRow, path=path)
-        reloaded = list_content_from_csv(path, OptionalTextRow)
+        reloaded = list_content_from_csv(path, row_model=OptionalTextRow)
         # Empty-string text is indistinguishable from None → both read back as None (documented).
         assert [item.text for item in reloaded.items] == [None, None]
 
     def test_required_text_empty_cell_rejected(self, tmp_path: Path) -> None:
         path = write_value_csv(tmp_path, "", name="reqtext.csv", header="text")
         with pytest.raises(CsvCoercionError):
-            list_content_from_csv(path, RequiredTextRow)
+            list_content_from_csv(path, row_model=RequiredTextRow)
 
     # ----------------------------------------------------------------------------------
     # Phase-2 review findings (#2 blank lines, #3 over-wide rows, #4 delimiter/encoding,
@@ -521,7 +521,7 @@ class TestCsvCodec:
     def test_blank_line_in_body_is_skipped(self, tmp_path: Path) -> None:
         # A blank physical line (csv yields []) is skipped, not turned into a phantom all-None row.
         path = write_csv_file(tmp_path, "a,b\nx,y\n\nz,w\n")
-        items = list_content_from_csv(path, OptPairRow).items
+        items = list_content_from_csv(path, row_model=OptPairRow).items
         assert [(item.a, item.b) for item in items] == [("x", "y"), ("z", "w")]
 
     def test_row_wider_than_header_raises(self, tmp_path: Path) -> None:
@@ -562,7 +562,7 @@ class TestCsvCodec:
         # row and concept (not the unhelpful "field(s) ?").
         path = write_csv_file(tmp_path, "a,b\n5,1\n")
         with pytest.raises(CsvCoercionError) as exc_info:
-            list_content_from_csv(path, OrderedPairRow)
+            list_content_from_csv(path, row_model=OrderedPairRow)
         message = str(exc_info.value)
         assert "field(s) ?" not in message
         # The offending row is the first data row, which is physical CSV line 2 (the header is line 1).
@@ -575,14 +575,14 @@ class TestCsvCodec:
         # =2-3), so the error must say "row 4", not "row 3".
         path = write_csv_file(tmp_path, 'label,number\n"multi\nline",1\nbad,oops\n')
         with pytest.raises(CsvCoercionError) as exc_info:
-            list_content_from_csv(path, LabeledIntRow)
+            list_content_from_csv(path, row_model=LabeledIntRow)
         assert "row 4" in str(exc_info.value)
 
     def test_coercion_error_row_number_counts_skipped_blank_lines(self, tmp_path: Path) -> None:
         # The reported row number is the physical CSV line, even when a blank line was skipped.
         path = write_csv_file(tmp_path, "value\n42\n\noops\n")
         with pytest.raises(CsvCoercionError) as exc_info:
-            list_content_from_csv(path, IntRow)
+            list_content_from_csv(path, row_model=IntRow)
         # 'oops' is on physical CSV line 4 (line 1 header, line 2 '42', line 3 blank, line 4 'oops').
         assert "row 4" in str(exc_info.value)
 

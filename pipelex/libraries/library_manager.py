@@ -846,7 +846,7 @@ class LibraryManager(LibraryManagerAbstract):
             log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
             return
 
-        if not version_satisfies(current_version, constraint):
+        if not version_satisfies(current_version, constraint=constraint):
             log.warning(
                 f"Package '{package_address}' requires MTHDS standard version "
                 f"'{mthds_version_constraint}', but the current version is "

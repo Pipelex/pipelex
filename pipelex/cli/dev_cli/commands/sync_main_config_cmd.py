@@ -116,7 +116,7 @@ def sync_main_config_cmd(
     if sync_kit:
         if KIT_CONFIG_PATH.exists():
             try:
-                kit_result = sync_toml_values(MAIN_CONFIG_PATH, KIT_CONFIG_PATH, dry_run=dry_run)
+                kit_result = sync_toml_values(MAIN_CONFIG_PATH, target_path=KIT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("kit", kit_result, KIT_CONFIG_PATH))
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check
@@ -134,7 +134,7 @@ def sync_main_config_cmd(
     if sync_project:
         if PROJECT_CONFIG_PATH.exists():
             try:
-                project_result = sync_toml_values(MAIN_CONFIG_PATH, PROJECT_CONFIG_PATH, dry_run=dry_run)
+                project_result = sync_toml_values(MAIN_CONFIG_PATH, target_path=PROJECT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("project", project_result, PROJECT_CONFIG_PATH))
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check

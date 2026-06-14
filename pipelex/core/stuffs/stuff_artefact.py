@@ -372,7 +372,7 @@ class StuffArtefact:
                 f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
             )
             raise TypeError(msg)
-        return content.render_with_images(registry, text_format)
+        return content.render_with_images(registry, text_format=text_format)
 
     # -------------------------------------------------------------------------
     # Access to underlying Stuff

@@ -89,7 +89,7 @@ class TextAndImagesContent(StuffContent):
         return "\n".join(parts)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # If neither text nor images are present
         if not self.text and not self.images:
             return Text("(empty)", style="dim italic")

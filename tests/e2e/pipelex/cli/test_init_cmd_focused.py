@@ -76,7 +76,7 @@ class TestFocusedInitialization:
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         # Get index for mistral
         kit_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
@@ -113,7 +113,7 @@ class TestFocusedInitialization:
             if backend_key == "internal":
                 continue
             toml_doc[backend_key]["enabled"] = backend_key in enabled_set  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         # User inputs for routing - need to confirm reconfigure since routing already exists
         env.add_confirm_input(True)  # Confirm "Would you like to reconfigure routing?"
@@ -143,7 +143,7 @@ class TestFocusedInitialization:
             if backend_key == "internal":
                 continue
             toml_doc[backend_key]["enabled"] = backend_key == "openai"  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         # User inputs
         env.add_confirm_input(True)  # Confirm "Would you like to reconfigure routing?"
@@ -185,7 +185,7 @@ class TestFocusedInitialization:
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
         toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(telemetry_path))
+        save_toml_to_path(toml_doc, path=str(telemetry_path))
 
         # User inputs - confirm reconfigure
         env.add_confirm_input(True)  # Confirm reconfigure
@@ -211,13 +211,13 @@ class TestFocusedInitialization:
             if backend_key == "internal":
                 continue
             toml_doc[backend_key]["enabled"] = backend_key == PipelexBackend.GATEWAY  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         # Modify routing to have wrong config (simulating the bug scenario)
         routing_path = env.inference_dir / "routing_profiles.toml"
         routing_doc = load_toml_with_tomlkit(str(routing_path))
         routing_doc["active"] = "wrong_profile"  # type: ignore[index]
-        save_toml_to_path(routing_doc, str(routing_path))
+        save_toml_to_path(routing_doc, path=str(routing_path))
 
         # User inputs - need to confirm reset initialization
         env.add_confirm_input(True)  # Confirm "Continue with initialization?" (reset mode)

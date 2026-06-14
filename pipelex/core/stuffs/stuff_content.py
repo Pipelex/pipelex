@@ -122,7 +122,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     # -------------------------------------------------------------------------
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         """Render content for pretty printing.
 
         Args:
@@ -138,5 +138,5 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         pretty_print(pretty, title=title, width=width)
 
     @override
-    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+    def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:
         return self.rendered_html()

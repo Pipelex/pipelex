@@ -83,7 +83,7 @@ class DocumentContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         source_text = Text()
         if self.title:
             source_text.append(self.title, style="bold")
