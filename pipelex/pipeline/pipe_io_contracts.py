@@ -42,14 +42,14 @@ class IOMultiplicity(StrEnum):
 class PipeInputContract(BaseModel):
     """One declared input: the concept it expects and the JSON Schema of its content."""
 
-    concept_code: str
+    concept_ref: str
     json_schema: dict[str, Any] = Field(default_factory=dict)
 
 
 class PipeOutputContract(BaseModel):
     """The pipe's output: the concept it produces and whether it is one item or a list."""
 
-    concept_code: str
+    concept_ref: str
     multiplicity: IOMultiplicity
 
 
@@ -106,11 +106,11 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
                     raise PipeIOContractError(message=msg) from exc
                 schema_memo[memo_key] = json_schema
             pipe_inputs[var_name] = PipeInputContract(
-                concept_code=stuff_spec.concept.concept_ref,
+                concept_ref=stuff_spec.concept.concept_ref,
                 json_schema=json_schema,
             )
         pipe_output = PipeOutputContract(
-            concept_code=pipe.output.concept.concept_ref,
+            concept_ref=pipe.output.concept.concept_ref,
             multiplicity=IOMultiplicity.VARIABLE if pipe.output.is_multiple() else IOMultiplicity.SINGLE,
         )
         io_contracts[pipe.pipe_ref] = PipeIOContract(inputs=pipe_inputs, output=pipe_output)

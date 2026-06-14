@@ -224,8 +224,8 @@ class TestDryValidateActivityInMemory:
             "dry_validate_alpha.alpha_second",
         }
         sequence_contract = result.pipe_io_contracts["dry_validate_alpha.alpha_sequence"]
-        assert sequence_contract.inputs["subject"].concept_code == "native.Text"
-        assert sequence_contract.output.concept_code == "native.Text"
+        assert sequence_contract.inputs["subject"].concept_ref == "native.Text"
+        assert sequence_contract.output.concept_ref == "native.Text"
 
     async def test_graph_failure_is_best_effort(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D5: an expected dry-run failure in the graph arm yields graph_spec=None, validation still OK."""
@@ -279,7 +279,7 @@ class TestDryValidateActivityInMemory:
         assert result.graph_spec is not None
         assert result.pending_signatures == ["dry_validate_sig.unimplemented_sig"]
         assert "dry_validate_sig.unimplemented_sig" in result.pipe_io_contracts
-        assert result.pipe_io_contracts["dry_validate_sig.unimplemented_sig"].output.concept_code == "native.Text"
+        assert result.pipe_io_contracts["dry_validate_sig.unimplemented_sig"].output.concept_ref == "native.Text"
 
     async def test_validation_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:
         """D-C5 regression: a deterministic validation failure must run the activity exactly once.

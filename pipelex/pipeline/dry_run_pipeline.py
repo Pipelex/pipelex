@@ -42,7 +42,7 @@ async def dry_run_pipeline(
         library_dirs: Optional library directories for pipe resolution.
 
     Returns:
-        Tuple of (GraphSpec, pipe_code).
+        Tuple of (GraphSpec, domain-qualified main-pipe ref).
 
     Raises:
         PipelexInterpreterError: If content parsing fails or main_pipe is missing.
@@ -53,18 +53,18 @@ async def dry_run_pipeline(
         msg = "mthds_contents must be provided"
         raise ValueError(msg)
 
-    # Pre-parse contents to extract main_pipe_code via the one shared selection rule.
-    # Note: pipeline_run_setup will re-parse these contents. The double-parse is
-    # accepted because the runner interface requires pipe_code upfront and does not
-    # expose the internally-resolved pipe code in its response.
+    # Pre-parse contents to extract the main pipe's domain-qualified ref via the one shared
+    # selection rule. Note: pipeline_run_setup will re-parse these contents. The double-parse
+    # is accepted because the runner interface requires the pipe ref upfront and does not
+    # expose the internally-resolved pipe ref in its response.
     blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-    main_pipe_code = select_primary_blueprint(blueprints).main_pipe_ref
+    main_pipe_ref = select_primary_blueprint(blueprints).main_pipe_ref
 
-    if not main_pipe_code:
+    if not main_pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
         raise PipelexInterpreterError(msg)
 
-    pipe_code: str = main_pipe_code
+    pipe_ref: str = main_pipe_ref
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
@@ -84,7 +84,7 @@ async def dry_run_pipeline(
     # with a configured backend doesn't get trace files written as a side effect of validation.
     with scoped_event_log(InMemoryEventLog()):
         response = await runner.execute(
-            pipe_code=pipe_code,
+            pipe_code=pipe_ref,
             mthds_contents=mthds_contents,
         )
     pipe_output = response.pipe_output
@@ -93,4 +93,4 @@ async def dry_run_pipeline(
         msg = "Pipeline execution did not produce a graph spec"
         raise DryRunGraphNotProducedError(msg)
 
-    return pipe_output.graph_spec, pipe_code
+    return pipe_output.graph_spec, pipe_ref
