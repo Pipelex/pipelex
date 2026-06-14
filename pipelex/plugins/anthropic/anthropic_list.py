@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 async def list_anthropic_models(
     sdk: str,
+    *,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,
@@ -70,6 +71,7 @@ async def list_anthropic_models(
 
 def _display_anthropic_models_flat(
     models: list[ModelInfo],
+    *,
     sdk: str,
     backend_name: str,
     any_listed: bool,
@@ -86,6 +88,7 @@ def _display_anthropic_models_flat(
 
 def _display_anthropic_models_table(
     models: list[ModelInfo],
+    *,
     sdk: str,
     backend_name: str,
 ) -> None:

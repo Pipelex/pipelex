@@ -7,6 +7,7 @@ from pipelex.plugins.plugin_sdk_registry import Plugin
 
 async def openai_list_available_models(
     plugin: Plugin,
+    *,
     backend: InferenceBackend,
 ) -> list[Model]:
     openai_client_async = OpenAIClientFactory.make_openai_client(

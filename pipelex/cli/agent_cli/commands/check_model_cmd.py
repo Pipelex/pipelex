@@ -82,7 +82,7 @@ def agent_check_model_cmd(
         ref = ModelReference.parse(name)
         resolved_model_type = CATEGORY_TO_MODEL_TYPE[model_type]
 
-        candidates = get_collection_keys(model_deck, resolved_model_type, ref.kind)
+        candidates = get_collection_keys(model_deck, model_type=resolved_model_type, kind=ref.kind)
         is_valid = ref.name in candidates
 
         result: dict[str, Any] = {
@@ -94,7 +94,9 @@ def agent_check_model_cmd(
         }
 
         if not is_valid:
-            suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, resolved_model_type, ref.name, ref.kind)
+            suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(
+                model_deck, model_type=resolved_model_type, name=ref.name, kind=ref.kind
+            )
             result["suggestions"] = suggestions
             result["wrong_sigil_hints"] = wrong_sigil_hints
             result["cross_collection_suggestions"] = cross_suggestions

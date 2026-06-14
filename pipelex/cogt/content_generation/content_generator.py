@@ -43,8 +43,8 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 def _revalidate_against_object_class(
     raw_obj: BaseModel,
-    object_class: type[BaseModelTypeVar],
     *,
+    object_class: type[BaseModelTypeVar],
     is_mock_built: bool,
 ) -> BaseModelTypeVar:
     """Re-validate a leaf-generated object's data against the original ``object_class``.
@@ -89,6 +89,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_llm_text(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
@@ -111,6 +112,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_object(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
@@ -129,13 +131,14 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
-        return _revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        return _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
 
     @override
     @update_job_metadata
     async def make_object_list(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
@@ -155,13 +158,17 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment)
         log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
-        return [_revalidate_against_object_class(raw_obj, object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
+        return [
+            _revalidate_against_object_class(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+            for raw_obj in raw_list
+        ]
 
     @override
     @update_job_metadata
     async def make_single_image(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
@@ -190,6 +197,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_image_list(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
@@ -218,6 +226,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_templated_text(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         context: dict[str, Any],
         template: str,
@@ -239,6 +248,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
@@ -266,6 +276,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
+        *,
         cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
@@ -318,6 +329,7 @@ class ContentGenerator(ContentGeneratorProtocol):
     async def make_search_structured(
         self,
         output_structure_class: type[BaseModelTypeVar],
+        *,
         search_assignment: SearchAssignment,
     ) -> BaseModelTypeVar:
         result_dict = await search_gen_structured(

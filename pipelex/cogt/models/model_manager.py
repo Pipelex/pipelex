@@ -64,6 +64,7 @@ class ModelManager(ModelManagerAbstract):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
+        *,
         gateway_config: GatewayConfig | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
@@ -99,6 +100,7 @@ class ModelManager(ModelManagerAbstract):
     def _enforce_gateway_model_membership(
         self,
         gateway_config: GatewayConfig | None,
+        *,
         gateway_config_source: RemoteConfigSource | None,
     ) -> None:
         """Fail loudly when the deck references a handle the gateway should provide but cannot.
@@ -191,6 +193,7 @@ class ModelManager(ModelManagerAbstract):
     def _resolve_terminal_candidates(
         cls,
         deck: ModelDeck,
+        *,
         ref: ModelReference,
         model_type: ModelType,
     ) -> list[str]:
@@ -223,6 +226,7 @@ class ModelManager(ModelManagerAbstract):
     def _collect_candidates(
         cls,
         ref: ModelReference,
+        *,
         aliases: dict[str, str],
         waterfalls: dict[str, list[str]],
         is_fallback_enabled: bool,
@@ -295,7 +299,7 @@ class ModelManager(ModelManagerAbstract):
             raise RuntimeError(msg)
         return self._routing_profile
 
-    def build_deck(self, enabled_backends: list[str], model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
+    def build_deck(self, enabled_backends: list[str], *, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         inference_models: dict[str, InferenceModelSpec] = {}
 
@@ -385,7 +389,7 @@ class ModelManager(ModelManagerAbstract):
         )
 
     @override
-    def get_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec:
+    def get_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
         if self.model_deck is None:
             msg = "Model deck is not initialized"
             raise RuntimeError(msg)

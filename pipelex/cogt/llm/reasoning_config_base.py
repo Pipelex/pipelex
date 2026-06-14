@@ -8,6 +8,7 @@ DISABLED_LEVEL = "disabled"
 
 def validate_effort_to_level_map(
     effort_to_level_map: EffortToLevelMap,
+    *,
     config_name: str,
     level_type: type[StrEnum] | None = None,
 ) -> EffortToLevelMap:
@@ -36,7 +37,7 @@ def validate_effort_to_level_map(
     return effort_to_level_map
 
 
-def get_reasoning_level_str(effort_to_level_map: EffortToLevelMap, effort: ReasoningEffort) -> str | None:
+def get_reasoning_level_str(effort_to_level_map: EffortToLevelMap, *, effort: ReasoningEffort) -> str | None:
     """Look up effort in the map, return None for 'disabled'."""
     level = effort_to_level_map.get(effort)
     if level is None:

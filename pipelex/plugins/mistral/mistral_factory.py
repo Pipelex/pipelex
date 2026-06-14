@@ -365,6 +365,7 @@ class MistralFactory:
     async def make_mistral_document_url_chunk_from_uri(
         cls,
         mistral_client: Mistral,
+        *,
         uri: str,
     ) -> DocumentURLChunkTypedDict:
         """Create a Mistral document_url document from a URI.
@@ -422,6 +423,7 @@ class MistralFactory:
     async def upload_file_to_mistral_for_ocr(
         cls,
         mistral_client: Mistral,
+        *,
         file_path: Path,
     ) -> str:
         """Upload a local file to Mistral.

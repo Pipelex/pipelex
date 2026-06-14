@@ -39,6 +39,7 @@ async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[Gener
 
 async def img_gen_single_image_and_store(
     img_gen_assignment: ImgGenAssignment,
+    *,
     generated_content_factory: GeneratedContentFactory,
 ) -> ImageContent:
     """Generate a single image and store it, returning an ImageContent with URLs (no raw binary data).
@@ -64,6 +65,7 @@ async def img_gen_single_image_and_store(
 
 async def img_gen_image_list_and_store(
     img_gen_assignment: ImgGenAssignment,
+    *,
     generated_content_factory: GeneratedContentFactory,
 ) -> list[ImageContent]:
     """Generate multiple images and store them, returning ImageContent list with URLs (no raw binary data).

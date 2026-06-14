@@ -16,6 +16,7 @@ from pipelex.tools.misc.image_utils import ImageFormat
 
 async def render_page_views_and_store(
     render_assignment: RenderPageViewsAssignment,
+    *,
     generated_content_factory: GeneratedContentFactory,
 ) -> list[ImageContent]:
     """Render PDF pages as images, store them, and return lightweight ImageContent references.

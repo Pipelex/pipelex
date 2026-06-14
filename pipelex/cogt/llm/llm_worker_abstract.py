@@ -83,7 +83,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         """Get the response model name. Override in subclass."""
         return "unknown"
 
-    def _start_otel_span_llm(self, llm_job: LLMJob, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
+    def _start_otel_span_llm(self, llm_job: LLMJob, *, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it.
 
         Always includes full (non-redacted) values in Pipelex attributes for PostHog exporters.
@@ -228,7 +228,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         return span
 
-    def _end_otel_span_with_completion_text(self, span: Span | None, llm_job: LLMJob, completion_text: str) -> None:
+    def _end_otel_span_with_completion_text(self, span: Span | None, *, llm_job: LLMJob, completion_text: str) -> None:
         """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
@@ -259,7 +259,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span.set_status(Status(StatusCode.OK))
         span.end()
 
-    def _end_otel_span_with_completion_object(self, span: Span | None, llm_job: LLMJob, completion_object: BaseModel) -> None:
+    def _end_otel_span_with_completion_object(self, span: Span | None, *, llm_job: LLMJob, completion_object: BaseModel) -> None:
         """End the OTel span, recording usage and status. Safe to call if span is None."""
         if span is None:
             return
@@ -291,7 +291,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         span.set_status(Status(StatusCode.OK))
         span.end()
 
-    def _end_otel_span_with_error(self, span: Span | None, llm_job: LLMJob, error: BaseException) -> None:
+    def _end_otel_span_with_error(self, span: Span | None, *, llm_job: LLMJob, error: BaseException) -> None:
         """End the OTel span, recording the error. Safe to call if span is None."""
         if span is None:
             return
@@ -327,6 +327,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def _after_text_job(
         self,
         span: Span | None,
+        *,
         llm_job: LLMJob,
         result_text: str,
     ):
@@ -341,6 +342,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def _after_object_job(
         self,
         span: Span | None,
+        *,
         llm_job: LLMJob,
         result_object: BaseModel,
     ):
@@ -396,6 +398,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         log.verbose(f"LLM Worker gen_object using {self.desc}")
@@ -433,6 +436,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         pass

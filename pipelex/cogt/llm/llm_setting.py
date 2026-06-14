@@ -95,6 +95,7 @@ class LLMSettingChoices(ConfigModel):
     def make_completed_with_defaults(
         cls,
         for_text: LLMModelChoice | None = None,
+        *,
         for_object: LLMModelChoice | None = None,
     ) -> Self:
         return cls(

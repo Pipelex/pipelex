@@ -103,7 +103,7 @@ class GoogleImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def dimensions_for_aspect_ratio_and_size(cls, model: str, aspect_ratio: AspectRatio, size: GoogleImageSize) -> tuple[int, int]:
+    def dimensions_for_aspect_ratio_and_size(cls, model: str, *, aspect_ratio: AspectRatio, size: GoogleImageSize) -> tuple[int, int]:
         """Get pixel dimensions (width, height) for the given aspect ratio."""
         aspect_ratio_str = cls.aspect_ratio_literal(aspect_ratio)
         match model:

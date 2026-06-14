@@ -86,6 +86,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     async def _extract_pages_from_document(
         self,
         document_uri: str,
+        *,
         extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
         if extract_job_params.should_caption_images:

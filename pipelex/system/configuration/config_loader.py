@@ -165,7 +165,7 @@ class ConfigLoader:
         # Imported lazily to avoid a circular import — config_loader is loaded very early.
         from pipelex.cogt.models.deck_manifest import compute_kit_manifest, write_manifest  # noqa: PLC0415
 
-        write_manifest(global_dir / "inference" / "deck", compute_kit_manifest())
+        write_manifest(global_dir / "inference" / "deck", manifest=compute_kit_manifest())
 
     @classmethod
     def _override_files_for_dir(cls, config_dir: Path, include_run_mode: bool) -> list[Path]:

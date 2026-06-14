@@ -110,6 +110,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
     async def _search_structured(
         self,
         search_job: SearchJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         job_params = search_job.job_params

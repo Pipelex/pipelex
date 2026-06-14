@@ -75,5 +75,5 @@ class TestAssignmentModelsSecurity:
         )
         restored = ObjectAssignment.model_validate_json(assignment.model_dump_json())
         with pytest.raises(UnsafeSchemaError) as exc_info:
-            SchemaToModelFactory.make_from_json_schema(restored.object_class_schema, restored.object_class_name)
+            SchemaToModelFactory.make_from_json_schema(restored.object_class_schema, class_name=restored.object_class_name)
         assert "x-python-import" in str(exc_info.value)

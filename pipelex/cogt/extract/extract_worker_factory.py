@@ -13,6 +13,7 @@ class ExtractWorkerFactory:
     def make_extract_worker(
         cls,
         inference_model: InferenceModelSpec,
+        *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ExtractWorkerAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)

@@ -25,6 +25,7 @@ class GeneratedContentFactory:
     def _build_storage_key(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         data: bytes,
         mime_type: str | None,
@@ -67,6 +68,7 @@ class GeneratedContentFactory:
     async def make_image_content(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
@@ -159,6 +161,7 @@ class GeneratedContentFactory:
     async def make_page_contents(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         extract_output: ExtractOutput,
     ) -> list[PageContent]:

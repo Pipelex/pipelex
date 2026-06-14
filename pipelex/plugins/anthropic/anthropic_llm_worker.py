@@ -112,7 +112,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     # Instance methods
     #########################################################
 
-    def _build_thinking_params(self, job_params: LLMJobParams, max_tokens: int) -> _ThinkingParams:
+    def _build_thinking_params(self, job_params: LLMJobParams, *, max_tokens: int) -> _ThinkingParams:
         """Build thinking-related SDK parameters from job params and model spec.
 
         Args:
@@ -145,6 +145,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_params_for_effort(
         self,
         thinking_mode: ThinkingMode,
+        *,
         effort: ReasoningEffort,
         max_tokens: int,
     ) -> _ThinkingParams:
@@ -199,6 +200,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_params_for_budget(
         self,
         thinking_mode: ThinkingMode,
+        *,
         budget: int,
         max_tokens: int,
     ) -> _ThinkingParams:
@@ -307,6 +309,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params

@@ -201,6 +201,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         """Generate multiple images by calling _gen_image multiple times.

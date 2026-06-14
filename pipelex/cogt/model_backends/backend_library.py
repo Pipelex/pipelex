@@ -58,6 +58,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def load(
         self,
         secrets_provider: SecretsProviderAbstract,
+        *,
         backends_library_path: str,
         backends_dir_path: str,
         include_disabled: bool = False,
@@ -227,6 +228,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def _load_gateway_model_specs(
         self,
         gateway_config: GatewayConfig,
+        *,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
@@ -265,6 +267,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def _load_local_model_specs(
         self,
         backend_name: str,
+        *,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
@@ -294,7 +297,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise InferenceBackendLibraryError(msg) from exc
         return model_specs_dict, f"file '{path_to_model_specs_toml}'"
 
-    def check_backend_credentials(self, path: str, include_disabled: bool = False) -> CredentialsValidationReport:
+    def check_backend_credentials(self, path: str, *, include_disabled: bool = False) -> CredentialsValidationReport:
         """Check if required environment variables are set for enabled backends.
 
         This method loads backend configurations and extracts variable placeholders

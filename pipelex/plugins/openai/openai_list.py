@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 async def list_openai_models(
     sdk: str,
+    *,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,
@@ -47,6 +48,7 @@ async def list_openai_models(
 
 def _display_openai_models_flat(
     models: list[Model],
+    *,
     sdk: str,
     backend_name: str,
     any_listed: bool,
@@ -67,6 +69,7 @@ def _display_openai_models_flat(
 
 def _display_openai_models_table(
     models: list[Model],
+    *,
     sdk: str,
     backend_name: str,
 ) -> None:

@@ -45,7 +45,7 @@ class TestDeckManifest:
     def test_manifest_round_trip(self, tmp_path: Path) -> None:
         manifest = DeckManifest(kit_version="1.2.3", files={"1_llm_deck.toml": "hash-a", "2_img_gen_deck.toml": "hash-b"})
         deck_dir = tmp_path / "deck"
-        write_manifest(deck_dir, manifest)
+        write_manifest(deck_dir, manifest=manifest)
         assert manifest_path(deck_dir).is_file()
 
         reloaded = read_manifest(deck_dir)
@@ -141,7 +141,7 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, contents)
         self._seed_installed(deck_dir, contents)
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(deck_dir, compute_kit_manifest())
+        write_manifest(deck_dir, manifest=compute_kit_manifest())
 
         report = compute_deck_sync_report(deck_dir)
         assert report.is_clean()
@@ -153,7 +153,7 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "old"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "old"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(deck_dir, compute_kit_manifest())
+        write_manifest(deck_dir, manifest=compute_kit_manifest())
 
         # Simulate a kit upgrade — the file content has moved on but the user has not edited theirs.
         (kit_dir / "1_llm_deck.toml").write_text("new", encoding="utf-8")
@@ -170,7 +170,7 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "kit-version"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "kit-version"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(deck_dir, compute_kit_manifest())
+        write_manifest(deck_dir, manifest=compute_kit_manifest())
 
         # User edits their installed file, kit unchanged.
         (deck_dir / "1_llm_deck.toml").write_text("user-edited", encoding="utf-8")
@@ -185,7 +185,9 @@ class TestDeckManifest:
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "a"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
         # Manifest captures only the file that existed at install time.
-        write_manifest(deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": compute_file_sha256(deck_dir / "1_llm_deck.toml")}))
+        write_manifest(
+            deck_dir, manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+        )
 
         report = compute_deck_sync_report(deck_dir)
         assert report.files["5_new_deck.toml"] == DeckFileStatus.KIT_ADDED
@@ -199,7 +201,7 @@ class TestDeckManifest:
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.1.0")
         write_manifest(
             deck_dir,
-            DeckManifest(
+            manifest=DeckManifest(
                 kit_version="1.0.0",
                 files={
                     "1_llm_deck.toml": compute_file_sha256(deck_dir / "1_llm_deck.toml"),
@@ -218,7 +220,7 @@ class TestDeckManifest:
         self._seed_kit(mocker, kit_dir, {"1_llm_deck.toml": "kit"})
         self._seed_installed(deck_dir, {"1_llm_deck.toml": "kit", "cookbook.toml": "user-content"})
         mocker.patch.object(deck_manifest, "get_package_version", return_value="1.0.0")
-        write_manifest(deck_dir, compute_kit_manifest())
+        write_manifest(deck_dir, manifest=compute_kit_manifest())
 
         report = compute_deck_sync_report(deck_dir)
         assert "cookbook.toml" not in report.files
@@ -274,7 +276,7 @@ class TestDeckManifest:
     ) -> None:
         deck_dir = tmp_path / "deck"
         deck_dir.mkdir()
-        write_manifest(deck_dir, DeckManifest(kit_version=manifest_version, files={}))
+        write_manifest(deck_dir, manifest=DeckManifest(kit_version=manifest_version, files={}))
         mocker.patch.object(deck_manifest, "get_package_version", return_value=current_version)
 
         assert is_deck_stale_fast(deck_dir) is expected_stale

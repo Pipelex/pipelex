@@ -191,6 +191,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
     async def _extract_base64_url(
         self,
         extract_job: ExtractJob,
+        *,
         base64_url: str,
         should_include_images: bool = False,
     ) -> ExtractOutput:

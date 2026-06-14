@@ -27,7 +27,7 @@ class OpenAIConfig(ConfigModel):
     @field_validator("effort_to_level_map")
     @classmethod
     def validate_effort_map(cls, value: EffortToLevelMap) -> EffortToLevelMap:
-        return validate_effort_to_level_map(value, "openai_config", level_type=OpenAIReasoningLevel)
+        return validate_effort_to_level_map(value, config_name="openai_config", level_type=OpenAIReasoningLevel)
 
     def get_reasoning_level(self, effort: ReasoningEffort) -> "ChatCompletionReasoningEffort | None":
         """Resolve a ReasoningEffort to an OpenAI ChatCompletionReasoningEffort value.
@@ -36,7 +36,7 @@ class OpenAIConfig(ConfigModel):
             The OpenAI effort value, or None if reasoning is disabled.
 
         """
-        level_str = get_reasoning_level_str(self.effort_to_level_map, effort)
+        level_str = get_reasoning_level_str(self.effort_to_level_map, effort=effort)
         if level_str is None:
             return None
         openai_level = OpenAIReasoningLevel(level_str)

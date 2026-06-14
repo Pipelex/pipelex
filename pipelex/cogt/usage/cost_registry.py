@@ -64,6 +64,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
     def generate_report(
         cls,
         pipeline_run_id: str,
+        *,
         tokens_usages: Sequence[TokensUsage],
         unit_scale: float,
         cost_report_file_path: Path | None = None,
@@ -188,10 +189,10 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             console.print(" [dim]Note: some costs might be missing or not up-to-date.[/dim]")
 
         if cost_report_file_path:
-            cls.save_to_csv(records, cost_report_file_path)
+            cls.save_to_csv(records, file_path=cost_report_file_path)
 
     @staticmethod
-    def save_to_csv(records: list[dict[str, Any]], file_path: Path) -> None:
+    def save_to_csv(records: list[dict[str, Any]], *, file_path: Path) -> None:
         """Save records to CSV file."""
         if not records:
             return
@@ -210,7 +211,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             writer.writerows(records)
 
     @classmethod
-    def compute_total_cost(cls, input_non_cached_cost: float, input_cached_cost: float, output_cost: float) -> float:
+    def compute_total_cost(cls, input_non_cached_cost: float, *, input_cached_cost: float, output_cost: float) -> float:
         return input_non_cached_cost + input_cached_cost + output_cost
 
     @classmethod

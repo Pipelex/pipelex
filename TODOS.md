@@ -147,19 +147,21 @@ Order: `core/` → `language/` → `kit/` → `libraries/`. Same per-package loo
 
 Order: `cogt/` → `plugins/`. `plugins/` wraps external LLM SDKs — watch for adapter functions handed to SDK callbacks (carve out / allowlist as needed). Respect `pipelex/builder/CLAUDE.md` spec-vs-blueprint boundaries if any spec code is touched here.
 
-- [ ] `cogt/`
-- [ ] `plugins/`
-- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
+- [x] `cogt/` — 139 cleared.
+- [x] `plugins/` — 50 cleared.
+- [x] Changelog under `[Unreleased]` (Changed section); left uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT D — Wave 3 landed
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint D reached & verified (2026-06-14):**
 
-- What landed this wave (files changed, left uncommitted in the working tree):
-- Remaining baseline count (link to `state.md`):
-- Decisions / edge cases this wave (esp. plugin/SDK callback signatures):
-- Deferred / surprises:
-- Next action:
+- **What landed (all uncommitted on `refactor/Function-calling-4`):** Wave 3 converted `cogt/` + `plugins/` to keyword-only — baseline **540 → 351** (189 cleared, the exact Wave 3 target). Working-tree diff (~127 files): the source files in `cogt/` + `plugins/` (bare `*` after subject), their call sites tree-wide (incl. `tests/`, `cli/`, `temporal/`, `system/`), the `@override` impl signatures forced by the now-keyword-only `cogt/` protocols/abstracts (`ContentGeneratorProtocol`, `LLMWorkerAbstract`/`ImgGenWorkerAbstract`/`SearchWorkerAbstract`, `PluginFactoryAbstract`, `InferenceManagerProtocol`, `ModelManagerAbstract`) + the deep `make_extras` cascade (`OpenAICompletionsFactory`/`OpenAIResponsesFactory` bases → `plugins/{blackboxai,openrouter,portkey,gateway}` overrides + the Temporal in-workflow content generator), the dry-mock `_ReportLLMJobFunc` → keyword-only `Protocol` conversion, the `SchemaToModelFactory._restricted_import` carve-out, `CHANGELOG.md`, regenerated `violations-baseline.txt` (351), `wip/keyword-only-args/state.md`, and this file.
+- **Verification:** `make agent-check` green (pyright 0, mypy 2190 ok, guard PASSED 351 known-debt); full `make agent-test` GREEN; guard unit tests 32/32.
+- **Remaining baseline:** 351 — per-package table in [`state.md`](wip/keyword-only-args/state.md). Both Wave 3 packages fully pruned to 0.
+- **Execution:** run as a Workflow (Wave 2 recipe) — a 14-agent file-disjoint signature barrier (189 funcs: 188 added-star, 1 moved-star, zero needs-manual/not-found), then a main-loop-driven pyright converge with an 11-batch fixer fan-out (~5 files each). Converge went 154 → 8 actionable in one pass; the 8 residuals (deep `make_extras` override cascade + 2 missed call sites) hand-fixed. No rate limits (the Wave 2 mitigation held).
+- **Decisions / edge cases this wave:** (1) **`_restricted_import` carve-out** — installed as the exec sandbox's `__import__`, so the interpreter calls it positionally; the keyword-only conversion passed agent-check but caused **155 agent-test failures** (every structured-object-gen path, incl. all the Temporal tracing/isolation tests). Reverted to positional + `# kw-only: ignore`. The recurrence of the Wave 1 Jinja2 lesson: framework/interpreter-registered callbacks stay positional, and only `make agent-test` catches them. (2) **`_ReportLLMJobFunc` callback type** — a keyword-only callback contract needs a `Protocol` with keyword-only `__call__`, not a `Callable[[...]]` alias (which can't express keyword-only). (3) **Deep override cascade surfaces level-by-level** — the 6 `make_extras` subclass overrides only appeared in pyright's *second* pass; re-run pyright until genuinely 0.
+- **Deferred / surprises:** the plan flagged *plugins SDK* callbacks as the risk; the actual callback casualties were both in `cogt/content_generation/`. No deferred design tradeoffs this wave.
+- **Next action:** Begin **Wave 4 / Phase 5** — execution path `pipe_operators/` (40) → `pipe_controllers/` (6) → `pipe_run/` (16) → `pipeline/` (15) → `graph/` (39), plus `runtime_bridge/` (13) and `pipe_signature/` (2). Reuse the Workflow recipe in `state.md`. `pipe_operators/` + `pipe_controllers/` already carry their `@override` `*` from Waves 2–3 — only their own non-override signatures remain. **Nothing is committed; the user reviews the working tree and pushes before Wave 4 cold-starts.**
 
 ---
 

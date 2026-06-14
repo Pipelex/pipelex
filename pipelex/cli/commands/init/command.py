@@ -357,7 +357,7 @@ def execute_initialization(
 
             # Stamp the deck manifest so future updates can detect drift and
             # `pipelex update` knows the exact kit version this install came from.
-            write_manifest(target_deck_dir, compute_kit_manifest())
+            write_manifest(target_deck_dir, manifest=compute_kit_manifest())
 
             # Reset routing_profiles.toml
             template_routing_path = template_inference_dir / "routing_profiles.toml"

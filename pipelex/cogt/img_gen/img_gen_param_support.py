@@ -59,6 +59,7 @@ class ImgGenParamSupport:
     def check_aspect_ratio(
         cls,
         rules: ImgGenModelRules,
+        *,
         aspect_ratio: AspectRatio,
         size: ImageSize | None,
         model_name: str,
@@ -86,6 +87,7 @@ class ImgGenParamSupport:
     def check_background(
         cls,
         rules: ImgGenModelRules,
+        *,
         background: Background,
         model_name: str,
     ) -> SupportCheck:
@@ -111,6 +113,7 @@ class ImgGenParamSupport:
     def check_output_format(
         cls,
         rules: ImgGenModelRules,
+        *,
         output_format: ImageFormat | None,
     ) -> SupportCheck:
         taxonomy_value = rules.get(ImgGenArgTopic.OUTPUT_FORMAT)
@@ -134,6 +137,7 @@ class ImgGenParamSupport:
     def check_input_fidelity(
         cls,
         rules: ImgGenModelRules,
+        *,
         input_fidelity: InputFidelity | None,
         model_name: str,
     ) -> SupportCheck:
@@ -162,6 +166,7 @@ class ImgGenParamSupport:
     def check_input_images_topic(
         cls,
         rules: ImgGenModelRules,
+        *,
         has_input_images: bool,
     ) -> SupportCheck:
         if not has_input_images:
@@ -178,6 +183,7 @@ class ImgGenParamSupport:
     def check_job_params(
         cls,
         rules: ImgGenModelRules,
+        *,
         params: ImgGenJobParams,
         model_name: str,
         has_input_images: bool = False,

@@ -104,6 +104,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
     def make_portkey_openai_client_for_completions(
         cls,
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -137,6 +138,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
     def make_extract_output_from_response(
         cls,
         inference_model: InferenceModelSpec,
+        *,
         response: GenericResponse,
     ) -> ExtractOutput:
         extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=inference_model.name)
@@ -365,6 +367,6 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return GatewayFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

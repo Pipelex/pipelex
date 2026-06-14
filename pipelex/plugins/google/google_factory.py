@@ -76,7 +76,7 @@ class GoogleFactory:
         return genai_types.Content(parts=parts, role="user")
 
     @classmethod
-    def extract_text_from_response(cls, response: genai_types.GenerateContentResponse, model_desc: str) -> str:
+    def extract_text_from_response(cls, response: genai_types.GenerateContentResponse, *, model_desc: str) -> str:
         """Extract text from a Google Gemini response, skipping thinking parts.
 
         Args:

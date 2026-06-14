@@ -10,6 +10,7 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 def load_active_routing_profile(
     routing_profile_library_path: str,
+    *,
     enabled_backends: list[str],
     lenient: bool = False,
 ) -> RoutingProfile:

@@ -9,6 +9,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 
 async def render_template(
     template: str,
+    *,
     category: TemplateCategory,
     context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,

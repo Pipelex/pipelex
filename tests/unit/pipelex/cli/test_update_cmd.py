@@ -61,7 +61,8 @@ class TestUpdateCmd:
         # Kit has moved on, but the install hasn't yet.
         (kit_dir / "1_llm_deck.toml").write_text("v2-content", encoding="utf-8")
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         self._patch_version(mocker, "1.1.0")
 
@@ -82,7 +83,8 @@ class TestUpdateCmd:
     def test_clean_behind_overwrites_without_backup(self, mocker: MockerFixture, kit_and_deck: tuple[Path, Path]) -> None:
         kit_dir, deck_dir = kit_and_deck
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         (kit_dir / "1_llm_deck.toml").write_text("v2-content", encoding="utf-8")
         self._patch_version(mocker, "1.1.0")
@@ -96,7 +98,8 @@ class TestUpdateCmd:
     def test_locally_modified_creates_backup_and_overwrites(self, mocker: MockerFixture, kit_and_deck: tuple[Path, Path]) -> None:
         kit_dir, deck_dir = kit_and_deck
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         (deck_dir / "1_llm_deck.toml").write_text("user-edits", encoding="utf-8")
         (kit_dir / "1_llm_deck.toml").write_text("v2-content", encoding="utf-8")
@@ -113,7 +116,8 @@ class TestUpdateCmd:
     def test_no_backup_flag_skips_backup(self, mocker: MockerFixture, kit_and_deck: tuple[Path, Path]) -> None:
         kit_dir, deck_dir = kit_and_deck
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         (deck_dir / "1_llm_deck.toml").write_text("user-edits", encoding="utf-8")
         (kit_dir / "1_llm_deck.toml").write_text("v2-content", encoding="utf-8")
@@ -127,7 +131,8 @@ class TestUpdateCmd:
     def test_kit_added_installs_new_file(self, mocker: MockerFixture, kit_and_deck: tuple[Path, Path]) -> None:
         kit_dir, deck_dir = kit_and_deck
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         (kit_dir / "5_new_deck.toml").write_text("brand-new", encoding="utf-8")
         self._patch_version(mocker, "1.1.0")
@@ -141,7 +146,7 @@ class TestUpdateCmd:
         (deck_dir / "9_retired_deck.toml").write_text("retired-content", encoding="utf-8")
         write_manifest(
             deck_dir,
-            DeckManifest(
+            manifest=DeckManifest(
                 kit_version="1.0.0",
                 files={
                     "1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml"),
@@ -171,7 +176,8 @@ class TestUpdateCmd:
     def test_yes_flag_skips_confirm(self, mocker: MockerFixture, kit_and_deck: tuple[Path, Path]) -> None:
         kit_dir, deck_dir = kit_and_deck
         write_manifest(
-            deck_dir, DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")})
+            deck_dir,
+            manifest=DeckManifest(kit_version="1.0.0", files={"1_llm_deck.toml": deck_manifest.compute_file_sha256(deck_dir / "1_llm_deck.toml")}),
         )
         (kit_dir / "1_llm_deck.toml").write_text("v2-content", encoding="utf-8")
         self._patch_version(mocker, "1.1.0")

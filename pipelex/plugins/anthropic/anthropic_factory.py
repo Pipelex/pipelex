@@ -37,6 +37,7 @@ class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
         try:
@@ -101,7 +102,7 @@ class AnthropicFactory:
         return image_block_param
 
     @staticmethod
-    def _make_document_block_param(prepped_document: PreparedFile, title: str | None = None) -> DocumentBlockParam:
+    def _make_document_block_param(prepped_document: PreparedFile, *, title: str | None = None) -> DocumentBlockParam:
         """Convert a PreparedFile to an Anthropic DocumentBlockParam."""
         document_block_param: DocumentBlockParam
         match prepped_document:
@@ -168,6 +169,7 @@ class AnthropicFactory:
     def openai_typed_user_message(
         cls,
         user_content_txt: str,
+        *,
         prepped_user_images: list[PreparedFile] | None = None,
         prepped_user_documents: list[tuple[PreparedFile, str | None]] | None = None,
     ) -> "ChatCompletionMessageParam":
@@ -239,7 +241,7 @@ class AnthropicFactory:
         return nb_tokens_by_category
 
     @staticmethod
-    def make_nb_tokens_by_category_from_nb(nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
+    def make_nb_tokens_by_category_from_nb(nb_input: int, *, nb_output: int) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: nb_input,
             TokenCategory.OUTPUT: nb_output,
