@@ -52,11 +52,11 @@ async def build_inputs_for_pipe(
         blueprints = validate_bundle_result.blueprints
         if not pipe_code:
             # Domain-qualified main pipe of the primary blueprint — the one shared selection rule.
-            main_pipe_code = select_primary_blueprint(blueprints).main_pipe_ref
-            if not main_pipe_code:
+            main_pipe_ref = select_primary_blueprint(blueprints).main_pipe_ref
+            if not main_pipe_ref:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
                 raise ValueError(msg)
-            pipe_code = main_pipe_code
+            pipe_code = main_pipe_ref
     elif bundle_path:
         # allow_signatures=True: see the mthds_contents branch — rendering inputs tolerates placeholders.
         validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, allow_signatures=True)

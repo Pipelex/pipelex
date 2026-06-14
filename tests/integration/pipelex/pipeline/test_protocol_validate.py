@@ -101,7 +101,7 @@ class TestProtocolValidate:
             assert report.is_runnable is True
             assert report.bundle_blueprint.domain == "protocol_validate"
             # `pipe_io_contracts` and `validated_pipes` are keyed/identified by namespaced pipe_ref.
-            assert report.pipe_io_contracts["protocol_validate.summarize"].output.concept_code == "protocol_validate.Summary"
+            assert report.pipe_io_contracts["protocol_validate.summarize"].output.concept_ref == "protocol_validate.Summary"
             assert {(entry["pipe_ref"], entry["status"]) for entry in report.validated_pipes} == {
                 ("protocol_validate.summarize", DryRunStatus.SUCCESS)
             }
