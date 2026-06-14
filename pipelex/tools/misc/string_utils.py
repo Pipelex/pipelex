@@ -346,15 +346,15 @@ def matches_wildcard_pattern(text: str, *, pattern: str) -> bool:
         True if the text matches the pattern
 
     Examples:
-        >>> matches_wildcard_pattern("claude-3-sonnet", "claude-*")
+        >>> matches_wildcard_pattern("claude-3-sonnet", pattern="claude-*")
         True
-        >>> matches_wildcard_pattern("gpt-4o-mini", "*mini")
+        >>> matches_wildcard_pattern("gpt-4o-mini", pattern="*mini")
         True
-        >>> matches_wildcard_pattern("mistral-large", "*large*")
+        >>> matches_wildcard_pattern("mistral-large", pattern="*large*")
         True
-        >>> matches_wildcard_pattern("any-model", "*")
+        >>> matches_wildcard_pattern("any-model", pattern="*")
         True
-        >>> matches_wildcard_pattern("exact-match", "exact-match")
+        >>> matches_wildcard_pattern("exact-match", pattern="exact-match")
         True
 
     """

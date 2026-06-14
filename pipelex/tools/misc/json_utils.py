@@ -245,7 +245,7 @@ def deep_update(target_dict: dict[str, Any], *, updates: Mapping[str, Any]):
     Example:
         >>> base = {"a": 1, "b": {"x": 2, "y": 3}, "c": [1, 2]}
         >>> updates = {"b": {"y": 4, "z": 5}, "c": [3, 4]}
-        >>> deep_update(base, updates)
+        >>> deep_update(base, updates=updates)
         >>> print(base)
         {'a': 1, 'b': {'x': 2, 'y': 4, 'z': 5}, 'c': [3, 4]}
 

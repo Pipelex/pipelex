@@ -28,7 +28,7 @@ def insert_before(dictionary: dict[K, V], *, target_key: K, new_key: K, new_valu
 
     Example:
         >>> d = {'a': 1, 'c': 3}
-        >>> insert_before(d, 'c', 'b', 2)
+        >>> insert_before(d, target_key='c', new_key='b', new_value=2)
         {'a': 1, 'b': 2, 'c': 3}
 
     """
@@ -64,7 +64,7 @@ def apply_to_strings_recursive(data: Any, *, transform_func: Callable[[str], str
 
     Example:
         >>> data = {'a': 'hello ${USER}', 'b': [1, 'world ${HOME}'], 'c': {'d': 'test ${PATH}'}}
-        >>> result = apply_to_strings_recursive(data, lambda s: s.replace('${USER}', 'john'))
+        >>> result = apply_to_strings_recursive(data, transform_func=lambda s: s.replace('${USER}', 'john'))
         >>> # Returns: {'a': 'hello john', 'b': [1, 'world ${HOME}'], 'c': {'d': 'test ${PATH}'}}
 
     """
@@ -120,7 +120,7 @@ def substitute_nested_in_context(context: dict[str, Any], *, extra_params: dict[
     Example:
         >>> context = {}
         >>> extra_params = {"foo.bar.blip": "hello"}
-        >>> substitute_nested_in_context(context, extra_params)
+        >>> substitute_nested_in_context(context, extra_params=extra_params)
         >>> context
         {'foo': {'bar': {'blip': 'hello'}}}
 
