@@ -1,6 +1,6 @@
 # Keyword-only arguments convention
 
-This is the canonical convention for keyword-only function parameters across the `pipelex/` source tree (tests are out of scope). The goal is self-documenting call sites: when a function takes more than one meaningful argument, the caller must name them, so `do_thing(retries=3, timeout=30)` is forced over the unreadable `do_thing(3, 30)`. The convention is mechanically enforced by an AST guard (the `check-keyword-only` dev command, wired into the `make check` family); this document is the human-readable specification that guard implements.
+This is the canonical convention for keyword-only function parameters across the `pipelex/` source tree (tests are out of scope). The goal is self-documenting call sites: when a function takes more than one meaningful argument, the caller must name them, so `do_thing(retries=3, timeout=30)` is forced over the unreadable `do_thing(3, 30)`. The convention is mechanically enforced by an AST guard (the `check-keyword-only` dev command, wired into both `make agent-check` and the `make check` family, and gated in CI). The `pipelex/` source tree is fully compliant, so the guard hard-blocks on **any** violation: new code must follow this convention or it fails the build. This document is the human-readable specification that guard implements.
 
 ## The rule
 
@@ -168,8 +168,19 @@ A pydantic validator — skipped by decorator; pydantic owns the positional prot
 def normalize(cls, value, info): ...
 ```
 
-## Rollout
+## Enforcement
 
-The guard ships red-to-green, not as a one-shot cleanup. On introduction the guard records the current set of violations to a baseline file; the build fails only on NEW violations not present in the baseline, and the baseline shrinks as packages are migrated to the convention. This lets the rule be enforced immediately for new code while the existing population is converted package by package. The baseline is removed once the source tree is fully compliant.
+The entire `pipelex/` source tree is compliant, so the guard hard-blocks on **any** violation — there is no baseline and no tolerated debt. The guard runs in three places:
 
-Known limitation (documented, not silently ignored): the baseline key is `<relative_path>::<qualified_name>` with no signature or parameter-count component, so the guard tolerates *growth* of an already-baselined function — adding more positional-or-keyword params to a function that is already a known violation does not trip the build. This is acceptable: a baselined function is already non-compliant and slated for migration, the convention's atomic unit is binary (the bare `*` is either present or not), and the exposure is bounded by the burn-down, after which the baseline is deleted entirely. A signature-aware key was deliberately rejected: keying on parameter count would flag *partial improvements* — shrinking a baselined `f(a, b, c, d)` to `f(a, b, c)` would change the key, drop the old entry to stale, and fail CI on a function that got strictly better — which is exactly contrary to the red-to-green philosophy above.
+- `make agent-check` — the fast everyday gate, so a new violation surfaces in the tight edit loop.
+- `make check` — the heavy aggregate gate.
+- CI — a dedicated lint job (`lint-keyword-only` in `.github/workflows/lint-check.yml`) gated by the required `Lint (all)` status check, so no non-compliant signature can merge.
+
+When you add or change a signature, place the bare `*` after the subject. If the type checker is blind to how a function is called (a framework or the interpreter invokes it positionally — a Jinja2 filter, an `__import__` hook, an aiohttp route handler, a PostHog `on_error` callback), the guard cannot detect that statically; the carve-outs above cover the known cases, and a genuinely justified one-off uses the `# kw-only: ignore` escape hatch. `make agent-test` is the safety net for these dynamic call surfaces — pyright/mypy will pass a wrongly-keywordized callback that the suite then catches at runtime.
+
+Run the guard directly to see the full picture:
+
+```bash
+make check-keyword-only            # alias: make cko — one line on pass, the full violation list on fail
+.venv/bin/pipelex-dev check-keyword-only --report   # full inventory grouped by package
+```

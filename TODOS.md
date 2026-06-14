@@ -2,7 +2,7 @@
 
 Make non-subject function parameters **keyword-only** across the `pipelex/` runtime, so call sites are self-documenting (a dev or SWE agent can read a call and know what each argument means without opening the definition). Build an enforcement guard *first*, then burn down the existing code package-by-package behind it.
 
-This file is the master tracker. Detailed convention spec and the running cold-start state live under `wip/keyword-only-args/` (created in Phase 1). Use the checkboxes to track progress; **do not skip the mandatory checkpoints** — each is a hard stop where the running agent must verify, snapshot context, and hand off cleanly.
+This file is the master tracker. **Status: COMPLETE — all phases done (Checkpoint G reached 2026-06-14).** The convention has been promoted to its permanent home at [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) and summarized as a standing rule in the contributor `CLAUDE.md` / `AGENTS.md`; the `wip/keyword-only-args/` track folder has been retired. This tracker remains as the historical record of the refactor (per-checkpoint cold-start snapshots reference paths as they were at the time). Use the checkboxes to track progress; **do not skip the mandatory checkpoints** — each is a hard stop where the running agent must verify, snapshot context, and hand off cleanly.
 
 ## Locked decisions
 
@@ -40,7 +40,7 @@ Adding `*` to a signature is the easy 5%. The moment `def f(a, *, b, c)` exists,
 - [x] Branch `refactor/Function-calling-1` created (off `refactor/Function-calling`) for this work.
 - **No PR per wave/checkpoint.** The agent does **not** commit, stage, or open PRs. Each wave's changes are left **uncommitted and unstaged** in the working tree at its checkpoint. The user reviews the working tree and commits/pushes the changes themselves before cold-starting the next phase.
 - Land each wave as a coherent, reviewable unit anyway: keep the working-tree diff scoped to one wave so the user's review and push stay clean.
-- [ ] Changelog entries go under the `[Unreleased]` section as waves land.
+- [x] Changelog entries go under the `[Unreleased]` section as waves land.
 
 ## Tooling approach
 
@@ -216,21 +216,23 @@ Order: `builder/` → `temporal/` → `system/` → `cli/` → top-level `hub.py
 
 ## Phase 7 — Flip to fully enforced & document
 
-- [ ] Confirm the baseline file is empty (no remaining known violations).
-- [ ] Make the guard hard-block on **any** violation; remove baseline scaffolding (or keep an empty baseline + a comment that it must stay empty).
-- [ ] Confirm `check-keyword-only` is in the `make check` aggregate and runs in CI.
-- [ ] Document the convention as a standing rule in `CLAUDE.md` (Pipelex coding rules) so new code follows it, linking to `wip/keyword-only-args/convention.md` (or promote the convention doc out of `wip/` to its permanent home).
-- [ ] Final changelog entry under `[Unreleased]` summarizing the refactor + the new guard.
-- [ ] Fold/retire the `wip/keyword-only-args/` track per the wip-docs convention once the work is done.
+- [x] Confirm the baseline file is empty (no remaining known violations).
+- [x] Make the guard hard-block on **any** violation; remove baseline scaffolding (or keep an empty baseline + a comment that it must stay empty). **Chose full removal** — deleted the baseline file, the `BASELINE_PATH` constant, the `load_baseline` / `write_baseline` / `partition_violations` / `_warn_stale_baseline` helpers, and the `--regen-baseline` CLI flag; the guard now fails on ANY violation. Also removed the 2 baseline-behaviour unit tests (which fixed a latent two-`TestClass`-per-module convention break).
+- [x] Confirm `check-keyword-only` is in the `make check` aggregate and runs in CI. It was already in `make check` + `make agent-check`; added a dedicated `lint-keyword-only` job to `.github/workflows/lint-check.yml`, wired into the required `Lint (all)` aggregator's `needs` + failure check.
+- [x] Document the convention as a standing rule in `CLAUDE.md` (Pipelex coding rules) so new code follows it, linking to the convention doc. **Promoted the convention out of `wip/` to its permanent home** at `docs/contribute/keyword-only-arguments.md` (added to the mkdocs nav under Project). The standing-rule summary was added to the kit rules **source** `pipelex/kit/agent_rules/pipelex_standards.md` (NOT the generated `CLAUDE.md` directly) and regenerated into `CLAUDE.md` + `AGENTS.md` via `make rules`; `make check-rules` confirms they are in sync.
+- [x] Final changelog entry under `[Unreleased]` summarizing the refactor + the new guard.
+- [x] Fold/retire the `wip/keyword-only-args/` track per the wip-docs convention once the work is done. **Retired the `wip/keyword-only-args/` folder** — convention promoted to `docs/`; the completed-migration scaffolding (baseline / inventory / "next: Phase 7" state log / README / workflow scripts) was removed (its lessons live in these checkpoint snapshots + memory). The one genuinely-open deferred record — the cross-repo lockstep work — was **preserved**, folded to a single self-describing file at the wip root: [`wip/keyword-only-arguments-downstream-consumer-breakage.md`](wip/keyword-only-arguments-downstream-consumer-breakage.md). A `./wip/` folder is intentionally kept.
 
 ### 🛑 CHECKPOINT G — fully enforced, documented, done
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint G reached & verified (2026-06-14):**
 
-- Guard now hard-blocking? CI confirmed?
-- Convention documented where:
-- Final `make agent-test` result:
-- Anything intentionally left out of scope (e.g. `tests/`):
+- **Guard now hard-blocking? CI confirmed?** Yes to both. The baseline scaffolding is fully removed; `pipelex-dev check-keyword-only` collects violations and fails on ANY (no baseline, no `--regen-baseline`). It runs in `make agent-check`, in the `make check` aggregate, and in a new `lint-keyword-only` CI job gated by the required `Lint (all)` status check in `.github/workflows/lint-check.yml`.
+- **Convention documented where:** permanent home `docs/contribute/keyword-only-arguments.md` (in the mkdocs nav under Project, "Keyword-Only Arguments"); standing-rule summary in the generated contributor `CLAUDE.md` / `AGENTS.md`, authored in the kit source `pipelex/kit/agent_rules/pipelex_standards.md` and regenerated via `make rules` (verified in sync by `make check-rules`). The guard module docstring and the convention doc both point at the new path; no references to the old `wip/` path remain in source.
+- **What landed (all uncommitted on `refactor/Function-calling-4`):** guard rewrite (`pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py` — baseline scaffolding removed, hard-block; docstrings de-baselined) + CLI wrapper (`_dev_cli.py` — dropped `--regen-baseline`) + unit tests (removed the baseline `TestClass`, 32 → 30 tests) + CI (`lint-check.yml` new job) + the promoted convention doc (`docs/contribute/keyword-only-arguments.md`, Rollout→Enforcement section rewritten to current reality) + mkdocs nav + kit rule source + regenerated `CLAUDE.md`/`AGENTS.md` + `CHANGELOG.md` final entry + this tracker; the **retirement** of the `wip/keyword-only-args/` folder (completed-migration scaffolding removed); and the preserved deferred-work record `wip/keyword-only-arguments-downstream-consumer-breakage.md`.
+- **Final `make agent-test` result:** GREEN (exit 0, "All tests passed"). The change set is dev-tooling + docs + CI + generated-rules only; no shipped runtime code changed.
+- **`make agent-check`:** green — pyright 0, mypy 2191 ok, guard PASSED (no baseline). Guard unit tests 30/30. `make check-rules` PASSED.
+- **Anything intentionally left out of scope:** `tests/` call sites remain positional by design (tests call internals positionally on purpose — locked decision #1). The four symmetric-tuple allowlist entries and the framework/interpreter `# kw-only: ignore` carve-outs (aiohttp `_apply`, `sys.excepthook`, PostHog `on_error` ×2, polyfactory `PostGenerated`, `__import__`, pytest hookimpl) are the sanctioned permanent exceptions. TODOS.md itself is left in place as the historical record (it may be deleted now that the work is complete).
 
 ---
 

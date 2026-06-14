@@ -3,8 +3,10 @@
 Non-subject function parameters must be keyword-only so call sites are self-documenting:
 ``do_thing(retries=3, timeout=30)`` is forced over the opaque ``do_thing(3, 30)``.
 
-The canonical human-readable specification lives in ``wip/keyword-only-args/convention.md``.
-This module is the AST guard that mechanically enforces it.
+The canonical human-readable specification lives in ``docs/contribute/keyword-only-arguments.md``.
+This module is the AST guard that mechanically enforces it: the ``pipelex/`` source tree is
+fully compliant, so the guard hard-blocks on ANY violation (a bare ``*`` after the subject,
+or a ``# kw-only: ignore`` escape hatch with a justification, is required).
 """
 
 from __future__ import annotations
@@ -23,7 +25,7 @@ from typing_extensions import override
 from pipelex.hub import get_console
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterator
 
 # --------------------------------------------------------------------------------------
 # Configuration / carve-out data
@@ -31,9 +33,6 @@ if TYPE_CHECKING:
 
 #: Source root scanned by the guard (relative to the repo root / cwd).
 SOURCE_ROOT = Path("pipelex")
-
-#: Baseline file: newline-delimited ``relpath::qualified_name`` keys, sorted, no line numbers.
-BASELINE_PATH = Path("wip/keyword-only-args/violations-baseline.txt")
 
 #: Inline comment that suppresses a single violation on the def line it sits on.
 ESCAPE_HATCH_MARKER = "# kw-only: ignore"
@@ -98,7 +97,7 @@ class Violation:
     Attributes:
         relative_path: The source file path relative to the repo root.
         qualified_name: Module-relative dotted path (package.module + class chain + function name).
-        lineno: 1-based line of the ``def`` for human display only — never part of the baseline key.
+        lineno: 1-based line of the ``def`` for human display only — never part of the stable key.
     """
 
     relative_path: str
@@ -107,7 +106,7 @@ class Violation:
 
     @property
     def key(self) -> str:
-        """Stable baseline key: ``<relative_path>::<qualified_function_name>`` (no line number)."""
+        """Stable identity key for sorting/dedup: ``<relative_path>::<qualified_function_name>`` (no line number)."""
         return f"{self.relative_path}::{self.qualified_name}"
 
 
@@ -368,32 +367,6 @@ def collect_all_violations(root: Path) -> list[Violation]:
     return sorted(violations, key=lambda violation: violation.key)
 
 
-def partition_violations(violations: list[Violation], *, baseline: set[str]) -> tuple[list[Violation], list[Violation]]:
-    """Split violations into (known, new) relative to a baseline key set."""
-    known: list[Violation] = []
-    new: list[Violation] = []
-    for violation in violations:
-        if violation.key in baseline:
-            known.append(violation)
-        else:
-            new.append(violation)
-    return known, new
-
-
-def load_baseline(path: Path) -> set[str]:
-    """Read the baseline file into a set of keys; an absent file is an empty baseline."""
-    if not path.exists():
-        return set()
-    return {line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()}
-
-
-def write_baseline(path: Path, *, keys: Iterable[str]) -> None:
-    """Write the baseline file: sorted, newline-delimited, deduplicated keys."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    sorted_keys = sorted(set(keys))
-    path.write_text("\n".join(sorted_keys) + ("\n" if sorted_keys else ""), encoding="utf-8")
-
-
 # --------------------------------------------------------------------------------------
 # Command entrypoint
 # --------------------------------------------------------------------------------------
@@ -419,87 +392,70 @@ def _print_report(violations: list[Violation]) -> None:
     console.print()
 
 
-def check_keyword_only_cmd(*, report: bool = False, regen_baseline: bool = False, quiet: bool = False) -> None:
+def check_keyword_only_cmd(*, report: bool = False, quiet: bool = False) -> None:
     """Enforce the keyword-only-arguments convention across ``pipelex/`` source.
+
+    The source tree is fully compliant, so the guard hard-blocks on ANY violation. The only
+    sanctioned non-compliant signatures are the explicit carve-outs and the ``# kw-only: ignore``
+    escape hatch (see ``docs/contribute/keyword-only-arguments.md``).
 
     Args:
         report: If True, print the full inventory grouped by package (no pass/fail gating).
-        regen_baseline: If True, rewrite the baseline file with all current violations and exit.
-        quiet: If True, output only a single validation line (for use in Make targets).
+        quiet: If True, keep the success output to a single line (for Make targets / CI). Quiet
+            only trims the happy path — a failure still prints the full actionable violation list.
     """
     console = get_console()
 
     if not SOURCE_ROOT.exists():
-        if quiet:
-            console.print("[red]✗ Keyword-only check: FAILED[/red] - pipelex/ source root does not exist")
-        else:
-            console.print()
-            console.print("[red]✗[/red] Source root [cyan]pipelex/[/cyan] does not exist")
-            console.print()
+        # An error is always loud — quiet only trims success output, never failures.
+        console.print("[red]✗ Keyword-only check: FAILED[/red] - source root [cyan]pipelex/[/cyan] does not exist")
         sys.exit(1)
 
     violations = collect_all_violations(SOURCE_ROOT)
-
-    if regen_baseline:
-        write_baseline(BASELINE_PATH, keys=(violation.key for violation in violations))
-        if quiet:
-            console.print(f"[green]✓ Keyword-only baseline written[/green] ({len(violations)} entries)")
-        else:
-            console.print()
-            console.print(f"[green]✓[/green] Wrote baseline [cyan]{escape(BASELINE_PATH.as_posix())}[/cyan] with {len(violations)} entries")
-            console.print()
-        return
 
     if report:
         _print_report(violations)
         return
 
-    baseline = load_baseline(BASELINE_PATH)
-    current_keys = {violation.key for violation in violations}
-    known, new = partition_violations(violations, baseline=baseline)
-    stale_baseline_keys = baseline - current_keys
-
-    if not new:
+    if not violations:
+        # Success is the only thing quiet trims: one line in quiet mode, a panel otherwise.
         if quiet:
-            suffix = f" ({len(known)} known-debt)" if known else ""
-            console.print(f"[green]✓ Keyword-only check: PASSED[/green]{suffix}")
+            console.print("[green]✓ Keyword-only check: PASSED[/green]")
         else:
-            _print_success_panel(known=known, stale_baseline_keys=stale_baseline_keys)
+            _print_success_panel()
         return
 
+    # Failure is always actionable: list the offending signatures so no re-run is needed —
+    # in quiet mode too, since the Make targets and CI invoke the guard quietly.
     if quiet:
-        console.print(f"[red]✗ Keyword-only check: FAILED[/red] - {len(new)} new violation(s). Run [cyan]make check-keyword-only[/cyan] for details.")
+        _print_failure_quiet(violations=violations)
     else:
-        _print_failure_panel(new=new, known=known, stale_baseline_keys=stale_baseline_keys)
+        _print_failure_panel(violations=violations)
     sys.exit(1)
 
 
-def _print_success_panel(*, known: list[Violation], stale_baseline_keys: set[str]) -> None:
-    """Verbose success output (no new violations)."""
+def _print_success_panel() -> None:
+    """Verbose success output (no violations)."""
     console = get_console()
     console.print()
-    body = "[green]✓[/green] No new keyword-only violations."
-    if known:
-        body += f"\n\n[dim]{len(known)} known-debt violation(s) remain in the baseline.[/dim]"
     console.print(
         Panel(
-            body,
+            "[green]✓[/green] No keyword-only violations.",
             title="[bold green]Keyword-only Check: PASSED[/bold green]",
             border_style="green",
             padding=(1, 2),
         )
     )
-    _warn_stale_baseline(stale_baseline_keys)
     console.print()
 
 
-def _print_failure_panel(*, new: list[Violation], known: list[Violation], stale_baseline_keys: set[str]) -> None:
+def _print_failure_panel(*, violations: list[Violation]) -> None:
     """Verbose failure output with a per-violation file:line list."""
     console = get_console()
     console.print()
     console.print(
         Panel(
-            f"[red]✗[/red] {len(new)} NEW keyword-only violation(s) found.\n\n"
+            f"[red]✗[/red] {len(violations)} keyword-only violation(s) found.\n\n"
             "[dim]Non-subject parameters must be keyword-only — place a bare `*` before them, "
             "or add `# kw-only: ignore` on the def line if genuinely justified.[/dim]",
             title="[bold red]Keyword-only Check: FAILED[/bold red]",
@@ -508,24 +464,23 @@ def _print_failure_panel(*, new: list[Violation], known: list[Violation], stale_
         )
     )
     console.print()
-    console.print("[bold]New violations:[/bold]")
-    for violation in new:
-        console.print(f"  [red]{escape(violation.relative_path)}:{violation.lineno}[/red]  [dim]{escape(violation.qualified_name)}[/dim]")
-    if known:
-        console.print()
-        console.print(f"[dim]{len(known)} known-debt violation(s) tolerated by the baseline.[/dim]")
-    _warn_stale_baseline(stale_baseline_keys)
+    console.print("[bold]Violations:[/bold]")
+    _print_violation_lines(violations)
     console.print()
 
 
-def _warn_stale_baseline(stale_baseline_keys: set[str]) -> None:
-    """Warn about baseline entries that are no longer violations so the baseline strictly shrinks."""
-    if not stale_baseline_keys:
-        return
+def _print_failure_quiet(*, violations: list[Violation]) -> None:
+    """Compact failure output for quiet mode: a status line, the actionable file:line list, one remedy hint."""
     console = get_console()
-    console.print()
+    console.print(f"[red]✗ Keyword-only check: FAILED[/red] - {len(violations)} violation(s):")
+    _print_violation_lines(violations)
     console.print(
-        f"[yellow]⚠[/yellow] {len(stale_baseline_keys)} stale baseline entr(y/ies) no longer violate — run [cyan]--regen-baseline[/cyan] to prune:"
+        "[dim]Place a bare `*` after the subject, or add `# kw-only: ignore` if justified — see docs/contribute/keyword-only-arguments.md[/dim]"
     )
-    for key in sorted(stale_baseline_keys):
-        console.print(f"  [dim]{escape(key)}[/dim]")
+
+
+def _print_violation_lines(violations: list[Violation]) -> None:
+    """Print one ``file:line  qualified_name`` row per violation."""
+    console = get_console()
+    for violation in violations:
+        console.print(f"  [red]{escape(violation.relative_path)}:{violation.lineno}[/red]  [dim]{escape(violation.qualified_name)}[/dim]")

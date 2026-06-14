@@ -1153,7 +1153,7 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cc check-unused-imports check-config-sync check-keyword-only check-rules check-urls check-gateway-models check-mthds-schema pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-keyword-only check-rules check-urls check-gateway-models check-mthds-schema format lint pyright mypy pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports format lint pyright mypy check-keyword-only

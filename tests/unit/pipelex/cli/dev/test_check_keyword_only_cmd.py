@@ -7,7 +7,6 @@ import textwrap
 from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import (
     Violation,
     find_violations_in_source,
-    partition_violations,
 )
 
 
@@ -350,31 +349,3 @@ class TestCheckKeywordOnly:
             """
         )
         assert _keys(violations) == {"pipelex/sample/module.py::Outer.method.inner"}
-
-
-class TestCheckKeywordOnlyBaseline:
-    """Baseline behaviour: baselined violations are tolerated, new ones fail."""
-
-    def test_new_violation_not_in_baseline_fails(self) -> None:
-        violations = _violate(
-            """
-            def unsafe(spec, dry_run):
-                ...
-            """
-        )
-        baseline: set[str] = set()
-        known, new = partition_violations(violations, baseline=baseline)
-        assert known == []
-        assert _keys(new) == {"pipelex/sample/module.py::unsafe"}
-
-    def test_baselined_violation_is_tolerated(self) -> None:
-        violations = _violate(
-            """
-            def unsafe(spec, dry_run):
-                ...
-            """
-        )
-        baseline = {"pipelex/sample/module.py::unsafe"}
-        known, new = partition_violations(violations, baseline=baseline)
-        assert _keys(known) == {"pipelex/sample/module.py::unsafe"}
-        assert new == []
