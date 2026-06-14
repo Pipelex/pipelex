@@ -1,6 +1,6 @@
 # Keyword-only arguments — cold-start state
 
-Status: Checkpoint A VERIFIED — guard built; `make agent-check` clean; full `make agent-test` green; rule strictness + gate placement confirmed with the user; `convention.md` corrected to match the enforced rule. Phase 1 committed (`d18a63fc`, `a58456f3`); `dev` has since been merged into this branch and the guard baseline reconciled (812 → 822 — see Per-package inventory). Ready to start Wave 1.
+Status: Checkpoint A VERIFIED — guard built; `make agent-check` clean; full `make agent-test` green; rule strictness + gate placement confirmed with the user; `convention.md` corrected to match the enforced rule. Phase 1 committed (`d18a63fc`, `a58456f3`). `dev` has since been merged twice into this branch (v0.31.0, then v0.33.0 at `fc23505c8`) and the guard baseline reconciled at each merge (812 → 822 → 844 — see Per-package inventory). Ready to start Wave 1.
 
 This is the running cold-start log for the keyword-only-arguments refactor. Read this file plus [`../../TODOS.md`](../../TODOS.md) and you have everything needed to resume with zero lost context. The convention itself lives in [`convention.md`](convention.md).
 
@@ -21,35 +21,41 @@ The guard currently passes against its own baseline (all current violations know
 
 ## Per-package violation inventory (baseline)
 
-These are tracked data mirrored from `inventory.json` (`per_package_counts`). Total: 822 — reconciled after merging `dev` (the Checkpoint A figure was 812).
+These are tracked data mirrored from `inventory.json` (`per_package_counts`). Total: 844 — reconciled after the second `dev` merge (Checkpoint A was 812; the first `dev` merge took it to 822).
 
 | Package | Violations |
 | --- | --- |
+| `cogt` | 139 |
 | `tools` | 136 |
-| `cogt` | 132 |
 | `cli` | 111 |
 | `core` | 110 |
 | `plugins` | 50 |
 | `system` | 44 |
 | `pipe_operators` | 40 |
-| `temporal` | 40 |
+| `temporal` | 39 |
 | `graph` | 39 |
-| `libraries` | 24 |
+| `libraries` | 28 |
 | `builder` | 21 |
-| `pipe_run` | 18 |
-| `pipeline` | 14 |
+| `pipe_run` | 16 |
+| `pipeline` | 15 |
+| `runtime_bridge` | 13 |
 | `kit` | 8 |
-| `reporting` | 7 |
 | `pipe_controllers` | 6 |
 | `tracing` | 6 |
+| `errors` | 5 |
+| `reporting` | 5 |
 | `<root>` (`pipelex.py`, `hub.py`, `config.py`, `types.py`, `urls.py`, `base_exceptions.py`, `exceptions.py`) | 4 |
 | `language` | 4 |
-| `errors` | 3 |
 | `observer` | 2 |
 | `pipe_signature` | 2 |
 | `test_extras` | 1 |
 
-**One-time growth at the `dev` merge.** Merging `dev` imported code written before the guard existed, so the baseline grew once here: +13 new violations from incoming files (`tools/tabular/csv_codec.py`, the new `pipe_signature/` package, dry-run-with-signatures changes in `pipeline/` and the `cli` validate cores, `core/` CSV-stuff factories) and −3 stale entries pruned (the old `pipe_run/dry_run*` functions `dev`'s #953 reshaped). Net 812 → 822. The "strictly shrinks" invariant resumes from this new waterline; the incoming violations get burned down within their normal packages (`csv_codec` → `tools` wave, `pipe_signature` → its own, the dry-run helpers → `pipe_run`/`pipeline`).
+**Growth at each `dev` merge.** Merging `dev` imports code written before the guard existed, so the baseline grows at each merge (it strictly shrinks only *between* merges, as waves land):
+
+- **First merge (v0.31.0): 812 → 822.** +13 new from incoming files (`tools/tabular/csv_codec.py`, the new `pipe_signature/` package, dry-run-with-signatures changes in `pipeline/` and the `cli` validate cores, `core/` CSV-stuff factories), −3 stale pruned (the old `pipe_run/dry_run*` functions `dev`'s #953 reshaped).
+- **Second merge (v0.33.0): 822 → 844.** +38 new, −16 stale (net +22). The new violations come from the framework-agnostic runtime-bridge extraction (`runtime_bridge/`, #969, +13 — a brand-new package), `cogt/content_generation/` dry-mock + search-assignment changes (+7), the additive-multi-file `libraries/` reconciliation (#970, +4), `errors/` page-generator (+2), and `pipeline/` (+1). The −16 stale entries are functions `dev` *relocated* — e.g. `pipe_run/dry_run_pipeline.py` → `pipeline/dry_run_pipeline.py`, `graph/graph_context.py::GraphContext.copy_for_child` → `graph/trace_context.py::TraceContext.copy_for_child`, the `temporal/tprl_pipe/hydration.py` helpers → `runtime_bridge/primitives/hydration.py` — so the same violations reappear at their new paths and count as "new".
+
+The "strictly shrinks" invariant resumes from the 844 waterline; the incoming violations get burned down within their normal packages/waves (`csv_codec` → `tools` wave, `pipe_signature` → its own, the runtime-bridge/dry-run helpers → `pipe_run`/`pipeline`/their packages).
 
 These are the burn-down targets ordered into waves in [`README.md`](README.md). The wave order is risk-based (leaf packages first, framework/public surface last), not violation-count order — so a high-count leaf like `tools/` lands in Wave 1 while a smaller but framework-sensitive package like `cli/` waits for Wave 5.
 
