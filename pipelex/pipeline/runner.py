@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from importlib import metadata
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mthds.client.pipeline import PipelineState
-from mthds.client.protocol import RunnerProtocol
-from pydantic import ValidationError
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.models import ModelDeck as MthdsModelDeck
+from mthds.protocol.models import ModelInfo as MthdsModelInfo
+from mthds.protocol.models import VersionInfo
+from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
+from pydantic import Field, ValidationError
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.builder.operations.models_ops import ModelCategory, list_models
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
@@ -16,27 +24,33 @@ from pipelex.hub import (
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_run,
+    get_pipeline_manager,
     get_report_delegate,
     get_telemetry_manager,
     set_current_library,
 )
+from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.pipeline_response import PipelexPipelineExecuteResponse
+from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
+from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     import asyncio
 
-    from mthds.client.pipeline import PipelineStartResponse
-    from mthds.models.pipe_output import VariableMultiplicity
-    from mthds.models.pipeline_inputs import PipelineInputs
-    from mthds.models.working_memory import WorkingMemoryAbstract
+    from mthds.protocol.pipe_output import VariableMultiplicity
+    from mthds.protocol.pipeline_inputs import PipelineInputs
+    from mthds.protocol.working_memory import WorkingMemoryAbstract
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -44,8 +58,31 @@ if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
-class PipelexRunner(RunnerProtocol["PipeOutput"]):
-    """Pipelex implementation of the mthds RunnerProtocol.
+class PipelexModelDeck(MthdsModelDeck):
+    """Pipelex's model deck — the protocol base plus this implementation's
+    routing metadata (aliases, waterfalls), keyed by model category.
+
+    The routing extensions are category-scoped on purpose: the same alias name
+    (e.g. `default-small`) legitimately exists in several categories pointing at
+    different models, so a flat map would silently lose entries on collision.
+    """
+
+    aliases: dict[str, dict[str, str]] = Field(default_factory=dict)
+    waterfalls: dict[str, dict[str, list[str]]] = Field(default_factory=dict)
+
+
+class PipelexVersionInfo(VersionInfo):
+    """Pipelex's version handshake — the protocol base plus this
+    implementation's identification.
+    """
+
+    implementation: str
+    implementation_version: str
+    runtime_version: str | None = None
+
+
+class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
+    """Pipelex implementation of the mthds MTHDSProtocol.
 
     Adapts pipelex pipeline execution to the mthds protocol interface.
     Pipelex-specific configuration (library directories, run mode, etc.)
@@ -54,10 +91,12 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
     def __init__(
         self,
+        *,
         library_id: str | None = None,
         library_dirs: list[str] | None = None,
         bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
+        is_mock_usage: bool = False,
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
@@ -67,6 +106,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.library_dirs = library_dirs
         self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
+        self.is_mock_usage = is_mock_usage
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
@@ -74,7 +114,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
 
     @override
-    async def execute_pipeline(
+    async def execute(
         self,
         pipe_code: str | None = None,
         mthds_contents: list[str] | None = None,
@@ -82,15 +122,16 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
+        extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
-    ) -> PipelexPipelineExecuteResponse:
+    ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
-        This method executes a pipe and returns its output. Unlike ``start_pipeline``,
+        This method executes a pipe and returns its output. Unlike ``start``,
         this method waits for the pipe execution to complete before returning.
 
         Pipelex-specific configuration (library directories, run mode, etc.) is provided
-        at construction time via the ``PipelexRunner`` constructor.
+        at construction time via the ``PipelexMTHDSProtocol`` constructor.
 
         Parameters
         ----------
@@ -112,16 +153,26 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             Output multiplicity specification.
         dynamic_output_concept_ref:
             Override the dynamic output concept ref.
+        extra:
+            Rejected — the local runtime defines no extension args. Extension
+            args are server-specific; pass them to the server that defines them.
+        delivery_assignment:
+            Internal delivery hook used by the API layer (in-process, not a
+            wire extension).
 
         Returns:
         -------
-        PipelexPipelineExecuteResponse
+        PipelexRunResultExecute
             The pipeline execution response wrapping the pipe output, including
             pipeline run ID, timestamps, and pipeline state. If ``generate_graph``
             was True, the execution graph is available in the pipe output's
             ``graph_spec``.
 
         """
+        if extra:
+            msg = f"The local runtime defines no extension args; got {sorted(extra)}."
+            raise PipelineRequestError(msg)
+
         created_at = datetime.now(timezone.utc).isoformat()
 
         # Use provided config or get default
@@ -152,6 +203,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 output_multiplicity=output_multiplicity,
                 dynamic_output_concept_ref=dynamic_output_concept_ref,
                 pipe_run_mode=self.pipe_run_mode,
+                is_mock_usage=self.is_mock_usage,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
@@ -200,9 +252,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg) from exc
         finally:
-            # Close graph tracer if it was opened (cleanup only — the PipeRun is
-            # responsible for capturing the graph spec on pipe_output)
-            if execution_config.is_generate_graph and pipeline_run_id is not None:
+            # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
+            # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
+            # (costs-only mode opens it with event_log=None), so the close gate must match that condition.
+            if (execution_config.is_generate_graph or execution_config.is_generate_usage) and pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     tracer_manager.close_tracer(pipeline_run_id)
@@ -210,6 +263,17 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             # Clear event log state from the report delegate (direct execution path)
             if pipeline_run_id is not None:
                 get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+
+            # Free the per-run registry entry so a later run can resubmit the same explicit
+            # pipeline_run_id (serial resubmission is a supported scenario; only genuinely
+            # concurrent same-id runs should collide in add_new_pipeline). Must come after
+            # close_tracer: while the entry is registered, the collision raise shields the live
+            # direct-mode tracer (keyed by the caller-suppliable pipeline_run_id) from
+            # open_tracer's stale-key pop-and-replace healing. The pop is tolerant — when
+            # pipeline_run_setup failed it already removed its own registration (and
+            # pipeline_run_id is None here anyway).
+            if pipeline_run_id is not None:
+                get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
@@ -234,16 +298,16 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
 
         finished_at = datetime.now(timezone.utc).isoformat()
-        return PipelexPipelineExecuteResponse.from_pipe_output(
+        return PipelexRunResultExecute.from_pipe_output(
             pipe_output=pipe_output,
             pipeline_run_id=pipe_output.pipeline_run_id,
             created_at=created_at,
-            pipeline_state=PipelineState.COMPLETED,
+            state=RunState.COMPLETED,
             finished_at=finished_at,
         )
 
     @override
-    async def start_pipeline(
+    async def start(
         self,
         pipe_code: str | None = None,
         mthds_contents: list[str] | None = None,
@@ -251,5 +315,177 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
-    ) -> PipelineStartResponse[PipeOutput]:
-        raise NotImplementedError
+        extra: dict[str, Any] | None = None,
+    ) -> PipelexRunResultStart:
+        """Start a method asynchronously — not implemented by the local runtime.
+
+        Asynchronous execution is owned by the API layer (pipelex-api overrides
+        this with Temporal dispatch) and the hosted platform; locally, use
+        `execute`.
+        """
+        _ = (
+            pipe_code,
+            mthds_contents,
+            inputs,
+            output_name,
+            output_multiplicity,
+            dynamic_output_concept_ref,
+            extra,
+        )
+        msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."
+        raise NotImplementedError(msg)
+
+    @override
+    async def validate(
+        self,
+        mthds_contents: list[str],
+        allow_signatures: bool = False,
+    ) -> PipelexValidationReport:
+        """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
+
+        Wraps `validate_bundle` and assembles its result into the canonical
+        `PipelexValidationReport` via `build_validation_report`: the primary
+        `bundle_blueprint`, `pipe_io_contracts` keyed by namespaced `pipe_ref`,
+        the per-pipe `validated_pipes` sweep outcomes, and the runnability
+        verdict — `pending_signatures` (qualified refs of pipes still declared
+        as `PipeSignature` in the assembled library) plus
+        `is_runnable = not pending_signatures`, the same convention as the
+        agent-CLI / builder validate envelopes. The verdict only matters on the
+        lenient `allow_signatures=True` path: in strict mode an unsatisfied
+        signature makes `validate_bundle` raise instead.
+
+        `graph_spec` is best-effort: when the batch declares a `main_pipe`
+        (primary-selection rule: first blueprint declaring one), it is dry-run
+        in-process via `dry_run_pipe_in_process` against the validation library
+        and the resulting graph rides on the report. A graph-arm domain failure
+        (`PipelexError`, polyfactory `FactoryException`, or any `ValueError` —
+        covering pydantic `ValidationError` and the ValueError-family domain
+        errors of the mock-input mint and schema resolution) degrades to
+        `graph_spec=None` with validation still successful — the same contract
+        as the Temporal validate activity, so every backend answers identically
+        for the same bundle. No declared `main_pipe` means no graph.
+
+        Args:
+            mthds_contents: MTHDS contents to load (always a list, even for one file).
+            allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
+
+        Returns:
+            PipelexValidationReport with the structural artifacts of a valid bundle.
+
+        Raises:
+            PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
+        """
+        library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
+        # `validate_bundle` deliberately leaves its validation library OPEN and
+        # current on success (the CLI surfaces consume it before process exit).
+        # This protocol wrapper is a long-lived entry point, so restore the
+        # caller's current-library and tear the validation library down on the
+        # way out — on failure `validate_bundle` already did both, so
+        # `validation_library_id` stays None and the cleanup below is a no-op.
+        # Artifacts that need the open validation library are built INSIDE the
+        # window, before the `finally` tears the library down:
+        # `pipe_io_contracts`'s JSON-Schema rendering resolves bundle-defined
+        # structure classes through the class registry, and the graph arm
+        # dry-runs the main pipe against the loaded library.
+        prev_library_id = get_current_library_id_or_none()
+        validation_library_id: str | None = None
+        # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
+        # exception the CALLER is currently handling (validate awaited inside an except block)
+        # and would wrongly suppress a genuine teardown failure after a successful body.
+        body_succeeded = False
+        try:
+            result = await validate_bundle(
+                mthds_contents=mthds_contents,
+                library_dirs=library_dirs,
+                allow_signatures=allow_signatures,
+            )
+            # Capture the validation library id ONCE, right after validate_bundle leaves
+            # it current — the graph arm and the finally must target the SAME library
+            # even if something inside the window later moves the contextvar.
+            validation_library_id = get_current_library_id_or_none()
+            pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
+            graph_spec: GraphSpec | None = await best_effort_graph_spec(
+                pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
+                library_id=validation_library_id,
+                log_context="Protocol validate",
+            )
+            body_succeeded = True
+        finally:
+            if validation_library_id is not None and validation_library_id != prev_library_id:
+                # Restore the caller's outer current-library FIRST so the guarantee
+                # survives a teardown raise — mirrors act_dry_validate.
+                if prev_library_id is not None:
+                    set_current_library(library_id=prev_library_id)
+                else:
+                    clear_current_library()
+                try:
+                    get_library_manager().teardown(library_id=validation_library_id)
+                except PipelexError as teardown_error:
+                    # A teardown failure must not REPLACE the body's in-flight error (the
+                    # caller's error would name the teardown instead of the actual problem) —
+                    # suppress it and let the primary propagate; raise it only when the body
+                    # succeeded. Mirrors act_dry_validate's finally.
+                    if body_succeeded:
+                        raise
+                    log.error(
+                        f"Protocol validate: library teardown also failed after a body error; "
+                        f"raising the original error. Suppressed teardown error: {teardown_error}"
+                    )
+        return build_validation_report(
+            blueprints=result.blueprints,
+            pipe_io_contracts=pipe_io_contracts,
+            dry_run_result=result.dry_run_result,
+            pending_signatures=result.pending_signatures,
+            graph_spec=graph_spec,
+        )
+
+    @override
+    async def models(self, category: MthdsModelCategory | None = None) -> PipelexModelDeck:
+        """The model deck this runtime can route to — protocol `models`.
+
+        Wraps the builder's `list_models`: presets project into the protocol's flat
+        `models` list (each entry carries its category as `type`); the aliases and
+        waterfalls routing extensions stay keyed by category — the same alias name
+        exists in several categories pointing at different models, so flattening
+        them would silently drop entries on collision.
+
+        Args:
+            category: Optional deck filter (`llm`, `extract`, `img_gen`, `search`).
+
+        Returns:
+            PipelexModelDeck with the flat model list and the category-keyed
+            aliases and routing waterfalls.
+        """
+        categories = [ModelCategory(category)] if category is not None else None
+        deck_raw = list_models(categories=categories)
+        models: list[MthdsModelInfo] = []
+        presets_by_category: dict[str, list[dict[str, Any]]] = deck_raw["presets"]
+        aliases_by_category: dict[str, dict[str, str]] = deck_raw["aliases"]
+        waterfalls_by_category: dict[str, dict[str, list[str]]] = deck_raw["waterfalls"]
+        for category_key, category_presets in presets_by_category.items():
+            for preset in category_presets:
+                models.append(MthdsModelInfo(name=preset["name"], type=MthdsModelCategory(category_key)))
+        return PipelexModelDeck(models=models, aliases=aliases_by_category, waterfalls=waterfalls_by_category)
+
+    @override
+    async def version(self) -> VersionInfo:
+        """Protocol + runner versions — protocol `version`.
+
+        Returns:
+            VersionInfo with the installed pipelex version as the runner
+            version, plus pipelex's identification extensions.
+        """
+        pipelex_version: str
+        try:
+            pipelex_version = metadata.version("pipelex")
+        except metadata.PackageNotFoundError:
+            # Source checkout on PYTHONPATH without an installed distribution —
+            # the runtime still works, so version() must not fail.
+            pipelex_version = "unknown"
+        return PipelexVersionInfo(
+            protocol_version=PROTOCOL_VERSION,
+            runner_version=pipelex_version,
+            implementation="pipelex",
+            implementation_version=pipelex_version,
+            runtime_version=pipelex_version,
+        )

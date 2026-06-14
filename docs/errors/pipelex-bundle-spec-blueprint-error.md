@@ -16,4 +16,4 @@ description: "Reference for the `PipelexBundleSpecBlueprintError` Pipelex error 
 | Defined in | `pipelex.builder.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

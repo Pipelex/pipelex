@@ -16,4 +16,4 @@ description: "Reference for the `TelemetryConfigValidationError` Pipelex error c
 | Defined in | `pipelex.system.telemetry.exceptions` |
 | Parent class | [`TelemetryConfigError`](telemetry-config-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

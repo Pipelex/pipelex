@@ -66,6 +66,10 @@ class TestAgentValidateDefaultsStrict:
             )
         )
         assert result["success"] is True
-        pipe_codes = {entry["pipe_code"] for entry in result["validated_pipes"]}
-        assert "agent_sigcli.agent_sig" in pipe_codes
-        assert "agent_sigcli.agent_seq" in pipe_codes
+        pipe_refs = {entry["pipe_ref"] for entry in result["validated_pipes"]}
+        assert "agent_sigcli.agent_sig" in pipe_refs
+        assert "agent_sigcli.agent_seq" in pipe_refs
+        # A lenient success that still carries an unimplemented signature is NOT runnable, and the
+        # envelope says so explicitly via is_runnable (derived from the pending_signatures set).
+        assert result["pending_signatures"] == ["agent_sigcli.agent_sig"]
+        assert result["is_runnable"] is False

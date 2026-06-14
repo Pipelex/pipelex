@@ -44,6 +44,8 @@ async def validate_all_core(
         allow_signatures=allow_signatures,
     )
 
+    # No `pending_signatures` here by design — see validate_all in builder/operations/validate_ops.py:
+    # it is a per-bundle top-down-build nudge surfaced only by `validate bundle`, not the whole-library sweep.
     return {
         "success": True,
         "validated_pipes": build_validated_pipes(dry_run_results),
@@ -77,12 +79,16 @@ async def validate_bundle_core(
     )
 
     # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
-    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8).
+    # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8). pending_signatures
+    # is the library-wide set of still-unimplemented forward declarations — a non-blocking nudge on a
+    # successful lenient (--allow-signatures) run.
     return {
         "success": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
+        "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }
 
 
@@ -174,10 +180,13 @@ async def validate_pipe_in_bundle_core(
     )
 
     # Consume the real per-pipe status from the sliced sweep — a fixed "SUCCESS" would hide an allowed
-    # failure or a cross-package SKIPPED the dry-run actually recorded (C-8).
+    # failure or a cross-package SKIPPED the dry-run actually recorded (C-8). pending_signatures is the
+    # library-wide set of still-unimplemented forward declarations.
     return {
         "success": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
+        "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
     }

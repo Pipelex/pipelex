@@ -18,4 +18,4 @@ Base exception for Google Image Generation Worker errors.
 | Defined in | `pipelex.plugins.google.google_exceptions` |
 | Parent class | [`CogtError`](cogt-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

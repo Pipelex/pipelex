@@ -17,4 +17,4 @@ description: "Reference for the `InferenceBackendCredentialsError` Pipelex error
 | Parent class | [`CogtError`](cogt-error.md) |
 | `user_action` | `check_credentials` — Check that the required API key environment variable is set |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

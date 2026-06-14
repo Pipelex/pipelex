@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
@@ -11,6 +12,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_model_deck
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
@@ -61,6 +63,7 @@ class TestContentGenerator:
 
         text: str = await content_generator.make_llm_text(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
             llm_setting_main=llm_setting_main,
         )
@@ -75,6 +78,7 @@ class TestContentGenerator:
 
         person_direct: Employee = await content_generator.make_object(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             object_class=Employee,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
@@ -90,6 +94,7 @@ class TestContentGenerator:
 
         person_list_direct: list[Employee] = await content_generator.make_object_list(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             object_class=Employee,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
@@ -106,6 +111,7 @@ class TestContentGenerator:
         positive_text = "A dog with sunglasses coding on a laptop"
         image: ImageContent = await content_generator.make_single_image(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             img_gen_handle=img_gen_handle,
             img_gen_prompt=ImgGenPrompt(
                 positive_text=positive_text,
@@ -121,6 +127,7 @@ class TestContentGenerator:
 
         jinja2_text: str = await content_generator.make_templated_text(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             context=context,
             template="The answer is: {{ the_answer }}",
         )
@@ -137,6 +144,7 @@ class TestContentGenerator:
     ):
         page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_handle=extract_handle_from_image,
             extract_input=ExtractInput(image_uri=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -157,6 +165,7 @@ class TestContentGenerator:
     ):
         page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             extract_handle=extract_handle_from_pdf,
             extract_input=ExtractInput(document_uri=DocumentTestCases.PDF_FILE_PATH_1),
             extract_job_params=extract_job_params,
@@ -173,6 +182,7 @@ class TestContentGenerator:
         with pytest.raises(ModelNotFoundError) as excinfo:
             await content_generator.make_llm_text(
                 job_metadata=job_metadata,
+                cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
                 llm_setting_main=llm_setting_main,
             )

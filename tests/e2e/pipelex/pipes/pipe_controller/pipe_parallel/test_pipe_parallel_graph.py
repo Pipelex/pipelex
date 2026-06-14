@@ -11,7 +11,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.pipes.pipe_controller.pipe_parallel.test_data import (
@@ -46,7 +46,7 @@ class TestPipeParallelGraph:
         """
         # Build config with graph tracing and all graph outputs enabled
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -64,12 +64,12 @@ class TestPipeParallelGraph:
         exec_config = exec_config.model_copy(update={"graph_config": graph_config})
 
         # Run pipeline with input text
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_parallel"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="parallel_then_consume",
             inputs={
                 "input_text": TextContent(text="The quick brown fox jumps over the lazy dog. This is a sample text for testing parallel processing."),
@@ -186,7 +186,7 @@ class TestPipeParallelGraph:
         """
         # Build config with graph tracing
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -203,12 +203,12 @@ class TestPipeParallelGraph:
         exec_config = exec_config.model_copy(update={"graph_config": graph_config})
 
         # Run pipeline
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_parallel"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code=pipe_code,
             inputs={"input_text": TextContent(text="Hello world, this is a test document for parallel analysis.")},
         )

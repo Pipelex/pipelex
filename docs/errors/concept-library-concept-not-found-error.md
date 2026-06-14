@@ -16,4 +16,4 @@ description: "Reference for the `ConceptLibraryConceptNotFoundError` Pipelex err
 | Defined in | `pipelex.core.concepts.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

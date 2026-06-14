@@ -18,4 +18,4 @@ Raised when a custom TelemetryManager is injected while using Pipelex Gateway.
 | Defined in | `pipelex.system.pipelex_service.exceptions` |
 | Parent class | [`PipelexServiceError`](pipelex-service-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

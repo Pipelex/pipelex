@@ -251,7 +251,7 @@ class TestOfflineDryRun:
         cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
         an image model and the offline dry-run completes.
 
-        Scope note: dry-run mocks image generation via ``ContentGeneratorDry``, so this does NOT build
+        Scope note: dry-run mocks image generation at the cogt leaf, so this does NOT build
         the img-gen worker and therefore does not exercise the spec's ``sdk`` -> worker-factory mapping;
         it covers membership + handle resolution for image models. The sdk-vs-factory contract is a
         runtime (non-dry) concern.

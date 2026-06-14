@@ -29,6 +29,10 @@ def _collect_possible_outputs(
     Returns:
         A list of possible output dicts, each containing 'concept_ref' and 'content'
     """
+    if the_pipe.is_signature:
+        # A signature is outside the `PipeType` taxonomy (no executable kind) and contributes no
+        # concrete output options; short-circuit before the `PipeType(...)` coercion, which would raise.
+        return []
     pipe_type = PipeType(the_pipe.type)
 
     # Check if the pipe is a PipeCondition
@@ -41,7 +45,8 @@ def _collect_possible_outputs(
                 return []
 
             possible_outputs: list[dict[str, Any]] = []
-            for mapped_pipe_code in mapped_pipe_codes:
+            # pipe_dependencies() is a set — sort so the user-facing output_option_N numbering is deterministic
+            for mapped_pipe_code in sorted(mapped_pipe_codes):
                 mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
                 try:
                     output_dict = mapped_pipe.output.render_stuff_spec(output_format)
@@ -106,7 +111,6 @@ def _collect_possible_outputs(
             | PipeType.PIPE_STRUCTURE
             | PipeType.PIPE_BATCH
             | PipeType.PIPE_PARALLEL
-            | PipeType.PIPE_SIGNATURE
         ):
             return []
 

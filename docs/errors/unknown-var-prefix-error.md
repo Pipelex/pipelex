@@ -18,4 +18,4 @@ Raised when an unknown variable prefix is used in variable substitution.
 | Defined in | `pipelex.tools.secrets.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

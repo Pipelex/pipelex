@@ -10,7 +10,6 @@ The `DryRunConfig` class controls how Pipelex behaves during dry runs.
 
 ```python
 class DryRunConfig(ConfigModel):
-    apply_to_jinja2_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
     nb_extract_pages: int
@@ -20,7 +19,6 @@ class DryRunConfig(ConfigModel):
 
 ### Fields
 
-- `apply_to_jinja2_rendering`: When true, simulates Jinja2 template rendering during dry runs
 - `text_gen_truncate_length`: Maximum length of generated text during dry runs
 - `nb_list_items`: Number of items to generate for list content during dry runs
 - `nb_extract_pages`: Number of pages to simulate for OCR operations during dry runs
@@ -31,7 +29,6 @@ class DryRunConfig(ConfigModel):
 
 ```toml
 [pipelex.dry_run_config]
-apply_to_jinja2_rendering = true
 text_gen_truncate_length = 100
 nb_list_items = 3
 nb_extract_pages = 2
@@ -41,14 +38,7 @@ allowed_to_fail_pipes = ["optional_pipe", "experimental_pipe"]
 
 ## Dry Run Behavior
 
-### Template Rendering
-
-When `apply_to_jinja2_rendering` is true:
-
-- Templates are processed but not actually rendered
-- Variables are validated
-- Template syntax is checked
-- No actual content is generated
+During a dry run, no AI provider is ever called and no storage IO is performed: each inference leaf (LLM text/object generation, image generation, document extraction, web search, templating) produces a synthetic mock instead. Jinja2 templates are still parse-checked, so a broken template fails loudly even in a dry run.
 
 ### Text Generation
 
@@ -82,7 +72,6 @@ The `text_gen_truncate_length` controls:
 
 - Use dry runs for testing before production
 - Set appropriate truncation lengths
-- Enable template validation when testing templates
 - Review dry run logs for potential issues
 
 ## Related Documentation

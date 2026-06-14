@@ -1,0 +1,18 @@
+domain = "market_research"
+
+# Concrete operator (leaf) satisfying the `draft_brief` header. Consumes the document and the upstream
+# findings whole (no field-read), so `KeyFinding` stays a simple concept.
+[pipe.draft_brief]
+type = "PipeLLM"
+description = "Draft a research brief from a document and its key findings."
+inputs = { document = "Document", findings = "KeyFinding[]" }
+output = "ResearchBrief"
+prompt = """
+Using the document and the key findings below, write a concise research brief.
+
+Document:
+@document
+
+Key findings:
+@findings
+"""

@@ -11,10 +11,8 @@ from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -25,7 +23,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.types import Self, StrEnum
+from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 PipeBlueprintUnion = Annotated[
@@ -142,102 +140,6 @@ class PipelexBundleBlueprint(BaseModel):
             raise ValueError(msg)
         return self
 
-    @model_validator(mode="after")
-    def validate_local_concept_references(self) -> Self:
-        """Validate that local concept references are declared in this bundle or are native concepts.
-
-        This validates two cases:
-        1. Concept codes without domain prefix (e.g., 'MyConceptName')
-        2. Concept refs with the same domain as this bundle (e.g., 'this_domain.MyConceptName')
-
-        External references (concepts from other domains) are not validated here - they're
-        assumed to be declared in their respective bundles and loaded via dependencies.
-        """
-        declared_concepts: set[str] = set(self.concept.keys()) if self.concept else set()
-        native_codes = {native.value for native in NativeConceptCode.values_list()}
-        all_refs = self._collect_local_concept_references()
-
-        undeclared_refs: list[str] = []
-        for concept_ref_or_code, context in all_refs:
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
-                continue
-
-            # Parse the reference using QualifiedRef
-            ref = QualifiedRef.parse(concept_ref_or_code)
-
-            if ref.is_external_to(self.domain):
-                # External reference - skip validation (will be validated when loading dependencies)
-                continue
-
-            # Local reference (bare code or same domain) - validate
-            concept_code = ref.local_code
-            if concept_code not in declared_concepts and concept_code not in native_codes:
-                undeclared_refs.append(f"'{concept_ref_or_code}' in {context}")
-
-        if undeclared_refs:
-            msg = (
-                f"The following local concept references are not declared in domain '{self.domain}' at '{self.source}' "
-                f"and are not native concepts: {', '.join(undeclared_refs)}. "
-                f"Declared concepts: {sorted(declared_concepts) if declared_concepts else '(none)'}. "
-                f"Native concepts: {sorted(native_codes)}"
-            )
-            raise ValueError(msg)
-        return self
-
-    @model_validator(mode="after")
-    def validate_local_pipe_references(self) -> Self:
-        """Validate that domain-qualified pipe references pointing to this bundle's domain exist locally.
-
-        Three categories:
-        - Bare refs (no dot): no validation here (deferred to package-level resolution)
-        - Domain-qualified, same domain: must exist in self.pipe
-        - Domain-qualified, different domain: skip (external, validated at load time)
-
-        Special outcomes ("fail", "continue") are excluded from validation.
-        """
-        declared_pipes: set[str] = set(self.pipe.keys()) if self.pipe else set()
-        special_outcomes = SpecialOutcome.value_list()
-        all_pipe_refs = self.collect_pipe_references()
-
-        invalid_refs: list[str] = []
-        for pipe_ref_str, context in all_pipe_refs:
-            # Skip special outcomes
-            if pipe_ref_str in special_outcomes:
-                continue
-
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
-                continue
-
-            # Try to parse as a pipe ref
-            try:
-                ref = QualifiedRef.parse_pipe_ref(pipe_ref_str)
-            except QualifiedRefError:
-                # If it doesn't parse as a valid pipe ref, skip (will be caught elsewhere)
-                continue
-
-            if not ref.is_qualified:
-                # Bare ref - no validation at bundle level
-                continue
-
-            if ref.is_external_to(self.domain):
-                # External domain - skip
-                continue
-
-            # Same domain, qualified ref - must exist locally
-            if ref.local_code not in declared_pipes:
-                invalid_refs.append(f"'{pipe_ref_str}' in {context}")
-
-        if invalid_refs:
-            msg = (
-                f"The following same-domain pipe references are not declared in domain '{self.domain}' "
-                f"at '{self.source}': {', '.join(invalid_refs)}. "
-                f"Declared pipes: {sorted(declared_pipes) if declared_pipes else '(none)'}"
-            )
-            raise ValueError(msg)
-        return self
-
     def get_elaboration_for(self, pipe_code: str) -> ElaborationMetadata | None:
         """Return the elaboration metadata for a synthetic pipe, or None if the pipe is user-authored."""
         if not self.elaboration_metadata:
@@ -270,7 +172,18 @@ class PipelexBundleBlueprint(BaseModel):
 
         return pipe_refs
 
-    def _collect_local_concept_references(self) -> list[tuple[str, str]]:
+    def collect_concept_references(self) -> list[tuple[str, str]]:
+        """Collect all concept references from this bundle's concepts and pipes.
+
+        Mirrors collect_pipe_references(): returns every concept reference (bare code,
+        same-domain, external-domain, or cross-package) paired with a context path. The
+        caller decides which references to resolve and where. Reference resolution for
+        same-domain refs is performed at library level over the merged crate, not per file,
+        so a concept declared in one file can be referenced from a sibling file.
+
+        Returns:
+            List of (concept_ref_or_code, context_description) tuples
+        """
         local_refs: list[tuple[str, str]] = []
 
         # Collect from concepts

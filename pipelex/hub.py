@@ -49,6 +49,7 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 class PipelexHub:
@@ -74,6 +75,10 @@ class PipelexHub:
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
+        # Keyless boot (``Pipelex.make(needs_inference=False)``) forces every run to DRY (eng
+        # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
+        # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
+        self._is_dry_run_forced: bool = False
 
         # pipelex
         self._library_manager: LibraryManagerAbstract | None = None
@@ -181,6 +186,12 @@ class PipelexHub:
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
+
+    def set_dry_run_forced(self, is_forced: bool) -> None:
+        self._is_dry_run_forced = is_forced
+
+    def is_dry_run_forced(self) -> bool:
+        return self._is_dry_run_forced
 
     # pipelex
 
@@ -463,7 +474,38 @@ def get_report_delegate() -> ReportingProtocol:
     return get_pipelex_hub().get_report_delegate()
 
 
+_content_generator_override: ContextVar[ContentGeneratorProtocol | None] = ContextVar("content_generator_override", default=None)
+
+
+@contextmanager
+def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Generator[None, None, None]:
+    """Set ``content_generator`` as the active generator for the scope, then restore the prior value on exit.
+
+    Inference operators (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeStructure) resolve
+    :func:`get_content_generator`; under a Temporal-enabled hub that default is
+    ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
+    dry-run/validation activity body) wraps itself in this scope with an inline generator so its
+    leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
+    mock without dispatching and without storage IO. ContextVar-scoped like
+    :func:`scoped_pipe_router`, so concurrent runs don't cross-contaminate.
+    """
+    prev = _content_generator_override.get()
+    _content_generator_override.set(content_generator)
+    try:
+        yield
+    finally:
+        _content_generator_override.set(prev)
+
+
+def is_dry_run_forced() -> bool:
+    """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
+    return get_pipelex_hub().is_dry_run_forced()
+
+
 def get_content_generator() -> ContentGeneratorProtocol:
+    override = _content_generator_override.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_content_generator()
 
 
@@ -611,8 +653,91 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
+_current_pipe_router: ContextVar["PipeRouterProtocol | None"] = ContextVar("current_pipe_router", default=None)
+
+
+def set_pipe_router(pipe_router: "PipeRouterProtocol") -> None:
+    """Override the active pipe router for the current async context.
+
+    Used by host runtimes that want controllers to dispatch sub-pipes
+    through their own router (e.g. Mistral-native mode swaps in a router
+    that turns sub-pipe calls into child workflows / activities). The
+    override is contextvar-scoped, so concurrent runs on the same hub
+    don't leak into each other. Pass ``None`` via
+    ``teardown_current_pipe_router()`` to restore the hub default.
+    """
+    _current_pipe_router.set(pipe_router)
+
+
+def teardown_current_pipe_router() -> None:
+    """Clear any contextvar-scoped router override set by ``set_pipe_router``."""
+    _current_pipe_router.set(None)
+
+
+@contextmanager
+def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, None, None]:
+    """Set ``pipe_router`` as the active router for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_current_pipe_router`` ContextVar value before setting
+    the new one. On exit — success or exception — restores the prior override
+    (or clears it if there wasn't one). Use this whenever a call needs its own
+    router for the *whole* run (root pipe + nested controller sub-pipes, which
+    resolve :func:`get_pipe_router`) without clobbering an outer caller's
+    override. Mirrors :func:`scoped_current_library`.
+
+    Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
+    pair internally: the raw teardown unconditionally resets the override to
+    ``None`` and so does not restore an outer override. The raw pair is kept
+    because the external ``pipelex-mistralai-workflows`` plugin depends on it.
+    """
+    prev = _current_pipe_router.get()
+    _current_pipe_router.set(pipe_router)
+    try:
+        yield
+    finally:
+        _current_pipe_router.set(prev)
+
+
 def get_pipe_router() -> "PipeRouterProtocol":
+    override = _current_pipe_router.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_pipe_router()
+
+
+_event_log_override: ContextVar["EventLogProtocol | None"] = ContextVar("event_log_override", default=None)
+
+
+@contextmanager
+def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, None]:
+    """Pin ``event_log`` as the trace-event transport for the scope, then restore the prior value on exit.
+
+    Both the write side (tracer emission, set up in ``pipeline_run_setup``) and the read
+    side (``tracing_assembly.assemble_tracing``) prefer this override over building a new
+    backend via ``make_event_log``, so emit and assemble share the SAME instance — which
+    is what makes a plain in-memory event log usable for graph assembly (no external
+    store bridges the two sides). A set override implies tracing-enabled: it is honored
+    even when ``tracing_config.is_enabled`` is False.
+
+    Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
+    not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at
+    teardown (``GraphTracer._reset``), which happens BEFORE the read side assembles. A scoped
+    event log's ``close()`` must therefore be safe to call mid-lifecycle — idempotent or a
+    no-op, as ``InMemoryEventLog``'s is. Scoping a backend whose ``close()`` releases a real
+    resource (NDJSON file handle, DynamoDB client) would break its own assembly read. Mirrors
+    :func:`scoped_pipe_router`.
+    """
+    prev = _event_log_override.get()
+    _event_log_override.set(event_log)
+    try:
+        yield
+    finally:
+        _event_log_override.set(prev)
+
+
+def get_event_log_override() -> "EventLogProtocol | None":
+    """Return the contextvar-scoped event-log override set by :func:`scoped_event_log`, or None."""
+    return _event_log_override.get()
 
 
 def get_pipe_run() -> "PipeRunProtocol":

@@ -20,7 +20,7 @@ from pipelex.graph.mermaidflow.mermaid_html import (
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
@@ -106,18 +106,18 @@ class TestGraphWithFullData:
         4. Verifies interactive rendering works with the captured data
         """
         # Build effective config with graph tracing and full data capture enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        exec_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=True,
         )
 
         # Run pipeline with graph tracing and full data capture
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators/pipe_compose"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="cv_job_matcher",
             inputs={
                 "cv_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_CV),

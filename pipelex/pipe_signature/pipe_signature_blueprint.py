@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
@@ -15,19 +15,20 @@ class PipeSignatureBlueprint(PipeBlueprint):
     """
 
     type: Literal["PipeSignature"] = "PipeSignature"
-    pipe_category: Literal["PipeSignature"] = "PipeSignature"
+    # Outside the executable taxonomy: no `PipeCategory`. Keep `exclude=True` (overriding the field
+    # type drops the base's `Field(exclude=True)` unless re-specified) so it never serializes into `.mthds`.
+    pipe_category: None = Field(default=None, exclude=True)
+    # `signature_for=PipeSignature` is now rejected structurally: `PipeSignature` is no longer a
+    # `PipeType` member, so Pydantic cannot coerce it into this field — no guard validator needed.
     signature_for: PipeType | None = Field(
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
     )
 
-    @field_validator("signature_for", mode="after")
-    @classmethod
-    def reject_signature_for_pipe_signature(cls, value: PipeType | None) -> PipeType | None:
-        if value is PipeType.PIPE_SIGNATURE:
-            msg = "A PipeSignature blueprint cannot have signature_for=PipeSignature."
-            raise ValueError(msg)
-        return value
+    @property
+    @override
+    def is_signature(self) -> bool:
+        return True
 
     @override
     def validate_inputs(self) -> None:

@@ -30,10 +30,10 @@ from pipelex.config import get_config
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, WebhookTarget
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.runtime_bridge.primitives.pipe_run_arg import PipeRunArg
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
-from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from tests.integration.pipelex.error_handling.test_data import ErrorReportParityTestData

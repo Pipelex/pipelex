@@ -11,7 +11,7 @@ from pipelex.config import get_config
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.pipe_run.dry_run_pipeline import dry_run_pipeline
+from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
@@ -119,7 +119,7 @@ async def _dry_run_bundle(
     mthds_content = bundle_path.read_text(encoding="utf-8")
 
     # Ensure the bundle's parent directory is included in library_dirs
-    # so PipelexRunner can resolve sibling dependencies
+    # so PipelexMTHDSProtocol can resolve sibling dependencies
     bundle_parent_dir = str(bundle_path.parent.resolve())
     effective_library_dirs: list[str]
     if library_dirs:
@@ -165,7 +165,7 @@ async def generate_graph_for_bundle(
     """
     graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )
@@ -235,7 +235,7 @@ async def generate_view_for_bundle(
     """
     graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
         mock_inputs=True,
     )

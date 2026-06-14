@@ -1,14 +1,15 @@
 """Shared test helpers for Temporal graph tracing integration tests."""
 
 import uuid
-from collections import defaultdict
-from collections.abc import AsyncGenerator, Generator, Iterable
+from collections import Counter, defaultdict
+from collections.abc import AsyncGenerator, Awaitable, Callable, Generator, Iterable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from pathlib import Path
 
 from temporalio import activity
 from temporalio.client import Client as TemporalClient
+from temporalio.client import WorkflowHistory
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -19,14 +20,14 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, NodeStatus, PipelineRef
+from pipelex.graph.trace_context import TraceContext
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
+from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
@@ -59,13 +60,22 @@ def route_activities_to(queue: str, activity_names: Iterable[str]) -> Generator[
                 worker_config.activity_queues[activity_name] = original
 
 
-def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
-    """Deep-copy a PipeJob and inject a GraphContext onto its JobMetadata.
+def inject_trace_context(
+    pipe_job: PipeJob,
+    pipeline_run_id: str,
+    *,
+    emit_graph_events: bool = True,
+    emit_usage_events: bool = True,
+) -> PipeJob:
+    """Deep-copy a PipeJob and inject a TraceContext onto its JobMetadata.
 
     Also overrides pipeline_run_id (must not be the dry-run sentinel,
     since NdjsonEventLog uses it as a directory name).
+
+    The emit flags default to True (the legacy "context present → emit both"
+    behavior); pass ``emit_graph_events=False`` to exercise costs-only mode.
     """
-    graph_context = GraphContext(
+    trace_context = TraceContext(
         graph_id=pipeline_run_id,
         parent_node_id=None,
         node_sequence=0,
@@ -76,10 +86,12 @@ def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
             stuff_html_content=False,
             error_stack_traces=False,
         ),
+        emit_graph_events=emit_graph_events,
+        emit_usage_events=emit_usage_events,
     )
     new_metadata = pipe_job.job_metadata.model_copy(
         update={
-            "graph_context": graph_context,
+            "trace_context": trace_context,
             "pipeline_run_id": pipeline_run_id,
         },
     )
@@ -109,7 +121,7 @@ async def execute_and_assemble(
     """
     # Give each execution its own pipeline_run_id to avoid event accumulation
     execution_run_id = f"tracing_exec_{uuid.uuid4().hex[:12]}"
-    execution_job = inject_graph_context(pipe_job, execution_run_id)
+    execution_job = inject_trace_context(pipe_job, execution_run_id)
 
     task_queue = str(uuid.uuid4())
     workflow_id = str(uuid.uuid4())
@@ -176,40 +188,33 @@ def node_pipe_codes(graph_spec: GraphSpec) -> set[str | None]:
     return {node.pipe_code for node in graph_spec.nodes}
 
 
-_RUNNER_FAKE_INFERENCE_MODEL_NAME = "split_runner_fake"
-_RUNNER_FAKE_INFERENCE_MODEL_ID = "split_runner_fake_id"
-_RUNNER_FAKE_RESPONSE_TEXT = "split-worker fake response"
+def scheduled_activity_names(history: WorkflowHistory) -> list[str]:
+    """Activity type names scheduled in a fetched workflow history, in event order."""
+    return [
+        event.activity_task_scheduled_event_attributes.activity_type.name
+        for event in history.events
+        if event.HasField("activity_task_scheduled_event_attributes")
+    ]
 
 
-@activity.defn(name="act_llm_gen_text")
-async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> str:  # noqa: RUF029
-    """Substitute for `act_llm_gen_text` that exercises the Phase-2 runner-side fallback.
+@activity.defn(name="act_flush_trace_events")
+async def act_flush_noop(arg: FlushTraceEventsArg) -> None:
+    """No-op flush substitute: keeps a test independent of any tracing backend.
 
-    Within a single pytest process the router worker registers a context via
-    `set_event_log` on the process-wide `ReportingManager` singleton; a real
-    runner activity in the same process would otherwise hit that same dict and
-    take the fast path, masking the cross-worker bug. Instead this activity:
-
-    - Clears `_event_log_contexts` on entry, simulating a cold runner process.
-    - Synthesizes an `LLMJob` with non-zero usage and reports it via
-      `report_inference_job`. The reporting path runs synchronously in the
-      activity, so `_emit_usage_event` sees the cleared contexts dict and
-      takes the fallback (writes to the per-process activity event log).
-    - Returns a fixed string so the calling workflow can finish without
-      attempting a real LLM call.
-
-    This avoids the LIVE/DRY-mode dilemma: the existing `pipe_job_from_bundle`
-    fixture defaults to DRY mode, where the LLM activity is normally bypassed
-    by `ContentGeneratorDry` reporting inline inside the workflow. Subbing
-    `act_llm_gen_text` with this version forces the activity to fire from the
-    workflow's `start_activity` call (because we route `act_llm_gen_text` to
-    `q_runner` via `worker_config.activity_queues`), exercising the
-    cross-worker path even in DRY mode and keeping the test hermetic.
+    Only the *schedule* of this activity matters to the command stream under test.
     """
-    delegate = get_report_delegate()
-    if isinstance(delegate, ReportingManager):
-        delegate._event_log_contexts.clear()  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
+
+def make_synthetic_usage_llm_job(
+    llm_assignment: LLMAssignment,
+    inference_model_name: str,
+    inference_model_id: str,
+) -> LLMJob:
+    """Synthesize an ``LLMJob`` with non-zero token usage from an activity's assignment.
+
+    For activity substitutes that need ``report_inference_job`` to emit a real
+    ``UsageReportEvent`` without performing an actual LLM call.
+    """
     now = datetime.now()
     synthetic_metadata = llm_assignment.job_metadata.model_copy(
         update={
@@ -219,19 +224,51 @@ async def _runner_isolated_act_llm_gen_text(llm_assignment: LLMAssignment) -> st
     )
     tokens_usage = LLMTokensUsage(
         job_metadata=synthetic_metadata,
-        inference_model_name=_RUNNER_FAKE_INFERENCE_MODEL_NAME,
-        inference_model_id=_RUNNER_FAKE_INFERENCE_MODEL_ID,
+        inference_model_name=inference_model_name,
+        inference_model_id=inference_model_id,
         unit_costs={CostCategory.INPUT: 0.0, CostCategory.OUTPUT: 0.0},
         nb_tokens_by_category={TokenCategory.INPUT: 1, TokenCategory.OUTPUT: 1},
     )
-    synthetic_job = LLMJob(
+    return LLMJob(
         job_metadata=synthetic_metadata,
         llm_prompt=llm_assignment.llm_prompt,
         job_params=llm_assignment.llm_setting.make_llm_job_params(),
         job_config=LLMJobConfig(schema_reask_max_attempts=1),
         job_report=LLMJobReport(llm_tokens_usage=tokens_usage),
     )
-    delegate.report_inference_job(inference_job=synthetic_job)
+
+
+_RUNNER_FAKE_INFERENCE_MODEL_NAME = "split_runner_fake"
+_RUNNER_FAKE_INFERENCE_MODEL_ID = "split_runner_fake_id"
+_RUNNER_FAKE_RESPONSE_TEXT = "split-worker fake response"
+
+
+@activity.defn(name="act_llm_gen_text")
+async def _synthetic_usage_act_llm_gen_text(llm_assignment: LLMAssignment) -> str:  # noqa: RUF029
+    """Substitute for `act_llm_gen_text` that emits synthetic usage from the activity.
+
+    Synthesizes an `LLMJob` with non-zero usage and reports it via
+    `report_inference_job`, then returns a fixed string so the calling workflow
+    can finish without attempting a real LLM call. The emission unconditionally
+    takes the per-process activity event log: `_emit_usage_event` checks
+    `_is_in_temporal_activity()` before any context lookup, so an in-activity
+    emission never touches a workflow's registered buffer — co-located or split
+    deployment alike (audit finding H1).
+
+    Since the unified dry run (leaf-level dry mock), DRY mode also dispatches
+    `act_llm_gen_text` (the leaf mocks inside the activity with zero-token,
+    suppressed usage), so this substitute is what guarantees a *reportable*
+    non-zero usage event lands on the runner regardless of the fixture's run
+    mode (we route `act_llm_gen_text` to `q_runner` via
+    `worker_config.activity_queues`) — keeping the cross-worker assertion
+    hermetic and deterministic.
+    """
+    synthetic_job = make_synthetic_usage_llm_job(
+        llm_assignment=llm_assignment,
+        inference_model_name=_RUNNER_FAKE_INFERENCE_MODEL_NAME,
+        inference_model_id=_RUNNER_FAKE_INFERENCE_MODEL_ID,
+    )
+    get_report_delegate().report_inference_job(inference_job=synthetic_job)
     return _RUNNER_FAKE_RESPONSE_TEXT
 
 
@@ -240,6 +277,7 @@ async def make_split_workers(
     temporal_client: TemporalClient,
     q_router: str,
     q_runner: str,
+    runner_act_llm_gen_text: Callable[[LLMAssignment], Awaitable[str]] = _synthetic_usage_act_llm_gen_text,
 ) -> AsyncGenerator[None, None]:
     """Open two scoped workers on two task queues in the current process.
 
@@ -249,9 +287,12 @@ async def make_split_workers(
       `task_queue` argument — the activity lands on the workflow's own queue
       and would never be picked up if the router registered no activities.
     - `q_runner`: activity-only (runner scope, `disable_all_workflows=True`),
-      with `act_llm_gen_text` substituted by the isolation wrapper that clears
-      the in-process `_event_log_contexts` cache so the runner cannot
-      accidentally use the router's registered context.
+      with `act_llm_gen_text` substituted by ``runner_act_llm_gen_text``. The
+      default substitute synthesizes usage instead of calling a real LLM; the
+      in-activity emission always lands in the per-process activity event log
+      (never the router's registered context — audit finding H1). Pass a
+      different substitute — e.g. one that runs real inference — to exercise
+      the same path with real provider token counts.
 
     Pair this with `worker_config.activity_queues[act_llm_gen_text.__name__] =
     ActivityRouteConfig(default=q_runner, by_handle={})` so the workflow on
@@ -279,7 +320,7 @@ async def make_split_workers(
                 "act_jinja2_gen_text",
                 "act_extract_gen_extract_pages",
                 "act_render_page_views",
-                "act_assemble_graph",
+                "act_assemble_tracing",
                 "act_deliver",
             ],
         },
@@ -297,7 +338,34 @@ async def make_split_workers(
             task_queue=q_runner,
             is_not_sandboxed=True,
             scope=runner_scope,
-            substitute_activities={act_llm_gen_text: _runner_isolated_act_llm_gen_text},
+            substitute_activities={act_llm_gen_text: runner_act_llm_gen_text},
         ),
     ):
         yield
+
+
+async def collect_scheduled_activity_counts(temporal_client: TemporalClient, workflow_id: str) -> "Counter[str]":
+    """Walk a workflow tree (parent + child workflows, pinned by run_id) and count every scheduled activity.
+
+    Counts ``ActivityTaskScheduled`` events by activity-type name across the parent history and every
+    child workflow it started — the leaf-dispatch evidence Tier 17 asserts on. Children are fetched by
+    ``(workflow_id, run_id)`` so a retried/continued run under the same id cannot substitute a history
+    the parent never observed.
+    """
+    scheduled_counts: Counter[str] = Counter()
+    pending_runs: list[tuple[str, str | None]] = [(workflow_id, None)]
+    visited_runs: set[tuple[str, str | None]] = set()
+    while pending_runs:
+        current_run = pending_runs.pop()
+        if current_run in visited_runs:
+            continue
+        visited_runs.add(current_run)
+        current_id, current_run_id = current_run
+        history = await temporal_client.get_workflow_handle(current_id, run_id=current_run_id).fetch_history()
+        for event in history.events:
+            if event.HasField("activity_task_scheduled_event_attributes"):
+                scheduled_counts[event.activity_task_scheduled_event_attributes.activity_type.name] += 1
+            elif event.HasField("child_workflow_execution_started_event_attributes"):
+                child_execution = event.child_workflow_execution_started_event_attributes.workflow_execution
+                pending_runs.append((child_execution.workflow_id, child_execution.run_id))
+    return scheduled_counts

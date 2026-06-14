@@ -125,3 +125,33 @@ class ValidateBundleError(PipelexError):
         """
         # TODO: refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
+
+
+class PipeIOContractError(PipelexError):
+    """Raised when projecting a validated pipe into its `pipe_io_contracts` IO contract fails.
+
+    Wraps a JSON-Schema rendering failure (a pydantic schema-generation error on a
+    structure class) into a structured Pipelex error, so every validate surface —
+    direct and Temporal alike — reports it identically instead of leaking a raw
+    third-party exception (which the Temporal error boundary would not convert and
+    Temporal would pointlessly retry).
+    """
+
+
+class PipelineInputContentError(PipelexError):
+    """A pipeline input's content reference (url) is unusable.
+
+    Raised by the input normalizer when an Image/Document input carries a
+    blank url, or a local path that cannot be read. The caller supplied the
+    value — INPUT domain, so API servers answer 422, never a sanitized 500
+    (a blank url used to surface as IsADirectoryError('.') → 500).
+    """
+
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail=(
+            "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
+        ),
+    )
+    caller_facing_message = True

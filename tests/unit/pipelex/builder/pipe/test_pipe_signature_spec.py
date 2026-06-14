@@ -36,8 +36,9 @@ class TestPipeSignatureSpec:
         assert with_hint.signature_for is PipeType.PIPE_LLM
 
     def test_signature_for_rejects_pipe_signature(self) -> None:
+        # Structural: `PipeSignature` is not a `PipeType`, so the string cannot coerce into the field.
         with pytest.raises(ValidationError):
-            _make_minimal_signature(signature_for=PipeType.PIPE_SIGNATURE)
+            _make_minimal_signature(signature_for="PipeSignature")
 
     def test_inputs_accept_multiplicity(self) -> None:
         var_list = _make_minimal_signature(inputs={"docs": "Document[]"})

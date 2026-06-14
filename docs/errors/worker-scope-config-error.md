@@ -16,4 +16,4 @@ description: "Reference for the `WorkerScopeConfigError` Pipelex error class."
 | Defined in | `pipelex.temporal.exceptions` |
 | Parent class | [`TemporalConfigError`](temporal-config-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

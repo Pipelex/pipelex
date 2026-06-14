@@ -4,7 +4,9 @@ description: "Declare contract-only pipes with PipeSignature. Mock dependencies 
 
 # Signature Pipes
 
-A `PipeSignature` is a contract-only pipe: it declares inputs, an output, and a purpose without providing an implementation. It is the placeholder you reach for when you want to design the shape of a pipeline (or one of its steps) before committing to the operator that will eventually do the work.
+Every pipe *has* a signature — its contract: the `inputs` it consumes, the `output` it promises, and a `description` of its purpose. A `PipeSignature` is that contract **alone**: a pipe declared by its signature with no implementation behind it. It is the placeholder you reach for when you want to design the shape of a pipeline (or one of its steps) before committing to the operator that will eventually do the work.
+
+Because a signature is a contract rather than a way of running, it sits **outside** the executable pipe taxonomy. That taxonomy has two levels: a `PipeCategory` (`PipeOperator` or `PipeController`) and, beneath it, a concrete `PipeType` (`PipeLLM`, `PipeSequence`, and the rest). A `PipeSignature` is neither — it is not a `PipeType` like `PipeLLM` or `PipeSequence`, and it belongs to no `PipeCategory`. Its runtime form is a dry-run-only shim — it can verify inputs and mock its declared output, but it never executes live. Implementing a signature is not swapping one pipe *type* for another; it is fulfilling a contract with a concrete pipe that satisfies it.
 
 Signatures let an agent (or a human author) build a complete, dry-runnable bundle while leaving some pipes deliberately unimplemented. Strict validation refuses any pipeline that still depends on a signature; lenient mode (`--allow-signatures`) dry-runs them as mocks, so you can keep iterating on the structure of a method before writing every step.
 
@@ -133,6 +135,11 @@ pipelex validate --all --allow-signatures
 ```
 
 When `--all` runs in strict mode, signature pipes themselves are skipped during the iteration (an unreached signature is fine). Strict mode only fires when a non-signature pipe *depends on* a signature.
+
+!!! note "Signatures and definitions can live in separate files"
+    A signature and the concrete pipe that implements it do not have to sit in the same `.mthds` file. A same-domain library can be split across sibling files in one directory: a header file forward-declares pipes as `PipeSignature` (plus the concepts those contracts reference), and definition files supply the concrete pipes. Loading the set merges them — a `PipeSignature` and a concrete pipe of the same code reconcile (the concrete satisfies the header), provided their `inputs`/`output` contracts match. Order does not matter.
+
+    On a successful lenient run, `validate bundle` reports `pending_signatures` — the headers still unimplemented across the *whole merged* library — and states explicitly whether the method is runnable (runnable once nothing remains, not yet runnable while headers are pending), so you can see exactly what is left to define. See [Validate Commands](../../tools/cli/validate.md) for the output surface. The same verdict is reported by the protocol-level `validate` (`PipelexMTHDSProtocol.validate`) as `pending_signatures` + `is_runnable` fields on its validation report, so a build driving the runtime through the MTHDS Protocol sees it too.
 
 ## Replacing a signature with a real implementation
 

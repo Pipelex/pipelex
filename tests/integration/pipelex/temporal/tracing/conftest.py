@@ -72,7 +72,7 @@ def enable_tracing(tracing_tmp_dir: Path) -> Generator[None, None, None]:
 
 @pytest.fixture(scope="class")
 def sequence_tracing_job(is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
-    """PipeJob for native_text_sequence (graph_context injected per-execution by execute_and_assemble)."""
+    """PipeJob for native_text_sequence (trace_context injected per-execution by execute_and_assemble)."""
     yield from pipe_job_from_bundle(
         bundle_file=SequenceTracingTestData.BUNDLE_FILE,
         pipe_code=SequenceTracingTestData.PIPE_CODE,
@@ -82,7 +82,7 @@ def sequence_tracing_job(is_class_registry_isolated: bool) -> Generator[PipeJob,
 
 @pytest.fixture(scope="class")
 def parallel_tracing_job(is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
-    """PipeJob for temporal_parallel (graph_context injected per-execution by execute_and_assemble)."""
+    """PipeJob for temporal_parallel (trace_context injected per-execution by execute_and_assemble)."""
     yield from pipe_job_from_bundle(
         bundle_file=ParallelTracingTestData.BUNDLE_FILE,
         pipe_code=ParallelTracingTestData.PIPE_CODE,
@@ -92,7 +92,7 @@ def parallel_tracing_job(is_class_registry_isolated: bool) -> Generator[PipeJob,
 
 @pytest.fixture(scope="class")
 def batch_tracing_job(is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
-    """PipeJob for temporal_batch (graph_context injected per-execution by execute_and_assemble)."""
+    """PipeJob for temporal_batch (trace_context injected per-execution by execute_and_assemble)."""
     yield from pipe_job_from_bundle(
         bundle_file=BatchTracingTestData.BUNDLE_FILE,
         pipe_code=BatchTracingTestData.PIPE_CODE,

@@ -13,6 +13,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
@@ -50,12 +51,8 @@ async def build_inputs_for_pipe(
         validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents, library_dirs=library_dirs, allow_signatures=True)
         blueprints = validate_bundle_result.blueprints
         if not pipe_code:
-            # Find the first blueprint that declares a main_pipe, domain-qualified
-            main_pipe_code: str | None = None
-            for blueprint in blueprints:
-                if blueprint.main_pipe:
-                    main_pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-                    break
+            # Domain-qualified main pipe of the primary blueprint — the one shared selection rule.
+            main_pipe_code = select_primary_blueprint(blueprints).main_pipe_ref
             if not main_pipe_code:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
                 raise ValueError(msg)

@@ -50,6 +50,10 @@ def run_method_cmd(
         bool,
         typer.Option("--graph/--no-graph", help="Generate execution graph visualizations (saved alongside output)"),
     ] = True,
+    costs: Annotated[
+        bool,
+        typer.Option("--costs/--no-costs", help="Emit usage (cost) tracing events. Default on."),
+    ] = True,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -120,7 +124,8 @@ def run_method_cmd(
             if mock_inputs:
                 agent_error("--mock-inputs is not supported with --runner api", "ArgumentError")
 
-            from mthds.client.exceptions import ClientAuthenticationError, PipelineRequestError  # noqa: PLC0415
+            from mthds.protocol.exceptions import PipelineRequestError  # noqa: PLC0415
+            from mthds.runners.api.exceptions import ClientAuthenticationError  # noqa: PLC0415
 
             try:
                 result = asyncio.run(
@@ -157,6 +162,7 @@ def run_method_cmd(
                         mock_inputs=mock_inputs,
                         library_dirs=all_library_dirs,
                         graph=graph,
+                        costs=costs,
                         with_memory=with_memory,
                     )
                 )

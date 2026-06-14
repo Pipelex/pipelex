@@ -16,13 +16,17 @@ ERROR_PAGES_DIR = Path("docs/errors")
 def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) -> None:
     """Generate per-class error documentation pages.
 
-    Bootstraps Pipelex (kept for parity with other dev CLI commands and to surface
-    config / setup errors loudly), then calls :func:`generate_error_pages`. The
-    underlying discovery rglobs every ``exceptions.py`` / ``*_exceptions.py``
-    via :func:`iter_pipelex_error_subclasses` — no manual import or class-list
-    update is needed when a new error class lands. Pages already carrying
-    ``<!-- pipelex:authored -->`` are preserved so hand-edited reference content
-    is never clobbered.
+    Bootstraps Pipelex with ``needs_inference=False`` (kept for parity with other
+    dev CLI commands and to surface config / setup errors loudly), then calls
+    :func:`generate_error_pages`. Inference is never invoked here — the command only
+    introspects ``PipelexError`` subclasses and writes markdown — so the bootstrap
+    must skip the inference-setup / gateway-terms checks; otherwise CI environments
+    with no configured backend (e.g. the docs deploy job) hit
+    ``InferenceSetupRequiredError``. The underlying discovery rglobs every
+    ``exceptions.py`` / ``*_exceptions.py`` via :func:`iter_pipelex_error_subclasses`
+    — no manual import or class-list update is needed when a new error class lands.
+    Pages already carrying ``<!-- pipelex:authored -->`` are preserved so hand-edited
+    reference content is never clobbered.
 
     Args:
         output: Custom output directory. Defaults to ``docs/errors/``.
@@ -36,7 +40,7 @@ def generate_error_pages_cmd(output: Path | None = None, quiet: bool = False) ->
         console.print("[bold]Generating per-class error documentation pages...[/bold]")
         console.print()
 
-    Pipelex.make()
+    Pipelex.make(needs_inference=False)
     try:
         report = generate_error_pages(output_dir=output_path)
     finally:

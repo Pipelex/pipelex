@@ -21,13 +21,21 @@ def make_storage_provider_from_config(storage_provider_config: StorageProviderCo
         A configured storage provider instance.
 
     Raises:
-        PipelexConfigError: If required provider-specific config is missing.
+        StorageConfigError: If the required provider-specific config is missing or fails its lazy_validate checks.
     """
     match storage_provider_config.method:
         case StorageMethod.LOCAL:
-            log.verbose(f"Using local storage at: {storage_provider_config.storage_path}")
-            return LocalStorageProvider(root_path=Path(storage_provider_config.storage_path))
+            if storage_provider_config.local is None:
+                msg = "local config is required when method is local"
+                raise StorageConfigError(msg)
+            storage_provider_config.local.lazy_validate()
+            log.verbose(f"Using local storage at: {storage_provider_config.local.local_storage_path}")
+            return LocalStorageProvider(root_path=Path(storage_provider_config.local.local_storage_path))
         case StorageMethod.IN_MEMORY:
+            if storage_provider_config.in_memory is None:
+                msg = "in_memory config is required when method is in_memory"
+                raise StorageConfigError(msg)
+            storage_provider_config.in_memory.lazy_validate()
             log.verbose("Using in-memory storage")
             return InMemoryStorageProvider()
         case StorageMethod.S3:

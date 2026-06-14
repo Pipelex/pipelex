@@ -21,9 +21,9 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import clear_current_library, get_current_library, set_current_library
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
+from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.temporal_hub import get_task_manager
-from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
-from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
 from tests.integration.pipelex.temporal.test_data import DeferredHydrationTestData

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -163,7 +164,6 @@ class PipeBatch(PipeController):
                     "output_multiplicity": None,
                 },
             )
-            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             return await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
@@ -189,13 +189,13 @@ class PipeBatch(PipeController):
             )
 
             # Register batch item extraction with graph tracer
-            if job_metadata.graph_context is not None:
+            if job_metadata.trace_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
-                    batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                    batch_controller_node_id = job_metadata.trace_context.parent_node_id
                     tracer_manager.register_batch_item_extraction(
-                        lookup_key=job_metadata.graph_context.lookup_key,
+                        lookup_key=job_metadata.trace_context.lookup_key,
                         list_stuff_code=input_stuff.stuff_code,
                         item_stuff_code=branch_input_item_code,
                         item_index=branch_index,
@@ -222,16 +222,16 @@ class PipeBatch(PipeController):
         )
 
         # Register batch aggregation with graph tracer
-        if job_metadata.graph_context is not None:
+        if job_metadata.trace_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                # Pass the PipeBatch's node_id (from graph_context.parent_node_id) so that
+                # Pass the PipeBatch's node_id (from trace_context.parent_node_id) so that
                 # BATCH_AGGREGATE edges correctly target this PipeBatch node, not a parent
                 # controller that may later finish and register as producer of the same output
-                batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                batch_controller_node_id = job_metadata.trace_context.parent_node_id
                 for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
                     tracer_manager.register_batch_aggregation(
-                        lookup_key=job_metadata.graph_context.lookup_key,
+                        lookup_key=job_metadata.trace_context.lookup_key,
                         output_list_stuff_code=output_stuff.stuff_code,
                         item_stuff_code=item_stuff_code,
                         item_index=agg_index,
@@ -271,16 +271,12 @@ class PipeBatch(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
-        # For dry run coordination: set the first item's pipe_code to "mock_main"
-        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
+        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
         main_stuff = pipe_output.main_stuff
         content = main_stuff.content
         if isinstance(content, ListContent):
             list_content = cast("ListContent[StuffContent]", content)
-            if list_content.items:
-                first_item = list_content.items[0]
-                if hasattr(first_item, "pipe_code"):
-                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            stamp_mock_main_coordination(list_content.items)
         return pipe_output
 
     @override

@@ -14,9 +14,9 @@ from typing import Any, Callable
 
 import pytest
 
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
+from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
@@ -109,9 +109,9 @@ def _assert_graphs_equivalent(direct_spec: GraphSpec, assembled_spec: GraphSpec)
 # Scenario runners: execute the same scenario through both paths
 # ---------------------------------------------------------------------------
 
-# A scenario is a callable that takes a GraphTracer and its initial GraphContext,
+# A scenario is a callable that takes a GraphTracer and its initial TraceContext,
 # and exercises a tracing scenario on it.
-ScenarioFn = Callable[[GraphTracer, GraphContext], None]
+ScenarioFn = Callable[[GraphTracer, TraceContext], None]
 
 
 def _run_both_paths(scenario: ScenarioFn) -> tuple[GraphSpec, GraphSpec]:
@@ -151,13 +151,13 @@ def _run_both_paths(scenario: ScenarioFn) -> tuple[GraphSpec, GraphSpec]:
 # ---------------------------------------------------------------------------
 
 
-def _scenario_simple_sequence(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_simple_sequence(tracer: GraphTracer, context: TraceContext) -> None:
     """3 child pipes in sequence under a parent controller."""
     started_at = _T0
 
     # Parent controller
     parent_id, child_ctx = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="sequence",
         pipe_type="PipeSequence",
         node_kind=NodeKind.CONTROLLER,
@@ -166,7 +166,7 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: GraphContext) -> Non
 
     # Child 1: produces digest_a
     child1_id, _ = tracer.on_pipe_start(
-        graph_context=child_ctx,
+        trace_context=child_ctx,
         pipe_code="gen_text",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -180,7 +180,7 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: GraphContext) -> Non
 
     # Child 2: consumes digest_a, produces digest_b
     child2_id, _ = tracer.on_pipe_start(
-        graph_context=child_ctx,
+        trace_context=child_ctx,
         pipe_code="refine",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -195,7 +195,7 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: GraphContext) -> Non
 
     # Child 3: consumes digest_b
     child3_id, _ = tracer.on_pipe_start(
-        graph_context=child_ctx,
+        trace_context=child_ctx,
         pipe_code="format",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -215,12 +215,12 @@ def _scenario_simple_sequence(tracer: GraphTracer, context: GraphContext) -> Non
     )
 
 
-def _scenario_parallel_branches(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_parallel_branches(tracer: GraphTracer, context: TraceContext) -> None:
     """Controller with 2 branch pipes producing PARALLEL_COMBINE edges."""
     started_at = _T0
 
     ctrl_id, ctrl_ctx = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="parallel",
         pipe_type="PipeParallel",
         node_kind=NodeKind.CONTROLLER,
@@ -229,7 +229,7 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: GraphContext) -> N
 
     # Branch A
     branch_a_id, _ = tracer.on_pipe_start(
-        graph_context=ctrl_ctx,
+        trace_context=ctrl_ctx,
         pipe_code="branch_a",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -243,7 +243,7 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: GraphContext) -> N
 
     # Branch B
     branch_b_id, _ = tracer.on_pipe_start(
-        graph_context=ctrl_ctx,
+        trace_context=ctrl_ctx,
         pipe_code="branch_b",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -280,12 +280,12 @@ def _scenario_parallel_branches(tracer: GraphTracer, context: GraphContext) -> N
     )
 
 
-def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: TraceContext) -> None:
     """Batch controller with item extraction and aggregation."""
     started_at = _T0
 
     ctrl_id, ctrl_ctx = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="batch",
         pipe_type="PipeBatch",
         node_kind=NodeKind.CONTROLLER,
@@ -309,7 +309,7 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: GraphContext) -
 
     # Branch 0: processes item 0
     branch0_id, _ = tracer.on_pipe_start(
-        graph_context=ctrl_ctx,
+        trace_context=ctrl_ctx,
         pipe_code="process",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -324,7 +324,7 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: GraphContext) -
 
     # Branch 1: processes item 1
     branch1_id, _ = tracer.on_pipe_start(
-        graph_context=ctrl_ctx,
+        trace_context=ctrl_ctx,
         pipe_code="process",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -359,12 +359,12 @@ def _scenario_batch_fan_out_fan_in(tracer: GraphTracer, context: GraphContext) -
     )
 
 
-def _scenario_partial_failure(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_partial_failure(tracer: GraphTracer, context: TraceContext) -> None:
     """Child pipe fails, parent has no end event → FAILED + CANCELED nodes."""
     started_at = _T0
 
     _parent_id, child_ctx = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="sequence",
         pipe_type="PipeSequence",
         node_kind=NodeKind.CONTROLLER,
@@ -372,7 +372,7 @@ def _scenario_partial_failure(tracer: GraphTracer, context: GraphContext) -> Non
     )
 
     child_id, _ = tracer.on_pipe_start(
-        graph_context=child_ctx,
+        trace_context=child_ctx,
         pipe_code="gen_text",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -388,13 +388,13 @@ def _scenario_partial_failure(tracer: GraphTracer, context: GraphContext) -> Non
     # Parent has no end event → will be marked CANCELED
 
 
-def _scenario_pass_through(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_pass_through(tracer: GraphTracer, context: TraceContext) -> None:
     """Pass-through output (same digest as input) is not registered as producer."""
     started_at = _T0
 
     # Pass-through pipe: input digest_a → output digest_a (same)
     pt_id, _ = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="passthrough",
         pipe_type="PipeParallel",
         node_kind=NodeKind.CONTROLLER,
@@ -409,7 +409,7 @@ def _scenario_pass_through(tracer: GraphTracer, context: GraphContext) -> None:
 
     # Downstream pipe consumes digest_a
     down_id, _ = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="consumer",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,
@@ -422,12 +422,12 @@ def _scenario_pass_through(tracer: GraphTracer, context: GraphContext) -> None:
     )
 
 
-def _scenario_condition_selected_outcome(tracer: GraphTracer, context: GraphContext) -> None:
+def _scenario_condition_selected_outcome(tracer: GraphTracer, context: TraceContext) -> None:
     """Condition pipe with SELECTED_OUTCOME edge."""
     started_at = _T0
 
     cond_id, cond_ctx = tracer.on_pipe_start(
-        graph_context=context,
+        trace_context=context,
         pipe_code="check",
         pipe_type="PipeCondition",
         node_kind=NodeKind.CONTROLLER,
@@ -435,7 +435,7 @@ def _scenario_condition_selected_outcome(tracer: GraphTracer, context: GraphCont
     )
 
     outcome_id, _ = tracer.on_pipe_start(
-        graph_context=cond_ctx,
+        trace_context=cond_ctx,
         pipe_code="branch_true",
         pipe_type="PipeLLM",
         node_kind=NodeKind.OPERATOR,

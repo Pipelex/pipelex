@@ -14,6 +14,6 @@ description: "Reference for the `ConceptLibraryError` Pipelex error class."
 | `type_uri` | `https://docs.pipelex.com/latest/errors/concept-library-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.libraries.concept.exceptions` |
-| Parent class | [`PipelexError`](pipelex-error.md) |
+| Parent class | [`LibraryError`](library-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

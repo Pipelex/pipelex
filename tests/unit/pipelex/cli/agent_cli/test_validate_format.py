@@ -23,7 +23,7 @@ class TestValidateFormat:
         """Patch the validate pipe command's dependencies."""
         result: dict[str, Any] = {
             "success": True,
-            "validated_pipes": [{"pipe_code": "p1", "status": "SUCCESS"}],
+            "validated_pipes": [{"pipe_ref": "p1", "status": "SUCCESS"}],
             "total_pipes": 1,
         }
         mocker.patch(f"{VALIDATE_PIPE_MODULE}.make_pipelex_for_agent_cli")

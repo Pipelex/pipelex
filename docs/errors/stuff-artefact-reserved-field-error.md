@@ -16,4 +16,4 @@ description: "Reference for the `StuffArtefactReservedFieldError` Pipelex error 
 | Defined in | `pipelex.core.stuffs.exceptions` |
 | Parent class | [`StuffArtefactError`](stuff-artefact-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

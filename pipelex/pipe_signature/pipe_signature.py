@@ -25,8 +25,15 @@ class PipeSignature(PipeAbstract):
     """
 
     type: Literal["PipeSignature"] = "PipeSignature"
-    pipe_category: Literal["PipeSignature"] = "PipeSignature"
+    # A signature is outside the executable taxonomy: it has no `PipeCategory`. `type` stays the
+    # discriminator tag; `pipe_category` is None (the base validator admits None only for signatures).
+    pipe_category: None = None
     signature_for: PipeType | None = None
+
+    @property
+    @override
+    def is_signature(self) -> bool:
+        return True
 
     @override
     def validate_inputs_static(self) -> None:

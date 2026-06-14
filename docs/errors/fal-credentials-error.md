@@ -16,4 +16,4 @@ description: "Reference for the `FalCredentialsError` Pipelex error class."
 | Defined in | `pipelex.cogt.img_gen.exceptions` |
 | Parent class | [`CredentialsError`](credentials-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

@@ -16,4 +16,4 @@ description: "Reference for the `JobMetadataError` Pipelex error class."
 | Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexUnexpectedError`](pipelex-unexpected-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

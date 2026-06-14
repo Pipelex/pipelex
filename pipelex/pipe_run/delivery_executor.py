@@ -18,7 +18,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.temporal.tprl_pipe.hydration import hydrate_content
+from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
@@ -270,7 +270,13 @@ class DeliveryExecutor:
         """
         try:
             payload: dict[str, Any] = dict(webhook.payload)
+            # Wire fields follow the MTHDS Protocol: `pipeline_run_id` (unchanged)
+            # + `state` (master D1 as revised). The legacy `status` spelling rides
+            # along for one release so receivers can migrate without a
+            # deploy-window gap (the hosted run-completion Lambda accepts both
+            # during the Phase C skew).
             payload["pipeline_run_id"] = pipeline_run_id
+            payload["state"] = status
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url

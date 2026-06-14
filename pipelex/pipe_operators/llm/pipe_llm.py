@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -171,9 +171,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeLLMOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
         # interpret / unwrap the arguments
         output_stuff_spec = self.resolve_dynamic_output_stuff_spec(pipe_run_params=pipe_run_params)
 
@@ -241,6 +240,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_text: str = await content_generator.make_llm_text(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     llm_prompt_for_text=llm_prompt_1_for_text,
                     llm_setting_main=llm_setting_main,
                 )
@@ -348,6 +348,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_objects = await content_generator.make_object_list(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_for_object,
                     llm_setting_for_object_list=llm_setting_for_object,
@@ -366,6 +367,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         try:
             return await content_generator.make_object(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 object_class=content_class,
                 llm_prompt_for_object=llm_prompt_for_object,
                 llm_setting_for_object=llm_setting_for_object,
@@ -382,29 +384,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
-        current_exc: BaseException | None = exc
-        while current_exc is not None:
+        for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
                 error_details += f"\n{format_pydantic_validation_error(current_exc)}"
                 break
-            current_exc = current_exc.__cause__
         return f"{error_details}\nLLM settings: {settings}"
-
-    @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeLLMOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
 
     @override
     async def _validate_before_run(

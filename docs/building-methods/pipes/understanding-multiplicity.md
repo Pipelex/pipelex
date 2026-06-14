@@ -379,11 +379,11 @@ Use fixed input multiplicity when:
 When a pipe produces multiple outputs, Pipelex automatically wraps them in a `ListContent` container. This container maintains the type information:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Execute a pipe with multiple outputs
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_line_items",
     inputs={"invoice_text": "Your invoice text here..."}
 )
@@ -401,11 +401,11 @@ line_items_container = pipe_output.main_stuff_as_list(item_type=LineItem)
 Similarly, when providing multiple inputs, you can use lists:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.core.stuffs.text_content import TextContent
 
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="summarize_all_documents",
     inputs={
         "documents": [

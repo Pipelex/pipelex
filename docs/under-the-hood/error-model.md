@@ -34,7 +34,7 @@ An error rises through a series of layers. Each layer has exactly one job.
 |-------|------|--------------------------|
 | **5 — CLI entry points** | `pipelex` / `pipelex-agent` commands | Catch, format for human (Rich) / agent (JSON·MD) / HTTP |
 | **4 — CLI factories** | `cli_factory.py`, `agent_cli_factory.py` | Catch setup errors, route to handlers |
-| **3 — Pipeline runner** | `PipelexRunner.execute_pipeline()` | Catch + wrap as `PipelineExecutionError` |
+| **3 — Pipeline runner** | `PipelexMTHDSProtocol.execute()` | Catch + wrap as `PipelineExecutionError` |
 | **2 — Pipe router / operators** | `PipeRouter`, pipe operators | Catch + wrap with pipe context (`pipe_code`, `pipe_stack`) |
 | **1 — Workers / SDK calls** | `pipelex/plugins/*/` | **Catch the SDK exception → classify → raise `CogtError`** |
 | **0 — Third-party SDKs** | OpenAI, Anthropic, Google, … | Raise raw, untyped provider exceptions |
@@ -256,7 +256,17 @@ When no report dict is found in the chain — a non-Pipelex exception, a worker 
 
 The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
 
-**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally.
+### Workflow-Level Fail-Safe Floor
+
+The activity bridge converts every error that crosses an *activity* boundary. But a `PipelexError` raised **inline in workflow code** — an operator that runs its leaf inline instead of dispatching it as an activity, or an inline setup error — is neither an `ActivityError` nor an `ApplicationError`. Temporal's default for an unhandled exception in workflow code that is *not* a recognized failure type is to treat it as a **workflow-task failure** and retry the task indefinitely (bounded only by the workflow execution timeout). That is the single worst outcome a durable-execution system can produce: invisible, resource-consuming, and surfaced only after ~the timeout as a generic timeout error rather than the real cause. The fail-safe floor closes that hole on two levels:
+
+- **Workflow-level catch-all (rich path).** `WfPipeRouter.run()` and `WfPipeRun.run()` each end their boundary handling with an `except PipelexError` clause. `WfPipeRouter` converts a genuine inline error to a terminal `TemporalError` via `from_message_exception` (same conversion the activity bridge does — the structured report rides in `ApplicationError.details`). `WfPipeRun` routes it through its deferred-delivery path so the FAILED webhook still fires, then chains a details-carrying `TemporalError` so the classification also survives to the submitter. The catch-all only converts *genuine* inline errors: an escaping `PipelexError` that already carries a Temporal failure in its `__cause__` chain (e.g. a nested child-dispatch that already wrapped a sub-pipe failure as `WorkflowExecutionError`) is already terminal and recoverable, so it propagates untouched rather than being flattened to a generic report.
+
+- **Worker-level floor (belt-and-suspenders).** The worker registers `workflow_failure_exception_types=[WorkflowExecutionError, PipelexError]`. Any domain error that slips past the catch-alls still fails the workflow **terminally** instead of hanging — degrading to a synthesized `UnrecoverableWorkflowFailureError` report (message preserved, classification floored) rather than a silent retry loop. The scope is deliberately `PipelexError`, not `Exception`: genuinely transient Temporal/infra errors and deterministic-replay glitches are not domain errors, and workflow-task retry is the *correct* behavior for them — so they keep Temporal's default.
+
+The rule of thumb: in a durable-execution system the default for "unexpected exception in business logic inside a workflow" is the most dangerous behavior available (retry forever), so "we convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
+
+**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes inline fails loud and bounded instead of hanging.
 
 ---
 

@@ -17,7 +17,7 @@ class DeliveryStatus(StrEnum):
 # (see ``DeliveryExecutor._notify_webhook``). A caller's static ``payload``
 # must not declare any of them — otherwise the value would shift silently
 # with delivery status. Enforced at construction by ``_reject_reserved_keys``.
-_RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"pipeline_run_id", "status", "result_url", "error"})
+_RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"state", "pipeline_run_id", "status", "result_url", "error"})
 
 
 class WebhookTarget(BaseModel):
@@ -33,7 +33,8 @@ class WebhookTarget(BaseModel):
         """Reject caller payload keys that Pipelex assigns per delivery.
 
         ``DeliveryExecutor._notify_webhook`` writes ``pipeline_run_id`` /
-        ``status`` / ``result_url`` / ``error`` onto the outgoing body. A static
+        ``state`` (protocol spellings) plus the transitional ``status`` alias,
+        ``result_url`` and ``error`` onto the outgoing body. A static
         payload that declares any of them would have its meaning shift with
         delivery status — fail loudly at construction instead of silently at
         delivery time.
@@ -70,3 +71,13 @@ class DeliveryAssignment(BaseModel):
 
     storage: StorageTarget | None = None
     webhooks: list[WebhookTarget] = Field(default_factory=empty_list_factory_of(WebhookTarget))
+
+    @property
+    def has_delivery_target(self) -> bool:
+        """True when at least one real delivery target (storage or a webhook) is configured.
+
+        A ``DeliveryAssignment`` with no storage and no webhooks is a no-op: it would
+        persist nothing and notify no one, so a fire-and-forget completion would be
+        silently dropped.
+        """
+        return self.storage is not None or bool(self.webhooks)

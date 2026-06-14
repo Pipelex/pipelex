@@ -1,9 +1,10 @@
 import shortuuid
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
@@ -233,14 +234,8 @@ class WorkingMemoryFactory(BaseModel):
         else:
             nb_stuffs = typed_named_stuff_spec.multiplicity
 
-        items: list[StuffContent] = []
-        for idx in range(nb_stuffs):
-            item_mock_content = cls.make_mock_content(typed_named_stuff_spec)
-            # For the first item in pipe specs, set pipe_code to "mock_main"
-            # to match the mock main_pipe in BundleHeaderSpec
-            if idx == 0 and hasattr(item_mock_content, "pipe_code"):
-                item_mock_content.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
-            items.append(item_mock_content)
+        items: list[StuffContent] = [cls.make_mock_content(typed_named_stuff_spec) for _ in range(nb_stuffs)]
+        stamp_mock_main_coordination(items)
 
         mock_list_content = ListContent[StuffContent](items=items)
         return StuffFactory.make_stuff(

@@ -47,7 +47,7 @@ class TestValidateBundleCmd:
         validation_result: dict[str, Any] = {
             "success": True,
             "bundle_path": str(mthds_file),
-            "validated_pipes": [{"pipe_code": "my_pipe", "status": "SUCCESS"}],
+            "validated_pipes": [{"pipe_ref": "my_pipe", "status": "SUCCESS"}],
             "total_pipes": 1,
         }
         mocker.patch(

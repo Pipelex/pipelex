@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -101,6 +100,10 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: type[ConfigRoot] | None = None,
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
+        # Readiness gate: flipped True only at the very end of make(), after setup() and the optional
+        # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
+        # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
+        self.is_ready: bool = False
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         self.pipelex_hub = PipelexHub()
@@ -363,18 +366,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
+        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
+        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
+        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
+        self.pipelex_hub.set_dry_run_forced(not needs_inference)
         if content_generator is None:
-            if not needs_inference:
-                content_generator = ContentGeneratorDry()
-            elif get_config().temporal.is_enabled:
+            if get_config().temporal.is_enabled:
                 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
                     ContentGeneratorInWorkflowFactory,
                 )
 
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                    generated_content_factory=generated_content_factory,
-                )
+                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
@@ -534,10 +538,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            needs_inference: When False, disables inference functionality by using a mock
-                content generator and loading backends leniently (skipping those with missing
-                credentials). This skips gateway terms check and model deck validation.
-                Useful for commands like validate/show that don't call inference APIs.
+            needs_inference: When False, forces every run THIS process initiates to DRY mode
+                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
+                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (skipping those with missing credentials). This skips gateway terms check and model
+                deck validation. Useful for commands like validate/show that don't call inference
+                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
+                not constrain work this process executes as a Temporal worker.
             temporal_enabled: When provided, overrides the temporal.is_enabled config value.
                 True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference
@@ -557,7 +564,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers: Custom observers for pipeline events
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
-                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+                Per-call library_dirs in execute/start will override this default.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.
@@ -603,6 +610,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
             raise
+        # Publish readiness only now: setup() AND the optional validate_model_deck() have both succeeded
+        # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
+        # that is about to be removed from the registry.
+        pipelex_instance.is_ready = True
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
@@ -610,6 +621,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def get_optional_instance(cls) -> Self | None:
         instance = MetaSingleton.instances.get(cls)
         return cast("Self | None", instance)
+
+    @classmethod
+    def is_fully_booted(cls) -> bool:
+        """True only when a singleton exists AND has completed make() (setup + validation).
+
+        Distinct from ``get_optional_instance() is not None``: the metaclass registers the instance
+        before ``setup()`` configures the hub. Callers that must not touch a half-built instance
+        (``ensure_pipelex_booted``) gate on this.
+        """
+        instance = cls.get_optional_instance()
+        return instance is not None and instance.is_ready
 
     @classmethod
     def get_instance(cls) -> Self:

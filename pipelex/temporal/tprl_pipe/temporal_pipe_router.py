@@ -11,6 +11,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.exceptions import WorkflowExecutionError
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow
@@ -22,7 +23,6 @@ from pipelex.temporal.tprl.observability import (
     stamp_submitter_session_id,
 )
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
-from pipelex.temporal.tprl_pipe.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
@@ -61,12 +61,15 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
 
         if is_in_temporal_workflow():
             # Child workflow dispatch (inside a Temporal workflow).
-            # The child id is a slash-separated path off the parent's workflow id,
-            # with a pipe-code prefix for readability and an 8-hex-char disambiguator
-            # from ``workflow.uuid4()`` (replay-safe — Temporal's uuid4 is deterministic).
+            # The child id is built off the parent's workflow id with an underscore
+            # separator, a pipe-code segment for readability and an 8-hex-char
+            # disambiguator from ``workflow.uuid4()`` (replay-safe — Temporal's uuid4
+            # is deterministic). The separator is ``_``, never ``/``: workflow ids must
+            # stay free of path separators so they can be reused verbatim as S3 keys or
+            # file names without spawning spurious directory segments.
             log.debug("TemporalPipeRouter: child workflow dispatch")
             parent_workflow_id = workflow.info().workflow_id
-            child_workflow_id = f"{parent_workflow_id}/{pipe_job.pipe.code}-{str(workflow.uuid4())[:8]}"
+            child_workflow_id = f"{parent_workflow_id}_{pipe_job.pipe.code}-{str(workflow.uuid4())[:8]}"
             # Dispatch via ``workflow.execute_child_workflow`` directly. The
             # ``WorkflowExecutorFactory`` is only safe at the submitter boundary
             # because it reads ``get_config().temporal.worker_config`` to seed

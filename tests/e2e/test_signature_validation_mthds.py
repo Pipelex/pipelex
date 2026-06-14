@@ -9,7 +9,7 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError, SignaturesNotAllowedError
 from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "signature_bundles"
@@ -76,12 +76,12 @@ class TestSignatureValidationE2E:
         assert sig_pipe.output.concept.structure_class_name != "TextContent"
 
     async def test_live_run_signature_pipeline_fails(self) -> None:
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=[str(_FIXTURE_DIR)],
             pipe_run_mode=PipeRunMode.LIVE,
         )
         with pytest.raises(PipelineExecutionError) as exc_info:
-            await runner.execute_pipeline(
+            await runner.execute(
                 pipe_code="summarize_doc",
                 inputs={"doc": TextContent(text="A document to summarize.")},
             )

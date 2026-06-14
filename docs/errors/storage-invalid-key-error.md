@@ -18,4 +18,4 @@ Raised when a storage key is invalid (e.g., contains scheme prefix).
 | Defined in | `pipelex.tools.storage.exceptions` |
 | Parent class | [`StorageError`](storage-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

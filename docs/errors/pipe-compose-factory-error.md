@@ -16,4 +16,4 @@ description: "Reference for the `PipeComposeFactoryError` Pipelex error class."
 | Defined in | `pipelex.pipe_operators.compose.exceptions` |
 | Parent class | [`PipeComposeError`](pipe-compose-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

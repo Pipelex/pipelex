@@ -38,8 +38,6 @@ class TestPipeBlueprintValidation:
                     pipe_type = PipeType.PIPE_LLM
                 case PipeCategory.PIPE_CONTROLLER:
                     pipe_type = PipeType.PIPE_SEQUENCE
-                case PipeCategory.PIPE_SIGNATURE:
-                    pipe_type = PipeType.PIPE_SIGNATURE
             blueprint = ConcretePipeBlueprint(
                 type=pipe_type,
                 pipe_category=category_enum,

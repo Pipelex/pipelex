@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -75,13 +75,18 @@ class ConceptBlueprint(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_mutually_exclusive_fields(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
+    def validate_mutually_exclusive_fields(cls, values: Any) -> Any:
         """Validate that refines and structure are not both set."""
-        if isinstance(values, dict) and values.get("refines") and values.get("structure"):
+        # mode="before" receives raw, unvalidated input — a non-dict (e.g. a plain string in a
+        # `ConceptBlueprint | str` union) must fall through untouched rather than crash on dict access
+        if not isinstance(values, dict):
+            return values
+        fields = cast("dict[str, Any]", values)
+        if fields.get("refines") and fields.get("structure"):
             msg = (
                 f"A concept cannot have both 'refines' and 'structure'. "
-                f"Got refines='{values.get('refines')}' and structure='{values.get('structure')}'. "
-                f"Concept description: '{values.get('description')}'"
+                f"Got refines='{fields.get('refines')}' and structure='{fields.get('structure')}'. "
+                f"Concept description: '{fields.get('description')}'"
             )
             raise ValueError(msg)
-        return values
+        return fields

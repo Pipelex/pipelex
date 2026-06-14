@@ -10,8 +10,8 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
-from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+from pipelex.pipe_run.tracing_assembly import assemble_tracing_on_output
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -67,10 +67,17 @@ class PipeRun(PipeRunProtocol):
                         f"Suppressed tracer close error: {tracer_close_error}"
                     )
 
-            if pipe_output is not None:
-                assemble_graph_on_output(
+            # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
+            # concerns are gated independently: graph events feed the GraphSpec (so a costs-only run does
+            # not set an empty GraphSpec, preserving the --no-graph contract), usage events feed the
+            # tokens_usages the submitter renders the cost report from.
+            trace_context = pipe_job.job_metadata.trace_context
+            if pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events):
+                assemble_tracing_on_output(
                     pipe_output=pipe_output,
                     pipeline_run_id=pipeline_run_id,
+                    assemble_graph=trace_context.emit_graph_events,
+                    assemble_usage=trace_context.emit_usage_events,
                     domain_code=pipe_job.pipe.domain_code,
                     main_pipe_code=pipe_job.pipe.code,
                 )

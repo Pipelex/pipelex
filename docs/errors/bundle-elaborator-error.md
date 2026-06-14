@@ -18,4 +18,4 @@ Raised when bundle elaboration fails (e.g. synthetic-name collision, invalid out
 | Defined in | `pipelex.core.interpreter.exceptions` |
 | Parent class | [`PipelexInterpreterError`](pipelex-interpreter-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

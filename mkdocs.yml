@@ -239,6 +239,7 @@ plugins:
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
         - building-methods/pipes/executing-pipelines.md: "Executing Pipelines"
+        - building-methods/pipes/run-modes-and-backends.md: "Run Modes & Backends"
         - building-methods/pipes/provide-inputs.md: "Providing Inputs to Pipelines"
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
@@ -348,9 +349,10 @@ extra_css:
 # - `CLAUDE.md` is a docs-authoring guide for contributors, not a published page.
 # - `errors/*.md` are generated reference stubs (one per PipelexError subclass) reached
 #   via the RFC 7807 `type` URI carried on every ErrorReport. They are not part of any
-#   guided navigation flow — the landing page `errors/index.md` is the only nav entry,
-#   and the individual per-class pages live as orphan pages whose existence is declared
-#   here so `mkdocs build --strict` does not flag them as accidentally unlisted.
+#   guided navigation flow — the only nav entries are the landing page `errors/index.md`
+#   and the macro listing pages (`errors/authoring-and-language.md`, etc., re-included
+#   below), and the individual per-class pages live as orphan pages whose existence is
+#   declared here so `mkdocs build --strict` does not flag them as accidentally unlisted.
 # - `agents/*.md` are AI-agent-facing playbooks (debugging workflows, environment
 #   gotchas) referenced from the root `CLAUDE.md`. They are built and searchable but
 #   intentionally kept out of the user-facing nav so they don't clutter the reading
@@ -359,7 +361,21 @@ not_in_nav: |
   CLAUDE.md
   errors/*.md
   !errors/index.md
+  !errors/authoring-and-language.md
+  !errors/execution-and-runtime.md
+  !errors/inference-and-providers.md
+  !errors/platform-and-tooling.md
   agents/*.md
+
+# exclude_docs: forward-looking pages kept in the repo but NOT built or served on
+#   the live site yet. The Mistral Workflows backend ships as a separate package
+#   (pipelex-mistralai-workflows) that is not published yet, so its user docs are
+#   held back to avoid advertising an unreleased package. Re-publish them — delete
+#   this block and restore the "Mistral Workflows" nav entries under Distributed
+#   Execution — once the package lands. See
+#   wip/distributed-execution/bridge-changes-sibling-repo-reconciliation.md.
+exclude_docs: |
+  distributed-execution/mistral-workflows/
 
 nav:
   - Get Started:
@@ -397,13 +413,6 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
-    - Retries & Resilience: reliability/retries-and-resilience.md
-    - Distributed Execution with Temporal:
-      - Overview: distributed-execution/index.md
-      - Cluster Setup: distributed-execution/cluster-setup.md
-      - Worker Deployment: distributed-execution/workers.md
-      - Task-Queue Routing: distributed-execution/task-routing.md
-      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -424,7 +433,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
-        - Distributed Execution with Temporal: features/distributed-execution.md
+        - Distributed Execution: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -446,6 +455,7 @@ nav:
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
+        - Run Modes & Backends: building-methods/pipes/run-modes-and-backends.md
         - Providing Inputs to Pipelines: building-methods/pipes/provide-inputs.md
         - Working Memory: building-methods/pipes/working-memory.md
         - Pipe Output: building-methods/pipes/pipe-output.md
@@ -469,7 +479,21 @@ nav:
         - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - Retries & Resilience:
+      - Overview: reliability/retries-and-resilience.md
+      - Automatic Retries: reliability/automatic-retries.md
+      - Failure Classification: reliability/failure-classification.md
+      - Durable Execution: reliability/durable-execution.md
+    - Distributed Execution:
+      - Overview: distributed-execution/index.md
+      - Temporal:
+        - Overview: distributed-execution/temporal/index.md
+        - Cluster Setup: distributed-execution/cluster-setup.md
+        - Worker Deployment: distributed-execution/workers.md
+        - Task-Queue Routing: distributed-execution/task-routing.md
+        - Workflow Observability: distributed-execution/observability.md
   - Reference:
+    - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
@@ -485,6 +509,18 @@ nav:
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
       - Agent CLI: tools/cli/agent-cli.md
+    - Tools:
+      - plxt (Formatter & Linter): tools/plxt.md
+      - Logging: tools/logging.md
+    - Analytics:
+      - Observer Data Extraction: analytics/data-extraction.md
+      - Telemetry: setup/telemetry.md
+    - Error Reference:
+      - Overview: errors/index.md
+      - Authoring & language: errors/authoring-and-language.md
+      - Execution & runtime: errors/execution-and-runtime.md
+      - Inference & providers: errors/inference-and-providers.md
+      - Platform & tooling: errors/platform-and-tooling.md
     - Configuration (TOML reference):
       - Overview: configuration/index.md
       - Pipeline Validation Configuration:
@@ -500,14 +536,6 @@ nav:
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
         - Feature: configuration/config-advanced/feature-config.md
-    - Tools:
-      - plxt (Formatter & Linter): tools/plxt.md
-      - Logging: tools/logging.md
-    - Analytics:
-      - Observer Data Extraction: analytics/data-extraction.md
-    - Telemetry: setup/telemetry.md
-    - Gateway Available Models: setup/gateway-models.md
-    - Error Reference: errors/index.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md

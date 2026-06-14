@@ -14,6 +14,6 @@ description: "Reference for the `PipeLibraryError` Pipelex error class."
 | `type_uri` | `https://docs.pipelex.com/latest/errors/pipe-library-error/` |
 | `error_domain` | _(inherited from parent)_ |
 | Defined in | `pipelex.libraries.pipe.exceptions` |
-| Parent class | [`PipelexError`](pipelex-error.md) |
+| Parent class | [`LibraryError`](library-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

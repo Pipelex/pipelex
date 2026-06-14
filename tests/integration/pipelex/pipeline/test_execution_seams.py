@@ -7,7 +7,7 @@ equivalent :class:`PipeJob` against an already-open library.
 """
 
 import pytest
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
@@ -45,7 +45,7 @@ prompt = "Echo the $subject as a topic"
 
 
 def _dry_mock_config() -> PipelineExecutionConfig:
-    return get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    return get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=False,
         mock_inputs=True,
     )
@@ -182,7 +182,7 @@ class TestExecutionSeams:
             normalize_spy = mocker.spy(execution_seams_module, "normalize_data_urls_to_storage")
             normalize_config = (
                 get_config()
-                .pipelex.pipeline_execution_config.with_graph_config_overrides(
+                .pipelex.pipeline_execution_config.with_execution_overrides(
                     generate_graph=False,
                     mock_inputs=False,
                 )

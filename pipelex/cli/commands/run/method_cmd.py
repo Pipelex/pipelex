@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from pipelex.cli.commands.run._run_core import COMMAND, execute_run
+from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.method_resolver import resolve_method_target
 
 
@@ -60,6 +60,14 @@ def run_method_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
+    mock_usage: Annotated[
+        bool,
+        typer.Option(
+            "--mock-usage",
+            hidden=True,
+            help="Internal test trigger: dry run whose LLM leaf mocks report nonzero synthetic usage so the cost report renders. Requires --dry-run.",
+        ),
+    ] = False,
     mock_inputs: Annotated[
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
@@ -80,11 +88,11 @@ def run_method_cmd(
             help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
         ),
     ] = None,
-    cost_report: Annotated[
+    costs: Annotated[
         bool | None,
         typer.Option(
-            "--cost-report/--no-cost-report",
-            help="Override config: --cost-report forces the cost table on; --no-cost-report skips reporting entirely (no table and no CSV file).",
+            "--costs/--no-costs",
+            help="Override config: emit usage (cost) tracing events and render the end-of-run cost report. Default on.",
         ),
     ] = None,
     save_csv: Annotated[
@@ -107,14 +115,7 @@ def run_method_cmd(
         pipelex run method my-method --inputs data.json
         pipelex run method my-method --dry-run
     """
-    # Validate --mock-inputs requires --dry-run
-    if mock_inputs and not dry_run:
-        typer.secho(
-            "Failed to run: --mock-inputs requires --dry-run",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
+    validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
     # Resolve method name to pipe_code and library dirs
     pipe_code, method_library_dirs, _ = resolve_method_target(
@@ -153,9 +154,10 @@ def run_method_cmd(
         graph_full_data=graph_full_data,
         output_dir=effective_output_dir,
         dry_run=dry_run,
+        mock_usage=mock_usage,
         mock_inputs=mock_inputs,
         library_dir=effective_library_dir,
-        cost_report=cost_report,
+        costs=costs,
         telemetry_command_label=f"{COMMAND} method",
         temporal=temporal,
         dynamic_output_concept_ref=dynamic_output_concept_ref,

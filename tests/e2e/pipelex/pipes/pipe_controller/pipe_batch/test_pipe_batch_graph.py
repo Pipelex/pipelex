@@ -11,7 +11,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -43,18 +43,18 @@ class TestPipeBatchGraph:
         4. Saves the GraphSpec for inspection
         """
         # Build effective config with graph tracing enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        exec_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
 
         # Run PipeBatch pipeline with graph tracing
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="batch_analyze_cvs_for_job_offer",
             inputs={
                 "cvs": [
@@ -167,7 +167,7 @@ class TestPipeBatchGraph:
         """
         # Build config with graph tracing and all graph outputs enabled
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -186,12 +186,12 @@ class TestPipeBatchGraph:
         exec_config = exec_config.model_copy(update={"graph_config": graph_config})
 
         # Run joke batch pipeline
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="generate_jokes_from_topics",
         )
         pipe_output = response.pipe_output
@@ -309,11 +309,11 @@ class TestPipeBatchGraph:
         attribute of the SearchResult stuff, validating the dotted-path resolution
         implemented in SubPipe.run_pipe().
         """
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="article_briefing",
             inputs={"topic": "artificial intelligence"},
         )

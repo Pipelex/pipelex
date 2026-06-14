@@ -16,4 +16,4 @@ description: "Reference for the `ContextProviderError` Pipelex error class."
 | Defined in | `pipelex.tools.misc.exceptions` |
 | Parent class | [`ToolError`](tool-error.md) |
 
-[Back to Error Model overview](../under-the-hood/error-model.md)
+[Back to Error Reference](index.md)

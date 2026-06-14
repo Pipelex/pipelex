@@ -3,11 +3,10 @@ from typing import TYPE_CHECKING, Callable
 import pytest
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.hub import get_current_library
-from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipe_signature.pipe_signature import PipeSignature
@@ -41,8 +40,10 @@ class TestPipeSignature:
         blueprint = make_signature_blueprint(inputs={"doc": "SigTestDoc"}, output="SigTestSummary")
         runtime = _make_runtime(blueprint)
         assert isinstance(runtime, PipeSignature)
-        assert runtime.type == PipeType.PIPE_SIGNATURE
-        assert runtime.pipe_category == PipeCategory.PIPE_SIGNATURE
+        # A signature is outside the executable taxonomy: `type` keeps the "PipeSignature" tag while
+        # `pipe_category` is None (no `PipeType`/`PipeCategory` membership).
+        assert runtime.type == "PipeSignature"
+        assert runtime.pipe_category is None
 
     def test_is_signature_true(
         self,
