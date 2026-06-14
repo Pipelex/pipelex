@@ -375,7 +375,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 
 mermaidflow = MermaidflowFactory.make_from_graphspec(
     graph_spec,
-    graph_config,
+    graph_config=graph_config,
     direction=FlowchartDirection.TOP_DOWN,
     include_subgraphs=True,
 )
@@ -488,8 +488,8 @@ validate_graphspec(graph_spec)
 | `GraphSpec.to_json()` | Serialize to JSON string |
 | `GraphAnalysis.from_graphspec(g)` | Pre-compute analysis |
 | `MermaidflowFactory.make_from_graphspec(...)` | Generate Mermaid |
-| `generate_reactflow_html(graphspec, config)` | Generate ReactFlow HTML |
-| `generate_graph_outputs(g, config, pipe_code)` | Generate all outputs |
+| `generate_reactflow_html(graphspec, config=...)` | Generate ReactFlow HTML |
+| `generate_graph_outputs(g, graph_config=..., pipe_code=...)` | Generate all outputs |
 
 ---
 

@@ -42,7 +42,7 @@ class _RaisingPipeRun(PipeRunProtocol):
         self._exc = exc
 
     @override
-    async def run(self, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
+    async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
         raise self._exc
 
 

@@ -77,7 +77,7 @@ class TestMermaidFromJson:
         graph_config = self._get_graph_config_with_data()
 
         # Generate mermaidflow Mermaid with data
-        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config, direction=FlowchartDirection.TOP_DOWN)
         assert mermaidflow.mermaid_code.startswith("flowchart TD")
 
         mermaidflow_mmd_path = output_dir / "mermaidflow.mmd"
@@ -122,7 +122,7 @@ class TestMermaidFromJson:
         json_str = load_text_from_path(Path(graph_json_path))
         graph_spec = GraphSpec.model_validate_json(json_str)
         graph_config = self._get_graph_config_with_data()
-        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config)
 
         mermaid_code = mermaidflow.mermaid_code
 

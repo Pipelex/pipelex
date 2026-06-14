@@ -49,6 +49,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
     async def run(
         self,
         pipe_job: PipeJob,
+        *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
         """Execute a pipe run via Temporal (blocking — waits for completion).
@@ -85,7 +86,7 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         # Rehydrate PipeOutput on the submitter. When the pipe_job carries a crate,
         # the helper opens a per-call scoped library so the submitter does not need
         # the bundle pre-loaded in its global registry.
-        return rehydrate_pipe_output_with_crate(pipe_output, pipe_job.library_crate)
+        return rehydrate_pipe_output_with_crate(pipe_output, library_crate=pipe_job.library_crate)
 
     @with_conditional_worker
     async def start(

@@ -141,8 +141,8 @@ def assemble_tracing(
 
 def assemble_tracing_on_output(
     pipe_output: PipeOutput,
-    pipeline_run_id: str,
     *,
+    pipeline_run_id: str,
     assemble_graph: bool,
     assemble_usage: bool,
     domain_code: str | None = None,

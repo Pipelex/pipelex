@@ -169,22 +169,24 @@ Order: `cogt/` → `plugins/`. `plugins/` wraps external LLM SDKs — watch for 
 
 Order: `pipe_operators/` → `pipe_controllers/` → `pipe_run/` → `pipeline/` → `graph/`. Heavily called internally; lean hard on pyright + the integration tests as the net.
 
-- [ ] `pipe_operators/`
-- [ ] `pipe_controllers/`
-- [ ] `pipe_run/`
-- [ ] `pipeline/`
-- [ ] `graph/`
-- [ ] Changelog under `[Unreleased]`; leave the wave uncommitted for the user to review and push.
+- [x] `pipe_operators/` — 40 cleared.
+- [x] `pipe_controllers/` — 6 cleared.
+- [x] `pipe_run/` — 16 cleared.
+- [x] `pipeline/` — 15 cleared.
+- [x] `graph/` — 39 cleared. (Plus `runtime_bridge/` 13 and `pipe_signature/` 2, which share these call paths — both cleared.)
+- [x] Changelog under `[Unreleased]` (Changed section); left uncommitted for the user to review and push.
 
 ### 🛑 CHECKPOINT E — Wave 4 landed
 
-**Cold-start snapshot (fill in at checkpoint):**
+**Cold-start snapshot — Checkpoint E reached & verified (2026-06-14):**
 
-- What landed this wave (files changed, left uncommitted in the working tree):
-- Remaining baseline count (link to `state.md`):
-- Decisions / edge cases this wave:
-- Deferred / surprises:
-- Next action:
+- **What landed (all uncommitted on `refactor/Function-calling-4`):** Wave 4 converted the execution path — `pipe_operators/` + `pipe_controllers/` + `pipe_run/` + `pipeline/` + `graph/` + `runtime_bridge/` + `pipe_signature/` — to keyword-only — baseline **351 → 220** (131 cleared, the exact Wave 4 target). Working-tree diff (~75 files): the source files in those seven packages (bare `*` after subject), their call sites tree-wide (incl. `tests/unit`, `tests/e2e`, `tests/integration`, and **2 `temporal/` caller files** — `temporal_pipe_router.py` + `temporal_pipe_run.py` — call-site fixes into the now-keyword-only execution path, NOT Wave 5 signature work), the `@override` impl signatures forced by the now-keyword-only `PipeController` / `PipeOperator` `_live_run_*` / `_dry_run_*` bases + `GraphTracerProtocol` + `PipeRouterProtocol` / `PipeRunProtocol` (the pipe-operator and pipe-controller subclasses), `CHANGELOG.md`, the regenerated `violations-baseline.txt` (220) + refreshed `inventory.json`, `wip/keyword-only-args/state.md`, the new signature-workflow script `wip/keyword-only-args/workflows/scripts/kw-only-wave4-signatures.js`, and this file.
+- **Verification:** `make agent-check` green (pyright 0, mypy 2191 ok, guard PASSED 220 known-debt); full `make agent-test` GREEN (exit 0).
+- **Remaining baseline:** 220 — per-package table in [`state.md`](wip/keyword-only-args/state.md). All seven Wave 4 packages fully pruned to 0; only Wave 5 packages remain (`cli` 111, `system` 44, `temporal` 39, `builder` 21, `<root>` public-API 4, plus the separate `test_extras` 1).
+- **Execution:** run as a Workflow (Wave 2/3 recipe) — a 10-editor file-disjoint signature barrier over 44 files (131 funcs: 123 added-star, 7 moved-star, 1 needs-manual = `PipeBatch._run_branch`), then a main-loop-driven pyright converge with a 10-batch fixer fan-out (~5 files each) over 174 actionable errors (141 `reportCallIssue` + 33 `reportIncompatibleMethodOverride`) — **cleared to 0 in one pass**, no rate limits, no residual existing-`*` trap.
+- **Decisions / edge cases this wave:** (1) **Clean wave — zero new carve-outs.** No framework/interpreter callback casualties (contrast Wave 1 Jinja2, Wave 3 `_restricted_import`); the execution path is heavily called internally + through tests, so pyright + the suite caught everything. (2) **`functools.partial` + nested closure** (`PipeBatch._run_branch`, the lone needs-manual) — resolved by making it keyword-only AND passing the bound arg by keyword in the partial (`partial(fn, subject, kw=val)`); no `# kw-only: ignore` needed, since *we* control the partial call (unlike the framework-positional carve-outs). (3) **Phase A args gotcha** — a large nested `args` object came through empty; switched the signature workflow to read a spec file via `args.specPath` (the saved fixer's `bucketsPath` pattern). All recorded in `state.md`.
+- **Deferred / surprises:** none. No deferred design tradeoffs. The override cascade surfaced level-by-level (as Wave 3 warned) but the single batched-fixer pass resolved all levels at once because fixers align each override against its base regardless of which level pyright reported. As in Wave 2, the only thing neither the guard nor the suite caught was stale **doc examples** with positional args — a `grep docs/` for the changed public-ish functions found and fixed three in `docs/under-the-hood/execution-graph-tracing.md` (`make_from_graphspec` / `generate_reactflow_html` / `generate_graph_outputs`).
+- **Next action:** Begin **Wave 5 / Phase 6** — framework-sensitive & public API: `builder/` (21) → `temporal/` (39, **carve out** `@activity.defn` / `@workflow.*` entrypoints — already in the guard) → `system/` (44, run `make tb` boot test after) → `cli/` (111, **carve out** Typer commands — already in the guard) → public surface `hub.py` / `config.py` / `pipelex.py` (4, enumerate breaking signatures explicitly in the changelog for downstream `pipelex-api` / `pipelex-worker` / `n8n` / cookbook). Reuse the Workflow recipe + the `kw-only-wave4-signatures.js` script (pass `args.specPath`). **Nothing is committed; the user reviews the working tree and pushes before Wave 5 cold-starts.**
 
 ---
 

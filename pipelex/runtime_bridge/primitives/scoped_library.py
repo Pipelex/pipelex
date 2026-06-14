@@ -13,7 +13,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 
 
 @contextmanager
-def scoped_library_for_crate(library_crate: LibraryCrate | None, library_id_prefix: str) -> Generator[str | None, None, None]:
+def scoped_library_for_crate(library_crate: LibraryCrate | None, *, library_id_prefix: str) -> Generator[str | None, None, None]:
     """Open a per-call scoped library loaded from ``library_crate`` for the duration of the block.
 
     When ``library_crate`` is None this is a no-op (yields None): callers fall back to the

@@ -60,7 +60,7 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
 
     # Generate and save mermaid files
     # Mermaidflow with data
-    mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+    mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
 
     log.info(f"Mermaidflow stuff_data keys: {list(mermaidflow.stuff_data.keys()) if mermaidflow.stuff_data else []}")
@@ -258,7 +258,7 @@ class TestGraphWithFullData:
 
         # Generate ReactFlow HTML
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title="Graph: cv_job_matcher")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Graph: cv_job_matcher")
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")
         log.info(f"Saved ReactFlow HTML to: {reactflow_path}")

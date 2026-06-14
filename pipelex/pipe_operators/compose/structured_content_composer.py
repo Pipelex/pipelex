@@ -116,7 +116,7 @@ class StructuredContentComposer:
 
         return field_values
 
-    async def _resolve_field(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> Any:
+    async def _resolve_field(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> Any:
         """Resolve a single field according to its composition method.
 
         Args:
@@ -142,7 +142,7 @@ class StructuredContentComposer:
             case ConstructFieldMethod.NESTED:
                 return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
 
-    def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> Any:
+    def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> Any:
         """Resolve a FROM_VAR field by getting value from working memory.
 
         The resolution is type-aware: it checks what the target field expects
@@ -184,7 +184,7 @@ class StructuredContentComposer:
 
         return resolved_value
 
-    def _convert_list_to_dict_keyed_by(self, value: Any, key_attr: str) -> dict[str, Any]:
+    def _convert_list_to_dict_keyed_by(self, value: Any, *, key_attr: str) -> dict[str, Any]:
         """Convert a ListContent or list to a dict keyed by a specified attribute.
 
         Items are converted to dicts to allow Pydantic's discriminated union validation
@@ -240,7 +240,7 @@ class StructuredContentComposer:
         log.verbose(f"  Converted to dict with keys: {list(result.keys())}")
         return result
 
-    def _resolve_dotted_path(self, path: str, expected_type: type[Any] | None) -> Any:
+    def _resolve_dotted_path(self, path: str, *, expected_type: type[Any] | None) -> Any:
         """Resolve a dotted path by navigating through object attributes.
 
         Handles paths like "deal.customer_name" by getting the base object
@@ -280,7 +280,7 @@ class StructuredContentComposer:
         else:
             return current_value  # pyright: ignore[reportUnknownVariableType]
 
-    def _resolve_from_stuff_name(self, name: str, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
+    def _resolve_from_stuff_name(self, name: str, *, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
         """Resolve a simple (non-dotted) path and convert content based on expected type.
 
         Args:
@@ -295,7 +295,7 @@ class StructuredContentComposer:
         log.verbose(f"  Stuff '{name}' content type: {type(stuff_content).__name__}")
         return self._convert_for_target_type(stuff_content=stuff_content, expected_type=expected_type)
 
-    def _convert_for_target_type(self, stuff_content: StuffContent, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
+    def _convert_for_target_type(self, stuff_content: StuffContent, *, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
         """Convert content based on the expected target field type.
 
         Central dispatcher for type-aware conversion. Routes to specific
@@ -321,7 +321,7 @@ class StructuredContentComposer:
             log.verbose(f"  -> Unknown target type, returning {type(stuff_content).__name__} object")
             return stuff_content
 
-    def _convert_text_content(self, text_content: TextContent, expected_type: Any) -> TextContent | str:
+    def _convert_text_content(self, text_content: TextContent, *, expected_type: Any) -> TextContent | str:
         """Convert TextContent based on expected type (str, TextContent, or subclass).
 
         Args:
@@ -346,7 +346,7 @@ class StructuredContentComposer:
             return text_content
 
     def _convert_list_content(
-        self, list_content: ListContent[StuffContent], expected_type: type[Any] | None
+        self, list_content: ListContent[StuffContent], *, expected_type: type[Any] | None
     ) -> ListContent[StuffContent] | list[dict[str, Any]]:
         """Convert ListContent based on expected type (list[X] or ListContent[X]).
 
@@ -389,7 +389,7 @@ class StructuredContentComposer:
         else:
             return None
 
-    def _expects_type(self, expected_type: type[Any], target_type: type) -> bool:
+    def _expects_type(self, expected_type: type[Any], *, target_type: type) -> bool:
         """Check if the expected type matches or is a subclass of target_type.
 
         Args:
@@ -407,7 +407,7 @@ class StructuredContentComposer:
             # expected_type is not a class (e.g., it's a generic like list[X])
             return False
 
-    def _convert_content_for_field(self, stuff_content: StuffContent, expected_type: type[StuffContent]) -> StuffContent:
+    def _convert_content_for_field(self, stuff_content: StuffContent, *, expected_type: type[StuffContent]) -> StuffContent:
         """Convert any StuffContent to the expected type if needed.
 
         This is a generic conversion method that handles class compatibility for
@@ -498,7 +498,7 @@ class StructuredContentComposer:
         else:
             return None
 
-    def _convert_list_items_as_dicts(self, items: list[StuffContent], expected_item_type: type[Any] | None) -> list[dict[str, Any]]:
+    def _convert_list_items_as_dicts(self, items: list[StuffContent], *, expected_item_type: type[Any] | None) -> list[dict[str, Any]]:
         """Convert list items to dicts for Pydantic model_validate reconstruction.
 
         Used when target is list[X] - items are returned as dicts so Pydantic
@@ -525,7 +525,7 @@ class StructuredContentComposer:
         log.verbose(f"     Returning {len(converted_items)} items as dicts")
         return converted_items
 
-    def _convert_list_items_as_objects(self, items: list[StuffContent], expected_item_type: type[Any] | None) -> list[StuffContent]:
+    def _convert_list_items_as_objects(self, items: list[StuffContent], *, expected_item_type: type[Any] | None) -> list[StuffContent]:
         """Convert list items while keeping them as objects (for ListContent target).
 
         Used when target is ListContent[X] - items are validated and potentially
@@ -546,13 +546,13 @@ class StructuredContentComposer:
 
         converted_items: list[StuffContent] = []
         for idx, item in enumerate(items):
-            converted_item = self._convert_single_item_as_object(item, expected_item_type, idx)
+            converted_item = self._convert_single_item_as_object(item, expected_type=expected_item_type, idx=idx)
             converted_items.append(converted_item)
 
         log.verbose(f"     Returning {len(converted_items)} items as objects")
         return converted_items
 
-    def _validate_item_compatibility(self, item: StuffContent, expected_type: type[Any], idx: int) -> None:
+    def _validate_item_compatibility(self, item: StuffContent, *, expected_type: type[Any], idx: int) -> None:
         """Validate that an item can be converted to the expected type.
 
         Args:
@@ -596,7 +596,7 @@ class StructuredContentComposer:
                 msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
-    def _convert_single_item_as_object(self, item: StuffContent, expected_type: type[Any], idx: int) -> StuffContent:
+    def _convert_single_item_as_object(self, item: StuffContent, *, expected_type: type[Any], idx: int) -> StuffContent:
         """Convert a single list item while keeping it as an object.
 
         Delegates to the generic _convert_content_for_field method,
@@ -615,7 +615,7 @@ class StructuredContentComposer:
         """
         try:
             log.verbose(f"     Item[{idx}]: Converting {type(item).__name__} to {expected_type.__name__}")
-            return self._convert_content_for_field(item, expected_type)
+            return self._convert_content_for_field(item, expected_type=expected_type)
         except StructuredContentComposerTypeError as exc:
             # Re-raise with item index in message
             msg = f"Item[{idx}]: {exc}"
@@ -659,7 +659,7 @@ class StructuredContentComposer:
             context=context,
         )
 
-    async def _resolve_nested(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> StuffContent:
+    async def _resolve_nested(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> StuffContent:
         """Resolve a NESTED field by recursively composing a nested StructuredContent.
 
         Args:

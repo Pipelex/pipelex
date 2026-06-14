@@ -168,6 +168,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -329,6 +330,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def _llm_gen_object_stuff_content(
         self,
         job_metadata: JobMetadata,
+        *,
         pipe_run_params: PipeRunParams,
         is_multiple_output: bool,
         fixed_nb_output: int | None,
@@ -381,7 +383,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
+    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
         for current_exc in iter_cause_chain(exc):

@@ -13,6 +13,7 @@ class PipeJobFactory:
     def make_pipe_job(
         cls,
         pipe: PipeAbstract,
+        *,
         job_metadata: JobMetadata,
         pipe_run_params: PipeRunParams | None = None,
         working_memory: WorkingMemory | None = None,

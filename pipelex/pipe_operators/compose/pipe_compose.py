@@ -142,6 +142,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -164,6 +165,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     async def _run_template_mode(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
@@ -222,6 +224,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     async def _run_construct_mode(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
@@ -275,6 +278,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -314,6 +318,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def _make_mock_construct_output(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         output_name: str | None,
     ) -> PipeComposeOutput:

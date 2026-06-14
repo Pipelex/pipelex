@@ -63,7 +63,7 @@ class TraceContext(BaseModel):
         """
         return f"{self.graph_id}:node_{self.node_sequence}"
 
-    def copy_for_child(self, child_node_id: str, next_sequence: int) -> "TraceContext":
+    def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> "TraceContext":
         """Create a child context for a nested pipe execution.
 
         Args:

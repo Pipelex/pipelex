@@ -117,6 +117,7 @@ class PipeBatch(PipeController):
     async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -148,7 +149,7 @@ class PipeBatch(PipeController):
                 f"for a workload this size, consider running on Temporal for durable, rate-limited execution."
             )
 
-        async def _run_branch(item_input_stuff: "Stuff", branch_output_item_code: str) -> PipeOutput:
+        async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
@@ -202,7 +203,7 @@ class PipeBatch(PipeController):
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code))
+            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code=branch_output_item_code))
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
@@ -259,6 +260,7 @@ class PipeBatch(PipeController):
     async def _dry_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,

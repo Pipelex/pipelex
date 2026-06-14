@@ -201,7 +201,7 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
         ) from sig_error
 
 
-def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
+def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
     """Select which loaded pipes to dry-run.
 
     Returns every loaded pipe when ``dry_run_pipe_codes`` is ``None`` (whole-bundle validation).
@@ -229,6 +229,7 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list
 
 async def validate_bundle(
     mthds_file_path: Path | None = None,
+    *,
     mthds_contents: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
@@ -279,7 +280,9 @@ async def validate_bundle(
                 loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
+                    library_id=library_id,
+                    allow_signatures=allow_signatures,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -302,7 +305,9 @@ async def validate_bundle(
                     loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
                 dry_run_results = await BundleValidator().validate_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
+                    library_id=library_id,
+                    allow_signatures=allow_signatures,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -327,7 +332,7 @@ async def validate_bundle(
             library_manager.teardown(library_id=library_id)
 
 
-async def validate_bundles_from_directory(directory: Path, allow_signatures: bool = False) -> ValidateBundleResult:
+async def validate_bundles_from_directory(directory: Path, *, allow_signatures: bool = False) -> ValidateBundleResult:
     mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
@@ -372,6 +377,7 @@ class LoadConceptsOnlyResult(BaseModel):
 
 def load_concepts_only(
     mthds_file_path: Path | None = None,
+    *,
     mthds_contents: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:

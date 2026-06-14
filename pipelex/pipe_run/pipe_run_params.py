@@ -27,6 +27,7 @@ FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 
 def output_multiplicity_to_apply(
     base_multiplicity: VariableMultiplicity | None,
+    *,
     override_multiplicity: VariableMultiplicity | None,
 ) -> VariableMultiplicityResolution:
     """Resolve output multiplicity settings by combining base configuration with override.
@@ -120,6 +121,7 @@ class BatchParams(BaseModel):
     def make_batch_params(
         cls,
         input_list_name: str,
+        *,
         input_item_name: str,
     ) -> BatchParams:
         return BatchParams(
@@ -204,6 +206,7 @@ class PipeRunParams(BaseModel):
     def copy_by_injecting_multiplicity(
         cls,
         pipe_run_params: Self,
+        *,
         applied_output_multiplicity: VariableMultiplicity | None,
     ) -> Self:
         """Copy the run params the nb_output into the params, and remove the attribute.

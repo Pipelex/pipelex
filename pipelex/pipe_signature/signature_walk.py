@@ -11,7 +11,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import get_optional_pipe
 
 
-def collect_signature_refs(pipe: PipeAbstract, visited: set[str] | None = None) -> set[str]:
+def collect_signature_refs(pipe: PipeAbstract, *, visited: set[str] | None = None) -> set[str]:
     """Return the qualified pipe_refs of every signature reachable from `pipe`.
 
     Walks `pipe.pipe_dependencies()`, resolving each dependency via `get_optional_pipe`.
@@ -39,6 +39,7 @@ def collect_signature_refs(pipe: PipeAbstract, visited: set[str] | None = None) 
 
 def collect_signature_paths(
     pipe: PipeAbstract,
+    *,
     current_path: list[str] | None = None,
     paths: dict[str, list[str]] | None = None,
 ) -> dict[str, list[str]]:

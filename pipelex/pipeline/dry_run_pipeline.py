@@ -25,6 +25,7 @@ from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 async def dry_run_pipeline(
     mthds_contents: list[str] | None = None,
+    *,
     bundle_uris: list[str] | None = None,
     library_dirs: list[str] | None = None,
 ) -> tuple[GraphSpec, str]:

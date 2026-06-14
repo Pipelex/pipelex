@@ -23,7 +23,7 @@ class TestOutputMultiplicityToApply:
         description: str,
     ):
         """Test output_multiplicity_to_apply with all parameter combinations."""
-        result = output_multiplicity_to_apply(base, override)
+        result = output_multiplicity_to_apply(base, override_multiplicity=override)
         assert result.resolved_multiplicity == expected_result.resolved_multiplicity, f"Failed resolved_multiplicity for case: {description}"
         assert result.is_multiple_outputs_enabled == expected_result.is_multiple_outputs_enabled, (
             f"Failed enable_multiple_outputs for case: {description}"
@@ -33,7 +33,7 @@ class TestOutputMultiplicityToApply:
     def test_override_none_uses_base(self):
         """Test that when override is None, base value is used as-is."""
         # Base None -> single output
-        result = output_multiplicity_to_apply(None, None)
+        result = output_multiplicity_to_apply(None, override_multiplicity=None)
         assert result.resolved_multiplicity is None
         assert result.is_multiple_outputs_enabled is False
         assert result.specific_output_count is None
