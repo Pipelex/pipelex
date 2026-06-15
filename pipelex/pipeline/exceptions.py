@@ -138,12 +138,21 @@ class ValidateBundleError(PipelexError):
         document carries machine-mappable diagnostics. The list is set to
         ``None`` when empty so it drops out of the ``exclude_none`` wire
         projection (and the round-trip stays identical to a plain report).
+
+        The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe
+        validation **plus** pipe/concept instantiation errors) so the
+        instantiation category is not silently dropped from the wire. The two
+        non-categorized failure channels — ``dry_run_error_message`` and
+        ``signature_check_error`` — are deliberately *not* projected as
+        ``ValidationErrorItem``s: they are single messages, not per-error data
+        with identity fields, so they ride the report's human-readable
+        ``message`` (the 7807 ``detail``) instead.
         """
         report = super().to_error_report()
         validation_error_items = build_validation_error_items(
             blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
             factory_errors=self.pipe_factory_errors,
-            pipe_validation_errors=self.pipe_validation_errors,
+            pipe_validation_errors=self.pipe_validation_error_data,
         )
         return report.model_copy(update={"validation_errors": validation_error_items or None})
 

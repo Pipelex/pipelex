@@ -13,6 +13,7 @@ from collections.abc import Callable
 
 import pytest
 
+from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -60,19 +61,30 @@ class TestValidateBundleSourceThreading:
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """An invalid bundle's structured ``validation_errors`` carry the threaded ``source``."""
+        """An invalid bundle's structured ``validation_errors`` carry the threaded ``source``.
+
+        Pins that the carrier is the *blueprint-validation* item produced by the dict-seeded
+        ``source`` (the failure happens before the post-validate object exists), not some
+        coincidental other item — so a regression that silently stopped seeding would fail here.
+        """
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_INVALID_MAIN_PIPE_MTHDS], mthds_names=["broken.mthds"])
         report = exc_info.value.to_error_report()
         assert report.validation_errors is not None
-        assert any(item.source == "broken.mthds" for item in report.validation_errors)
+        seeded_items = [item for item in report.validation_errors if item.source == "broken.mthds"]
+        assert seeded_items, "no validation_errors item carried the threaded source"
+        assert any(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in seeded_items)
 
-    async def test_length_mismatch_is_rejected(
+    async def test_length_mismatch_is_a_host_contract_error(
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """``mthds_names`` must align with ``mthds_contents`` position-for-position."""
+        """A ``mthds_names``/``mthds_contents`` length mismatch is a host wiring bug, not user input.
+
+        It must raise an internal error (→ 500, redacted under STRICT), not a caller-facing
+        ``ValidateBundleError`` (→ 422) — ``mthds_names`` is never supplied by the end caller.
+        """
         load_empty_library()
-        with pytest.raises(ValidateBundleError, match="must be a per-item name list matching mthds_contents"):
+        with pytest.raises(PipelexUnexpectedError, match="must be a per-item name list matching mthds_contents"):
             await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_names=["a.mthds", "b.mthds"])

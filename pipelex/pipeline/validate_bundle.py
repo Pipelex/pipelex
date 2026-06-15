@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 from typing_extensions import TypedDict, assert_never
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
@@ -255,11 +256,15 @@ async def validate_bundle(
         msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
         raise ValidateBundleError(message=msg)
     if mthds_names is not None and (mthds_contents is None or len(mthds_names) != len(mthds_contents)):
-        # ``mthds_names`` is a per-content logical-name list (the API threads each bundle's
-        # name onto the in-memory load path so its diagnostics carry a real ``source``). It is
-        # meaningful only alongside ``mthds_contents`` and must align position-for-position.
+        # ``mthds_names`` is a per-content logical-name list (the host — e.g. an HTTP API —
+        # threads each bundle's name onto the in-memory load path so its diagnostics carry a
+        # real ``source``). It is never supplied by the end caller, so a missing-alongside /
+        # length-mismatch is a host wiring bug, not bad user input: raise an internal error
+        # (→ 500, redacted under STRICT) rather than ``ValidateBundleError`` (→ caller-facing
+        # 422). Contrast the empty-``mthds_contents`` guard above, which can legitimately
+        # reflect an end user submitting no bundles and so stays a caller-facing input error.
         msg = "mthds_names, when provided, must be a per-item name list matching mthds_contents in length"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()

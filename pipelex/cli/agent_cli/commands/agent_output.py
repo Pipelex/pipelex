@@ -428,6 +428,6 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     items = build_validation_error_items(
         blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
         factory_errors=exc.pipe_factory_errors,
-        pipe_validation_errors=exc.pipe_validation_errors,
+        pipe_validation_errors=exc.pipe_validation_error_data,
     )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]

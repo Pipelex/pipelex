@@ -58,6 +58,15 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # ever rides a ``ValidateBundleError`` report (a caller-facing INPUT error), but
 # it is kept here — not by the caller-facing branch's bespoke logic — so the
 # decision lives in this one allowlist.
+#
+# Caveat — ``validation_errors[].source``: on the *in-memory* validate path
+# ``source`` is the caller-supplied logical name (e.g. ``api://bundle-0.mthds``),
+# which is the hosted/STRICT case and safe to surface. On the *on-disk* path it
+# is a real server filesystem path, and STRICT does NOT redact it (consistent
+# with ``DisclosureMode`` being a classification-projection, not a path-leak
+# shield — see its docstring). A hosted surface that validates from disk should
+# therefore use the in-memory path with logical names rather than rely on STRICT
+# to scrub the path.
 _STRICT_KEPT_FIELDS: frozenset[str] = frozenset(
     {"error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
 )

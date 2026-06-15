@@ -8,6 +8,8 @@ projection — including the ``source`` / ``field_name`` / ``concept_code`` fiel
 that the older CLI-only extractor dropped — and the CLI↔API shape parity.
 """
 
+import json
+
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import extract_validation_errors
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -18,11 +20,16 @@ from pipelex.pipeline.validation_errors import build_validation_error_items
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
-    """Call the builder with the error's three categorized lists (its real call shape)."""
+    """Call the builder with the error's categorized lists, exactly as production does.
+
+    The pipe-validation arm uses ``pipe_validation_error_data`` (pipe validation **plus**
+    pipe/concept instantiation errors) — the same combined accessor both real call sites
+    (``ValidateBundleError.to_error_report`` and the CLI ``extract_validation_errors``) pass.
+    """
     return build_validation_error_items(
         blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
         factory_errors=exc.pipe_factory_errors,
-        pipe_validation_errors=exc.pipe_validation_errors,
+        pipe_validation_errors=exc.pipe_validation_error_data,
     )
 
 
@@ -141,10 +148,42 @@ class TestBuildValidationErrorItems:
         assert cli_dicts == builder_dicts
 
     def test_cli_extractor_equals_api_report_validation_errors(self) -> None:
-        """The CLI dicts deep-equal the API report's ``validation_errors`` — cross-surface parity."""
+        """The CLI array and the API 422 ``validation_errors`` are identical on the wire.
+
+        The API report path dumps in python mode (``to_dict`` → ``model_dump(exclude_none=True)``),
+        so ``category`` rides as a live ``ValidationErrorCategory`` enum, while the CLI dumps
+        ``mode="json"`` strings. A plain ``==`` would pass merely because ``StrEnum`` subclasses
+        ``str``; to prove *wire-byte* parity (and catch a future python/json-divergent field that
+        is not a StrEnum), we also compare the encoded JSON, not just the in-memory dicts.
+        """
         exc = _all_category_error()
         cli_dicts = extract_validation_errors(exc)
         problem_document = exc.to_error_report().to_problem_document()
-        # StrEnum ``category`` compares equal to its string value, so the dicts match regardless
-        # of dump mode (the API report dumps in python mode, the CLI in json mode).
         assert problem_document["validation_errors"] == cli_dicts
+        assert json.dumps(problem_document["validation_errors"], sort_keys=True) == json.dumps(cli_dicts, sort_keys=True)
+
+    def test_instantiation_errors_are_projected_as_pipe_validation(self) -> None:
+        """Pipe/concept *instantiation* errors reach the wire too (not silently dropped).
+
+        ``ValidateBundleError`` aggregates them in a separate list; both real call sites route
+        through ``pipe_validation_error_data`` so they project as ``PIPE_VALIDATION`` items.
+        """
+        exc = ValidateBundleError(
+            message="validation failed",
+            pipe_concept_instantiation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    source="instantiated.mthds",
+                    pipe_code="pipe_inst",
+                    message="instantiation failed",
+                    field_path="pipe_inst.inputs.z",
+                ),
+            ],
+        )
+        items = _build_items(exc)
+        assert [item.category for item in items] == [ValidationErrorCategory.PIPE_VALIDATION]
+        assert items[0].source == "instantiated.mthds"
+        # And the API report surfaces it (would be None/empty if the list were dropped).
+        report = exc.to_error_report()
+        assert report.validation_errors is not None
+        assert report.validation_errors[0].pipe_code == "pipe_inst"

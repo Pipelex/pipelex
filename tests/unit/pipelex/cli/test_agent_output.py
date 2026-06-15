@@ -26,9 +26,6 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import ValidateBundleError
 
@@ -125,54 +122,11 @@ class TestAgentOutput:
         assert parsed["success"] is True
         assert parsed["value"] == 42
 
-    def test_extract_validation_errors_all_categories(self) -> None:
-        """extract_validation_errors should return entries from all 4 categories."""
-        exc = ValidateBundleError(
-            message="validation failed",
-            pipelex_bundle_blueprint_validation_errors=[
-                PipelexBundleBlueprintValidationErrorData(
-                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    pipe_code="pipe_a",
-                    message="missing var x",
-                    variable_names=["x"],
-                ),
-            ],
-            pipe_factory_errors=[
-                PipeFactoryErrorData(
-                    error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
-                    pipe_code="pipe_b",
-                    message="concept Foo not found",
-                    missing_concept_code="Foo",
-                    declared_concepts=["Bar", "Baz"],
-                ),
-            ],
-            pipe_validation_errors=[
-                PipesAndConceptValidationErrorData(
-                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    pipe_code="pipe_c",
-                    message="extra var y",
-                    field_path="pipe_c.inputs.y",
-                    variable_names=["y"],
-                ),
-            ],
-        )
-
-        result = extract_validation_errors(exc)
-        assert len(result) == 3
-
-        categories = [entry["category"] for entry in result]
-        assert "blueprint_validation" in categories
-        assert "pipe_factory" in categories
-        assert "pipe_validation" in categories
-
-        # Check factory error has extra fields
-        factory_entry = next(entry for entry in result if entry["category"] == "pipe_factory")
-        assert factory_entry["missing_concept_code"] == "Foo"
-        assert factory_entry["declared_concepts"] == ["Bar", "Baz"]
-
-        # Check blueprint entry has variable_names
-        blueprint_entry = next(entry for entry in result if entry["category"] == "blueprint_validation")
-        assert blueprint_entry["variable_names"] == ["x"]
+    # NOTE: the per-category projection of ``extract_validation_errors`` is now pinned
+    # thoroughly (including CLI↔API shape parity) by the shared-builder suite in
+    # tests/unit/pipelex/pipeline/test_validation_errors.py — the former
+    # ``test_extract_validation_errors_all_categories`` here duplicated it with weaker
+    # asserts and a stale "4 categories" docstring, so it was removed.
 
     # -------------------------------------------------------------------------
     # Datetime serialization tests (regression for "Object of type datetime is
