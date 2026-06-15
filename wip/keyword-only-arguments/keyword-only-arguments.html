@@ -231,7 +231,7 @@ flowchart TD
   <p class="note">A near-universal tell: the existing call sites already passed the "positional" arg by keyword — the positional permission was buying nothing.</p>
 </details>
 
-<h2>Downstream: one branch SHA, four consumers, exactly one real break</h2>
+<h2>Downstream: one branch SHA, five consumers, exactly one real break</h2>
 <p>The consumers were pinned to the pipelex branch git rev and walked forward as the branch moved. The headache wasn't the keyword-only changes — it was that bumping off PyPI&nbsp;0.32.x surfaced the whole accumulated <code>dev</code> delta (notably the unrelated <code>PipelexRunner → PipelexMTHDSProtocol</code> runner rename). The keyword-only-specific call-site fixes were tiny.</p>
 
 <table>
@@ -241,8 +241,8 @@ flowchart TD
     <tr><td>cocode</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/cocode/pull/75">PR&nbsp;#75</a></td><td>No (all keyword already)</td><td class="pill good">green · pushed</td></tr>
     <tr><td>pipelex-cookbook</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-cookbook/pull/153">PR&nbsp;#153</a></td><td>No (earlier waves only)</td><td class="pill good">green · pushed</td></tr>
     <tr><td>pipelex-starter-python</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-starter-python/pull/55">PR&nbsp;#55</a></td><td>No</td><td class="pill good">green · pushed</td></tr>
-    <tr><td>pipelex-mistralai-workflows</td><td><code>feature/Mistral-native</code> (mistralai-2x hold pin)</td><td>Out of scope</td><td class="pill">n/a</td></tr>
-    <tr><td>pipelex-worker</td><td><code>dev</code> (PyPI version pin)</td><td>Out of scope</td><td class="pill">n/a</td></tr>
+    <tr><td>pipelex-worker</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-worker/pull/23">PR&nbsp;#23</a></td><td>No — no <code>pipelex</code> imports (thin worker); fixed a brittle ANSI assertion in the doctor smoke test</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-mistralai-workflows</td><td><code>feature/Mistral-native</code> (mistralai-2x hold pin)</td><td>Out of scope (own hold track)</td><td class="pill">n/a</td></tr>
   </tbody>
 </table>
 
@@ -360,7 +360,7 @@ exec "$PYTHON" "$GUARD" "$file_path"   # exit 2 + stderr → Claude Code surface
 </div>
 
 <footer>
-  Branch <code>refactor/Function-calling-4</code>. Consumer PRs: pipelex-api&nbsp;#19, cocode&nbsp;#75, pipelex-cookbook&nbsp;#153, pipelex-starter-python&nbsp;#55. The full convention spec, the resolved suspects list, and the raw audit live alongside this file in the <code>keyword-only-arguments/</code> track.
+  Branch <code>refactor/Function-calling-4</code>. Consumer PRs: pipelex-api&nbsp;#19, cocode&nbsp;#75, pipelex-cookbook&nbsp;#153, pipelex-starter-python&nbsp;#55, pipelex-worker&nbsp;#23. The full convention spec, the resolved suspects list, and the raw audit live alongside this file in the <code>keyword-only-arguments/</code> track.
 </footer>
 
 </div>

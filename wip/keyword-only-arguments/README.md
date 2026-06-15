@@ -4,7 +4,7 @@ Track record for the **keyword-only arguments refactor** on `refactor/Function-c
 
 ## Status
 
-The pipelex-internal refactor is **complete and landed on the branch** — all waves done, the guard hard-blocks on any violation, and the convention is promoted to the canonical contributor doc at [`docs/contribute/keyword-only-arguments.md`](../../docs/contribute/keyword-only-arguments.md) (in the mkdocs nav). The downstream consumers were updated in lockstep (PRs #19 / #55 / #75 / #153) and **pushed**, all pinned to the branch git rev `0e32c8c0` and green on `make agent-check` + `make agent-test`.
+The pipelex-internal refactor is **complete and landed on the branch** — all waves done, the guard hard-blocks on any violation, and the convention is promoted to the canonical contributor doc at [`docs/contribute/keyword-only-arguments.md`](../../docs/contribute/keyword-only-arguments.md) (in the mkdocs nav). The downstream consumers were updated in lockstep (PRs #19 / #55 / #75 / #153, plus pipelex-worker #23) and **pushed**, all pinned to the branch git rev `0e32c8c0` and green on their test suites. (`pipelex-mistralai-workflows` is the one genuine out-of-scope consumer — it's on its own mistralai-2x hold track.)
 
 **One open item:** at pipelex release, swap each consumer's temporary `[tool.uv.sources]` git pin back to the released `pipelex` version. Tracked in the checklist of [`downstream-consumer-breakage.md`](downstream-consumer-breakage.md).
 
