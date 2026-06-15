@@ -148,8 +148,8 @@ async def validate_pipe_core(
 
 
 async def validate_pipe_in_bundle_core(
-    bundle_path: Path,
     *,
+    bundle_path: Path,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,

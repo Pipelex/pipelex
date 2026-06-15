@@ -81,7 +81,7 @@ def update_cmd(
         return
 
     actions_applied = _apply_updates(deck_dir=deck_dir, report=report, no_backup=no_backup)
-    write_manifest(deck_dir, manifest=compute_kit_manifest())
+    write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
 
     console.print()
     console.print(_summary_panel(f"Model deck updated ({actions_applied} file change(s) applied).", style="green"))

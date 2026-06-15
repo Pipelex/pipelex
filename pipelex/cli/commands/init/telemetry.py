@@ -9,7 +9,7 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
 
 
-def setup_telemetry(console: Console, *, telemetry_config_path: Path, for_project: bool) -> None:
+def setup_telemetry(*, console: Console, telemetry_config_path: Path, for_project: bool) -> None:
     """Set up telemetry configuration by copying the appropriate kit template.
 
     The global template (`telemetry.toml`) carries active defaults and seeds

@@ -299,7 +299,7 @@ class ModelManager(ModelManagerAbstract):
             raise RuntimeError(msg)
         return self._routing_profile
 
-    def build_deck(self, enabled_backends: list[str], *, model_deck_blueprint: ModelDeckBlueprint) -> ModelDeck:
+    def build_deck(self, model_deck_blueprint: ModelDeckBlueprint, *, enabled_backends: list[str]) -> ModelDeck:
         all_models_and_possible_backends = self.inference_backend_library.get_all_models_and_possible_backends()
         inference_models: dict[str, InferenceModelSpec] = {}
 

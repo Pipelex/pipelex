@@ -170,15 +170,15 @@ def _categorize_concept_validation_error(
 
 
 def categorize_blueprint_validation_error(
-    blueprint_dict: dict[str, Any],
-    *,
     error: ErrorDetails,
+    *,
+    blueprint_dict: dict[str, Any],
 ) -> PipelexBundleBlueprintValidationErrorData | None:
     """Categorize a BLUEPRINT validation error and create structured error data or return None if the error cannot be categorized.
 
     Args:
-        blueprint_dict: The blueprint dict being validated (for context extraction)
         error: Pydantic error from PipelexBundleBlueprint.model_validate()
+        blueprint_dict: The blueprint dict being validated (for context extraction)
 
     Returns:
         PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized

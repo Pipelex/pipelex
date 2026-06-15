@@ -436,8 +436,8 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
 
 
 def display_health_report(
-    config_healthy: bool,
     *,
+    config_healthy: bool,
     config_message: str,
     config_missing_count: int,
     telemetry_healthy: bool,

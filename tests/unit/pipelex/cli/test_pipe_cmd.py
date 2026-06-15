@@ -43,39 +43,38 @@ class TestCliPipeCmd:
             "prompt": "Write about $text",
         }
         pipe_type = spec.pop("type")
-        result = parse_pipe_spec(pipe_type, spec_data=spec)
+        result = parse_pipe_spec(spec, pipe_type=pipe_type)
         assert result.pipe_code == "test"
 
     # -- CLI TOML serialization (uses format_toml_string) -----------------
 
     def test_llm_model_appears_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
+        spec = parse_pipe_spec({**self._BASE_LLM}, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "$writing-creative"' in toml
 
     def test_llm_different_model_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM, "model": "$engineering-structured"})
+        spec = parse_pipe_spec({**self._BASE_LLM, "model": "$engineering-structured"}, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "$engineering-structured"' in toml
 
     def test_extract_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeExtract",
-            spec_data={
+            {
                 "pipe_code": "my_extract",
                 "description": "Extract pipe",
                 "inputs": {"doc": "Document"},
                 "output": "Page[]",
                 "model": "@default-extract-document",
             },
+            pipe_type="PipeExtract",
         )
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "@default-extract-document"' in toml
 
     def test_img_gen_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeImgGen",
-            spec_data={
+            {
                 "pipe_code": "my_img_gen",
                 "description": "Image gen pipe",
                 "inputs": {"prompt_text": "ImgGenPrompt"},
@@ -83,25 +82,25 @@ class TestCliPipeCmd:
                 "model": "$gen-image",
                 "prompt": "Generate: $prompt_text",
             },
+            pipe_type="PipeImgGen",
         )
         toml = _pipe_spec_to_toml(spec)
         assert 'model = "$gen-image"' in toml
 
     def test_toml_contains_pipe_section(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
+        spec = parse_pipe_spec({**self._BASE_LLM}, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(spec)
         assert "[pipe.my_llm_pipe]" in toml
         assert 'type = "PipeLLM"' in toml
 
     def test_toml_contains_prompt(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", spec_data={**self._BASE_LLM})
+        spec = parse_pipe_spec({**self._BASE_LLM}, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(spec)
         assert 'prompt = "Write about $text"' in toml
 
     def test_sequence_toml_has_steps(self) -> None:
         spec = parse_pipe_spec(
-            "PipeSequence",
-            spec_data={
+            {
                 "pipe_code": "my_seq",
                 "description": "A sequence",
                 "inputs": {"doc": "Document"},
@@ -111,6 +110,7 @@ class TestCliPipeCmd:
                     {"pipe": "step_two", "result": "final"},
                 ],
             },
+            pipe_type="PipeSequence",
         )
         toml = _pipe_spec_to_toml(spec)
         assert "step_one" in toml
@@ -119,8 +119,7 @@ class TestCliPipeCmd:
     def test_search_fields_appear_in_toml(self) -> None:
         """PipeSearch type-specific fields (prompt, model, filters) must round-trip to TOML."""
         spec = parse_pipe_spec(
-            "PipeSearch",
-            spec_data={
+            {
                 "pipe_code": "my_search",
                 "description": "Search pipe",
                 "inputs": {"topic": "Text"},
@@ -133,6 +132,7 @@ class TestCliPipeCmd:
                 "exclude_domains": ["example.com"],
                 "max_results": 5,
             },
+            pipe_type="PipeSearch",
         )
         toml = _pipe_spec_to_toml(spec)
         assert 'type = "PipeSearch"' in toml
@@ -148,14 +148,14 @@ class TestCliPipeCmd:
     def test_search_optional_filters_omitted_in_toml(self) -> None:
         """Unset PipeSearch filters must not appear in the TOML (only prompt is required)."""
         spec = parse_pipe_spec(
-            "PipeSearch",
-            spec_data={
+            {
                 "pipe_code": "bare_search",
                 "description": "Minimal search pipe",
                 "inputs": {"topic": "Text"},
                 "output": "Text",
                 "prompt": "About $topic",
             },
+            pipe_type="PipeSearch",
         )
         toml = _pipe_spec_to_toml(spec)
         assert 'prompt = "About $topic"' in toml
@@ -169,14 +169,14 @@ class TestCliPipeCmd:
     def test_llm_no_model_omits_model_in_toml(self) -> None:
         """When model is None, no model line should appear in the TOML."""
         spec = parse_pipe_spec(
-            "PipeLLM",
-            spec_data={
+            {
                 "pipe_code": "my_pipe",
                 "description": "No model specified",
                 "inputs": {"text": "Text"},
                 "output": "Text",
                 "prompt": "Write about $text",
             },
+            pipe_type="PipeLLM",
         )
         toml = _pipe_spec_to_toml(spec)
         assert "model =" not in toml
@@ -193,7 +193,7 @@ class TestCliPipeCmd:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
-        result = parse_pipe_spec("PipeLLM", spec_data=spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.model == "$writing-creative"  # type: ignore[attr-defined]
         assert result.output == "ImgGenPrompt"
 
@@ -207,7 +207,7 @@ class TestCliPipeCmd:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
-        result = parse_pipe_spec("PipeLLM", spec_data=spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(result)
         assert 'model = "$writing-creative"' in toml
         assert 'output = "ImgGenPrompt"' in toml

@@ -152,7 +152,7 @@ def read_manifest(deck_dir: Path) -> DeckManifest | None:
         return None
 
 
-def write_manifest(deck_dir: Path, *, manifest: DeckManifest) -> None:
+def write_manifest(manifest: DeckManifest, *, deck_dir: Path) -> None:
     """Persist the manifest, creating the deck directory if needed."""
     deck_dir.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump()

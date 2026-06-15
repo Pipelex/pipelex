@@ -269,7 +269,7 @@ def pipe_cmd(
 
     # Validate and convert spec
     try:
-        pipe_spec = parse_pipe_spec(resolved_pipe_type, spec_data=spec_data)
+        pipe_spec = parse_pipe_spec(spec_data, pipe_type=resolved_pipe_type)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
         print(toml_content, end="" if toml_content.endswith("\n") else "\n")

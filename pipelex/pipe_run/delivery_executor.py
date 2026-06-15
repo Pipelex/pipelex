@@ -64,7 +64,12 @@ class DeliveryExecutor:
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
         for webhook in delivery_assignment.webhooks:
             await self._notify_webhook(
-                pipeline_run_id, status=status, result_url=result_url, webhook=webhook, error_report=error_report, request_id=request_id
+                pipeline_run_id=pipeline_run_id,
+                status=status,
+                result_url=result_url,
+                webhook=webhook,
+                error_report=error_report,
+                request_id=request_id,
             )
 
     # ---- Result file generation ----
@@ -255,8 +260,8 @@ class DeliveryExecutor:
 
     async def _notify_webhook(
         self,
-        pipeline_run_id: str,
         *,
+        pipeline_run_id: str,
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,

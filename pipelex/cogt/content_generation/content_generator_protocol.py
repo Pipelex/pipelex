@@ -55,8 +55,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_llm_text(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
@@ -64,8 +64,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_object(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
@@ -74,8 +74,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_object_list(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
@@ -85,8 +85,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_single_image(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
@@ -96,8 +96,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_image_list(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
@@ -108,8 +108,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_templated_text(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         context: dict[str, Any],
         template: str,
@@ -119,8 +119,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_render_page_views(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
@@ -130,8 +130,8 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_extract_pages(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
@@ -146,7 +146,7 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_search_structured(
         self,
-        output_structure_class: type[BaseModelTypeVar],
         *,
+        output_structure_class: type[BaseModelTypeVar],
         search_assignment: SearchAssignment,
     ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...

@@ -45,7 +45,7 @@ def build_primary_backend_panel(backend_keys: list[str], *, backend_options: lis
     )
 
 
-def prompt_primary_backend(console: Console, *, backend_keys: list[str]) -> str:
+def prompt_primary_backend(*, console: Console, backend_keys: list[str]) -> str:
     """Prompt user to select a primary backend from enabled backends.
 
     Args:

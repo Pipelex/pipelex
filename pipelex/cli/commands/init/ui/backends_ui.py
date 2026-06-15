@@ -237,7 +237,7 @@ def prompt_backend_select(
     return selected_indices, selected_backend_keys
 
 
-def display_selected_backends(console: Console, *, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
+def display_selected_backends(*, console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
     """Display confirmation of selected backends.
 
     Args:

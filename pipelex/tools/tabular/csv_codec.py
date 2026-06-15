@@ -216,7 +216,7 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     return header, data_rows
 
 
-def _row_to_dict(header: list[str], *, data_row: list[str]) -> dict[str, str]:
+def _row_to_dict(data_row: list[str], *, header: list[str]) -> dict[str, str]:
     """Map a raw data row onto the header, padding a short row with empty cells."""
     return {column: (data_row[index] if index < len(data_row) else "") for index, column in enumerate(header)}
 
@@ -229,12 +229,12 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
     header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
-    return [_row_to_dict(header, data_row=row) for _, row in data_rows]
+    return [_row_to_dict(row, header=header) for _, row in data_rows]
 
 
 def write_rows(
-    path: Path,
     *,
+    path: Path,
     headers: list[str],
     rows: list[dict[str, str]],
     delimiter: str = DEFAULT_DELIMITER,
@@ -355,7 +355,7 @@ def list_content_from_csv(
 
     items: list[StuffContentType] = []
     for row_number, data_row in data_rows:
-        cell_map = _row_to_dict(header, data_row=data_row)
+        cell_map = _row_to_dict(data_row, header=header)
         # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required).
         row_data: dict[str, str | None] = {column: (value or None) for column, value in cell_map.items()}
         for omitted_field in omitted_nullable_fields:
@@ -401,7 +401,7 @@ def csv_from_list_content(
             raise CsvError(msg)
         dumped = item.model_dump(mode="json")
         rows.append({field_name: _to_cell(dumped.get(field_name)) for field_name in headers})
-    write_rows(path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)
+    write_rows(path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)
 
 
 def _validation_error_label(error: "ErrorDetails") -> str:

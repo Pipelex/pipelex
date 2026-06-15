@@ -231,13 +231,13 @@ class Pipelex(ConfigModel):
 class MigrationConfig(ConfigModel):
     migration_maps: dict[str, dict[str, str]]
 
-    def text_in_renaming_keys(self, category: str, *, text: str) -> list[tuple[str, str]]:
+    def text_in_renaming_keys(self, text: str, *, category: str) -> list[tuple[str, str]]:
         renaming_map = self.migration_maps.get(category)
         if not renaming_map:
             return []
         return [(key, value) for key, value in renaming_map.items() if text in key]
 
-    def text_in_renaming_values(self, category: str, *, text: str) -> list[tuple[str, str]]:
+    def text_in_renaming_values(self, text: str, *, category: str) -> list[tuple[str, str]]:
         renaming_map = self.migration_maps.get(category)
         if not renaming_map:
             return []

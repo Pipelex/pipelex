@@ -86,12 +86,12 @@ def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
                 data.pop(alias)
 
 
-def parse_pipe_spec(pipe_type: str, *, spec_data: Any) -> PipeSpec:
+def parse_pipe_spec(spec_data: Any, *, pipe_type: str) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
 
     Args:
-        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
         spec_data: Raw data for the pipe spec (untrusted JSON-like input).
+        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
 
     Returns:
         Validated PipeSpec instance of the correct type.

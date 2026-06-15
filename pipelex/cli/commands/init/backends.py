@@ -89,7 +89,7 @@ def disable_gateway_backend(backends_toml_path: Path) -> None:
         save_toml_to_path(toml_doc, path=backends_toml_path)
 
 
-def customize_backends_config(is_first_time_setup: bool = False, *, target_config_dir: Path | None = None) -> None:
+def customize_backends_config(*, is_first_time_setup: bool = False, target_config_dir: Path | None = None) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
     Args:
@@ -158,7 +158,7 @@ def customize_backends_config(is_first_time_setup: bool = False, *, target_confi
         save_toml_to_path(toml_doc, path=backends_toml_path)
 
         # UI: Display confirmation
-        display_selected_backends(console, selected_indices=selected_indices, backend_options=backend_options)
+        display_selected_backends(console=console, selected_indices=selected_indices, backend_options=backend_options)
 
         # Save gateway terms acceptance to global config (separate from backends save)
         if gateway_terms_accepted is not None:

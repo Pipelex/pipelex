@@ -99,7 +99,7 @@ def customize_routing_profile(selected_backend_keys: list[str], *, target_config
 
         # Show panel and prompt for primary backend
         console.print(build_primary_backend_panel(selected_backend_keys, backend_options=backend_options))
-        primary_backend = prompt_primary_backend(console, backend_keys=selected_backend_keys)
+        primary_backend = prompt_primary_backend(console=console, backend_keys=selected_backend_keys)
 
         # Prompt for fallback order if there are 2+ remaining backends
         remaining_backends = [b for b in selected_backend_keys if b != primary_backend]

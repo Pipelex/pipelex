@@ -114,9 +114,9 @@ class StuffFactory:
     @classmethod
     def combine_stuffs(
         cls,
-        concept: Concept,
-        *,
         stuff_contents: dict[str, StuffContent],
+        *,
+        concept: Concept,
         name: str | None = None,
     ) -> Stuff:
         """Combine a dictionary of stuffs into a single stuff."""

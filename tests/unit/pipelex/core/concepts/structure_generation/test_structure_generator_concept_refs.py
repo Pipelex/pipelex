@@ -51,7 +51,7 @@ class TestStructureGeneratorConceptRefs:
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Invoice", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Invoice", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER
@@ -86,7 +86,7 @@ class Invoice(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Invoice", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Invoice", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER
@@ -120,7 +120,9 @@ class Invoice(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("CategoryNode", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            class_name="CategoryNode", structure_blueprint=structure_blueprint
+        )
 
         expected_code = (
             AUTOGEN_HEADER
@@ -150,7 +152,7 @@ class CategoryNode(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Parent", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Parent", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER
@@ -185,7 +187,7 @@ class Parent(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Order", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Order", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER
@@ -214,7 +216,7 @@ class Order(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Container", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Container", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER
@@ -272,7 +274,9 @@ class Container(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("ComplexEntity", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            class_name="ComplexEntity", structure_blueprint=structure_blueprint
+        )
 
         expected_code = (
             AUTOGEN_HEADER
@@ -305,7 +309,9 @@ class ComplexEntity(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("ReportWrapper", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            class_name="ReportWrapper", structure_blueprint=structure_blueprint
+        )
 
         # Native concepts should generate imports and use the Content class name
         assert "from pipelex.core.stuffs.html_content import HtmlContent" in generated_code
@@ -324,7 +330,9 @@ class ComplexEntity(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("TextWrapper", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            class_name="TextWrapper", structure_blueprint=structure_blueprint
+        )
 
         # Native concepts should generate imports and use the Content class name
         assert "from pipelex.core.stuffs.text_content import TextContent" in generated_code
@@ -344,7 +352,9 @@ class ComplexEntity(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("ImageGallery", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(
+            class_name="ImageGallery", structure_blueprint=structure_blueprint
+        )
 
         # Native concepts in lists should also generate imports
         assert "from pipelex.core.stuffs.image_content import ImageContent" in generated_code
@@ -459,7 +469,7 @@ class TechAnalysis(StructuredContent):
         }
 
         generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Container", structure_blueprint=structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Container", structure_blueprint=structure_blueprint)
 
         expected_code = (
             AUTOGEN_HEADER

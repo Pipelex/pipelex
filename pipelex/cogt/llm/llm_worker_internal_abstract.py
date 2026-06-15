@@ -122,8 +122,8 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     async def _after_text_job(
         self,
-        span: Span | None,
         *,
+        span: Span | None,
         llm_job: LLMJob,
         result_text: str,
     ):
@@ -134,8 +134,8 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     @override
     async def _after_object_job(
         self,
-        span: Span | None,
         *,
+        span: Span | None,
         llm_job: LLMJob,
         result_object: BaseModel,
     ):

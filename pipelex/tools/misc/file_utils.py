@@ -35,12 +35,12 @@ def reject_bare_str_or_path(value: object, *, param_name: str) -> None:
 ########################################################
 
 
-def save_bytes_to_binary_file(file_path: Path, *, byte_data: bytes, create_directory: bool = False) -> Path:
+def save_bytes_to_binary_file(byte_data: bytes, *, file_path: Path, create_directory: bool = False) -> Path:
     """Write binary data to a file.
 
     Args:
-        file_path (Path): Path where the binary data will be saved
         byte_data (bytes): Binary data to be written
+        file_path (Path): Path where the binary data will be saved
         create_directory (bool, optional): Whether to create the directory if it doesn't exist.
             Defaults to False.
 

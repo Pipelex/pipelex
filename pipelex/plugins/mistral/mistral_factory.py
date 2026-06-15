@@ -422,8 +422,8 @@ class MistralFactory:
     @classmethod
     async def upload_file_to_mistral_for_ocr(
         cls,
-        mistral_client: Mistral,
         *,
+        mistral_client: Mistral,
         file_path: Path,
     ) -> str:
         """Upload a local file to Mistral.

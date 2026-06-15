@@ -72,7 +72,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     raise PipeJobError(msg)
 
 
-def hydrate_content(concept: Concept, *, raw_content: list[Any] | dict[str, Any] | str) -> StuffContent:
+def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: Concept) -> StuffContent:
     """Hydrate a single StuffContent from a raw value.
 
     Handles both plain content and ListContent.  The Temporal serialization

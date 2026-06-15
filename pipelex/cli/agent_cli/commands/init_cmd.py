@@ -142,7 +142,7 @@ def _copy_inference_templates(target_dir: Path) -> None:
         if deck_file.suffix == ".toml":
             shutil.copy2(deck_file, target_deck_dir / deck_file.name)
 
-    write_manifest(target_deck_dir, manifest=compute_kit_manifest())
+    write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
 
     # Copy routing_profiles.toml
     template_routing_path = template_inference_dir / "routing_profiles.toml"

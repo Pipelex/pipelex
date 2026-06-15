@@ -369,7 +369,7 @@ def execute_initialization(
 
             # Stamp the deck manifest so future updates can detect drift and
             # `pipelex update` knows the exact kit version this install came from.
-            write_manifest(target_deck_dir, manifest=compute_kit_manifest())
+            write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
 
             # Reset routing_profiles.toml
             template_routing_path = template_inference_dir / "routing_profiles.toml"
@@ -413,7 +413,7 @@ def execute_initialization(
 
     # Step 4: Set up telemetry if needed
     if needs_telemetry:
-        setup_telemetry(console, telemetry_config_path=telemetry_config_path, for_project=for_project)
+        setup_telemetry(console=console, telemetry_config_path=telemetry_config_path, for_project=for_project)
 
     # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
     # No-op when gateway is disabled or terms have not been accepted. We forward

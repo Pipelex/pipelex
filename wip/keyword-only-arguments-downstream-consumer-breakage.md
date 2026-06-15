@@ -1,6 +1,17 @@
 # Downstream consumer breakage — keyword-only refactor follow-up
 
-> **Status (2026-06-14):** the pipelex-internal keyword-only refactor is **complete** (all waves landed, guard hard-blocks — see [`../TODOS.md`](../TODOS.md)). What remains is this **cross-repo lockstep**: sibling repos that consume `pipelex` from PyPI and call the now-keyword-only public helpers positionally will break at runtime (`TypeError`) the moment they upgrade. This is the release-time checklist for that. Companion to the convention itself at [`../docs/contribute/keyword-only-arguments.md`](../docs/contribute/keyword-only-arguments.md).
+> **Status (2026-06-15):** lockstep PRs opened against each consumer's `dev`, each pinning `pipelex` to the keyword-only branch git rev (`529b9082`, branch `refactor/Function-calling-4`) and carrying the call-site fixes. All four pass local `make agent-check` + `make agent-test`:
+>
+> - **pipelex-api** → [PR #19](https://github.com/Pipelex/pipelex-api/pull/19) — keyword-only delta only (it already tracked pipelex `dev`): one `parse_pipe_spec(pipe_type, spec_data=...)` fix.
+> - **pipelex-starter-python** → [PR #55](https://github.com/Pipelex/pipelex-starter-python/pull/55)
+> - **cocode** → [PR #75](https://github.com/Pipelex/cocode/pull/75)
+> - **pipelex-cookbook** → [PR #153](https://github.com/Pipelex/pipelex-cookbook/pull/153)
+>
+> **Key finding:** cookbook/cocode/starter-python were pinned to **PyPI `pipelex` 0.32.x**, so pinning them to the branch (which tracks pipelex `dev`) surfaced the **whole accumulated dev delta**, dominated by a *non*-keyword-only change — the **`PipelexRunner` → `PipelexMTHDSProtocol`** runner rename (MTHDS Protocol surface alignment: `execute_pipeline()` → `execute()`, `response.pipe_output` unchanged). Those three PRs therefore carry that runtime-runner migration **in addition to** the keyword-only fixes. Keyword-only-specific fixes were tiny: cookbook's `save_text_to_path` + its `get_stuff_as`/`get_stuff_as_list` (`content_type=`/`item_type=`) calls; nothing extra in cocode/starter. The git-rev pins are **temporary** — swap each back to a released `pipelex` version once the refactor lands on PyPI.
+>
+> **Follow-up (2026-06-15b):** `parse_pipe_spec` arg order was **reversed** in pipelex — `parse_pipe_spec(pipe_type, *, spec_data)` → `parse_pipe_spec(spec_data, *, pipe_type)` — so the subject is now the thing being parsed (the data), matching its sibling `parse_concept_spec(spec_data)`. This re-breaks the **single** call site PR #19 had already fixed: `pipelex-api/api/routes/pipelex/agent/pipe_spec.py:48` must change from `parse_pipe_spec(request_data.pipe_type, spec_data=request_data.spec)` to `parse_pipe_spec(request_data.spec, pipe_type=request_data.pipe_type)`. **Sequence (don't desync the pin):** (1) commit the pipelex reversal → new SHA; (2) bump pipelex-api's `[tool.uv.sources]` rev from `529b908255…` to the new SHA on PR #19's branch `chore/keyword-only-pipelex-rev`; (3) apply the call-site fix; (4) `make agent-check` + `make agent-test` in pipelex-api. No other consumer calls `parse_pipe_spec`, so #55 / #75 / #153 are unaffected by the reversal (only a rev bump if we want them on the newest SHA).
+>
+> Original release-time checklist below (the pipelex-internal keyword-only refactor is **complete** — all waves landed, guard hard-blocks; see [`../TODOS.md`](../TODOS.md)). Companion to the convention itself at [`../docs/contribute/keyword-only-arguments.md`](../docs/contribute/keyword-only-arguments.md).
 
 The keyword-only refactor intentionally turns multi-arg public helpers keyword-only (e.g. `save_text_to_path(text, *, path, create_directory=False)`, and on the public surface `Pipelex.make()` / `Pipelex.setup()` / `PipelexHub.setup_config()` — every argument after the first is now keyword-only). This is a deliberate breaking change, documented in the runtime `CHANGELOG.md`. Breaking changes are allowed in this workspace, but consumers must be updated in lockstep — otherwise the official examples ship broken.
 
@@ -50,6 +61,8 @@ Generalise the helper list per wave: take the functions a wave converted (the `#
 
 ## Checklist
 
-- [ ] `pipelex-cookbook/utils/results_utils.py:42` → keyword form, then run the cookbook example that exercises it.
-- [ ] Re-run the audit greps above for the full converted surface (Waves 1–5, incl. the public `Pipelex.make` / `setup` / `setup_config`).
-- [ ] When the refactor branch is released, confirm each consumer repo's pinned `pipelex` version and bump + fix in lockstep before they pick up the new release.
+- [x] `pipelex-cookbook/utils/results_utils.py:42` → keyword form (PR #153, with its unit-test assertion updated to keyword form).
+- [x] Re-run the audit greps for the full converted surface (Waves 1–5). Only positional keyword-only break found across consumers: cookbook's `save_text_to_path` + `get_stuff_as*`, and pipelex-api's `parse_pipe_spec`. All `Pipelex.make` call sites already pass the subject positionally + the rest by keyword (compliant).
+- [x] Open lockstep PRs pinning each consumer to the branch git rev, all green on local `make agent-check` + `make agent-test` (PRs #19 / #55 / #75 / #153).
+- [ ] **`parse_pipe_spec` reversal (2026-06-15b) — pipelex-api lockstep:** after committing the pipelex reversal, bump PR #19's pin to the new SHA and change `pipe_spec.py:48` to `parse_pipe_spec(request_data.spec, pipe_type=request_data.pipe_type)`; re-verify pipelex-api. See the follow-up note at the top.
+- [ ] **At pipelex release:** swap each consumer's temporary `[tool.uv.sources]` git pin back to the released `pipelex` version (`==`/`>=`), and confirm CI stays green. Remember the release also ships the `PipelexRunner → PipelexMTHDSProtocol` rename — already handled in these PRs.

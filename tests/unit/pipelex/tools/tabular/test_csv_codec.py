@@ -277,12 +277,12 @@ class TestCsvCodec:
     def test_write_rows_then_read_rows_round_trips(self, tmp_path: Path) -> None:
         path = tmp_path / "out.csv"
         rows = [{"name": "Ada", "age": "36"}, {"name": "Grace", "age": "85"}]
-        write_rows(path, headers=["name", "age"], rows=rows)
+        write_rows(path=path, headers=["name", "age"], rows=rows)
         assert read_rows(path) == rows
 
     def test_write_rows_empty_writes_header_only(self, tmp_path: Path) -> None:
         path = tmp_path / "empty.csv"
-        write_rows(path, headers=["name", "age"], rows=[])
+        write_rows(path=path, headers=["name", "age"], rows=[])
         text = path.read_text(encoding="utf-8")
         assert text.splitlines() == ["name,age"]
 
@@ -538,7 +538,7 @@ class TestCsvCodec:
         with pytest.raises(CsvError):
             read_rows(read_path, delimiter=bad_delimiter)
         with pytest.raises(CsvError):
-            write_rows(tmp_path / "out.csv", headers=["a"], rows=[], delimiter=bad_delimiter)
+            write_rows(path=tmp_path / "out.csv", headers=["a"], rows=[], delimiter=bad_delimiter)
 
     def test_unknown_encoding_raises(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "a\n1\n")
@@ -549,7 +549,7 @@ class TestCsvCodec:
         # A cell that the target encoding can't represent must surface a typed CsvError on write,
         # not let a raw UnicodeEncodeError escape the codec boundary.
         with pytest.raises(CsvError):
-            write_rows(tmp_path / "out.csv", headers=["name"], rows=[{"name": "café"}], encoding="ascii")
+            write_rows(path=tmp_path / "out.csv", headers=["name"], rows=[{"name": "café"}], encoding="ascii")
 
     def test_write_rejects_item_not_matching_row_model(self, tmp_path: Path) -> None:
         # An item whose class isn't the declared row_model would write silent empty cells → reject loudly.

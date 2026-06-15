@@ -77,8 +77,8 @@ class StructureGenerator:
 
     def generate_from_structure_blueprint(
         self,
-        class_name: str,
         *,
+        class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
         description: str = "",

@@ -11,8 +11,8 @@ from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 
 
 async def execute_delivery(
-    pipe_output: PipeOutput | None,
     *,
+    pipe_output: PipeOutput | None,
     user_id: str,
     pipeline_run_id: str,
     delivery_assignment: DeliveryAssignment,

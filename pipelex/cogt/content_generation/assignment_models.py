@@ -26,8 +26,8 @@ class LLMAssignment(BaseModel):
     @classmethod
     def make_from_prompt(
         cls,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         llm_setting: LLMSetting,
         llm_prompt: LLMPrompt,

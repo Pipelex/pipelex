@@ -31,7 +31,7 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 _template_cache: dict[str, str] = {}
 
 
-def load_template(package: str, *, template_name: str) -> str:
+def load_template(*, package: str, template_name: str) -> str:
     """Load a template file from a Python package.
 
     Uses importlib.resources.files() for package-safe file access.

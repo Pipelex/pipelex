@@ -158,8 +158,8 @@ async def validate_pipe(
 
 
 async def validate_pipe_in_bundle(
-    bundle_path: Path,
     *,
+    bundle_path: Path,
     pipe_code: str,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:
