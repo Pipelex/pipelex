@@ -288,7 +288,7 @@ class TestProtocolValidate:
         try:
             library_manager = get_library_manager()
             mocker.patch(
-                "pipelex.pipeline.runner.build_pipe_io_contracts",
+                "pipelex.pipeline.validate_in_process.build_pipe_io_contracts",
                 side_effect=PipeIOContractError(message="simulated render failure"),
             )
             mocker.patch.object(library_manager, "teardown", side_effect=LibraryError("simulated teardown failure"))

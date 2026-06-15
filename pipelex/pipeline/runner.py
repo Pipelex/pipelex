@@ -14,7 +14,6 @@ from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.builder.operations.models_ops import ModelCategory, list_models
 from pipelex.config import get_config
@@ -29,15 +28,11 @@ from pipelex.hub import (
     get_telemetry_manager,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.exceptions import PipeRouterError
-from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
+from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -50,11 +45,11 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
-    from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -376,67 +371,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
         """
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
-        # `validate_bundle` deliberately leaves its validation library OPEN and
-        # current on success (the CLI surfaces consume it before process exit).
-        # This protocol wrapper is a long-lived entry point, so restore the
-        # caller's current-library and tear the validation library down on the
-        # way out — on failure `validate_bundle` already did both, so
-        # `validation_library_id` stays None and the cleanup below is a no-op.
-        # Artifacts that need the open validation library are built INSIDE the
-        # window, before the `finally` tears the library down:
-        # `pipe_io_contracts`'s JSON-Schema rendering resolves bundle-defined
-        # structure classes through the class registry, and the graph arm
-        # dry-runs the main pipe against the loaded library.
-        prev_library_id = get_current_library_id_or_none()
-        validation_library_id: str | None = None
-        # Explicit body-success flag — NOT sys.exc_info() in the finally, which also sees an
-        # exception the CALLER is currently handling (validate awaited inside an except block)
-        # and would wrongly suppress a genuine teardown failure after a successful body.
-        body_succeeded = False
-        try:
-            result = await validate_bundle(
-                mthds_contents=mthds_contents,
-                library_dirs=library_dirs,
-                allow_signatures=allow_signatures,
-            )
-            # Capture the validation library id ONCE, right after validate_bundle leaves
-            # it current — the graph arm and the finally must target the SAME library
-            # even if something inside the window later moves the contextvar.
-            validation_library_id = get_current_library_id_or_none()
-            pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
-            graph_spec: GraphSpec | None = await best_effort_graph_spec(
-                pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
-                library_id=validation_library_id,
-                log_context="Protocol validate",
-            )
-            body_succeeded = True
-        finally:
-            if validation_library_id is not None and validation_library_id != prev_library_id:
-                # Restore the caller's outer current-library FIRST so the guarantee
-                # survives a teardown raise — mirrors act_dry_validate.
-                if prev_library_id is not None:
-                    set_current_library(library_id=prev_library_id)
-                else:
-                    clear_current_library()
-                try:
-                    get_library_manager().teardown(library_id=validation_library_id)
-                except PipelexError as teardown_error:
-                    # A teardown failure must not REPLACE the body's in-flight error (the
-                    # caller's error would name the teardown instead of the actual problem) —
-                    # suppress it and let the primary propagate; raise it only when the body
-                    # succeeded. Mirrors act_dry_validate's finally.
-                    if body_succeeded:
-                        raise
-                    log.error(
-                        f"Protocol validate: library teardown also failed after a body error; "
-                        f"raising the original error. Suppressed teardown error: {teardown_error}"
-                    )
-        return build_validation_report(
-            blueprints=result.blueprints,
-            pipe_io_contracts=pipe_io_contracts,
-            dry_run_result=result.dry_run_result,
-            pending_signatures=result.pending_signatures,
-            graph_spec=graph_spec,
+        # Delegate to the shared in-process orchestrator (library-window management,
+        # graph arm, report assembly). The protocol `validate` interface carries only
+        # nameless content strings, so `mthds_names` stays `None` and `blueprint.source`
+        # is `None` on this path. (The CLI's disk path populates `source` from the real
+        # file path via a separate `validate_bundle(mthds_file_path=…)` entry point that
+        # does not route through this orchestrator.)
+        return await validate_bundles_in_process(
+            mthds_contents=mthds_contents,
+            library_dirs=library_dirs,
+            allow_signatures=allow_signatures,
+            log_context="Protocol validate",
         )
 
     @override

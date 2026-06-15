@@ -31,12 +31,29 @@ These supersede or refine the items above where they conflict.
 - **Version-gate leniency (v1).** Parse `implementation_version` leniently — treat unparseable / prerelease / dev tags (`0.4.0-dev`, `latest`) as capable (warn-once, don't hard-block). Capability-probe redesign is a follow-up TODO.
 - **mthds-js runtime checklist.** Beyond "rollup bundles it": verify `fetch`, `AbortController`, proxy settings, TLS/cert handling, ESM/CJS interop on the VS Code extension-host Node runtime. Confirm SecretStorage→env token **precedence** actually overrides any native env read in `mthds-js`. Consider a file/workspace pin for `mthds` during dev while the npm publish is pending.
 
+## ▶ Resume point — current status (last updated 2026-06-15)
+
+**Strategy pivot (supersedes "release 0.34.0 to unblock Phase 2"):** we are NOT releasing pipelex first. We fix the **entire cross-repo train against an unreleased pipelex commit pin**, prove it end-to-end, and **cut pipelex 0.34.0 LAST**. This avoids a premature release PR and version juggling — the pipelex worktree stays at `0.33.0`, so pipelex-api's `==0.33.0` constraint keeps matching the pin throughout.
+
+**Pin mechanism ("both"):** pipelex-api pins pipelex with an **editable path** locally (`pipelex = { path = "../_calls", editable = true }` in `[tool.uv.sources]`) for a tight iteration loop, but the **committed** form must be the **git-rev SHA** (reproducible/CI). A comment block in `../pipelex-api/pyproject.toml` records the git-rev line to restore. ⚠️ **Before committing pipelex-api with the git-rev form: push the pipelex branch first and bump the SHA** — the current recorded SHA `ec6e3a811` predates this session's pipelex helper extraction (T3 enabling work), so the git-rev build would miss `validate_bundles_in_process`.
+
+**DONE:**
+
+- **Phase 1 (pipelex)** — committed + **pushed**, branch `feature/Tweaks-for-validation-api`, tip **`ec6e3a811`** (version still `0.33.0`). See Checkpoint 1 below.
+- **Pipelex side of T3 (the enabling refactor)** — implemented, `make agent-check` GREEN, **uncommitted** on `feature/Tweaks-for-validation-api` (live in pipelex-api via the editable pin):
+  - NEW `pipelex/pipeline/validate_in_process.py::validate_bundles_in_process(*, mthds_contents, mthds_names=None, library_dirs=None, allow_signatures=False, log_context="validate")` — extracted the in-process validate orchestration (validate_bundle + pipe_io_contracts + best_effort_graph_spec + **load-bearing library teardown** + build_validation_report) out of `PipelexMTHDSProtocol.validate`. The protocol method now converts `self.library_dirs`→`Path` and delegates; **its signature is untouched** (honors the cross-repo abstract `MTHDSProtocol.validate` in the `mthds` pkg, and avoids duplicating teardown into pipelex-api). This is the mechanism for "ApiRunner.validate calls `validate_bundle(mthds_names=…)` directly".
+  - `DryValidateArg.mthds_names` added + `act_dry_validate` passes it to `validate_bundle` (temporal path; additive, temporal wire never shipped).
+  - Tests reconciled: `test_runner_validate_plumbing.py` + `test_protocol_validate.py` patch targets `pipelex.pipeline.runner.*`→`pipelex.pipeline.validate_in_process.*`, `mthds_names=None` added to asserts. pipelex-api validate subset re-green (26) — no regression.
+- **pipelex-api repo state** — branch **`feature/validation-errors-source`** (off `chore/keyword-only-pipelex-rev` @ `24c91c4`, supersets the keyword-only re-pin). Editable pin set, `uv lock`+`sync` done, **253/253 tests green**. No pipelex-api *code* changes yet.
+
+**NEXT (resume here):** pipelex-api **T3/T4** (see Phase 2). T3 = add optional `mthds_names` to `ValidateRequest` (+ length-match validator → 422) and thread through `ApiRunner.validate` (direct → call the new `validate_bundles_in_process(mthds_names=…)`; temporal → `DryValidateArg` + the `make_pipelex_bundle_blueprint` loop) and the route. Then conformance test on the real 422 wire, version bump `0.3.0→0.4.0`, docs/openapi. Then mthds-js (T5) → vscode (T6–T11).
+
 ## Repos, paths, and current versions
 
 | Repo | Path | Version | Role in this plan |
 | --- | --- | --- | --- |
 | pipelex (worktree) | `../_calls` (branch `feature/Tweaks-for-validation-api`) | 0.33.0 | Expose `validation_errors` on the API error contract |
-| pipelex-api | `../pipelex-api` | 0.3.0 | Re-pin pipelex, surface the field, bump `implementation_version` |
+| pipelex-api | `../pipelex-api` (branch `feature/validation-errors-source`) | 0.3.0 | Re-pin pipelex (done, editable), surface the field, bump `implementation_version` |
 | mthds-js | `../mthds-js` | 0.10.0 | Type the validation report + structured errors; publish |
 | vscode-pipelex | `.` (this repo) | — | Backend abstraction, settings, consume `mthds-js` |
 
@@ -44,7 +61,7 @@ These supersede or refine the items above where they conflict.
 >
 > **Doc vantage point.** Paths in this doc are written from the **vscode-pipelex** repo's perspective (`.` = vscode-pipelex, `../_calls` = the pipelex worktree). This copy of the doc currently lives in `../_calls`, so read the relative paths with that offset in mind.
 >
-> **Current state (verified 2026-06-15).** No validation work is committed yet — the `feature/Tweaks-for-validation-api` branch was cut off the keyword-only refactor and its recent commits are all that work. `pipelex-api` currently pins `pipelex` at git rev `0e32c8c02` (the keyword-only tip), **not** a released 0.34.0; that pin is re-pointed in Phase 2.
+> **Current state (updated 2026-06-15 — see "▶ Resume point" above for the authoritative status).** Phase 1 is committed + pushed (`feature/Tweaks-for-validation-api`, tip `ec6e3a811`). The pipelex side of T3 (the `validate_bundles_in_process` extraction + temporal `mthds_names`) is implemented but uncommitted, live via the editable pin. `pipelex-api` (branch `feature/validation-errors-source`) has been **re-pointed off `0e32c8c02` to an editable pin on `../_calls`** (the committed form will be a git-rev SHA newer than `ec6e3a811`). No pipelex-api code changes yet.
 
 ## Architecture overview — the seam
 
@@ -113,7 +130,9 @@ This phase has two parts: (A) get structured errors onto the API wire, and (B) m
 > - Tests: `tests/unit/pipelex/pipeline/test_validation_errors.py`, `test_validate_bundle_error_report.py`, additions to `test_error_report_disclosure_mode.py` (STRICT both branches), `tests/integration/pipelex/pipeline/test_validate_bundle_source_threading.py`. `make agent-check` + full `make agent-test` GREEN.
 > - Docs: `docs/under-the-hood/error-model.md` (schema row + `validation_errors` subsection + File→Purpose). CHANGELOG entries under `[Unreleased]` (NOT bumped to 0.34.0 — versioning happens at release time).
 >
-> **REMAINING gated step (the actual Checkpoint 1 boundary):** cut the **pipelex 0.34.0 release** via `/release` (bumps `pyproject.toml`, finalizes `[Unreleased]` → `[0.34.0]`, opens PR to main). This is the outward-facing handoff that unblocks Phase 2 (`pipelex-api` re-pin). **Record the released version here once cut.** Everything downstream depends on this.
+> **Checkpoint 1 boundary — REVISED (strategy pivot, see "▶ Resume point").** We no longer cut the 0.34.0 release here. Phase 2 is unblocked by **pinning pipelex-api to the unreleased commit** (editable locally / git-rev SHA committed) instead of a release. The **pipelex 0.34.0 release is now the LAST step of the whole train** (after pipelex-api + mthds-js + vscode are all proven against the pin). When it's time: `/release` bumps `pyproject.toml`, finalizes `[Unreleased]` → `[0.34.0]`, opens PR to main; then re-point every consumer's pin from the git-rev SHA to `==0.34.0`. **Record the released version here once cut.**
+>
+> **Also done this session (T3 enabling refactor, uncommitted, live via editable pin):** `validate_bundles_in_process` extracted into `pipelex/pipeline/validate_in_process.py` (protocol `validate` signature untouched, delegates) + `DryValidateArg.mthds_names`. Full detail in "▶ Resume point". These pipelex commits must be pushed and the recorded pin SHA bumped past `ec6e3a811` before pipelex-api is committed with its git-rev form.
 
 ---
 
@@ -123,8 +142,8 @@ The route `validate_mthds` (`api/routes/pipelex/validate.py`) lets `ValidateBund
 
 **Changes.**
 
-1. **Re-pin pipelex** to the Phase 1 version in `pyproject.toml`.
-1b. **Validate request gains optional per-item names (Issue 5).** Extend `ValidateRequest` (`api/schemas/models.py:196`) with an additive, optional way to carry a name/path per content item (parallel `mthds_names` or `list[{name, content}]` — neutral/standard field names, MTHDS brand boundary). The API runner threads it into `blueprint.source` so the 422 `validation_errors` carry a real `source` instead of `None`. Additive → old callers (n8n, app) keep working. Update `pipelex-api.openapi.yaml` accordingly.
+1. **Re-pin pipelex** — ✅ DONE (editable path pin on `../_calls`; committed form will be a git-rev SHA newer than `ec6e3a811`). Branch `feature/validation-errors-source`, 253/253 tests green.
+1b. **Validate request gains optional per-item names (Issue 5).** — ⬅ NEXT. Extend `ValidateRequest` (`api/schemas/models.py:196`) with an additive, optional way to carry a name/path per content item (parallel `mthds_names` or `list[{name, content}]` — neutral/standard field names, MTHDS brand boundary). The API runner threads it into `blueprint.source` so the 422 `validation_errors` carry a real `source` instead of `None`. Additive → old callers (n8n, app) keep working. Update `pipelex-api.openapi.yaml` accordingly.
 2. **Contract docs.** Update `docs/openapi/pipelex-api.openapi.yaml` (error response schema gains `validation_errors`), `docs/error-responses.md`, and `docs/pipe-validate.md` with the structured-error shape and an example 422.
 3. **Version surface.** Bump pipelex-api 0.3.0 → 0.4.0 so `GET /v1/version` reports an `implementation_version` the extension can gate on.
 4. **Confirm 200-vs-422 boundary.** *Verified:* today the route raises 422 on any `ValidateBundleError` and never emits per-pipe `FAILURE` entries on a 200 — the response model supports them, the handler does not produce them. Document this as the actual contract. If the 200-FAILURE channel is wanted, scope it as an explicit behavior change here (out of scope as currently written); otherwise the extension's 200 `validated_pipes` FAILURE channel stays empty.
@@ -210,12 +229,14 @@ The route `validate_mthds` (`api/routes/pipelex/validate.py`) lets `ValidateBund
 
 ## Cross-repo release ordering
 
-The API validation path only reaches parity once 1→3 are released, so ship in dependency order:
+**Strategy pivot (2026-06-15):** *build* against an unreleased pipelex commit pin, *release* in dependency order at the end. Concretely:
 
-1. **pipelex (`../_calls`)** — release the `validation_errors` field (Checkpoint 1).
-2. **pipelex-api** — re-pin pipelex, release image + bumped `implementation_version` (Checkpoint 2).
-3. **mthds-js** — typed report + errors, publish to npm (Checkpoint 3).
-4. **vscode-pipelex** — pin the published `mthds`, gate the API backend on the min pipelex-api version, release the extension (Checkpoints 4–5).
+- **Build/iterate phase (now):** pipelex-api → mthds-js → vscode are all developed against the pinned (editable / git-rev SHA) unreleased pipelex `0.33.0`. Prove the full path before any release.
+- **Release phase (last):** once the train is proven, ship in dependency order, re-pointing each consumer's pin from the git-rev SHA to the released version:
+  1. **pipelex (`../_calls`)** — `/release` the `validation_errors` field as **0.34.0** (Checkpoint 1).
+  2. **pipelex-api** — re-pin pipelex `==0.34.0`, release image + bumped `implementation_version` (Checkpoint 2).
+  3. **mthds-js** — typed report + errors, publish to npm (Checkpoint 3).
+  4. **vscode-pipelex** — pin the published `mthds`, gate the API backend on the min pipelex-api version, release the extension (Checkpoints 4–5).
 
 The graph-only API path could technically ship before 1–3 (GraphSpec already matches), but validation diagnostics would regress, so prefer shipping the whole feature together.
 
@@ -286,7 +307,8 @@ No critical gaps (no failure that is untested AND unhandled AND silent).
 
 - [x] **T1 (P1)** pipelex — thread per-item name into `blueprint.source` on the in-memory load path (Issue 5) — DONE (`make_pipelex_bundle_blueprint(mthds_name=)` + `validate_bundle(mthds_names=)`)
 - [x] **T2 (P1)** pipelex — Part A: ValidationErrorItem + shared builder + ErrorReport field + ValidateBundleError override + `_STRICT_KEPT_FIELDS` (Issues 1) — DONE
-- [ ] **T3 (P1)** pipelex-api — optional per-item names on ValidateRequest, threaded to runner (Issue 5)
+- [x] **T2b (P1)** pipelex — T3 enabling refactor (this session, uncommitted/editable-live): extract `validate_bundles_in_process` (protocol `validate` signature untouched) + `DryValidateArg.mthds_names`; tests reconciled; `make agent-check` GREEN — DONE
+- [ ] **T3 (P1)** pipelex-api — optional per-item names on ValidateRequest, threaded to runner (Issue 5) — *pipelex side ready (T2b); next: API request field + length validator + `ApiRunner.validate(mthds_names=)` direct→`validate_bundles_in_process`, temporal→`DryValidateArg`+blueprint loop, + route*
 - [ ] **T4 (P2)** pipelex-api — docs/specs + conformance test for the validate error envelope, assert real wire (Issue 2)
 - [ ] **T5 (P1)** mthds-js — typed report + `ApiResponseError.validationErrors` + named contents on `validate()` (Issue 5)
 - [ ] **T6 (P1)** vscode — `CliValidationBackend` single-spawn exit-code discriminator (D1/Q1)
