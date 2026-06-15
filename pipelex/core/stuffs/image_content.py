@@ -65,7 +65,7 @@ class ImageContent(StuffContent):
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
     def render_with_images(

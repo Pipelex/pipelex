@@ -119,8 +119,8 @@ def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_
 
 
 def detect_jinja2_required_variables(
-    template_category: TemplateCategory,
     *,
+    template_category: TemplateCategory,
     template_source: str,
 ) -> set[str]:
     """Returns the set of full variable paths required by the Jinja2 template.
@@ -253,8 +253,8 @@ def _collect_variable_references(
 
 
 def detect_jinja2_variable_references(
-    template_category: TemplateCategory,
     *,
+    template_category: TemplateCategory,
     template_source: str,
 ) -> list[VariableReference]:
     """Returns variable references in the Jinja2 template with their applied filters.

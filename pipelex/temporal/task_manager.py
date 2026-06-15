@@ -35,8 +35,8 @@ class TaskManager(Protocol):
 
     async def run_worker(
         self,
-        is_not_sandboxed: bool,
         *,
+        is_not_sandboxed: bool,
         is_unit_testing: bool,
         task_queue: str | None = None,
         scope_name: str | None = None,

@@ -88,8 +88,8 @@ class JobMetadata(BaseModel):
 
     def copy_with_update(
         self,
-        otel_context: OtelContext | None,
         *,
+        otel_context: OtelContext | None,
         trace_context: TraceContext | None = None,
         **updates: Any,
     ) -> "JobMetadata":

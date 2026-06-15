@@ -1,7 +1,7 @@
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 
 
-def model_cost_per_token(costs: CostsByCategoryDict, *, cost_category: CostCategory) -> float:
+def model_cost_per_token(*, costs: CostsByCategoryDict, cost_category: CostCategory) -> float:
     # cost_per_million_tokens_usd should be missing only for models that we run on our own GPUs
     # all token types are not used for all models
     match cost_category:

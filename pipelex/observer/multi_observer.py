@@ -11,7 +11,7 @@ class MultiObserver(ObserverProtocol):
         """Add an observer with a given name."""
         self.observers[name] = observer
 
-    def remove_observer(self, name: str) -> None:
+    def remove_observer(self, *, name: str) -> None:
         """Remove an observer by name."""
         self.observers.pop(name, None)
 

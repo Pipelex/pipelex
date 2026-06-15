@@ -64,8 +64,8 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def make_img_gen_prompt(
         self,
-        context_provider: ContextProviderAbstract,
         *,
+        context_provider: ContextProviderAbstract,
         extra_params: dict[str, Any] | None = None,
         max_prompt_images: int | None = None,
     ) -> ImgGenPrompt:
@@ -268,8 +268,8 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def _render_text(
         self,
-        context_provider: ContextProviderAbstract,
         *,
+        context_provider: ContextProviderAbstract,
         template_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
         image_registry: ImageRegistry | None = None,

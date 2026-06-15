@@ -248,7 +248,7 @@ class ReportingManager(ReportingProtocol):
         ReportingManager._emit_best_effort(event_log=context.event_log, event=event)
 
     @staticmethod
-    def _emit_best_effort(event_log: EventLogProtocol, *, event: UsageReportEvent) -> None:
+    def _emit_best_effort(*, event_log: EventLogProtocol, event: UsageReportEvent) -> None:
         """Emit a usage event, dropping infra-level backend failures with a WARNING.
 
         Shared by both emit paths (the registered-context fast path and the runner fallback).

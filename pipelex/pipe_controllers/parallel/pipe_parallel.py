@@ -134,8 +134,8 @@ class PipeParallel(PipeController):
     @override
     async def _live_run_controller_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -228,8 +228,8 @@ class PipeParallel(PipeController):
     @override
     async def _dry_run_controller_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -325,8 +325,8 @@ class PipeParallel(PipeController):
 
     def _register_branch_outputs_with_graph_tracer(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         output_stuffs: dict[str, "Stuff"],
     ) -> None:
         """Register branch outputs with the graph tracer.
@@ -368,8 +368,8 @@ class PipeParallel(PipeController):
 
     def _register_parallel_combine_with_graph_tracer(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         combined_stuff: "Stuff",
         branch_stuffs: dict[str, "Stuff"],
     ) -> None:

@@ -12,8 +12,8 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 def build_run_output(
-    with_memory: bool,
     *,
+    with_memory: bool,
     main_stuff_json: dict[str, Any],
     working_memory_dump: dict[str, Any],
     compact_result: dict[str, Any] | None,

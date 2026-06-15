@@ -14,7 +14,7 @@ from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 
 
-def _validate_as_known_class(item_class: type[StuffContent], *, raw_item: StuffContent | dict[str, Any]) -> StuffContent:
+def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
     """Validate raw_item into item_class, tolerating cross-exec instances.
 
     The Temporal hot path now ships ListContent items as plain dicts with
@@ -54,7 +54,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
         class_name_from_instance = type(raw_item).__name__
         item_class_or_none = get_class_registry().get_class(name=class_name_from_instance)
         if item_class_or_none is not None and issubclass(item_class_or_none, StuffContent):
-            return _validate_as_known_class(item_class_or_none, raw_item=raw_item)
+            return _validate_as_known_class(item_class=item_class_or_none, raw_item=raw_item)
         return raw_item
 
     class_name = raw_item.get("__pipelex_class__")
@@ -93,7 +93,7 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
             # structured concept class). Use _validate_as_known_class so that
             # cross-exec instances rebuilt by kajson during Temporal transit
             # get normalized through a dict round-trip.
-            items = [_validate_as_known_class(item_class_or_none, raw_item=raw_item) for raw_item in raw_content]
+            items = [_validate_as_known_class(item_class=item_class_or_none, raw_item=raw_item) for raw_item in raw_content]
         else:
             # Anything or unknown concept — resolve each item by its embedded type metadata
             raw_items = cast("list[dict[str, Any]]", raw_content)

@@ -33,7 +33,7 @@ class MistralConfig(ConfigModel):
             The Mistral prompt mode, or None if reasoning is disabled.
 
         """
-        level_str = get_reasoning_level_str(self.effort_to_level_map, effort=effort)
+        level_str = get_reasoning_level_str(effort_to_level_map=self.effort_to_level_map, effort=effort)
         if level_str is None:
             return None
         mistral_level = MistralReasoningLevel(level_str)

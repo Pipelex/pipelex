@@ -123,7 +123,7 @@ class TestApplyTagStyle:
         """Test NO_TAG style returns value unchanged."""
         context = self._make_context(mocker, TagStyle.NO_TAG)
 
-        result = apply_tag_style(context, value="hello", tag_name="my_tag")
+        result = apply_tag_style(context=context, value="hello", tag_name="my_tag")
 
         assert result == "hello"
 
@@ -131,7 +131,7 @@ class TestApplyTagStyle:
         """Test TICKS style without tag name."""
         context = self._make_context(mocker, TagStyle.TICKS)
 
-        result = apply_tag_style(context, value="content", tag_name=None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "```\ncontent\n```"
 
@@ -139,7 +139,7 @@ class TestApplyTagStyle:
         """Test TICKS style with tag name."""
         context = self._make_context(mocker, TagStyle.TICKS)
 
-        result = apply_tag_style(context, value="content", tag_name="my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "my_tag: ```\ncontent\n```"
 
@@ -147,7 +147,7 @@ class TestApplyTagStyle:
         """Test XML style uses 'data' as default tag name."""
         context = self._make_context(mocker, TagStyle.XML)
 
-        result = apply_tag_style(context, value="content", tag_name=None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "<data>\ncontent\n</data>"
 
@@ -155,7 +155,7 @@ class TestApplyTagStyle:
         """Test XML style with tag name."""
         context = self._make_context(mocker, TagStyle.XML)
 
-        result = apply_tag_style(context, value="content", tag_name="my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "<my_tag>\ncontent\n</my_tag>"
 
@@ -163,7 +163,7 @@ class TestApplyTagStyle:
         """Test SQUARE_BRACKETS style uses 'data' as default tag name."""
         context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
 
-        result = apply_tag_style(context, value="content", tag_name=None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "[data]\ncontent\n[/data]"
 
@@ -171,7 +171,7 @@ class TestApplyTagStyle:
         """Test SQUARE_BRACKETS style with tag name."""
         context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
 
-        result = apply_tag_style(context, value="content", tag_name="my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "[my_tag]\ncontent\n[/my_tag]"
 
@@ -182,6 +182,6 @@ class TestApplyTagStyle:
         context = mocker.MagicMock(spec=Context)
         context.get = lambda key, default=None: context_dict.get(key, default)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
 
-        result = apply_tag_style(context, value="content", tag_name=None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert "```" in result  # TICKS is default

@@ -37,8 +37,8 @@ class LibraryCrate(BaseModel):
 
     @staticmethod
     def compute_fingerprint_from_content(
-        concepts: dict[str, "ConceptBlueprint | str"],
         *,
+        concepts: dict[str, "ConceptBlueprint | str"],
         pipes: dict[str, PipeBlueprintUnion],
     ) -> str:
         """Compute SHA-256 fingerprint from concepts and pipes content.

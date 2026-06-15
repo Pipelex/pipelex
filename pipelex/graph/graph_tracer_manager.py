@@ -265,8 +265,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_success(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
         output_preview: str | None = None,
@@ -303,8 +303,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_execution_data(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         node_id: str | None,
         execution_data: dict[str, Any],
     ) -> None:
@@ -324,8 +324,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_error(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
         error_type: str,
@@ -359,8 +359,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def add_edge(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
@@ -388,8 +388,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_controller_output(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         node_id: str,
         output_spec: IOSpec,
     ) -> None:
@@ -410,8 +410,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_item_extraction(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -439,8 +439,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_aggregation(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -468,8 +468,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_parallel_combine(
         self,
-        lookup_key: str,
         *,
+        lookup_key: str,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,

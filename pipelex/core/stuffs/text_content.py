@@ -31,7 +31,7 @@ class TextContent(StuffContent):
         return html.escape(self.text)
 
     @override
-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return self.text
 
     @override

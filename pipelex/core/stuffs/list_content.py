@@ -105,7 +105,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return self.rendered_markdown()
 
     @override
-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
@@ -126,7 +126,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return await self.rendered_markdown_async()
 
     @override
-    async def rendered_markdown_async(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, *, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:

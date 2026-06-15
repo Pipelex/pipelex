@@ -26,8 +26,8 @@ FORCE_DRY_RUN_MODE_ENV_KEY = "PIPELEX_FORCE_DRY_RUN_MODE"
 
 
 def output_multiplicity_to_apply(
-    base_multiplicity: VariableMultiplicity | None,
     *,
+    base_multiplicity: VariableMultiplicity | None,
     override_multiplicity: VariableMultiplicity | None,
 ) -> VariableMultiplicityResolution:
     """Resolve output multiplicity settings by combining base configuration with override.
@@ -60,13 +60,13 @@ def output_multiplicity_to_apply(
         - If override is int: Use override count, enable multiple outputs
 
     Examples:
-        >>> result = output_multiplicity_to_apply(None, None)
+        >>> result = output_multiplicity_to_apply(base_multiplicity=None, override_multiplicity=None)
         >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
         (None, False, None)
-        >>> result = output_multiplicity_to_apply(True, None)
+        >>> result = output_multiplicity_to_apply(base_multiplicity=True, override_multiplicity=None)
         >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
         (True, True, None)
-        >>> result = output_multiplicity_to_apply(3, None)
+        >>> result = output_multiplicity_to_apply(base_multiplicity=3, override_multiplicity=None)
         >>> (result.resolved_multiplicity, result.enable_multiple_outputs, result.specific_output_count)
         (3, True, 3)
 

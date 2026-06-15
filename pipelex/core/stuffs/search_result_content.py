@@ -43,7 +43,7 @@ class SearchResultContent(StuffContent):
         return result
 
     @override
-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         result = self.answer
         if self.sources:
             result += "\n\n**Sources:**\n\n"

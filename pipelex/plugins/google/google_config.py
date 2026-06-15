@@ -38,7 +38,7 @@ class GoogleConfig(ConfigModel):
         """
         from google.genai import types as genai_types  # noqa: PLC0415
 
-        level_str = get_reasoning_level_str(self.effort_to_level_map, effort=effort)
+        level_str = get_reasoning_level_str(effort_to_level_map=self.effort_to_level_map, effort=effort)
         if level_str is None:
             return None
         google_level = GoogleThinkingLevel(level_str)

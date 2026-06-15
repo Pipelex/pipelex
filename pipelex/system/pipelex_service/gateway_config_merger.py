@@ -68,8 +68,8 @@ class GatewayConfigMerger:
     @classmethod
     def _apply_overrides_to_model(
         cls,
-        model_name: str,
         *,
+        model_name: str,
         gateway_model_specs: BackendModelSpecs,
         local_model_config: BackendModelSpecs,
     ) -> None:

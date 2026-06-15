@@ -9,7 +9,7 @@ from pipelex.urls import URLs
 PLXT_CONFIG_NAME = "plxt.toml"
 
 
-def check_is_initialized(print_warning_if_not: bool = True) -> bool:
+def check_is_initialized(*, print_warning_if_not: bool = True) -> bool:
     # Use resolve_config_file for all checks — consistent with how backends and routing are resolved
     config_exists = path_exists(config_manager.resolve_config_file(CONFIG_NAME)) and path_exists(config_manager.resolve_config_file(PLXT_CONFIG_NAME))
     backends_exists = path_exists(config_manager.backends_file_path)

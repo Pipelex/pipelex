@@ -177,10 +177,16 @@ class DeliveryExecutor:
 
     async def _generate_main_stuff_files(self, main_stuff: Stuff, *, files: dict[str, ResultFile]) -> None:
         content = main_stuff.content
-        await self._try_add_rendered_file(files, filename="main_stuff.json", render=content.rendered_json_async(), content_type="application/json")
-        await self._try_add_rendered_file(files, filename="main_stuff.md", render=content.rendered_markdown_async(), content_type="text/markdown")
-        await self._try_add_rendered_file(files, filename="main_stuff.html", render=content.rendered_html_async(), content_type="text/html")
-        await self._try_add_rendered_file(files, filename="main_stuff_viewer.html", render=render_stuff_viewer(main_stuff), content_type="text/html")
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff.json", render=content.rendered_json_async(), content_type="application/json"
+        )
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff.md", render=content.rendered_markdown_async(), content_type="text/markdown"
+        )
+        await self._try_add_rendered_file(files=files, filename="main_stuff.html", render=content.rendered_html_async(), content_type="text/html")
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff_viewer.html", render=render_stuff_viewer(main_stuff), content_type="text/html"
+        )
 
     async def _generate_graph_files(self, graph_spec: Any, *, files: dict[str, ResultFile]) -> None:
         try:
@@ -189,10 +195,10 @@ class DeliveryExecutor:
                 graph_spec=graph_spec,
                 graph_config=graph_config,
             )
-            self._add_optional_text_file(files, filename="graphspec.json", text=graph_outputs.graphspec_json, content_type="application/json")
-            self._add_optional_text_file(files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
-            self._add_optional_text_file(files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
-            self._add_optional_text_file(files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
+            self._add_optional_text_file(files=files, filename="graphspec.json", text=graph_outputs.graphspec_json, content_type="application/json")
+            self._add_optional_text_file(files=files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
+            self._add_optional_text_file(files=files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
+            self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
         except Exception:  # noqa: BLE001
             # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
             log.warning("Failed to generate graph outputs")
@@ -200,8 +206,8 @@ class DeliveryExecutor:
     @classmethod
     async def _try_add_rendered_file(
         cls,
-        files: dict[str, ResultFile],
         *,
+        files: dict[str, ResultFile],
         filename: str,
         render: Awaitable[str],
         content_type: str,
@@ -216,7 +222,7 @@ class DeliveryExecutor:
         files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
 
     @classmethod
-    def _add_optional_text_file(cls, files: dict[str, ResultFile], *, filename: str, text: str | None, content_type: str) -> None:
+    def _add_optional_text_file(cls, *, files: dict[str, ResultFile], filename: str, text: str | None, content_type: str) -> None:
         """Encode `text` and store it under `filename`. No-op when `text` is None."""
         if text is not None:
             files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)

@@ -110,7 +110,7 @@ class StructuredContent(StuffContent):
                 return html_module.escape(str(value))
 
     @override
-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         dict_dump = clean_model_to_dict(obj=self)
         return convert_to_markdown(data=dict_dump, level=level, is_pretty=is_pretty)
 

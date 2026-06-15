@@ -224,8 +224,8 @@ class PipeCondition(PipeController):
     @override
     async def _live_run_controller_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -284,8 +284,8 @@ class PipeCondition(PipeController):
     @override
     async def _dry_run_controller_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,

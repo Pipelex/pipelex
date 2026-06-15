@@ -297,8 +297,8 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
     @classmethod
     def create_executor(
         cls,
-        task_queue: str | None = None,
         *,
+        task_queue: str | None = None,
         workflow_execution_timeout: timedelta | None = None,
         retry_policy: RetryPolicy | None = None,
         run_timeout: timedelta | None = None,

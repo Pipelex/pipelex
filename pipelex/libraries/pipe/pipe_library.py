@@ -94,7 +94,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
         return None
 
-    def add_dependency_pipe(self, alias: str, *, pipe: PipeAbstract) -> None:
+    def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract) -> None:
         """Add a pipe from a dependency package with an aliased key.
 
         Args:

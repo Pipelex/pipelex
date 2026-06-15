@@ -188,7 +188,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
 
-    def add_dependency_concept(self, alias: str, *, concept: Concept) -> None:
+    def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:
         """Add a concept from a dependency package with an aliased key.
 
         Args:

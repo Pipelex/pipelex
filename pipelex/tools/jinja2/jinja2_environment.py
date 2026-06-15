@@ -7,8 +7,8 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
 
 def make_jinja2_env_from_loader(
-    template_category: TemplateCategory,
     *,
+    template_category: TemplateCategory,
     loader: BaseLoader,
     enable_async: bool = True,
 ) -> Environment:

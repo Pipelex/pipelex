@@ -125,8 +125,8 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
 
 
 def make_temporal_pipe_router(
-    task_queue: str | None = None,
     *,
+    task_queue: str | None = None,
     workflow_execution_timeout: timedelta | None = None,
     retry_policy: RetryPolicy | None = None,
     should_auto_connect_temporal: bool = True,

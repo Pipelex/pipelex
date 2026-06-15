@@ -25,8 +25,8 @@ class BackendCredentialsErrorMsgFactory:
     @classmethod
     def make_one_variable_missing_error_msg(
         cls,
-        secrets_provider: SecretsProviderAbstract,
         *,
+        secrets_provider: SecretsProviderAbstract,
         backend_name: str | None,
         var_name: str,
     ) -> str:

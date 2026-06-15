@@ -349,8 +349,8 @@ class LLMPromptBlueprint(BaseModel):
 
     async def _unravel_text(
         self,
-        context_provider: ContextProviderAbstract,
         *,
+        context_provider: ContextProviderAbstract,
         jinja2_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
         image_registry: ImageRegistry | None = None,

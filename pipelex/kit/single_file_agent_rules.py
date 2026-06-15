@@ -9,7 +9,7 @@ from pipelex.kit.paths import get_kit_agents_dir
 from pipelex.types import Traversable
 
 
-def _read_agent_file(agents_dir: Traversable, *, name: str) -> str:
+def _read_agent_file(*, agents_dir: Traversable, name: str) -> str:
     """Read an agent markdown file.
 
     Args:
@@ -46,7 +46,7 @@ def _demote_headings(md_content: str, *, levels: int) -> str:
     return re.sub(pattern, demote_match, md_content, flags=re.MULTILINE)
 
 
-def build_merged_rules(kit_index: KitIndex, *, agent_set: str | None = None, file_list: list[str] | None = None) -> str:
+def build_merged_rules(*, kit_index: KitIndex, agent_set: str | None = None, file_list: list[str] | None = None) -> str:
     """Build merged agent documentation from ordered files.
 
     Args:
@@ -76,7 +76,7 @@ def build_merged_rules(kit_index: KitIndex, *, agent_set: str | None = None, fil
     parts: list[str] = []
 
     for name in files_to_merge:
-        md_content = _read_agent_file(agents_dir, name=name)
+        md_content = _read_agent_file(agents_dir=agents_dir, name=name)
         demoted = _demote_headings(md_content, levels=kit_index.agent_rules.demote)
         parts.append(demoted.rstrip())
 
@@ -126,7 +126,7 @@ def update_single_file_agent_rules(
             target_file_list = target.sets[agent_set]
 
         # Build merged rules for this specific target (with override if applicable)
-        merged_rules = build_merged_rules(kit_index, agent_set=agent_set, file_list=target_file_list)
+        merged_rules = build_merged_rules(kit_index=kit_index, agent_set=agent_set, file_list=target_file_list)
 
         # Add heading
         after = f"# Pipelex Coding Rules\n\n{merged_rules}"

@@ -193,8 +193,8 @@ class Concept(ConceptAbstract):
 
     def render_concept_representation(
         self,
-        output_format: ConceptRepresentationFormat,
         *,
+        output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.

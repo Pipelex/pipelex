@@ -171,8 +171,8 @@ def _copy_telemetry_template(target_dir: Path, *, for_project: bool) -> None:
 
 
 def _configure_backends(
-    config: dict[str, Any],
     *,
+    config: dict[str, Any],
     backends_toml_path: Path,
     template_backends_path: Path,
 ) -> list[str]:
@@ -396,7 +396,9 @@ def agent_init_cmd(
         # Step 2: Configure backends
         template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
         backends_toml_path = target_dir / "inference" / "backends.toml"
-        backends_enabled = _configure_backends(parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path)
+        backends_enabled = _configure_backends(
+            config=parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path
+        )
 
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)

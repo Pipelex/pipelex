@@ -79,7 +79,7 @@ def check_rules_sync_cmd(show_diff: bool = True, *, quiet: bool = False) -> None
             target_file_list = target.sets[agent_set]
 
         # Build merged rules for this specific target (with override if applicable)
-        merged_rules = build_merged_rules(kit_index, agent_set=agent_set, file_list=target_file_list)
+        merged_rules = build_merged_rules(kit_index=kit_index, agent_set=agent_set, file_list=target_file_list)
 
         # Expected content is heading + merged rules
         expected_content = f"# Pipelex Coding Rules\n\n{merged_rules}"

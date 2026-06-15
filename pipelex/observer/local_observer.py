@@ -19,7 +19,7 @@ class LocalObserver(ObserverProtocol):
         self.storage_dir = Path(storage_dir or get_config().pipelex.observer_config.observer_dir)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-    def _write_to_jsonl(self, event_type: str, *, payload: PayloadType) -> None:
+    def _write_to_jsonl(self, *, event_type: str, payload: PayloadType) -> None:
         # event_type goes last so a payload key cannot overwrite the lifecycle event name
         payload = {
             **payload,
@@ -32,12 +32,12 @@ class LocalObserver(ObserverProtocol):
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.BEFORE_RUN, payload=payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.BEFORE_RUN, payload=payload)
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.AFTER_SUCCESSFUL_RUN, payload=payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.AFTER_SUCCESSFUL_RUN, payload=payload)
 
     @override
     async def observe_after_failing_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.AFTER_FAILING_RUN, payload=payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.AFTER_FAILING_RUN, payload=payload)

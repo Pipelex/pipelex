@@ -180,8 +180,8 @@ def _check_gateway_terms_if_needed(console: Console, *, backends_toml_path: Path
 
 
 def determine_needs(
-    reset: bool,
     *,
+    reset: bool,
     check_config: bool,
     check_inference: bool,
     check_routing: bool,

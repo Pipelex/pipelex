@@ -34,8 +34,8 @@ def _should_include(category: ModelCategory, *, categories: list[ModelCategory] 
 
 
 def _resolve_preset_backend(
-    model_deck: ModelDeck,
     *,
+    model_deck: ModelDeck,
     model_handle: str,
     model_type: ModelType,
 ) -> InferenceModelSpec | None:
@@ -58,7 +58,7 @@ def _filter_presets_by_backend(
         setting = presets_dict.get(preset_name)
         if setting is None:
             continue
-        spec = _resolve_preset_backend(model_deck, model_handle=setting.model, model_type=model_type)
+        spec = _resolve_preset_backend(model_deck=model_deck, model_handle=setting.model, model_type=model_type)
         if spec is not None and spec.backend_name == backend:
             filtered.append(preset_entry)
     return filtered
@@ -99,8 +99,8 @@ def _filter_waterfalls_by_backend(
 
 
 def _build_presets_for_category(
-    model_deck: ModelDeck,
     *,
+    model_deck: ModelDeck,
     category: ModelCategory,
     backend: str | None,
 ) -> list[dict[str, Any]]:
@@ -133,8 +133,8 @@ def _build_presets_for_category(
 
 
 def _build_aliases_for_category(
-    model_deck: ModelDeck,
     *,
+    model_deck: ModelDeck,
     category: ModelCategory,
     backend: str | None,
 ) -> dict[str, str]:
@@ -158,8 +158,8 @@ def _build_aliases_for_category(
 
 
 def _build_waterfalls_for_category(
-    model_deck: ModelDeck,
     *,
+    model_deck: ModelDeck,
     category: ModelCategory,
     backend: str | None,
 ) -> dict[str, list[str]]:
@@ -203,24 +203,24 @@ def list_models(
     waterfalls: dict[str, dict[str, list[str]]] = {}
 
     if _should_include(ModelCategory.LLM, categories=categories):
-        presets["llm"] = _build_presets_for_category(model_deck, category=ModelCategory.LLM, backend=backend)
-        aliases["llm"] = _build_aliases_for_category(model_deck, category=ModelCategory.LLM, backend=backend)
-        waterfalls["llm"] = _build_waterfalls_for_category(model_deck, category=ModelCategory.LLM, backend=backend)
+        presets["llm"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.LLM, backend=backend)
+        aliases["llm"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.LLM, backend=backend)
+        waterfalls["llm"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.LLM, backend=backend)
 
     if _should_include(ModelCategory.IMG_GEN, categories=categories):
-        presets["img_gen"] = _build_presets_for_category(model_deck, category=ModelCategory.IMG_GEN, backend=backend)
-        aliases["img_gen"] = _build_aliases_for_category(model_deck, category=ModelCategory.IMG_GEN, backend=backend)
-        waterfalls["img_gen"] = _build_waterfalls_for_category(model_deck, category=ModelCategory.IMG_GEN, backend=backend)
+        presets["img_gen"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.IMG_GEN, backend=backend)
+        aliases["img_gen"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.IMG_GEN, backend=backend)
+        waterfalls["img_gen"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.IMG_GEN, backend=backend)
 
     if _should_include(ModelCategory.EXTRACT, categories=categories):
-        presets["extract"] = _build_presets_for_category(model_deck, category=ModelCategory.EXTRACT, backend=backend)
-        aliases["extract"] = _build_aliases_for_category(model_deck, category=ModelCategory.EXTRACT, backend=backend)
-        waterfalls["extract"] = _build_waterfalls_for_category(model_deck, category=ModelCategory.EXTRACT, backend=backend)
+        presets["extract"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.EXTRACT, backend=backend)
+        aliases["extract"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.EXTRACT, backend=backend)
+        waterfalls["extract"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.EXTRACT, backend=backend)
 
     if _should_include(ModelCategory.SEARCH, categories=categories):
-        presets["search"] = _build_presets_for_category(model_deck, category=ModelCategory.SEARCH, backend=backend)
-        aliases["search"] = _build_aliases_for_category(model_deck, category=ModelCategory.SEARCH, backend=backend)
-        waterfalls["search"] = _build_waterfalls_for_category(model_deck, category=ModelCategory.SEARCH, backend=backend)
+        presets["search"] = _build_presets_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
+        aliases["search"] = _build_aliases_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
+        waterfalls["search"] = _build_waterfalls_for_category(model_deck=model_deck, category=ModelCategory.SEARCH, backend=backend)
 
     return {
         "presets": presets,

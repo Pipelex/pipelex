@@ -19,6 +19,6 @@ class PluginSdkRegistry(RootModel[PluginSdkRegistryRoot]):
     def get_sdk_instance(self, plugin: Plugin) -> Any | None:
         return self.root.get(plugin.sdk_handle)
 
-    def set_sdk_instance(self, plugin: Plugin, *, sdk_instance: Any) -> Any:
+    def set_sdk_instance(self, *, plugin: Plugin, sdk_instance: Any) -> Any:
         self.root[plugin.sdk_handle] = sdk_instance
         return sdk_instance

@@ -389,7 +389,7 @@ class StructuredContentComposer:
         else:
             return None
 
-    def _expects_type(self, expected_type: type[Any], *, target_type: type) -> bool:
+    def _expects_type(self, *, expected_type: type[Any], target_type: type) -> bool:
         """Check if the expected type matches or is a subclass of target_type.
 
         Args:

@@ -23,8 +23,8 @@ app = typer.Typer()
 
 
 async def run_worker(
-    project: str | None = None,
     *,
+    project: str | None = None,
     is_not_sandboxed: bool = False,
     is_unit_testing: bool = False,
     task_queue: str | None = None,
@@ -97,7 +97,7 @@ def configure(
 
     asyncio.run(
         run_worker(
-            project,
+            project=project,
             is_not_sandboxed=is_not_sandboxed,
             is_unit_testing=is_unit_testing,
             task_queue=task_queue,
