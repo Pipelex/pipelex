@@ -25,6 +25,7 @@ This folder holds the **active** planning, design, and current-state docs for th
 - **[structured-logging.md](structured-logging.md)** — kickoff briefing for replacing string-interpolated log context with structured logging + contextvars. Kicked off, not started; sequenced after the error-handling stack merges.
 - **[stuffs-as-nodespec.md](stuffs-as-nodespec.md)** — future graph-model rework to make stuffs first-class `NodeSpec` instances. A starter, not a worked plan.
 - **[blueprint-elaboration-directives.md](blueprint-elaboration-directives.md)** — extending the build-time blueprint-elaboration system: first-class synthetic-pipe handling, a directive plugin registry, and supporting tooling.
+- **[doctor-output-ansi-under-force-color.md](doctor-output-ansi-under-force-color.md)** — deferred decision: `pipelex doctor` emits ANSI when captured under `FORCE_COLOR` (an env artifact, not a pipelex defect — it's plain when piped without it). Records the evidence and the one optional follow-up (a `--plain`/`--no-color` flag for diagnostics). Low priority. Surfaced by pipelex-worker PR #23.
 - **[pathlib-refactor.workflow.js](pathlib-refactor.workflow.js)** — a runnable multi-agent workflow that refactors filesystem path handling to `pathlib.Path` across `pipelex/` (intended for the `refactor/Paths` branch). Tooling, not a doc.
 
 ## Suggested priorities
