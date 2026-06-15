@@ -182,7 +182,7 @@ flowchart LR
     G2 -->|clean| P2["pass"]
   end
   G1 -. "same AST core<br/>(find_violations_in_source)" .- G2
-</figure>
+</div>
 <figcaption>The single-file hook result is an exact subset of the full-tree scan — <code>relative_path</code>/<code>module_qname</code> are computed identically, so the carve-out allowlist matches either way.</figcaption>
 </figure>
 
@@ -213,7 +213,7 @@ flowchart TD
   F --> G["Consolidate: all 59 made FULLY keyword-only<br/>move * before the subject · no reorder · no rename"]
   G --> H["agent-check + agent-test green"]
   H --> I["Downstream consumers re-pinned + fixed in lockstep"]
-</figure>
+</div>
 <figcaption>"No reordering, no renames" is the load-bearing property: it means the only way the consolidation can break a caller is if that caller passed a now-keyword-only subject <i>positionally</i>.</figcaption>
 </figure>
 
@@ -237,10 +237,10 @@ flowchart TD
 <table>
   <thead><tr><th>Consumer</th><th>Branch</th><th>Keyword-only break?</th><th>Result</th></tr></thead>
   <tbody>
-    <tr><td>pipelex-api</td><td><code>chore/keyword-only-pipelex-rev</code> · PR&nbsp;#19</td><td><b>Yes (1)</b> — <code>tests/unit/conftest.py</code></td><td class="pill good">green · pushed</td></tr>
-    <tr><td>cocode</td><td><code>chore/keyword-only-pipelex-rev</code> · PR&nbsp;#75</td><td>No (all keyword already)</td><td class="pill good">green · pushed</td></tr>
-    <tr><td>pipelex-cookbook</td><td><code>chore/keyword-only-pipelex-rev</code> · PR&nbsp;#153</td><td>No (earlier waves only)</td><td class="pill good">green · pushed</td></tr>
-    <tr><td>pipelex-starter-python</td><td><code>chore/keyword-only-pipelex-rev</code> · PR&nbsp;#55</td><td>No</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-api</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-api/pull/19">PR&nbsp;#19</a></td><td><b>Yes (1)</b> — <code>tests/unit/conftest.py</code></td><td class="pill good">green · pushed</td></tr>
+    <tr><td>cocode</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/cocode/pull/75">PR&nbsp;#75</a></td><td>No (all keyword already)</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-cookbook</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-cookbook/pull/153">PR&nbsp;#153</a></td><td>No (earlier waves only)</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-starter-python</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-starter-python/pull/55">PR&nbsp;#55</a></td><td>No</td><td class="pill good">green · pushed</td></tr>
     <tr><td>pipelex-mistralai-workflows</td><td><code>feature/Mistral-native</code> (mistralai-2x hold pin)</td><td>Out of scope</td><td class="pill">n/a</td></tr>
     <tr><td>pipelex-worker</td><td><code>dev</code> (PyPI version pin)</td><td>Out of scope</td><td class="pill">n/a</td></tr>
   </tbody>
@@ -251,17 +251,17 @@ flowchart TD
 sequenceDiagram
   participant PX as pipelex branch
   participant API as pipelex-api
-  participant REST as cocode / cookbook / starter
-  Note over PX: 529b9082 — initial keyword-only waves
-  PX->>API: pin → 529b9082 (one parse_pipe_spec fix)
-  PX->>REST: pin → 529b9082
-  Note over PX: 755b8211 — parse_pipe_spec arg order reversed (+ siblings)
-  PX->>API: re-pin → 755b8211 + pipe_spec.py call-site fix
-  PX->>REST: re-pin → 755b8211 (no positional call sites)
-  Note over PX: 0e32c8c0 — positional-subject consolidation<br/>(Pipelex.make now fully keyword-only)
-  PX->>API: re-pin → 0e32c8c0 + conftest integration_mode= fix
-  PX->>REST: re-pin → 0e32c8c0 (no-op bump; call sites already keyword)
-</figure>
+  participant REST as cocode, cookbook, starter
+  Note over PX: 529b9082 -- initial keyword-only waves
+  PX->>API: pin to 529b9082, one parse_pipe_spec fix
+  PX->>REST: pin to 529b9082
+  Note over PX: 755b8211 -- parse_pipe_spec arg order reversed
+  PX->>API: re-pin to 755b8211, pipe_spec.py call-site fix
+  PX->>REST: re-pin to 755b8211, no positional call sites
+  Note over PX: 0e32c8c0 -- positional-subject consolidation
+  PX->>API: re-pin to 0e32c8c0, conftest integration_mode fix
+  PX->>REST: re-pin to 0e32c8c0, no-op bump, call sites already keyword
+</div>
 <figcaption>Each re-pin touched <code>pyproject.toml</code> <b>and</b> <code>uv.lock</code>, then <code>uv sync --all-extras</code> + <code>make agent-check</code> + <code>make agent-test</code> before committing.</figcaption>
 </figure>
 
