@@ -28,6 +28,7 @@ import typer
 
 from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
 
@@ -408,67 +409,25 @@ def agent_success_formatted(
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
-    """Extract all validation error categories from a ValidateBundleError into a flat list.
+    """Project a ``ValidateBundleError`` into the CLI ``validation_errors`` JSON array.
 
-    Covers all 4 error sources:
-    - Blueprint validation errors (from interpreter)
-    - Pipe factory errors (e.g., missing concepts)
-    - Pipe validation errors (e.g., missing inputs, type mismatches)
-    - Pipe/concept instantiation errors (from Pydantic validation during factory)
-
-    Each entry includes a ``category`` field identifying its source.
+    Thin adapter over the shared ``build_validation_error_items`` builder — the
+    same one feeding the API 422's ``ErrorReport.validation_errors`` — so the CLI
+    and API structured shapes can never drift. Each typed item is dumped to a
+    plain dict with unset fields dropped (``exclude_none``), matching the
+    machine-first agent-CLI envelope; the entries carry ``category``,
+    ``error_type``, ``message``, and whatever identity / ``source`` fields the
+    underlying error populated.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
 
     Returns:
-        List of dicts, each with at minimum ``category``, ``error_type``, and ``message``.
+        List of dicts, each with at minimum ``category`` and ``message``.
     """
-    validation_errors: list[dict[str, Any]] = []
-
-    for blueprint_error in exc.pipelex_bundle_blueprint_validation_errors:
-        entry: dict[str, Any] = {
-            "category": "blueprint_validation",
-            "error_type": str(blueprint_error.error_type) if blueprint_error.error_type else None,
-            "pipe_code": blueprint_error.pipe_code,
-            "message": blueprint_error.message,
-        }
-        if blueprint_error.domain_code:
-            entry["domain_code"] = blueprint_error.domain_code
-        if blueprint_error.variable_names:
-            entry["variable_names"] = blueprint_error.variable_names
-        validation_errors.append(entry)
-
-    for factory_error in exc.pipe_factory_errors:
-        entry = {
-            "category": "pipe_factory",
-            "error_type": str(factory_error.error_type),
-            "pipe_code": factory_error.pipe_code,
-            "message": factory_error.message,
-        }
-        if factory_error.domain_code:
-            entry["domain_code"] = factory_error.domain_code
-        if factory_error.missing_concept_code:
-            entry["missing_concept_code"] = factory_error.missing_concept_code
-        if factory_error.declared_concepts:
-            entry["declared_concepts"] = factory_error.declared_concepts
-        validation_errors.append(entry)
-
-    for pipe_error in exc.pipe_validation_errors:
-        entry = {
-            "category": "pipe_validation",
-            "error_type": str(pipe_error.error_type),
-            "pipe_code": pipe_error.pipe_code,
-            "message": pipe_error.message,
-        }
-        if pipe_error.domain_code:
-            entry["domain_code"] = pipe_error.domain_code
-        if pipe_error.concept_code:
-            entry["concept_code"] = pipe_error.concept_code
-        if pipe_error.field_path:
-            entry["field_path"] = pipe_error.field_path
-        if pipe_error.variable_names:
-            entry["variable_names"] = pipe_error.variable_names
-        validation_errors.append(entry)
-
-    return validation_errors
+    items = build_validation_error_items(
+        blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
+        factory_errors=exc.pipe_factory_errors,
+        pipe_validation_errors=exc.pipe_validation_errors,
+    )
+    return [item.model_dump(mode="json", exclude_none=True) for item in items]

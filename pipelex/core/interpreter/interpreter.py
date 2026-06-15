@@ -19,7 +19,25 @@ class PipelexInterpreter(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
     @classmethod
-    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, *, mthds_content: str | None = None) -> PipelexBundleBlueprint:
+    def make_pipelex_bundle_blueprint(
+        cls,
+        bundle_path: Path | None = None,
+        *,
+        mthds_content: str | None = None,
+        mthds_name: str | None = None,
+    ) -> PipelexBundleBlueprint:
+        """Parse one MTHDS source into a ``PipelexBundleBlueprint``.
+
+        Exactly one of ``bundle_path`` (load from disk) or ``mthds_content``
+        (load from a string) must be provided. ``mthds_name`` is an optional
+        logical name for the *in-memory* path: the API submits nameless bundle
+        text (``mthds_contents: list[str]``), so without it ``blueprint.source``
+        is ``None`` and cross-file diagnostics misfire. When given, it becomes
+        the blueprint's ``source`` (and is seeded into the dict before
+        validation, so blueprint-validation errors carry it too) — mirroring the
+        real file path the disk path already records. Ignored when ``bundle_path``
+        is provided (the path wins).
+        """
         blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
@@ -27,6 +45,8 @@ class PipelexInterpreter(BaseModel):
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = str(bundle_path)
             elif mthds_content is not None:
                 blueprint_dict = load_toml_from_content(content=mthds_content)
+                if mthds_name is not None:
+                    blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_name
             else:
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
                 raise PipelexInterpreterError(msg)
@@ -40,7 +60,7 @@ class PipelexInterpreter(BaseModel):
 
         try:
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
-            pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
+            pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path is not None else mthds_name
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []

@@ -6,6 +6,7 @@ from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErro
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.validation_errors import build_validation_error_items
 
 
 class PipeExecutionError(PipelexError):
@@ -125,6 +126,26 @@ class ValidateBundleError(PipelexError):
         """
         # TODO: refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        """Attach the structured ``validation_errors`` list onto the base report.
+
+        ``super().to_error_report()`` builds the report and enriches it from the
+        ``__cause__`` chain; this override then attaches the per-error structured
+        list — the same items the agent CLI emits, via the shared
+        ``build_validation_error_items`` builder — so the API 422 problem
+        document carries machine-mappable diagnostics. The list is set to
+        ``None`` when empty so it drops out of the ``exclude_none`` wire
+        projection (and the round-trip stays identical to a plain report).
+        """
+        report = super().to_error_report()
+        validation_error_items = build_validation_error_items(
+            blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
+            factory_errors=self.pipe_factory_errors,
+            pipe_validation_errors=self.pipe_validation_errors,
+        )
+        return report.model_copy(update={"validation_errors": validation_error_items or None})
 
 
 class PipeIOContractError(PipelexError):

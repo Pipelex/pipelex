@@ -101,7 +101,19 @@ This phase has two parts: (A) get structured errors onto the API wire, and (B) m
 
 **Versioning & docs.** Bump pipelex 0.33.0 → 0.34.0 (new error-contract field + new combined `--view` output). Update CHANGELOG and the relevant `../_calls/docs/` pages (validate error envelope + the `--view --format json` output contract).
 
-> **CHECKPOINT 1.** The pipelex runtime serializes structured `validation_errors` on `ValidateBundleError` problem documents, and `validate bundle --view --format json` returns a combined validation+graph envelope. Both gated behind a released version. Everything downstream depends on this. Record the released version here before moving on.
+> **CHECKPOINT 1 — ✅ IMPLEMENTED (code + tests + docs), release pending.** The pipelex runtime now serializes structured `validation_errors` on `ValidateBundleError` problem documents (Part A). Part B was deferred (eng review), so the combined `--view` envelope is intentionally NOT built — the single `--view` spawn already serves both channels via exit code.
+>
+> **As-built (2026-06-15, branch `feature/Tweaks-for-validation-api`, uncommitted):**
+>
+> - `ValidationErrorItem` + `ValidationErrorCategory` live in `pipelex/base_exceptions.py` (next to `ErrorReport`, NOT in `core/exceptions.py` as the plan originally suggested — that would create a `base_exceptions ← core.exceptions` import cycle, since `ErrorReport` references the item as a typed field). The union fields match the plan: `category`, `message`, `error_type`, `pipe_code`, `concept_code`, `domain_code`, `source`, `field_path`, `field_name`, `variable_names`, `missing_concept_code`, `declared_concepts`.
+> - Shared builder `build_validation_error_items` in `pipelex/pipeline/validation_errors.py`. **Signature note:** it takes the three categorized error *lists* (keyword-only) rather than a `ValidateBundleError` instance — a `TYPE_CHECKING` back-reference to `ValidateBundleError` tripped pyright's `reportImportCycles` (it counts type-only imports). Both `ValidateBundleError.to_error_report()` and the CLI's `extract_validation_errors` call it.
+> - `ErrorReport.validation_errors: list[ValidationErrorItem] | None` added; `"validation_errors"` added to `_STRICT_KEPT_FIELDS` (surfaced on BOTH STRICT branches — caller's own bundle diagnostics).
+> - `ValidateBundleError.to_error_report()` override attaches the list; CLI `extract_validation_errors` is now a thin dump-adapter over the shared builder (and now also surfaces the previously-dropped `source` / `concept_code` / `field_name`).
+> - **Issue 5 / T1 source fix:** `make_pipelex_bundle_blueprint(mthds_name=...)` sets `blueprint.source` (and seeds `blueprint_dict["source"]` before validation so blueprint-validation errors carry it). `validate_bundle(mthds_names=...)` threads per-content names (length-mismatch → `ValidateBundleError`). The MTHDS protocol `validate` signature was deliberately NOT touched (cross-repo protocol change) — Phase 2's `ApiRunner.validate` will call `validate_bundle(mthds_names=...)` directly.
+> - Tests: `tests/unit/pipelex/pipeline/test_validation_errors.py`, `test_validate_bundle_error_report.py`, additions to `test_error_report_disclosure_mode.py` (STRICT both branches), `tests/integration/pipelex/pipeline/test_validate_bundle_source_threading.py`. `make agent-check` + full `make agent-test` GREEN.
+> - Docs: `docs/under-the-hood/error-model.md` (schema row + `validation_errors` subsection + File→Purpose). CHANGELOG entries under `[Unreleased]` (NOT bumped to 0.34.0 — versioning happens at release time).
+>
+> **REMAINING gated step (the actual Checkpoint 1 boundary):** cut the **pipelex 0.34.0 release** via `/release` (bumps `pyproject.toml`, finalizes `[Unreleased]` → `[0.34.0]`, opens PR to main). This is the outward-facing handoff that unblocks Phase 2 (`pipelex-api` re-pin). **Record the released version here once cut.** Everything downstream depends on this.
 
 ---
 
@@ -272,8 +284,8 @@ No critical gaps (no failure that is untested AND unhandled AND silent).
 
 **Implementation Tasks** (also in `tasks-eng-review-*.jsonl` for /autoplan):
 
-- [ ] **T1 (P1)** pipelex — thread per-item name into `blueprint.source` on the in-memory load path (Issue 5)
-- [ ] **T2 (P1)** pipelex — Part A: ValidationErrorItem + shared builder + ErrorReport field + ValidateBundleError override + `_STRICT_KEPT_FIELDS` (Issues 1)
+- [x] **T1 (P1)** pipelex — thread per-item name into `blueprint.source` on the in-memory load path (Issue 5) — DONE (`make_pipelex_bundle_blueprint(mthds_name=)` + `validate_bundle(mthds_names=)`)
+- [x] **T2 (P1)** pipelex — Part A: ValidationErrorItem + shared builder + ErrorReport field + ValidateBundleError override + `_STRICT_KEPT_FIELDS` (Issues 1) — DONE
 - [ ] **T3 (P1)** pipelex-api — optional per-item names on ValidateRequest, threaded to runner (Issue 5)
 - [ ] **T4 (P2)** pipelex-api — docs/specs + conformance test for the validate error envelope, assert real wire (Issue 2)
 - [ ] **T5 (P1)** mthds-js — typed report + `ApiResponseError.validationErrors` + named contents on `validate()` (Issue 5)
