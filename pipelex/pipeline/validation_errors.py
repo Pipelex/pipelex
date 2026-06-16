@@ -26,6 +26,7 @@ def build_validation_error_items(
     factory_errors: list[PipeFactoryErrorData],
     pipe_validation_errors: list[PipesAndConceptValidationErrorData],
     dry_run_error_message: str | None = None,
+    fallback_message: str | None = None,
 ) -> list[ValidationErrorItem]:
     """Flatten a bundle-validation error's categorized lists into typed items.
 
@@ -37,13 +38,27 @@ def build_validation_error_items(
     underlying error-data model carries it, so a consumer can map each error to
     its owning file.
 
-    The ``dry_run`` residual is the structured-info invariant's safety net: a
-    dry-run failure (``DryRunError`` / ``PipeRunError``) surfaces only a single
-    message, not per-error data with identity fields. When it is the *only*
-    failure channel (no categorized error has data), it becomes one
-    :class:`ValidationErrorCategory.DRY_RUN` item carrying that message — so an
+    Two residual safety nets make the structured-info invariant **total** — an
     invalid verdict never rides a bare ``detail`` with an empty
-    ``validation_errors[]``. It is graph-level, so it carries no ``source``.
+    ``validation_errors[]``:
+
+    - The ``dry_run`` residual: a dry-run failure (``DryRunError`` /
+      ``PipeRunError``) surfaces only a single message, not per-error data with
+      identity fields. When it is the *only* failure channel (no categorized
+      error has data), it becomes one :class:`ValidationErrorCategory.DRY_RUN`
+      item carrying that message.
+    - The ``fallback_message`` residual: a parse-level failure (a TOML-syntax
+      error, an empty blueprint, a bundle-elaborator failure) surfaces only the
+      error's top-level message, with no categorized data and no dry-run channel.
+      When *nothing else* produced an item, it becomes one
+      :class:`ValidationErrorCategory.BLUEPRINT_VALIDATION` item carrying that
+      message — the bundle could not be turned into a blueprint at all.
+
+    Both residuals are graph/parse-level (the builder has no file context), so
+    they carry no ``source``. They are ordered ``dry_run`` then
+    ``fallback_message`` (most-specific channel first): a dry-run failure that
+    also passes a fallback message must still surface its ``dry_run`` item, and
+    the ``not items`` guard on each block guarantees only one residual fires.
 
     Args:
         blueprint_errors: Interpreter / blueprint-validation error data.
@@ -51,11 +66,15 @@ def build_validation_error_items(
         pipe_validation_errors: Pipe/concept validation error data.
         dry_run_error_message: The residual dry-run failure message, if any. Only
             projected as a ``dry_run`` item when no categorized error has data.
+        fallback_message: The error's caller-facing message, used as the
+            last-resort residual. Only projected as a ``blueprint_validation``
+            item when no categorized error and no dry-run residual produced one.
 
     Returns:
         One :class:`ValidationErrorItem` per underlying error, in the order
-        blueprint → factory → pipe/concept validation, then the ``dry_run``
-        residual when it is the sole failure channel.
+        blueprint → factory → pipe/concept validation, then the ``dry_run`` or
+        (last-resort) ``fallback_message`` residual when it is the sole failure
+        channel.
     """
     items: list[ValidationErrorItem] = []
 
@@ -111,6 +130,22 @@ def build_validation_error_items(
                 category=ValidationErrorCategory.DRY_RUN,
                 error_type="DryRunError",
                 message=dry_run_error_message,
+            )
+        )
+
+    # Last-resort residual: a parse-level failure (TOML syntax, an empty blueprint, a bundle
+    # elaborator failure) surfaces only a top-level message — no categorized data and no dry-run
+    # channel. Emit one BLUEPRINT_VALIDATION item carrying that message so an invalid verdict is
+    # NEVER a bare detail with an empty validation_errors[] — the structured-info invariant, now
+    # total. The bundle could not be turned into a blueprint at all, so blueprint_validation is the
+    # right bucket; parse-level → no source, and error_type stays None (the message is
+    # authoritative and the residual fires for several distinct underlying errors). Ordered after
+    # the dry_run residual (the more specific channel); the `not items` guard fires only one.
+    if not items and fallback_message:
+        items.append(
+            ValidationErrorItem(
+                category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
+                message=fallback_message,
             )
         )
 

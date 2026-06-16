@@ -142,9 +142,13 @@ class ValidateBundleError(PipelexError):
         instantiation category is not silently dropped from the wire. The
         ``dry_run_error_message`` channel is a single message, not per-error data
         with identity fields, so the shared builder projects it as one
-        ``dry_run``-category item **only** when no categorized error has data —
-        the structured-info invariant, so an invalid verdict never rides a bare
-        ``detail`` with an empty ``validation_errors[]``.
+        ``dry_run``-category item **only** when no categorized error has data.
+        Finally ``fallback_message=self.message`` is passed so a parse-level
+        failure (TOML syntax, an empty blueprint, a bundle elaborator) — which
+        carries only a message — still surfaces one ``blueprint_validation``
+        residual item. Together these make the structured-info invariant
+        **total**: an invalid verdict never rides a bare ``detail`` with an empty
+        ``validation_errors[]``.
         """
         report = super().to_error_report()
         validation_error_items = build_validation_error_items(
@@ -152,6 +156,7 @@ class ValidateBundleError(PipelexError):
             factory_errors=self.pipe_factory_errors,
             pipe_validation_errors=self.pipe_validation_error_data,
             dry_run_error_message=self.dry_run_error_message,
+            fallback_message=self.message,
         )
         return report.model_copy(update={"validation_errors": validation_error_items or None})
 

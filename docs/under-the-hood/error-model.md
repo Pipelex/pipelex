@@ -68,10 +68,12 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 A bundle-validation failure (`ValidateBundleError`) aggregates per-error data across stages and projects it onto `validation_errors` as a list of typed `ValidationErrorItem`s, so the structured error report an HTTP API surfaces carries machine-mappable diagnostics (not just a single `detail` string). Each item's `category` is one of the **closed** `ValidationErrorCategory` set:
 
-- `blueprint_validation` — interpreter / blueprint-validation faults.
+- `blueprint_validation` — interpreter / blueprint-validation faults. This also serves as the **last-resort residual**: a parse-level failure (a TOML-syntax error, an empty blueprint, a bundle-elaborator failure) is raised with only a message and no categorized data, so when *nothing else* produced an item the builder projects that message as one `blueprint_validation` item (no `error_type`, no `source` — the bundle could not become a blueprint at all).
 - `pipe_factory` — pipe-factory failures (e.g. a missing concept).
 - `pipe_validation` — pipe/concept validation (missing input variable, type mismatch).
-- `dry_run` — the **residual** dry-run failure (`DryRunError` / `PipeRunError`) with no structured locator. It is projected as one message-only item **only when no categorized error has data**, so an invalid verdict always carries a non-empty `validation_errors[]` (the **structured-info invariant**) instead of a bare message. It is graph-level, so it typically carries **no `source`**.
+- `dry_run` — the **residual** dry-run failure (`DryRunError` / `PipeRunError`) with no structured locator. It is projected as one message-only item **only when no categorized error has data**. It is graph-level, so it typically carries **no `source`**.
+
+Together the two residuals make the **structured-info invariant total**: every invalid verdict carries a non-empty `validation_errors[]`, never a bare message. The builder tries the channels in order — categorized data, then the `dry_run` residual (the more specific channel), then the `blueprint_validation` fallback — and emits exactly one residual only when no earlier channel produced an item.
 
 Besides `category` and `message`, each item carries whatever identity fields its stage produced — `error_type`, `pipe_code`, `concept_code`, `domain_code`, `field_path`, `field_name`, `variable_names`, `missing_concept_code`, `declared_concepts`, and a `source` (the declaring file path, or the per-content source the in-memory load path was given) that hands a consumer the owning file for cross-file diagnostic placement.
 

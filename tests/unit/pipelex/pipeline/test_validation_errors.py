@@ -20,11 +20,14 @@ from pipelex.pipeline.validation_errors import build_validation_error_items
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
-    """Call the builder with the error's categorized lists, exactly as production does.
+    """Call the builder with the error's categorized lists only — for the category-projection tests.
 
     The pipe-validation arm uses ``pipe_validation_error_data`` (pipe validation **plus**
     pipe/concept instantiation errors) — the same combined accessor both real call sites
     (``ValidateBundleError.to_error_report`` and the CLI ``extract_validation_errors``) pass.
+    The residual channels (``dry_run_error_message`` / ``fallback_message``) are intentionally
+    omitted here so these tests pin the categorized projection in isolation; the residual behavior
+    has its own dedicated tests below.
     """
     return build_validation_error_items(
         blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
@@ -159,6 +162,71 @@ class TestBuildValidationErrorItems:
         report = ValidateBundleError(message="Dry run failed", dry_run_error_message="Dry run failed: residual error").to_error_report()
         assert report.validation_errors is not None
         assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.DRY_RUN]
+
+    def test_fallback_message_residual_becomes_single_blueprint_item(self) -> None:
+        """A parse-level failure (only a message, no categorized data) yields one ``blueprint_validation`` item.
+
+        This is the most common failure — a malformed ``.mthds`` file (TOML syntax, an empty
+        blueprint, a bundle elaborator). The bundle could not be turned into a blueprint at all, so
+        ``blueprint_validation`` is the right bucket. It is parse-level, so it has no ``source``, and
+        ``error_type`` stays ``None`` (the message is authoritative).
+        """
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[],
+            fallback_message="TOML syntax error at line 3, column 1: unclosed table header",
+        )
+        assert [item.category for item in items] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
+        assert items[0].message == "TOML syntax error at line 3, column 1: unclosed table header"
+        assert items[0].error_type is None
+        assert items[0].source is None
+
+    def test_dry_run_residual_wins_over_fallback_message(self) -> None:
+        """When both residual channels are available, the more-specific ``dry_run`` item wins (ordering)."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[],
+            dry_run_error_message="Dry run failed: residual error",
+            fallback_message="should not be used",
+        )
+        assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN]
+
+    def test_fallback_message_suppressed_when_categorized_data_present(self) -> None:
+        """A categorized error wins over the fallback residual — the residual is a last resort only."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[
+                PipeFactoryErrorData(
+                    error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
+                    pipe_code="pipe_x",
+                    missing_concept_code="Foo",
+                    message="concept Foo not found",
+                ),
+            ],
+            pipe_validation_errors=[],
+            fallback_message="should not be used",
+        )
+        assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
+
+    def test_to_error_report_is_total_for_message_only_error(self) -> None:
+        """A bare-message ``ValidateBundleError`` still surfaces a non-empty ``validation_errors`` — the invariant is total.
+
+        ``to_error_report`` passes ``fallback_message=self.message``, so even an error with no
+        categorized data and no dry-run channel projects one ``blueprint_validation`` residual.
+        An invalid verdict is therefore NEVER a bare ``detail`` with an empty ``validation_errors[]``.
+        """
+        report = ValidateBundleError(message="Could not make 'PipelexBundleBlueprint': no blueprint found").to_error_report()
+        assert report.validation_errors is not None
+        assert report.validation_errors  # non-empty: the totality guarantee
+        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
+        assert report.validation_errors[0].message == "Could not make 'PipelexBundleBlueprint': no blueprint found"
+
+    def test_cli_extractor_is_total_for_message_only_error(self) -> None:
+        """The CLI ``extract_validation_errors`` is also total — a bare-message error yields one item, never an empty array."""
+        cli_dicts = extract_validation_errors(ValidateBundleError(message="empty blueprint"))
+        assert cli_dicts == [{"category": "blueprint_validation", "message": "empty blueprint"}]
 
     def test_empty_collections_collapse_to_none(self) -> None:
         """An empty ``declared_concepts`` / ``variable_names`` becomes ``None`` so it drops from the wire."""

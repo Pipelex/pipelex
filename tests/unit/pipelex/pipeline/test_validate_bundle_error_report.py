@@ -7,7 +7,7 @@ of only a single ``detail`` string. The cause-chain enrichment from the base
 ``to_error_report`` is preserved.
 """
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain
+from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ValidationErrorCategory
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
@@ -52,10 +52,17 @@ class TestValidateBundleErrorReport:
         assert report.caller_facing_message is True
         assert report.error_type == "ValidateBundleError"
 
-    def test_empty_error_leaves_validation_errors_none(self) -> None:
-        """No categorized errors → ``validation_errors`` stays ``None`` (drops from the wire)."""
+    def test_message_only_error_surfaces_a_residual_item(self) -> None:
+        """No categorized errors → a ``blueprint_validation`` residual still rides the wire (invariant is total).
+
+        ``to_error_report`` passes ``fallback_message=self.message``, so a parse-level failure that
+        carries only a message (TOML syntax, an empty blueprint, a bundle elaborator) projects one
+        residual item rather than a bare ``detail`` with an empty ``validation_errors[]``.
+        """
         report = ValidateBundleError(message="generic failure").to_error_report()
-        assert report.validation_errors is None
+        assert report.validation_errors is not None
+        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
+        assert report.validation_errors[0].message == "generic failure"
 
     def test_problem_document_carries_validation_errors_with_source(self) -> None:
         """The 422 problem document rides ``validation_errors[]`` as an extension member."""

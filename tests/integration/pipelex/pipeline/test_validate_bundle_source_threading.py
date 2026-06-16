@@ -36,6 +36,15 @@ main_pipe = "Not A Valid Pipe Code!"
 description = "A customer"
 """
 
+# An unclosed table header is a TOML *syntax* error: it fails in the interpreter before any
+# blueprint dict exists, so the ``PipelexInterpreterError`` carries only a message — no
+# categorized error data and (crucially) no chance to seed the threaded ``source``.
+_MALFORMED_TOML_MTHDS = """
+domain = "testapp"
+[concept.Customer
+description = "the table header above is never closed"
+"""
+
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestValidateBundleSourceThreading:
@@ -75,6 +84,28 @@ class TestValidateBundleSourceThreading:
         seeded_items = [item for item in report.validation_errors if item.source == "broken.mthds"]
         assert seeded_items, "no validation_errors item carried the threaded source"
         assert any(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in seeded_items)
+
+    async def test_parse_level_failure_yields_a_sourceless_residual_item(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A TOML-syntax error still surfaces a non-empty ``validation_errors`` — the invariant is total.
+
+        Parse-level failures (TOML syntax, an empty blueprint, a bundle elaborator) are raised by
+        the interpreter with only a message — no per-error data, and (since they fail before the
+        blueprint dict is seeded) no threaded ``source``. The shared builder's last-resort residual
+        still emits one ``blueprint_validation`` item, so an invalid verdict never rides a bare
+        message with an empty ``validation_errors[]``. Being parse-level, the residual carries no
+        ``source`` — even though one was threaded in — which this contrasts against the categorized
+        cases above.
+        """
+        load_empty_library()
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[_MALFORMED_TOML_MTHDS], mthds_sources=["broken.mthds"])
+        report = exc_info.value.to_error_report()
+        assert report.validation_errors, "a parse-level failure must still carry a non-empty validation_errors[]"
+        assert all(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in report.validation_errors)
+        assert all(item.source is None for item in report.validation_errors)
 
     async def test_length_mismatch_is_a_host_contract_error(
         self,

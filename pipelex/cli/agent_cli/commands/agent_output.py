@@ -411,10 +411,13 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     plain dict with unset fields dropped (``exclude_none``), matching the
     machine-first agent-CLI envelope; the entries carry ``category``,
     ``error_type``, ``message``, and whatever identity / ``source`` fields the
-    underlying error populated. A residual dry-run failure (no structured
-    locator) is projected as one ``dry_run``-category item by the shared builder,
-    so the envelope's ``validation_errors[]`` is non-empty on every invalid
-    verdict (the structured-info invariant) — never a bare message.
+    underlying error populated. Two residuals make the invariant total: a dry-run
+    failure with no structured locator becomes one ``dry_run``-category item, and
+    a parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator)
+    that carries only a message becomes one ``blueprint_validation`` residual
+    (``fallback_message=exc.message``). So the envelope's ``validation_errors[]``
+    is non-empty on every invalid verdict (the structured-info invariant) — never
+    a bare message.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
@@ -427,5 +430,6 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
         factory_errors=exc.pipe_factory_errors,
         pipe_validation_errors=exc.pipe_validation_error_data,
         dry_run_error_message=exc.dry_run_error_message,
+        fallback_message=exc.message,
     )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]

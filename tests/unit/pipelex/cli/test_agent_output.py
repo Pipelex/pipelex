@@ -168,11 +168,16 @@ class TestAgentOutput:
         assert parsed["error"] is True
         assert parsed["failed_at"] == "2026-02-09T14:00:00"
 
-    def test_extract_validation_errors_empty(self) -> None:
-        """extract_validation_errors should return empty list when no errors."""
+    def test_extract_validation_errors_message_only(self) -> None:
+        """A message-only error yields one ``blueprint_validation`` residual — the structured-info invariant is total.
+
+        A parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator) carries no
+        categorized data, but the builder's last-resort ``fallback_message`` residual still emits
+        one item so the CLI's ``validation_errors[]`` is never empty on an invalid verdict.
+        """
         exc = ValidateBundleError(message="no details")
         result = extract_validation_errors(exc)
-        assert result == []
+        assert result == [{"category": "blueprint_validation", "message": "no details"}]
 
     # -------------------------------------------------------------------------
     # _build_error_source tests
