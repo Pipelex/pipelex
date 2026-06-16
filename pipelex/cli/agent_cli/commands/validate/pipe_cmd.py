@@ -84,11 +84,16 @@ def validate_pipe_cmd(
             agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
         except ValidateBundleError as exc:
-            validation_errors = extract_validation_errors(exc)
-            validate_all_extra: dict[str, Any] = {"validation_errors": validation_errors}
-            if exc.dry_run_error_message:
-                validate_all_extra["dry_run_error"] = exc.dry_run_error_message
-            agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **validate_all_extra)
+            # Invalid verdict: structured failure envelope. validation_errors[] is the shared builder's
+            # output (a residual dry-run failure rides one dry_run item). `validate all` makes no
+            # runnability claim, so there is no signature gate — signatures never reach this arm.
+            agent_error(
+                exc.message,
+                error_type="ValidateBundleError",
+                cause=exc,
+                is_valid=False,
+                validation_errors=extract_validation_errors(exc),
+            )
 
         except PipeOperatorModelChoiceError as exc:
             agent_error(
@@ -161,11 +166,15 @@ def validate_pipe_cmd(
         agent_error(error_message, error_type="PipeNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict (see the --all arm): structured failure envelope; validation_errors[] is the
+        # shared builder's output (a residual dry-run failure rides one dry_run item).
+        agent_error(
+            exc.message,
+            error_type="ValidateBundleError",
+            cause=exc,
+            is_valid=False,
+            validation_errors=extract_validation_errors(exc),
+        )
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

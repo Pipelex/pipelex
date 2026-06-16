@@ -12,6 +12,7 @@ nowhere. Primary-blueprint selection (`bundle_blueprint`) goes through
 """
 
 from collections.abc import Sequence
+from typing import Literal
 
 from mthds.protocol.models import ValidationReport
 from pydantic import Field
@@ -33,6 +34,11 @@ class PipelexValidationReport(ValidationReport):
     (the parsed form of `.mthds` content), so the field is `bundle_blueprint` — no
     `pipelex_` prefix inside this already-Pipelex-branded envelope.
     """
+
+    is_valid: Literal[True] = True
+    """Always `True` on this report — the discriminant of the valid arm of the HTTP response
+    union (mirrored by pipelex-api's `InvalidReport` `Literal[False]`). Self-describing, sits
+    beside `is_runnable`: a sound bundle may still be not-yet-runnable (pending signatures)."""
 
     bundle_blueprint: PipelexBundleBlueprint
     """The batch's primary blueprint: first declaring `main_pipe`, else first."""

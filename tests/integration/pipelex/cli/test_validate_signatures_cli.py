@@ -97,32 +97,29 @@ class TestValidateSignaturesCli:
         # Orphan signature (no caller): strict --all should still succeed since signatures are filtered out.
         do_validate_all_libraries_and_dry_run(library_dirs=[orphan_signature_dir])
 
-    def test_validate_all_strict_fails_with_caller_of_signature(self, signature_caller_dir: Path) -> None:
-        # Non-signature pipe reaching a signature: strict --all must wrap SignaturesNotAllowedError
-        # as a friendly typer.Exit(1) (consistent with the bundle/pipe paths), not bubble a raw
-        # traceback to the user.
-        with pytest.raises(typer.Exit) as exc_info:
-            do_validate_all_libraries_and_dry_run(library_dirs=[signature_caller_dir])
-        assert exc_info.value.exit_code == 1
+    def test_validate_all_strict_default_passes_with_caller_of_signature(self, signature_caller_dir: Path) -> None:
+        # Signatures are never an error (D-B): `validate --all` makes no library-wide runnability claim
+        # (it does not compute pending_signatures), so a non-signature pipe reaching a signature is swept
+        # (the signature sub-pipe mints a mock during the dry run) and the sweep completes — no gate, no raise.
+        do_validate_all_libraries_and_dry_run(library_dirs=[signature_caller_dir])
 
     def test_validate_all_allow_signatures_passes(self, signature_caller_dir: Path) -> None:
         # Lenient mode: --all succeeds even when a non-signature pipe reaches a signature.
         do_validate_all_libraries_and_dry_run(library_dirs=[signature_caller_dir], allow_signatures=True)
 
-    def test_validate_pipe_strict_default_fails_with_friendly_exit(
+    def test_validate_pipe_strict_default_passes_with_caller_of_signature(
         self,
         signature_caller_dir: Path,
     ) -> None:
-        # Regression (issue 6 / greptile): single-pipe validation must wrap SignaturesNotAllowedError
-        # as typer.Exit(1) with a Rich error message, not bubble a raw traceback to the user.
-        with pytest.raises(typer.Exit) as exc_info:
-            asyncio.run(
-                _validate_pipe_or_bundle(
-                    pipe_code="sigcli_caller.caller_seq",
-                    library_dirs=[signature_caller_dir],
-                )
+        # Signatures are never an error (D-B): single-pipe validation reaching a signature dry-runs
+        # trivially (the signature sub-pipe mints a mock) and completes — `validate pipe` makes no
+        # runnability claim, so there is no gate and no raise.
+        asyncio.run(
+            _validate_pipe_or_bundle(
+                pipe_code="sigcli_caller.caller_seq",
+                library_dirs=[signature_caller_dir],
             )
-        assert exc_info.value.exit_code == 1
+        )
 
     def test_validate_pipe_allow_signatures_passes(
         self,

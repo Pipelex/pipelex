@@ -107,10 +107,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # Validation errors
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
-    "SignaturesNotAllowedError": (
-        "This pipeline reaches a PipeSignature placeholder that has no implementation. Replace each signature with a real "
-        "pipe, or re-run with --allow-signatures to validate the partial pipeline."
-    ),
     # Execution errors
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
@@ -161,8 +157,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
-    # SignaturesNotAllowedError intentionally absent: it carries a class-level error_domain = INPUT,
-    # so the report is its single source of truth (enforced by test_agent_output_drift).
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
@@ -417,7 +411,10 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
     plain dict with unset fields dropped (``exclude_none``), matching the
     machine-first agent-CLI envelope; the entries carry ``category``,
     ``error_type``, ``message``, and whatever identity / ``source`` fields the
-    underlying error populated.
+    underlying error populated. A residual dry-run failure (no structured
+    locator) is projected as one ``dry_run``-category item by the shared builder,
+    so the envelope's ``validation_errors[]`` is non-empty on every invalid
+    verdict (the structured-info invariant) — never a bare message.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
@@ -429,5 +426,6 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
         blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
         factory_errors=exc.pipe_factory_errors,
         pipe_validation_errors=exc.pipe_validation_error_data,
+        dry_run_error_message=exc.dry_run_error_message,
     )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]

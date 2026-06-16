@@ -25,6 +25,7 @@ def build_validation_error_items(
     blueprint_errors: list[PipelexBundleBlueprintValidationErrorData],
     factory_errors: list[PipeFactoryErrorData],
     pipe_validation_errors: list[PipesAndConceptValidationErrorData],
+    dry_run_error_message: str | None = None,
 ) -> list[ValidationErrorItem]:
     """Flatten a bundle-validation error's categorized lists into typed items.
 
@@ -36,14 +37,25 @@ def build_validation_error_items(
     underlying error-data model carries it, so a consumer can map each error to
     its owning file.
 
+    The ``dry_run`` residual is the structured-info invariant's safety net: a
+    dry-run failure (``DryRunError`` / ``PipeRunError``) surfaces only a single
+    message, not per-error data with identity fields. When it is the *only*
+    failure channel (no categorized error has data), it becomes one
+    :class:`ValidationErrorCategory.DRY_RUN` item carrying that message — so an
+    invalid verdict never rides a bare ``detail`` with an empty
+    ``validation_errors[]``. It is graph-level, so it carries no ``source``.
+
     Args:
         blueprint_errors: Interpreter / blueprint-validation error data.
         factory_errors: Pipe-factory error data (e.g. a missing concept).
         pipe_validation_errors: Pipe/concept validation error data.
+        dry_run_error_message: The residual dry-run failure message, if any. Only
+            projected as a ``dry_run`` item when no categorized error has data.
 
     Returns:
         One :class:`ValidationErrorItem` per underlying error, in the order
-        blueprint → factory → pipe/concept validation.
+        blueprint → factory → pipe/concept validation, then the ``dry_run``
+        residual when it is the sole failure channel.
     """
     items: list[ValidationErrorItem] = []
 
@@ -87,6 +99,18 @@ def build_validation_error_items(
                 field_name=pipe_error.field_name,
                 variable_names=pipe_error.variable_names or None,
                 message=pipe_error.message,
+            )
+        )
+
+    # The dry-run residual is the structured-info safety net: emit it only when no categorized
+    # error carries data, so an invalid verdict driven solely by a dry-run failure still surfaces
+    # a non-empty validation_errors[] instead of a bare detail. Graph-level → no source.
+    if not items and dry_run_error_message:
+        items.append(
+            ValidationErrorItem(
+                category=ValidationErrorCategory.DRY_RUN,
+                error_type="DryRunError",
+                message=dry_run_error_message,
             )
         )
 

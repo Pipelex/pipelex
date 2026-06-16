@@ -5,7 +5,6 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 
 
@@ -78,8 +77,11 @@ class ValidateBundleError(PipelexError):
     - Pipe factory errors (from PipeFactoryError exceptions, e.g., missing concepts)
     - Pipe validation errors (from PipeValidationError exceptions)
     - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
-    - Dry run errors
-    - Signature pre-check errors (strict-mode validation refused due to PipeSignature placeholders)
+    - Dry run errors (the residual message, projected as one ``dry_run`` item by the shared builder)
+
+    Signatures are **never** an error (D-B): an unimplemented ``PipeSignature`` reached during
+    validation is a runnability fact (reported library-wide via the report's ``pending_signatures``
+    + ``is_runnable``), not a validation failure — so this error no longer carries a signature channel.
 
     All errors are categorized and stored in their respective lists.
     """
@@ -101,7 +103,6 @@ class ValidateBundleError(PipelexError):
         pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
-        signature_check_error: SignaturesNotAllowedError | None = None,
     ):
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
         self.pipe_factory_errors = pipe_factory_errors or []
@@ -112,9 +113,6 @@ class ValidateBundleError(PipelexError):
         self.pipe_concept_instantiation_errors = pipe_concept_instantiation_errors or []
 
         self.dry_run_error_message = dry_run_error_message
-
-        # Signature pre-check error (strict-mode validation refused due to PipeSignature placeholders)
-        self.signature_check_error = signature_check_error
 
         super().__init__(message)
 
@@ -141,18 +139,19 @@ class ValidateBundleError(PipelexError):
 
         The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe
         validation **plus** pipe/concept instantiation errors) so the
-        instantiation category is not silently dropped from the wire. The two
-        non-categorized failure channels — ``dry_run_error_message`` and
-        ``signature_check_error`` — are deliberately *not* projected as
-        ``ValidationErrorItem``s: they are single messages, not per-error data
-        with identity fields, so they ride the report's human-readable
-        ``message`` (the 7807 ``detail``) instead.
+        instantiation category is not silently dropped from the wire. The
+        ``dry_run_error_message`` channel is a single message, not per-error data
+        with identity fields, so the shared builder projects it as one
+        ``dry_run``-category item **only** when no categorized error has data —
+        the structured-info invariant, so an invalid verdict never rides a bare
+        ``detail`` with an empty ``validation_errors[]``.
         """
         report = super().to_error_report()
         validation_error_items = build_validation_error_items(
             blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
             factory_errors=self.pipe_factory_errors,
             pipe_validation_errors=self.pipe_validation_error_data,
+            dry_run_error_message=self.dry_run_error_message,
         )
         return report.model_copy(update={"validation_errors": validation_error_items or None})
 

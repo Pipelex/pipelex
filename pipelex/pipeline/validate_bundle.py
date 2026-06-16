@@ -36,7 +36,6 @@ from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 
@@ -105,9 +104,9 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
     ``PipeFactoryError`` carries the categorized factory error, etc. Sharing one
     source of truth means a new handler only needs to be added once. The
     pipe-loading / dry-run handlers (``PipeFactoryError``, ``PipeValidationError``,
-    ``PipeRunError``, ``DryRunError``, ``SignaturesNotAllowedError``) are dead code
-    in the concepts-only paths (those functions never instantiate pipes or run dry
-    runs), but they are harmless there — they simply never fire.
+    ``PipeRunError``, ``DryRunError``) are dead code in the concepts-only paths
+    (those functions never instantiate pipes or run dry runs), but they are
+    harmless there — they simply never fire.
 
     ``category`` controls the user-facing framing for the one branch that fires
     from both paths: the ``except ValidationError`` arm catches pydantic
@@ -192,14 +191,6 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-    except SignaturesNotAllowedError as sig_error:
-        # Strict-mode dry-run refused because the dependency graph reaches a
-        # ``PipeSignature`` placeholder. Carry the error so the CLI can render the
-        # offending signatures and the dependency chains that reach them.
-        raise ValidateBundleError(
-            message=str(sig_error),
-            signature_check_error=sig_error,
-        ) from sig_error
 
 
 def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
@@ -244,11 +235,15 @@ async def validate_bundle(
         ]
     )
     if provided_params == 0:
+        # Programmer error: a caller (the HTTP request layer, a builder op) must wire exactly one
+        # input. It is not a content verdict the end user can fix → PipelexUnexpectedError (→ 500,
+        # redacted under STRICT), matching the mthds_sources-mismatch guard below — never a
+        # ValidateBundleError, which would 200/422 a host-wiring bug as if the bundle were invalid.
         msg = "At least one of mthds_contents or mthds_file_path must be provided to validate_bundle"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if provided_params > 1:
         msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if mthds_contents is not None and not mthds_contents:
         # An EMPTY list is not None, so it passes the provided-params check above — without this
         # guard it would yield a blueprint-less result that downstream consumers (the canonical
@@ -416,11 +411,13 @@ def load_concepts_only(
     """
     provided_params = sum([mthds_contents is not None, mthds_file_path is not None])
     if provided_params == 0:
+        # Programmer error (see validate_bundle's twin guard): the caller must wire exactly one
+        # input. Not a content verdict → PipelexUnexpectedError (→ 500), never ValidateBundleError.
         msg = "At least one of mthds_contents or mthds_file_path must be provided to load_concepts_only"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if provided_params > 1:
         msg = "Only one of mthds_contents or mthds_file_path can be provided to load_concepts_only, not both"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()

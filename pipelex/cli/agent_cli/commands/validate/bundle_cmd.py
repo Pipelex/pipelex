@@ -208,6 +208,14 @@ def validate_bundle_cmd(
 
         agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
+        # Gate-from-report (D-B consumer-decides): the bundle is valid, but unsatisfied PipeSignature
+        # placeholders make it NOT runnable. The success envelope (carrying pending_signatures +
+        # is_runnable) is already emitted above; the exit code — not a fabricated error item — reflects
+        # the gate. --allow-signatures tolerates the placeholders (exit 0). Re-raised by the
+        # `except typer.Exit` arm below so teardown still runs.
+        if not allow_signatures and not result.get("is_runnable", True):
+            raise typer.Exit(1)
+
     except PipeNotFoundError as exc:
         agent_error(str(exc), error_type="PipeNotFoundError", cause=exc)
 
@@ -215,11 +223,18 @@ def validate_bundle_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict: emit the structured failure envelope. validation_errors[] is the shared
+        # builder's output — non-empty on every invalid verdict (a residual dry-run failure rides one
+        # dry_run item, not a separate field). is_valid:false is the discriminant mirroring the success
+        # envelope; signatures never reach here (they are a runnability fact, gated above).
+        agent_error(
+            exc.message,
+            error_type="ValidateBundleError",
+            cause=exc,
+            is_valid=False,
+            bundle_path=str(bundle_path),
+            validation_errors=extract_validation_errors(exc),
+        )
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

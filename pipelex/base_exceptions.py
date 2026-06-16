@@ -253,13 +253,17 @@ class ValidationErrorCategory(StrEnum):
 
     Mirrors the categorized error-data lists aggregated by ``ValidateBundleError``:
     blueprint validation (from the interpreter), pipe-factory failures (e.g. a
-    missing concept), and pipe/concept validation (e.g. a missing input variable
-    or a type mismatch).
+    missing concept), pipe/concept validation (e.g. a missing input variable
+    or a type mismatch), and the ``dry_run`` residual — a dry-run failure with no
+    structured locator (graph-level), carried as a single message-only item so an
+    invalid verdict always surfaces a non-empty ``validation_errors[]`` (the
+    structured-info invariant) instead of a bare ``detail``.
     """
 
     BLUEPRINT_VALIDATION = "blueprint_validation"
     PIPE_FACTORY = "pipe_factory"
     PIPE_VALIDATION = "pipe_validation"
+    DRY_RUN = "dry_run"
 
 
 class ValidationErrorItem(BaseModel):

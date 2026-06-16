@@ -59,6 +59,8 @@ class TestBuildValidationReport:
             pending_signatures=["beta.still_pending"],
         )
 
+        # is_valid is the always-True discriminant of the valid arm of the HTTP response union.
+        assert report.is_valid is True
         # Primary selection: the first blueprint declaring main_pipe wins, not the first in the batch.
         assert report.bundle_blueprint is blueprints[1]
         assert report.pipe_io_contracts == pipe_io_contracts

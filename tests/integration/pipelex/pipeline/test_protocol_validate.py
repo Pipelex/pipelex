@@ -204,13 +204,19 @@ class TestProtocolValidate:
         with pytest.raises(ValidateBundleError, match="must not be empty"):
             await runner.validate(mthds_contents=[])
 
-    async def test_strict_mode_raises_on_unsatisfied_signature(self, load_empty_library: Callable[[], str]) -> None:
-        """With the strict default (``allow_signatures=False``), an unsatisfied signature raises instead of reporting."""
+    async def test_strict_mode_reports_unsatisfied_signature(self, load_empty_library: Callable[[], str]) -> None:
+        """Signatures are never an error (D-B): with the strict default (``allow_signatures=False``) an
+        unsatisfied signature is reported as pending — not yet runnable — exactly as the lenient path
+        does (strict ≡ lenient in the report body). The "is this a failure?" decision moves to the consumer.
+        """
         load_empty_library()
         try:
             runner = PipelexMTHDSProtocol()
-            with pytest.raises(ValidateBundleError):
-                await runner.validate(mthds_contents=_signature_only_contents())
+            report = await runner.validate(mthds_contents=_signature_only_contents())
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.pending_signatures == ["research.find_key_findings"]
+            assert report.is_runnable is False
         finally:
             clear_current_library()
 

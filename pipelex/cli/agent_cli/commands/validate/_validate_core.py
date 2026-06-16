@@ -47,8 +47,11 @@ async def validate_all_core(
 
     # No `pending_signatures` here by design — see validate_all in builder/operations/validate_ops.py:
     # it is a per-bundle top-down-build nudge surfaced only by `validate bundle`, not the whole-library sweep.
+    # No `is_runnable` either (it derives from pending_signatures), so `validate all` makes no runnability
+    # claim and has no signature gate — it reaches this success return iff no real validation error fired.
     return {
         "success": True,
+        "is_valid": True,
         "validated_pipes": build_validated_pipes(dry_run_results),
         "total_pipes": len(dry_run_results),
     }
@@ -86,6 +89,7 @@ async def validate_bundle_core(
     # successful lenient (--allow-signatures) run.
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
@@ -131,6 +135,7 @@ async def validate_pipe_core(
 
         return {
             "success": True,
+            "is_valid": True,
             "validated_pipes": build_validated_pipes(dry_run_results),
             "total_pipes": len(dry_run_results),
         }
@@ -188,6 +193,7 @@ async def validate_pipe_in_bundle_core(
     # library-wide set of still-unimplemented forward declarations.
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),

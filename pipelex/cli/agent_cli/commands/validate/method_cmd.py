@@ -101,15 +101,27 @@ def validate_method_cmd(
 
         agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
+        # Gate-from-report (D-B consumer-decides): valid but NOT runnable when unsatisfied PipeSignature
+        # placeholders remain. The success envelope (with pending_signatures + is_runnable) is emitted
+        # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by the
+        # `except typer.Exit` arm below so teardown still runs.
+        if not allow_signatures and not result.get("is_runnable", True):
+            raise typer.Exit(1)
+
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict (see bundle_cmd): structured failure envelope; validation_errors[] is the
+        # shared builder's output (a residual dry-run failure rides one dry_run item).
+        agent_error(
+            exc.message,
+            error_type="ValidateBundleError",
+            cause=exc,
+            is_valid=False,
+            bundle_path=str(bundle_path),
+            validation_errors=extract_validation_errors(exc),
+        )
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
@@ -131,6 +143,11 @@ def validate_method_cmd(
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+
+    except typer.Exit:
+        # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
+        # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
+        raise
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.

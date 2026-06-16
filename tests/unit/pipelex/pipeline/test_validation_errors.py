@@ -119,6 +119,47 @@ class TestBuildValidationErrorItems:
         """A ValidateBundleError with no categorized lists builds an empty list."""
         assert _build_items(ValidateBundleError(message="no details")) == []
 
+    def test_dry_run_residual_becomes_single_dry_run_item(self) -> None:
+        """A residual dry-run failure (no categorized data) yields one ``dry_run`` item — the structured-info invariant.
+
+        This is the case that previously produced a bare-message error with an empty
+        ``validation_errors[]``; it now carries the message as a ``dry_run``-category item.
+        It is graph-level, so it has no ``source``.
+        """
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[],
+            dry_run_error_message="Dry run failed: residual error",
+        )
+        assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN]
+        assert items[0].message == "Dry run failed: residual error"
+        assert items[0].error_type == "DryRunError"
+        assert items[0].source is None
+
+    def test_dry_run_residual_suppressed_when_categorized_data_present(self) -> None:
+        """When a categorized error carries data, the dry-run residual is NOT added — the categorized items win."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[
+                PipeFactoryErrorData(
+                    error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
+                    pipe_code="pipe_x",
+                    missing_concept_code="Foo",
+                    message="concept Foo not found",
+                ),
+            ],
+            pipe_validation_errors=[],
+            dry_run_error_message="should be ignored",
+        )
+        assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
+
+    def test_to_error_report_projects_dry_run_residual(self) -> None:
+        """A ``ValidateBundleError`` carrying only ``dry_run_error_message`` surfaces one ``dry_run`` item on the report."""
+        report = ValidateBundleError(message="Dry run failed", dry_run_error_message="Dry run failed: residual error").to_error_report()
+        assert report.validation_errors is not None
+        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.DRY_RUN]
+
     def test_empty_collections_collapse_to_none(self) -> None:
         """An empty ``declared_concepts`` / ``variable_names`` becomes ``None`` so it drops from the wire."""
         exc = ValidateBundleError(

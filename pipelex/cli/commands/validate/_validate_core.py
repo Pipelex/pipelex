@@ -12,7 +12,6 @@ from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
-    handle_signatures_not_allowed_error,
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -27,7 +26,6 @@ from pipelex.hub import (
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.bundle_validator import BundleValidator
@@ -86,10 +84,6 @@ def do_validate_all_libraries_and_dry_run(
             asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
             signature_count = sum(1 for pipe in pipes if pipe.is_signature)
             typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
-    except SignaturesNotAllowedError as sig_error:
-        # A non-signature pipe in the library reaches a PipeSignature. Render it as a friendly
-        # CLI error (matching the bundle/pipe paths) instead of bubbling a raw traceback.
-        handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelChoiceError as exc:
@@ -111,6 +105,18 @@ async def _validate_pipe_or_bundle(
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
+            # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
+            # bundle with unsatisfied PipeSignature placeholders is valid yet NOT runnable. The CLI
+            # exits non-zero on `not is_runnable` unless --allow-signatures tolerates the placeholders.
+            if bundle_result.pending_signatures and not allow_signatures:
+                pending = ", ".join(bundle_result.pending_signatures)
+                typer.secho(
+                    f"Bundle '{bundle_path}' is valid but NOT yet runnable — unimplemented PipeSignature placeholder(s): {pending}\n"
+                    "Implement them, or re-run with --allow-signatures to accept placeholders.",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
             signature_count = sum(1 for pipe in bundle_result.pipes if pipe.is_signature)
             typer.secho(
                 f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count)}",
@@ -137,14 +143,14 @@ async def _validate_pipe_or_bundle(
 
         pipe = get_required_pipe(pipe_code=pipe_code)
         typer.echo(f"Validating pipe '{pipe_code}'...")
-        try:
-            await BundleValidator().validate_pipes(
-                pipes=[pipe],
-                library_id=library_id,
-                allow_signatures=allow_signatures,
-            )
-        except SignaturesNotAllowedError as sig_error:
-            handle_signatures_not_allowed_error(sig_error, context=ErrorContext.VALIDATION)
+        # Signatures are never an error (D-B): a single-pipe validation reaching a PipeSignature
+        # dry-runs trivially (the placeholder mints a mock). validate pipe makes no library-wide
+        # runnability claim — pending_signatures is a bundle-surface fact — so there is no gate here.
+        await BundleValidator().validate_pipes(
+            pipes=[pipe],
+            library_id=library_id,
+            allow_signatures=allow_signatures,
+        )
         signature_count = len(collect_signature_refs(pipe=pipe))
         typer.secho(
             f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
