@@ -71,6 +71,13 @@ class PersonWithImageTuple(StructuredContent):
     before_after: tuple[ImageContent, ImageContent]
 
 
+class GalleryWithImageDict(StructuredContent):
+    """A gallery with a dict of images."""
+
+    title: TextContent
+    photos_by_role: dict[str, ImageContent]
+
+
 class PhotoAlbumItem(StructuredContent):
     """An item in a photo album with nested image."""
 
@@ -133,6 +140,13 @@ class GalleryWithListContent(StructuredContent):
     album_list: ListContent[PhotoAlbumItem]
 
 
+class GalleryWithImageListContent(StructuredContent):
+    """A gallery using ListContent to hold images directly."""
+
+    title: TextContent
+    photos: ListContent[ImageContent]
+
+
 class TestData:
     """Test data for find_nested_image_fields_in_structure_class tests."""
 
@@ -164,10 +178,14 @@ class TestData:
         ("GalleryWithImageList", ["photos"]),
         # Tuple of images
         ("PersonWithImageTuple", ["before_after"]),
+        # Dict of images
+        ("GalleryWithImageDict", ["photos_by_role"]),
         # List with nested images in items
         ("PhotoAlbumWithNestedImages", ["album_items"]),
         # Complex deeply nested structure
         ("ComplexNestedGallery", ["gallery_entries"]),
         # ListContent with nested images
         ("GalleryWithListContent", ["album_list"]),
+        # ListContent with direct images
+        ("GalleryWithImageListContent", ["photos"]),
     ]

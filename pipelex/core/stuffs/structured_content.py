@@ -8,6 +8,8 @@ from rich.table import Table
 from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
@@ -143,7 +145,10 @@ class StructuredContent(StuffContent):
                 continue
             rendered = self._render_value_with_images(field_value, registry, text_format)
             if rendered:
-                parts.append(f"{field_name}: {rendered}")
+                if self._is_image_collection_value(field_value):
+                    parts.append(rendered)
+                else:
+                    parts.append(f"{field_name}: {rendered}")
         return "\n".join(parts)
 
     def _render_value_with_images(
@@ -185,6 +190,38 @@ class StructuredContent(StuffContent):
         if isinstance(value, StuffContent):
             return value.rendered_for_prompt(text_format)
         return str(value)
+
+    def _is_image_collection_value(self, value: Any) -> bool:
+        """Return True for image collections where names should be omitted."""
+        if isinstance(value, (list, tuple)):
+            sequence = cast("list[Any]", value)
+            return bool(sequence) and all(self._is_image_only_value(item) for item in sequence)
+        if isinstance(value, dict):
+            dict_value = cast("dict[str, Any]", value)
+            return bool(dict_value) and all(self._is_image_only_value(item) for item in dict_value.values())
+        if isinstance(value, ListContent):
+            list_content = cast("ListContent[Any]", value)
+            items = list_content.items
+            return bool(items) and all(self._is_image_only_value(item) for item in items)
+        return False
+
+    def _is_image_only_value(self, value: Any) -> bool:
+        """Return True when a value is an image or nested image-only structure."""
+        if value is None:
+            return False
+        if isinstance(value, ImageContent):
+            return True
+        if isinstance(value, (list, tuple)):
+            sequence = cast("list[Any]", value)
+            return bool(sequence) and all(self._is_image_only_value(item) for item in sequence)
+        if isinstance(value, dict):
+            dict_value = cast("dict[str, Any]", value)
+            return bool(dict_value) and all(self._is_image_only_value(item) for item in dict_value.values())
+        if isinstance(value, ListContent):
+            list_content = cast("ListContent[Any]", value)
+            items = list_content.items
+            return bool(items) and all(self._is_image_only_value(item) for item in items)
+        return False
 
     # -------------------------------------------------------------------------
     # Pretty printing

@@ -5,6 +5,8 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.image_field_search import check_generic_container_for_images
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
@@ -48,6 +50,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
         ("PersonWithOptionalImage", "A person with optional image", "PersonWithOptionalImage", None),
         ("GalleryWithImageList", "A gallery with a list of images", "GalleryWithImageList", None),
         ("PersonWithImageTuple", "A person with a tuple of images", "PersonWithImageTuple", None),
+        ("GalleryWithImageDict", "A gallery with a dict of images", "GalleryWithImageDict", None),
         ("PhotoAlbumItem", "An item in a photo album", "PhotoAlbumItem", None),
         ("PhotoAlbumWithNestedImages", "A photo album with nested images in list items", "PhotoAlbumWithNestedImages", None),
         ("MediaFrame", "A frame containing an image", "MediaFrame", None),
@@ -55,6 +58,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
         ("MediaCollection", "A collection with sections and thumbnails", "MediaCollection", None),
         ("ComplexNestedGallery", "A deeply nested gallery structure", "ComplexNestedGallery", None),
         ("GalleryWithListContent", "A gallery using ListContent", "GalleryWithListContent", None),
+        ("GalleryWithImageListContent", "A gallery using ListContent with direct images", "GalleryWithImageListContent", None),
     ]
 
     # Create and register concepts
@@ -145,3 +149,20 @@ class TestConceptFindImageFieldPaths:
 
         # Assert - should find the images field which is list[ImageContent] | None
         assert image_paths == ["images"]
+
+    @pytest.mark.parametrize(
+        "container_type",
+        [
+            list[ImageContent | None],
+            tuple[ImageContent | None, ...],
+            dict[str, ImageContent | None],
+            dict[str, data.PhotoAlbumItem | None],
+        ],
+    )
+    def test_check_generic_container_for_images_supports_optional_item_types(self, container_type: object):
+        """Optional image-bearing items inside containers should still be discoverable."""
+        assert check_generic_container_for_images(container_type)
+
+    def test_check_generic_container_for_images_ignores_dict_key_annotations(self):
+        """Dict key annotations are metadata and should not count as prompt images."""
+        assert not check_generic_container_for_images(dict[data.PhotoAlbumItem, str])
