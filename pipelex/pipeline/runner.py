@@ -345,9 +345,12 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         verdict — `pending_signatures` (qualified refs of pipes still declared
         as `PipeSignature` in the assembled library) plus
         `is_runnable = not pending_signatures`, the same convention as the
-        agent-CLI / builder validate envelopes. The verdict only matters on the
-        lenient `allow_signatures=True` path: in strict mode an unsatisfied
-        signature makes `validate_bundle` raise instead.
+        agent-CLI / builder validate envelopes. Signatures are never a validation
+        error (D-B): strict and lenient return the same report body — `allow_signatures`
+        only controls whether signature pipes are mock-run and listed in
+        `validated_pipes`, not the verdict. The "is an unsatisfied signature a
+        failure?" decision is the consumer's (the CLI gates its exit code on
+        `is_runnable`; this protocol method just reports it).
 
         `graph_spec` is best-effort: when the batch declares a `main_pipe`
         (primary-selection rule: first blueprint declaring one), it is dry-run

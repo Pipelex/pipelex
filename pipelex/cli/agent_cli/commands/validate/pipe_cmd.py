@@ -83,10 +83,18 @@ def validate_pipe_cmd(
             result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
             agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
+            # Gate-from-report (D-B consumer-decides): `validate all` is strict by default — the
+            # library is valid but NOT runnable while unsatisfied PipeSignature placeholders remain.
+            # The success envelope (carrying library-wide pending_signatures + is_runnable) is emitted
+            # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by
+            # the `except typer.Exit` arm below so teardown still runs.
+            if not allow_signatures and not result.get("is_runnable", True):
+                raise typer.Exit(1)
+
         except ValidateBundleError as exc:
             # Invalid verdict: structured failure envelope. validation_errors[] is the shared builder's
-            # output (a residual dry-run failure rides one dry_run item). `validate all` makes no
-            # runnability claim, so there is no signature gate — signatures never reach this arm.
+            # output (a residual dry-run failure rides one dry_run item). Signatures are a runnability
+            # fact (pending_signatures + the gate above), not an error, so they never reach this arm.
             agent_error(
                 exc.message,
                 error_type="ValidateBundleError",
@@ -113,6 +121,11 @@ def validate_pipe_cmd(
                 pipe_code=exc.pipe_code,
                 model_handle=exc.model_handle,
             )
+
+        except typer.Exit:
+            # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
+            # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
+            raise
 
         except Exception as exc:  # noqa: BLE001
             # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.

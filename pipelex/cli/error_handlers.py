@@ -314,12 +314,6 @@ def _display_validation_error_details(console: Console, *, exc: ValidateBundleEr
     if exc.dry_run_error_message:
         console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
         console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Replace each placeholder with a real implementation, or re-run with [cyan]--allow-signatures[/cyan]."
-    )
-    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
 
 
 def handle_validate_bundle_error(exc: ValidateBundleError, *, bundle_path: Path | None = None) -> NoReturn:

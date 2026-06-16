@@ -202,7 +202,10 @@ class TestErrorHandlersExtended:
         assert "Pipe Validation Errors:" not in output
         assert "Dry Run Error:" not in output
         assert "💡 Tip:" in output
-        assert "--allow-signatures" in output
+        # A non-signature bundle error must NOT advertise the signature opt-out: signatures are a
+        # runnability fact reported via pending_signatures, not a ValidateBundleError (the old
+        # signature-specific tip used to leak here from the deleted handle_signatures_not_allowed_error).
+        assert "--allow-signatures" not in output
 
     def test_handle_telemetry_config_validation_error(self, console: Console) -> None:
         """The telemetry handler explains the format migration."""

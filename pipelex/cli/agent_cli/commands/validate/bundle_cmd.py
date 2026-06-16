@@ -213,7 +213,12 @@ def validate_bundle_cmd(
         # is_runnable) is already emitted above; the exit code — not a fabricated error item — reflects
         # the gate. --allow-signatures tolerates the placeholders (exit 0). Re-raised by the
         # `except typer.Exit` arm below so teardown still runs.
-        if not allow_signatures and not result.get("is_runnable", True):
+        #
+        # Only the whole-bundle path gates: with --pipe, `result` is the slice envelope whose
+        # is_runnable derives from LIBRARY-WIDE pending_signatures, so gating there would fail a
+        # fully-implemented slice for unrelated placeholders elsewhere in the bundle. The slice makes
+        # no library-wide runnability claim (mirroring `validate pipe`), so it is not gated.
+        if not pipe and not allow_signatures and not result.get("is_runnable", True):
             raise typer.Exit(1)
 
     except PipeNotFoundError as exc:

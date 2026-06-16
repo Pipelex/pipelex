@@ -20,8 +20,8 @@ Signatures let an agent (or a human author) build a complete, dry-runnable bundl
 
 | Mode | Behavior |
 | ---- | -------- |
-| **Strict validation** (default) | A pipeline that reaches a signature through its dependency graph is rejected with a `SignaturesNotAllowedError`. The error names every reachable signature plus the controller chain that leads to it. |
-| **Lenient validation** (`--allow-signatures`) | Signatures are accepted. During dry-run, each signature mints a mock `Stuff` matching its declared `output` (including multiplicity). |
+| **Strict validation** (default) | Signatures are never a validation error: the bundle is valid, but a pipeline that reaches an unimplemented signature is reported as NOT yet runnable. The validation report lists the outstanding placeholders in `pending_signatures` and sets `is_runnable: false`; `validate` / `validate --all` / `validate bundle` / `validate method` then exit non-zero on that verdict (the runnability gate). In strict mode signature pipes are excluded from the dry-run sweep (not mock-run). |
+| **Lenient validation** (`--allow-signatures`) | The verdict is unchanged (`pending_signatures` / `is_runnable` are still reported), but the runnability gate is tolerated (exit 0) and signature pipes are mock-run during the sweep — each mints a mock `Stuff` matching its declared `output`, multiplicity included. |
 | **Live execution** | Running a pipeline that hits a signature raises `PipeSignatureNotExecutableError` — a signature has no implementation to execute. |
 
 ## MTHDS Parameters

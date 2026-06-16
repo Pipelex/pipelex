@@ -105,7 +105,12 @@ def validate_method_cmd(
         # placeholders remain. The success envelope (with pending_signatures + is_runnable) is emitted
         # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by the
         # `except typer.Exit` arm below so teardown still runs.
-        if not allow_signatures and not result.get("is_runnable", True):
+        #
+        # Only the whole-method path gates: with --pipe, `result` is the slice envelope whose
+        # is_runnable derives from LIBRARY-WIDE pending_signatures, so gating there would fail a
+        # fully-implemented slice for unrelated placeholders. The slice makes no library-wide
+        # runnability claim (mirroring `validate pipe`), so it is not gated.
+        if not pipe and not allow_signatures and not result.get("is_runnable", True):
             raise typer.Exit(1)
 
     except FileNotFoundError as exc:

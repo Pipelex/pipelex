@@ -199,8 +199,8 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
     Returns every loaded pipe when ``dry_run_pipe_codes`` is ``None`` (whole-bundle validation).
     Otherwise returns only the pipes whose bare ``code`` or qualified ``pipe_ref`` is requested —
     used by the ``--pipe`` path to validate a single implemented slice of a partially stubbed
-    bundle without dry-running (and thus rejecting) unrelated pipes or signatures. Filtering here,
-    before ``BundleValidator.validate_pipes``, also narrows its strict signature pre-check to just the selected pipe.
+    bundle without dry-running unrelated pipes. Filtering here, before ``BundleValidator.validate_pipes``,
+    narrows the dry-run sweep to just the selected pipe (signatures are never an error either way — D-B).
 
     Raises:
         PipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded bundle —

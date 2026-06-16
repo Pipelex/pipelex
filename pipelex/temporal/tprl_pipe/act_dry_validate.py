@@ -104,9 +104,10 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     """Run the validation sweep + the in-memory graph dry-run against one library, in-process.
 
     Raises (crossing as structured ``ErrorReport``s via ``convert_pipelex_errors``):
-        ValidateBundleError: any validation failure — blueprint/factory/wiring errors, unexpected
-            dry-run pipe failures, strict-mode signature refusals (the same categorized cascade
-            the direct-mode route surfaces).
+        ValidateBundleError: any validation failure — blueprint/factory/wiring errors and unexpected
+            dry-run pipe failures (the same categorized cascade the direct-mode route surfaces).
+            Signatures are NOT a failure (D-B): an unsatisfied ``PipeSignature`` rides the result's
+            ``pending_signatures`` / ``is_runnable``, it does not raise.
         PipeIOContractError: a JSON-Schema rendering failure while building `pipe_io_contracts`
             (non-retryable at the workflow tier, like ValidateBundleError — deterministic).
         PipelexError: non-validation failures (config, library, tracing infra).
