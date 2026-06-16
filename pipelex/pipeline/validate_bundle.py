@@ -232,7 +232,7 @@ async def validate_bundle(
     mthds_file_path: Path | None = None,
     *,
     mthds_contents: list[str] | None = None,
-    mthds_names: list[str] | None = None,
+    mthds_sources: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
@@ -255,15 +255,15 @@ async def validate_bundle(
         # report's primary-blueprint selection) cannot represent.
         msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
         raise ValidateBundleError(message=msg)
-    if mthds_names is not None and (mthds_contents is None or len(mthds_names) != len(mthds_contents)):
-        # ``mthds_names`` is a per-content logical-name list (the host — e.g. an HTTP API —
-        # threads each bundle's name onto the in-memory load path so its diagnostics carry a
+    if mthds_sources is not None and (mthds_contents is None or len(mthds_sources) != len(mthds_contents)):
+        # ``mthds_sources`` is a per-content source list (the host — e.g. an HTTP API —
+        # threads each bundle's source onto the in-memory load path so its diagnostics carry a
         # real ``source``). It is never supplied by the end caller, so a missing-alongside /
         # length-mismatch is a host wiring bug, not bad user input: raise an internal error
         # (→ 500, redacted under STRICT) rather than ``ValidateBundleError`` (→ caller-facing
         # 422). Contrast the empty-``mthds_contents`` guard above, which can legitimately
         # reflect an end user submitting no bundles and so stays a caller-facing input error.
-        msg = "mthds_names, when provided, must be a per-item name list matching mthds_contents in length"
+        msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
@@ -289,10 +289,10 @@ async def validate_bundle(
             else:
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
-                content_names: list[str | None] = list(mthds_names) if mthds_names is not None else [None] * len(mthds_contents)
+                content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
                 loaded_blueprints = [
-                    PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_name=name)
-                    for content, name in zip(mthds_contents, content_names, strict=True)
+                    PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                    for content, source in zip(mthds_contents, content_sources, strict=True)
                 ]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(

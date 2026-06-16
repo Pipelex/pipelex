@@ -24,13 +24,13 @@ class PipelexInterpreter(BaseModel):
         bundle_path: Path | None = None,
         *,
         mthds_content: str | None = None,
-        mthds_name: str | None = None,
+        mthds_source: str | None = None,
     ) -> PipelexBundleBlueprint:
         """Parse one MTHDS source into a ``PipelexBundleBlueprint``.
 
         Exactly one of ``bundle_path`` (load from disk) or ``mthds_content``
-        (load from a string) must be provided. ``mthds_name`` is an optional
-        logical name for the *in-memory* path: the API submits nameless bundle
+        (load from a string) must be provided. ``mthds_source`` is an optional
+        logical source for the *in-memory* path: the API submits sourceless bundle
         text (``mthds_contents: list[str]``), so without it ``blueprint.source``
         is ``None`` and cross-file diagnostics misfire. It is seeded into the
         blueprint dict before validation (as the ``source`` field), so it lands
@@ -50,7 +50,7 @@ class PipelexInterpreter(BaseModel):
                 # overrides any ``source`` the bundle text declared and keeps the success
                 # path (``model_validate`` below) and the error path (the categorizer,
                 # which reads ``source`` off this dict) in agreement on one value.
-                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_name
+                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source
             else:
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
                 raise PipelexInterpreterError(msg)
@@ -64,7 +64,7 @@ class PipelexInterpreter(BaseModel):
 
         try:
             # ``source`` is already populated from the seeded ``blueprint_dict`` above
-            # (disk path → real file path; in-memory path → ``mthds_name``), so no
+            # (disk path → real file path; in-memory path → ``mthds_source``), so no
             # post-validate re-assignment is needed.
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
         except ValidationError as exc:

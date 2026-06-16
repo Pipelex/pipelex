@@ -1,9 +1,9 @@
-"""Integration: ``validate_bundle`` threads per-content ``mthds_names`` into ``blueprint.source``.
+"""Integration: ``validate_bundle`` threads per-content ``mthds_sources`` into ``blueprint.source``.
 
-The API submits nameless bundle text (``mthds_contents: list[str]``), so without
-a per-item name the in-memory load path sets ``blueprint.source = None`` and
-cross-file diagnostics misfire. ``validate_bundle(mthds_names=...)`` pairs each
-content with its logical name, so the loaded blueprint — and any
+The API submits sourceless bundle text (``mthds_contents: list[str]``), so without
+a per-item source the in-memory load path sets ``blueprint.source = None`` and
+cross-file diagnostics misfire. ``validate_bundle(mthds_sources=...)`` pairs each
+content with its logical source, so the loaded blueprint — and any
 ``ValidateBundleError`` it raises — carries a real ``source`` the consumer can map
 to the owning file. The CLI's on-disk path keeps using real file paths and is
 unaffected.
@@ -43,16 +43,16 @@ class TestValidateBundleSourceThreading:
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """A valid bundle's loaded blueprint records the threaded per-content name as ``source``."""
+        """A valid bundle's loaded blueprint records the threaded per-content source as ``source``."""
         load_empty_library()
-        result = await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_names=["api://bundle-0.mthds"])
+        result = await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_sources=["api://bundle-0.mthds"])
         assert result.blueprints[0].source == "api://bundle-0.mthds"
 
     async def test_source_none_without_names(
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """Without ``mthds_names`` the in-memory path leaves ``source`` unset (unchanged behavior)."""
+        """Without ``mthds_sources`` the in-memory path leaves ``source`` unset (unchanged behavior)."""
         load_empty_library()
         result = await validate_bundle(mthds_contents=[_VALID_MTHDS])
         assert result.blueprints[0].source is None
@@ -69,7 +69,7 @@ class TestValidateBundleSourceThreading:
         """
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_contents=[_INVALID_MAIN_PIPE_MTHDS], mthds_names=["broken.mthds"])
+            await validate_bundle(mthds_contents=[_INVALID_MAIN_PIPE_MTHDS], mthds_sources=["broken.mthds"])
         report = exc_info.value.to_error_report()
         assert report.validation_errors is not None
         seeded_items = [item for item in report.validation_errors if item.source == "broken.mthds"]
@@ -80,11 +80,11 @@ class TestValidateBundleSourceThreading:
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """A ``mthds_names``/``mthds_contents`` length mismatch is a host wiring bug, not user input.
+        """A ``mthds_sources``/``mthds_contents`` length mismatch is a host wiring bug, not user input.
 
         It must raise an internal error (→ 500, redacted under STRICT), not a caller-facing
-        ``ValidateBundleError`` (→ 422) — ``mthds_names`` is never supplied by the end caller.
+        ``ValidateBundleError`` (→ 422) — ``mthds_sources`` is never supplied by the end caller.
         """
         load_empty_library()
-        with pytest.raises(PipelexUnexpectedError, match="must be a per-item name list matching mthds_contents"):
-            await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_names=["a.mthds", "b.mthds"])
+        with pytest.raises(PipelexUnexpectedError, match="must be a per-item source list matching mthds_contents"):
+            await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_sources=["a.mthds", "b.mthds"])

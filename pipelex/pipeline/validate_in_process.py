@@ -8,12 +8,12 @@ management — `validate_bundle` leaves its validation library OPEN on success, 
 long-lived entry point must restore the caller's current-library and tear the validation
 library down — lives once, so the two backends cannot drift on teardown semantics.
 
-The `mthds_names` parameter is the in-memory source-threading hook: the API submits
-nameless bundle text (`mthds_contents: list[str]`), so without per-content names
-`blueprint.source` is `None` and cross-file diagnostics misfire. Threading names here lands
+The `mthds_sources` parameter is the in-memory source-threading hook: the API submits
+sourceless bundle text (`mthds_contents: list[str]`), so without per-content sources
+`blueprint.source` is `None` and cross-file diagnostics misfire. Threading sources here lands
 them on `blueprint.source` for both the success path and the categorized
 `ValidateBundleError` (whose per-error `source` the extension maps to the owning file). The
-local protocol runtime passes `None` — its `validate` interface carries only nameless
+local protocol runtime passes `None` — its `validate` interface carries only sourceless
 content strings, so `blueprint.source` stays `None` on that path too. (The CLI populates
 `source` from the real file path via a separate `validate_bundle(mthds_file_path=…)` entry
 point that bypasses this orchestrator.)
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 async def validate_bundles_in_process(
     *,
     mthds_contents: list[str],
-    mthds_names: list[str] | None = None,
+    mthds_sources: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     log_context: str = "validate",
@@ -61,9 +61,9 @@ async def validate_bundles_in_process(
 
     Args:
         mthds_contents: MTHDS contents to load (always a list, even for one file).
-        mthds_names: Optional per-content logical names threaded onto `blueprint.source`
+        mthds_sources: Optional per-content sources threaded onto `blueprint.source`
             (length must match `mthds_contents` — `validate_bundle` enforces it). `None`
-            for the local protocol runtime, which receives only nameless content strings
+            for the local protocol runtime, which receives only sourceless content strings
             (so `source` stays `None` on that path).
         library_dirs: Resolved library directories to load before the bundle.
         allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
@@ -93,7 +93,7 @@ async def validate_bundles_in_process(
     try:
         result = await validate_bundle(
             mthds_contents=mthds_contents,
-            mthds_names=mthds_names,
+            mthds_sources=mthds_sources,
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
         )

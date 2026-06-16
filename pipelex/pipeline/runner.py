@@ -373,7 +373,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # Delegate to the shared in-process orchestrator (library-window management,
         # graph arm, report assembly). The protocol `validate` interface carries only
-        # nameless content strings, so `mthds_names` stays `None` and `blueprint.source`
+        # sourceless content strings, so `mthds_sources` stays `None` and `blueprint.source`
         # is `None` on this path. (The CLI's disk path populates `source` from the real
         # file path via a separate `validate_bundle(mthds_file_path=…)` entry point that
         # does not route through this orchestrator.)

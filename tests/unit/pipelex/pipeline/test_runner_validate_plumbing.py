@@ -79,7 +79,7 @@ class TestRunnerValidatePlumbing:
 
         env.validate_bundle_mock.assert_awaited_once_with(
             mthds_contents=["bundle-content"],
-            mthds_names=None,
+            mthds_sources=None,
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
         )
@@ -93,7 +93,7 @@ class TestRunnerValidatePlumbing:
 
         env.validate_bundle_mock.assert_awaited_once_with(
             mthds_contents=["bundle-content"],
-            mthds_names=None,
+            mthds_sources=None,
             library_dirs=None,
             allow_signatures=False,
         )

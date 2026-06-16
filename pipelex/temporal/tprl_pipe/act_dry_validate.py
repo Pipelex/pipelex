@@ -63,10 +63,10 @@ class DryValidateArg(BaseModel):
     """Input for the dry-run+validation activity (serializable across the Temporal boundary)."""
 
     mthds_contents: list[str] | None = None
-    # Optional per-content logical names threaded onto `blueprint.source` so the worker's
+    # Optional per-content sources threaded onto `blueprint.source` so the worker's
     # categorized `ValidateBundleError` carries a real `source` (length must match
     # `mthds_contents` — `validate_bundle` enforces it). `None` keeps `source=None`.
-    mthds_names: list[str] | None = None
+    mthds_sources: list[str] | None = None
     allow_signatures: bool = False
     # Optional explicit pipe selection for the graph arm; defaults to the bundle's declared
     # main_pipe (qualified from the first blueprint declaring one). The sweep always covers the
@@ -116,7 +116,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     # Success → the library is left loaded + current (D6) and THIS activity owns the teardown.
     validate_result = await validate_bundle(
         mthds_contents=arg.mthds_contents,
-        mthds_names=arg.mthds_names,
+        mthds_sources=arg.mthds_sources,
         allow_signatures=arg.allow_signatures,
     )
     library_id = get_current_library_id_or_none()
