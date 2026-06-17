@@ -328,6 +328,17 @@ class TestCheckKeywordOnly:
         )
         assert _keys(violations) == {"pipelex/sample/module.py::unsafe"}
 
+    def test_escape_hatch_survives_form_feed_earlier_in_file(self) -> None:
+        r"""A form-feed before an escaped def must not shift line indexing off the marker.
+
+        ``str.splitlines()`` splits on ``\x0c`` but ``ast`` line numbers do not, so a form-feed earlier
+        in the file used to make the escape-hatch lookup read the marker off the wrong physical line — a
+        false-positive violation on an explicitly-suppressed def (which would wrongly block a hook edit).
+        """
+        source = 'page = "one\x0ctwo"\ndef safe(spec, dry_run):  # kw-only: ignore\n    return spec\n'
+        violations = find_violations_in_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        assert violations == []
+
     def test_async_def_supported(self) -> None:
         """Async functions are inspected too."""
         violations = _violate(

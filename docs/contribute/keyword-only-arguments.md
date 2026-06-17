@@ -167,18 +167,34 @@ def normalize(cls, value, info): ...
 
 The entire `pipelex/` source tree is compliant, so the guard hard-blocks on **any** violation — there is no baseline and no tolerated debt. The guard runs at several gates:
 
-- A Claude Code `PostToolUse` hook (`.claude/hooks/check-keyword-only.sh`, wired in `.claude/settings.json`) — the tightest loop. After every `Edit`/`Write`/`MultiEdit` of a `pipelex/**/*.py` file it checks just that file and blocks with the offending signatures if it regressed, so an agent learns at edit time rather than at the end of the session. It runs the stdlib-only core by file path (no Typer/hub import), so it costs a few tens of milliseconds.
-- `make agent-check` — the fast everyday gate, so a new violation surfaces even outside Claude Code.
-- `make check` — the heavy aggregate gate.
+- A Claude Code `PostToolUse` hook (`.claude/hooks/check-keyword-only.sh`, wired in `.claude/settings.json`) — the tightest loop. After every `Edit`/`Write`/`MultiEdit` of a `pipelex/**/*.py` file it checks just that file and blocks with the offending signatures if it regressed, so an agent learns at edit time rather than at the end of the session. It runs the stdlib-only core by file path (no Typer/hub import), so it costs a few tens of milliseconds. The hook is check-only — it never rewrites a file mid-edit.
+- `make agent-check` — the fast everyday gate. It runs the **auto-fixing** variant (`fix-keyword-only`) early, right after `fix-unused-imports` and before `ruff format`, so a mechanically-fixable violation is corrected in place instead of failing the build. The fixer is **non-gating** — it reports the violations it can't mechanically fix but does not abort — so `format`, `lint`, `pyright`, and `mypy` all still run (you get keyword-only *and* type feedback in a single pass, and the tree is never left half-mutated and unformatted). The **read-only** `check-keyword-only` then runs **last** and is what actually blocks on any remaining violation.
+- `make check` — the heavy aggregate gate. It runs the **check-only** `check-keyword-only` (no rewriting), so CI-equivalent runs stay read-only.
 - CI — a dedicated lint job (`lint-keyword-only` in `.github/workflows/lint-check.yml`) gated by the required `Lint (all)` status check, so no non-compliant signature can merge. This is the hard guarantee; the hook and `make` gates are local conveniences layered on top.
 
-When you add or change a signature, place the bare `*` after the subject. If the type checker is blind to how a function is called (a framework or the interpreter invokes it positionally — a Jinja2 filter, an `__import__` hook, an aiohttp route handler, a PostHog `on_error` callback), the guard cannot detect that statically; the carve-outs above cover the known cases, and a genuinely justified one-off uses the `# kw-only: ignore` escape hatch. `make agent-test` is the safety net for these dynamic call surfaces — pyright/mypy will pass a wrongly-keywordized callback that the suite then catches at runtime.
+When you add or change a signature, place the bare `*` after the subject — or run `make fix-keyword-only` (alias `fko`) to insert it automatically. If the type checker is blind to how a function is called (a framework or the interpreter invokes it positionally — a Jinja2 filter, an `__import__` hook, an aiohttp route handler, a PostHog `on_error` callback), the guard cannot detect that statically; the carve-outs above cover the known cases, and a genuinely justified one-off uses the `# kw-only: ignore` escape hatch. `make agent-test` is the safety net for these dynamic call surfaces — pyright/mypy will pass a wrongly-keywordized callback that the suite then catches at runtime.
+
+## Auto-fix
+
+`pipelex-dev check-keyword-only --fix` (exposed as `make fix-keyword-only` / `fko`, and run automatically inside `make agent-check`) rewrites every *mechanically-fixable* violation by inserting a bare `*` as far left as possible — immediately after `self`/`cls` (and after any `/`) — so **every** non-`self`/`cls` parameter becomes keyword-only, not just the ones after the subject: `def f(a, b)` becomes `def f(*, a, b)`, `def m(self, a, b)` becomes `def m(self, *, a, b)`. (The exception that lets the subject stay positional is a permission, not a requirement — the fixer takes the always-allowed, more explicit form.) The raw insert lands on the def's original line(s); the `make fix-keyword-only` / `fko` target runs `ruff format` right after the rewrite, so the standalone path leaves a `ruff format`-clean tree (inside `agent-check` the later `format` step would normalize it anyway). The rewrite is idempotent and is re-parsed before being written — a rewrite that would not parse is discarded and the violation reported instead.
+
+A few shapes the guard flags cannot be fixed by a single bare-`*` insert, and are reported for a manual fix rather than rewritten:
+
+- a `*args` is present — the parameters before it cannot be made keyword-only by a bare `*`, and a bare `*` cannot coexist with `*args`;
+- a keyword-only section already exists (a bare `*` is already in the signature, with a positional parameter still ahead of it) — the existing `*` must be moved by hand, since a second one is a syntax error;
+- two or more positional-only parameters (before a `/`, excluding a leading `self`/`cls`) remain — a bare `*` cannot precede the `/`, so they stay positional and the single permitted positional subject is not enough to reach compliance. (A *single* positional-only subject is still auto-fixable: the `*` goes right after the `/`, e.g. `def f(a, /, b, c)` → `def f(a, /, *, b, c)`.)
+
+The `--fix` path is **non-gating**: it mutates and reports, but never exits non-zero on the violations it couldn't fix. The read-only `check-keyword-only` (no flag) owns the gating — it runs last in `agent-check` and is the variant `make check` / CI use. So `make fko` fixes what it can and prints the rest without failing your shell; run `make check-keyword-only` (alias `cko`) when you want the pass/fail gate. This split is deliberate: a tree-mutating step shouldn't also be the hard gate, or an abort could leave files rewritten-but-unformatted and mask the type-check phase.
+
+Auto-fix is not a substitute for review: the guard is blind to framework-positional callers (see the safety-net note above), so a signature it "fixes" might be one some framework invokes positionally. `make agent-test` remains the safety net — verify after a bulk auto-fix.
 
 Run the guard directly to see the full picture:
 
 ```bash
 make check-keyword-only            # alias: make cko — one line on pass, the full violation list on fail
+make fix-keyword-only              # alias: make fko — auto-insert the bare `*`; reports any manual-fix cases
 .venv/bin/pipelex-dev check-keyword-only --report   # full inventory grouped by package
+.venv/bin/pipelex-dev check-keyword-only --fix      # auto-fix (what `make fko` runs)
 
 # Lean single-file check (what the PostToolUse hook runs): stdlib only, invoked by file path so it
 # skips the pipelex package import chain. Prints violations to stderr and exits 2, else exits 0.

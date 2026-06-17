@@ -8,12 +8,14 @@ from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
+    get_pipe_library,
     get_required_pipe,
     resolve_library_dirs,
     set_current_library,
 )
 from pipelex.pipeline.bundle_validator import BundleValidator
-from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
+from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -37,21 +39,40 @@ async def validate_all_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    # acquire_and_validate opens a fresh library, loads the resolved dirs, sweeps every loaded pipe
-    # (filtering signatures in strict mode), and tears the library down — the standalone validate-all
-    # lifecycle (D6). The returned map is keyed by namespaced pipe_ref.
-    dry_run_results = await BundleValidator().acquire_and_validate(
+    # This mirrors BundleValidator.acquire_and_validate's lifecycle (acquire → sweep → restore +
+    # teardown) inline rather than calling it, because `validate all` is strict-by-default on
+    # signatures and must read the LIBRARY-WIDE pending set BEFORE teardown — acquire_and_validate
+    # returns only the per-pipe status map and tears the library down before we could compute it.
+    prev_library_id = get_current_library_id_or_none()
+    acquired_id, _ = acquire_library(
+        library_id="",
         library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
-        allow_signatures=allow_signatures,
     )
+    try:
+        # acquire_library left the freshly-acquired library current, so the inner sweep targets it
+        # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
+        dry_run_results = await BundleValidator().validate_current_library(allow_signatures=allow_signatures)
 
-    # No `pending_signatures` here by design — see validate_all in builder/operations/validate_ops.py:
-    # it is a per-bundle top-down-build nudge surfaced only by `validate bundle`, not the whole-library sweep.
-    return {
-        "success": True,
-        "validated_pipes": build_validated_pipes(dry_run_results),
-        "total_pipes": len(dry_run_results),
-    }
+        # pending_signatures is the library-wide set of still-unimplemented forward declarations;
+        # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
+        # gates the exit code on it unless --allow-signatures), so both keys ride the envelope.
+        pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
+        return {
+            "success": True,
+            "is_valid": True,
+            "validated_pipes": build_validated_pipes(dry_run_results),
+            "total_pipes": len(dry_run_results),
+            "pending_signatures": pending_signatures,
+            "is_runnable": not pending_signatures,
+        }
+    finally:
+        # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown
+        # raise), then tear the acquired library down — mirroring acquire_and_validate / validate_pipe_core.
+        if prev_library_id is not None:
+            set_current_library(library_id=prev_library_id)
+        else:
+            clear_current_library()
+        get_library_manager().teardown(library_id=acquired_id)
 
 
 async def validate_bundle_core(
@@ -86,6 +107,7 @@ async def validate_bundle_core(
     # successful lenient (--allow-signatures) run.
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
@@ -131,6 +153,7 @@ async def validate_pipe_core(
 
         return {
             "success": True,
+            "is_valid": True,
             "validated_pipes": build_validated_pipes(dry_run_results),
             "total_pipes": len(dry_run_results),
         }
@@ -159,8 +182,11 @@ async def validate_pipe_in_bundle_core(
     Loads the bundle's pipes into the library (so the requested pipe's dependencies resolve),
     then dry-runs ONLY the requested pipe. Unrelated pipes — including unimplemented
     `PipeSignature` placeholders — are loaded but not dry-run, so they do not block validating
-    an implemented slice of a partially stubbed bundle. Strict mode is still enforced on the
-    requested pipe: if it reaches a signature, validation fails.
+    an implemented slice of a partially stubbed bundle. Signatures are never an error (D-B): if the
+    requested pipe reaches one, it dry-runs trivially (the placeholder mints a mock); the unsatisfied
+    set is reported library-wide via `pending_signatures` / `is_runnable`, never raised. The caller
+    (`validate bundle`/`validate method` with `--pipe`) makes no library-wide runnability claim — it
+    surfaces `pending_signatures` for information but does not gate its exit code on it.
 
     Args:
         bundle_path: Path to the bundle file.
@@ -188,6 +214,7 @@ async def validate_pipe_in_bundle_core(
     # library-wide set of still-unimplemented forward declarations.
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),

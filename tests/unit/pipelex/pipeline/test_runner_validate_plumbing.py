@@ -41,27 +41,28 @@ class _ValidateEnv(NamedTuple):
 class TestRunnerValidatePlumbing:
     def _patch_env(self, mocker: MockerFixture, *, library_ids: list[str | None]) -> _ValidateEnv:
         """Patch ``validate_bundle``, the library hub getters, and the report-artifact builders
-        at the runner namespace so ``validate``'s body runs without a real loaded library.
+        at the ``validate_in_process`` namespace (the shared orchestrator the protocol ``validate``
+        wrapper delegates to) so the body runs without a real loaded library.
 
         ``library_ids`` feeds ``get_current_library_id_or_none`` as a side_effect pair: first
         call = the caller's prev library, second call = the validation library left current by
         ``validate_bundle``.
         """
         validate_bundle_mock = mocker.patch(
-            "pipelex.pipeline.runner.validate_bundle",
+            "pipelex.pipeline.validate_in_process.validate_bundle",
             new=mocker.AsyncMock(return_value=mocker.MagicMock(name="validate_bundle_result")),
         )
-        mocker.patch("pipelex.pipeline.runner.get_current_library_id_or_none", side_effect=library_ids)
-        set_current_library_mock = mocker.patch("pipelex.pipeline.runner.set_current_library")
-        clear_current_library_mock = mocker.patch("pipelex.pipeline.runner.clear_current_library")
-        library_manager = mocker.patch("pipelex.pipeline.runner.get_library_manager").return_value
+        mocker.patch("pipelex.pipeline.validate_in_process.get_current_library_id_or_none", side_effect=library_ids)
+        set_current_library_mock = mocker.patch("pipelex.pipeline.validate_in_process.set_current_library")
+        clear_current_library_mock = mocker.patch("pipelex.pipeline.validate_in_process.clear_current_library")
+        library_manager = mocker.patch("pipelex.pipeline.validate_in_process.get_library_manager").return_value
         # These artifact builders run inside the library window; mock them so the body completes
         # without a real loaded library. Their output shaping is pinned in test_validation_report.py
         # and the integration test_protocol_validate.py — this module asserts only the plumbing.
-        mocker.patch("pipelex.pipeline.runner.build_pipe_io_contracts", return_value={})
-        mocker.patch("pipelex.pipeline.runner.select_primary_blueprint")
-        mocker.patch("pipelex.pipeline.runner.best_effort_graph_spec", new=mocker.AsyncMock(return_value=None))
-        mocker.patch("pipelex.pipeline.runner.build_validation_report")
+        mocker.patch("pipelex.pipeline.validate_in_process.build_pipe_io_contracts", return_value={})
+        mocker.patch("pipelex.pipeline.validate_in_process.select_primary_blueprint")
+        mocker.patch("pipelex.pipeline.validate_in_process.best_effort_graph_spec", new=mocker.AsyncMock(return_value=None))
+        mocker.patch("pipelex.pipeline.validate_in_process.build_validation_report")
         return _ValidateEnv(
             validate_bundle_mock=validate_bundle_mock,
             set_current_library_mock=set_current_library_mock,
@@ -78,6 +79,7 @@ class TestRunnerValidatePlumbing:
 
         env.validate_bundle_mock.assert_awaited_once_with(
             mthds_contents=["bundle-content"],
+            mthds_sources=None,
             library_dirs=[Path("dir_alpha"), Path("nested/dir_beta")],
             allow_signatures=True,
         )
@@ -91,6 +93,7 @@ class TestRunnerValidatePlumbing:
 
         env.validate_bundle_mock.assert_awaited_once_with(
             mthds_contents=["bundle-content"],
+            mthds_sources=None,
             library_dirs=None,
             allow_signatures=False,
         )

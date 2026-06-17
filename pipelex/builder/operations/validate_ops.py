@@ -45,6 +45,7 @@ async def validate_all(
     # down before returning, so the set could not be computed post-hoc without reshaping a shared method.
     return {
         "success": True,
+        "is_valid": True,
         "validated_pipes": build_validated_pipes(dry_run_results),
         "total_pipes": len(dry_run_results),
     }
@@ -71,6 +72,7 @@ async def validate_bundle_file(
 
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),
@@ -98,6 +100,7 @@ async def validate_bundle_content(
 
     return {
         "success": True,
+        "is_valid": True,
         "mthds_contents": mthds_contents,
         "pipelex_bundle_blueprint": [b.model_dump(mode="json") for b in blueprints],
         "validated_pipes": build_validated_pipes(validate_bundle_result.dry_run_result),
@@ -141,6 +144,7 @@ async def validate_pipe(
 
         return {
             "success": True,
+            "is_valid": True,
             "validated_pipes": build_validated_pipes(dry_run_results),
             "total_pipes": len(dry_run_results),
         }
@@ -186,6 +190,7 @@ async def validate_pipe_in_bundle(
 
     return {
         "success": True,
+        "is_valid": True,
         "bundle_path": str(bundle_path),
         "validated_pipes": build_validated_pipes(result.dry_run_result),
         "total_pipes": len(result.dry_run_result),

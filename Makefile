@@ -130,6 +130,8 @@ make ttm                      - Shorthand -> test-temporal
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
+make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a bare *)
+make fko                      - Shorthand -> fix-keyword-only
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -180,7 +182,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
@@ -322,6 +324,14 @@ check-keyword-only: env
 
 cko: check-keyword-only
 	@echo "> done: cko = check-keyword-only"
+
+fix-keyword-only: env
+	$(call PRINT_TITLE,"Auto-fixing keyword-only-arguments violations across pipelex/ source")
+	$(VENV_PIPELEX_DEV) check-keyword-only --fix --quiet
+	$(VENV_RUFF) format . --config pyproject.toml
+
+fko: fix-keyword-only
+	@echo "> done: fko = fix-keyword-only"
 
 generate-mthds-schema: env
 	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
@@ -1144,7 +1154,7 @@ trund: temporal-run-dry
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
+c: check-keyword-only format lint pyright mypy
 	@echo "> done: c = check"
 
 cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
@@ -1153,10 +1163,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-keyword-only check-rules check-urls check-gateway-models check-mthds-schema format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports format lint pyright mypy check-keyword-only
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only
 	@echo "> done: agent-check"
 
 v: validate

@@ -26,10 +26,6 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cogt.exceptions import CogtError, InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
-from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
@@ -72,24 +68,6 @@ class TestAgentOutput:
         assert "hint" in parsed
         assert parsed["hint"] == AGENT_ERROR_HINTS["PipeOperatorModelChoiceError"]
 
-    def test_agent_error_includes_signature_hint(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """A SignaturesNotAllowedError surfaced through the agent boundary must carry the --allow-signatures hint.
-
-        The agent CLI's strict `validate pipe --all` / single-pipe paths surface this error through
-        agent_error with the exception as cause. The hint still comes from the AGENT_ERROR_HINTS
-        fallback (the class declares no class-level user_action), while error_domain now flows from the
-        exception's class-level INPUT classification rather than the AGENT_ERROR_DOMAINS dict.
-        """
-        cause = SignaturesNotAllowedError(offending_pipe_refs={"d.caller"}, signature_refs={"d.summary_sig"}, dep_paths={})
-        with pytest.raises(typer.Exit):
-            agent_error("strict validation reached a PipeSignature", error_type="SignaturesNotAllowedError", cause=cause)
-
-        parsed = json.loads(capsys.readouterr().err)
-        assert parsed["hint"] == AGENT_ERROR_HINTS["SignaturesNotAllowedError"]
-        assert "--allow-signatures" in parsed["hint"]
-        # error_domain is now sourced from the class-level metadata (INPUT), not the lookup dict.
-        assert parsed["error_domain"] == "input"
-
     def test_agent_error_no_hint_for_unknown_type(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should not include hint for unregistered error types."""
         with pytest.raises(typer.Exit):
@@ -125,54 +103,11 @@ class TestAgentOutput:
         assert parsed["success"] is True
         assert parsed["value"] == 42
 
-    def test_extract_validation_errors_all_categories(self) -> None:
-        """extract_validation_errors should return entries from all 4 categories."""
-        exc = ValidateBundleError(
-            message="validation failed",
-            pipelex_bundle_blueprint_validation_errors=[
-                PipelexBundleBlueprintValidationErrorData(
-                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
-                    pipe_code="pipe_a",
-                    message="missing var x",
-                    variable_names=["x"],
-                ),
-            ],
-            pipe_factory_errors=[
-                PipeFactoryErrorData(
-                    error_type=PipeFactoryErrorType.UNKNOWN_CONCEPT,
-                    pipe_code="pipe_b",
-                    message="concept Foo not found",
-                    missing_concept_code="Foo",
-                    declared_concepts=["Bar", "Baz"],
-                ),
-            ],
-            pipe_validation_errors=[
-                PipesAndConceptValidationErrorData(
-                    error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
-                    pipe_code="pipe_c",
-                    message="extra var y",
-                    field_path="pipe_c.inputs.y",
-                    variable_names=["y"],
-                ),
-            ],
-        )
-
-        result = extract_validation_errors(exc)
-        assert len(result) == 3
-
-        categories = [entry["category"] for entry in result]
-        assert "blueprint_validation" in categories
-        assert "pipe_factory" in categories
-        assert "pipe_validation" in categories
-
-        # Check factory error has extra fields
-        factory_entry = next(entry for entry in result if entry["category"] == "pipe_factory")
-        assert factory_entry["missing_concept_code"] == "Foo"
-        assert factory_entry["declared_concepts"] == ["Bar", "Baz"]
-
-        # Check blueprint entry has variable_names
-        blueprint_entry = next(entry for entry in result if entry["category"] == "blueprint_validation")
-        assert blueprint_entry["variable_names"] == ["x"]
+    # NOTE: the per-category projection of ``extract_validation_errors`` is now pinned
+    # thoroughly (including CLI↔API shape parity) by the shared-builder suite in
+    # tests/unit/pipelex/pipeline/test_validation_errors.py — the former
+    # ``test_extract_validation_errors_all_categories`` here duplicated it with weaker
+    # asserts and a stale "4 categories" docstring, so it was removed.
 
     # -------------------------------------------------------------------------
     # Datetime serialization tests (regression for "Object of type datetime is
@@ -233,11 +168,16 @@ class TestAgentOutput:
         assert parsed["error"] is True
         assert parsed["failed_at"] == "2026-02-09T14:00:00"
 
-    def test_extract_validation_errors_empty(self) -> None:
-        """extract_validation_errors should return empty list when no errors."""
+    def test_extract_validation_errors_message_only(self) -> None:
+        """A message-only error yields one ``blueprint_validation`` residual — the structured-info invariant is total.
+
+        A parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator) carries no
+        categorized data, but the builder's last-resort ``fallback_message`` residual still emits
+        one item so the CLI's ``validation_errors[]`` is never empty on an invalid verdict.
+        """
         exc = ValidateBundleError(message="no details")
         result = extract_validation_errors(exc)
-        assert result == []
+        assert result == [{"category": "blueprint_validation", "message": "no details"}]
 
     # -------------------------------------------------------------------------
     # _build_error_source tests

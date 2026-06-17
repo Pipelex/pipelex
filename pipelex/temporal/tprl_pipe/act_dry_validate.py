@@ -63,6 +63,10 @@ class DryValidateArg(BaseModel):
     """Input for the dry-run+validation activity (serializable across the Temporal boundary)."""
 
     mthds_contents: list[str] | None = None
+    # Optional per-content sources threaded onto `blueprint.source` so the worker's
+    # categorized `ValidateBundleError` carries a real `source` (length must match
+    # `mthds_contents` — `validate_bundle` enforces it). `None` keeps `source=None`.
+    mthds_sources: list[str] | None = None
     allow_signatures: bool = False
     # Optional explicit pipe selection for the graph arm; defaults to the bundle's declared
     # main_pipe (qualified from the first blueprint declaring one). The sweep always covers the
@@ -100,9 +104,10 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     """Run the validation sweep + the in-memory graph dry-run against one library, in-process.
 
     Raises (crossing as structured ``ErrorReport``s via ``convert_pipelex_errors``):
-        ValidateBundleError: any validation failure — blueprint/factory/wiring errors, unexpected
-            dry-run pipe failures, strict-mode signature refusals (the same categorized cascade
-            the direct-mode route surfaces).
+        ValidateBundleError: any validation failure — blueprint/factory/wiring errors and unexpected
+            dry-run pipe failures (the same categorized cascade the direct-mode route surfaces).
+            Signatures are NOT a failure (D-B): an unsatisfied ``PipeSignature`` rides the result's
+            ``pending_signatures`` / ``is_runnable``, it does not raise.
         PipeIOContractError: a JSON-Schema rendering failure while building `pipe_io_contracts`
             (non-retryable at the workflow tier, like ValidateBundleError — deterministic).
         PipelexError: non-validation failures (config, library, tracing infra).
@@ -112,6 +117,7 @@ async def act_dry_validate(arg: DryValidateArg) -> DryValidateResult:
     # Success → the library is left loaded + current (D6) and THIS activity owns the teardown.
     validate_result = await validate_bundle(
         mthds_contents=arg.mthds_contents,
+        mthds_sources=arg.mthds_sources,
         allow_signatures=arg.allow_signatures,
     )
     library_id = get_current_library_id_or_none()

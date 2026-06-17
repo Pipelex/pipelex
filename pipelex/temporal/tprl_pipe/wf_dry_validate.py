@@ -28,7 +28,7 @@ class WfDryValidate(WorkflowClass[DryValidateArg, DryValidateResult]):
         # D-C5: explicit timeout + retry bounds, deterministic in workflow code (no config reads).
         # Validation is deterministic — its failures must NOT retry. The deterministic-failure
         # surface crosses the boundary as TWO types: validate_bundle wraps
-        # SignaturesNotAllowedError / DryRunError / PipelexInterpreterError into
+        # DryRunError / PipeRunError / PipelexInterpreterError into
         # ValidateBundleError before they escape, and build_pipe_io_contracts wraps a
         # JSON-Schema rendering failure into PipeIOContractError; the activity-boundary
         # TemporalError carries the OUTER PipelexError class name as the ApplicationError

@@ -47,8 +47,8 @@ def collect_signature_paths(
 
     Each value is the ordered list of controller pipe_refs traversed (entry-point first).
     Keys and path entries are qualified pipe_refs. Companion of `collect_signature_refs`
-    used to render the dep chain in `SignaturesNotAllowedError`. When a signature is reachable
-    by several paths (a diamond), the longest — most informative — chain is kept.
+    used to render the dep chain that reaches each unimplemented signature. When a signature
+    is reachable by several paths (a diamond), the longest — most informative — chain is kept.
     """
     if current_path is None:
         current_path = []

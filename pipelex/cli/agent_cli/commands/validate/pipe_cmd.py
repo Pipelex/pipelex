@@ -83,12 +83,25 @@ def validate_pipe_cmd(
             result = asyncio.run(validate_all_core(library_dirs=library_dirs, allow_signatures=allow_signatures))
             agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
+            # Gate-from-report (D-B consumer-decides): `validate all` is strict by default — the
+            # library is valid but NOT runnable while unsatisfied PipeSignature placeholders remain.
+            # The success envelope (carrying library-wide pending_signatures + is_runnable) is emitted
+            # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by
+            # the `except typer.Exit` arm below so teardown still runs.
+            if not allow_signatures and not result.get("is_runnable", True):
+                raise typer.Exit(1)
+
         except ValidateBundleError as exc:
-            validation_errors = extract_validation_errors(exc)
-            validate_all_extra: dict[str, Any] = {"validation_errors": validation_errors}
-            if exc.dry_run_error_message:
-                validate_all_extra["dry_run_error"] = exc.dry_run_error_message
-            agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **validate_all_extra)
+            # Invalid verdict: structured failure envelope. validation_errors[] is the shared builder's
+            # output (a residual dry-run failure rides one dry_run item). Signatures are a runnability
+            # fact (pending_signatures + the gate above), not an error, so they never reach this arm.
+            agent_error(
+                exc.message,
+                error_type="ValidateBundleError",
+                cause=exc,
+                is_valid=False,
+                validation_errors=extract_validation_errors(exc),
+            )
 
         except PipeOperatorModelChoiceError as exc:
             agent_error(
@@ -108,6 +121,11 @@ def validate_pipe_cmd(
                 pipe_code=exc.pipe_code,
                 model_handle=exc.model_handle,
             )
+
+        except typer.Exit:
+            # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
+            # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
+            raise
 
         except Exception as exc:  # noqa: BLE001
             # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
@@ -161,11 +179,15 @@ def validate_pipe_cmd(
         agent_error(error_message, error_type="PipeNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict (see the --all arm): structured failure envelope; validation_errors[] is the
+        # shared builder's output (a residual dry-run failure rides one dry_run item).
+        agent_error(
+            exc.message,
+            error_type="ValidateBundleError",
+            cause=exc,
+            is_valid=False,
+            validation_errors=extract_validation_errors(exc),
+        )
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

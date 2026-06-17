@@ -251,13 +251,23 @@ def check_mthds_schema_command(
 @app.command(name="check-keyword-only", help="Enforce the keyword-only-arguments convention across pipelex/ source")
 def check_keyword_only_command(
     report: Annotated[bool, typer.Option("--report", help="Print the full violation inventory grouped by package")] = False,
+    fix: Annotated[
+        bool,
+        typer.Option(
+            "--fix",
+            help=(
+                "Auto-fix by inserting a bare `*` as far left as possible "
+                "(every non-self/cls parameter becomes keyword-only); reports any that need a manual fix"
+            ),
+        ),
+    ] = False,
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
     ] = False,
 ) -> None:
     """Enforce the keyword-only-arguments convention across pipelex/ source."""
     try:
-        check_keyword_only_cmd(report=report, quiet=quiet)
+        check_keyword_only_cmd(report=report, fix=fix, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise
