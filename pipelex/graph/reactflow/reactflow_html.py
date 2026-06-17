@@ -33,6 +33,7 @@ def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
 
 def _build_templating_context(
     graphspec: GraphSpec,
+    *,
     config: ReactFlowRenderingConfig,
     title: str | None,
 ) -> dict[str, object]:
@@ -49,8 +50,8 @@ def _build_templating_context(
 
 def generate_reactflow_html(
     graphspec: GraphSpec,
-    config: ReactFlowRenderingConfig,
     *,
+    config: ReactFlowRenderingConfig,
     title: str | None = None,
 ) -> str:
     """Generate HTML with embedded GraphSpec; viewer assets load from jsDelivr (SRI-pinned).
@@ -67,14 +68,14 @@ def generate_reactflow_html(
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        templating_context=_build_templating_context(graphspec, config, title),
+        templating_context=_build_templating_context(graphspec, config=config, title=title),
     )
 
 
 async def generate_reactflow_html_async(
     graphspec: GraphSpec,
-    config: ReactFlowRenderingConfig,
     *,
+    config: ReactFlowRenderingConfig,
     title: str | None = None,
 ) -> str:
     """Async variant of `generate_reactflow_html`."""
@@ -82,5 +83,5 @@ async def generate_reactflow_html_async(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        templating_context=_build_templating_context(graphspec, config, title),
+        templating_context=_build_templating_context(graphspec, config=config, title=title),
     )

@@ -58,7 +58,7 @@ class PipeParallelSpec(PipeSpec):
         return self
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Get base pipe information from parent
         base_group = super().rendered_pretty(title=title, depth=depth)
 

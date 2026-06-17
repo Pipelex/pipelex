@@ -93,6 +93,7 @@ class Concept(ConceptAbstract):
     @classmethod
     def are_concept_compatible(
         cls,
+        *,
         concept_1: "Concept",
         concept_2: "Concept",
         strict: bool = False,
@@ -144,7 +145,7 @@ class Concept(ConceptAbstract):
             return False
 
         # Check if classes are structurally equivalent (same fields, types)
-        if are_classes_equivalent(concept_1_class, concept_2_class):
+        if are_classes_equivalent(concept_1_class, class_2=concept_2_class):
             return True
 
         if strict:
@@ -160,7 +161,7 @@ class Concept(ConceptAbstract):
             pass
 
         # Check if concept_1 has compatible fields with concept_2
-        return has_compatible_field(concept_1_class, concept_2_class)
+        return has_compatible_field(concept_1_class, target_type=concept_2_class)
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
@@ -192,6 +193,7 @@ class Concept(ConceptAbstract):
 
     def render_concept_representation(
         self,
+        *,
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
     ) -> tuple[dict[str, Any], set[str]]:
@@ -213,7 +215,7 @@ class Concept(ConceptAbstract):
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
                 generator = ConceptRepresentationGenerator(output_format)
                 # For inputs, we only want required fields (not optional ones)
-                result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
+                result = generator.generate_representation(self.concept_ref, structure_class=self.get_structure_class(), include_optional=False)
 
                 # If multiple and JSON format, wrap content in a list
                 # For Python format, the caller handles wrapping since content is a string

@@ -42,6 +42,7 @@ if TYPE_CHECKING:
 
 async def pipeline_run_setup(
     execution_config: PipelineExecutionConfig,
+    *,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,

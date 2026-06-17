@@ -59,7 +59,7 @@ class TestGenerateFieldValueLiteralTypes:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_field_value(
             Literal["Casual", "Professional", "Humorous", "Academic"],
-            "tone",
+            field_name="tone",
         )
         assert result in TONE_CHOICES, f"Expected one of {TONE_CHOICES}, got {result!r}"
 
@@ -68,7 +68,7 @@ class TestGenerateFieldValueLiteralTypes:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_field_value(
             Literal["Short", "Medium", "Long"],
-            "length",
+            field_name="length",
         )
         assert result in LENGTH_CHOICES
         assert "Literal" not in str(result), f"Should not contain 'Literal' placeholder, got {result!r}"
@@ -79,7 +79,7 @@ class TestGenerateFieldValueLiteralTypes:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_field_value(
             Literal["electronics", "clothing", "food"] | None,
-            "category",
+            field_name="category",
         )
         assert result in {"electronics", "clothing", "food"}, f"Expected a valid choice, got {result!r}"
 
@@ -98,7 +98,7 @@ class TestGenerateFieldValueLiteralTypes:
     ) -> None:
         """Literal fields with different sets of choices all generate valid values."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(literal_type, "field")
+        result = generator.generate_field_value(literal_type, field_name="field")
         assert result in valid_choices, f"[{topic}] Expected one of {valid_choices}, got {result!r}"
 
     def test_class_with_literal_field_json(self) -> None:

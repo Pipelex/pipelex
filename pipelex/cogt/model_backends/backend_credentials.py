@@ -25,6 +25,7 @@ class BackendCredentialsErrorMsgFactory:
     @classmethod
     def make_one_variable_missing_error_msg(
         cls,
+        *,
         secrets_provider: SecretsProviderAbstract,
         backend_name: str | None,
         var_name: str,
@@ -77,6 +78,7 @@ class BackendCredentialsErrorMsgFactory:
     def make_comprehensive_error_msg(
         cls,
         backend_credential_reports: dict[str, BackendCredentialsReport],
+        *,
         secrets_provider: SecretsProviderAbstract | None = None,
     ) -> str:
         """Build a comprehensive error message for missing backend credentials.

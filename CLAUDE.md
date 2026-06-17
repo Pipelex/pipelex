@@ -168,6 +168,17 @@ When adding validation or fields, decide which layer they belong to. Language ru
 - If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml`. NEVER add them commented out: commented-out TOML is never parsed or validated, so it rots silently when keys are refactored. Instead, write the actual default values (matching `pipelex/pipelex.toml`, even empty ones like `activity_queues = {}`) so the override file stays valid and behaves like setting nothing. Plain prose comments explaining the setting are fine — it's commented-out keys/values that are forbidden.
 - The different `pipelex.toml` files and the python model `configs.py` must be up to date with each other in terms of structure and attributes, otherwise the loading of teh config fails. To check quickly that you're good, just run `make tb` which tests the boot sequence, which includes the config loading.
 
+### Keyword-only arguments
+
+Non-subject function parameters across `pipelex/` source must be **keyword-only**, so call sites are self-documenting: `do_thing(retries=3, timeout=30)` over the opaque `do_thing(3, 30)`. The compliant shape places a bare `*` after the subject:
+
+- `def f(subject, *, opt1, opt2): ...` — the first non-`self`/`cls` parameter (the subject) may stay positional; everything after it must be keyword-only. Making the subject keyword-only too (`def f(*, a, b)`) is always allowed and often preferable.
+- A lone subject (`def render(node)`) is compliant; a second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is a violation.
+
+The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation. Carve-outs (dunders, pydantic validators/serializers, Typer/Temporal/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net.
+
+The full specification — the two exceptions, the carve-out list, the symmetric-tuple allowlist, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
+
 ## Writing Docs
 
 We use Material for MkDocs. All markdown in our docs must be compatible with Material for MkDocs and done using best practices to get the best results with Material for MkDocs.

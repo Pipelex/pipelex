@@ -54,7 +54,7 @@ def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level:
     """
     doc = load_toml_with_tomlkit(pipelex_toml_path)
     doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level  # type: ignore[index]
-    save_toml_to_path(doc, pipelex_toml_path)
+    save_toml_to_path(doc, path=pipelex_toml_path)
 
 
 def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:

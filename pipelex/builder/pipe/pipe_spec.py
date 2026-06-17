@@ -161,7 +161,7 @@ class PipeSpec(StructuredContent):
         )
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))

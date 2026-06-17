@@ -62,14 +62,14 @@ def inputs_method_cmd(
         agent_success(result)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
         validation_errors = extract_validation_errors(exc)
         extra: dict[str, Any] = {"validation_errors": validation_errors}
         if exc.dry_run_error_message:
             extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
+        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
         agent_success(
@@ -84,7 +84,7 @@ def inputs_method_cmd(
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            "PipeOperatorModelChoiceError",
+            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -100,11 +100,11 @@ def inputs_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

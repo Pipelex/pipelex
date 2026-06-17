@@ -95,6 +95,7 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
     def make_portkey_openai_client_for_completions(
         cls,
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -125,6 +126,6 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return PortkeyFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

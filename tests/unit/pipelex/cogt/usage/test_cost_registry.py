@@ -73,7 +73,7 @@ class TestCostRegistry:
 
         # Save to CSV
         csv_file = tmp_path / "test_report.csv"
-        CostRegistry.save_to_csv(records, csv_file)
+        CostRegistry.save_to_csv(records, file_path=csv_file)
 
         # Verify file exists
         assert csv_file.exists()
@@ -99,7 +99,7 @@ class TestCostRegistry:
     def test_save_to_csv_empty_records(self, tmp_path: Path):
         """Test that save_to_csv handles empty records gracefully."""
         csv_file = tmp_path / "empty_report.csv"
-        CostRegistry.save_to_csv([], csv_file)
+        CostRegistry.save_to_csv([], file_path=csv_file)
 
         # File should not be created for empty records
         assert not csv_file.exists()
@@ -135,7 +135,7 @@ class TestCostRegistry:
 
         # Save to CSV - should handle varying fields without errors
         csv_file = tmp_path / "varying_fields_report.csv"
-        CostRegistry.save_to_csv(records, csv_file)
+        CostRegistry.save_to_csv(records, file_path=csv_file)
 
         # Verify file exists
         assert csv_file.exists()

@@ -206,7 +206,9 @@ def setup_ci_environment():
         _cleanup_placeholder_env_vars(env_var_keys=env_var_keys)
 
 
-def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(  # kw-only: ignore — pytest hookimpl, invoked by pluggy as a framework entrypoint
+    config: Config, items: list[pytest.Item]
+) -> None:
     """Auto-skip non-dry-runnable inference tests when --disable-inference is set.
 
     This hook runs after test collection and adds skip markers to tests that:

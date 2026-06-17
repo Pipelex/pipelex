@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keyword-only arguments — what we built</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel2: #1d212c; --ink: #e6e9ef; --muted: #9aa3b2;
+    --line: #2a2f3a; --accent: #6ea8fe; --good: #4ec98a; --bad: #f0768b; --warn: #e7b964;
+    --add-bg: #11271b; --add-ink: #7fe0a8; --del-bg: #2a1620; --del-ink: #f3899d; --code: #cdd6e6;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.hero { border-bottom: 1px solid var(--line); padding-bottom: 22px; margin-bottom: 28px; }
+  .eyebrow { color: var(--accent); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+  h1 { font-size: 33px; line-height: 1.15; margin: 8px 0 6px; }
+  h2 { font-size: 23px; margin: 44px 0 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  h3 { font-size: 17px; margin: 26px 0 8px; color: #cfd6e4; }
+  p, li { color: #d3d8e2; }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); background: #11141c; border: 1px solid var(--line); border-radius: 5px; padding: .08em .36em; font-size: .9em; color: var(--code); }
+  .sub { color: var(--muted); font-size: 15px; }
+  .tldr {
+    background: linear-gradient(180deg, #1a2030, #161b28);
+    border: 1px solid #2c3650; border-left: 4px solid var(--accent);
+    border-radius: 12px; padding: 18px 22px; margin: 4px 0 8px;
+  }
+  .tldr h2 { border: 0; margin: 0 0 8px; padding: 0; font-size: 18px; color: var(--accent); }
+  .tldr ul { margin: 8px 0 0; padding-left: 20px; }
+  .tldr li { margin: 5px 0; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 16px 0; }
+  @media (max-width: 720px){ .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+  .card h3 { margin-top: 0; }
+  .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .pill.good { color: var(--good); border-color: #275; } .pill.warn { color: var(--warn); border-color: #654; }
+  figure { margin: 18px 0; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+  figure figcaption { color: var(--muted); font-size: 13px; margin-top: 8px; text-align: center; }
+  .mermaid { background: transparent; text-align: center; }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 16px; margin: 12px 0; }
+  details[open] { padding-bottom: 14px; }
+  summary { cursor: pointer; font-weight: 650; color: #d8def0; padding: 6px 0; }
+  summary::marker { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14.5px; }
+  th, td { border: 1px solid var(--line); padding: 8px 11px; text-align: left; vertical-align: top; }
+  th { background: var(--panel2); color: #cfd6e4; }
+  td code { font-size: .86em; }
+  /* tabs */
+  .tabs { margin: 16px 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+  .tabbar { display: flex; flex-wrap: wrap; gap: 0; background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .tabbar button {
+    appearance: none; background: transparent; border: 0; border-right: 1px solid var(--line);
+    color: var(--muted); padding: 10px 15px; cursor: pointer; font: 600 13.5px var(--mono); letter-spacing: .02em;
+  }
+  .tabbar button:hover { color: var(--ink); }
+  .tabbar button.active { color: var(--ink); background: var(--panel); box-shadow: inset 0 -2px 0 var(--accent); }
+  .tabpanel { display: none; padding: 0; }
+  .tabpanel.active { display: block; }
+  pre { margin: 0; padding: 16px 18px; overflow-x: auto; font-family: var(--mono); font-size: 13px; line-height: 1.55; color: var(--code); background: #0c0e14; }
+  pre.plain { border: 1px solid var(--line); border-radius: 10px; }
+  .diff .ln { display: block; white-space: pre; }
+  .diff .add { background: var(--add-bg); color: var(--add-ink); }
+  .diff .del { background: var(--del-bg); color: var(--del-ink); }
+  .diff .ctx { color: #8b93a4; }
+  .diff .hdr { color: #6f7891; }
+  .filechip { font: 600 12px var(--mono); color: var(--muted); padding: 8px 18px; background: var(--panel2); border-bottom: 1px solid var(--line); }
+  .note { font-size: 14px; color: var(--muted); }
+  .kbd { font-family: var(--mono); background:#11141c; border:1px solid var(--line); border-bottom-width:2px; border-radius:5px; padding:.03em .4em; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:var(--muted); margin: 6px 2px 0;}
+  .legend span { display:inline-flex; align-items:center; gap:6px;}
+  .sw { width:14px; height:14px; border-radius:3px; display:inline-block; border:1px solid var(--line);}
+  footer { margin-top: 50px; border-top: 1px solid var(--line); padding-top: 18px; color: var(--muted); font-size: 13.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow">Pipelex runtime · refactor/Function-calling-4</div>
+  <h1>Keyword-only arguments, everywhere — and a guard that keeps it that way</h1>
+  <p class="sub">A codebase-wide refactor + a mechanical enforcement guard, plus the lockstep update of every downstream consumer. Written for the people who'll write the next function.</p>
+</header>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <ul>
+    <li><b>What changed:</b> across all of <code>pipelex/</code>, every <i>non-subject</i> function parameter is now <b>keyword-only</b>. A function may keep its first real argument (the "subject") positional; everything after it must be passed by name. So <code>do_thing(retries=3, timeout=30)</code> — never the opaque <code>do_thing(3, 30)</code>.</li>
+    <li><b>Why:</b> call sites become self-documenting, and you can reorder / insert parameters without silently rebinding a caller's positional args.</li>
+    <li><b>How it stays true:</b> a stdlib-only AST guard (<code>check-keyword-only</code>) runs in <code>make agent-check</code>, in the <code>make check</code> aggregate, and in CI — it <b>hard-blocks on any violation</b>. A <code>PostToolUse</code> hook runs the same guard on each edited file in ~40&nbsp;ms, so agents get blocked in-loop, not at CI.</li>
+    <li><b>The sweep:</b> ~1,800 functions audited (one Sonnet sub-agent per package); <b>59</b> "kept-positional-out-of-habit" suspects were found and all made <i>fully</i> keyword-only — by relocating the bare <code>*</code> only, <b>no reordering, no renames</b>.</li>
+    <li><b>Breaking &amp; downstream:</b> the public surface (<code>Pipelex.make()</code> / <code>setup()</code> / <code>PipelexHub.setup_config()</code>) is now keyword-only after the subject. All four consumer repos (pipelex-api, cocode, cookbook, starter-python) were re-pinned to the branch and fixed in lockstep — exactly <b>one</b> real call-site break across all of them. Green on <code>agent-check</code> + <code>agent-test</code>; PRs pushed.</li>
+    <li><b>One open item:</b> at pipelex release, swap each consumer's temporary git pin back to a released version.</li>
+  </ul>
+</div>
+
+<h2>The rule, in one picture</h2>
+<p>The compliant shape places a bare <code>*</code> right after the subject. The subject — the first non-<code>self</code>/<code>cls</code> parameter — <i>may</i> stay positional; making it keyword-only too is always allowed and often nicer.</p>
+
+<figure>
+<svg viewBox="0 0 900 220" width="100%" role="img" aria-label="Anatomy of a compliant signature">
+  <style>
+    .mono{font-family:var(--mono);font-size:18px;fill:#e6e9ef}
+    .lbl{font-family:var(--mono);font-size:12.5px}
+    .box{fill:none;stroke-width:2;rx:8}
+  </style>
+  <rect x="0" y="0" width="900" height="220" fill="#12151d" rx="14"/>
+  <text x="40" y="74" class="mono">def <tspan fill="#6ea8fe">handle</tspan>(<tspan fill="#9aa3b2">self</tspan>, <tspan fill="#4ec98a">request</tspan>, <tspan fill="#e7b964">*</tspan>, <tspan fill="#cdd6e6">retries</tspan>=3, <tspan fill="#cdd6e6">timeout</tspan>=30):</text>
+
+  <!-- subject brace -->
+  <rect x="148" y="48" width="86" height="34" class="box" stroke="#4ec98a"/>
+  <text x="191" y="120" text-anchor="middle" class="lbl" fill="#4ec98a">subject</text>
+  <text x="191" y="138" text-anchor="middle" class="lbl" fill="#7f9">may stay positional</text>
+
+  <!-- star -->
+  <rect x="245" y="48" width="22" height="34" class="box" stroke="#e7b964"/>
+  <text x="256" y="120" text-anchor="middle" class="lbl" fill="#e7b964">bare *</text>
+  <text x="256" y="138" text-anchor="middle" class="lbl" fill="#caa">the boundary</text>
+
+  <!-- keywords -->
+  <rect x="278" y="48" width="300" height="34" class="box" stroke="#6ea8fe"/>
+  <text x="428" y="120" text-anchor="middle" class="lbl" fill="#6ea8fe">keyword-only</text>
+  <text x="428" y="138" text-anchor="middle" class="lbl" fill="#9bf">must be passed by name</text>
+
+  <text x="40" y="190" class="lbl" fill="#9aa3b2">Call site &#8594; <tspan fill="#4ec98a">handle(request)</tspan>  or  <tspan fill="#4ec98a">handle(request=req, retries=5, timeout=10)</tspan>   —   never <tspan fill="#f0768b">handle(req, 5, 10)</tspan></text>
+</svg>
+<figcaption>A lone subject (<code>def render(node)</code>) is compliant. A second bare positional (<code>def f(a, b)</code>, <code>def truncate(text, max_length=80)</code>) is a violation.</figcaption>
+</figure>
+
+<div class="tabs" id="rule-tabs">
+  <div class="tabbar">
+    <button class="active" data-tab="ok">✓ compliant</button>
+    <button data-tab="bad">✗ violations</button>
+    <button data-tab="hatch"># kw-only: ignore</button>
+  </div>
+  <div class="tabpanel active" data-panel="ok">
+<pre class="plain">def render(node): ...                       # lone subject — fine
+def f(subject, *, opt1, opt2): ...          # subject positional, rest keyword
+def f(*, a, b): ...                         # fully keyword-only — always allowed
+def make(cls, *, integration_mode=...): ... # classmethod, fully keyword-only</pre>
+  </div>
+  <div class="tabpanel" data-panel="bad">
+<pre class="plain">def f(a, b): ...                            # second bare positional
+def truncate(text, max_length=80): ...      # max_length must be keyword-only
+def make(cls, integration_mode, *, ...): .. # subject kept positional "by habit"
+                                            #   when every call site already
+                                            #   passes integration_mode=...</pre>
+  </div>
+  <div class="tabpanel" data-panel="hatch">
+<pre class="plain"># A genuinely justified one-off — placed right after the open paren so
+# `ruff format` keeps it on the def header line:
+def legacy_cb(a, b):  # kw-only: ignore
+    ...
+
+# Carve-outs are automatic (no marker needed): dunders, pydantic
+# validators/serializers, Typer/Temporal/pytest/Jinja2 entrypoints,
+# @override impls, and a curated symmetric-tuple allowlist.</pre>
+  </div>
+</div>
+
+<h2>How it stays true: three layers of enforcement</h2>
+<p>One rule, one AST core, three places it fires. The guard is <b>stdlib-only</b> (<code>ast</code>/<code>re</code>/<code>pathlib</code>) so the single-file path can run without importing the <code>pipelex</code> package chain — that's what keeps the editor hook at a few tens of milliseconds.</p>
+
+<figure>
+<div class="mermaid">
+flowchart LR
+  subgraph DEV["In-loop (per edit)"]
+    E["Edit/Write a *.py file"] --> H{{"PostToolUse hook<br/>check-keyword-only.sh"}}
+    H -->|"by file path,<br/>no -m import"| G1["guard.main()<br/>single file, ~40ms"]
+    G1 -->|violation| B1["exit 2 → blocks the agent<br/>prints offending signatures"]
+    G1 -->|clean| P1["exit 0"]
+  end
+  subgraph CI["Gate (pre-merge)"]
+    C["make agent-check / make check / CI"] --> G2["pipelex-dev check-keyword-only<br/>full pipelex/ tree"]
+    G2 -->|any violation| B2["non-zero → hard-block"]
+    G2 -->|clean| P2["pass"]
+  end
+  G1 -. "same AST core<br/>(find_violations_in_source)" .- G2
+</div>
+<figcaption>The single-file hook result is an exact subset of the full-tree scan — <code>relative_path</code>/<code>module_qname</code> are computed identically, so the carve-out allowlist matches either way.</figcaption>
+</figure>
+
+<details>
+  <summary>The carve-outs (skipped automatically) and the escape hatch</summary>
+  <ul>
+    <li><b>Dunders</b> — <code>__init__</code>, <code>__call__</code>, … (interpreter calls them positionally).</li>
+    <li><b>pydantic</b> — <code>@field_validator</code>, <code>@model_validator</code>, <code>@field_serializer</code>, <code>@model_serializer</code>, <code>@validator</code>, <code>@root_validator</code>.</li>
+    <li><b>Framework entrypoints invoked positionally</b> — Typer <code>@app.command</code>/<code>@app.callback</code> (and the decorator-less <code>Argument(...)</code>/<code>Option(...)</code> annotation form), Temporal <code>@activity.defn</code> / <code>@workflow.run|signal|query|update</code>, <code>@pytest.fixture</code>, and Jinja2 <code>@pass_context</code>/<code>@pass_environment</code>/<code>@pass_eval_context</code>.</li>
+    <li><b><code>@override</code> impls</b> — they track the base signature.</li>
+    <li><b>Curated symmetric-tuple allowlist</b> — a handful of <code>(qualified_name, path)</code> pairs where both operands are genuinely peers (e.g. <code>diff_files(a, b)</code>). No pattern guessing; both name and path must match exactly.</li>
+    <li><b>Escape hatch</b> — an inline <code># kw-only: ignore</code> on the <code>def</code> line, for a justified one-off.</li>
+  </ul>
+  <p class="note">The type checker can't see framework-positional callbacks (route handlers, <code>__import__</code> hooks), so <code>make agent-test</code> is the safety net — and it caught real cases during the rollout.</p>
+</details>
+
+<h2>Rolling it out: audit → consolidation → enforce</h2>
+<p>The tree was made compliant wave by wave (execution path, then the framework-sensitive &amp; public API last). Then a dedicated pass hunted the subtler problem: signatures that satisfied the rule on a technicality — they kept <i>a</i> subject positional — but where that "subject" was really a lookup table, a mode flag, or a trace-context carrier, while the actual operand sat in the keyword args.</p>
+
+<figure>
+<div class="mermaid">
+flowchart TD
+  A["Waves 1–5: make pipelex/ compliant<br/>(bare * after the subject)"] --> B["Guard built + CI-gated<br/>(hard-block, baseline scaffolding removed)"]
+  B --> C["Positional-subject audit<br/>~1,800 functions · 1 Sonnet sub-agent per package"]
+  C --> D{"Is the positional<br/>arg really the subject?"}
+  D -->|"yes — fine"| E["leave it"]
+  D -->|"no — abuse"| F["59 suspects<br/>(lookup tables, mode flags,<br/>trace carriers, symmetric pairs)"]
+  F --> G["Consolidate: all 59 made FULLY keyword-only<br/>move * before the subject · no reorder · no rename"]
+  G --> H["agent-check + agent-test green"]
+  H --> I["Downstream consumers re-pinned + fixed in lockstep"]
+</div>
+<figcaption>"No reordering, no renames" is the load-bearing property: it means the only way the consolidation can break a caller is if that caller passed a now-keyword-only subject <i>positionally</i>.</figcaption>
+</figure>
+
+<details>
+  <summary>The recurring shapes the 59 suspects collapsed into</summary>
+  <ul>
+    <li><b>Lookup-table / registry carried positional</b> while the real query is keyworded — e.g. <code>model_cost_per_token(costs, *, cost_category)</code>, <code>get_reasoning_level_str(effort_to_level_map, *, effort)</code>.</li>
+    <li><b><code>*_for_pipe</code> / <code>*_from_response</code> / <code>*_from_uri</code></b> — the name advertises the operand, but a <i>different</i> arg was positional.</li>
+    <li><b>Mode flag / bare bool positional</b> — <code>f(True)</code> reveals nothing, and every call site already keyworded it.</li>
+    <li><b>Trace/provenance carrier positional</b> (<code>job_metadata</code>, <code>lookup_key</code>, <code>calling_pipe_code</code>) while the function acts on the keyword args.</li>
+    <li><b>Accumulator/sink dict positional</b> while the content being added is keyworded.</li>
+    <li><b>Symmetric pair split across the <code>*</code></b> — neither operand is "the subject", so the split was just noise.</li>
+    <li><b>Public-API surface</b> — <code>Pipelex.make</code>/<code>setup</code>, a deliberate keyword-only break.</li>
+  </ul>
+  <p class="note">A near-universal tell: the existing call sites already passed the "positional" arg by keyword — the positional permission was buying nothing.</p>
+</details>
+
+<h2>Downstream: one branch SHA, five consumers, exactly one real break</h2>
+<p>The consumers were pinned to the pipelex branch git rev and walked forward as the branch moved. The headache wasn't the keyword-only changes — it was that bumping off PyPI&nbsp;0.32.x surfaced the whole accumulated <code>dev</code> delta (notably the unrelated <code>PipelexRunner → PipelexMTHDSProtocol</code> runner rename). The keyword-only-specific call-site fixes were tiny.</p>
+
+<table>
+  <thead><tr><th>Consumer</th><th>Branch</th><th>Keyword-only break?</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>pipelex-api</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-api/pull/19">PR&nbsp;#19</a></td><td><b>Yes (1)</b> — <code>tests/unit/conftest.py</code></td><td class="pill good">green · pushed</td></tr>
+    <tr><td>cocode</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/cocode/pull/75">PR&nbsp;#75</a></td><td>No (all keyword already)</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-cookbook</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-cookbook/pull/153">PR&nbsp;#153</a></td><td>No (earlier waves only)</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-starter-python</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-starter-python/pull/55">PR&nbsp;#55</a></td><td>No</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-worker</td><td><code>chore/keyword-only-pipelex-rev</code> · <a href="https://github.com/Pipelex/pipelex-worker/pull/23">PR&nbsp;#23</a></td><td>No — no <code>pipelex</code> imports (thin worker); fixed a brittle ANSI assertion in the doctor smoke test</td><td class="pill good">green · pushed</td></tr>
+    <tr><td>pipelex-mistralai-workflows</td><td><code>feature/Mistral-native</code> (mistralai-2x hold pin)</td><td>Out of scope (own hold track)</td><td class="pill">n/a</td></tr>
+  </tbody>
+</table>
+
+<figure>
+<div class="mermaid">
+sequenceDiagram
+  participant PX as pipelex branch
+  participant API as pipelex-api
+  participant REST as cocode, cookbook, starter
+  Note over PX: 529b9082 -- initial keyword-only waves
+  PX->>API: pin to 529b9082, one parse_pipe_spec fix
+  PX->>REST: pin to 529b9082
+  Note over PX: 755b8211 -- parse_pipe_spec arg order reversed
+  PX->>API: re-pin to 755b8211, pipe_spec.py call-site fix
+  PX->>REST: re-pin to 755b8211, no positional call sites
+  Note over PX: 0e32c8c0 -- positional-subject consolidation
+  PX->>API: re-pin to 0e32c8c0, conftest integration_mode fix
+  PX->>REST: re-pin to 0e32c8c0, no-op bump, call sites already keyword
+</div>
+<figcaption>Each re-pin touched <code>pyproject.toml</code> <b>and</b> <code>uv.lock</code>, then <code>uv sync --all-extras</code> + <code>make agent-check</code> + <code>make agent-test</code> before committing.</figcaption>
+</figure>
+
+<h2>Minimal diffs for the critical changes</h2>
+<div class="legend">
+  <span><i class="sw" style="background:var(--add-bg)"></i> added</span>
+  <span><i class="sw" style="background:var(--del-bg)"></i> removed</span>
+  <span><i class="sw" style="background:#0c0e14"></i> context / new file</span>
+</div>
+
+<div class="tabs" id="diff-tabs">
+  <div class="tabbar">
+    <button class="active" data-tab="d-make">Pipelex.make</button>
+    <button data-tab="d-flips">representative flips</button>
+    <button data-tab="d-guard">the guard (core)</button>
+    <button data-tab="d-hook">PostToolUse hook</button>
+    <button data-tab="d-down">downstream fix</button>
+  </div>
+
+  <div class="tabpanel active" data-panel="d-make">
+    <div class="filechip">pipelex/pipelex.py — the public-API change that drove the one consumer break</div>
+    <pre class="diff"><span class="ln ctx">     def make(</span><span class="ln ctx">         cls,</span><span class="ln del">-        integration_mode: IntegrationMode = IntegrationMode.PYTHON,</span><span class="ln ctx">         *,</span><span class="ln add">+        integration_mode: IntegrationMode = IntegrationMode.PYTHON,</span><span class="ln ctx">         needs_inference: bool = True,</span><span class="ln ctx">         temporal_enabled: bool | None = None,</span><span class="ln ctx">         ...</span></pre>
+    <p class="note">The <code>*</code> moved up one line — that's the whole change. <code>Pipelex.make(IntegrationMode.PYTHON)</code> no longer type-checks; <code>Pipelex.make(integration_mode=...)</code> does. Same shape applied to <code>Pipelex.setup()</code> and <code>PipelexHub.setup_config()</code>.</p>
+  </div>
+
+  <div class="tabpanel" data-panel="d-flips">
+    <div class="filechip">representative one-line flips — move <code>*</code> before the subject, nothing else</div>
+    <pre class="diff"><span class="ln hdr"># pipelex/cogt/usage/costs_per_token.py — lookup table was positional</span><span class="ln del">-def model_cost_per_token(costs: CostsByCategoryDict, *, cost_category: CostCategory) -> float:</span><span class="ln add">+def model_cost_per_token(*, costs: CostsByCategoryDict, cost_category: CostCategory) -> float:</span><span class="ln ctx"> </span><span class="ln hdr"># pipelex/core/stuffs/stuff_content.py — both args are render options, self is the subject</span><span class="ln del">-    def rendered_markdown(self, level: int = 1, *, is_pretty: bool = False) -> str:</span><span class="ln add">+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:</span><span class="ln ctx"> </span><span class="ln hdr"># pipelex/libraries/concept/concept_library.py — alias is a namespacing key, concept is what's added</span><span class="ln del">-    def add_dependency_concept(self, alias: str, *, concept: Concept) -> None:</span><span class="ln add">+    def add_dependency_concept(self, *, alias: str, concept: Concept) -> None:</span></pre>
+    <p class="note">All 59 suspects were resolved exactly like this — relocate the bare <code>*</code>, no reorder, no rename. Internal call sites that passed the subject positionally were converted to keyword in the same commit.</p>
+  </div>
+
+  <div class="tabpanel" data-panel="d-guard">
+    <div class="filechip">pipelex/cli/dev_cli/commands/keyword_only_guard.py (new · stdlib-only) — the rule</div>
+    <pre class="plain">def _positional_or_keyword_count(node, *, is_method: bool) -> int:
+    """Count positional-or-keyword params after dropping self/cls and the allowed subject."""
+    params = [*node.args.posonlyargs, *node.args.args]
+    if is_method and params and params[0].arg in {"self", "cls"}:
+        params = params[1:]
+    params = params[1:]            # drop the single allowed subject (Exception 1)
+    return len(params)             # *args/**kwargs and kw-only params are not counted
+
+def _evaluate_def(node, *, module_qname, relative_path, class_stack,
+                  func_stack, is_method, source_lines) -> Violation | None:
+    # carve-outs first — any match => skip entirely
+    if _is_dunder(node.name): return None
+    if _def_line_has_escape_hatch(node, source_lines=source_lines): return None
+    if _has_carveout_decorator(node): return None       # pydantic / Typer / Temporal / pytest / Jinja2 / @override
+    if _has_typer_param_annotation(node): return None   # decorator-less Typer entrypoints
+    if (dotted_qname, relative_path) in SYMMETRIC_ALLOWLIST: return None
+
+    # the rule: a bare * is required once any non-subject positional-or-keyword param remains
+    if _positional_or_keyword_count(node, is_method=is_method) >= 1:
+        return Violation(relative_path=relative_path, qualified_name=local_qname, lineno=node.lineno)
+    return None</pre>
+    <p class="note">A <code>_Collector(ast.NodeVisitor)</code> walks the module tracking the class/function scope; <code>find_violations_in_source()</code> is the shared core both entrypoints call. A mid-edit <code>SyntaxError</code> is skipped, never reported — the hook must not block on a transient parse error.</p>
+  </div>
+
+  <div class="tabpanel" data-panel="d-hook">
+    <div class="filechip">.claude/hooks/check-keyword-only.sh (new) — the in-loop gate</div>
+    <pre class="plain"># PostToolUse hook: run the stdlib-only AST guard on the just-edited file (~40ms).
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}"
+GUARD="$PROJECT_DIR/pipelex/cli/dev_cli/commands/keyword_only_guard.py"
+PYTHON="$PROJECT_DIR/.venv/bin/python"
+
+input=$(cat)                       # tool-call JSON on stdin (pure bash, no jq — house style)
+file_path=$(echo "$input" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' \
+  | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)
+
+[ -z "$file_path" ] && exit 0      # fast, silent pass-through ...
+case "$file_path" in *.py) ;; *) exit 0 ;; esac   # ... non-.py rejected in bash, no Python launch
+[ -x "$PYTHON" ] || exit 0
+[ -f "$GUARD" ] || exit 0
+
+cd "$PROJECT_DIR"                   # invoked by FILE PATH (not -m) → skips the pipelex import chain
+exec "$PYTHON" "$GUARD" "$file_path"   # exit 2 + stderr → Claude Code surfaces it as blocking feedback</pre>
+    <p class="note">Running by file path instead of <code>python -m</code> is deliberate: <code>-m</code> would import <code>pipelex/__init__.py → rich</code> and blow the cold-start budget.</p>
+  </div>
+
+  <div class="tabpanel" data-panel="d-down">
+    <div class="filechip">pipelex-api — the only real downstream call-site break + the lockstep pin bump</div>
+    <pre class="diff"><span class="ln hdr"># tests/unit/conftest.py — integration_mode was passed positionally</span><span class="ln ctx">     pipelex_instance = Pipelex.make(</span><span class="ln del">-        IntegrationMode.PYTEST,</span><span class="ln add">+        integration_mode=IntegrationMode.PYTEST,</span><span class="ln ctx">         needs_inference=needs_inference_in_pipelex(request),</span><span class="ln ctx">         temporal_enabled=False,</span><span class="ln ctx">     )</span><span class="ln ctx"> </span><span class="ln hdr"># pyproject.toml (mirrored in uv.lock) — re-pin to the consolidation SHA</span><span class="ln ctx"> [tool.uv.sources]</span><span class="ln del">-pipelex = { git = "...pipelex.git", rev = "755b82117fd4c26ba090455cfd571099cf05708b" }</span><span class="ln add">+pipelex = { git = "...pipelex.git", rev = "0e32c8c02600e17bbe146331f9b701ccc03a1ca1" }</span></pre>
+    <p class="note">This call was <i>compliant</i> under the earlier SHA (the subject was positional-allowed) and only broke once the consolidation made <code>Pipelex.make</code> fully keyword-only — a textbook example of why the rule pays off: insert/reorder safety. cocode / cookbook / starter-python needed only the rev bump.</p>
+  </div>
+</div>
+
+<h2>Status &amp; the one open thread</h2>
+<div class="grid">
+  <div class="card">
+    <h3>Done <span class="pill good">landed on branch</span></h3>
+    <p>Tree fully compliant; guard hard-blocks in <code>agent-check</code> + CI; convention promoted to the contributor docs (in the mkdocs nav); a standing rule lives in the kit source that regenerates <code>CLAUDE.md</code>/<code>AGENTS.md</code>. All four consumer PRs pushed and green.</p>
+  </div>
+  <div class="card">
+    <h3>Open <span class="pill warn">at release</span></h3>
+    <p>When the refactor lands on PyPI, swap each consumer's temporary <code>[tool.uv.sources]</code> git pin back to the released <code>pipelex</code> version (<code>==</code>/<code>&gt;=</code>) and confirm CI stays green. Tracked in the downstream-consumer-breakage record's checklist.</p>
+  </div>
+</div>
+
+<footer>
+  Branch <code>refactor/Function-calling-4</code>. Consumer PRs: pipelex-api&nbsp;#19, cocode&nbsp;#75, pipelex-cookbook&nbsp;#153, pipelex-starter-python&nbsp;#55, pipelex-worker&nbsp;#23. The full convention spec, the resolved suspects list, and the raw audit live alongside this file in the <code>keyword-only-arguments/</code> track.
+</footer>
+
+</div>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: {
+      background: "#171a23", primaryColor: "#1d212c", primaryBorderColor: "#2c3650",
+      primaryTextColor: "#e6e9ef", lineColor: "#6ea8fe", fontSize: "14px"
+    },
+    flowchart: { curve: "basis" }
+  });
+  // lightweight tabs
+  document.querySelectorAll(".tabs").forEach(function (tabs) {
+    var buttons = tabs.querySelectorAll(".tabbar button");
+    var panels = tabs.querySelectorAll(".tabpanel");
+    buttons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var key = btn.getAttribute("data-tab");
+        buttons.forEach(function (b) { b.classList.toggle("active", b === btn); });
+        panels.forEach(function (p) { p.classList.toggle("active", p.getAttribute("data-panel") === key); });
+      });
+    });
+  });
+</script>
+</body>
+</html>

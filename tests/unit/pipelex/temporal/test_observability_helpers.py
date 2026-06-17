@@ -296,7 +296,7 @@ class TestObservabilityHelpers:
     def test_build_activity_summary_includes_method_pipe_and_extras(self) -> None:
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r", pipe_code="translate_doc")
 
-        summary = build_activity_summary("LLM text", job_metadata, extras={"model": "gpt-4o"})
+        summary = build_activity_summary("LLM text", job_metadata=job_metadata, extras={"model": "gpt-4o"})
 
         assert summary == "LLM text · pipe=translate_doc · model=gpt-4o"
 
@@ -307,21 +307,21 @@ class TestObservabilityHelpers:
         """
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r", pipe_code="extract_text")
 
-        summary = build_activity_summary("LLM object", job_metadata, extras={"class": "Section"})
+        summary = build_activity_summary("LLM object", job_metadata=job_metadata, extras={"class": "Section"})
 
         assert summary == "LLM object · pipe=extract_text · class=Section"
 
     def test_build_activity_summary_omits_pipe_segment_when_pipe_code_is_unset(self) -> None:
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r")
 
-        summary = build_activity_summary("LLM text", job_metadata, extras={"model": "gpt-4o"})
+        summary = build_activity_summary("LLM text", job_metadata=job_metadata, extras={"model": "gpt-4o"})
 
         assert summary == "LLM text · model=gpt-4o"
 
     def test_build_activity_summary_omits_extras_section_when_none(self) -> None:
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r", pipe_code="my_pipe")
 
-        summary = build_activity_summary("Templated text", job_metadata)
+        summary = build_activity_summary("Templated text", job_metadata=job_metadata)
 
         assert summary == "Templated text · pipe=my_pipe"
 
@@ -329,7 +329,7 @@ class TestObservabilityHelpers:
         job_metadata = JobMetadata(user_id="u", pipeline_run_id="r", pipe_code="p")
         long_value = "x" * 500
 
-        summary = build_activity_summary("LLM text", job_metadata, extras={"extra": long_value})
+        summary = build_activity_summary("LLM text", job_metadata=job_metadata, extras={"extra": long_value})
 
         assert len(summary.encode("utf-8")) <= 200
         assert summary.endswith("…")

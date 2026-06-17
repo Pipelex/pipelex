@@ -31,9 +31,9 @@ code path, identical mock everywhere); exotic format constraints must declare
 ``examples`` / ``mock_format`` — see ``DryRunObjectFidelityError``.
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
@@ -140,7 +140,7 @@ def _report_synthetic_llm_job(
     get_report_delegate().report_inference_job(inference_job=synthetic_job)
 
 
-def report_dry_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
+def report_dry_llm_job(job_metadata: JobMetadata, *, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
     """Report a zero-token synthetic LLM job for a ``--dry-run`` inference (cost report suppressed)."""
     _report_synthetic_llm_job(
         job_metadata=job_metadata,
@@ -152,7 +152,7 @@ def report_dry_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_p
     )
 
 
-def report_mock_usage_llm_job(job_metadata: JobMetadata, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
+def report_mock_usage_llm_job(job_metadata: JobMetadata, *, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None:
     """Report a non-zero synthetic LLM job for a dry run with ``is_mock_usage=True`` (cost report renders)."""
     _report_synthetic_llm_job(
         job_metadata=job_metadata,
@@ -183,7 +183,7 @@ def build_mock_object(model_class: type[BaseModelTypeVar], **field_values: Any) 
         raise DryRunMockBuildError.for_object_class(model_class.__name__) from exc
 
 
-def build_mock_objects(model_class: type[BaseModelTypeVar], count: int) -> list[BaseModelTypeVar]:
+def build_mock_objects(model_class: type[BaseModelTypeVar], *, count: int) -> list[BaseModelTypeVar]:
     """Build ``count`` mock instances with a single factory construction.
 
     ``DryRunFactory.make_dry_run_factory`` recursively scans the model tree and mints dynamic
@@ -233,10 +233,11 @@ def _nb_list_items(object_assignment: ObjectAssignment) -> int:
     return get_config().pipelex.dry_run_config.nb_list_items
 
 
-_ReportLLMJobFunc = Callable[[JobMetadata, LLMSetting, LLMPrompt], None]
+class _ReportLLMJobFunc(Protocol):
+    def __call__(self, job_metadata: JobMetadata, *, llm_setting: LLMSetting, llm_prompt: LLMPrompt) -> None: ...
 
 
-def _leaf_gen_object(object_assignment: ObjectAssignment, report_func: _ReportLLMJobFunc) -> BaseModel:
+def _leaf_gen_object(object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc) -> BaseModel:
     """Shared object-mock pipeline: reconstruct the class from its schema, report once, build one mock.
 
     Built from the schema-reconstructed class (the leaf carries only the JSON schema, not the original
@@ -254,17 +255,17 @@ def _leaf_gen_object(object_assignment: ObjectAssignment, report_func: _ReportLL
     mock_object = build_mock_object(item_class)
     # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
-    report_func(llm_assignment.job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
+    report_func(llm_assignment.job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
     return mock_object
 
 
-def _leaf_gen_object_list(object_assignment: ObjectAssignment, report_func: _ReportLLMJobFunc) -> list[BaseModel]:
+def _leaf_gen_object_list(object_assignment: ObjectAssignment, *, report_func: _ReportLLMJobFunc) -> list[BaseModel]:
     """List counterpart of :func:`_leaf_gen_object`: one report, ``nb_items`` builds (D11)."""
     item_class = _reconstruct_object_class(object_assignment)
-    mock_objects = build_mock_objects(item_class, _nb_list_items(object_assignment))
+    mock_objects = build_mock_objects(item_class, count=_nb_list_items(object_assignment))
     # Report only after a successful build — a failed mock must not leave a usage event behind.
     llm_assignment = object_assignment.llm_assignment_for_object
-    report_func(llm_assignment.job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
+    report_func(llm_assignment.job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
     return mock_objects
 
 
@@ -294,7 +295,7 @@ def dry_llm_gen_text(llm_assignment: LLMAssignment) -> str:
     job_metadata = llm_assignment.job_metadata
     log.verbose(f"🤡 DRY RUN: llm_gen_text for '{job_metadata.pipeline_run_id}'")
     report_func = _dry_report_func(llm_assignment.cogt_run_params)
-    report_func(job_metadata, llm_assignment.llm_setting, llm_assignment.llm_prompt)
+    report_func(job_metadata, llm_setting=llm_assignment.llm_setting, llm_prompt=llm_assignment.llm_prompt)
     prompt_truncated = llm_assignment.llm_prompt.desc(truncate_text_length=_dry_text_gen_truncate_length())
     return f"DRY RUN: llm_gen_text • llm_setting={llm_assignment.llm_setting.desc()} • prompt={prompt_truncated}"
 
@@ -339,7 +340,7 @@ def dry_templating_gen_text(templating_assignment: TemplatingAssignment) -> str:
     )
 
 
-def _dry_image_content(image_url: str, img_gen_assignment: ImgGenAssignment | None = None) -> ImageContent:
+def _dry_image_content(image_url: str, *, img_gen_assignment: ImgGenAssignment | None = None) -> ImageContent:
     image_content = ImageContent(
         url=image_url,
         public_url=image_url,
@@ -406,7 +407,7 @@ def dry_search_gen_sourced_answer(search_assignment: SearchAssignment) -> Search
     """Dry leaf for sourced-answer search: polyfactory-built result with mock sources, no provider."""
     log.verbose(f"🤡 DRY RUN: search_gen_sourced_answer for '{search_assignment.search_handle}'")
     nb_sources = get_config().pipelex.dry_run_config.nb_list_items
-    mock_sources = build_mock_objects(DocumentContent, nb_sources)
+    mock_sources = build_mock_objects(DocumentContent, count=nb_sources)
     return build_mock_object(SearchResultContent, sources=mock_sources)
 
 

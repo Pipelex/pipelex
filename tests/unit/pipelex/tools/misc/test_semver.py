@@ -81,7 +81,7 @@ class TestSemver:
         """Caret constraints allow compatible updates within the same major (or minor for 0.x)."""
         constraint = parse_constraint(constraint_str)
         version = parse_version(version_str)
-        assert version_satisfies(version, constraint) == expected
+        assert version_satisfies(version, constraint=constraint) == expected
 
     @pytest.mark.parametrize(
         ("constraint_str", "version_str", "expected"),
@@ -96,7 +96,7 @@ class TestSemver:
         """Tilde constraints allow patch-level updates only."""
         constraint = parse_constraint(constraint_str)
         version = parse_version(version_str)
-        assert version_satisfies(version, constraint) == expected
+        assert version_satisfies(version, constraint=constraint) == expected
 
     @pytest.mark.parametrize(
         ("constraint_str", "version_str", "expected"),
@@ -119,7 +119,7 @@ class TestSemver:
         """Comparison operators (>=, >, <=, <, ==, !=) work correctly."""
         constraint = parse_constraint(constraint_str)
         version = parse_version(version_str)
-        assert version_satisfies(version, constraint) == expected
+        assert version_satisfies(version, constraint=constraint) == expected
 
     @pytest.mark.parametrize(
         ("constraint_str", "version_str", "expected"),
@@ -135,7 +135,7 @@ class TestSemver:
         """Wildcard constraints match any version (or within a major range)."""
         constraint = parse_constraint(constraint_str)
         version = parse_version(version_str)
-        assert version_satisfies(version, constraint) == expected
+        assert version_satisfies(version, constraint=constraint) == expected
 
     @pytest.mark.parametrize(
         ("constraint_str", "version_str", "expected"),
@@ -149,13 +149,13 @@ class TestSemver:
         """Compound constraints (AND of multiple sub-constraints) work correctly."""
         constraint = parse_constraint(constraint_str)
         version = parse_version(version_str)
-        assert version_satisfies(version, constraint) == expected
+        assert version_satisfies(version, constraint=constraint) == expected
 
     def test_version_satisfies_exact_no_operator(self) -> None:
         """A bare version string (no operator) means exact match."""
         constraint = parse_constraint("1.0.0")
-        assert version_satisfies(parse_version("1.0.0"), constraint) is True
-        assert version_satisfies(parse_version("1.0.1"), constraint) is False
+        assert version_satisfies(parse_version("1.0.0"), constraint=constraint) is True
+        assert version_satisfies(parse_version("1.0.1"), constraint=constraint) is False
 
     @pytest.mark.parametrize(
         ("tag", "expected_major", "expected_minor", "expected_patch"),
@@ -187,39 +187,39 @@ class TestSemver:
         """MVS returns the lowest version satisfying the constraint."""
         versions = [Version("1.0.0"), Version("1.1.0"), Version("1.2.0"), Version("2.0.0")]
         constraint = SimpleSpec("^1.0.0")
-        result = select_minimum_version(versions, constraint)
+        result = select_minimum_version(versions, constraint=constraint)
         assert result == Version("1.0.0")
 
     def test_select_minimum_version_skips_non_matching(self) -> None:
         """MVS skips versions that don't satisfy the constraint."""
         versions = [Version("0.9.0"), Version("1.0.0"), Version("1.5.0")]
         constraint = SimpleSpec(">=1.0.0")
-        result = select_minimum_version(versions, constraint)
+        result = select_minimum_version(versions, constraint=constraint)
         assert result == Version("1.0.0")
 
     def test_select_minimum_version_no_match(self) -> None:
         """MVS returns None when no version matches."""
         versions = [Version("1.0.0")]
         constraint = SimpleSpec("^2.0.0")
-        result = select_minimum_version(versions, constraint)
+        result = select_minimum_version(versions, constraint=constraint)
         assert result is None
 
     def test_select_minimum_version_empty_list(self) -> None:
         """MVS returns None for an empty version list."""
         constraint = SimpleSpec("^1.0.0")
-        result = select_minimum_version([], constraint)
+        result = select_minimum_version([], constraint=constraint)
         assert result is None
 
     def test_select_minimum_version_multiple_constraints(self) -> None:
         """Multi-constraint MVS returns the lowest version satisfying all constraints."""
         versions = [Version("1.0.0"), Version("1.2.0"), Version("2.0.0")]
         constraints = [SimpleSpec(">=1.0.0"), SimpleSpec(">=1.2.0")]
-        result = select_minimum_version_for_multiple_constraints(versions, constraints)
+        result = select_minimum_version_for_multiple_constraints(versions, constraints=constraints)
         assert result == Version("1.2.0")
 
     def test_select_minimum_version_multiple_constraints_unsatisfiable(self) -> None:
         """Multi-constraint MVS returns None when constraints are unsatisfiable together."""
         versions = [Version("1.0.0"), Version("2.0.0")]
         constraints = [SimpleSpec(">=1.5.0"), SimpleSpec("<2.0.0")]
-        result = select_minimum_version_for_multiple_constraints(versions, constraints)
+        result = select_minimum_version_for_multiple_constraints(versions, constraints=constraints)
         assert result is None

@@ -44,7 +44,7 @@ def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     data.pop("inputs", None)
 
 
-def _normalize_sub_pipe_list(raw_value: Any, field_name: str) -> list[dict[str, Any]]:
+def _normalize_sub_pipe_list(raw_value: Any, *, field_name: str) -> list[dict[str, Any]]:
     """Validate and normalize a raw ``steps`` / ``branches`` value into a list of step dicts.
 
     Each entry is copied (to avoid mutating the caller's nested dicts) and passed
@@ -86,12 +86,12 @@ def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
                 data.pop(alias)
 
 
-def parse_pipe_spec(pipe_type: str, spec_data: Any) -> PipeSpec:
+def parse_pipe_spec(spec_data: Any, *, pipe_type: str) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
 
     Args:
-        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
         spec_data: Raw data for the pipe spec (untrusted JSON-like input).
+        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
 
     Returns:
         Validated PipeSpec instance of the correct type.
@@ -188,7 +188,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: Any) -> PipeSpec:
     return spec_class.model_validate(spec_data)
 
 
-def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: Table) -> None:
+def add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: Table) -> None:
     """Add type-specific fields to the pipe TOML table.
 
     Args:
@@ -329,7 +329,7 @@ def pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     pipe_item_table.add("output", pipe_spec.output)
 
     # Add type-specific fields
-    add_type_specific_fields(pipe_spec, pipe_item_table)
+    add_type_specific_fields(pipe_spec, pipe_table=pipe_item_table)
 
     # Build the nested structure: [pipe.pipe_code]
     pipe_section = tomlkit.table()

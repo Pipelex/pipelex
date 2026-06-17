@@ -12,8 +12,8 @@ Phase-3 contract (TODOS.md):
 - tracing stays in memory: no NDJSON partition appears, ``make_event_log`` is never called;
 - the graph is best-effort (D5): an expected dry-run failure yields ``graph_spec=None`` with
   validation still successful, while a non-Pipelex programming bug propagates and fails the run;
-- a validation failure crosses back as a structured ``ErrorReport`` whose offending-signature
-  data survives the crossing (D3/T3);
+- a validation failure crosses back as a structured ``ErrorReport`` whose per-error
+  ``validation_errors`` data survives the crossing (D3/T3);
 - concurrent invocations don't cross-contaminate the scoped overrides.
 """
 
@@ -29,6 +29,7 @@ from temporalio.client import WorkflowFailureError
 from temporalio.common import RetryPolicy
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
+from pipelex.base_exceptions import ValidationErrorCategory
 from pipelex.config import get_config
 from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipe_run.exceptions import DryRunError
@@ -118,6 +119,15 @@ type = "PipeSignature"
 description = "A contract-only placeholder"
 inputs = { doc = "Text" }
 output = "Text"
+"""
+
+_INVALID_MTHDS = """
+domain = "dry_validate_invalid"
+description = "Bundle with a real validation error: an invalid main_pipe code fails blueprint validation"
+main_pipe = "Not A Valid Pipe Code!"
+
+[concept.InvalidDoc]
+description = "A document for the invalid-bundle test"
 """
 
 
@@ -250,23 +260,24 @@ class TestDryValidateActivityInMemory:
             await self._execute(temporal_client, DryValidateArg(mthds_contents=[_ALPHA_MTHDS]))
 
     async def test_validation_failure_crosses_as_structured_error_report(self, temporal_client: TemporalClient) -> None:
-        """D3/T3: a strict-mode signature refusal raises, and the structured offending-signature
+        """D3/T3: a genuine validation failure raises, and the structured per-error ``validation_errors``
         data survives the ErrorReport crossing (it must not degrade to a plain message).
 
-        The sweep goes through ``validate_bundle``'s cascade, so the crossing report carries the
-        SAME identity the direct-mode route's 422 carries — ``ValidateBundleError``,
-        ``error_domain=input`` — with the offender and signature refs in the caller-facing
-        message (the API problem document is built from exactly these ErrorReport fields).
+        Signatures are never an error (D-B), so the trigger is a real validation fault — an invalid
+        ``main_pipe`` code that fails blueprint validation. The sweep goes through ``validate_bundle``'s
+        cascade, so the crossing report carries the SAME identity the direct-mode route's body carries —
+        ``ValidateBundleError``, ``error_domain=input`` — with the per-error items in
+        ``validation_errors`` (the API ``InvalidReport`` is built from exactly these ErrorReport fields).
         """
         with pytest.raises(WorkflowFailureError) as exc_info:
-            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=False))
+            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_INVALID_MTHDS]))
 
         error_report = recover_error_report(exc_info.value)
         assert error_report.error_type == "ValidateBundleError"
         assert error_report.error_domain == "input"
-        # The structured signature data — offender and signature refs — survives in the report.
-        assert "dry_validate_sig.sig_caller" in error_report.message
-        assert "dry_validate_sig.unimplemented_sig" in error_report.message
+        # The structured per-error data survives the crossing (not a bare message).
+        assert error_report.validation_errors is not None
+        assert any(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in error_report.validation_errors)
 
     async def test_signatures_allowed_in_lenient_mode(self, temporal_client: TemporalClient) -> None:
         """The same signature bundle validates in lenient mode (allow_signatures=True), and the
@@ -292,7 +303,7 @@ class TestDryValidateActivityInMemory:
             wraps=validate_bundle,
         )
         with pytest.raises(WorkflowFailureError):
-            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_SIGNATURE_MTHDS], allow_signatures=False))
+            await self._execute(temporal_client, DryValidateArg(mthds_contents=[_INVALID_MTHDS]))
         assert sweep_spy.call_count == 1
 
     async def test_pipe_io_contracts_failure_does_not_retry_activity(self, temporal_client: TemporalClient, mocker: MockerFixture) -> None:

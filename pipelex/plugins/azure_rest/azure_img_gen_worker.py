@@ -104,6 +104,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
@@ -216,7 +217,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         try:
             response_dict = response.json()
         except json.JSONDecodeError as exc:
-            metadata = extract_azure_metadata_from_response(response, type(exc).__name__, message=str(exc))
+            metadata = extract_azure_metadata_from_response(response, sdk_exception_type=type(exc).__name__, message=str(exc))
             classification = classify_inference_error(metadata)
             raise render_inference_error(
                 metadata=metadata,

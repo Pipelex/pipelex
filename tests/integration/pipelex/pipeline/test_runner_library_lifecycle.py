@@ -75,7 +75,7 @@ class _FailingPipeRun(PipeRunProtocol):
     """
 
     @override
-    async def run(self, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
+    async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
         msg = "Injected pipe-run failure to exercise library teardown."
         raise PipeRouterError(
             message=msg,

@@ -273,6 +273,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_libraries(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
@@ -335,6 +336,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_libraries_concepts_only(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list["Concept"]:
@@ -420,7 +422,7 @@ class LibraryManager(LibraryManagerAbstract):
         return self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
 
     @override
-    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
@@ -514,7 +516,7 @@ class LibraryManager(LibraryManagerAbstract):
         return all_pipes
 
     @override
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
@@ -558,6 +560,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_concepts_only_from_blueprints(
         self,
         library_id: str,
+        *,
         blueprints: list[PipelexBundleBlueprint],
     ) -> list["Concept"]:
         """Load only domains and concepts from blueprints, skipping pipes.
@@ -758,7 +761,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_mthds_files_into_library(self, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(self, library_id: str, *, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
@@ -836,6 +839,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _warn_if_mthds_version_unsatisfied(
         self,
         mthds_version_constraint: str,
+        *,
         package_address: str,
     ) -> None:
         """Emit a warning if the current MTHDS standard version does not satisfy the package's constraint."""
@@ -846,7 +850,7 @@ class LibraryManager(LibraryManagerAbstract):
             log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
             return
 
-        if not version_satisfies(current_version, constraint):
+        if not version_satisfies(current_version, constraint=constraint):
             log.warning(
                 f"Package '{package_address}' requires MTHDS standard version "
                 f"'{mthds_version_constraint}', but the current version is "
@@ -856,6 +860,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _check_package_visibility(
         self,
         blueprints: list[PipelexBundleBlueprint],
+        *,
         mthds_paths: list[Path],
     ) -> MethodsManifest | None:
         """Check package visibility if a METHODS.toml manifest exists.
@@ -940,6 +945,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_dependency_packages(
         self,
         library_id: str,
+        *,
         manifest: MethodsManifest,
         package_root: Path,
     ) -> None:
@@ -975,6 +981,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_single_dependency(
         self,
         library: Library,
+        *,
         resolved_dep: ResolvedDependency,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
@@ -1135,6 +1142,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_address_based_dependencies(
         self,
         library_id: str,
+        *,
         blueprints: list[PipelexBundleBlueprint],
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
@@ -1185,6 +1193,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_address_based_dependency(
         self,
         library: "Library",
+        *,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
     ) -> bool:
@@ -1243,12 +1252,12 @@ class LibraryManager(LibraryManagerAbstract):
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=concept_codes_to_remove)
 
     @override
-    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, library_id: str, *, blueprint: PipelexBundleBlueprint) -> None:
         self._remove_pipes_from_blueprint(blueprint=blueprint)
         self._remove_concepts_from_blueprint(blueprint=blueprint)
 
     @override
-    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 
@@ -1345,7 +1354,7 @@ class LibraryManager(LibraryManagerAbstract):
 
             return refs
 
-        def check_for_cycle(concept_ref: str, visiting: set[str], path: list[str]) -> None:
+        def check_for_cycle(concept_ref: str, *, visiting: set[str], path: list[str]) -> None:
             """Recursively check for cycles starting from concept_ref."""
             if concept_ref in visiting:
                 # Found a cycle - build error message
@@ -1364,11 +1373,11 @@ class LibraryManager(LibraryManagerAbstract):
             path.append(concept_ref)
 
             for ref in get_referenced_concepts(concept):
-                check_for_cycle(ref, visiting, path)
+                check_for_cycle(ref, visiting=visiting, path=path)
 
             path.pop()
             visiting.remove(concept_ref)
 
         # Check each concept as a starting point
         for concept in concepts:
-            check_for_cycle(concept.concept_ref, set(), [])
+            check_for_cycle(concept.concept_ref, visiting=set(), path=[])

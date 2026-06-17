@@ -24,6 +24,7 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         blueprint: dict[str, str],
     ) -> InputStuffSpecs:
@@ -39,6 +40,7 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_string(
         cls,
+        *,
         domain_code: str,
         stuff_spec_str: str,
     ) -> StuffSpec:

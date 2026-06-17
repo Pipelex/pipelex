@@ -37,6 +37,7 @@ graph_app = typer.Typer(no_args_is_help=True)
 
 def _do_graph_render(
     input_file: Path,
+    *,
     out: str | None,
     direction: FlowchartDirection | None,
     mermaidflow: bool,

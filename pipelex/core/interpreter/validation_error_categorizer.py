@@ -26,6 +26,7 @@ def _extract_variable_names_from_message(message: str) -> list[str] | None:
 
 def _categorize_input_validation_error(
     message: str,
+    *,
     domain: str | None,
     source: str | None,
     pipe_code: str | None,
@@ -72,6 +73,7 @@ def _categorize_input_validation_error(
 
 def _categorize_syntax_validation_error(
     message: str,
+    *,
     domain: str | None,
     source: str | None,
 ) -> PipelexBundleBlueprintValidationErrorData | None:
@@ -124,6 +126,7 @@ def _is_pydantic_internal_loc_element(element: str) -> bool:
 
 def _categorize_concept_validation_error(
     loc: tuple[int | str, ...],
+    *,
     message: str,
     domain: str | None,
     source: str | None,
@@ -167,14 +170,15 @@ def _categorize_concept_validation_error(
 
 
 def categorize_blueprint_validation_error(
-    blueprint_dict: dict[str, Any],
     error: ErrorDetails,
+    *,
+    blueprint_dict: dict[str, Any],
 ) -> PipelexBundleBlueprintValidationErrorData | None:
     """Categorize a BLUEPRINT validation error and create structured error data or return None if the error cannot be categorized.
 
     Args:
-        blueprint_dict: The blueprint dict being validated (for context extraction)
         error: Pydantic error from PipelexBundleBlueprint.model_validate()
+        blueprint_dict: The blueprint dict being validated (for context extraction)
 
     Returns:
         PipelexBundleBlueprintValidationErrorData with all relevant fields populated, or None if error cannot be categorized

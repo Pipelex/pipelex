@@ -109,6 +109,7 @@ def _make_retry_predicate(retry_on_ambiguous_failure: bool) -> Callable[[BaseExc
 
 async def request_with_transport_retry(
     send_request: Callable[[], Awaitable[httpx.Response]],
+    *,
     max_retries: int,
     retry_on_ambiguous_failure: bool = True,
 ) -> httpx.Response:

@@ -142,7 +142,7 @@ class Pipelex(metaclass=MetaSingleton):
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+    def _get_validation_error_msg(*, component_name: str, validation_exc: Exception) -> str:
         """Generate error message for invalid config files."""
         msg = ""
         cause_exc = validation_exc.__cause__
@@ -164,6 +164,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        *,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
         temporal_enabled: bool | None = None,
@@ -349,10 +350,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg) from routing_profile_exc
 
         except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            msg = self._get_validation_error_msg(component_name="inference backend library", validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
-            msg = self._get_validation_error_msg("model deck", deck_validation_exc)
+            msg = self._get_validation_error_msg(component_name="model deck", validation_exc=deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
 
@@ -510,6 +511,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
+        *,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
         temporal_enabled: bool | None = None,

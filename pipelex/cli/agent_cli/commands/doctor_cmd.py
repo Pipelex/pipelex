@@ -194,7 +194,7 @@ def agent_doctor_cmd(
         # Agent CLI command boundary: agent_error() (NoReturn) converts any genuinely
         # unexpected failure into the structured error payload. PipelexConfigError is
         # handled by the inner arm above and never reaches here.
-        agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
+        agent_error(f"Health check failed unexpectedly: {exc}", error_type=type(exc).__name__, cause=exc)
 
     # Pin stdout discipline regardless of bootstrap path (broken-config branch never
     # installed a hub or configured log — the helper guards both internally).

@@ -83,7 +83,7 @@ class TestOtelFactory:
 
     def test_make_trace_names_returns_full_and_redacted(self) -> None:
         """Test that make_trace_names returns both full and redacted trace names."""
-        trace_name, trace_name_redacted = OtelFactory.make_trace_names("run_123", "my_pipe")
+        trace_name, trace_name_redacted = OtelFactory.make_trace_names("run_123", pipe_code="my_pipe")
 
         # Full trace name should include pipe code
         assert trace_name.startswith("my_pipe_")

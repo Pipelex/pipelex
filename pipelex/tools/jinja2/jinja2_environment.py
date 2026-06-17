@@ -7,9 +7,9 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
 
 def make_jinja2_env_from_loader(
+    *,
     template_category: TemplateCategory,
     loader: BaseLoader,
-    *,
     enable_async: bool = True,
 ) -> Environment:
     autoescape: bool
@@ -56,8 +56,8 @@ def make_jinja2_env_from_loader(
 
 def _register_filters(
     jinja2_env: Environment,
-    template_category: TemplateCategory,
     *,
+    template_category: TemplateCategory,
     enable_async: bool,
 ) -> None:
     """Register template category filters on the Jinja2 environment.
@@ -90,7 +90,7 @@ def make_jinja2_env_without_loader(
         enable_async=enable_async,
     )
 
-    _register_filters(jinja2_env, template_category, enable_async=enable_async)
+    _register_filters(jinja2_env, template_category=template_category, enable_async=enable_async)
     return jinja2_env
 
 
@@ -119,5 +119,5 @@ def make_jinja2_env_from_registry(
         enable_async=enable_async,
     )
 
-    _register_filters(jinja2_env, template_category, enable_async=enable_async)
+    _register_filters(jinja2_env, template_category=template_category, enable_async=enable_async)
     return jinja2_env

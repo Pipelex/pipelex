@@ -9,6 +9,7 @@ from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 def bedrock_list_available_models(
     plugin: Plugin,  # noqa: ARG001
+    *,
     backend: InferenceBackend,  # noqa: ARG001
 ) -> list[dict[str, Any]]:
     """List available Bedrock foundation models.

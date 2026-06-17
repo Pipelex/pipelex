@@ -94,6 +94,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def open_tracer(
         self,
         graph_id: str,
+        *,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -217,6 +218,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def on_pipe_start(
         self,
         trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -263,6 +265,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_success(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -300,6 +303,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_execution_data(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         execution_data: dict[str, Any],
@@ -320,6 +324,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_error(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -354,6 +359,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def add_edge(
         self,
+        *,
         lookup_key: str,
         source_node_id: str,
         target_node_id: str,
@@ -382,6 +388,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_controller_output(
         self,
+        *,
         lookup_key: str,
         node_id: str,
         output_spec: IOSpec,
@@ -403,6 +410,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_item_extraction(
         self,
+        *,
         lookup_key: str,
         list_stuff_code: str,
         item_stuff_code: str,
@@ -431,6 +439,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_aggregation(
         self,
+        *,
         lookup_key: str,
         output_list_stuff_code: str,
         item_stuff_code: str,
@@ -459,6 +468,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_parallel_combine(
         self,
+        *,
         lookup_key: str,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],

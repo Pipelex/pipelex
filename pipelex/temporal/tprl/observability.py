@@ -35,7 +35,7 @@ USER_ID_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("Us
 DOMAIN_CODE_KEY: Final[SearchAttributeKey[str]] = SearchAttributeKey.for_keyword("DomainCode")
 
 
-def _truncate_utf8(text: str, max_bytes: int) -> str:
+def _truncate_utf8(text: str, *, max_bytes: int) -> str:
     """Return ``text`` truncated so its UTF-8 encoding fits in ``max_bytes``.
 
     A trailing ellipsis is appended when truncation occurs. The slice is decoded
@@ -131,7 +131,7 @@ def build_static_summary(pipe: PipeAbstract) -> str:
         text = f"{pipe.code} — {pipe.description}"
     else:
         text = pipe.code
-    return _truncate_utf8(text, _MAX_SUMMARY_BYTES)
+    return _truncate_utf8(text, max_bytes=_MAX_SUMMARY_BYTES)
 
 
 def build_static_details(pipe_job: PipeJob) -> str:
@@ -157,11 +157,12 @@ def build_static_details(pipe_job: PipeJob) -> str:
     lines: list[str] = ["| Field | Value |", "|---|---|"]
     for field, value in rows:
         lines.append(f"| {field} | {value} |")
-    return _truncate_utf8("\n".join(lines), _MAX_DETAILS_BYTES)
+    return _truncate_utf8("\n".join(lines), max_bytes=_MAX_DETAILS_BYTES)
 
 
 def build_activity_summary(
     method_label: str,
+    *,
     job_metadata: JobMetadata,
     extras: Mapping[str, str] | None = None,
 ) -> str:
@@ -181,4 +182,4 @@ def build_activity_summary(
         for key, value in extras.items():
             parts.append(f"{key}={value}")
     text = " · ".join(parts)
-    return _truncate_utf8(text, _MAX_SUMMARY_BYTES)
+    return _truncate_utf8(text, max_bytes=_MAX_SUMMARY_BYTES)

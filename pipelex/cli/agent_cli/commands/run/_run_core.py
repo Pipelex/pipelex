@@ -20,6 +20,7 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 
 async def run_pipeline_core(
     pipe_code: str,
+    *,
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
     inputs: dict[str, Any] | None = None,

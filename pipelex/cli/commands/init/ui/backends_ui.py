@@ -14,7 +14,7 @@ from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
-def get_backend_options_from_toml(template_path: Path, existing_path: Path | None = None) -> list[tuple[str, str]]:
+def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | None = None) -> list[tuple[str, str]]:
     """Get backend options dynamically from TOML files.
 
     Args:
@@ -58,7 +58,7 @@ def get_backend_options_from_toml(template_path: Path, existing_path: Path | Non
     return backend_options
 
 
-def get_currently_enabled_backends(backends_toml_path: Path, backend_options: list[tuple[str, str]]) -> list[int]:
+def get_currently_enabled_backends(backends_toml_path: Path, *, backend_options: list[tuple[str, str]]) -> list[int]:
     """Get list of currently enabled backend indices from existing backends.toml.
 
     Args:
@@ -95,7 +95,7 @@ def get_currently_enabled_backends(backends_toml_path: Path, backend_options: li
 
 
 def build_backend_selection_panel(
-    backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
+    backend_options: list[tuple[str, str]], *, currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
 ) -> Panel:
     """Create a Rich Panel for backend selection with options table.
 
@@ -154,6 +154,7 @@ def build_backend_selection_panel(
 
 def prompt_backend_select(
     console: Console,
+    *,
     backend_options: list[tuple[str, str]],
     currently_enabled: list[int] | None = None,
     is_first_time_setup: bool = False,
@@ -236,7 +237,7 @@ def prompt_backend_select(
     return selected_indices, selected_backend_keys
 
 
-def display_selected_backends(console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
+def display_selected_backends(*, console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
     """Display confirmation of selected backends.
 
     Args:

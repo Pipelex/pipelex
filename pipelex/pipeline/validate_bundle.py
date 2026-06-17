@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 from typing_extensions import TypedDict, assert_never
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
@@ -35,7 +36,6 @@ from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
 
@@ -104,9 +104,9 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
     ``PipeFactoryError`` carries the categorized factory error, etc. Sharing one
     source of truth means a new handler only needs to be added once. The
     pipe-loading / dry-run handlers (``PipeFactoryError``, ``PipeValidationError``,
-    ``PipeRunError``, ``DryRunError``, ``SignaturesNotAllowedError``) are dead code
-    in the concepts-only paths (those functions never instantiate pipes or run dry
-    runs), but they are harmless there — they simply never fire.
+    ``PipeRunError``, ``DryRunError``) are dead code in the concepts-only paths
+    (those functions never instantiate pipes or run dry runs), but they are
+    harmless there — they simply never fire.
 
     ``category`` controls the user-facing framing for the one branch that fires
     from both paths: the ``except ValidationError`` arm catches pydantic
@@ -191,24 +191,16 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-    except SignaturesNotAllowedError as sig_error:
-        # Strict-mode dry-run refused because the dependency graph reaches a
-        # ``PipeSignature`` placeholder. Carry the error so the CLI can render the
-        # offending signatures and the dependency chains that reach them.
-        raise ValidateBundleError(
-            message=str(sig_error),
-            signature_check_error=sig_error,
-        ) from sig_error
 
 
-def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
+def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: list[str] | None) -> list[PipeAbstract]:
     """Select which loaded pipes to dry-run.
 
     Returns every loaded pipe when ``dry_run_pipe_codes`` is ``None`` (whole-bundle validation).
     Otherwise returns only the pipes whose bare ``code`` or qualified ``pipe_ref`` is requested —
     used by the ``--pipe`` path to validate a single implemented slice of a partially stubbed
-    bundle without dry-running (and thus rejecting) unrelated pipes or signatures. Filtering here,
-    before ``BundleValidator.validate_pipes``, also narrows its strict signature pre-check to just the selected pipe.
+    bundle without dry-running unrelated pipes. Filtering here, before ``BundleValidator.validate_pipes``,
+    narrows the dry-run sweep to just the selected pipe (signatures are never an error either way — D-B).
 
     Raises:
         PipeNotFoundError: when ``dry_run_pipe_codes`` names a pipe absent from the loaded bundle —
@@ -229,7 +221,9 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], dry_run_pipe_codes: list
 
 async def validate_bundle(
     mthds_file_path: Path | None = None,
+    *,
     mthds_contents: list[str] | None = None,
+    mthds_sources: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
@@ -241,17 +235,31 @@ async def validate_bundle(
         ]
     )
     if provided_params == 0:
+        # Programmer error: a caller (the HTTP request layer, a builder op) must wire exactly one
+        # input. It is not a content verdict the end user can fix → PipelexUnexpectedError (→ 500,
+        # redacted under STRICT), matching the mthds_sources-mismatch guard below — never a
+        # ValidateBundleError, which would 200/422 a host-wiring bug as if the bundle were invalid.
         msg = "At least one of mthds_contents or mthds_file_path must be provided to validate_bundle"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if provided_params > 1:
         msg = "Only one of mthds_contents or mthds_file_path can be provided to validate_bundle, not both"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if mthds_contents is not None and not mthds_contents:
         # An EMPTY list is not None, so it passes the provided-params check above — without this
         # guard it would yield a blueprint-less result that downstream consumers (the canonical
         # report's primary-blueprint selection) cannot represent.
         msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
         raise ValidateBundleError(message=msg)
+    if mthds_sources is not None and (mthds_contents is None or len(mthds_sources) != len(mthds_contents)):
+        # ``mthds_sources`` is a per-content source list (the host — e.g. an HTTP API —
+        # threads each bundle's source onto the in-memory load path so its diagnostics carry a
+        # real ``source``). It is never supplied by the end caller, so a missing-alongside /
+        # length-mismatch is a host wiring bug, not bad user input: raise an internal error
+        # (→ 500, redacted under STRICT) rather than ``ValidateBundleError`` (→ caller-facing
+        # 422). Contrast the empty-``mthds_contents`` guard above, which can legitimately
+        # reflect an end user submitting no bundles and so stays a caller-facing input error.
+        msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
+        raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()
@@ -276,10 +284,16 @@ async def validate_bundle(
             else:
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
-                loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+                content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
+                loaded_blueprints = [
+                    PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
+                    for content, source in zip(mthds_contents, content_sources, strict=True)
+                ]
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
+                    library_id=library_id,
+                    allow_signatures=allow_signatures,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -302,7 +316,9 @@ async def validate_bundle(
                     loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
 
                 dry_run_results = await BundleValidator().validate_pipes(
-                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes), library_id=library_id, allow_signatures=allow_signatures
+                    pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
+                    library_id=library_id,
+                    allow_signatures=allow_signatures,
                 )
                 result = ValidateBundleResult(
                     blueprints=loaded_blueprints,
@@ -327,7 +343,7 @@ async def validate_bundle(
             library_manager.teardown(library_id=library_id)
 
 
-async def validate_bundles_from_directory(directory: Path, allow_signatures: bool = False) -> ValidateBundleResult:
+async def validate_bundles_from_directory(directory: Path, *, allow_signatures: bool = False) -> ValidateBundleResult:
     mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
@@ -372,6 +388,7 @@ class LoadConceptsOnlyResult(BaseModel):
 
 def load_concepts_only(
     mthds_file_path: Path | None = None,
+    *,
     mthds_contents: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:
@@ -394,11 +411,13 @@ def load_concepts_only(
     """
     provided_params = sum([mthds_contents is not None, mthds_file_path is not None])
     if provided_params == 0:
+        # Programmer error (see validate_bundle's twin guard): the caller must wire exactly one
+        # input. Not a content verdict → PipelexUnexpectedError (→ 500), never ValidateBundleError.
         msg = "At least one of mthds_contents or mthds_file_path must be provided to load_concepts_only"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
     if provided_params > 1:
         msg = "Only one of mthds_contents or mthds_file_path can be provided to load_concepts_only, not both"
-        raise ValidateBundleError(message=msg)
+        raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
     library_id, library = library_manager.open_library()

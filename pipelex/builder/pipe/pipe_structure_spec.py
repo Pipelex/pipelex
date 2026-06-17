@@ -40,7 +40,7 @@ class PipeStructureSpec(PipeSpec):
         return value
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         base_group = super().rendered_pretty(title=title, depth=depth)
 
         structure_group = Group()

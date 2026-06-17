@@ -55,7 +55,7 @@ class TestSyncTomlValues:
         """Differing values are updated in place while header comments, inline comments and blank lines all survive."""
         source_path, target_path = write_pair(tmp_path, SOURCE_CONTENT, TARGET_CONTENT)
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert target_path.read_text() == SYNCED_TARGET_CONTENT
         assert result.updated_keys == ["title", "section.sub.deep"]
@@ -75,7 +75,7 @@ class TestSyncTomlValues:
             'shared = "from-target"\n',
         )
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         target_text = target_path.read_text()
         assert "source_only" not in target_text
@@ -90,7 +90,7 @@ class TestSyncTomlValues:
             'shared = "same"\ntarget_only = "precious"  # do not lose\n',
         )
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert target_path.read_text() == 'shared = "same"\ntarget_only = "precious"  # do not lose\n'
         assert result.updated_keys == []
@@ -102,7 +102,7 @@ class TestSyncTomlValues:
         source_path, target_path = write_pair(tmp_path, SOURCE_CONTENT, TARGET_CONTENT)
         bytes_before = target_path.read_bytes()
 
-        result = sync_toml_values(source_path, target_path, dry_run=True)
+        result = sync_toml_values(source_path=source_path, target_path=target_path, dry_run=True)
 
         assert target_path.read_bytes() == bytes_before
         assert result.updated_keys == ["title", "section.sub.deep"]
@@ -117,7 +117,7 @@ class TestSyncTomlValues:
         source_path, target_path = write_pair(tmp_path, 'answer = 42\n\n[section]\nkey = "tight"\n', quirky_target)
         bytes_before = target_path.read_bytes()
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert target_path.read_bytes() == bytes_before
         assert result.updated_keys == []
@@ -127,10 +127,10 @@ class TestSyncTomlValues:
         """A second sync after a first one that applied changes finds nothing to update and leaves the bytes identical."""
         source_path, target_path = write_pair(tmp_path, SOURCE_CONTENT, TARGET_CONTENT)
 
-        first_result = sync_toml_values(source_path, target_path)
+        first_result = sync_toml_values(source_path=source_path, target_path=target_path)
         bytes_after_first = target_path.read_bytes()
 
-        second_result = sync_toml_values(source_path, target_path)
+        second_result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert first_result.updated_keys == ["title", "section.sub.deep"]
         assert second_result.updated_keys == []
@@ -146,7 +146,7 @@ class TestSyncTomlValues:
             "count = 30  # inline note\n\n[outer.inner]\nflag = false\n",
         )
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert target_path.read_text() == 'count = "thirty"  # inline note\n\n[outer.inner]\nflag = true\n'
         assert result.updated_keys == ["count", "outer.inner.flag"]
@@ -163,7 +163,7 @@ class TestSyncTomlValues:
             '[[servers]]\nname = "beta"\nport = 8000\n\n[[servers]]\nname = "gamma"\nport = 8001\n',
         )
 
-        result = sync_toml_values(source_path, target_path)
+        result = sync_toml_values(source_path=source_path, target_path=target_path)
 
         assert target_path.read_text() == '[[servers]]\nname = "alpha"\nport = 9000\n'
         assert result.updated_keys == ["servers"]
@@ -181,4 +181,4 @@ class TestSyncTomlValues:
             source_path, target_path = existing_path, absent_path
 
         with pytest.raises(FileNotFoundError):
-            sync_toml_values(source_path, target_path)
+            sync_toml_values(source_path=source_path, target_path=target_path)

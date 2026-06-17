@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 def list_bedrock_models(
     sdk: str,
+    *,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,
@@ -78,6 +79,7 @@ def list_bedrock_models(
 
 def _display_bedrock_models_flat(
     models: list[dict[str, Any]],
+    *,
     sdk: str,
     backend_name: str,
     aws_region: str,
@@ -96,6 +98,7 @@ def _display_bedrock_models_flat(
 
 def _display_bedrock_models_table(
     models: list[dict[str, Any]],
+    *,
     sdk: str,
     aws_region: str,
 ) -> None:

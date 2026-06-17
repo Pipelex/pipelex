@@ -63,7 +63,7 @@ class TestCollectPossibleOutputsSequence:
         }
         get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET, return_value=final_pipe)
 
-        result = _collect_possible_outputs(sequence_pipe, ConceptRepresentationFormat.JSON)
+        result = _collect_possible_outputs(sequence_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert result == [{"concept_ref": "test.Final", "content": {"text": "final output"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="final_step")
@@ -105,7 +105,7 @@ class TestCollectPossibleOutputsSequence:
 
         get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET, side_effect=fake_get_required_pipe)
 
-        result = _collect_possible_outputs(outer_pipe, ConceptRepresentationFormat.JSON)
+        result = _collect_possible_outputs(outer_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert result == [{"concept_ref": "test.Leaf", "content": {"text": "leaf output"}}]
         assert get_pipe_mock.call_count == 2

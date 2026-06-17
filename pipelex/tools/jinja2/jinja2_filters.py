@@ -104,10 +104,10 @@ async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
     else:
         rendered_value = str(value)
 
-    return apply_tag_style(context, rendered_value, final_tag_name)
+    return apply_tag_style(context=context, value=rendered_value, tag_name=final_tag_name)
 
 
-def apply_tag_style(context: Context, value: str, tag_name: str | None = None) -> str:
+def apply_tag_style(*, context: Context, value: str, tag_name: str | None = None) -> str:
     """Apply tag style wrapping to content.
 
     Args:

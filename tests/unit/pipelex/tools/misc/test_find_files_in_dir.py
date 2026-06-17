@@ -19,7 +19,7 @@ class TestFindFilesInDir:
             (sub_dir / "file4.py").touch()
 
             # Find Python files non-recursively
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=False)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=False)
 
             assert len(files) == 2
             file_names = [f.name for f in files]
@@ -41,7 +41,7 @@ class TestFindFilesInDir:
             (sub_dir / "file4.py").touch()
 
             # Find Python files recursively
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True)
 
             expected_files_length = 3
             assert len(files) == expected_files_length
@@ -53,7 +53,7 @@ class TestFindFilesInDir:
     def test_find_files_empty_directory(self):
         """Test finding files in empty directory."""
         with tempfile.TemporaryDirectory() as temp_dir:
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=False)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=False)
             assert len(files) == 0
 
     def test_find_files_no_matches(self):
@@ -62,7 +62,7 @@ class TestFindFilesInDir:
             (Path(temp_dir) / "file1.txt").touch()
             (Path(temp_dir) / "file2.md").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=False)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=False)
             assert len(files) == 0
 
     def test_find_files_with_excluded_dirs_single(self):
@@ -86,7 +86,7 @@ class TestFindFilesInDir:
             normal_dir.mkdir()
             (normal_dir / "normal.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[".venv"])
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[".venv"])
 
             assert len(files) == 2
             file_names = [f.name for f in files]
@@ -118,7 +118,7 @@ class TestFindFilesInDir:
             src_dir = Path(temp_dir) / "src"
             (src_dir / "normal.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[".venv", "node_modules", "__pycache__"])
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[".venv", "node_modules", "__pycache__"])
 
             assert len(files) == 2
             file_names = [f.name for f in files]
@@ -157,7 +157,7 @@ class TestFindFilesInDir:
 
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
                 force_include_dirs=[str(force_include_dir)],
@@ -202,7 +202,7 @@ class TestFindFilesInDir:
 
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
                 force_include_dirs=["pipelex"],
@@ -248,7 +248,7 @@ class TestFindFilesInDir:
 
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv", "node_modules"],
                 force_include_dirs=[str(pipelex_dir), "special"],
@@ -292,7 +292,7 @@ class TestFindFilesInDir:
 
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
                 force_include_dirs=[str(pkg1), str(pkg2)],
@@ -323,7 +323,7 @@ class TestFindFilesInDir:
 
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
                 force_include_dirs=[str(deep_path)],
@@ -346,7 +346,7 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=None)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=None)
 
             # Should find all files when no exclusions
             assert len(files) == 2
@@ -364,7 +364,7 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=None)
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=None)
 
             # Should exclude all venv files when no includes
             assert len(files) == 1
@@ -386,7 +386,7 @@ class TestFindFilesInDir:
             # Include directory is in src, not in excluded dir
             files = find_files_in_dir(
                 Path(temp_dir),
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv"],
                 force_include_dirs=[str(src_dir)],
@@ -410,12 +410,12 @@ class TestFindFilesInDir:
             (venv_dir / "venv_data.json").touch()
 
             # Find only .py files
-            py_files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[".venv"])
+            py_files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[".venv"])
             assert len(py_files) == 1
             assert py_files[0].name == "script.py"
 
             # Find only .json files
-            json_files = find_files_in_dir(Path(temp_dir), "*.json", is_recursive=True, excluded_dirs=[".venv"])
+            json_files = find_files_in_dir(Path(temp_dir), pattern="*.json", is_recursive=True, excluded_dirs=[".venv"])
             assert len(json_files) == 1
             assert json_files[0].name == "data.json"
 
@@ -428,7 +428,7 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[])
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[])
 
             # Empty list should behave like None - no exclusions
             assert len(files) == 2
@@ -442,7 +442,7 @@ class TestFindFilesInDir:
             venv_dir.mkdir()
             (venv_dir / "venv_file.py").touch()
 
-            files = find_files_in_dir(Path(temp_dir), "*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=[])
+            files = find_files_in_dir(Path(temp_dir), pattern="*.py", is_recursive=True, excluded_dirs=[".venv"], force_include_dirs=[])
 
             # Empty include list should exclude all venv files
             assert len(files) == 1
@@ -467,7 +467,7 @@ class TestFindFilesInDir:
             # Exclude structures using its absolute path
             result = find_files_in_dir(
                 temp_path,
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[str(structures_dir.resolve())],
             )
@@ -494,7 +494,7 @@ class TestFindFilesInDir:
             # Test with trailing slash
             result_with_slash = find_files_in_dir(
                 temp_path,
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[str(structures_dir.resolve()) + "/"],
             )
@@ -502,7 +502,7 @@ class TestFindFilesInDir:
             # Test without trailing slash
             result_without_slash = find_files_in_dir(
                 temp_path,
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[str(structures_dir.resolve())],
             )
@@ -537,7 +537,7 @@ class TestFindFilesInDir:
 
             result = find_files_in_dir(
                 temp_path,
-                "*.py",
+                pattern="*.py",
                 is_recursive=True,
                 excluded_dirs=[".venv", str(structures_dir.resolve())],
             )

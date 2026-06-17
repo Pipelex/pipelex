@@ -59,11 +59,11 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
     # Protocol-based rendering
     if isinstance(value, ImageRenderable):
-        return value.render_with_images(registry, text_format)
+        return value.render_with_images(registry, text_format=text_format)
 
     # Handle plain lists/tuples (structural types that may contain ImageRenderable items)
     if isinstance(value, (list, tuple)):
-        return _render_sequence_with_images(value, registry, text_format)  # pyright: ignore[reportUnknownArgumentType]
+        return _render_sequence_with_images(value, registry=registry, text_format=text_format)  # pyright: ignore[reportUnknownArgumentType]
 
     # Type cannot be rendered with images
     msg = (
@@ -77,6 +77,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
 def _render_sequence_with_images(
     sequence: list[Any] | tuple[Any, ...],
+    *,
     registry: ImageRegistry,
     text_format: TextFormat,
 ) -> str:
@@ -93,7 +94,7 @@ def _render_sequence_with_images(
     parts: list[str] = []
     for item in sequence:
         if isinstance(item, ImageRenderable):
-            rendered = item.render_with_images(registry, text_format)
+            rendered = item.render_with_images(registry, text_format=text_format)
         else:
             rendered = str(item)
         if rendered:

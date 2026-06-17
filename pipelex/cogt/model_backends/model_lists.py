@@ -17,6 +17,7 @@ class ModelLister:
     async def list_models(
         cls,
         backend_name: str,
+        *,
         flat: bool = False,
     ) -> None:
         """List available models for a specific backend.
@@ -192,6 +193,7 @@ class ModelLister:
     @staticmethod
     def _display_unsupported_sdks_message(
         any_listed: bool,
+        *,
         unsupported_sdks: list[str],
         backend_name: str,
         models_by_sdk: dict[str, list[str]],

@@ -24,7 +24,6 @@ from pipelex.cli.error_handlers import (
     handle_model_deck_preset_error,
     handle_remote_config_unavailable_error,
     handle_remote_config_validation_error,
-    handle_signatures_not_allowed_error,
     handle_telemetry_config_validation_error,
     handle_validate_bundle_error,
 )
@@ -34,7 +33,6 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -146,7 +144,7 @@ class TestErrorHandlersExtended:
         assert "Enabled Backends:" not in output
 
     def test_handle_validate_bundle_error_renders_all_sections(self, console: Console) -> None:
-        """Blueprint, pipe, dry-run and signature sections all render with their details."""
+        """Blueprint, pipe, and dry-run sections all render with their details."""
         blueprint_error = PipelexBundleBlueprintValidationErrorData(
             error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
             domain_code="demo",
@@ -165,17 +163,11 @@ class TestErrorHandlersExtended:
             field_path="pipes.other_pipe.output",
             variable_names=["report"],
         )
-        signature_error = SignaturesNotAllowedError(
-            offending_pipe_refs={"stub_pipe"},
-            signature_refs={"stub_pipe"},
-            dep_paths={"stub_pipe": ["main_pipe", "stub_pipe"]},
-        )
         exc = ValidateBundleError(
             message="validation failed",
             pipelex_bundle_blueprint_validation_errors=[blueprint_error],
             pipe_validation_errors=[pipe_error],
             dry_run_error_message="dry run exploded",
-            signature_check_error=signature_error,
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -195,7 +187,6 @@ class TestErrorHandlersExtended:
         assert "└─ Path: pipes.other_pipe.output" in output
         assert "Dry Run Error:" in output
         assert "dry run exploded" in output
-        assert "Unimplemented Signatures:" in output
 
     def test_handle_validate_bundle_error_minimal_skips_sections(self, console: Console) -> None:
         """With no detail lists and no bundle path, only the banner and tip render."""
@@ -210,24 +201,11 @@ class TestErrorHandlersExtended:
         assert "Blueprint Validation Errors:" not in output
         assert "Pipe Validation Errors:" not in output
         assert "Dry Run Error:" not in output
-        assert "Unimplemented Signatures:" not in output
         assert "💡 Tip:" in output
-
-    def test_handle_signatures_not_allowed_error(self, console: Console) -> None:
-        """The signature handler explains the strict-mode refusal and the opt-out flag."""
-        exc = SignaturesNotAllowedError(
-            offending_pipe_refs={"stub_pipe"},
-            signature_refs={"stub_pipe"},
-            dep_paths={"stub_pipe": ["main_pipe", "stub_pipe"]},
-        )
-
-        with pytest.raises(typer.Exit) as exc_info:
-            handle_signatures_not_allowed_error(exc, context=ErrorContext.VALIDATION)
-
-        assert exc_info.value.exit_code == 1
-        output = console.export_text()
-        assert "unimplemented PipeSignature placeholders" in output
-        assert "--allow-signatures" in output
+        # A non-signature bundle error must NOT advertise the signature opt-out: signatures are a
+        # runnability fact reported via pending_signatures, not a ValidateBundleError (the old
+        # signature-specific tip used to leak here from the deleted handle_signatures_not_allowed_error).
+        assert "--allow-signatures" not in output
 
     def test_handle_telemetry_config_validation_error(self, console: Console) -> None:
         """The telemetry handler explains the format migration."""

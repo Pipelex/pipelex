@@ -44,7 +44,7 @@ class VertexAIFactory(ConfigModel):
         return endpoint, api_key
 
     @classmethod
-    def _make_endpoint(cls, gcp_project_id: str, gcp_location: str) -> str:
+    def _make_endpoint(cls, gcp_project_id: str, *, gcp_location: str) -> str:
         return f"https://{gcp_location}-aiplatform.googleapis.com/v1beta1/projects/{gcp_project_id}/locations/{gcp_location}/endpoints/openapi"
 
     @classmethod

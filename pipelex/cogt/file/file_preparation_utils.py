@@ -23,6 +23,7 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 async def prepare_file_from_uri(
     uri: str,
+    *,
     keep_http_url: bool,
     keep_local_path: bool,
 ) -> PreparedFile:

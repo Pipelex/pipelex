@@ -189,16 +189,16 @@ class PipelexBundleBlueprint(BaseModel):
         # Collect from concepts
         if self.concept:
             for concept_code, concept_blueprint in self.concept.items():
-                local_refs.extend(self._collect_local_refs_from_concept(concept_code, concept_blueprint))
+                local_refs.extend(self._collect_local_refs_from_concept(concept_code, concept_blueprint=concept_blueprint))
 
         # Collect from pipes
         if self.pipe:
             for pipe_code, pipe_blueprint in self.pipe.items():
-                local_refs.extend(self._collect_local_refs_from_pipe(pipe_code, pipe_blueprint))
+                local_refs.extend(self._collect_local_refs_from_pipe(pipe_code, pipe_blueprint=pipe_blueprint))
 
         return local_refs
 
-    def _collect_local_refs_from_concept(self, concept_code: str, concept_blueprint: ConceptBlueprint | str) -> list[tuple[str, str]]:
+    def _collect_local_refs_from_concept(self, concept_code: str, *, concept_blueprint: ConceptBlueprint | str) -> list[tuple[str, str]]:
         local_refs: list[tuple[str, str]] = []
 
         if isinstance(concept_blueprint, str):
@@ -221,7 +221,7 @@ class PipelexBundleBlueprint(BaseModel):
 
         return local_refs
 
-    def _collect_local_refs_from_pipe(self, pipe_code: str, pipe_blueprint: PipeBlueprintUnion) -> list[tuple[str, str]]:
+    def _collect_local_refs_from_pipe(self, pipe_code: str, *, pipe_blueprint: PipeBlueprintUnion) -> list[tuple[str, str]]:
         local_refs: list[tuple[str, str]] = []
 
         # Check inputs

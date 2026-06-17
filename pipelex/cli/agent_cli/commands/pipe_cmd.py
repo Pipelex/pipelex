@@ -62,7 +62,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     pipe_item_table.add("output", pipe_spec.output)
 
     # Add type-specific fields
-    _add_type_specific_fields(pipe_spec, pipe_item_table)
+    _add_type_specific_fields(pipe_spec, pipe_table=pipe_item_table)
 
     # Build the nested structure: [pipe.pipe_code]
     pipe_section = tomlkit.table()
@@ -71,7 +71,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     return tomlkit.dumps(doc)
 
 
-def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
+def _add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
     """Add type-specific fields to the pipe TOML table.
 
     Args:
@@ -234,10 +234,10 @@ def pipe_cmd(
     """
     # Validate that exactly one of spec or spec_file is provided
     if spec is None and spec_file is None:
-        agent_error("Either --spec or --spec-file must be provided", "ArgumentError")
+        agent_error("Either --spec or --spec-file must be provided", error_type="ArgumentError")
 
     if spec is not None and spec_file is not None:
-        agent_error("Cannot use both --spec and --spec-file", "ArgumentError")
+        agent_error("Cannot use both --spec and --spec-file", error_type="ArgumentError")
 
     # Load spec data
     spec_data: dict[str, Any]
@@ -248,9 +248,9 @@ def pipe_cmd(
         else:
             spec_data = json.loads(spec)  # type: ignore[arg-type]
     except FileNotFoundError as exc:
-        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError", cause=exc)
+        agent_error(f"Spec file not found: {spec_file}", error_type="FileNotFoundError", cause=exc)
     except json.JSONDecodeError as exc:
-        agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
+        agent_error(f"Invalid JSON: {exc.msg}", error_type="JSONDecodeError", cause=exc)
 
     # Accept "pipe_type" as an alias for "type" in the JSON spec
     if "pipe_type" in spec_data and "type" not in spec_data:
@@ -265,22 +265,22 @@ def pipe_cmd(
     elif "type" in spec_data:
         resolved_pipe_type = spec_data.pop("type")
     else:
-        agent_error("Pipe type must be provided either via --type or as 'type' in the JSON spec", "ArgumentError")
+        agent_error("Pipe type must be provided either via --type or as 'type' in the JSON spec", error_type="ArgumentError")
 
     # Validate and convert spec
     try:
-        pipe_spec = parse_pipe_spec(resolved_pipe_type, spec_data)
+        pipe_spec = parse_pipe_spec(spec_data, pipe_type=resolved_pipe_type)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
         print(toml_content, end="" if toml_content.endswith("\n") else "\n")
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
-        agent_error(message, "ValidationError", cause=exc, validation_details=details)
+        agent_error(message, error_type="ValidationError", cause=exc, validation_details=details)
 
     except ValueError as exc:
-        agent_error(str(exc), "ValueError", cause=exc)
+        agent_error(str(exc), error_type="ValueError", cause=exc)
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)

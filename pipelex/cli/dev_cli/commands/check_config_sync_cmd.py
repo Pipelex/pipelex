@@ -23,6 +23,7 @@ class LeadingConfig(StrEnum):
 
 def check_config_sync_cmd(
     show_diff: bool = True,
+    *,
     leading: LeadingConfig = LeadingConfig.INSTALLED,
     quiet: bool = False,
 ) -> None:
@@ -75,7 +76,7 @@ def check_config_sync_cmd(
 
     # Check for differences (excluding files and directories that intentionally differ)
     try:
-        has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+        has_diff = has_diff_dirs(dir1=left_dir, dir2=right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
     except OSError as exc:
         # Handle race condition where directories are deleted/modified after existence checks
         if quiet:
@@ -119,7 +120,9 @@ def check_config_sync_cmd(
 
         if show_diff:
             console.print()
-            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+            pretty_diff = make_diff_dirs_pretty(
+                dir1=left_dir, dir2=right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS
+            )
             console.print(pretty_diff)
             console.print()
 

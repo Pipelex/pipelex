@@ -36,7 +36,7 @@ class TestTomlSyncNestedAccess:
     def test_get_nested_value_found(self, doc_kind: str, key_path: str, expected_value: Any) -> None:
         """Existing top-level, 2-deep and 3-deep dotted paths are found with the right value."""
         doc = make_doc(doc_kind)
-        found, value = get_nested_value(doc, key_path)
+        found, value = get_nested_value(doc, key_path=key_path)
         assert found is True
         assert value == expected_value
 
@@ -54,7 +54,7 @@ class TestTomlSyncNestedAccess:
     def test_get_nested_value_not_found(self, doc_kind: str, key_path: str) -> None:
         """Missing leaves, missing intermediate tables and traversal through scalars all yield (False, None)."""
         doc = make_doc(doc_kind)
-        found, value = get_nested_value(doc, key_path)
+        found, value = get_nested_value(doc, key_path=key_path)
         assert found is False
         assert value is None
 

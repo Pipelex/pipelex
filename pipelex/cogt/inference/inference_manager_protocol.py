@@ -21,6 +21,7 @@ class InferenceManagerProtocol(Protocol):
     def set_llm_worker_from_external_plugin(
         self,
         llm_handle: str,
+        *,
         llm_worker_class: type[LLMWorkerAbstract],
         should_warn_if_already_registered: bool = True,
     ): ...

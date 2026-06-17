@@ -206,6 +206,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params

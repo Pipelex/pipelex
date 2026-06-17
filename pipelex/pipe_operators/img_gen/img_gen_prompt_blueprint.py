@@ -64,6 +64,7 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def make_img_gen_prompt(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         extra_params: dict[str, Any] | None = None,
         max_prompt_images: int | None = None,
@@ -197,6 +198,7 @@ class ImgGenPromptBlueprint(BaseModel):
     def _extract_direct_image(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -222,6 +224,7 @@ class ImgGenPromptBlueprint(BaseModel):
     def _extract_direct_list_images(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -265,6 +268,7 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def _render_text(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         template_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,

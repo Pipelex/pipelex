@@ -34,6 +34,7 @@ SUB_COMMAND_INPUTS = "inputs"
 
 async def _generate_inputs_core(
     pipe_code: str | None = None,
+    *,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
     library_dir: list[str] | None = None,
@@ -114,6 +115,7 @@ async def _generate_inputs_core(
 
 def execute_generate_inputs(
     pipe_code: str | None,
+    *,
     bundle_path: Path | None,
     output_path: Path | None,
     library_dir: list[str] | None = None,

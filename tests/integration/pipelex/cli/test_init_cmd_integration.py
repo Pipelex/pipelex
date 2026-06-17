@@ -215,7 +215,7 @@ class TestInitCommandIntegration:
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
         toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(telemetry_path))
+        save_toml_to_path(toml_doc, path=str(telemetry_path))
 
         # Get index for mistral
         kit_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
@@ -247,7 +247,7 @@ class TestInitCommandIntegration:
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         # Get index for openai
         kit_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"

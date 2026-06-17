@@ -39,11 +39,11 @@ class GraphFormat(StrEnum):
 
 async def render_graph_from_spec(
     graph_spec: GraphSpec,
+    *,
     graph_config: GraphConfig,
     include_mermaidflow: bool,
     include_reactflow: bool,
     output_dir: Path,
-    *,
     pipe_code: str = "",
     title: str | None = None,
     direction: FlowchartDirection | None = None,
@@ -102,6 +102,7 @@ async def render_graph_from_spec(
 
 async def _dry_run_bundle(
     bundle_path: Path,
+    *,
     library_dirs: list[str] | None = None,
 ) -> tuple[GraphSpec, str]:
     """Dry-run a bundle file to produce a GraphSpec.
@@ -138,6 +139,7 @@ async def _dry_run_bundle(
 
 async def generate_graph_for_bundle(
     bundle_path: Path,
+    *,
     graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
     direction: FlowchartDirection | None = None,
@@ -163,7 +165,7 @@ async def generate_graph_for_bundle(
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
-    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
+    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs)
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
@@ -212,6 +214,7 @@ async def generate_graph_for_bundle(
 
 async def generate_view_for_bundle(
     bundle_path: Path,
+    *,
     library_dirs: list[str] | None = None,
     direction: FlowchartDirection | None = None,
 ) -> dict[str, Any]:
@@ -233,7 +236,7 @@ async def generate_view_for_bundle(
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
-    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
+    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs)
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,

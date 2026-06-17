@@ -7,11 +7,11 @@ class MultiObserver(ObserverProtocol):
     def __init__(self, observers: dict[str, ObserverProtocol] | None = None) -> None:
         self.observers: dict[str, ObserverProtocol] = observers or {}
 
-    def add_observer(self, name: str, observer: ObserverProtocol) -> None:
+    def add_observer(self, *, name: str, observer: ObserverProtocol) -> None:
         """Add an observer with a given name."""
         self.observers[name] = observer
 
-    def remove_observer(self, name: str) -> None:
+    def remove_observer(self, *, name: str) -> None:
         """Remove an observer by name."""
         self.observers.pop(name, None)
 

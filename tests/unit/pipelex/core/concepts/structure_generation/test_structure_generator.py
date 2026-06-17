@@ -21,7 +21,9 @@ class TestStructureGenerator:
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("TestModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TestModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -77,7 +79,9 @@ class TestModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ComplexModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -119,7 +123,9 @@ class ComplexModel(StructuredContent):
             "size": ConceptStructureBlueprint(description="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="Product", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -173,7 +179,7 @@ class Product(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("Order", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(class_name="Order", structure_blueprint=structure_blueprint)
 
         expected_code = '''\
 """
@@ -209,7 +215,9 @@ class Order(StructuredContent):
         """Test generation of structure with no fields."""
         structure_blueprint: dict[str, ConceptStructureBlueprint] = {}
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("EmptyModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="EmptyModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -245,7 +253,9 @@ class EmptyModel(StructuredContent):
             "page_count": ConceptStructureBlueprint(description="Number of pages", type=ConceptStructureBlueprintFieldType.INTEGER, required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("DocumentInfo", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DocumentInfo", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -282,7 +292,9 @@ class DocumentInfo(StructuredContent):
             "value": ConceptStructureBlueprint(description="Test value", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ConvenienceTest", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ConvenienceTest", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -334,7 +346,9 @@ class ConvenienceTest(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TypeMappingTest", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -376,7 +390,9 @@ class TypeMappingTest(StructuredContent):
             "optional_field": ConceptStructureBlueprint(description="Optional field", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="RequiredFieldsModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -430,7 +446,9 @@ class RequiredFieldsModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="PersonWithDefaults", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -485,7 +503,9 @@ class PersonWithDefaults(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ListTypesModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -543,7 +563,9 @@ class ListTypesModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DictTypesModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -607,7 +629,9 @@ class DictTypesModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ComplexItem", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -657,7 +681,9 @@ class ComplexItem(StructuredContent):
 
         normalized_structure = normalize_structure_blueprint(mixed_structure_blueprint)
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="PersonInfo", structure_blueprint=normalized_structure
+        )
 
         expected_code = '''\
 """
@@ -703,7 +729,7 @@ class PersonInfo(StructuredContent):
         }
 
         generator = StructureGenerator()
-        python_code, the_class = generator.generate_from_structure_blueprint("ValidTestModel", structure_blueprint)
+        python_code, the_class = generator.generate_from_structure_blueprint(class_name="ValidTestModel", structure_blueprint=structure_blueprint)
 
         expected_code = '''\
 """
@@ -777,8 +803,8 @@ class WrongClassName(StructuredContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Question",
-            structure_blueprint,
+            class_name="Question",
+            structure_blueprint=structure_blueprint,
             base_class_name="TextContent",
         )
 
@@ -839,8 +865,8 @@ class Question(TextContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "TableScreenshot",
-            structure_blueprint,
+            class_name="TableScreenshot",
+            structure_blueprint=structure_blueprint,
             base_class_name="ImageContent",
         )
 
@@ -893,8 +919,8 @@ class TableScreenshot(ImageContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Temperature",
-            structure_blueprint,
+            class_name="Temperature",
+            structure_blueprint=structure_blueprint,
             base_class_name="NumberContent",
         )
 
@@ -946,8 +972,8 @@ class Temperature(NumberContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "ConfigData",
-            structure_blueprint,
+            class_name="ConfigData",
+            structure_blueprint=structure_blueprint,
             base_class_name="JSONContent",
         )
 
@@ -993,8 +1019,8 @@ class ConfigData(JSONContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "EnhancedText",
-            structure_blueprint,
+            class_name="EnhancedText",
+            structure_blueprint=structure_blueprint,
             base_class_name="TextContent",
         )
 
@@ -1049,8 +1075,8 @@ class EnhancedText(TextContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Invoice",
-            structure_blueprint,
+            class_name="Invoice",
+            structure_blueprint=structure_blueprint,
             base_class_name="DocumentContent",
         )
 
@@ -1112,8 +1138,8 @@ class Invoice(DocumentContent):
 
             generator = StructureGenerator()
             generated_code, generated_class = generator.generate_from_structure_blueprint(
-                class_name,
-                structure_blueprint,
+                class_name=class_name,
+                structure_blueprint=structure_blueprint,
                 base_class_name=base_class_name,
             )
 

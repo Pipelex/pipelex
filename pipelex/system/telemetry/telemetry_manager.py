@@ -128,7 +128,9 @@ class TelemetryManager(TelemetryManagerAbstract):
                 pipelex_distinct_id=self._pipelex_distinct_id,
             )
 
-    def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
+    def _handle_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
+        self, error: Exception | None, _items: list[dict[str, Any]]
+    ) -> None:
         """Handle errors that occur during custom telemetry transmission.
 
         Args:
@@ -138,7 +140,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         if error:
             log.error(f"Telemetry transmission error: {error}")
 
-    def _handle_pipelex_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
+    def _handle_pipelex_transmission_error(  # kw-only: ignore — PostHog on_error callback, invoked positionally as (error, items)
+        self, error: Exception | None, _items: list[dict[str, Any]]
+    ) -> None:
         """Handle errors that occur during Pipelex telemetry transmission.
 
         Args:
@@ -231,7 +235,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         TelemetryManagerAbstract.clear_instance()
 
     @override
-    def track_event(self, event_name: EventName, properties: dict[EventProperty, Any] | None = None):
+    def track_event(self, event_name: EventName, *, properties: dict[EventProperty, Any] | None = None):
         # We copy the incoming properties to avoid modifying the original dictionary
         # and to convert the keys to str
         # and to remove the properties that are in the redact list
@@ -262,7 +266,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         if self._pipelex_telemetry_enabled:
             self._track_to_pipelex(event_name=event_name, properties=tracked_properties)
 
-    def _track_anonymous_event(self, event_name: str, properties: dict[str, Any]):
+    def _track_anonymous_event(self, event_name: str, *, properties: dict[str, Any]):
         if not self.custom_posthog_client:
             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
@@ -270,14 +274,14 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.custom_posthog_client.capture(event_name, properties=properties)
         log.verbose(f"Tracked anonymous event '{event_name}' with properties: {properties}")
 
-    def _track_identified_event(self, event_name: str, properties: dict[str, Any], user_id: str):
+    def _track_identified_event(self, event_name: str, *, properties: dict[str, Any], user_id: str):
         if not self.custom_posthog_client:
             log.error("Could not track event to custom telemetry because custom_posthog_client is not set")
             return
         self.custom_posthog_client.capture(event_name, distinct_id=user_id, properties=properties)
         log.verbose(f"Tracked identified event '{event_name}' with properties: {properties}")
 
-    def _track_to_pipelex(self, event_name: str, properties: dict[str, Any]):
+    def _track_to_pipelex(self, event_name: str, *, properties: dict[str, Any]):
         """Track event to Pipelex's PostHog (always identified)."""
         if not self.pipelex_posthog_client or not self._pipelex_distinct_id:
             log.error("Could not track event to Pipelex telemetry because pipelex_posthog_client or _pipelex_distinct_id is not set")
@@ -386,7 +390,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self._pipelex_telemetry_enabled
 
     @override
-    def handle_trace_start(self, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.

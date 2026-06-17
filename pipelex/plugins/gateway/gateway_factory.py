@@ -62,7 +62,7 @@ class GatewayFactory:
 
     @classmethod
     def make_extras(
-        cls, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        cls, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         extra_headers: dict[str, str] = {}
         extra_body: dict[str, Any] = {}

@@ -27,6 +27,7 @@ class OpenAIClientFactory:
     def make_openai_client(
         cls,
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> openai.AsyncClient:
         try:

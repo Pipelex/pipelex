@@ -20,6 +20,7 @@ async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOut
 
 async def extract_gen_pages_and_store(
     extract_assignment: ExtractAssignment,
+    *,
     generated_content_factory: GeneratedContentFactory,
 ) -> list[PageContent]:
     """Extract pages and store extracted images, returning PageContent with URLs (no raw binary data).

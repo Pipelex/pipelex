@@ -21,7 +21,7 @@ from tests.e2e.pipelex.pipes.pipe_controller.pipe_batch.test_data import JokeBat
 def _get_next_output_folder() -> Path:
     """Get the next numbered output folder for batch graph outputs."""
     base_dir = Path(TEST_OUTPUTS_DIR) / "pipe_batch_graph"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 @pytest.mark.dry_runnable
@@ -129,7 +129,7 @@ class TestPipeBatchGraph:
         output_dir = _get_next_output_folder()
         graph_json_path = output_dir / "graph.json"
         graph_json = graph_spec.to_json()
-        save_text_to_path(graph_json, graph_json_path)
+        save_text_to_path(graph_json, path=graph_json_path)
         log.info(f"Saved graph.json to: {graph_json_path}")
 
         # Pretty print the graph summary
@@ -212,21 +212,21 @@ class TestPipeBatchGraph:
 
         # Save outputs to folder
         output_dir = Path(TEST_OUTPUTS_DIR) / "joke_batch_graph"
-        output_dir = get_incremental_directory_path(output_dir, "run")
+        output_dir = get_incremental_directory_path(output_dir, base_name="run")
 
         if graph_outputs.graphspec_json:
             graph_json_path = output_dir / "graph.json"
-            save_text_to_path(graph_outputs.graphspec_json, graph_json_path)
+            save_text_to_path(graph_outputs.graphspec_json, path=graph_json_path)
             log.info(f"Saved graph.json to: {graph_json_path}")
 
         if graph_outputs.mermaidflow_html:
             mermaid_path = output_dir / "mermaidflow.html"
-            save_text_to_path(graph_outputs.mermaidflow_html, mermaid_path)
+            save_text_to_path(graph_outputs.mermaidflow_html, path=mermaid_path)
             log.info(f"Saved mermaidflow.html to: {mermaid_path}")
 
         if graph_outputs.reactflow_html:
             reactflow_path = output_dir / "reactflow.html"
-            save_text_to_path(graph_outputs.reactflow_html, reactflow_path)
+            save_text_to_path(graph_outputs.reactflow_html, path=reactflow_path)
             log.info(f"Saved reactflow.html to: {reactflow_path}")
 
         # Log edge counts

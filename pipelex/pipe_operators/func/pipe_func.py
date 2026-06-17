@@ -175,6 +175,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -242,7 +243,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             "function_qualname": getattr(function, "__qualname__", self.function_name),
             "output_content_type": type(the_content).__name__,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,
@@ -253,6 +254,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     async def _dry_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -302,7 +304,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             "output_content_type": type(mock_content).__name__,
             "is_mock_output": True,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,
@@ -311,7 +313,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         function = func_registry.get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
@@ -329,6 +331,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

@@ -23,7 +23,7 @@ def _get_next_output_folder() -> Path:
     Creates folders like: temp/test_outputs/reactflow_from_json/run_01, run_02, etc.
     """
     base_dir = Path(TEST_OUTPUTS_DIR) / "reactflow_from_json"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 class TestReactFlowFromJson:
@@ -57,7 +57,7 @@ class TestReactFlowFromJson:
 
         # Generate ReactFlow HTML directly from GraphSpec
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title=f"Graph: {topic}")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title=f"Graph: {topic}")
 
         # Save outputs to TEST_OUTPUTS_DIR
         output_dir = _get_next_output_folder()
@@ -98,7 +98,7 @@ class TestReactFlowFromJson:
 
         # Generate ReactFlow HTML
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title="Test Graph")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Test Graph")
 
         # Verify GraphSpec is embedded
         assert '<script type="application/json" id="pipelex-graphspec">' in reactflow_html

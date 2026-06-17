@@ -96,7 +96,7 @@ class DynamoDBEventLog(EventLogProtocol):
         return f"PIPELINE_RUN#{pipeline_run_id}"
 
     @staticmethod
-    def _make_sk(workflow_id: str, writer_id: str, sequence: int) -> str:
+    def _make_sk(workflow_id: str, *, writer_id: str, sequence: int) -> str:
         return f"EVENT#{workflow_id}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
@@ -108,7 +108,7 @@ class DynamoDBEventLog(EventLogProtocol):
         """Write a single event to DynamoDB. Synchronous and idempotent."""
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
-            "SK": self._make_sk(event.workflow_id, event.writer_id, event.sequence),
+            "SK": self._make_sk(event.workflow_id, writer_id=event.writer_id, sequence=event.sequence),
             "pipeline_run_id": event.pipeline_run_id,
             "workflow_id": event.workflow_id,
             "writer_id": event.writer_id,

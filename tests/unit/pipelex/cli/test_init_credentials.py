@@ -57,7 +57,7 @@ class TestInitCredentials:
     def test_write_env_file_creates_file_with_header(self, tmp_path: Path) -> None:
         """Write creates the file with a header comment and entries."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {"FOO": "bar", "BAZ": "qux"})
+        write_env_file(env_path, entries={"FOO": "bar", "BAZ": "qux"})
         content = env_path.read_text()
         assert "# Pipelex credentials" in content
         assert "FOO=bar" in content
@@ -66,32 +66,32 @@ class TestInitCredentials:
     def test_write_env_file_sets_permissions(self, tmp_path: Path) -> None:
         """Written file has 0600 permissions."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {"KEY": "value"})
+        write_env_file(env_path, entries={"KEY": "value"})
         mode = env_path.stat().st_mode & 0o777
         assert mode == stat.S_IRUSR | stat.S_IWUSR
 
     def test_write_env_file_creates_parent_dirs(self, tmp_path: Path) -> None:
         """Parent directories are created if they don't exist."""
         env_path = tmp_path / "sub" / "dir" / ".env"
-        write_env_file(env_path, {"KEY": "value"})
+        write_env_file(env_path, entries={"KEY": "value"})
         assert env_path.is_file()
 
     def test_write_then_read_roundtrip(self, tmp_path: Path) -> None:
         """Data survives a write/read cycle."""
         env_path = tmp_path / ".env"
         entries = {"ALPHA": "one", "BETA": "two"}
-        write_env_file(env_path, entries)
+        write_env_file(env_path, entries=entries)
         result = read_env_file(env_path)
         assert result == entries
 
     def test_write_env_file_merges_with_existing(self, tmp_path: Path) -> None:
         """Writing merges: new keys added, existing keys updated."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {"OLD": "original", "SHARED": "old_val"})
+        write_env_file(env_path, entries={"OLD": "original", "SHARED": "old_val"})
         existing = read_env_file(env_path)
         existing["SHARED"] = "new_val"
         existing["NEW"] = "fresh"
-        write_env_file(env_path, existing)
+        write_env_file(env_path, entries=existing)
         result = read_env_file(env_path)
         assert result == {"OLD": "original", "SHARED": "new_val", "NEW": "fresh"}
 
@@ -130,7 +130,7 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml)
+        prompt_credentials(mock_console, backends_toml_path=backends_toml)
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
         mock_prompt.assert_not_called()
@@ -152,7 +152,7 @@ class TestInitCredentials:
             return_value="sk-test-value",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml)
+        prompt_credentials(mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was written
         env_path = tmp_path / ".env"
@@ -182,7 +182,7 @@ class TestInitCredentials:
             return_value="",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml)
+        prompt_credentials(mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was NOT written (no values entered)
         env_path = tmp_path / ".env"
@@ -191,7 +191,7 @@ class TestInitCredentials:
     def test_prompt_credentials_preserves_existing_env_entries(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Existing entries in .env are preserved when new ones are added."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {"EXISTING_KEY": "existing_value"})
+        write_env_file(env_path, entries={"EXISTING_KEY": "existing_value"})
 
         backends_toml = tmp_path / "backends.toml"
         backends_toml.write_text('[openai]\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n\n[internal]\nenabled = true\n')
@@ -207,7 +207,7 @@ class TestInitCredentials:
             return_value="sk-new",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml)
+        prompt_credentials(mock_console, backends_toml_path=backends_toml)
 
         result = read_env_file(env_path)
         assert result["EXISTING_KEY"] == "existing_value"
@@ -226,5 +226,5 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml)
+        prompt_credentials(mock_console, backends_toml_path=backends_toml)
         mock_prompt.assert_not_called()

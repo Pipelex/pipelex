@@ -22,7 +22,7 @@ class NumberContent(StuffContent):
         return str(self.number)
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return str(self.number)
 
     @override

@@ -70,14 +70,14 @@ class TestWorkerCli:
 
         boot_mocks["load_toml"].assert_not_called()
         boot_mocks["pipelex_make"].assert_called_once_with(temporal_enabled=True)
-        assert boot_mocks["run_worker"].call_args.args[0] == "explicit-project"
+        assert boot_mocks["run_worker"].call_args.kwargs["project"] == "explicit-project"
 
     def test_project_resolved_from_pyproject_project_name(self, boot_mocks: dict[str, Any]) -> None:
         """With no argument, the project name comes from [project].name in pyproject.toml."""
         worker_cli.configure()
 
         boot_mocks["load_toml"].assert_called_once_with(path="pyproject.toml")
-        assert boot_mocks["run_worker"].call_args.args[0] == "my-project"
+        assert boot_mocks["run_worker"].call_args.kwargs["project"] == "my-project"
 
     def test_project_falls_back_to_poetry_name(self, boot_mocks: dict[str, Any]) -> None:
         """When [project].name is absent, [tool.poetry].name is used."""
@@ -85,7 +85,7 @@ class TestWorkerCli:
 
         worker_cli.configure()
 
-        assert boot_mocks["run_worker"].call_args.args[0] == "poetry-project"
+        assert boot_mocks["run_worker"].call_args.kwargs["project"] == "poetry-project"
 
     def test_missing_project_name_raises(self, boot_mocks: dict[str, Any]) -> None:
         """A pyproject.toml without any project name aborts before booting Pipelex."""
@@ -178,7 +178,7 @@ class TestWorkerCli:
         assert boot_mocks["config"].temporal is temporal_mock
 
     def test_cli_arg_wiring_reaches_run_worker(self, boot_mocks: dict[str, Any]) -> None:
-        """All CLI options travel through Typer parsing into run_worker, positionally correct."""
+        """All CLI options travel through Typer parsing into run_worker, with the correct keyword wiring."""
         runner = CliRunner()
 
         result = runner.invoke(
@@ -197,7 +197,14 @@ class TestWorkerCli:
         )
 
         assert result.exit_code == 0, result.output
-        boot_mocks["run_worker"].assert_called_once_with("cli-project", True, True, "queue_from_cli", "router", "anthropic-tier4")
+        boot_mocks["run_worker"].assert_called_once_with(
+            project="cli-project",
+            is_not_sandboxed=True,
+            is_unit_testing=True,
+            task_queue="queue_from_cli",
+            scope_name="router",
+            profile_name="anthropic-tier4",
+        )
 
     def test_cli_defaults_reach_run_worker(self, boot_mocks: dict[str, Any]) -> None:
         """Invoking with no arguments resolves the project from pyproject and passes default options."""
@@ -206,4 +213,11 @@ class TestWorkerCli:
         result = runner.invoke(worker_cli.app, [])
 
         assert result.exit_code == 0, result.output
-        boot_mocks["run_worker"].assert_called_once_with("my-project", False, False, None, None, None)
+        boot_mocks["run_worker"].assert_called_once_with(
+            project="my-project",
+            is_not_sandboxed=False,
+            is_unit_testing=False,
+            task_queue=None,
+            scope_name=None,
+            profile_name=None,
+        )

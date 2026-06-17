@@ -87,12 +87,12 @@ def run_pipe_cmd(
         agent_error(
             f"'{pipe_code}' looks like a file path or directory. "
             f"Use 'run bundle {pipe_code}' for bundles/directories, or 'run pipe <code>' for pipe codes.",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
 
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
-        agent_error("--mock-inputs requires --dry-run", "ArgumentError")
+        agent_error("--mock-inputs requires --dry-run", error_type="ArgumentError")
 
     # Check installed methods' exports for additional library dirs
     try:
@@ -100,7 +100,7 @@ def run_pipe_cmd(
     except ValueError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
-            "ArgumentError",
+            error_type="ArgumentError",
             cause=exc,
         )
     if export_dirs:
@@ -118,9 +118,9 @@ def run_pipe_cmd(
         case RunnerType.API:
             # Validate unsupported flags for API runner
             if dry_run:
-                agent_error("--dry-run is not supported with --runner api", "ArgumentError")
+                agent_error("--dry-run is not supported with --runner api", error_type="ArgumentError")
             if mock_inputs:
-                agent_error("--mock-inputs is not supported with --runner api", "ArgumentError")
+                agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
 
             from mthds.protocol.exceptions import PipelineRequestError  # noqa: PLC0415
             from mthds.runners.api.exceptions import ClientAuthenticationError  # noqa: PLC0415
@@ -133,17 +133,19 @@ def run_pipe_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
+                agent_success_formatted(
+                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
+                )
 
             except ClientAuthenticationError as exc:
-                agent_error(str(exc), "ClientAuthenticationError", cause=exc)
+                agent_error(str(exc), error_type="ClientAuthenticationError", cause=exc)
 
             except PipelineRequestError as exc:
-                agent_error(str(exc), "PipelineRequestError", cause=exc)
+                agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
 
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), type(exc).__name__, cause=exc)
+                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
             make_pipelex_for_agent_cli(needs_inference=not dry_run, needs_model_specs=True)
@@ -161,7 +163,9 @@ def run_pipe_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
+                agent_success_formatted(
+                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
+                )
 
             except PipelineExecutionError as exc:
                 extra_fields: dict[str, Any] = {
@@ -171,12 +175,12 @@ def run_pipe_cmd(
                 if exc.__cause__:
                     extra_fields["cause_type"] = type(exc.__cause__).__name__
                     extra_fields["cause_message"] = str(exc.__cause__)
-                agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
+                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
 
             except PipeOperatorModelChoiceError as exc:
                 agent_error(
                     exc.message,
-                    "PipeOperatorModelChoiceError",
+                    error_type="PipeOperatorModelChoiceError",
                     cause=exc,
                     pipe_code=exc.pipe_code,
                     model_type=str(exc.model_type),
@@ -192,11 +196,11 @@ def run_pipe_cmd(
                     availability_extra["fallback_list"] = exc.fallback_list
                 if exc.pipe_stack:
                     availability_extra["pipe_stack"] = exc.pipe_stack
-                agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+                agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), type(exc).__name__, cause=exc)
+                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
             finally:
                 Pipelex.teardown_if_needed()

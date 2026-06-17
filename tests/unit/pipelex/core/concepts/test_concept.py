@@ -307,21 +307,21 @@ class TestConcept:
             blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
 
-        assert Concept.are_concept_compatible(concept_7, concept_6, strict=True) is False
-        assert Concept.are_concept_compatible(concept_7, concept_6, strict=False) is False
+        assert Concept.are_concept_compatible(concept_1=concept_7, concept_2=concept_6, strict=True) is False
+        assert Concept.are_concept_compatible(concept_1=concept_7, concept_2=concept_6, strict=False) is False
 
         # Test same code and domain
-        assert Concept.are_concept_compatible(concept1, concept2) is True
+        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept2) is True
 
         # Test different code and domain
-        assert Concept.are_concept_compatible(concept1, concept3) is True
+        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept3) is True
 
         # Test same structure class name
-        assert Concept.are_concept_compatible(concept1, concept4) is False
+        assert Concept.are_concept_compatible(concept_1=concept1, concept_2=concept4) is False
 
         # Test same refines
-        assert Concept.are_concept_compatible(concept_5, concept_6, strict=False) is True
-        assert Concept.are_concept_compatible(concept_5, concept_6, strict=True) is False
+        assert Concept.are_concept_compatible(concept_1=concept_5, concept_2=concept_6, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=concept_5, concept_2=concept_6, strict=True) is False
 
     def test_concept_refining_text_is_strictly_compatible(self):
         """Test that a concept created with .make() that refines native.Text is strictly compatible with Text."""
@@ -338,8 +338,8 @@ class TestConcept:
         text_concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
 
         # A concept that refines Text should be strictly compatible with Text
-        assert Concept.are_concept_compatible(concept_not_native_text, text_concept, strict=True) is True
-        assert Concept.are_concept_compatible(concept_not_native_text, text_concept, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=concept_not_native_text, concept_2=text_concept, strict=True) is True
+        assert Concept.are_concept_compatible(concept_1=concept_not_native_text, concept_2=text_concept, strict=False) is True
 
     def test_concept_with_same_structure_as_text_content(self):
         """Test: create a concept with a structure EXACTLY like TextContent (text: str) and compare with native Text."""
@@ -366,8 +366,8 @@ class TestConcept:
         assert custom_text_like_concept.structure_class_name != native_text_concept.structure_class_name
 
         # Concepts with the same JSON structure should be compatible
-        assert Concept.are_concept_compatible(custom_text_like_concept, native_text_concept, strict=True) is True
-        assert Concept.are_concept_compatible(custom_text_like_concept, native_text_concept, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=custom_text_like_concept, concept_2=native_text_concept, strict=True) is True
+        assert Concept.are_concept_compatible(concept_1=custom_text_like_concept, concept_2=native_text_concept, strict=False) is True
 
     def test_nested_image_content_strict_false_nonstrict_true(self):
         """Test: strict=True returns False, strict=False returns True for nested compatible field."""
@@ -396,18 +396,18 @@ class TestConcept:
 
         # --- Test with NestedImageInfo (custom class with same structure as ImageContent) ---
         # strict=True should be False: DocumentWithNestedImage is NOT structurally equivalent to NestedImageInfo
-        assert Concept.are_concept_compatible(concept_with_nested_image, concept_image_like, strict=True) is False
+        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=concept_image_like, strict=True) is False
         # strict=False should be True: DocumentWithNestedImage has a field (metadata) that is NestedImageInfo
-        assert Concept.are_concept_compatible(concept_with_nested_image, concept_image_like, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=concept_image_like, strict=False) is True
 
         # --- Test NestedImageInfo vs native Image (ImageContent) ---
         # NestedImageInfo has the same structure as ImageContent, so should be strictly compatible
-        assert Concept.are_concept_compatible(concept_image_like, native_image_concept, strict=True) is True
-        assert Concept.are_concept_compatible(concept_image_like, native_image_concept, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=concept_image_like, concept_2=native_image_concept, strict=True) is True
+        assert Concept.are_concept_compatible(concept_1=concept_image_like, concept_2=native_image_concept, strict=False) is True
 
         # --- Test DocumentWithNestedImage vs native Image (ImageContent) ---
         # strict=True should be False: DocumentWithNestedImage is NOT structurally equivalent to ImageContent
-        assert Concept.are_concept_compatible(concept_with_nested_image, native_image_concept, strict=True) is False
+        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=native_image_concept, strict=True) is False
         # strict=False should be True: DocumentWithNestedImage has a nested field (metadata: NestedImageInfo)
         # that is STRUCTURALLY EQUIVALENT to ImageContent
-        assert Concept.are_concept_compatible(concept_with_nested_image, native_image_concept, strict=False) is True
+        assert Concept.are_concept_compatible(concept_1=concept_with_nested_image, concept_2=native_image_concept, strict=False) is True

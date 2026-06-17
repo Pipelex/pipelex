@@ -152,7 +152,7 @@ def read_manifest(deck_dir: Path) -> DeckManifest | None:
         return None
 
 
-def write_manifest(deck_dir: Path, manifest: DeckManifest) -> None:
+def write_manifest(manifest: DeckManifest, *, deck_dir: Path) -> None:
     """Persist the manifest, creating the deck directory if needed."""
     deck_dir.mkdir(parents=True, exist_ok=True)
     payload = manifest.model_dump()
@@ -173,10 +173,10 @@ def is_deck_stale_fast(deck_dir: Path) -> bool:
     manifest = read_manifest(deck_dir)
     if manifest is None:
         return True
-    return _is_manifest_older(manifest.kit_version, get_package_version())
+    return _is_manifest_older(manifest.kit_version, current_version=get_package_version())
 
 
-def _is_manifest_older(manifest_version: str, current_version: str) -> bool:
+def _is_manifest_older(manifest_version: str, *, current_version: str) -> bool:
     """True iff the manifest's recorded core version is strictly older than the installed package.
 
     Compares semver cores (``X.Y.Z``) ignoring pre-release/build metadata so that an editable build

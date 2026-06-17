@@ -7,6 +7,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 
 def validate_concept_references_in_blueprints(
     blueprints: list[PipelexBundleBlueprint],
+    *,
     already_loaded_concept_refs: set[str] | None = None,
 ) -> None:
     """Validate that every same-domain concept reference resolves against the merged library.

@@ -200,7 +200,7 @@ class Log:
         """
         self.set_level_by_int(level_int=level.int_logging_level)
 
-    def set_level_for_package(self, package_name: str, level: LogLevel):
+    def set_level_for_package(self, package_name: str, *, level: LogLevel):
         """Set the log level for a specific package.
 
         Args:
@@ -224,6 +224,7 @@ class Log:
     def verbose(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -242,6 +243,7 @@ class Log:
     def debug(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -260,6 +262,7 @@ class Log:
     def dev(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -278,6 +281,7 @@ class Log:
     def info(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -296,6 +300,7 @@ class Log:
     def warning(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         problem_id: str | None = None,
@@ -318,6 +323,7 @@ class Log:
     def error(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         include_exception: bool = False,
@@ -348,6 +354,7 @@ class Log:
     def critical(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         include_exception: bool = False,

@@ -21,7 +21,7 @@ def load_model_deck_blueprint(model_deck_paths: list[str]) -> ModelDeckBlueprint
         except FileNotFoundError as not_found_exc:
             msg = f"Could not find Model Deck file at '{deck_path}': {not_found_exc}"
             raise ModelDeckNotFoundError(msg) from not_found_exc
-        deep_update(full_deck_dict, deck_dict)
+        deep_update(full_deck_dict, updates=deck_dict)
 
     try:
         return ModelDeckBlueprint.model_validate(full_deck_dict)

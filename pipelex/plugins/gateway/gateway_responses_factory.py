@@ -26,6 +26,7 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
     def make_portkey_openai_client_for_responses(
         cls,
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
@@ -52,6 +53,6 @@ class GatewayResponsesFactory(OpenAIResponsesFactory):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return GatewayFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

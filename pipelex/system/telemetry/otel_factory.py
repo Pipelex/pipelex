@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 class OtelFactory:
     @classmethod
-    def make_truncated_content(cls, content: str, max_length: int | None) -> str:
+    def make_truncated_content(cls, content: str, *, max_length: int | None) -> str:
         """Truncate content for telemetry capture if it exceeds max length.
 
         Args:
@@ -61,6 +61,7 @@ class OtelFactory:
     def make_inputs_json(
         cls,
         working_memory: WorkingMemory,
+        *,
         needed_input_names: set[str],
         max_length: int | None,
     ) -> str:
@@ -89,6 +90,7 @@ class OtelFactory:
     def make_output_json(
         cls,
         pipe_output: PipeOutput,
+        *,
         max_length: int | None,
     ) -> str:
         """Serialize pipe output to JSON for telemetry.
@@ -128,7 +130,7 @@ class OtelFactory:
         return hash_md5_to_int(pipeline_run_id)
 
     @classmethod
-    def make_trace_names(cls, pipeline_run_id: str, pipe_code: str) -> tuple[str, str]:
+    def make_trace_names(cls, pipeline_run_id: str, *, pipe_code: str) -> tuple[str, str]:
         """Create both full and redacted trace names from pipeline run ID and pipe code.
 
         Args:
@@ -196,6 +198,7 @@ class OtelFactory:
     def make_ai_tracer(
         cls,
         user_id: str | None,
+        *,
         custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,
         pipelex_posthog_client: "Posthog | None",

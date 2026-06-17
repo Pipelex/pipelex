@@ -16,6 +16,7 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 
 async def run_pipeline_core_api(
     pipe_code: str,
+    *,
     mthds_contents: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
     with_memory: bool = False,

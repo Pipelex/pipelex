@@ -125,7 +125,7 @@ class EdgeKind(StrEnum):
                 return False
 
 
-def _truncate_string(value: str | None, max_length: int) -> str | None:
+def _truncate_string(value: str | None, *, max_length: int) -> str | None:
     """Truncate a string to max_length with ellipsis if needed."""
     if value is None:
         return None
@@ -195,7 +195,7 @@ class IOSpec(BaseModel):
     @classmethod
     def truncate_preview(cls, value: str | None) -> str | None:
         """Truncate preview to MAX_PREVIEW_LENGTH."""
-        return _truncate_string(value, MAX_PREVIEW_LENGTH)
+        return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
 
 
 class NodeIOSpec(BaseModel):
@@ -223,7 +223,7 @@ class ErrorSpec(BaseModel):
     @classmethod
     def truncate_stack(cls, value: str | None) -> str | None:
         """Truncate stack trace to MAX_STACK_LENGTH."""
-        return _truncate_string(value, MAX_STACK_LENGTH)
+        return _truncate_string(value, max_length=MAX_STACK_LENGTH)
 
 
 class NodeSpec(BaseModel):

@@ -337,6 +337,6 @@ class TestResolveDispatch:
         assert worker_config.resolve_queue("act_jinja2_gen_text") == "default_q"
 
         # resolve_dispatch agrees with resolve_queue on the queue name.
-        assert worker_config.resolve_dispatch("act_llm_gen_text", "claude-opus-4-7").task_queue == "anthropic_q"
-        assert worker_config.resolve_dispatch("act_llm_gen_text", "gpt-5").task_queue == "inference_q"
+        assert worker_config.resolve_dispatch("act_llm_gen_text", routing_key="claude-opus-4-7").task_queue == "anthropic_q"
+        assert worker_config.resolve_dispatch("act_llm_gen_text", routing_key="gpt-5").task_queue == "inference_q"
         assert worker_config.resolve_dispatch("act_jinja2_gen_text").task_queue == "default_q"

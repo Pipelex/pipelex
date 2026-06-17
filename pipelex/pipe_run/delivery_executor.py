@@ -40,6 +40,7 @@ class DeliveryExecutor:
     async def execute(
         self,
         pipe_output: PipeOutput | None,
+        *,
         user_id: str,
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
@@ -56,11 +57,20 @@ class DeliveryExecutor:
         # Step 1: Persist the result files to storage (only on success with output)
         result_url: str | None = None
         if delivery_assignment.storage is not None and pipe_output is not None:
-            result_url = await self._store_results(pipe_output, user_id, pipeline_run_id, delivery_assignment.storage, request_id=request_id)
+            result_url = await self._store_results(
+                pipe_output, user_id=user_id, pipeline_run_id=pipeline_run_id, storage=delivery_assignment.storage, request_id=request_id
+            )
 
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
         for webhook in delivery_assignment.webhooks:
-            await self._notify_webhook(pipeline_run_id, status, result_url, webhook, error_report, request_id=request_id)
+            await self._notify_webhook(
+                pipeline_run_id=pipeline_run_id,
+                status=status,
+                result_url=result_url,
+                webhook=webhook,
+                error_report=error_report,
+                request_id=request_id,
+            )
 
     # ---- Result file generation ----
 
@@ -89,9 +99,9 @@ class DeliveryExecutor:
             raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
             main_stuff = self.try_local_hydrate_stuff(raw_main_stuff) if raw_main_stuff is not None else None
             if main_stuff is not None:
-                await self._generate_main_stuff_files(main_stuff, files)
+                await self._generate_main_stuff_files(main_stuff, files=files)
             elif raw_main_stuff is not None:
-                self._generate_main_stuff_files_from_raw(raw_main_stuff, files)
+                self._generate_main_stuff_files_from_raw(raw_main_stuff, files=files)
         else:
             files["working_memory.json"] = ResultFile(
                 data=clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8"),
@@ -99,11 +109,11 @@ class DeliveryExecutor:
             )
             main_stuff = pipe_output.working_memory.get_optional_main_stuff()
             if main_stuff is not None:
-                await self._generate_main_stuff_files(main_stuff, files)
+                await self._generate_main_stuff_files(main_stuff, files=files)
 
         graph_spec = pipe_output.graph_spec
         if graph_spec:
-            await self._generate_graph_files(graph_spec, files)
+            await self._generate_graph_files(graph_spec, files=files)
 
         return files
 
@@ -150,7 +160,7 @@ class DeliveryExecutor:
             return None
 
     @classmethod
-    def _generate_main_stuff_files_from_raw(cls, raw_main_stuff: dict[str, Any], files: dict[str, ResultFile]) -> None:
+    def _generate_main_stuff_files_from_raw(cls, raw_main_stuff: dict[str, Any], *, files: dict[str, ResultFile]) -> None:
         """Generic fallback rendering of a main stuff that we couldn't locally hydrate.
 
         Produces JSON-in-markdown and `<pre>`-in-HTML so the user still gets
@@ -165,24 +175,30 @@ class DeliveryExecutor:
         # like "</pre><script>...</script>" in pipeline outputs.
         files["main_stuff.html"] = ResultFile(data=f"<pre>{html.escape(json_text)}</pre>".encode(), content_type="text/html")
 
-    async def _generate_main_stuff_files(self, main_stuff: Stuff, files: dict[str, ResultFile]) -> None:
+    async def _generate_main_stuff_files(self, main_stuff: Stuff, *, files: dict[str, ResultFile]) -> None:
         content = main_stuff.content
-        await self._try_add_rendered_file(files, "main_stuff.json", content.rendered_json_async(), "application/json")
-        await self._try_add_rendered_file(files, "main_stuff.md", content.rendered_markdown_async(), "text/markdown")
-        await self._try_add_rendered_file(files, "main_stuff.html", content.rendered_html_async(), "text/html")
-        await self._try_add_rendered_file(files, "main_stuff_viewer.html", render_stuff_viewer(main_stuff), "text/html")
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff.json", render=content.rendered_json_async(), content_type="application/json"
+        )
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff.md", render=content.rendered_markdown_async(), content_type="text/markdown"
+        )
+        await self._try_add_rendered_file(files=files, filename="main_stuff.html", render=content.rendered_html_async(), content_type="text/html")
+        await self._try_add_rendered_file(
+            files=files, filename="main_stuff_viewer.html", render=render_stuff_viewer(main_stuff), content_type="text/html"
+        )
 
-    async def _generate_graph_files(self, graph_spec: Any, files: dict[str, ResultFile]) -> None:
+    async def _generate_graph_files(self, graph_spec: Any, *, files: dict[str, ResultFile]) -> None:
         try:
             graph_config = get_config().pipelex.pipeline_execution_config.graph_config
             graph_outputs = await generate_graph_outputs(
                 graph_spec=graph_spec,
                 graph_config=graph_config,
             )
-            self._add_optional_text_file(files, "graphspec.json", graph_outputs.graphspec_json, "application/json")
-            self._add_optional_text_file(files, "mermaidflow.mmd", graph_outputs.mermaidflow_mmd, "text/plain")
-            self._add_optional_text_file(files, "mermaidflow.html", graph_outputs.mermaidflow_html, "text/html")
-            self._add_optional_text_file(files, "reactflow.html", graph_outputs.reactflow_html, "text/html")
+            self._add_optional_text_file(files=files, filename="graphspec.json", text=graph_outputs.graphspec_json, content_type="application/json")
+            self._add_optional_text_file(files=files, filename="mermaidflow.mmd", text=graph_outputs.mermaidflow_mmd, content_type="text/plain")
+            self._add_optional_text_file(files=files, filename="mermaidflow.html", text=graph_outputs.mermaidflow_html, content_type="text/html")
+            self._add_optional_text_file(files=files, filename="reactflow.html", text=graph_outputs.reactflow_html, content_type="text/html")
         except Exception:  # noqa: BLE001
             # Best-effort: graph generation spans a deep mermaid/reactflow render tree; a graph failure must never fail result delivery.
             log.warning("Failed to generate graph outputs")
@@ -190,6 +206,7 @@ class DeliveryExecutor:
     @classmethod
     async def _try_add_rendered_file(
         cls,
+        *,
         files: dict[str, ResultFile],
         filename: str,
         render: Awaitable[str],
@@ -205,7 +222,7 @@ class DeliveryExecutor:
         files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
 
     @classmethod
-    def _add_optional_text_file(cls, files: dict[str, ResultFile], filename: str, text: str | None, content_type: str) -> None:
+    def _add_optional_text_file(cls, *, files: dict[str, ResultFile], filename: str, text: str | None, content_type: str) -> None:
         """Encode `text` and store it under `filename`. No-op when `text` is None."""
         if text is not None:
             files[filename] = ResultFile(data=text.encode("utf-8"), content_type=content_type)
@@ -215,6 +232,7 @@ class DeliveryExecutor:
     async def _store_results(
         self,
         pipe_output: PipeOutput,
+        *,
         user_id: str,
         pipeline_run_id: str,
         storage: StorageTarget,
@@ -248,6 +266,7 @@ class DeliveryExecutor:
 
     async def _notify_webhook(
         self,
+        *,
         pipeline_run_id: str,
         status: DeliveryStatus,
         result_url: str | None,

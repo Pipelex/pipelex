@@ -8,6 +8,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 class PluginFactoryAbstract(ABC):
     @abstractmethod
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         pass

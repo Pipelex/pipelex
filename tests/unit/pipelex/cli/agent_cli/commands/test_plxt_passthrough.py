@@ -29,7 +29,7 @@ class TestPlxtPassthrough:
         mocker.patch("shutil.which", return_value=None)
 
         with pytest.raises(typer.Exit) as exc_info:
-            run_plxt("fmt", "file.mthds")
+            run_plxt("fmt", file_path="file.mthds")
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
@@ -44,7 +44,7 @@ class TestPlxtPassthrough:
         mocker.patch("shutil.which", return_value=None)
 
         with pytest.raises(typer.Exit):
-            run_plxt("lint", "file.mthds")
+            run_plxt("lint", file_path="file.mthds")
 
         parsed = json.loads(capsys.readouterr().err)
         assert "uv tool install pipelex-tools" in parsed["message"]
@@ -71,7 +71,7 @@ class TestPlxtPassthrough:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            run_plxt("fmt", "file.mthds")
+            run_plxt("fmt", file_path="file.mthds")
 
         assert exc_info.value.exit_code == exit_code
 
@@ -87,7 +87,7 @@ class TestPlxtPassthrough:
         )
 
         with pytest.raises(typer.Exit):
-            run_plxt("fmt", "/path/to/file.mthds")
+            run_plxt("fmt", file_path="/path/to/file.mthds")
 
         mock_run.assert_called_once_with(
             ["/usr/bin/plxt", "fmt", "/path/to/file.mthds"],
@@ -105,7 +105,7 @@ class TestPlxtPassthrough:
 
         fmt_cmd("some/file.mthds")
 
-        mock_run_plxt.assert_called_once_with("fmt", "some/file.mthds")
+        mock_run_plxt.assert_called_once_with("fmt", file_path="some/file.mthds")
 
     def test_lint_cmd_delegates_to_plxt_with_lint_subcommand(
         self,
@@ -118,4 +118,4 @@ class TestPlxtPassthrough:
 
         lint_cmd("some/file.mthds")
 
-        mock_run_plxt.assert_called_once_with("lint", "some/file.mthds")
+        mock_run_plxt.assert_called_once_with("lint", file_path="some/file.mthds")

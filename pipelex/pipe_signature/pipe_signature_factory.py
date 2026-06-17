@@ -15,6 +15,7 @@ class PipeSignatureFactory(PipeFactoryProtocol[PipeSignatureBlueprint, PipeSigna
     def make(
         cls,
         pipe_category: Any,
+        *,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,

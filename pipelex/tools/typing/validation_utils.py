@@ -1,7 +1,7 @@
 from typing import Any
 
 
-def has_exactly_one_among_attributes_from_list(obj: Any, attributes_list: list[str]) -> bool:
+def has_exactly_one_among_attributes_from_list(obj: Any, *, attributes_list: list[str]) -> bool:
     """Checks if exactly one attribute from a list of attributes is non-None in an object.
 
     This function is useful for validating mutually exclusive attributes in data models
@@ -20,7 +20,7 @@ def has_exactly_one_among_attributes_from_list(obj: Any, attributes_list: list[s
     return len(provided_attributes) == 1
 
 
-def has_more_than_one_among_attributes_from_list(obj: Any, attributes_list: list[str]) -> bool:
+def has_more_than_one_among_attributes_from_list(obj: Any, *, attributes_list: list[str]) -> bool:
     """Checks if more than one attribute from a list of attributes is non-None in an object.
 
     This function is useful for detecting conflicts in configurations or data models
@@ -39,7 +39,7 @@ def has_more_than_one_among_attributes_from_list(obj: Any, attributes_list: list
     return len(provided_attributes) > 1
 
 
-def has_more_than_one_among_attributes_from_lists(obj: Any, attributes_lists: list[list[str]]) -> list[str] | None:
+def has_more_than_one_among_attributes_from_lists(obj: Any, *, attributes_lists: list[list[str]]) -> list[str] | None:
     """Checks if more than one attribute from lists (plural) of attributes is non-None in an object.
 
     This function is useful for detecting conflicts in configurations or data models
@@ -54,6 +54,6 @@ def has_more_than_one_among_attributes_from_lists(obj: Any, attributes_lists: li
 
     """
     for attributes_list in attributes_lists:
-        if has_more_than_one_among_attributes_from_list(obj, attributes_list):
+        if has_more_than_one_among_attributes_from_list(obj, attributes_list=attributes_list):
             return attributes_list
     return None
