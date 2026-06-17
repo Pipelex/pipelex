@@ -23,6 +23,7 @@ app = typer.Typer()
 
 
 async def run_worker(
+    *,
     project: str | None = None,
     is_not_sandboxed: bool = False,
     is_unit_testing: bool = False,
@@ -31,7 +32,7 @@ async def run_worker(
     profile_name: str | None = None,
 ):
     if project is None:
-        log.info(f"Starting worker for current project '{project}', from {os.path.relpath(__file__)}")
+        log.info(f"Starting worker for current project, from {os.path.relpath(__file__)}")
     else:
         log.info(f"Starting worker for chosen project '{project}', from {os.path.relpath(__file__)}")
     await get_task_manager().run_worker(
@@ -94,7 +95,16 @@ def configure(
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
         get_config().temporal = updated_temporal
 
-    asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue, scope, profile))
+    asyncio.run(
+        run_worker(
+            project=project,
+            is_not_sandboxed=is_not_sandboxed,
+            is_unit_testing=is_unit_testing,
+            task_queue=task_queue,
+            scope_name=scope,
+            profile_name=profile,
+        )
+    )
 
 
 if __name__ == "__main__":

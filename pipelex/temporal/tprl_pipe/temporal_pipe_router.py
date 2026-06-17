@@ -121,10 +121,11 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
         # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict.
         # Uses a per-call scoped library when the pipe_job carries a crate so the
         # submitter does not need to have pre-loaded the bundle into its global registry.
-        return rehydrate_pipe_output_with_crate(pipe_output, pipe_job.library_crate)
+        return rehydrate_pipe_output_with_crate(pipe_output, library_crate=pipe_job.library_crate)
 
 
 def make_temporal_pipe_router(
+    *,
     task_queue: str | None = None,
     workflow_execution_timeout: timedelta | None = None,
     retry_policy: RetryPolicy | None = None,

@@ -26,6 +26,7 @@ class LLMAssignment(BaseModel):
     @classmethod
     def make_from_prompt(
         cls,
+        *,
         job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         llm_setting: LLMSetting,
@@ -85,6 +86,7 @@ class ObjectAssignment(BaseModel):
     @staticmethod
     def make_for_class(
         object_class: type[BaseModel],
+        *,
         llm_assignment: LLMAssignment,
         nb_items: int | None = None,
     ) -> "ObjectAssignment":
@@ -174,6 +176,7 @@ class SearchObjectAssignment(BaseModel):
     @staticmethod
     def make_for_class(
         output_class: type[BaseModel],
+        *,
         search_assignment: SearchAssignment,
     ) -> "SearchObjectAssignment":
         return SearchObjectAssignment(

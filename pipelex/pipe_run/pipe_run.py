@@ -30,6 +30,7 @@ class PipeRun(PipeRunProtocol):
     async def run(
         self,
         pipe_job: PipeJob,
+        *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id

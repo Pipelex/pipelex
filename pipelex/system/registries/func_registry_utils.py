@@ -15,7 +15,7 @@ from pipelex.tools.typing.module_inspector import import_module_from_file_if_has
 
 class FuncRegistryUtils:
     @classmethod
-    def register_pipe_funcs_from_package(cls, package_name: str, package: Any) -> int:
+    def register_pipe_funcs_from_package(cls, package_name: str, *, package: Any) -> int:
         """Register all @pipe_func decorated functions from a package.
 
         Args:
@@ -75,6 +75,7 @@ class FuncRegistryUtils:
     def register_funcs_in_folder(
         cls,
         folder_path: Path,
+        *,
         force_include_dirs: list[Path] | None = None,
         is_recursive: bool = True,
     ) -> None:

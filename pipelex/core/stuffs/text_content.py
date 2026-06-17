@@ -31,7 +31,7 @@ class TextContent(StuffContent):
         return html.escape(self.text)
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return self.text
 
     @override
@@ -43,7 +43,7 @@ class TextContent(StuffContent):
         return bool(HTML_PATTERN.match(self.text))
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         if self._looks_like_html():
             return Syntax(self.text, "html", word_wrap=True)
         return Markdown(self.text)

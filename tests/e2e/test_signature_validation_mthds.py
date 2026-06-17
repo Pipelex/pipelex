@@ -6,11 +6,11 @@ import pytest
 
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError, SignaturesNotAllowedError
+from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.bundle_validator import DryRunStatus
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.validate_bundle import validate_bundle
 
 _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "signature_bundles"
 _SIGNATURE_ONLY = _FIXTURE_DIR / "signature_only.mthds"
@@ -21,29 +21,28 @@ _STRUCTURED = _FIXTURE_DIR / "signature_with_structured_output.mthds"
 
 @pytest.mark.asyncio
 class TestSignatureValidationE2E:
-    async def test_signature_only_bundle_strict_fails(self) -> None:
-        with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_file_path=_SIGNATURE_ONLY)
-        sig_error = exc_info.value.signature_check_error
-        assert sig_error is not None
-        assert isinstance(sig_error, SignaturesNotAllowedError)
-        assert "signature_demo.summarize_doc" in sig_error.signature_refs
+    async def test_signature_only_bundle_strict_reports_pending(self) -> None:
+        # Signatures are never an error (D-B): strict validation does not raise — it reports the
+        # outstanding signature via pending_signatures and excludes the signature pipe from the sweep.
+        result = await validate_bundle(mthds_file_path=_SIGNATURE_ONLY)
+        assert "signature_demo.summarize_doc" in result.pending_signatures
+        assert "signature_demo.summarize_doc" not in result.dry_run_result
 
     async def test_signature_only_bundle_lenient_passes(self) -> None:
         result = await validate_bundle(mthds_file_path=_SIGNATURE_ONLY, allow_signatures=True)
         assert "signature_demo.summarize_doc" in result.dry_run_result
         assert result.dry_run_result["signature_demo.summarize_doc"].status is DryRunStatus.SUCCESS
+        # The placeholder is still an unsatisfied forward declaration even when mock-run in lenient mode.
+        assert "signature_demo.summarize_doc" in result.pending_signatures
 
-    async def test_mixed_bundle_strict_fails_with_dep_path(self) -> None:
-        with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_file_path=_MIXED)
-        sig_error = exc_info.value.signature_check_error
-        assert sig_error is not None
-        signature_ref = "signature_mixed.summarize_extracted"
-        assert signature_ref in sig_error.signature_refs
-        assert signature_ref in sig_error.dep_paths
-        chain = sig_error.dep_paths[signature_ref]
-        assert "signature_mixed.process_doc" in chain
+    async def test_mixed_bundle_strict_reports_pending_signature(self) -> None:
+        # Strict mode no longer raises on the reached signature. The non-signature caller (process_doc)
+        # is still swept and dry-runs trivially (its signature sub-pipe mints a mock); the signature pipe
+        # itself is excluded from the sweep and reported via pending_signatures.
+        result = await validate_bundle(mthds_file_path=_MIXED)
+        assert "signature_mixed.summarize_extracted" in result.pending_signatures
+        assert result.dry_run_result["signature_mixed.process_doc"].status is DryRunStatus.SUCCESS
+        assert "signature_mixed.summarize_extracted" not in result.dry_run_result
 
     async def test_mixed_bundle_lenient_passes_and_produces_mock(self) -> None:
         result = await validate_bundle(mthds_file_path=_MIXED, allow_signatures=True)

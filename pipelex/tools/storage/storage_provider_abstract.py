@@ -94,7 +94,7 @@ class StorageProviderAbstract(ABC):
             StoredData containing bytes and optional MIME type.
         """
 
-    async def store(self, data: bytes, key: str, content_type: str | None = None) -> str:
+    async def store(self, data: bytes, *, key: str, content_type: str | None = None) -> str:
         """Store data and return full URI with scheme.
 
         Args:

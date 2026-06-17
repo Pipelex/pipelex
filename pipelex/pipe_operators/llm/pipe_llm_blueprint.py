@@ -106,10 +106,14 @@ class PipeLLMBlueprint(PipeBlueprint):
         }
 
         # Find variables used in prompts but not satisfied by any input
-        missing_inputs = {var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, declared_inputs)}
+        missing_inputs = {
+            var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, input_names=declared_inputs)
+        }
 
         # Find inputs declared but not used by any variable path
-        unused_inputs = {input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, filtered_variable_paths)}
+        unused_inputs = {
+            input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, variable_paths=filtered_variable_paths)
+        }
 
         if missing_inputs:
             missing_vars_str = ", ".join(sorted(missing_inputs))

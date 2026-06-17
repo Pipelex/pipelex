@@ -12,7 +12,6 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_pipe_in_bundle_core,  # noqa: PLC2701
 )
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -130,40 +129,54 @@ class TestAgentValidatePipeInBundle:
             )
         )
         assert result["success"] is True
-        pipe_codes = {entry["pipe_code"] for entry in result["validated_pipes"]}
+        pipe_refs = {entry["pipe_ref"] for entry in result["validated_pipes"]}
         # Identity is the namespaced pipe_ref (domain.code) on every validate surface.
-        assert "slice_bundle.implemented_pipe" in pipe_codes
+        assert "slice_bundle.implemented_pipe" in pipe_refs
+        # pending_signatures is library-wide: the unrelated standalone signature still counts, so even
+        # this successful slice reports the bundle as not-yet-runnable.
+        assert "slice_bundle.draft_pipe" in result["pending_signatures"]
+        assert result["is_runnable"] is False
 
-    def test_whole_bundle_strict_still_rejects_unrelated_signature(
+    def test_whole_bundle_strict_reports_unrelated_signature_as_pending(
         self,
         implemented_plus_signature_dir: Path,
     ) -> None:
-        # The whole-bundle path keeps strict semantics: a bundle that merely *contains* a signature
-        # is rejected (by design), even when the signature is unreached.
-        with pytest.raises(ValidateBundleError) as exc_info:
-            asyncio.run(
-                validate_bundle_core(
-                    bundle_path=implemented_plus_signature_dir / "bundle.mthds",
-                    library_dirs=[implemented_plus_signature_dir],
-                )
+        # Signatures are never an error (D-B): whole-bundle strict no longer rejects a bundle that merely
+        # contains a standalone signature. It returns a valid-but-not-runnable envelope listing the
+        # signature in pending_signatures; the bundle command's exit-code gate enforces the verdict.
+        result = asyncio.run(
+            validate_bundle_core(
+                bundle_path=implemented_plus_signature_dir / "bundle.mthds",
+                library_dirs=[implemented_plus_signature_dir],
             )
-        assert exc_info.value.signature_check_error is not None
+        )
+        assert result["is_valid"] is True
+        assert "slice_bundle.draft_pipe" in result["pending_signatures"]
+        assert result["is_runnable"] is False
+        # The implemented pipe is swept; the standalone signature pipe is excluded from the strict sweep.
+        pipe_refs = {entry["pipe_ref"] for entry in result["validated_pipes"]}
+        assert "slice_bundle.implemented_pipe" in pipe_refs
+        assert "slice_bundle.draft_pipe" not in pipe_refs
 
-    def test_pipe_slice_strict_rejects_pipe_that_reaches_signature(
+    def test_pipe_slice_strict_reports_reached_signature_as_pending(
         self,
         caller_of_signature_dir: Path,
     ) -> None:
-        # --pipe does NOT loosen strict mode for the *selected* pipe: if the requested pipe itself
-        # reaches a signature, strict validation still fails.
-        with pytest.raises(ValidateBundleError) as exc_info:
-            asyncio.run(
-                validate_pipe_in_bundle_core(
-                    bundle_path=caller_of_signature_dir / "bundle.mthds",
-                    pipe_code="caller_seq",
-                    library_dirs=[caller_of_signature_dir],
-                )
+        # The requested pipe reaches a signature through its dependency graph. Signatures are never an
+        # error (D-B): the slice is swept and dry-runs trivially (the signature sub-pipe mints a mock);
+        # the reached signature is reported library-wide via pending_signatures, leaving it not-runnable.
+        result = asyncio.run(
+            validate_pipe_in_bundle_core(
+                bundle_path=caller_of_signature_dir / "bundle.mthds",
+                pipe_code="caller_seq",
+                library_dirs=[caller_of_signature_dir],
             )
-        assert exc_info.value.signature_check_error is not None
+        )
+        assert result["is_valid"] is True
+        assert "slice_caller.summary_sig" in result["pending_signatures"]
+        assert result["is_runnable"] is False
+        pipe_refs = {entry["pipe_ref"] for entry in result["validated_pipes"]}
+        assert "slice_caller.caller_seq" in pipe_refs
 
     def test_pipe_slice_unknown_pipe_raises_not_found(
         self,
@@ -194,6 +207,9 @@ class TestAgentValidatePipeInBundle:
             )
         )
         assert result["success"] is True
-        statuses = {entry["pipe_code"]: entry["status"] for entry in result["validated_pipes"]}
+        statuses = {entry["pipe_ref"]: entry["status"] for entry in result["validated_pipes"]}
         # Identity is the namespaced pipe_ref (domain.code), not the bare code.
         assert statuses == {"slice_xpkg.cross_parallel": "SKIPPED"}
+        # This bundle has no PipeSignature pipes, so it is runnable — the envelope reports it.
+        assert result["pending_signatures"] == []
+        assert result["is_runnable"] is True

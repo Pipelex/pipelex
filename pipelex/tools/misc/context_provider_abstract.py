@@ -8,7 +8,7 @@ class ContextProviderAbstract(ABC):
     """
 
     @abstractmethod
-    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
+    def get_typed_object_or_attribute(self, name: str, *, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         pass
 
     @abstractmethod

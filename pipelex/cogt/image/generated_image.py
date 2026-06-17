@@ -58,7 +58,7 @@ class GeneratedImageRawDetails(CustomBaseModel):
         return self
 
     @classmethod
-    def make_from_pil_image(cls, pil_image: Image.Image, image_format: ImageFormat) -> GeneratedImageRawDetails:
+    def make_from_pil_image(cls, pil_image: Image.Image, *, image_format: ImageFormat) -> GeneratedImageRawDetails:
         try:
             width, height = pil_image.size
             actual_bytes = pil_image_to_bytes(pil_image=pil_image, image_format=image_format)

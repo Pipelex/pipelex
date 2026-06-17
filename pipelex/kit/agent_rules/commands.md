@@ -18,6 +18,17 @@
 
    Always fix any issues reported by these tools before proceeding.
 
+## Keyword-only arguments check
+
+   Non-subject function parameters across `pipelex/` source must be keyword-only (a bare `*` after the subject). The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+
+   ```bash
+   make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
+   make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   ```
+
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
+
 ## Cleaning Derived Files
 
    If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...

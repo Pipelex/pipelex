@@ -29,7 +29,9 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_class_registry, get_current_library
+from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -271,6 +273,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_libraries(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
@@ -333,6 +336,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_libraries_concepts_only(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list["Concept"]:
@@ -400,7 +404,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Load MTHDS files as concepts only (no pipes)
         log.debug(f"Loading concepts only from MTHDS files: {[str(p) for p in valid_mthds_paths]}")
         library = self.get_library(library_id=library_id)
-        all_concepts: list[Concept] = []
+        all_blueprints: list[PipelexBundleBlueprint] = []
         for mthds_path in valid_mthds_paths:
             # Track loaded path (resolve if possible)
             try:
@@ -409,14 +413,16 @@ class LibraryManager(LibraryManagerAbstract):
                 resolved_path = mthds_path
             library.loaded_mthds_paths.append(resolved_path)
 
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
-            concepts = self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
-            all_concepts.extend(concepts)
+            all_blueprints.append(PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path))
 
-        return all_concepts
+        # Load all sibling files as a single batch so same-domain concept references resolve against
+        # the merged set regardless of directory iteration order — mirroring load_concepts_only_from_directory.
+        # A one-file-at-a-time loop would make a valid additive concepts library fail based on file order
+        # (e.g. a file whose structure references a concept declared in a sibling that loads later).
+        return self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
 
     @override
-    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
@@ -459,9 +465,18 @@ class LibraryManager(LibraryManagerAbstract):
         # Detect cycles in concept references (A -> B -> A is forbidden)
         self._detect_concept_cycles(all_concepts)
 
-        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe)
+        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe).
+        # Sourced from the LIVE library (native concepts + concepts from prior load batches + this
+        # batch's concepts, already added above), not just this crate — so a pipe can reference, by
+        # bare code, a same-domain concept that a prior batch (e.g. a -L library directory) loaded.
+        # This is the pipe-factory counterpart to the loader's cross-batch concept-reference check:
+        # without it, that check would pass a bare cross-batch ref only for the factory to reject
+        # it. Cross-package aliased entries ('alias->...') are skipped — they resolve through the
+        # dependency resolver, not by bare code, and would not parse as a concept ref.
         domain_concept_codes: dict[str, list[str]] = {}
-        for concept_ref in crate.concepts:
+        for concept_ref in library.concept_library.root:
+            if QualifiedRef.has_cross_package_prefix(concept_ref):
+                continue
             parsed_concept = QualifiedRef.parse_concept_ref(raw=concept_ref)
             if parsed_concept.domain_path is not None:
                 domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
@@ -501,7 +516,7 @@ class LibraryManager(LibraryManagerAbstract):
         return all_pipes
 
     @override
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
@@ -527,6 +542,17 @@ class LibraryManager(LibraryManagerAbstract):
         # Build the crate (merges, qualifies, detects duplicates)
         crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
 
+        # Validate same-domain concept references against the live library: the concepts declared
+        # in this batch plus those already loaded by prior batches (e.g. via a -L library
+        # directory). This is done in the loader, not the crate factory, so a bare concept ref can
+        # resolve across separate load batches into the same library. The batch's own concepts are
+        # not in the library yet (load_from_crate adds them below), so they come from `blueprints`.
+        library = self.get_library(library_id=library_id)
+        validate_concept_references_in_blueprints(
+            blueprints=blueprints,
+            already_loaded_concept_refs=set(library.concept_library.root.keys()),
+        )
+
         # Load from crate (domains, concepts, pipes, validation)
         return self.load_from_crate(library_id=library_id, crate=crate)
 
@@ -534,6 +560,7 @@ class LibraryManager(LibraryManagerAbstract):
     def load_concepts_only_from_blueprints(
         self,
         library_id: str,
+        *,
         blueprints: list[PipelexBundleBlueprint],
     ) -> list["Concept"]:
         """Load only domains and concepts from blueprints, skipping pipes.
@@ -565,6 +592,16 @@ class LibraryManager(LibraryManagerAbstract):
             )
             all_domains.append(domain)
         library.domain_library.add_domains(domains=all_domains)
+
+        # Validate same-domain concept references against the live library before adding this batch's
+        # concepts — mirrors load_from_blueprints so the lightweight concepts-only path rejects a
+        # dangling concept_ref / item_concept_ref instead of leaving an invalid schema behind. The
+        # batch's own concepts come from `blueprints` (not yet in the library); concepts loaded by
+        # prior batches resolve via already_loaded_concept_refs.
+        validate_concept_references_in_blueprints(
+            blueprints=blueprints,
+            already_loaded_concept_refs=set(library.concept_library.root.keys()),
+        )
 
         # Load concepts (forward references resolved after all are loaded)
         all_concepts = self._load_concepts_from_blueprints(blueprints)
@@ -613,18 +650,14 @@ class LibraryManager(LibraryManagerAbstract):
                     # Detect duplicate concept declarations across different bundles in the same library
                     if concept_ref in concept_source_in_this_load:
                         existing_source = concept_source_in_this_load[concept_ref]
-                        if existing_source == new_source:
-                            msg = (
-                                f"Concept '{concept_ref}' is declared twice in the same bundle file: '{existing_source}'. "
-                                "Please remove the duplicate declaration."
+                        raise ConceptLibraryError(
+                            duplicate_ref_msg(
+                                ref_kind="concept",
+                                ref=concept_ref,
+                                existing_source=str(existing_source) if existing_source else None,
+                                incoming_source=str(new_source) if new_source else None,
                             )
-                        else:
-                            msg = (
-                                f"Concept '{concept_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{new_source}'. "
-                                "Please remove one of the declarations or rename one of the concepts."
-                            )
-                        raise ConceptLibraryError(msg)
+                        )
                     concept_source_in_this_load[concept_ref] = new_source
                     ref_to_entry[concept_ref] = (
                         blueprint.domain,
@@ -728,7 +761,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_mthds_files_into_library(self, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(self, library_id: str, *, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
@@ -794,10 +827,19 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(
                 message=msg,
             ) from validation_error
+        except (ConceptLibraryError, PipeLibraryError) as ref_error:
+            # Merge-time reference errors (undeclared cross-file concept refs, signature/concrete
+            # contract mismatches, duplicate refs) carry no structured validation payload — unlike
+            # LibraryLoadingError, which must propagate intact so its aggregated errors survive.
+            # Add the batch's file list as context, then let the outer
+            # _translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
+            raise type(ref_error)(msg) from ref_error
 
     def _warn_if_mthds_version_unsatisfied(
         self,
         mthds_version_constraint: str,
+        *,
         package_address: str,
     ) -> None:
         """Emit a warning if the current MTHDS standard version does not satisfy the package's constraint."""
@@ -808,7 +850,7 @@ class LibraryManager(LibraryManagerAbstract):
             log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
             return
 
-        if not version_satisfies(current_version, constraint):
+        if not version_satisfies(current_version, constraint=constraint):
             log.warning(
                 f"Package '{package_address}' requires MTHDS standard version "
                 f"'{mthds_version_constraint}', but the current version is "
@@ -818,6 +860,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _check_package_visibility(
         self,
         blueprints: list[PipelexBundleBlueprint],
+        *,
         mthds_paths: list[Path],
     ) -> MethodsManifest | None:
         """Check package visibility if a METHODS.toml manifest exists.
@@ -902,6 +945,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_dependency_packages(
         self,
         library_id: str,
+        *,
         manifest: MethodsManifest,
         package_root: Path,
     ) -> None:
@@ -937,6 +981,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_single_dependency(
         self,
         library: Library,
+        *,
         resolved_dep: ResolvedDependency,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
@@ -972,6 +1017,15 @@ class LibraryManager(LibraryManagerAbstract):
                 mthds_version_constraint=resolved_dep.manifest.mthds_version,
                 package_address=resolved_dep.address,
             )
+
+        # Merge the dependency's files into one crate so a multi-file package reconciles exactly like
+        # the main load path: a PipeSignature header and its concrete sibling collapse to a single
+        # pipe (concrete wins), and genuine duplicates / signature-concrete contract mismatches raise
+        # here rather than colliding later in add_new_pipe (which the per-pipe handler below would
+        # swallow as a warning, silently dropping one declaration). Same-domain concept references are
+        # validated across the merged files; cross-package and external-domain refs are deferred.
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=dep_blueprints)
+        validate_concept_references_in_blueprints(blueprints=dep_blueprints)
 
         # Create isolated child library for this dependency
         child_library = LibraryFactory.make_empty()
@@ -1038,27 +1092,37 @@ class LibraryManager(LibraryManagerAbstract):
                 library.concept_library.add_new_concept(concept=concept)
                 temp_concept_refs.append(concept.concept_ref)
 
-        # Load exported pipes into child library, ensuring temp concepts are
-        # always cleaned up even if an unexpected exception occurs
+        # Per-domain concept codes let a pipe resolve a same-domain concept by bare code, mirroring
+        # load_from_crate. A multi-file dependency may span several domains.
+        domain_concept_codes: dict[str, list[str]] = {}
+        for concept in dep_concepts:
+            parsed_concept = QualifiedRef.parse_concept_ref(raw=concept.concept_ref)
+            if parsed_concept.domain_path is not None:
+                domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
+
+        # Load exported pipes (reconciled by the crate) into child library, ensuring temp concepts
+        # are always cleaned up even if an unexpected exception occurs
         try:
-            concept_codes = [concept.code for concept in dep_concepts]
-            for blueprint in dep_blueprints:
-                if blueprint.pipe is None:
+            for pipe_ref, pipe_blueprint in crate.pipes.items():
+                parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
+                if parsed_pipe.domain_path is None:
+                    msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
+                    raise PipeLibraryError(msg)
+                domain_code = parsed_pipe.domain_path
+                pipe_code = parsed_pipe.local_code
+                # If manifest has exports, only load exported pipes
+                if has_exports and pipe_code not in all_exported:
                     continue
-                for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                    # If manifest has exports, only load exported pipes
-                    if has_exports and pipe_code not in all_exported:
-                        continue
-                    try:
-                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                            domain_code=blueprint.domain,
-                            pipe_code=pipe_code,
-                            blueprint=pipe_blueprint,
-                            concept_codes_from_the_same_domain=concept_codes,
-                        )
-                        child_library.pipe_library.add_new_pipe(pipe=pipe)
-                    except (PipeLibraryError, ValidationError) as exc:
-                        log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+                try:
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=domain_code,
+                        pipe_code=pipe_code,
+                        blueprint=pipe_blueprint,
+                        concept_codes_from_the_same_domain=domain_concept_codes.get(domain_code, []),
+                    )
+                    child_library.pipe_library.add_new_pipe(pipe=pipe)
+                except ValidationError as exc:
+                    log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
         finally:
             # Remove temporary concept entries from main library
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
@@ -1078,6 +1142,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_address_based_dependencies(
         self,
         library_id: str,
+        *,
         blueprints: list[PipelexBundleBlueprint],
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
@@ -1128,6 +1193,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_address_based_dependency(
         self,
         library: "Library",
+        *,
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
     ) -> bool:
@@ -1186,12 +1252,12 @@ class LibraryManager(LibraryManagerAbstract):
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=concept_codes_to_remove)
 
     @override
-    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, library_id: str, *, blueprint: PipelexBundleBlueprint) -> None:
         self._remove_pipes_from_blueprint(blueprint=blueprint)
         self._remove_concepts_from_blueprint(blueprint=blueprint)
 
     @override
-    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 
@@ -1288,7 +1354,7 @@ class LibraryManager(LibraryManagerAbstract):
 
             return refs
 
-        def check_for_cycle(concept_ref: str, visiting: set[str], path: list[str]) -> None:
+        def check_for_cycle(concept_ref: str, *, visiting: set[str], path: list[str]) -> None:
             """Recursively check for cycles starting from concept_ref."""
             if concept_ref in visiting:
                 # Found a cycle - build error message
@@ -1307,11 +1373,11 @@ class LibraryManager(LibraryManagerAbstract):
             path.append(concept_ref)
 
             for ref in get_referenced_concepts(concept):
-                check_for_cycle(ref, visiting, path)
+                check_for_cycle(ref, visiting=visiting, path=path)
 
             path.pop()
             visiting.remove(concept_ref)
 
         # Check each concept as a starting point
         for concept in concepts:
-            check_for_cycle(concept.concept_ref, set(), [])
+            check_for_cycle(concept.concept_ref, visiting=set(), path=[])

@@ -37,6 +37,7 @@ def make_base64_url_from_bytes(raw_bytes: bytes) -> str:
 
 def make_base64_url(
     base64_data: str,
+    *,
     file_type: FileType,
 ) -> str:
     """Create a data: URL from base64 string and file type."""

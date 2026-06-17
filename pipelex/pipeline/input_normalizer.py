@@ -60,6 +60,7 @@ async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> Worki
 
 async def _normalize_value(
     value: Any,
+    *,
     storage: StorageProviderAbstract,
 ) -> tuple[Any, bool]:
     """Recursively normalize a value, converting data URLs in ImageContent/DocumentContent to storage URIs.
@@ -94,6 +95,7 @@ async def _normalize_value(
 
 async def _normalize_structured_content(
     structured_content: StructuredContent,
+    *,
     storage: StorageProviderAbstract,
 ) -> tuple[StructuredContent, bool]:
     """Normalize a StructuredContent by recursively processing all its fields.
@@ -124,6 +126,7 @@ async def _normalize_structured_content(
 
 async def _normalize_list_content(
     list_content: ListContent[Any],
+    *,
     storage: StorageProviderAbstract,
 ) -> tuple[ListContent[Any], bool]:
     """Normalize a ListContent by processing all its items.
@@ -157,6 +160,7 @@ async def _normalize_list_content(
 
 async def _normalize_list(
     items: list[Any],
+    *,
     storage: StorageProviderAbstract,
 ) -> tuple[list[Any], bool]:
     """Normalize a list by processing all its items.
@@ -182,6 +186,7 @@ async def _normalize_list(
 
 async def _normalize_url_content(
     content: NormalizableContent,
+    *,
     storage: StorageProviderAbstract,
 ) -> NormalizableContent:
     """Normalize ImageContent or DocumentContent by converting data URLs to storage URIs.

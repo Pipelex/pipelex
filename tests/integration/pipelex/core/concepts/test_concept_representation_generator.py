@@ -75,7 +75,7 @@ class TestComplexNestedStructuresJson:
     def test_attachment_json(self) -> None:
         """Test simple Attachment generates correct JSON."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Attachment", Attachment)
+        result = generator.generate_representation("test.Attachment", structure_class=Attachment)
         assert result["concept"] == "test.Attachment"
         assert result["content"]["name"] == "name_value"
         assert result["content"]["url"].startswith("https://mock-")
@@ -83,7 +83,7 @@ class TestComplexNestedStructuresJson:
     def test_embed_json(self) -> None:
         """Test Embed with multiple string fields generates correct JSON."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Embed", Embed)
+        result = generator.generate_representation("test.Embed", structure_class=Embed)
         expected = {
             "concept": "test.Embed",
             "content": {
@@ -97,7 +97,7 @@ class TestComplexNestedStructuresJson:
     def test_message_json_recursive(self) -> None:
         """Test Message with nested Attachment and Embed lists generates correct recursive JSON."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Message", Message)
+        result = generator.generate_representation("test.Message", structure_class=Message)
         content = result["content"]
         assert content["author"] == "author_value"
         assert content["content"] == "content_value"
@@ -110,7 +110,7 @@ class TestComplexNestedStructuresJson:
     def test_channel_json_deeply_nested(self) -> None:
         """Test Channel with deeply nested messages generates correct JSON."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Channel", Channel)
+        result = generator.generate_representation("test.Channel", structure_class=Channel)
         content = result["content"]
         assert content["name"] == "name_value"
         assert content["position"] == 0
@@ -123,7 +123,7 @@ class TestComplexNestedStructuresJson:
     def test_newsletter_json_multiple_lists(self) -> None:
         """Test Newsletter with multiple list fields generates correct JSON."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Newsletter", Newsletter)
+        result = generator.generate_representation("test.Newsletter", structure_class=Newsletter)
         expected = {
             "concept": "test.Newsletter",
             "content": {
@@ -146,14 +146,14 @@ class TestComplexNestedStructuresPython:
     def test_attachment_python(self) -> None:
         """Test simple Attachment generates correct Python instantiation."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_representation("test.Attachment", Attachment)
+        result = generator.generate_representation("test.Attachment", structure_class=Attachment)
         assert result["concept"] == "test.Attachment"
         assert 'Attachment(name="name_value", url="https://mock-' in result["content"]
 
     def test_message_python_recursive(self) -> None:
         """Test Message with nested structures generates correct Python."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_representation("test.Message", Message)
+        result = generator.generate_representation("test.Message", structure_class=Message)
         content = result["content"]
         assert content.startswith(
             'Message(author="author_value", content="content_value", attachments=[Attachment(name="name_value", url="https://mock-'
@@ -164,7 +164,7 @@ class TestComplexNestedStructuresPython:
     def test_channel_python_deeply_nested(self) -> None:
         """Test Channel with deeply nested structures generates correct Python."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_representation("test.Channel", Channel)
+        result = generator.generate_representation("test.Channel", structure_class=Channel)
         content = result["content"]
         assert content.startswith('Channel(name="name_value", position=0, messages=[Message(')
         assert 'Attachment(name="name_value", url="https://mock-' in content
@@ -176,7 +176,7 @@ class TestImportsTrackingIntegration:
     def test_channel_tracks_all_nested_imports(self) -> None:
         """Test that Channel tracks imports for all nested classes."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        generator.generate_representation("test.Channel", Channel)
+        generator.generate_representation("test.Channel", structure_class=Channel)
 
         expected_imports = {"Channel", "Message", "Attachment", "Embed"}
         assert generator.imports_needed == expected_imports
@@ -184,7 +184,7 @@ class TestImportsTrackingIntegration:
     def test_newsletter_tracks_all_imports(self) -> None:
         """Test that Newsletter tracks imports for all nested classes."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        generator.generate_representation("test.Newsletter", Newsletter)
+        generator.generate_representation("test.Newsletter", structure_class=Newsletter)
 
         expected_imports = {"Newsletter", "ChannelSummary"}
         assert generator.imports_needed == expected_imports
@@ -195,7 +195,7 @@ class TestConvenienceFunctionsIntegration:
 
     def test_generate_json_representation_complex(self) -> None:
         """Test generate_json_representation with complex structure."""
-        result = generate_json_representation("test.Message", Message)
+        result = generate_json_representation("test.Message", structure_class=Message)
         assert result["concept"] == "test.Message"
         assert "attachments" in result["content"]
         assert len(result["content"]["attachments"]) == 1
@@ -204,7 +204,7 @@ class TestConvenienceFunctionsIntegration:
 
     def test_generate_python_representation_complex(self) -> None:
         """Test generate_python_representation with complex structure."""
-        result, imports = generate_python_representation("test.Message", Message)
+        result, imports = generate_python_representation("test.Message", structure_class=Message)
         assert result["concept"] == "test.Message"
         assert "Message(" in result["content"]
         assert "Attachment(" in result["content"]

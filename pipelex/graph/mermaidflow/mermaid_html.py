@@ -85,12 +85,12 @@ async def render_mermaid_html_async(
 
 async def render_mermaid_html_with_data_async(
     mermaid_code: str,
+    *,
     stuff_data: dict[str, str | dict[str, object] | list[str] | list[dict[str, object]] | None] | None = None,
     stuff_data_text: dict[str, str] | None = None,
     stuff_data_html: dict[str, str] | None = None,
     stuff_metadata: dict[str, dict[str, str]] | None = None,
     stuff_content_type: dict[str, str] | None = None,
-    *,
     title: str = "Pipelex Graph",
     theme: str = "dark",
 ) -> str:

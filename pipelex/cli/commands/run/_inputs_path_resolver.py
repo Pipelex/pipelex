@@ -42,7 +42,7 @@ def is_relative_local_path(uri: str) -> bool:
     return not Path(resolved.path).is_absolute()
 
 
-def resolve_url_in_value(value: Any, base_dir: Path) -> Any:
+def resolve_url_in_value(value: Any, *, base_dir: Path) -> Any:
     """Recursively walk a JSON-like value and resolve relative ``url`` fields.
 
     When a ``dict`` contains a ``"url"`` key whose value is a relative local
@@ -62,17 +62,17 @@ def resolve_url_in_value(value: Any, base_dir: Path) -> Any:
             if key == "url" and isinstance(val, str) and is_relative_local_path(val):
                 result[key] = str(base_dir / val)
             else:
-                result[key] = resolve_url_in_value(val, base_dir)
+                result[key] = resolve_url_in_value(val, base_dir=base_dir)
         return result
 
     if isinstance(value, list):
         value_list = cast("list[Any]", value)
-        return [resolve_url_in_value(item, base_dir) for item in value_list]
+        return [resolve_url_in_value(item, base_dir=base_dir) for item in value_list]
 
     return value
 
 
-def resolve_inputs_paths(inputs_dict: dict[str, Any], base_dir: Path) -> dict[str, Any]:
+def resolve_inputs_paths(inputs_dict: dict[str, Any], *, base_dir: Path) -> dict[str, Any]:
     """Resolve relative ``url`` paths in a pipeline inputs dict.
 
     Entry point that applies :func:`resolve_url_in_value` to each top-level
@@ -88,5 +88,5 @@ def resolve_inputs_paths(inputs_dict: dict[str, Any], base_dir: Path) -> dict[st
     """
     resolved: dict[str, Any] = {}
     for key, value in inputs_dict.items():
-        resolved[key] = resolve_url_in_value(value, base_dir)
+        resolved[key] = resolve_url_in_value(value, base_dir=base_dir)
     return resolved

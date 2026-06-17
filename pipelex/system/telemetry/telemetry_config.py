@@ -280,7 +280,7 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     # Apply variable substitution to all string values (keep placeholders for missing vars)
     substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
     try:
-        telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
+        telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, transform_func=substitute_vars_with_provider)
     except UnknownVarPrefixError as exc:
         paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"

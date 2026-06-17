@@ -26,20 +26,21 @@ class WfDryValidate(WorkflowClass[DryValidateArg, DryValidateResult]):
     @workflow.run
     async def run(self, workflow_arg: DryValidateArg) -> DryValidateResult:
         # D-C5: explicit timeout + retry bounds, deterministic in workflow code (no config reads).
-        # Validation is deterministic — its failures must NOT retry. The whole sweep cascade
-        # crosses the boundary as ONE type: validate_bundle wraps SignaturesNotAllowedError /
-        # DryRunError / PipelexInterpreterError into ValidateBundleError before they escape, and
-        # the activity-boundary TemporalError carries the OUTER PipelexError class name as the
-        # ApplicationError type (which is what non_retryable_error_types matches). The graph arm
-        # never raises domain errors (it degrades to graph_spec=None), so ValidateBundleError is
-        # the entire deterministic-failure surface. Everything else (worker crash, transient
-        # infra) gets one retry.
+        # Validation is deterministic — its failures must NOT retry. The deterministic-failure
+        # surface crosses the boundary as TWO types: validate_bundle wraps
+        # DryRunError / PipeRunError / PipelexInterpreterError into
+        # ValidateBundleError before they escape, and build_pipe_io_contracts wraps a
+        # JSON-Schema rendering failure into PipeIOContractError; the activity-boundary
+        # TemporalError carries the OUTER PipelexError class name as the ApplicationError
+        # type (which is what non_retryable_error_types matches). The graph arm never raises
+        # domain errors (it degrades to graph_spec=None). Everything else (worker crash,
+        # transient infra) gets one retry.
         return await workflow.execute_activity(
             act_dry_validate,
             arg=workflow_arg,
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=RetryPolicy(
                 maximum_attempts=2,
-                non_retryable_error_types=["ValidateBundleError"],
+                non_retryable_error_types=["ValidateBundleError", "PipeIOContractError"],
             ),
         )

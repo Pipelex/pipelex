@@ -53,6 +53,7 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
     async def search_structured(
         self,
         search_job: SearchJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         """Execute a search query and return structured data matching the schema."""
@@ -84,6 +85,7 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
     async def _search_structured(
         self,
         search_job: SearchJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         pass

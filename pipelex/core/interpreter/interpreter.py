@@ -19,7 +19,26 @@ class PipelexInterpreter(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
     @classmethod
-    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, mthds_content: str | None = None) -> PipelexBundleBlueprint:
+    def make_pipelex_bundle_blueprint(
+        cls,
+        bundle_path: Path | None = None,
+        *,
+        mthds_content: str | None = None,
+        mthds_source: str | None = None,
+    ) -> PipelexBundleBlueprint:
+        """Parse one MTHDS source into a ``PipelexBundleBlueprint``.
+
+        Exactly one of ``bundle_path`` (load from disk) or ``mthds_content``
+        (load from a string) must be provided. ``mthds_source`` is an optional
+        logical source for the *in-memory* path: the API submits sourceless bundle
+        text (``mthds_contents: list[str]``), so without it ``blueprint.source``
+        is ``None`` and cross-file diagnostics misfire. It is seeded into the
+        blueprint dict before validation (as the ``source`` field), so it lands
+        both on the validated blueprint AND on any blueprint-validation error the
+        categorizer reads off that dict — mirroring the real file path the disk
+        path already records, and overriding any ``source`` the bundle text
+        itself declared. Ignored when ``bundle_path`` is provided (the path wins).
+        """
         blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
@@ -27,6 +46,11 @@ class PipelexInterpreter(BaseModel):
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = str(bundle_path)
             elif mthds_content is not None:
                 blueprint_dict = load_toml_from_content(content=mthds_content)
+                # Seed the logical source unconditionally (``None`` when unnamed): this
+                # overrides any ``source`` the bundle text declared and keeps the success
+                # path (``model_validate`` below) and the error path (the categorizer,
+                # which reads ``source`` off this dict) in agreement on one value.
+                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source
             else:
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the PipelexInterpreter to make a PipelexBundleBlueprint"
                 raise PipelexInterpreterError(msg)
@@ -39,8 +63,10 @@ class PipelexInterpreter(BaseModel):
             raise PipelexInterpreterError(msg)
 
         try:
+            # ``source`` is already populated from the seeded ``blueprint_dict`` above
+            # (disk path → real file path; in-memory path → ``mthds_source``), so no
+            # post-validate re-assignment is needed.
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
-            pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []

@@ -1,18 +1,24 @@
-"""Pipeline-level dry run with graph generation.
+"""In-process, in-memory graph-producing dry run against an already-open library.
 
-Provides a single entrypoint to dry-run an entire pipeline from MTHDS content,
-producing a GraphSpec. Used by both the CLI graph commands and the API.
+`dry_run_pipe_in_process` is the in-process twin of `dry_run_pipeline`
+(`pipelex.pipeline.dry_run_pipeline`): it dry-runs ONE pipe against a library the caller
+already opened, never dispatches (even under a Temporal-enabled hub), and traces the graph
+into an in-memory event log. It lives in its own module — not in `dry_run_pipeline` —
+because `dry_run_pipeline` imports `PipelexMTHDSProtocol` from `pipelex.pipeline.runner`,
+and the protocol's `validate` graph arm calls this function: sharing a module would close
+an import cycle through `runner`.
 """
 
+from polyfactory.exceptions import FactoryException
+
+from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import scoped_content_generator, scoped_event_log, scoped_pipe_router
+from pipelex.hub import get_library_manager, scoped_content_generator, scoped_event_log, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -20,96 +26,54 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
-async def dry_run_pipeline(
-    mthds_contents: list[str] | None = None,
-    bundle_uris: list[str] | None = None,
-    library_dirs: list[str] | None = None,
-) -> tuple[GraphSpec, str]:
-    """Dry-run a full pipeline from MTHDS content, producing a GraphSpec.
+async def best_effort_graph_spec(pipe_ref: str | None, *, library_id: str | None, log_context: str) -> GraphSpec | None:
+    """Best-effort graph arm of the validate surfaces: dry-run ``pipe_ref`` for its graph, or degrade to None.
 
-    Parses the content, identifies the main pipe, and executes the pipeline
-    in dry-run mode with graph tracing enabled and mock inputs.
-
-    All contents are parsed into blueprints and loaded together; the main_pipe
-    is found from the first blueprint that declares one.
+    The ONE implementation of the validate graph-arm contract, shared by every backend
+    (`PipelexMTHDSProtocol.validate` and the Temporal validate activity) so they answer
+    identically for the same bundle: no target or no library means no graph; pipe
+    resolution targets the EXPLICIT ``library_id`` (never the ambient current-library
+    contextvar — the caller captured the validation library once and the graph must come
+    from that same library) and sits INSIDE the catch on purpose (an unknown ``pipe_ref``
+    degrades like any other graph-arm domain failure); an expected dry-run domain
+    failure — ``PipelexError``, polyfactory ``FactoryException``, or any ``ValueError``
+    (covers pydantic ``ValidationError`` and the ValueError-family domain errors such as
+    ``ConceptValueError``, all reachable from the mock-input mint and schema resolution) —
+    degrades to ``None`` with a warning. Only non-Pipelex programming bugs propagate.
 
     Args:
-        mthds_contents: List of MTHDS bundle contents as strings.
-        bundle_uris: Optional list of URIs for the bundles (used by runner for dedup).
-        library_dirs: Optional library directories for pipe resolution.
+        pipe_ref: The namespaced ref of the pipe to dry-run, or ``None`` for no graph.
+        library_id: The id of the already-open library to run against, or ``None`` for no graph.
+        log_context: Caller tag prefixed to the degrade warning (e.g. ``"act_dry_validate"``).
 
     Returns:
-        Tuple of (GraphSpec, pipe_code).
-
-    Raises:
-        PipelexInterpreterError: If content parsing fails or main_pipe is missing.
-        DryRunGraphNotProducedError: If pipeline execution does not produce a graph spec.
-        PipelineExecutionError: If dry-run execution fails.
+        The assembled GraphSpec, or ``None`` when skipped or degraded.
     """
-    if not mthds_contents:
-        msg = "mthds_contents must be provided"
-        raise ValueError(msg)
-
-    # Pre-parse contents to extract main_pipe_code.
-    # Note: pipeline_run_setup will re-parse these contents. The double-parse is
-    # accepted because the runner interface requires pipe_code upfront and does not
-    # expose the internally-resolved pipe code in its response.
-    main_pipe_code: str | None = None
-
-    for content in mthds_contents:
-        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content)
-        if bundle_blueprint.main_pipe and main_pipe_code is None:
-            # Domain-qualify to avoid ambiguity across multiple domains
-            main_pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=bundle_blueprint.main_pipe)
-
-    if not main_pipe_code:
-        msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise PipelexInterpreterError(msg)
-
-    pipe_code: str = main_pipe_code
-
-    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
-        generate_graph=True,
-        mock_inputs=True,
-    )
-
-    runner = PipelexMTHDSProtocol(
-        bundle_uris=bundle_uris,
-        pipe_run_mode=PipeRunMode.DRY,
-        execution_config=execution_config,
-        library_dirs=library_dirs or [],
-    )
-    # This function's whole purpose is the graph, so it owns the graph transport: the scoped
-    # in-memory event log is the run's emit AND assemble channel (see hub.scoped_event_log, D1),
-    # making graph generation independent of the host's tracing_config — a host with tracing
-    # disabled (e.g. pipelex-api's /validate in direct mode) still gets its graph, and a host
-    # with a configured backend doesn't get trace files written as a side effect of validation.
-    with scoped_event_log(InMemoryEventLog()):
-        response = await runner.execute(
-            pipe_code=pipe_code,
-            mthds_contents=mthds_contents,
+    if not pipe_ref or not library_id:
+        return None
+    try:
+        pipe = get_library_manager().get_library(library_id=library_id).pipe_library.get_required_pipe(pipe_code=pipe_ref)
+        return await dry_run_pipe_in_process(pipe=pipe, library_id=library_id)
+    except (PipelexError, FactoryException, ValueError) as graph_error:
+        log.warning(
+            f"{log_context}: graph dry-run of '{pipe_ref}' did not produce a graph "
+            f"({type(graph_error).__name__}: {graph_error}); returning validation result without graph_spec"
         )
-    pipe_output = response.pipe_output
-
-    if not pipe_output.graph_spec:
-        msg = "Pipeline execution did not produce a graph spec"
-        raise DryRunGraphNotProducedError(msg)
-
-    return pipe_output.graph_spec, pipe_code
+        return None
 
 
 async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> GraphSpec:
     """Dry-run ``pipe`` against an already-open library fully in-process, tracing the graph in memory.
 
-    The in-process twin of :func:`dry_run_pipeline` for hosts where the hub is Temporal-enabled
-    but the run must NOT dispatch anything — e.g. the body of the dry-run/validation Temporal
-    activity. Three contextvar scopes pin the whole run (root pipe + nested controller sub-pipes
-    + inference leaves) to in-process execution:
+    The in-process twin of :func:`pipelex.pipeline.dry_run_pipeline.dry_run_pipeline` for hosts
+    where the hub is Temporal-enabled but the run must NOT dispatch anything — e.g. the body of
+    the dry-run/validation Temporal activity, or the protocol `validate` graph arm. Three
+    contextvar scopes pin the whole run (root pipe + nested controller sub-pipes + inference
+    leaves) to in-process execution:
 
     - ``scoped_event_log(InMemoryEventLog())`` — emit and assemble share one in-memory transport
       (no NDJSON file, no DynamoDB round-trip); the ``GraphSpec`` rides back on ``PipeOutput``.

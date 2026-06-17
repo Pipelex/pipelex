@@ -153,7 +153,7 @@ def resolve_method_from_path(method_path: str) -> InstalledMethod:
         raise typer.Exit(1)
 
     seen_dirs: set[Path] = set()
-    method = discover_method_at(method_dir, seen_dirs)
+    method = discover_method_at(method_dir, seen_dirs=seen_dirs)
     if method is None:
         typer.secho(
             f"No method package (METHODS.toml) found at '{method_path}'.",
@@ -212,7 +212,7 @@ def resolve_method_from_url(url: str) -> InstalledMethod:
 
     # Discover the method package
     seen_dirs: set[Path] = set()
-    method = discover_method_at(method_dir, seen_dirs)
+    method = discover_method_at(method_dir, seen_dirs=seen_dirs)
     if method is None:
         typer.secho(
             f"No method package (METHODS.toml) found at '{url}'.",
@@ -226,6 +226,7 @@ def resolve_method_from_url(url: str) -> InstalledMethod:
 
 def resolve_method_target(
     method_name: str,
+    *,
     pipe_override: str | None = None,
     library_dirs: list[str] | None = None,
 ) -> tuple[str, list[str], InstalledMethod]:

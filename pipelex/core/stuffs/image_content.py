@@ -65,12 +65,13 @@ class ImageContent(StuffContent):
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,  # noqa: ARG002
     ) -> str:
         """Register this image and return a token."""
@@ -78,7 +79,7 @@ class ImageContent(StuffContent):
         return f"[Image {image_index + 1}]"
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         group = Group()
 
         # title indicating it's an image:

@@ -73,6 +73,9 @@ class MistralFactory:
     async def make_simple_messages(self, llm_job: LLMJob) -> list[Messages]:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         messages: list[Messages] = []
+        if system_text := llm_job.llm_prompt.system_text:
+            messages.append(SystemMessage(content=system_text))
+
         user_content: list[ContentChunk] = []
         if user_text := llm_job.llm_prompt.user_text:
             user_content.append(TextChunk(text=user_text))
@@ -84,9 +87,6 @@ class MistralFactory:
             user_content.extend(document_chunks)
         if user_content:
             messages.append(UserMessage(content=user_content))
-
-        if system_text := llm_job.llm_prompt.system_text:
-            messages.append(SystemMessage(content=system_text))
 
         return messages
 
@@ -364,6 +364,7 @@ class MistralFactory:
     @classmethod
     async def make_mistral_document_url_chunk_from_uri(
         cls,
+        *,
         mistral_client: Mistral,
         uri: str,
     ) -> DocumentURLChunkTypedDict:
@@ -384,7 +385,7 @@ class MistralFactory:
             ValueError: If mistral_client is None and a local file needs to be uploaded
 
         Example:
-            >>> doc = await make_mistral_document_url_chunk_from_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf")
+            >>> doc = await make_mistral_document_url_chunk_from_uri(uri="https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf")
             >>> doc
             {"type": "document_url", "document_url": "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf"}
         """
@@ -421,6 +422,7 @@ class MistralFactory:
     @classmethod
     async def upload_file_to_mistral_for_ocr(
         cls,
+        *,
         mistral_client: Mistral,
         file_path: Path,
     ) -> str:

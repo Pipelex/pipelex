@@ -68,7 +68,7 @@ def clean_json_content(content: Any) -> Any:
 
 
 # TODO: make this more powerful using kajson
-def clean_json_dumps(data: Any, indent: int | None = None) -> str:
+def clean_json_dumps(data: Any, *, indent: int | None = None) -> str:
     """Serialize data to a JSON string, producing clean output without metadata.
 
     Unlike kajson.dumps (which adds ``__class__``/``__module__`` metadata for
@@ -89,7 +89,7 @@ def clean_json_dumps(data: Any, indent: int | None = None) -> str:
     return json.dumps(clean_json_content(data), indent=indent)
 
 
-def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False) -> str:
+def json_str(some_object: Any, *, title: str | None = None, is_spaced: bool = False) -> str:
     """Creates a formatted JSON string representation of any Python object with optional title and spacing.
 
     This function is a higher-level wrapper around purify_json that provides additional formatting
@@ -127,6 +127,7 @@ def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False
 
 def save_as_json_to_path(
     object_to_save: Any,
+    *,
     path: Path,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
@@ -149,7 +150,7 @@ def save_as_json_to_path(
 
     """
     _, json_string = purify_json(object_to_save, indent=indent, is_warning_enabled=is_warning_enabled)
-    save_text_to_path(json_string, path, create_directory=create_directory)
+    save_text_to_path(json_string, path=path, create_directory=create_directory)
 
 
 def load_json_from_path(path: Path) -> JsonContent:
@@ -223,7 +224,7 @@ def load_json_list_from_path(path: Path) -> list[Any]:
     raise JsonTypeError(msg)
 
 
-def deep_update(target_dict: dict[str, Any], updates: Mapping[str, Any]):
+def deep_update(target_dict: dict[str, Any], *, updates: Mapping[str, Any]):
     """Recursively updates a dictionary with values from another mapping.
 
     This function performs a deep merge, handling nested mappings (``dict`` or any
@@ -244,14 +245,14 @@ def deep_update(target_dict: dict[str, Any], updates: Mapping[str, Any]):
     Example:
         >>> base = {"a": 1, "b": {"x": 2, "y": 3}, "c": [1, 2]}
         >>> updates = {"b": {"y": 4, "z": 5}, "c": [3, 4]}
-        >>> deep_update(base, updates)
+        >>> deep_update(base, updates=updates)
         >>> print(base)
         {'a': 1, 'b': {'x': 2, 'y': 4, 'z': 5}, 'c': [3, 4]}
 
     """
     for key, value in updates.items():
         if isinstance(value, Mapping) and key in target_dict and isinstance(target_dict[key], dict):
-            deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
+            deep_update(target_dict[key], updates=value)  # pyright: ignore[reportUnknownArgumentType]
         elif isinstance(value, Mapping) and not isinstance(value, dict):
             target_dict[key] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
         else:
@@ -313,6 +314,7 @@ def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:
 
 def purify_json(
     data: Any,
+    *,
     indent: int | None = None,
     is_truncate_bytes_enabled: bool = False,
     is_warning_enabled: bool = True,
@@ -392,6 +394,7 @@ def purify_json(
 
 def purify_json_list(
     data: list[Any],
+    *,
     indent: int | None = None,
     is_truncate_bytes_enabled: bool = False,
 ) -> tuple[list[Any], str]:
@@ -447,7 +450,7 @@ def purify_json_list(
     return pure_list, list_string
 
 
-def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: bool = True) -> tuple[dict[str, Any], str]:
+def purify_json_dict(data: Any, *, indent: int | None = None, is_warning_enabled: bool = True) -> tuple[dict[str, Any], str]:
     """Converts any Python object into a JSON-serializable dictionary and its string representation.
 
     This function specifically handles dictionary-like objects and Pydantic BaseModel instances,
@@ -502,7 +505,7 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
     return pure_dict, dict_string
 
 
-def pure_json_str(data: Any, indent: int | None = None, is_warning_enabled: bool = True) -> str:
+def pure_json_str(data: Any, *, indent: int | None = None, is_warning_enabled: bool = True) -> str:
     """Converts any Python object directly to its JSON string representation.
 
     This is a convenience wrapper around purify_json that returns only the string

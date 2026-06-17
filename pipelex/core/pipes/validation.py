@@ -1,7 +1,7 @@
 from pipelex.tools.misc.string_utils import is_snake_case
 
 
-def is_variable_satisfied_by_inputs(variable_path: str, input_names: set[str]) -> bool:
+def is_variable_satisfied_by_inputs(variable_path: str, *, input_names: set[str]) -> bool:
     """Check if a variable path is satisfied by the declared inputs.
 
     A variable path is satisfied if:
@@ -29,7 +29,7 @@ def is_variable_satisfied_by_inputs(variable_path: str, input_names: set[str]) -
     return False
 
 
-def is_input_used_by_variables(input_name: str, variable_paths: set[str]) -> bool:
+def is_input_used_by_variables(input_name: str, *, variable_paths: set[str]) -> bool:
     """Check if an input is used by any of the variable paths.
 
     An input is considered used if:

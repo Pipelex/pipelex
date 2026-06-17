@@ -33,6 +33,7 @@ from pipelex.system.configuration.config_loader import config_manager
 
 def update_cmd(
     local: bool = False,
+    *,
     yes: bool = False,
     dry_run: bool = False,
     no_backup: bool = False,
@@ -54,7 +55,7 @@ def update_cmd(
         sys.exit(1)
 
     report = compute_deck_sync_report(deck_dir)
-    _print_status_table(report, deck_dir)
+    _print_status_table(report, deck_dir=deck_dir)
 
     if report.is_clean():
         console.print(_summary_panel("Model deck is up to date.", style="green"))
@@ -80,7 +81,7 @@ def update_cmd(
         return
 
     actions_applied = _apply_updates(deck_dir=deck_dir, report=report, no_backup=no_backup)
-    write_manifest(deck_dir, compute_kit_manifest())
+    write_manifest(compute_kit_manifest(), deck_dir=deck_dir)
 
     console.print()
     console.print(_summary_panel(f"Model deck updated ({actions_applied} file change(s) applied).", style="green"))
@@ -98,7 +99,7 @@ def _resolve_deck_dir(local: bool) -> Path:
     return config_manager.model_decks_dir_path
 
 
-def _print_status_table(report: DeckSyncReport, deck_dir: Path) -> None:
+def _print_status_table(report: DeckSyncReport, *, deck_dir: Path) -> None:
     """Render the per-file sync status as a Rich table."""
     table = Table(title="Pipelex Model Deck — Update Plan", show_lines=False)
     table.add_column("File", style="cyan", no_wrap=True)
@@ -134,7 +135,7 @@ def _action_description(status: DeckFileStatus) -> str:
             return "back up + overwrite from kit"
 
 
-def _apply_updates(deck_dir: Path, report: DeckSyncReport, no_backup: bool) -> int:
+def _apply_updates(deck_dir: Path, *, report: DeckSyncReport, no_backup: bool) -> int:
     """Apply the per-file actions described by ``report``. Returns the count of files changed."""
     kit_dir = kit_deck_dir()
     timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")

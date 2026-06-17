@@ -18,6 +18,7 @@ class PromptDocumentFactory:
     def make_prompt_document(
         cls,
         uri: str | None = None,
+        *,
         base64_data: str | None = None,
         raw_bytes: bytes | None = None,
         mime_type: str | None = None,

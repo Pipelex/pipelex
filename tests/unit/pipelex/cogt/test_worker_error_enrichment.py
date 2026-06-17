@@ -72,7 +72,7 @@ class _StubLLMWorker(LLMWorkerAbstract):
         raise self._error
 
     @override
-    async def _gen_object(self, llm_job: Any, schema: Any) -> Any:
+    async def _gen_object(self, llm_job: Any, *, schema: Any) -> Any:
         raise self._error
 
 
@@ -88,7 +88,7 @@ class _StubImgGenWorker(ImgGenWorkerAbstract):
         raise self._error
 
     @override
-    async def _gen_image_list(self, img_gen_job: Any, nb_images: int) -> Any:
+    async def _gen_image_list(self, img_gen_job: Any, *, nb_images: int) -> Any:
         raise self._error
 
 
@@ -116,7 +116,7 @@ class _StubSearchWorker(SearchWorkerAbstract):
         raise self._error
 
     @override
-    async def _search_structured(self, search_job: Any, schema: Any) -> Any:
+    async def _search_structured(self, search_job: Any, *, schema: Any) -> Any:
         raise self._error
 
 

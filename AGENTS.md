@@ -20,6 +20,17 @@
 
    Always fix any issues reported by these tools before proceeding.
 
+### Keyword-only arguments check
+
+   Non-subject function parameters across `pipelex/` source must be keyword-only (a bare `*` after the subject). The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+
+   ```bash
+   make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
+   make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   ```
+
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
+
 ### Cleaning Derived Files
 
    If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
@@ -274,6 +285,17 @@ When adding validation or fields, decide which layer they belong to. Language ru
 - **Important**: NEVER EVER set default values for config attributes in the class definition. All the default values are defined in the main config file `pipelex/pipelex.toml`. The only exception si for Optional values which must be set to `None` in the class definition.
 - If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml`. NEVER add them commented out: commented-out TOML is never parsed or validated, so it rots silently when keys are refactored. Instead, write the actual default values (matching `pipelex/pipelex.toml`, even empty ones like `activity_queues = {}`) so the override file stays valid and behaves like setting nothing. Plain prose comments explaining the setting are fine — it's commented-out keys/values that are forbidden.
 - The different `pipelex.toml` files and the python model `configs.py` must be up to date with each other in terms of structure and attributes, otherwise the loading of teh config fails. To check quickly that you're good, just run `make tb` which tests the boot sequence, which includes the config loading.
+
+### Keyword-only arguments
+
+Non-subject function parameters across `pipelex/` source must be **keyword-only**, so call sites are self-documenting: `do_thing(retries=3, timeout=30)` over the opaque `do_thing(3, 30)`. The compliant shape places a bare `*` after the subject:
+
+- `def f(subject, *, opt1, opt2): ...` — the first non-`self`/`cls` parameter (the subject) may stay positional; everything after it must be keyword-only. Making the subject keyword-only too (`def f(*, a, b)`) is always allowed and often preferable.
+- A lone subject (`def render(node)`) is compliant; a second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is a violation.
+
+The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation. Carve-outs (dunders, pydantic validators/serializers, Typer/Temporal/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net.
+
+The full specification — the two exceptions, the carve-out list, the symmetric-tuple allowlist, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
 
 ## Writing tests
 

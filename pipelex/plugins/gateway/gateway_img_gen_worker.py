@@ -61,6 +61,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:

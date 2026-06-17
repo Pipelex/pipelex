@@ -9,6 +9,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 
 def search_for_nested_image_fields(
     content_class: type[StuffContent],
+    *,
     current_path: str = "",
 ) -> list[str]:
     """Recursively search for image fields in a structure class.

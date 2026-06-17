@@ -56,7 +56,7 @@ def parse_constraint(constraint_str: str) -> SimpleSpec:
         raise SemVerError(msg) from exc
 
 
-def version_satisfies(version: Version, constraint: SimpleSpec) -> bool:
+def version_satisfies(version: Version, *, constraint: SimpleSpec) -> bool:
     """Check whether a version satisfies a constraint.
 
     Args:
@@ -72,6 +72,7 @@ def version_satisfies(version: Version, constraint: SimpleSpec) -> bool:
 
 def select_minimum_version(
     available_versions: list[Version],
+    *,
     constraint: SimpleSpec,
 ) -> Version | None:
     """Select the minimum version that satisfies a constraint (MVS).
@@ -94,6 +95,7 @@ def select_minimum_version(
 
 def select_minimum_version_for_multiple_constraints(
     available_versions: list[Version],
+    *,
     constraints: list[SimpleSpec],
 ) -> Version | None:
     """Select the minimum version that satisfies ALL constraints simultaneously.

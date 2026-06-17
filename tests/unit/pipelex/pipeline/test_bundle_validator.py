@@ -1,10 +1,10 @@
 """Unit tests for the BundleValidator classify engine (Phase 2).
 
 These pin the tolerant per-pipe classification, the D3 union catch + recursive SKIPPED
-cause-walk, the D7 wiring-before-signature precedence, the single collect-all aggregate
-(no per-pipe early abort), and the per-sweep telemetry. The seams (``prepare_pipe_job``)
-and the run primitive (``PipeRun``) are mocked here; the real composition is exercised by
-the integration suite.
+cause-walk, the strict-mode signature exclusion (signatures are never an error — D-B), the
+single collect-all aggregate (no per-pipe early abort), and the per-sweep telemetry. The seams
+(``prepare_pipe_job``) and the run primitive (``PipeRun``) are mocked here; the real composition
+is exercised by the integration suite.
 """
 
 import pytest
@@ -16,7 +16,6 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.system.telemetry.events import EventName, EventProperty
 
@@ -171,53 +170,41 @@ class TestBundleValidator:
         assert "dom.b_pipe" in message
 
     @pytest.mark.asyncio
-    async def test_strict_signature_pre_pass_raises_before_sweep(self, mocker: MockerFixture) -> None:
-        # In strict mode a reached signature raises the aggregated SignaturesNotAllowedError before any
-        # pipe is dry-run — so the seam (prepare_pipe_job) is never invoked.
+    async def test_strict_mode_excludes_signature_pipes_from_sweep(self, mocker: MockerFixture) -> None:
+        # Signatures are never an error (D-B): in strict mode a signature pipe is excluded from the sweep
+        # entirely — not mock-run (the seam is never invoked) and absent from the returned status map (so
+        # absent from validated_pipes). The unsatisfied set is reported library-wide via pending_signatures.
         validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
         signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
 
-        with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await validator.validate_pipes([signature_pipe], library_id="lib-1", allow_signatures=False)
-        assert "dom.sig_pipe" in exc_info.value.signature_refs
+        results = await validator.validate_pipes([signature_pipe], library_id="lib-1", allow_signatures=False)
+
+        assert results == {}
         prepare_mock.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_validate_with_libraries_error_precedes_signature_pre_pass(self, mocker: MockerFixture) -> None:
-        # D7 precedence: the static wiring pass runs (and can raise) BEFORE the signature pre-pass, so a
-        # wiring failure surfaces ahead of a signature error even when both are present.
+    async def test_lenient_mode_sweeps_signature_pipes(self, mocker: MockerFixture) -> None:
+        # allow_signatures is sweep mechanics (D-B): in lenient mode a signature pipe IS swept (it dry-runs
+        # trivially by minting a mock) and therefore appears in the returned status map / validated_pipes.
+        validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
+        signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
+
+        results = await validator.validate_pipes([signature_pipe], library_id="lib-1", allow_signatures=True)
+
+        assert results["dom.sig_pipe"].status.is_success
+        prepare_mock.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_wiring_error_propagates(self, mocker: MockerFixture) -> None:
+        # The static wiring pass runs first and can raise (real validate_with_libraries raises
+        # PipeValidationError) — a wiring failure aborts the sweep rather than being swallowed.
         validator, _telemetry, _prepare, _pipe_run = self._patch_env(mocker)
-        spy_collect = mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_refs")
         wiring_pipe = self._make_pipe(mocker, code="wiring_pipe", pipe_ref="dom.wiring_pipe")
         # Stand-in for a wiring error (real validate_with_libraries raises PipeValidationError).
         wiring_pipe.validate_with_libraries.side_effect = RuntimeError("wiring failed")
-        signature_pipe = self._make_pipe(mocker, code="sig_pipe", pipe_ref="dom.sig_pipe", is_signature=True)
 
         with pytest.raises(RuntimeError, match="wiring failed"):
-            await validator.validate_pipes([wiring_pipe, signature_pipe], library_id="lib-1", allow_signatures=False)
-        # The signature pre-pass was never reached — the wiring pass pre-empted it.
-        spy_collect.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_signature_behind_cross_package_wiring_gap_still_raises(self, mocker: MockerFixture) -> None:
-        # A pipe dropped to SKIPPED in step 1 for an unresolved cross-package dependency must STILL be
-        # signature-checked: the strict pre-pass runs over the FULL pipe list, not just the wiring
-        # survivors. Otherwise an unimplemented PipeSignature hidden behind a wiring gap would silently
-        # pass strict validation (the old dry_run_pipes ran the pre-pass over all pipes first).
-        validator, _telemetry, prepare_mock, _pipe_run = self._patch_env(mocker)
-        # Step 1 drops this pipe to SKIPPED — its wiring references an unloaded cross-package sub-pipe...
-        pipe = self._make_pipe(mocker, code="hybrid_pipe", pipe_ref="dom.hybrid_pipe")
-        pipe.validate_with_libraries.side_effect = PipeNotFoundError("hybrid->other.missing not found")
-        # ...but it also reaches an unimplemented signature through a RESOLVED branch (real
-        # collect_signature_refs tolerates the unresolved branch via get_optional_pipe and still finds it).
-        mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_refs", return_value={"dom.unimplemented_sig"})
-        mocker.patch("pipelex.pipeline.bundle_validator.collect_signature_paths", return_value={})
-
-        with pytest.raises(SignaturesNotAllowedError) as exc_info:
-            await validator.validate_pipes([pipe], library_id="lib-1", allow_signatures=False)
-        assert "dom.unimplemented_sig" in exc_info.value.signature_refs
-        # The signature is caught at the pre-pass, before any dry-run of the (SKIPPED) pipe.
-        prepare_mock.assert_not_called()
+            await validator.validate_pipes([wiring_pipe], library_id="lib-1", allow_signatures=False)
 
     @pytest.mark.asyncio
     async def test_one_pipe_dry_run_event_emitted_for_the_sweep(self, mocker: MockerFixture) -> None:

@@ -75,7 +75,7 @@ class DocumentContent(StuffContent):
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         display_text = self.title or self.public_url or self.url
         result = f"[{display_text}]({self.public_url or self.url})"
         if self.snippet:
@@ -83,7 +83,7 @@ class DocumentContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         source_text = Text()
         if self.title:
             source_text.append(self.title, style="bold")

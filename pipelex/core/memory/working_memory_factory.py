@@ -39,6 +39,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_multiple_stuffs(
         cls,
         stuff_list: list[Stuff],
+        *,
         main_name: str | None = None,
         is_ignore_unnamed: bool = False,
     ) -> WorkingMemory:
@@ -67,6 +68,7 @@ class WorkingMemoryFactory(BaseModel):
     def make_from_pipeline_inputs(
         cls,
         pipeline_inputs: PipelineInputs,
+        *,
         search_domain_codes: list[str] | None = None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
@@ -145,7 +147,7 @@ class WorkingMemoryFactory(BaseModel):
         return needed_inputs_for_factory
 
     @classmethod
-    def convert_stuff_spec_to_typed_named(cls, stuff_spec: StuffSpec, name: str) -> TypedNamedStuffSpec:
+    def convert_stuff_spec_to_typed_named(cls, stuff_spec: StuffSpec, *, name: str) -> TypedNamedStuffSpec:
         """Resolve a single output `StuffSpec` to a `TypedNamedStuffSpec`.
 
         Mirrors the class-registry lookup behavior of ``convert_to_working_memory_format``:

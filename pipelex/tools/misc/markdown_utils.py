@@ -4,7 +4,7 @@ from pipelex.tools.misc.json_utils import purify_json_dict
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
 
-def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> str:
+def convert_to_markdown(data: Any, *, level: int = 1, is_pretty: bool = False) -> str:
     """Convert arbitrary JSON-compatible Python data to a Markdown string
     without needing to specify the markdown type explicitly.
     """

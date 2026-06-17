@@ -23,6 +23,7 @@ class BedrockClientAioboto3(BedrockClientProtocol):
     async def chat(
         self,
         messages: BedrockMessageDictList,
+        *,
         system_text: str | None,
         model: str,
         temperature: float,

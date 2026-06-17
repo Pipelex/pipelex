@@ -162,6 +162,7 @@ def apply_agent_cli_output_discipline() -> None:
 
 def make_pipelex_for_agent_cli(
     library_dirs: list[str] | list[Path] | None = None,
+    *,
     needs_inference: bool = True,
     needs_model_specs: bool | None = None,
 ) -> Pipelex:
@@ -236,21 +237,21 @@ def make_pipelex_for_agent_cli(
         )
         raise typer.Exit(0) from None
     except TelemetryConfigValidationError as exc:
-        agent_error(exc.message, "TelemetryConfigValidationError", cause=exc)
+        agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
     except GatewayTermsNotAcceptedError as exc:
-        agent_error(exc.message, "GatewayTermsNotAcceptedError", cause=exc)
+        agent_error(exc.message, error_type="GatewayTermsNotAcceptedError", cause=exc)
     except GatewayApiKeyMissingError as exc:
-        agent_error(exc.message, "GatewayApiKeyMissingError", cause=exc)
+        agent_error(exc.message, error_type="GatewayApiKeyMissingError", cause=exc)
     except GatewayDoNotTrackConflictError as exc:
-        agent_error(exc.message, "GatewayDoNotTrackConflictError", cause=exc)
+        agent_error(exc.message, error_type="GatewayDoNotTrackConflictError", cause=exc)
     except RemoteConfigUnavailableError as exc:
-        agent_error(exc.message, "RemoteConfigUnavailableError", cause=exc)
+        agent_error(exc.message, error_type="RemoteConfigUnavailableError", cause=exc)
     except RemoteConfigValidationError as exc:
-        agent_error(exc.message, "RemoteConfigValidationError", cause=exc)
+        agent_error(exc.message, error_type="RemoteConfigValidationError", cause=exc)
     except GatewayUnknownModelError as exc:
         agent_error(
             exc.message,
-            "GatewayUnknownModelError",
+            error_type="GatewayUnknownModelError",
             cause=exc,
             model_name=exc.model_name,
             source=exc.source,
@@ -258,7 +259,7 @@ def make_pipelex_for_agent_cli(
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,
-            "ModelDeckPresetValidatonError",
+            error_type="ModelDeckPresetValidatonError",
             cause=exc,
             preset_id=exc.preset_id,
             model_type=str(exc.model_type),
@@ -269,7 +270,7 @@ def make_pipelex_for_agent_cli(
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
         agent_error(
             f"Pipelex initialization failed: {exc}",
-            type(exc).__name__,
+            error_type=type(exc).__name__,
             cause=exc,
             hint="Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration",
         )

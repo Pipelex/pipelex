@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from temporalio.converter import DataConverter
 
 
-async def connect_to_temporal_server(server_config: TemporalServerConfig, name: str | None = None) -> TemporalClient:
+async def connect_to_temporal_server(server_config: TemporalServerConfig, *, name: str | None = None) -> TemporalClient:
     """Connect to Temporal using the provided server config."""
     api_key: str | None
     match server_config.api_key_method:

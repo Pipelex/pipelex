@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
 from rich.markup import escape
@@ -40,23 +40,20 @@ class PipeSignatureSpec(PipeSpec):
 
     Optional fields:
         - `signature_for`: hint naming the downstream pipe type the signature stands in for
-          (e.g. `PipeType.PIPE_LLM`). Tooling-only; cannot itself be `PipeSignature`.
+          (e.g. `PipeType.PIPE_LLM`). Tooling-only; `PipeSignature` is not a `PipeType`, so it
+          cannot be selected here.
     """
 
     type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    # Spec-layer display/authoring tag only: NOT propagated by `to_blueprint()`, which leaves the
+    # blueprint (and runtime) at `pipe_category = None` because a signature is outside the executable
+    # taxonomy. Kept per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; it only
+    # surfaces in `rendered_pretty` below.
     pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
     signature_for: PipeType | None = Field(
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
     )
-
-    @field_validator("signature_for", mode="after")
-    @classmethod
-    def reject_signature_for_pipe_signature(cls, value: PipeType | None) -> PipeType | None:
-        if value is PipeType.PIPE_SIGNATURE:
-            msg = "A PipeSignature cannot have signature_for=PipeSignature."
-            raise ValueError(msg)
-        return value
 
     @override
     def to_blueprint(self) -> PipeSignatureBlueprint:
@@ -68,7 +65,7 @@ class PipeSignatureSpec(PipeSpec):
         )
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pipe_group = Group()
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))

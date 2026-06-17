@@ -22,6 +22,7 @@ class ModelManagerAbstract(ABC):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
+        *,
         gateway_config: GatewayConfig | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,
@@ -29,7 +30,7 @@ class ModelManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec:
+    def get_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
         pass
 
     @abstractmethod

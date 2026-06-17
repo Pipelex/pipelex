@@ -7,7 +7,7 @@ from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 
 
-def make_event_log(tracing_config: TracingConfig, writer_id: str = "primary") -> EventLogProtocol:
+def make_event_log(tracing_config: TracingConfig, *, writer_id: str = "primary") -> EventLogProtocol:
     """Create an event log backend from tracing configuration.
 
     The writer_id is stamped on every TraceEvent emitted through the resulting

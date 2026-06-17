@@ -64,7 +64,7 @@ def load_toml_with_tomlkit(path: str | Path) -> tomlkit.TOMLDocument:
         return tomlkit.load(file)
 
 
-def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str | Path) -> None:
+def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, *, path: str | Path) -> None:
     """Save dictionary as TOML to path, preserving formatting and comments.
 
     Args:
@@ -86,6 +86,6 @@ def load_toml_from_path_and_merge_with_overrides(paths: Sequence[str | Path]) ->
     merged_dict: dict[str, Any] = {}
     for path in paths:
         if one_dict := load_toml_from_path_if_exists(path):
-            deep_update(merged_dict, one_dict)
+            deep_update(merged_dict, updates=one_dict)
 
     return merged_dict

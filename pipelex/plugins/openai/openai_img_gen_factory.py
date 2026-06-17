@@ -119,11 +119,12 @@ class OpenAIImgGenFactory:
 
     @classmethod
     def moderation_for_openai_image(cls, is_moderated: bool | None) -> OpenAIImageModerationType:
+        """Map the is_moderated flag to OpenAI's moderation parameter: "auto" is standard filtering, "low" is less restrictive."""
         if is_moderated is None:
             return omit
         if is_moderated:
-            return "low"
-        return "auto"
+            return "auto"
+        return "low"
 
     @classmethod
     def input_fidelity_for_openai_image(cls, input_fidelity: InputFidelity) -> OpenAIImageInputFidelityType:

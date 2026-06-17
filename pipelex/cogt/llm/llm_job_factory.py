@@ -10,6 +10,7 @@ class LLMJobFactory:
     def make_llm_job(
         cls,
         llm_prompt: LLMPrompt,
+        *,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
         llm_job_config: LLMJobConfig | None = None,

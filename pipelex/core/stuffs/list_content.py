@@ -105,7 +105,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return self.rendered_markdown()
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
@@ -126,7 +126,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return await self.rendered_markdown_async()
 
     @override
-    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, *, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
@@ -141,13 +141,14 @@ class ListContent(StuffContent, Generic[StuffContentType]):
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,
     ) -> str:
         """Render each item with images."""
         parts: list[str] = []
         for item in self.items:
             if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
-                rendered = item.render_with_images(registry, text_format)
+                rendered = item.render_with_images(registry, text_format=text_format)
             else:
                 rendered = item.rendered_markdown()
             if rendered:
@@ -155,7 +156,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return "\n".join(parts)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Check if we've exceeded maximum depth - fall back to Pretty rendering
         # Pretty shows the Python object structure beautifully, just like when calling pretty_print(stuff)
         if depth >= MAX_RENDER_DEPTH:

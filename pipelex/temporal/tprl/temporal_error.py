@@ -229,7 +229,7 @@ class TemporalError(ApplicationError):
         )
 
     @classmethod
-    def from_message_exception(cls, exc: PipelexError, force_non_retryable: bool = False) -> Self:
+    def from_message_exception(cls, exc: PipelexError, *, force_non_retryable: bool = False) -> Self:
         """Convert a Pipelex exception into a ``TemporalError``.
 
         **Activity-side (default).** Retryability is derived from the ``__cause__``
@@ -267,7 +267,7 @@ class TemporalError(ApplicationError):
         )
 
     @classmethod
-    def _is_non_retryable(cls, exc: PipelexError, error_type: str) -> bool:
+    def _is_non_retryable(cls, exc: PipelexError, *, error_type: str) -> bool:
         """Decide retryability — category-aware for ``CogtError``, name-list fallback otherwise.
 
         A categorized ``CogtError`` is usually wrapped — ``PipeRunError`` ->

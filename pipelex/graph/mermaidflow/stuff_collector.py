@@ -17,6 +17,7 @@ T = TypeVar("T")
 
 def _collect_stuff_field(
     graph: GraphSpec,
+    *,
     extractor: Callable[[IOSpec], T | None],
 ) -> dict[str, T]:
     """Generic collector that iterates all IOSpecs and extracts values.
@@ -69,7 +70,7 @@ def collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
         Dict mapping stuff IDs (s_xxx format) to their IOSpec.data content.
         Only includes entries where data is not None.
     """
-    return _collect_stuff_field(graph, lambda io_spec: io_spec.data)
+    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data)
 
 
 def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
@@ -82,7 +83,7 @@ def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
         Dict mapping stuff IDs (s_xxx format) to their text representation.
         Only includes entries where data_text is not None.
     """
-    return _collect_stuff_field(graph, lambda io_spec: io_spec.data_text)
+    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data_text)
 
 
 def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
@@ -95,7 +96,7 @@ def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
         Dict mapping stuff IDs (s_xxx format) to their HTML representation.
         Only includes entries where data_html is not None.
     """
-    return _collect_stuff_field(graph, lambda io_spec: io_spec.data_html)
+    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.data_html)
 
 
 def collect_stuff_content_type(graph: GraphSpec) -> dict[str, str]:
@@ -110,7 +111,7 @@ def collect_stuff_content_type(graph: GraphSpec) -> dict[str, str]:
         Dict mapping stuff IDs (s_xxx format) to their content_type.
         Only includes entries where content_type is not None.
     """
-    return _collect_stuff_field(graph, lambda io_spec: io_spec.content_type)
+    return _collect_stuff_field(graph, extractor=lambda io_spec: io_spec.content_type)
 
 
 def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
@@ -129,4 +130,4 @@ def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
             meta["concept"] = io_spec.concept
         return meta
 
-    return _collect_stuff_field(graph, extract_metadata)
+    return _collect_stuff_field(graph, extractor=extract_metadata)

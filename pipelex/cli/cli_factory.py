@@ -29,6 +29,7 @@ from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 
 
 def make_pipelex_for_cli(
+    *,
     context: ErrorContext,
     library_dirs: list[str] | list[Path] | None = None,
     needs_inference: bool = True,

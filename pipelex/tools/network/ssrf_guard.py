@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 async def resolve_to_allowed_ips(
     host: str,
+    *,
     port: int,
     timeout: float | None = None,  # noqa: ASYNC109 — propagates httpcore's connect timeout to bound DNS resolution
 ) -> list[str]:
@@ -110,7 +111,7 @@ class SsrfGuardedBackend(httpcore.AsyncNetworkBackend):
         # monotonic deadline and hand each step only the time left in the budget.
         loop = asyncio.get_running_loop()
         deadline = None if timeout is None else loop.time() + timeout
-        vetted_ips = await resolve_to_allowed_ips(host, port, timeout=timeout)
+        vetted_ips = await resolve_to_allowed_ips(host, port=port, timeout=timeout)
         # Every IP is pre-vetted, so dialing any literal is rebind-safe (getaddrinfo
         # on an IP literal does no DNS). Try them in order and fall back on connect
         # failure, restoring the multi-address resilience (dual-stack / multiple A

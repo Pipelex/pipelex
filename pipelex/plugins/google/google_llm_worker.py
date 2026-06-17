@@ -108,7 +108,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     # Reasoning helpers
     #########################################################
 
-    def _build_thinking_config(self, job_params: LLMJobParams, max_tokens: int | None) -> genai_types.ThinkingConfig | None:
+    def _build_thinking_config(self, job_params: LLMJobParams, *, max_tokens: int | None) -> genai_types.ThinkingConfig | None:
         """Build thinking config from job params and model spec.
 
         Args:
@@ -135,6 +135,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_config_for_effort(
         self,
         thinking_mode: ThinkingMode,
+        *,
         effort: ReasoningEffort,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
@@ -171,6 +172,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_config_for_budget(
         self,
         thinking_mode: ThinkingMode,
+        *,
         budget: int,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
@@ -242,6 +244,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""

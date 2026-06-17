@@ -76,7 +76,7 @@ def validate_method_cmd(
         library_dirs=library_dir,
     )
     if not method.mthds_files:
-        agent_error(f"Method '{name}' has no .mthds bundle files.", "MethodError")
+        agent_error(f"Method '{name}' has no .mthds bundle files.", error_type="MethodError")
 
     bundle_path = method.mthds_files[0]
 
@@ -99,22 +99,39 @@ def validate_method_cmd(
             # Validate the entire bundle
             result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures))
 
-        agent_success_formatted(result, format_validate_markdown, output_format)
+        agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
+
+        # Gate-from-report (D-B consumer-decides): valid but NOT runnable when unsatisfied PipeSignature
+        # placeholders remain. The success envelope (with pending_signatures + is_runnable) is emitted
+        # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by the
+        # `except typer.Exit` arm below so teardown still runs.
+        #
+        # Only the whole-method path gates: with --pipe, `result` is the slice envelope whose
+        # is_runnable derives from LIBRARY-WIDE pending_signatures, so gating there would fail a
+        # fully-implemented slice for unrelated placeholders. The slice makes no library-wide
+        # runnability claim (mirroring `validate pipe`), so it is not gated.
+        if not pipe and not allow_signatures and not result.get("is_runnable", True):
+            raise typer.Exit(1)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict (see bundle_cmd): structured failure envelope; validation_errors[] is the
+        # shared builder's output (a residual dry-run failure rides one dry_run item).
+        agent_error(
+            exc.message,
+            error_type="ValidateBundleError",
+            cause=exc,
+            is_valid=False,
+            bundle_path=str(bundle_path),
+            validation_errors=extract_validation_errors(exc),
+        )
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            "PipeOperatorModelChoiceError",
+            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -130,11 +147,16 @@ def validate_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+
+    except typer.Exit:
+        # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
+        # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
+        raise
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

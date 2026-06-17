@@ -33,7 +33,7 @@ def _get_next_output_folder() -> Path:
     Creates folders like: temp/test_outputs/graph_full_data/run_01, run_02, etc.
     """
     base_dir = Path(TEST_OUTPUTS_DIR) / "graph_full_data"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[str, int]:
@@ -55,12 +55,12 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     # Save graph.json
     graph_json_path = output_dir / "graph.json"
     graph_json = graph_spec.to_json()
-    save_text_to_path(graph_json, graph_json_path)
+    save_text_to_path(graph_json, path=graph_json_path)
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files
     # Mermaidflow with data
-    mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+    mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
 
     log.info(f"Mermaidflow stuff_data keys: {list(mermaidflow.stuff_data.keys()) if mermaidflow.stuff_data else []}")
@@ -258,7 +258,7 @@ class TestGraphWithFullData:
 
         # Generate ReactFlow HTML
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title="Graph: cv_job_matcher")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Graph: cv_job_matcher")
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")
         log.info(f"Saved ReactFlow HTML to: {reactflow_path}")

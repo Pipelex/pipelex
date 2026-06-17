@@ -81,7 +81,7 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
@@ -93,11 +93,11 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def load_concepts_only_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
+    def load_concepts_only_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
         """Load only domains and concepts from blueprints, skipping pipes.
 
         This is a lightweight alternative to load_from_blueprints() that only processes
@@ -113,17 +113,18 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, library_id: str, *, blueprint: PipelexBundleBlueprint) -> None:
         pass
 
     @abstractmethod
-    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> None:
         pass
 
     @abstractmethod
     def load_libraries(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
@@ -133,6 +134,7 @@ class LibraryManagerAbstract(ABC):
     def load_libraries_concepts_only(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list["Concept"]:

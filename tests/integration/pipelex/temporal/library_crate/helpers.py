@@ -50,7 +50,7 @@ def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = No
     that production submitters use.
     """
     library_crate = pipe_job.library_crate if pipe_job is not None else None
-    return rehydrate_pipe_output_with_crate(pipe_output, library_crate)
+    return rehydrate_pipe_output_with_crate(pipe_output, library_crate=library_crate)
 
 
 async def execute_workflow(

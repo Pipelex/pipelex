@@ -28,6 +28,7 @@ import typer
 
 from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.types import StrEnum
 
@@ -106,10 +107,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # Validation errors
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
-    "SignaturesNotAllowedError": (
-        "This pipeline reaches a PipeSignature placeholder that has no implementation. Replace each signature with a real "
-        "pipe, or re-run with --allow-signatures to validate the partial pipeline."
-    ),
     # Execution errors
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
@@ -160,8 +157,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
-    # SignaturesNotAllowedError intentionally absent: it carries a class-level error_domain = INPUT,
-    # so the report is its single source of truth (enforced by test_agent_output_drift).
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
@@ -215,7 +210,7 @@ def _build_error_source(exc: BaseException) -> list[str]:
     return sources
 
 
-def _assemble_error_payload(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
+def _assemble_error_payload(message: str, *, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> dict[str, Any]:
     """Build the structured error payload shared by the JSON and markdown renderers.
 
     Sources ``hint`` / ``retryable`` / ``error_domain`` / ``error_category`` /
@@ -308,14 +303,14 @@ def _render_error_markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _agent_error_json(message: str, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> NoReturn:
+def _agent_error_json(message: str, *, error_type: str, cause: BaseException | None, extra: dict[str, Any]) -> NoReturn:
     """Print a structured JSON error to stderr and exit with code 1."""
-    payload = _assemble_error_payload(message, error_type, cause, extra)
+    payload = _assemble_error_payload(message, error_type=error_type, cause=cause, extra=extra)
     print(clean_json_dumps(payload, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause
 
 
-def agent_error_markdown(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+def agent_error_markdown(message: str, *, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Print a markdown-rendered error to stderr and exit with code 1.
 
     The markdown sibling of :func:`agent_error`'s JSON path: an error-type
@@ -330,12 +325,12 @@ def agent_error_markdown(message: str, error_type: str, cause: BaseException | N
         cause: Optional exception to chain with ``raise ... from``.
         **extra: Additional fields merged into the payload.
     """
-    payload = _assemble_error_payload(message, error_type, cause, extra)
+    payload = _assemble_error_payload(message, error_type=error_type, cause=cause, extra=extra)
     print(_render_error_markdown(payload), file=sys.stderr)
     raise typer.Exit(1) from cause
 
 
-def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
+def agent_error(message: str, *, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Emit a structured error to stderr and exit with code 1.
 
     Dispatches on the active error format (see :func:`set_agent_cli_error_format`):
@@ -353,9 +348,9 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     """
     match get_agent_cli_error_format():
         case CliOutputFormat.JSON:
-            _agent_error_json(message, error_type, cause, extra)
+            _agent_error_json(message, error_type=error_type, cause=cause, extra=extra)
         case CliOutputFormat.MARKDOWN:
-            agent_error_markdown(message, error_type, cause, **extra)
+            agent_error_markdown(message, error_type=error_type, cause=cause, **extra)
 
 
 def agent_success(result: dict[str, Any]) -> None:
@@ -381,6 +376,7 @@ def agent_success(result: dict[str, Any]) -> None:
 
 def agent_success_formatted(
     result: dict[str, Any],
+    *,
     markdown_renderer: Callable[[dict[str, Any]], str],
     output_format: CliOutputFormat,
 ) -> None:
@@ -407,67 +403,33 @@ def agent_success_formatted(
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
-    """Extract all validation error categories from a ValidateBundleError into a flat list.
+    """Project a ``ValidateBundleError`` into the CLI ``validation_errors`` JSON array.
 
-    Covers all 4 error sources:
-    - Blueprint validation errors (from interpreter)
-    - Pipe factory errors (e.g., missing concepts)
-    - Pipe validation errors (e.g., missing inputs, type mismatches)
-    - Pipe/concept instantiation errors (from Pydantic validation during factory)
-
-    Each entry includes a ``category`` field identifying its source.
+    Thin adapter over the shared ``build_validation_error_items`` builder — the
+    same one feeding the API 422's ``ErrorReport.validation_errors`` — so the CLI
+    and API structured shapes can never drift. Each typed item is dumped to a
+    plain dict with unset fields dropped (``exclude_none``), matching the
+    machine-first agent-CLI envelope; the entries carry ``category``,
+    ``error_type``, ``message``, and whatever identity / ``source`` fields the
+    underlying error populated. Two residuals make the invariant total: a dry-run
+    failure with no structured locator becomes one ``dry_run``-category item, and
+    a parse-level failure (TOML syntax, an empty blueprint, a bundle elaborator)
+    that carries only a message becomes one ``blueprint_validation`` residual
+    (``fallback_message=exc.message``). So the envelope's ``validation_errors[]``
+    is non-empty on every invalid verdict (the structured-info invariant) — never
+    a bare message.
 
     Args:
         exc: The ValidateBundleError to extract errors from.
 
     Returns:
-        List of dicts, each with at minimum ``category``, ``error_type``, and ``message``.
+        List of dicts, each with at minimum ``category`` and ``message``.
     """
-    validation_errors: list[dict[str, Any]] = []
-
-    for blueprint_error in exc.pipelex_bundle_blueprint_validation_errors:
-        entry: dict[str, Any] = {
-            "category": "blueprint_validation",
-            "error_type": str(blueprint_error.error_type) if blueprint_error.error_type else None,
-            "pipe_code": blueprint_error.pipe_code,
-            "message": blueprint_error.message,
-        }
-        if blueprint_error.domain_code:
-            entry["domain_code"] = blueprint_error.domain_code
-        if blueprint_error.variable_names:
-            entry["variable_names"] = blueprint_error.variable_names
-        validation_errors.append(entry)
-
-    for factory_error in exc.pipe_factory_errors:
-        entry = {
-            "category": "pipe_factory",
-            "error_type": str(factory_error.error_type),
-            "pipe_code": factory_error.pipe_code,
-            "message": factory_error.message,
-        }
-        if factory_error.domain_code:
-            entry["domain_code"] = factory_error.domain_code
-        if factory_error.missing_concept_code:
-            entry["missing_concept_code"] = factory_error.missing_concept_code
-        if factory_error.declared_concepts:
-            entry["declared_concepts"] = factory_error.declared_concepts
-        validation_errors.append(entry)
-
-    for pipe_error in exc.pipe_validation_errors:
-        entry = {
-            "category": "pipe_validation",
-            "error_type": str(pipe_error.error_type),
-            "pipe_code": pipe_error.pipe_code,
-            "message": pipe_error.message,
-        }
-        if pipe_error.domain_code:
-            entry["domain_code"] = pipe_error.domain_code
-        if pipe_error.concept_code:
-            entry["concept_code"] = pipe_error.concept_code
-        if pipe_error.field_path:
-            entry["field_path"] = pipe_error.field_path
-        if pipe_error.variable_names:
-            entry["variable_names"] = pipe_error.variable_names
-        validation_errors.append(entry)
-
-    return validation_errors
+    items = build_validation_error_items(
+        blueprint_errors=exc.pipelex_bundle_blueprint_validation_errors,
+        factory_errors=exc.pipe_factory_errors,
+        pipe_validation_errors=exc.pipe_validation_error_data,
+        dry_run_error_message=exc.dry_run_error_message,
+        fallback_message=exc.message,
+    )
+    return [item.model_dump(mode="json", exclude_none=True) for item in items]

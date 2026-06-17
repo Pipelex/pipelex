@@ -48,18 +48,18 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
             result: dict[str, Any] = json.loads(config_arg)
             return result
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse inline JSON config: {exc}", "JSONDecodeError", cause=exc)
+            agent_error(f"Failed to parse inline JSON config: {exc}", error_type="JSONDecodeError", cause=exc)
     else:
         try:
             with open(config_arg, encoding="utf-8") as file:
                 loaded: Any = json.load(file)
                 if not isinstance(loaded, dict):
-                    agent_error(f"Config file must contain a JSON object, got {type(loaded).__name__}", "JSONDecodeError")
+                    agent_error(f"Config file must contain a JSON object, got {type(loaded).__name__}", error_type="JSONDecodeError")
                 return cast("dict[str, Any]", loaded)
         except FileNotFoundError as exc:
-            agent_error(f"Config file not found: {config_arg}", "FileNotFoundError", cause=exc)
+            agent_error(f"Config file not found: {config_arg}", error_type="FileNotFoundError", cause=exc)
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse config file JSON: {exc}", "JSONDecodeError", cause=exc)
+            agent_error(f"Failed to parse config file JSON: {exc}", error_type="JSONDecodeError", cause=exc)
 
     return {}
 
@@ -102,7 +102,7 @@ def _resolve_target_dir(global_: bool) -> Path:
         agent_error(
             "No project root found (no .git, pyproject.toml, etc. in parent directories). "
             "Use --global/-g to target the global ~/.pipelex/ directory.",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
     return project_root / ".pipelex"
 
@@ -142,7 +142,7 @@ def _copy_inference_templates(target_dir: Path) -> None:
         if deck_file.suffix == ".toml":
             shutil.copy2(deck_file, target_deck_dir / deck_file.name)
 
-    write_manifest(target_deck_dir, compute_kit_manifest())
+    write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
 
     # Copy routing_profiles.toml
     template_routing_path = template_inference_dir / "routing_profiles.toml"
@@ -150,7 +150,7 @@ def _copy_inference_templates(target_dir: Path) -> None:
         shutil.copy2(template_routing_path, target_inference_dir / "routing_profiles.toml")
 
 
-def _copy_telemetry_template(target_dir: Path, for_project: bool) -> None:
+def _copy_telemetry_template(target_dir: Path, *, for_project: bool) -> None:
     """Copy the appropriate telemetry template to the target directory.
 
     The global template (`telemetry.toml`) carries active defaults. The project
@@ -171,6 +171,7 @@ def _copy_telemetry_template(target_dir: Path, for_project: bool) -> None:
 
 
 def _configure_backends(
+    *,
     config: dict[str, Any],
     backends_toml_path: Path,
     template_backends_path: Path,
@@ -186,7 +187,7 @@ def _configure_backends(
         List of enabled backend keys.
     """
     if not backends_toml_path.exists():
-        agent_error("backends.toml not found after config initialization", "InitConfigError")
+        agent_error("backends.toml not found after config initialization", error_type="InitConfigError")
 
     requested_backends: list[str] | None = config.get("backends")
 
@@ -195,14 +196,14 @@ def _configure_backends(
         return get_selected_backend_keys(backends_toml_path)
 
     # Validate requested backend keys
-    backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
+    backend_options = get_backend_options_from_toml(template_backends_path, existing_path=backends_toml_path)
     available_keys = [key for key, _ in backend_options]
 
     for backend_key in requested_backends:
         if backend_key not in available_keys:
             agent_error(
                 f"Unknown backend: {backend_key}. Available: {', '.join(available_keys)}",
-                "ArgumentError",
+                error_type="ArgumentError",
             )
 
     # Build selected indices from requested backend keys
@@ -211,8 +212,8 @@ def _configure_backends(
 
     # Update backends.toml
     toml_doc = load_toml_with_tomlkit(backends_toml_path)
-    update_backends_in_toml(toml_doc, selected_indices, backend_options)
-    save_toml_to_path(toml_doc, backends_toml_path)
+    update_backends_in_toml(toml_doc, selected_indices=selected_indices, backend_options=backend_options)
+    save_toml_to_path(toml_doc, path=backends_toml_path)
 
     # Handle pipelex_gateway terms acceptance (only when explicitly provided)
     if PipelexBackend.GATEWAY in requested_backends:
@@ -224,7 +225,7 @@ def _configure_backends(
     return requested_backends
 
 
-def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any], target_dir: Path) -> str:
+def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, Any], target_dir: Path) -> str:
     """Configure routing profile based on selected backends and config.
 
     Args:
@@ -238,14 +239,14 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     routing_profiles_toml_path = target_dir / "inference" / "routing_profiles.toml"
 
     if not routing_profiles_toml_path.exists():
-        agent_error("routing_profiles.toml not found after config initialization", "InitConfigError")
+        agent_error("routing_profiles.toml not found after config initialization", error_type="InitConfigError")
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
     # Case 1: pipelex_gateway is enabled → use all_pipelex_gateway
     if PipelexBackend.GATEWAY in selected_backend_keys:
         toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         return PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
 
     # Case 2: Only one backend → use all_{backend_key}
@@ -265,7 +266,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
             toml_doc["profiles"][profile_name] = profile_data  # type: ignore[index]
 
         toml_doc["active"] = profile_name
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
         return profile_name
 
     # Case 3: Multiple backends (no pipelex_gateway) → need primary_backend
@@ -275,13 +276,13 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
         agent_error(
             f"primary_backend is required when multiple backends are selected ({', '.join(selected_backend_keys)}) "
             "and pipelex_gateway is not among them",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
 
     if primary_backend not in selected_backend_keys:
         agent_error(
             f"primary_backend '{primary_backend}' is not in the selected backends: {', '.join(selected_backend_keys)}",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
 
     # Build custom_routing profile
@@ -309,7 +310,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     toml_doc["profiles"] = new_profiles  # type: ignore[assignment]
     toml_doc["active"] = "custom_routing"
 
-    save_toml_to_path(toml_doc, routing_profiles_toml_path)
+    save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
     return "custom_routing"
 
 
@@ -395,10 +396,12 @@ def agent_init_cmd(
         # Step 2: Configure backends
         template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
         backends_toml_path = target_dir / "inference" / "backends.toml"
-        backends_enabled = _configure_backends(parsed_config, backends_toml_path, template_backends_path)
+        backends_enabled = _configure_backends(
+            config=parsed_config, backends_toml_path=backends_toml_path, template_backends_path=template_backends_path
+        )
 
         # Step 3: Configure routing
-        routing_profile = _configure_routing(backends_enabled, parsed_config, target_dir)
+        routing_profile = _configure_routing(backends_enabled, config=parsed_config, target_dir=target_dir)
 
         # Step 4: Mark inference setup as completed
         update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
@@ -422,10 +425,10 @@ def agent_init_cmd(
             result_payload["cache_priming_error"] = priming_result.error_message
 
         # Output result
-        agent_success_formatted(result_payload, _format_init_markdown, output_format)
+        agent_success_formatted(result_payload, markdown_renderer=_format_init_markdown, output_format=output_format)
 
     except typer.Exit:
         raise
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(f"Initialization failed: {exc}", type(exc).__name__, cause=exc)
+        agent_error(f"Initialization failed: {exc}", error_type=type(exc).__name__, cause=exc)

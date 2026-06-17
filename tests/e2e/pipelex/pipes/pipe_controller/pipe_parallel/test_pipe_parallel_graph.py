@@ -25,7 +25,7 @@ from tests.e2e.pipelex.pipes.pipe_controller.pipe_parallel.test_data import (
 def _get_next_output_folder(subfolder: str) -> Path:
     """Get the next numbered output folder for parallel graph outputs."""
     base_dir = Path(TEST_OUTPUTS_DIR) / f"pipe_parallel_graph_{subfolder}"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 @pytest.mark.dry_runnable
@@ -146,11 +146,11 @@ class TestPipeParallelGraph:
 
         output_dir = _get_next_output_folder("add_each")
         if graph_outputs.graphspec_json:
-            save_text_to_path(graph_outputs.graphspec_json, output_dir / "graph.json")
+            save_text_to_path(graph_outputs.graphspec_json, path=output_dir / "graph.json")
         if graph_outputs.mermaidflow_html:
-            save_text_to_path(graph_outputs.mermaidflow_html, output_dir / "mermaidflow.html")
+            save_text_to_path(graph_outputs.mermaidflow_html, path=output_dir / "mermaidflow.html")
         if graph_outputs.reactflow_html:
-            save_text_to_path(graph_outputs.reactflow_html, output_dir / "reactflow.html")
+            save_text_to_path(graph_outputs.reactflow_html, path=output_dir / "reactflow.html")
 
         pretty_print(
             {
@@ -271,13 +271,13 @@ class TestPipeParallelGraph:
 
         output_dir = _get_next_output_folder(pipe_code)
         if graph_outputs.graphspec_json:
-            save_text_to_path(graph_outputs.graphspec_json, output_dir / "graph.json")
+            save_text_to_path(graph_outputs.graphspec_json, path=output_dir / "graph.json")
         if graph_outputs.mermaidflow_html:
-            save_text_to_path(graph_outputs.mermaidflow_html, output_dir / "mermaidflow.html")
+            save_text_to_path(graph_outputs.mermaidflow_html, path=output_dir / "mermaidflow.html")
         if graph_outputs.mermaidflow_mmd:
-            save_text_to_path(graph_outputs.mermaidflow_mmd, output_dir / "mermaidflow.mmd")
+            save_text_to_path(graph_outputs.mermaidflow_mmd, path=output_dir / "mermaidflow.mmd")
         if graph_outputs.reactflow_html:
-            save_text_to_path(graph_outputs.reactflow_html, output_dir / "reactflow.html")
+            save_text_to_path(graph_outputs.reactflow_html, path=output_dir / "reactflow.html")
 
         pretty_print(
             {

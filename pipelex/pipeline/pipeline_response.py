@@ -36,6 +36,7 @@ class PipelexRunResultExecute(RunResultExecute[PipeOutput]):
     def from_pipe_output(
         cls,
         pipe_output: PipeOutput,
+        *,
         pipeline_run_id: str = "",
         created_at: str = "",
         state: RunState = RunState.COMPLETED,

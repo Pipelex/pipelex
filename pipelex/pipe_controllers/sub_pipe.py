@@ -33,6 +33,7 @@ class SubPipe(BaseModel):
 
     async def run_pipe(
         self,
+        *,
         calling_pipe_code: str,
         working_memory: WorkingMemory,
         job_metadata: JobMetadata,

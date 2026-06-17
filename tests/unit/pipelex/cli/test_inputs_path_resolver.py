@@ -227,9 +227,9 @@ class TestInputsPathResolver:
 
     def test_resolve_url_in_value_string_passthrough(self) -> None:
         """Non-dict, non-list values pass through unchanged."""
-        assert resolve_url_in_value("hello", Path("/base")) == "hello"
-        assert resolve_url_in_value(42, Path("/base")) == 42
-        assert resolve_url_in_value(None, Path("/base")) is None
+        assert resolve_url_in_value("hello", base_dir=Path("/base")) == "hello"
+        assert resolve_url_in_value(42, base_dir=Path("/base")) == 42
+        assert resolve_url_in_value(None, base_dir=Path("/base")) is None
 
     # ---- resolve_inputs_paths ----
 
@@ -250,5 +250,5 @@ class TestInputsPathResolver:
     )
     def test_resolve_inputs_paths(self, topic: str, inputs_dict: dict[str, Any], expected: dict[str, Any]) -> None:  # noqa: ARG002
         """Resolves relative url paths in various input structures."""
-        result = resolve_inputs_paths(inputs_dict, _ResolveInputsPathsCases.BASE_DIR)
+        result = resolve_inputs_paths(inputs_dict, base_dir=_ResolveInputsPathsCases.BASE_DIR)
         assert result == expected

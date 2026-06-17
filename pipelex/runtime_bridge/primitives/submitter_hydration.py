@@ -29,6 +29,7 @@ if TYPE_CHECKING:
 
 def rehydrate_pipe_output_with_crate(
     pipe_output: PipeOutput,
+    *,
     library_crate: "LibraryCrate | None",
 ) -> PipeOutput:
     """Rehydrate `pipe_output.working_memory_raw` into a typed WorkingMemory.

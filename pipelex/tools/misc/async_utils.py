@@ -18,6 +18,7 @@ async def _invoke(factory: Callable[[], Awaitable[_T]]) -> _T:
 
 async def gather_bounded(
     task_factories: Sequence[Callable[[], Awaitable[_T]]],
+    *,
     max_concurrency: int | None,
 ) -> list[_T]:
     """Run `task_factories` in chunks with at most `max_concurrency` awaitables in flight at once.

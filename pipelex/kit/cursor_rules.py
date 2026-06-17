@@ -31,7 +31,7 @@ def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
             yield child.name, child.read_text(encoding="utf-8")
 
 
-def _front_matter_for(name: str, kit_index: KitIndex) -> dict[str, Any]:
+def _front_matter_for(name: str, *, kit_index: KitIndex) -> dict[str, Any]:
     """Build front-matter for a specific file.
 
     Args:
@@ -74,7 +74,7 @@ def _is_pipelex_managed(mdc_path: Path) -> bool:
     return parsed_dict.get(_PIPELEX_MARKER_KEY) is True
 
 
-def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) -> None:
+def update_cursor_rules(repo_root: Path, *, kit_index: KitIndex, agent_set: str) -> None:
     """Update Cursor .mdc rule files from agent markdown with YAML front-matter.
 
     Args:
@@ -96,7 +96,7 @@ def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) ->
     for fname, body in _iter_agent_files(agents_dir):
         if fname not in allowed_files:
             continue
-        fm = _front_matter_for(fname, kit_index)
+        fm = _front_matter_for(fname, kit_index=kit_index)
         yaml_block = "---\n" + yaml.safe_dump(fm, sort_keys=False).rstrip() + "\n---\n"
         mdc = yaml_block + body
         out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
@@ -110,7 +110,7 @@ def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) ->
             typer.echo(f"⚪ Unchanged {out_path}")
 
 
-def remove_cursor_rules(repo_root: Path, kit_index: KitIndex | None = None) -> None:
+def remove_cursor_rules(repo_root: Path, *, kit_index: KitIndex | None = None) -> None:
     """Remove Pipelex-generated Cursor .mdc files.
 
     Scans every .mdc file in `.cursor/rules/` and deletes the file when any of:

@@ -21,7 +21,7 @@ class TestAgentErrorFormat:
     def test_agent_error_defaults_to_json(self, capsys: pytest.CaptureFixture[str]) -> None:
         """With no format opted in, agent_error keeps emitting JSON to stderr."""
         with pytest.raises(typer.Exit):
-            agent_error("something went wrong", "FooError")
+            agent_error("something went wrong", error_type="FooError")
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert parsed["error_type"] == "FooError"
@@ -30,7 +30,7 @@ class TestAgentErrorFormat:
         """When markdown is the active error format, agent_error renders markdown to stderr."""
         set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
         with pytest.raises(typer.Exit) as exc_info:
-            agent_error("something went wrong", "FooError")
+            agent_error("something went wrong", error_type="FooError")
         assert exc_info.value.exit_code == 1
 
         captured = capsys.readouterr()
@@ -51,7 +51,7 @@ class TestAgentErrorFormat:
         with pytest.raises(typer.Exit):
             agent_error_markdown(
                 "model issue",
-                "PipeOperatorModelChoiceError",
+                error_type="PipeOperatorModelChoiceError",
                 cause=cause,
                 pipe_code="my_pipe",
             )

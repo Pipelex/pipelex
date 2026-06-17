@@ -30,6 +30,7 @@ kit_app = typer.Typer(no_args_is_help=True)
 
 def _sync_agent_rules(
     repo_root: Path | None,
+    *,
     agent_set: str | None,
     cleanup: bool,
     kit_index: KitIndex | None = None,
@@ -55,7 +56,7 @@ def _sync_agent_rules(
     # so a simple membership check is enough to pick the branch.
     if AgentTarget.CURSOR in targets_to_update:
         typer.echo("Updating Cursor rules...")
-        update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
+        update_cursor_rules(resolved_repo_root, kit_index=loaded_kit_index, agent_set=agent_set)
     else:
         all_targets = loaded_kit_index.agent_rules.targets
         filtered_targets: dict[str, Target] = {}
@@ -89,6 +90,7 @@ def _sync_agent_rules(
 
 def _cleanup_other_targets(
     repo_root: Path,
+    *,
     kit_index: KitIndex,
     preferred_targets: list[AgentTarget],
 ) -> None:

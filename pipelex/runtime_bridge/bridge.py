@@ -105,6 +105,7 @@ class PipelexPipeRunOutput(BaseModel):
 
 async def run_pipe_via_bridge(
     input_payload: PipelexPipeRunInput,
+    *,
     trace_context: TraceContext | None = None,
 ) -> PipelexPipeRunOutput:
     """Run a Pipelex pipe from inside a host-runtime activity.
@@ -158,6 +159,7 @@ async def run_pipe_via_bridge(
 
 def build_pipe_job_from_input(
     input_payload: PipelexPipeRunInput,
+    *,
     library_crate: LibraryCrate | None,
     trace_context: TraceContext | None = None,
 ) -> PipeJob:
@@ -235,7 +237,7 @@ def serialize_pipe_output(pipe_output: PipeOutput) -> dict[str, Any]:
     return pipe_output.working_memory.dump_for_temporal()
 
 
-def _validate_input(input_payload: PipelexPipeRunInput, delivery_assignment: DeliveryAssignment | None) -> None:
+def _validate_input(input_payload: PipelexPipeRunInput, *, delivery_assignment: DeliveryAssignment | None) -> None:
     if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
         if delivery_assignment is None or not delivery_assignment.has_delivery_target:
             msg = (
@@ -267,6 +269,7 @@ def _decode_delivery_assignment(delivery_assignment_dump: dict[str, Any] | None)
 
 async def _run_direct(
     pipe_job: PipeJob,
+    *,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
     # DIRECT mode forces in-process execution even inside a Temporal-enabled
@@ -293,6 +296,7 @@ async def _run_direct(
 
 async def _run_temporal_blocking(
     pipe_job: PipeJob,
+    *,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
     from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
@@ -325,6 +329,7 @@ async def _run_temporal_blocking(
 
 async def _run_temporal_fire_and_forget(
     pipe_job: PipeJob,
+    *,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
     from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
@@ -352,6 +357,7 @@ async def _run_temporal_fire_and_forget(
 
 def _serialize_completed_output(
     pipe_output: PipeOutput,
+    *,
     workflow_id: str | None,
 ) -> PipelexPipeRunOutput:
     output_dict = serialize_pipe_output(pipe_output=pipe_output)
@@ -401,6 +407,7 @@ def _require_pipelex_temporal_extra() -> None:
 
 async def _run_mistral_native(
     pipe_job: PipeJob,
+    *,
     delivery_assignment: DeliveryAssignment | None,
 ) -> PipelexPipeRunOutput:
     try:

@@ -8,6 +8,7 @@ class SearchJobFactory:
     def make_search_job(
         cls,
         query: str,
+        *,
         search_setting: SearchSetting,
         job_metadata: JobMetadata,
         include_domains: list[str] | None = None,

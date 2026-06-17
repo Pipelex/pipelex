@@ -7,7 +7,7 @@ corrupt the published contract while the rest of the suite stays green:
 1. **Truthful status.** A FAILURE (e.g. an ``allowed_to_fail`` pipe) and a SKIPPED (cross-package)
    must surface as ``"FAILURE"`` / ``"SKIPPED"`` — NOT flattened to ``"SUCCESS"`` (the exact bug the
    C-8 fix removed). The old callers hardcoded an all-``"SUCCESS"`` list.
-2. **Namespaced identity.** Each entry's ``pipe_code`` field carries the namespaced ``pipe_ref``
+2. **Namespaced identity.** Each entry's ``pipe_ref`` field carries the namespaced ``pipe_ref``
    (``domain.code``), never the bare ``code`` — one unambiguous identity across every validate surface.
 
 Pure unit test (no Pipelex boot, no inference): drives the projection over a hand-built result map.
@@ -34,7 +34,7 @@ class TestBuildValidatedPipes:
 
         entries = build_validated_pipes(dry_run_result)
 
-        by_ref = {entry["pipe_code"]: entry["status"] for entry in entries}
+        by_ref = {entry["pipe_ref"]: entry["status"] for entry in entries}
         # Every entry is keyed by its namespaced pipe_ref, never the bare code.
         assert set(by_ref) == {"domain_a.impl", "domain_a.flaky", "domain_b.xpkg"}
         assert not ({"impl", "flaky", "xpkg"} & set(by_ref))

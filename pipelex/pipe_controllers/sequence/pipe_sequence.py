@@ -158,11 +158,11 @@ class PipeSequence(PipeController):
                     )
                     for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                            needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
+                            needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
             else:
                 for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
-                        needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
+                        needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
 
             # Add this step's output to generated outputs
             if sequential_sub_pipe.output_name:
@@ -177,6 +177,7 @@ class PipeSequence(PipeController):
     @override
     async def _live_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -203,7 +204,7 @@ class PipeSequence(PipeController):
         execution_data_dict: dict[str, Any] = {
             "step_count": len(self.sequential_sub_pipes),
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=evolving_memory,
@@ -213,6 +214,7 @@ class PipeSequence(PipeController):
     @override
     async def _dry_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -229,12 +231,12 @@ class PipeSequence(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

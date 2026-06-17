@@ -20,6 +20,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     def make(
         cls,
         pipe_category: Any,
+        *,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
@@ -51,6 +52,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     def _make_template_mode(
         cls,
         pipe_code: str,
+        *,
         domain_code: str,
         description: str,
         inputs: InputStuffSpecs,

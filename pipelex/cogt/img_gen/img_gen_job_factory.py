@@ -10,6 +10,7 @@ class ImgGenJobFactory:
     def make_img_gen_job_from_prompt(
         cls,
         img_gen_prompt: ImgGenPrompt,
+        *,
         job_metadata: JobMetadata,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
@@ -31,6 +32,7 @@ class ImgGenJobFactory:
     def make_img_gen_job_from_prompt_contents(
         cls,
         positive_text: str,
+        *,
         negative_text: str | None,
         job_metadata: JobMetadata,
         img_gen_job_params: ImgGenJobParams | None = None,

@@ -317,6 +317,7 @@ plugins:
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
+        - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
         - changelog.md: "Changelog"
 
 markdown_extensions:
@@ -563,6 +564,7 @@ nav:
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
+    - Keyword-Only Arguments: contribute/keyword-only-arguments.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md

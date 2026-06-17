@@ -40,20 +40,20 @@ class TestTagFilterValidation:
         context = self._make_context(mocker)
 
         with pytest.raises(Jinja2ContextError, match="undefined"):
-            await tag(context, Undefined())
+            await tag(context, value=Undefined())
 
     async def test_tag_raises_on_undefined_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test tag raises error for undefined value with tag name in message."""
         context = self._make_context(mocker)
 
         with pytest.raises(Jinja2ContextError, match="tag_name 'my_tag'"):
-            await tag(context, Undefined(), tag_name="my_tag")
+            await tag(context, value=Undefined(), tag_name="my_tag")
 
     async def test_tag_with_string_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts plain string input."""
         context = self._make_context(mocker)
 
-        result = await tag(context, "hello world")
+        result = await tag(context, value="hello world")
 
         assert "hello world" in result
         assert "```" in result  # Default style is TICKS
@@ -62,7 +62,7 @@ class TestTagFilterValidation:
         """Test tag filter converts number input to string."""
         context = self._make_context(mocker)
 
-        result = await tag(context, 42)
+        result = await tag(context, value=42)
 
         assert "42" in result
 
@@ -70,7 +70,7 @@ class TestTagFilterValidation:
         """Test tag filter uses provided custom tag name."""
         context = self._make_context(mocker, tag_style=TagStyle.XML)
 
-        result = await tag(context, "content", tag_name="custom")
+        result = await tag(context, value="content", tag_name="custom")
 
         assert "<custom>" in result
         assert "</custom>" in result
@@ -85,7 +85,7 @@ class TestTagFilterValidation:
         mock_renderable.render_for_tag_async = mocker.AsyncMock(return_value="rendered content")
         mock_renderable.default_tag_name = "my_stuff"
 
-        result = await tag(context, mock_renderable)
+        result = await tag(context, value=mock_renderable)
 
         mock_renderable.render_for_tag_async.assert_called_once()
         assert "rendered content" in result
@@ -99,7 +99,7 @@ class TestTagFilterValidation:
         mock_renderable.render_for_tag_async = mocker.AsyncMock(return_value="content")
         mock_renderable.default_tag_name = "default_name"
 
-        result = await tag(context, mock_renderable, tag_name="override_name")
+        result = await tag(context, value=mock_renderable, tag_name="override_name")
 
         assert "<override_name>" in result
         assert "default_name" not in result
@@ -123,7 +123,7 @@ class TestApplyTagStyle:
         """Test NO_TAG style returns value unchanged."""
         context = self._make_context(mocker, TagStyle.NO_TAG)
 
-        result = apply_tag_style(context, "hello", "my_tag")
+        result = apply_tag_style(context=context, value="hello", tag_name="my_tag")
 
         assert result == "hello"
 
@@ -131,7 +131,7 @@ class TestApplyTagStyle:
         """Test TICKS style without tag name."""
         context = self._make_context(mocker, TagStyle.TICKS)
 
-        result = apply_tag_style(context, "content", None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "```\ncontent\n```"
 
@@ -139,7 +139,7 @@ class TestApplyTagStyle:
         """Test TICKS style with tag name."""
         context = self._make_context(mocker, TagStyle.TICKS)
 
-        result = apply_tag_style(context, "content", "my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "my_tag: ```\ncontent\n```"
 
@@ -147,7 +147,7 @@ class TestApplyTagStyle:
         """Test XML style uses 'data' as default tag name."""
         context = self._make_context(mocker, TagStyle.XML)
 
-        result = apply_tag_style(context, "content", None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "<data>\ncontent\n</data>"
 
@@ -155,7 +155,7 @@ class TestApplyTagStyle:
         """Test XML style with tag name."""
         context = self._make_context(mocker, TagStyle.XML)
 
-        result = apply_tag_style(context, "content", "my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "<my_tag>\ncontent\n</my_tag>"
 
@@ -163,7 +163,7 @@ class TestApplyTagStyle:
         """Test SQUARE_BRACKETS style uses 'data' as default tag name."""
         context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
 
-        result = apply_tag_style(context, "content", None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert result == "[data]\ncontent\n[/data]"
 
@@ -171,7 +171,7 @@ class TestApplyTagStyle:
         """Test SQUARE_BRACKETS style with tag name."""
         context = self._make_context(mocker, TagStyle.SQUARE_BRACKETS)
 
-        result = apply_tag_style(context, "content", "my_tag")
+        result = apply_tag_style(context=context, value="content", tag_name="my_tag")
 
         assert result == "[my_tag]\ncontent\n[/my_tag]"
 
@@ -182,6 +182,6 @@ class TestApplyTagStyle:
         context = mocker.MagicMock(spec=Context)
         context.get = lambda key, default=None: context_dict.get(key, default)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
 
-        result = apply_tag_style(context, "content", None)
+        result = apply_tag_style(context=context, value="content", tag_name=None)
 
         assert "```" in result  # TICKS is default

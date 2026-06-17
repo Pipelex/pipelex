@@ -70,7 +70,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         # Check for unused inputs: declared in inputs but not used by any variable path
         for input_name in input_names:
-            if not is_input_used_by_variables(input_name, required_variable_paths):
+            if not is_input_used_by_variables(input_name, variable_paths=required_variable_paths):
                 msg = f"PipeLLM '{self.code}' has input '{input_name}' declared but it is not used in the prompt or system_prompt."
                 raise PipeValidationError(
                     message=msg,
@@ -82,7 +82,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         # Check for missing inputs: variable paths in prompt/system_prompt not satisfied by any input
         for variable_path in required_variable_paths:
-            if not is_variable_satisfied_by_inputs(variable_path, input_names):
+            if not is_variable_satisfied_by_inputs(variable_path, input_names=input_names):
                 msg = f"PipeLLM '{self.code}' uses variable '{variable_path}' in prompt/system_prompt but it is not declared in inputs."
                 raise PipeValidationError(
                     message=msg,
@@ -168,6 +168,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -320,7 +321,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
             execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -329,6 +330,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     async def _llm_gen_object_stuff_content(
         self,
         job_metadata: JobMetadata,
+        *,
         pipe_run_params: PipeRunParams,
         is_multiple_output: bool,
         fixed_nb_output: int | None,
@@ -381,7 +383,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
+    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
         for current_exc in iter_cause_chain(exc):
@@ -392,12 +394,12 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

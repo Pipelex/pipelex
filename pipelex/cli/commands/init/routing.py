@@ -23,7 +23,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 
-def customize_routing_profile(selected_backend_keys: list[str], target_config_dir: Path | None = None) -> None:
+def customize_routing_profile(selected_backend_keys: list[str], *, target_config_dir: Path | None = None) -> None:
     """Interactively customize routing profile based on selected backends.
 
     Args:
@@ -49,13 +49,13 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
 
         # Get backend options for display names
         template_backends_path = Path(str(get_kit_configs_dir() / "inference" / "backends.toml"))
-        backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
+        backend_options = get_backend_options_from_toml(template_backends_path, existing_path=backends_toml_path)
 
         # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway
         if PipelexBackend.GATEWAY in selected_backend_keys:
             toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
-            save_toml_to_path(toml_doc, routing_profiles_toml_path)
-            display_routing_profile_result(console, PipelexRoutingProfile.ALL_PIPELEX_GATEWAY, created=False)
+            save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
+            display_routing_profile_result(console, profile_name=PipelexRoutingProfile.ALL_PIPELEX_GATEWAY, created=False)
             return
 
         # Case 2: Only one backend selected - use all_{backend_key} profile
@@ -88,8 +88,8 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
 
             # Set as active profile
             toml_doc["active"] = profile_name
-            save_toml_to_path(toml_doc, routing_profiles_toml_path)
-            display_routing_profile_result(console, profile_name, created=not profile_exists)
+            save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
+            display_routing_profile_result(console, profile_name=profile_name, created=not profile_exists)
             return
 
         # Case 3: Multiple backends (no pipelex_gateway) - create/update custom_routing profile
@@ -98,8 +98,8 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         console.print()
 
         # Show panel and prompt for primary backend
-        console.print(build_primary_backend_panel(selected_backend_keys, backend_options))
-        primary_backend = prompt_primary_backend(console, selected_backend_keys)
+        console.print(build_primary_backend_panel(selected_backend_keys, backend_options=backend_options))
+        primary_backend = prompt_primary_backend(console=console, backend_keys=selected_backend_keys)
 
         # Prompt for fallback order if there are 2+ remaining backends
         remaining_backends = [b for b in selected_backend_keys if b != primary_backend]
@@ -107,9 +107,9 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
 
         if len(remaining_backends) >= 2:
             console.print()
-            console.print(build_fallback_order_panel(remaining_backends, backend_options))
+            console.print(build_fallback_order_panel(remaining_backends, backend_options=backend_options))
             # Get the ordered remaining backends from user (default keeps current order)
-            ordered_remaining = prompt_fallback_order(console, remaining_backends, backend_options)
+            ordered_remaining = prompt_fallback_order(console, remaining_backends=remaining_backends, backend_options=backend_options)
             fallback_order = [primary_backend, *ordered_remaining]
         elif len(remaining_backends) == 1:
             # Only one remaining backend - set fallback_order with primary first
@@ -144,8 +144,8 @@ def customize_routing_profile(selected_backend_keys: list[str], target_config_di
         toml_doc["profiles"] = new_profiles  # type: ignore[assignment]
         toml_doc["active"] = "custom_routing"
 
-        save_toml_to_path(toml_doc, routing_profiles_toml_path)
-        display_routing_profile_result(console, "custom_routing", created=True)
+        save_toml_to_path(toml_doc, path=routing_profiles_toml_path)
+        display_routing_profile_result(console, profile_name="custom_routing", created=True)
 
         # Inform user about customization options
         console.print("[dim]You can find your custom routing profile in:[/dim]")

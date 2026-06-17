@@ -115,38 +115,38 @@ class TestGenerateFieldValueBasicTypes:
     def test_string_field(self) -> None:
         """String field generates 'fieldname_value'."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(str, "my_field")
+        result = generator.generate_field_value(str, field_name="my_field")
         assert result == "my_field_value"
 
     def test_int_field(self) -> None:
         """Int field generates 0."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(int, "count")
+        result = generator.generate_field_value(int, field_name="count")
         assert result == 0
 
     def test_float_field(self) -> None:
         """Float field generates 0.0."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(float, "rate")
+        result = generator.generate_field_value(float, field_name="rate")
         assert result == 0.0
 
     def test_bool_field(self) -> None:
         """Bool field generates False."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(bool, "active")
+        result = generator.generate_field_value(bool, field_name="active")
         assert result is False
 
     def test_int_or_float_union_field(self) -> None:
         """Int | float union field generates a numeric value (1), not a string placeholder."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(int | float, "number")
+        result = generator.generate_field_value(int | float, field_name="number")
         assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
         assert result == 1
 
     def test_float_or_int_union_field(self) -> None:
         """Float | int union field generates a numeric value (1), not a string placeholder."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(float | int, "amount")
+        result = generator.generate_field_value(float | int, field_name="amount")
         assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
         assert result == 1
 
@@ -162,54 +162,54 @@ class TestGenerateFieldValueComplexTypes:
     def test_enum_field(self) -> None:
         """Enum field generates first enum value."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(StatusEnum, "status")
+        result = generator.generate_field_value(StatusEnum, field_name="status")
         assert result == "pending"
 
     def test_list_of_strings(self) -> None:
         """List[str] generates list with one placeholder."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(list[str], "tags")
+        result = generator.generate_field_value(list[str], field_name="tags")
         assert result == ["tags_item_value"]
 
     def test_list_of_nested_content_json(self) -> None:
         """List[StuffContent] generates list with nested dict (JSON)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(list[NestedChild], "children")
+        result = generator.generate_field_value(list[NestedChild], field_name="children")
         expected = [{"value": "value_value"}]
         assert result == expected
 
     def test_list_of_nested_content_python(self) -> None:
         """List[StuffContent] generates list with instantiation (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_field_value(list[NestedChild], "children")
+        result = generator.generate_field_value(list[NestedChild], field_name="children")
         expected = ['NestedChild(value="value_value")']
         assert result == expected
 
     def test_dict_field(self) -> None:
         """Dict field generates placeholder dict."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(dict[str, str], "metadata")
+        result = generator.generate_field_value(dict[str, str], field_name="metadata")
         expected = {"metadata_key": "metadata_value"}
         assert result == expected
 
     def test_nested_content_json(self) -> None:
         """Nested StuffContent generates dict (JSON)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(NestedChild, "child")
+        result = generator.generate_field_value(NestedChild, field_name="child")
         expected = {"value": "value_value"}
         assert result == expected
 
     def test_nested_content_python(self) -> None:
         """Nested StuffContent generates instantiation (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_field_value(NestedChild, "child")
+        result = generator.generate_field_value(NestedChild, field_name="child")
         expected = 'NestedChild(value="value_value")'
         assert result == expected
 
     def test_optional_field_unwrapped(self) -> None:
         """Optional[str] is unwrapped and handled as str."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_field_value(str | None, "name")
+        result = generator.generate_field_value(str | None, field_name="name")
         assert result == "name_value"
 
 
@@ -317,7 +317,7 @@ class TestGenerateRepresentation:
     def test_wraps_with_concept_json(self) -> None:
         """Result is wrapped with concept (JSON)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.SimpleContent", SimpleContent)
+        result = generator.generate_representation("test.SimpleContent", structure_class=SimpleContent)
         expected = {
             "concept": "test.SimpleContent",
             "content": {
@@ -332,7 +332,7 @@ class TestGenerateRepresentation:
     def test_wraps_with_concept_python(self) -> None:
         """Result is wrapped with concept (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        result = generator.generate_representation("test.SimpleContent", SimpleContent)
+        result = generator.generate_representation("test.SimpleContent", structure_class=SimpleContent)
         expected = {
             "concept": "test.SimpleContent",
             "content": 'SimpleContent(name="name_value", count=0, rate=0.0, active=False)',
@@ -342,7 +342,7 @@ class TestGenerateRepresentation:
     def test_nested_structure_wrapped(self) -> None:
         """Nested structure is wrapped correctly."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        result = generator.generate_representation("test.Nested", ContentWithNestedClass)
+        result = generator.generate_representation("test.Nested", structure_class=ContentWithNestedClass)
         expected = {
             "concept": "test.Nested",
             "content": {"child": {"value": "value_value"}},
@@ -361,21 +361,21 @@ class TestImportsTracking:
     def test_tracks_main_class(self) -> None:
         """Tracks the main class."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        generator.generate_representation("test.Simple", SimpleContent)
+        generator.generate_representation("test.Simple", structure_class=SimpleContent)
         assert "SimpleContent" in generator.imports_needed
 
     def test_tracks_nested_classes(self) -> None:
         """Tracks nested classes."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        generator.generate_representation("test.Nested", ContentWithNestedClass)
+        generator.generate_representation("test.Nested", structure_class=ContentWithNestedClass)
         assert "ContentWithNestedClass" in generator.imports_needed
         assert "NestedChild" in generator.imports_needed
 
     def test_clears_on_new_generation(self) -> None:
         """Clears imports on new generation call."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-        generator.generate_representation("test.Nested", ContentWithNestedClass)
-        generator.generate_representation("test.Simple", SimpleContent)
+        generator.generate_representation("test.Nested", structure_class=ContentWithNestedClass)
+        generator.generate_representation("test.Simple", structure_class=SimpleContent)
         assert "NestedChild" not in generator.imports_needed
         assert "SimpleContent" in generator.imports_needed
 
@@ -390,7 +390,7 @@ class TestConvenienceFunctions:
 
     def test_generate_json_representation(self) -> None:
         """generate_json_representation returns correct result."""
-        result = generate_json_representation("test.Simple", SimpleContent)
+        result = generate_json_representation("test.Simple", structure_class=SimpleContent)
         expected = {
             "concept": "test.Simple",
             "content": {
@@ -404,7 +404,7 @@ class TestConvenienceFunctions:
 
     def test_generate_python_representation(self) -> None:
         """generate_python_representation returns correct result and imports."""
-        result, imports = generate_python_representation("test.Simple", SimpleContent)
+        result, imports = generate_python_representation("test.Simple", structure_class=SimpleContent)
         expected = {
             "concept": "test.Simple",
             "content": 'SimpleContent(name="name_value", count=0, rate=0.0, active=False)',

@@ -14,7 +14,7 @@ class TestTargetSetOverrides:
         claude_target = idx.agent_rules.targets["claude"]
 
         assert claude_target.sets is not None
-        merged = build_merged_rules(idx, agent_set="all", file_list=claude_target.sets["all"])
+        merged = build_merged_rules(kit_index=idx, agent_set="all", file_list=claude_target.sets["all"])
 
         assert PYTHON_STANDARDS_HEADING not in merged
         assert PYTEST_STANDARDS_HEADING_LOWER not in merged.lower()
@@ -25,7 +25,7 @@ class TestTargetSetOverrides:
         claude_target = idx.agent_rules.targets["claude"]
 
         assert claude_target.sets is not None
-        merged = build_merged_rules(idx, agent_set="standalone", file_list=claude_target.sets["standalone"])
+        merged = build_merged_rules(kit_index=idx, agent_set="standalone", file_list=claude_target.sets["standalone"])
 
         assert PYTHON_STANDARDS_HEADING in merged
         assert "writing tests" in merged.lower()
@@ -36,7 +36,7 @@ class TestTargetSetOverrides:
         agents_target = idx.agent_rules.targets["agents"]
 
         assert agents_target.sets is not None
-        merged = build_merged_rules(idx, agent_set="all", file_list=agents_target.sets["all"])
+        merged = build_merged_rules(kit_index=idx, agent_set="all", file_list=agents_target.sets["all"])
 
         assert PYTHON_STANDARDS_HEADING in merged
         assert "writing tests" in merged.lower()
@@ -46,5 +46,5 @@ class TestTargetSetOverrides:
         idx = load_index()
 
         assert "tdd.md" not in idx.agent_rules.sets["all"]
-        merged = build_merged_rules(idx, agent_set="all")
+        merged = build_merged_rules(kit_index=idx, agent_set="all")
         assert TDD_HEADING_LOWER not in merged.lower()

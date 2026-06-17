@@ -55,7 +55,7 @@ class TestNestedConceptsPipe:
         assert pipe_output.main_stuff.concept.domain_code == "nested_concepts_test"
 
         # Get the typed invoice using working_memory.get_stuff_as()
-        invoice = pipe_output.working_memory.get_stuff_as("main_stuff", Invoice)
+        invoice = pipe_output.working_memory.get_stuff_as("main_stuff", content_type=Invoice)
         assert isinstance(invoice, Invoice)
 
         # Log output for debugging

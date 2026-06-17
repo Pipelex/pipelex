@@ -48,7 +48,7 @@ class TestDryRunMockBuildError:
     def test_unbuildable_class_list_variant_raises_same_typed_error(self) -> None:
         """The list builder carries the same terminal-error contract as the single builder."""
         with pytest.raises(DryRunMockBuildError):
-            build_mock_objects(UnbuildableName, 2)
+            build_mock_objects(UnbuildableName, count=2)
 
     def test_buildable_class_builds(self) -> None:
         """Control arm: an unconstrained class builds a valid instance."""

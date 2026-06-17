@@ -12,7 +12,6 @@ from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetVal
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -122,7 +121,7 @@ def display_error_panel(
     console.print()
 
 
-def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
+def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelChoiceError with formatted output.
 
     Args:
@@ -153,7 +152,7 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
     raise typer.Exit(1) from exc
 
 
-def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, context: ErrorContext) -> NoReturn:
+def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, context: ErrorContext) -> NoReturn:
     """Handle and display PipeOperatorModelAvailabilityError with formatted output.
 
     Args:
@@ -190,7 +189,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
     raise typer.Exit(1) from exc
 
 
-def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: ErrorContext) -> NoReturn:
+def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:
     """Handle and display ModelDeckPresetValidatonError with formatted output.
 
     Args:
@@ -245,7 +244,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def _display_validation_error_details(console: Console, exc: ValidateBundleError) -> None:
+def _display_validation_error_details(console: Console, *, exc: ValidateBundleError) -> None:
     """Display the detailed validation error information from a ValidateBundleError.
 
     Args:
@@ -316,31 +315,8 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
         console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
         console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
 
-    # Display signature pre-check error (strict mode refused due to PipeSignature placeholders)
-    if exc.signature_check_error is not None:
-        console.print("[bold cyan]Unimplemented Signatures:[/bold cyan]\n")
-        console.print(f"[yellow]{escape(str(exc.signature_check_error))}[/yellow]\n")
 
-
-def handle_signatures_not_allowed_error(exc: SignaturesNotAllowedError, *, context: ErrorContext) -> NoReturn:
-    """Render `SignaturesNotAllowedError` as a Rich CLI error and exit.
-
-    Mirrors the bundle-path treatment so the single-pipe validation path also produces a
-    friendly error message instead of an unhandled traceback (issue #6 / greptile).
-    """
-    console = get_console()
-    print_traceback_if_requested(console)
-    console.print(f"\n[bold red]❌ {context} failed because of unimplemented PipeSignature placeholders[/bold red]\n")
-    console.print(f"[yellow]{escape(str(exc))}[/yellow]\n")
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Replace each placeholder with a real implementation, or re-run with [cyan]--allow-signatures[/cyan]."
-    )
-    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
+def handle_validate_bundle_error(exc: ValidateBundleError, *, bundle_path: Path | None = None) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
     Args:

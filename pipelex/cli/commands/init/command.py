@@ -126,7 +126,7 @@ def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> 
     return CachePrimingResult(primed=True)
 
 
-def prime_remote_config_cache(console: Console, target_config_dir: Path | None = None) -> None:
+def prime_remote_config_cache(console: Console, *, target_config_dir: Path | None = None) -> None:
     """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
 
     Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
@@ -141,7 +141,7 @@ def prime_remote_config_cache(console: Console, target_config_dir: Path | None =
         console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
 
 
-def _check_gateway_terms_if_needed(console: Console, backends_toml_path: Path) -> None:
+def _check_gateway_terms_if_needed(console: Console, *, backends_toml_path: Path) -> None:
     """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
 
     This is called after init_config() to ensure users who have gateway enabled
@@ -180,6 +180,7 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: Path) -
 
 
 def determine_needs(
+    *,
     reset: bool,
     check_config: bool,
     check_inference: bool,
@@ -217,6 +218,7 @@ def determine_needs(
 
 def confirm_initialization(
     console: Console,
+    *,
     needs_config: bool,
     needs_inference: bool,
     needs_routing: bool,
@@ -244,7 +246,16 @@ def confirm_initialization(
         typer.Exit: If user cancels initialization.
     """
     console.print()
-    console.print(build_initialization_panel(needs_config, needs_inference, needs_routing, needs_telemetry, reset, check_credentials))
+    console.print(
+        build_initialization_panel(
+            needs_config,
+            needs_inference=needs_inference,
+            needs_routing=needs_routing,
+            needs_telemetry=needs_telemetry,
+            reset=reset,
+            check_credentials=check_credentials,
+        )
+    )
 
     if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
         console.print("\n[yellow]Initialization cancelled.[/yellow]")
@@ -265,6 +276,7 @@ def confirm_initialization(
 
 def execute_initialization(
     console: Console,
+    *,
     needs_config: bool,
     needs_inference: bool,
     needs_routing: bool,
@@ -317,7 +329,7 @@ def execute_initialization(
         # If we're NOT going to run customize_backends_config (which handles gateway terms),
         # we need to check if gateway is enabled and terms not accepted
         if not needs_inference and backends_existed_before:
-            _check_gateway_terms_if_needed(console, backends_toml_path)
+            _check_gateway_terms_if_needed(console, backends_toml_path=backends_toml_path)
 
     # Determine if this is truly a first-time setup
     first_time_setup = is_first_time_backends_setup
@@ -357,7 +369,7 @@ def execute_initialization(
 
             # Stamp the deck manifest so future updates can detect drift and
             # `pipelex update` knows the exact kit version this install came from.
-            write_manifest(target_deck_dir, compute_kit_manifest())
+            write_manifest(compute_kit_manifest(), deck_dir=target_deck_dir)
 
             # Reset routing_profiles.toml
             template_routing_path = template_inference_dir / "routing_profiles.toml"
@@ -378,7 +390,7 @@ def execute_initialization(
 
     # Step 2.5: Prompt for missing credentials
     if check_credentials:
-        prompt_credentials(console, backends_toml_path)
+        prompt_credentials(console, backends_toml_path=backends_toml_path)
 
     # Step 3: Set up routing profile if specifically requested
     if needs_routing:
@@ -401,7 +413,7 @@ def execute_initialization(
 
     # Step 4: Set up telemetry if needed
     if needs_telemetry:
-        setup_telemetry(console, telemetry_config_path, for_project=for_project)
+        setup_telemetry(console=console, telemetry_config_path=telemetry_config_path, for_project=for_project)
 
     # Step 5: Prime the remote-config cache so dry-runs and validate can fall back offline.
     # No-op when gateway is disabled or terms have not been accepted. We forward
@@ -465,6 +477,7 @@ def _init_agreement(console: Console) -> None:
 
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
+    *,
     skip_confirmation: bool = False,
     local: bool = False,
 ):
@@ -493,7 +506,7 @@ def init_cmd(
             console.print("[yellow]No backends.toml found. Please run 'pipelex init' first.[/yellow]")
             console.print()
             return
-        prompt_credentials(console, backends_toml_path)
+        prompt_credentials(console, backends_toml_path=backends_toml_path)
         console.print()
         return
 

@@ -15,6 +15,7 @@ from pipelex.pipeline.bundle_validator import BundleValidator
 
 
 async def build_runner_code_for_pipe(
+    *,
     mthds_contents: list[str],
     pipe_code: str,
 ) -> str:

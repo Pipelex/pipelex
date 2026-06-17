@@ -16,6 +16,7 @@ from pipelex.hub import get_model_deck
 
 def _raise_model_choice_not_found(
     msg: str,
+    *,
     model_deck: ModelDeck,
     model_type: ModelType,
     raw_choice: str,
@@ -24,7 +25,7 @@ def _raise_model_choice_not_found(
     available_options: list[str],
 ) -> NoReturn:
     """Compute fuzzy suggestions and raise ModelChoiceNotFoundError."""
-    suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, model_type, name, reference_kind)
+    suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, model_type=model_type, name=name, kind=reference_kind)
     raise ModelChoiceNotFoundError(
         message=msg,
         model_type=model_type,
@@ -50,14 +51,26 @@ def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
                 return
             msg = f"LLM preset '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
-                msg, model_deck, ModelType.LLM, ref.raw, ref.name, ModelReferenceKind.PRESET, list(model_deck.llm_presets.keys())
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.LLM,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.PRESET,
+                available_options=list(model_deck.llm_presets.keys()),
             )
         case ModelReferenceKind.ALIAS:
             if ref.name in model_deck.llm_aliases:
                 return
             msg = f"Alias '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
-                msg, model_deck, ModelType.LLM, ref.raw, ref.name, ModelReferenceKind.ALIAS, list(model_deck.llm_aliases.keys())
+                msg,
+                model_deck=model_deck,
+                model_type=ModelType.LLM,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.ALIAS,
+                available_options=list(model_deck.llm_aliases.keys()),
             )
         case ModelReferenceKind.WATERFALL:
             if ref.name in model_deck.llm_waterfalls:
@@ -65,12 +78,12 @@ def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
             msg = f"Waterfall '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.LLM,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.WATERFALL,
-                list(model_deck.llm_waterfalls.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.LLM,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.WATERFALL,
+                available_options=list(model_deck.llm_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
             if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
@@ -78,12 +91,12 @@ def check_llm_choice_with_deck(llm_choice: LLMModelChoice) -> None:
             msg = f"Model handle '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.LLM,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.HANDLE,
-                list(model_deck.inference_models.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.LLM,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.HANDLE,
+                available_options=list(model_deck.inference_models.keys()),
             )
 
 
@@ -101,12 +114,12 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
             msg = f"Extract preset '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.TEXT_EXTRACTOR,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.PRESET,
-                list(model_deck.extract_presets.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.TEXT_EXTRACTOR,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.PRESET,
+                available_options=list(model_deck.extract_presets.keys()),
             )
         case ModelReferenceKind.ALIAS:
             if ref.name in model_deck.extract_aliases:
@@ -114,12 +127,12 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
             msg = f"Alias '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.TEXT_EXTRACTOR,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.ALIAS,
-                list(model_deck.extract_aliases.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.TEXT_EXTRACTOR,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.ALIAS,
+                available_options=list(model_deck.extract_aliases.keys()),
             )
         case ModelReferenceKind.WATERFALL:
             if ref.name in model_deck.extract_waterfalls:
@@ -127,12 +140,12 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
             msg = f"Waterfall '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.TEXT_EXTRACTOR,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.WATERFALL,
-                list(model_deck.extract_waterfalls.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.TEXT_EXTRACTOR,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.WATERFALL,
+                available_options=list(model_deck.extract_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
             if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.TEXT_EXTRACTOR):
@@ -140,12 +153,12 @@ def check_extract_choice_with_deck(extract_choice: ExtractModelChoice) -> None:
             msg = f"Model handle '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.TEXT_EXTRACTOR,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.HANDLE,
-                list(model_deck.inference_models.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.TEXT_EXTRACTOR,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.HANDLE,
+                available_options=list(model_deck.inference_models.keys()),
             )
 
 
@@ -163,12 +176,12 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
             msg = f"Search preset '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.SEARCH,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.PRESET,
-                list(model_deck.search_presets.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.SEARCH,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.PRESET,
+                available_options=list(model_deck.search_presets.keys()),
             )
         case ModelReferenceKind.ALIAS:
             if ref.name in model_deck.search_aliases:
@@ -176,12 +189,12 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
             msg = f"Alias '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.SEARCH,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.ALIAS,
-                list(model_deck.search_aliases.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.SEARCH,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.ALIAS,
+                available_options=list(model_deck.search_aliases.keys()),
             )
         case ModelReferenceKind.WATERFALL:
             if ref.name in model_deck.search_waterfalls:
@@ -189,12 +202,12 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
             msg = f"Waterfall '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.SEARCH,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.WATERFALL,
-                list(model_deck.search_waterfalls.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.SEARCH,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.WATERFALL,
+                available_options=list(model_deck.search_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
             if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
@@ -202,12 +215,12 @@ def check_search_choice_with_deck(search_choice: SearchModelChoice) -> None:
             msg = f"Model handle '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.SEARCH,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.HANDLE,
-                list(model_deck.inference_models.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.SEARCH,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.HANDLE,
+                available_options=list(model_deck.inference_models.keys()),
             )
 
 
@@ -225,12 +238,12 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
             msg = f"Image generation preset '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.IMG_GEN,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.PRESET,
-                list(model_deck.img_gen_presets.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.IMG_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.PRESET,
+                available_options=list(model_deck.img_gen_presets.keys()),
             )
         case ModelReferenceKind.ALIAS:
             if ref.name in model_deck.img_gen_aliases:
@@ -238,12 +251,12 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
             msg = f"Alias '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.IMG_GEN,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.ALIAS,
-                list(model_deck.img_gen_aliases.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.IMG_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.ALIAS,
+                available_options=list(model_deck.img_gen_aliases.keys()),
             )
         case ModelReferenceKind.WATERFALL:
             if ref.name in model_deck.img_gen_waterfalls:
@@ -251,12 +264,12 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
             msg = f"Waterfall '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.IMG_GEN,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.WATERFALL,
-                list(model_deck.img_gen_waterfalls.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.IMG_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.WATERFALL,
+                available_options=list(model_deck.img_gen_waterfalls.keys()),
             )
         case ModelReferenceKind.HANDLE:
             if model_deck.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.IMG_GEN):
@@ -264,10 +277,10 @@ def check_img_gen_choice_with_deck(img_gen_choice: ImgGenModelChoice) -> None:
             msg = f"Model handle '{ref.name}' was not found in the model deck"
             _raise_model_choice_not_found(
                 msg,
-                model_deck,
-                ModelType.IMG_GEN,
-                ref.raw,
-                ref.name,
-                ModelReferenceKind.HANDLE,
-                list(model_deck.inference_models.keys()),
+                model_deck=model_deck,
+                model_type=ModelType.IMG_GEN,
+                raw_choice=ref.raw,
+                name=ref.name,
+                reference_kind=ModelReferenceKind.HANDLE,
+                available_options=list(model_deck.inference_models.keys()),
             )

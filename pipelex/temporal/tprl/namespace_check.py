@@ -68,7 +68,7 @@ class RegistrationFailure(BaseModel):
     rpc_error_message: str
 
 
-def format_temporal_cli_command(missing: Sequence[str], namespace: str) -> str:
+def format_temporal_cli_command(missing: Sequence[str], *, namespace: str) -> str:
     """Format the exact ``temporal operator search-attribute create`` invocation
     so an operator with raw ``temporal`` CLI access can copy-paste it.
     """
@@ -81,7 +81,7 @@ def format_temporal_cli_command(missing: Sequence[str], namespace: str) -> str:
     return " \\\n".join(parts)
 
 
-def format_tcld_cli_command(missing: Sequence[str], namespace: str) -> str:
+def format_tcld_cli_command(missing: Sequence[str], *, namespace: str) -> str:
     """Format the Temporal Cloud ``tcld`` invocation a namespace admin runs
     when the worker API key lacks ``OperatorService.AddSearchAttributes``
     permission. Used both as a hint in the dry-run output and as part of the
@@ -93,6 +93,7 @@ def format_tcld_cli_command(missing: Sequence[str], namespace: str) -> str:
 
 async def check_required_search_attributes(
     temporal_client: TemporalClient,
+    *,
     namespace: str,
     configured_attributes: Sequence[str],
 ) -> None:
@@ -153,6 +154,7 @@ async def check_required_search_attributes(
 
 async def ensure_required_search_attributes_registered(
     temporal_client: TemporalClient,
+    *,
     namespace: str,
     configured_attributes: Sequence[str],
 ) -> RegistrationFailure | tuple[str, ...]:

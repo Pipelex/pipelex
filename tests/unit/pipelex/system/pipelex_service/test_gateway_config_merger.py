@@ -23,7 +23,7 @@ class TestGatewayConfigMerger:
         }
         local_overrides: dict[str, Any] = {}
 
-        result = GatewayConfigMerger.merge(remote_config, local_overrides)
+        result = GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         assert result == remote_config
         # Verify it's a copy, not the same object
@@ -47,7 +47,7 @@ class TestGatewayConfigMerger:
 
         with warnings.catch_warnings(record=True) as caught_warnings:
             warnings.simplefilter("always")
-            result = GatewayConfigMerger.merge(remote_config, local_overrides)
+            result = GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         assert result["gpt-4o"]["sdk"] == "gateway_responses"
         assert result["gpt-4o"]["structure_method"] == "instructor/openai_responses_tools"
@@ -71,7 +71,7 @@ class TestGatewayConfigMerger:
             },
         }
 
-        result = GatewayConfigMerger.merge(remote_config, local_overrides)
+        result = GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         # Original values should be preserved
         assert result["gpt-4o"]["model_id"] == "gpt-4o-2024-11-20"
@@ -86,7 +86,7 @@ class TestGatewayConfigMerger:
             "unknown-model": {"sdk": "gateway_responses"},
         }
 
-        result = GatewayConfigMerger.merge(remote_config, local_overrides)
+        result = GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         # Unknown model should not be added
         assert "unknown-model" not in result
@@ -105,7 +105,7 @@ class TestGatewayConfigMerger:
             },
         }
 
-        result = GatewayConfigMerger.merge(remote_config, local_overrides)
+        result = GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         # Defaults override should be ignored - original values preserved
         assert result["defaults"]["sdk"] == "gateway_completions"
@@ -121,7 +121,7 @@ class TestGatewayConfigMerger:
             },
         }
 
-        result = GatewayConfigMerger.merge(remote_config, {})
+        result = GatewayConfigMerger.merge(remote_config, local_overrides={})
 
         # Modify the result
         result["gpt-4o"]["costs"]["input"] = 999
@@ -145,7 +145,7 @@ class TestGatewayConfigMerger:
         }
 
         with pytest.raises(GatewayConfigMergeError) as exc_info:
-            GatewayConfigMerger.merge(remote_config, local_overrides)
+            GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         assert "gpt-4o" in str(exc_info.value)
         assert "must be a dictionary" in str(exc_info.value)
@@ -160,7 +160,7 @@ class TestGatewayConfigMerger:
         }
 
         with pytest.raises(GatewayConfigMergeError) as exc_info:
-            GatewayConfigMerger.merge(remote_config, local_overrides)
+            GatewayConfigMerger.merge(remote_config, local_overrides=local_overrides)
 
         assert "gpt-4o" in str(exc_info.value)
         assert "must be a dictionary" in str(exc_info.value)

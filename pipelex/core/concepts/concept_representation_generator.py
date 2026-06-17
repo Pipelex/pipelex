@@ -50,6 +50,7 @@ class ConceptRepresentationGenerator:
     def generate_representation(
         self,
         concept_ref: str,
+        *,
         structure_class: type[StuffContent],
         include_optional: bool = True,
     ) -> dict[str, Any]:
@@ -74,6 +75,7 @@ class ConceptRepresentationGenerator:
     def generate_class_representation(
         self,
         content_class: type[StuffContent],
+        *,
         include_optional: bool = True,
     ) -> dict[str, Any] | str:
         """Generate representation for a StuffContent class (recursive).
@@ -97,7 +99,7 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name, fields_dict)
+                return self._format_as_python(class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
@@ -105,6 +107,7 @@ class ConceptRepresentationGenerator:
     def _generate_fields_dict(
         self,
         content_class: type[StuffContent],
+        *,
         include_optional: bool = True,
     ) -> dict[str, Any]:
         """Generate a dict with field values for a class.
@@ -124,12 +127,12 @@ class ConceptRepresentationGenerator:
                 continue
 
             field_type = field_info.annotation
-            field_value = self.generate_field_value(field_type, field_name)
+            field_value = self.generate_field_value(field_type, field_name=field_name)
             fields_dict[field_name] = field_value
 
         return fields_dict
 
-    def generate_field_value(self, field_type: Any, field_name: str) -> Any:
+    def generate_field_value(self, field_type: Any, *, field_name: str) -> Any:
         """Generate a representation value for a field based on its type (recursive).
 
         Handles:
@@ -152,7 +155,7 @@ class ConceptRepresentationGenerator:
 
         # Handle list types
         if origin is list:
-            return self._generate_list_value(args, field_name)
+            return self._generate_list_value(args, field_name=field_name)
 
         # Handle dict types
         if origin is dict:
@@ -160,11 +163,11 @@ class ConceptRepresentationGenerator:
 
         # Handle Literal types (fields with choices)
         if origin is typing.Literal:
-            return self._generate_literal_value(args, field_name)
+            return self._generate_literal_value(args, field_name=field_name)
 
         # Handle StrEnum types
         if inspect.isclass(actual_type) and issubclass(actual_type, StrEnum):
-            return self._generate_enum_value(actual_type, field_name)
+            return self._generate_enum_value(actual_type, field_name=field_name)
 
         # Handle nested StuffContent (recursive)
         if inspect.isclass(actual_type) and issubclass(actual_type, StuffContent):
@@ -175,7 +178,7 @@ class ConceptRepresentationGenerator:
             return self._generate_basemodel_representation(actual_type)
 
         # Handle basic types
-        return self._generate_basic_value(actual_type, field_name)
+        return self._generate_basic_value(actual_type, field_name=field_name)
 
     def _unwrap_optional(self, field_type: Any) -> Any:
         """Unwrap Optional[T] to get T.
@@ -193,7 +196,7 @@ class ConceptRepresentationGenerator:
             return next((arg for arg in args if arg is not type(None)), field_type) if args else field_type
         return field_type
 
-    def _generate_list_value(self, args: tuple[Any, ...], field_name: str) -> list[Any]:
+    def _generate_list_value(self, args: tuple[Any, ...], *, field_name: str) -> list[Any]:
         """Generate a list value with one example item.
 
         Args:
@@ -219,7 +222,7 @@ class ConceptRepresentationGenerator:
             return [item_repr]
 
         # Handle list of basic types
-        return [self._generate_basic_value(item_type, f"{field_name}_item")]
+        return [self._generate_basic_value(item_type, field_name=f"{field_name}_item")]
 
     def _generate_dict_value(self, field_name: str) -> dict[str, str]:
         """Generate a placeholder dict value.
@@ -232,7 +235,7 @@ class ConceptRepresentationGenerator:
         """
         return {f"{field_name}_key": f"{field_name}_value"}
 
-    def _generate_literal_value(self, literal_args: tuple[Any, ...], field_name: str) -> Any:
+    def _generate_literal_value(self, literal_args: tuple[Any, ...], *, field_name: str) -> Any:
         """Generate a value from a Literal type by randomly picking one of its choices.
 
         Args:
@@ -247,7 +250,7 @@ class ConceptRepresentationGenerator:
             return random.choice(literal_args)
         return f"{field_name}_value"
 
-    def _generate_enum_value(self, enum_type: type[StrEnum], field_name: str) -> str:
+    def _generate_enum_value(self, enum_type: type[StrEnum], *, field_name: str) -> str:
         """Generate a value from a StrEnum type.
 
         Args:
@@ -275,19 +278,19 @@ class ConceptRepresentationGenerator:
         fields_dict: dict[str, Any] = {}
         for field_name, field_info in model_class.model_fields.items():
             field_type = field_info.annotation
-            field_value = self.generate_field_value(field_type, field_name)
+            field_value = self.generate_field_value(field_type, field_name=field_name)
             fields_dict[field_name] = field_value
 
         match self.output_format:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name, fields_dict)
+                return self._format_as_python(class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
 
-    def _generate_basic_value(self, actual_type: Any, field_name: str) -> Any:
+    def _generate_basic_value(self, actual_type: Any, *, field_name: str) -> Any:
         """Generate a value for basic Python types.
 
         Args:
@@ -319,11 +322,11 @@ class ConceptRepresentationGenerator:
                     if set(non_none_args) == {int, float}:
                         return 1  # Return a sensible default for number types
                     # For other unions, try to generate a value for the first type
-                    return self._generate_basic_value(non_none_args[0], field_name)
+                    return self._generate_basic_value(non_none_args[0], field_name=field_name)
             type_name = getattr(actual_type, "__name__", str(actual_type))
             return f"{field_name}_{type_name}"
 
-    def _format_as_python(self, class_name: str, fields: dict[str, Any]) -> str:
+    def _format_as_python(self, class_name: str, *, fields: dict[str, Any]) -> str:
         """Format a class instantiation as Python code string.
 
         Args:
@@ -390,6 +393,7 @@ class ConceptRepresentationGenerator:
 
 def generate_json_representation(
     concept_ref: str,
+    *,
     structure_class: type[StuffContent],
 ) -> dict[str, Any]:
     """Convenience function to generate a JSON format representation.
@@ -402,11 +406,12 @@ def generate_json_representation(
         Dict with concept and content
     """
     generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
-    return generator.generate_representation(concept_ref, structure_class)
+    return generator.generate_representation(concept_ref, structure_class=structure_class)
 
 
 def generate_python_representation(
     concept_ref: str,
+    *,
     structure_class: type[StuffContent],
 ) -> tuple[dict[str, Any], set[str]]:
     """Convenience function to generate a Python format representation.
@@ -419,5 +424,5 @@ def generate_python_representation(
         Tuple of (representation dict, imports_needed set)
     """
     generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-    representation = generator.generate_representation(concept_ref, structure_class)
+    representation = generator.generate_representation(concept_ref, structure_class=structure_class)
     return representation, generator.imports_needed
