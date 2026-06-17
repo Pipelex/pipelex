@@ -18,6 +18,12 @@ can be loaded in two cold-start budgets:
 
 Single-file results are an exact subset of the full scan: ``relative_path``/``module_qname`` are
 computed identically (see ``collect_violations_for_files``), so the carve-out allowlist matches.
+
+The module also exposes an auto-fix surface (``fix_source`` / ``fix_all_violations``) backing the
+``--fix`` flag: it inserts a bare ``*`` as far left as possible (right after ``self``/``cls``) so every
+non-``self``/``cls`` parameter becomes keyword-only, for the mechanically fixable violations, and reports
+the rest for a manual fix. See ``docs/contribute/keyword-only-arguments.md`` (the Auto-fix section) for the
+fixable/unfixable shapes.
 """
 
 from __future__ import annotations
@@ -39,6 +45,13 @@ if TYPE_CHECKING:
 
 #: Source root scanned by the guard (relative to the repo root / cwd).
 SOURCE_ROOT = Path("pipelex")
+
+#: The line breaks ``ast``/CPython counts toward ``node.lineno`` — and ONLY these.
+#: ``str.splitlines()`` additionally splits on form-feed, vertical tab, NEL, file/group/record/unit
+#: separators and the Unicode line/paragraph separators, so a single such character before a violation
+#: would shift every subsequent ``lineno``-based index off by one. The capturing group keeps the
+#: separators in the split output so :func:`_split_source_lines` can reconstruct the file byte-for-byte.
+_LINE_BREAK_RE = re.compile(r"(\r\n|\r|\n)")
 
 #: Inline comment that suppresses a single violation on the def line it sits on.
 ESCAPE_HATCH_MARKER = "# kw-only: ignore"
@@ -275,14 +288,66 @@ def _evaluate_def(
     return None
 
 
+def _fix_insertion_point(node: ast.FunctionDef | ast.AsyncFunctionDef, *, is_method: bool) -> tuple[int, int] | None:
+    """Locate where a bare ``*`` must be inserted to fix a violation, or None if not mechanically fixable.
+
+    The ``*`` is placed as far left as possible — immediately after ``self``/``cls`` (and after any ``/``)
+    — so EVERY non-``self``/``cls`` parameter becomes keyword-only, not just the params after the subject:
+    ``def f(a, b)`` is fixed to ``def f(*, a, b)`` and ``def m(self, a, b)`` to ``def m(self, *, a, b)``.
+    The convention permits the subject to stay positional, but making it keyword-only too is always allowed
+    and is preferred here (see ``docs/contribute/keyword-only-arguments.md``).
+
+    Returns the ``(lineno, col_offset)`` of the parameter the bare ``*`` must immediately precede — the
+    first positional-or-keyword parameter that is not ``self``/``cls``. The ``col_offset`` is a UTF-8 byte
+    offset, matching ``ast`` (see :func:`fix_source` for how it is used).
+
+    Returns None for the signatures a simple bare-``*`` insert cannot fix — these need human judgement:
+
+    - a ``*args`` is present (``node.args.vararg``): a bare ``*`` cannot coexist with ``*args``;
+    - a keyword-only section already exists (``node.args.kwonlyargs`` while ``vararg`` is None means a bare
+      ``*`` is already in the signature): a second bare ``*`` is a syntax error, so the existing one must be
+      moved by hand;
+    - two or more positional-only parameters (before a ``/``, excluding a leading ``self``/``cls``) remain:
+      a bare ``*`` cannot precede the ``/``, so they stay positional and the single allowed subject is not
+      enough to reach compliance.
+    """
+    if node.args.vararg is not None or node.args.kwonlyargs:
+        return None
+    args = node.args.args
+    # self/cls (when it leads the positional-or-keyword params) stays positional; the `*` goes right after it.
+    skip = 1 if (is_method and args and args[0].arg in {"self", "cls"}) else 0
+    if skip >= len(args):
+        return None  # nothing after self/cls in the positional-or-keyword section to make keyword-only
+    # A bare `*` cannot precede a `/`, so positional-only params can't be made keyword-only. After the
+    # insert, only the positional-only params (plus a leading self/cls) stay positional; mirror
+    # `_positional_or_keyword_count` on that residue — the convention allows exactly one (the subject), so
+    # two or more leftover positional-or-keyword params mean a bare `*` can't reach compliance.
+    residual_positional = [*node.args.posonlyargs, *args[:skip]]
+    if is_method and residual_positional and residual_positional[0].arg in {"self", "cls"}:
+        residual_positional = residual_positional[1:]
+    if len(residual_positional) > 1:
+        return None
+    target = args[skip]
+    return (target.lineno, target.col_offset)
+
+
+class _FixRecord(NamedTuple):
+    """A violation paired with where to insert the bare ``*`` (or None when it needs a manual fix)."""
+
+    violation: Violation
+    insertion: tuple[int, int] | None
+
+
 class _Collector(ast.NodeVisitor):
     """Walks the module, tracking the enclosing class/function scope to qualify defs."""
 
-    def __init__(self, *, module_qname: str, relative_path: str, source_lines: list[str]) -> None:
+    def __init__(self, *, module_qname: str, relative_path: str, source_lines: list[str], collect_fixes: bool = False) -> None:
         self.module_qname = module_qname
         self.relative_path = relative_path
         self.source_lines = source_lines
+        self.collect_fixes = collect_fixes
         self.violations: list[Violation] = []
+        self.fix_records: list[_FixRecord] = []
         self._class_stack: tuple[str, ...] = ()
         self._func_stack: tuple[str, ...] = ()
         self._in_class_body: tuple[bool, ...] = ()
@@ -308,6 +373,9 @@ class _Collector(ast.NodeVisitor):
         )
         if violation is not None:
             self.violations.append(violation)
+            if self.collect_fixes:
+                insertion = _fix_insertion_point(node, is_method=is_method)
+                self.fix_records.append(_FixRecord(violation=violation, insertion=insertion))
         # Descend into the function body; nested defs are NOT methods of the enclosing class.
         self._func_stack = (*self._func_stack, node.name)
         self._in_class_body = (*self._in_class_body, False)
@@ -324,6 +392,16 @@ class _Collector(ast.NodeVisitor):
         self._visit_function(node)
 
 
+def _split_source_lines(source: str) -> list[str]:
+    """Split ``source`` into content lines indexable by ``ast`` line number (``node.lineno - 1``).
+
+    Unlike ``str.splitlines()``, this splits ONLY on the tokenizer's newline set (see :data:`_LINE_BREAK_RE`),
+    so an exotic-whitespace character earlier in the file never shifts a ``lineno``-based index. The content
+    lines are the even-indexed elements of the capturing split (odd indices are the separators).
+    """
+    return _LINE_BREAK_RE.split(source)[::2]
+
+
 def find_violations_in_source(source: str, *, module_qname: str, relative_path: str) -> list[Violation]:
     """Find all keyword-only convention violations in a single Python source string.
 
@@ -336,9 +414,58 @@ def find_violations_in_source(source: str, *, module_qname: str, relative_path: 
         The violations found, in source order.
     """
     tree = ast.parse(source)
-    collector = _Collector(module_qname=module_qname, relative_path=relative_path, source_lines=source.splitlines())
+    collector = _Collector(module_qname=module_qname, relative_path=relative_path, source_lines=_split_source_lines(source))
     collector.visit(tree)
     return collector.violations
+
+
+# --------------------------------------------------------------------------------------
+# Auto-fix (insert a bare `*` before the first non-self/cls positional-or-keyword param)
+# --------------------------------------------------------------------------------------
+
+
+def _find_fix_records_in_source(source: str, *, module_qname: str, relative_path: str) -> list[_FixRecord]:
+    """Collect a fix record (violation + insertion point) for every violation in a single source string."""
+    tree = ast.parse(source)
+    collector = _Collector(module_qname=module_qname, relative_path=relative_path, source_lines=_split_source_lines(source), collect_fixes=True)
+    collector.visit(tree)
+    return collector.fix_records
+
+
+def fix_source(source: str, *, module_qname: str, relative_path: str) -> tuple[str, list[Violation], list[Violation]]:
+    """Insert a bare ``*`` for every mechanically-fixable violation in a single source string.
+
+    Returns ``(new_source, fixed, unfixable)``: the rewritten text, the violations that were auto-fixed,
+    and the violations that need a manual fix (see :func:`_fix_insertion_point` for which shapes those are).
+    If the rewrite somehow fails to re-parse, the original source is returned unchanged and every violation
+    is reported as unfixable — a rewrite that breaks the file is never written.
+
+    Args:
+        source: The Python source text to fix.
+        module_qname: The dotted module path used to qualify each def (e.g. ``pipelex.builder.foo``).
+        relative_path: The source file path relative to the repo root (used in each violation's key).
+    """
+    records = _find_fix_records_in_source(source, module_qname=module_qname, relative_path=relative_path)
+    fixable = [(record.violation, record.insertion) for record in records if record.insertion is not None]
+    unfixable = [record.violation for record in records if record.insertion is None]
+    if not fixable:
+        return source, [], unfixable
+
+    # Split keeping separators so the file rebuilds byte-for-byte. Content of `ast` line N is the
+    # even-indexed element at `(N - 1) * 2`; odd indices are the separators (see _LINE_BREAK_RE).
+    parts = _LINE_BREAK_RE.split(source)
+    # Apply bottom-up so an earlier insertion never shifts a not-yet-applied byte offset.
+    for lineno, col in sorted((insertion for _, insertion in fixable), reverse=True):
+        content_index = (lineno - 1) * 2
+        line_bytes = parts[content_index].encode("utf-8")
+        parts[content_index] = (line_bytes[:col] + b"*, " + line_bytes[col:]).decode("utf-8")
+    new_source = "".join(parts)
+
+    try:
+        ast.parse(new_source)
+    except SyntaxError:
+        return source, [], [record.violation for record in records]
+    return new_source, [violation for violation, _ in fixable], unfixable
 
 
 # --------------------------------------------------------------------------------------
@@ -371,6 +498,26 @@ def collect_all_violations(root: Path) -> list[Violation]:
         source = path.read_text(encoding="utf-8")
         violations.extend(find_violations_in_source(source, module_qname=module_qname, relative_path=relative_path))
     return sorted(violations, key=lambda violation: violation.key)
+
+
+def fix_all_violations(root: Path) -> tuple[list[Violation], list[Violation]]:
+    """Rewrite every mechanically-fixable violation under ``root`` in place.
+
+    Returns ``(fixed, unfixable)``, each sorted by key: the violations auto-fixed by inserting a bare
+    ``*`` as far left as possible (right after ``self``/``cls``), and those that still need a manual fix.
+    Only files whose content actually changed are rewritten. Inserted text stays on the def's original
+    line(s); a subsequent ``ruff format`` (the next step in ``make agent-check``) normalizes the layout.
+    """
+    fixed_all: list[Violation] = []
+    unfixable_all: list[Violation] = []
+    for path in iter_source_files(root):
+        source = path.read_text(encoding="utf-8")
+        new_source, fixed, unfixable = fix_source(source, module_qname=_module_qname_for(path), relative_path=path.as_posix())
+        if new_source != source:
+            path.write_text(new_source, encoding="utf-8")
+        fixed_all.extend(fixed)
+        unfixable_all.extend(unfixable)
+    return sorted(fixed_all, key=lambda violation: violation.key), sorted(unfixable_all, key=lambda violation: violation.key)
 
 
 # --------------------------------------------------------------------------------------
@@ -457,7 +604,8 @@ def main(argv: list[str]) -> int:
     for violation in violations:
         print(f"  {violation.relative_path}:{violation.lineno}  {violation.qualified_name}", file=sys.stderr)
     print(
-        "Place a bare `*` after the subject, or add `# kw-only: ignore` on the def line if justified — see docs/contribute/keyword-only-arguments.md",
+        "Place a bare `*` so the non-subject parameters are keyword-only (or run `make fix-keyword-only`), "
+        "or add `# kw-only: ignore` on the def line if justified — see docs/contribute/keyword-only-arguments.md",
         file=sys.stderr,
     )
     return 2

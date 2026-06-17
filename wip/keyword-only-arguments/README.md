@@ -8,8 +8,11 @@ The pipelex-internal refactor is **complete and landed on the branch** — all w
 
 **One open item:** at pipelex release, swap each consumer's temporary `[tool.uv.sources]` git pin back to the released `pipelex` version. Tracked in the checklist of [`downstream-consumer-breakage.md`](downstream-consumer-breakage.md).
 
+**Follow-on (separate branch):** an `--fix` auto-fix capability was added to the guard on `feature/Tweaks-for-validation-api`. Its code review surfaced open items (incl. a latent silent-corruption bug) tracked in [`autofix-review-followups.md`](autofix-review-followups.md).
+
 ## What's here
 
+- **[autofix-review-followups.md](autofix-review-followups.md)** — review follow-ups for the `--fix` auto-fix addition (the `make fko` / `check-keyword-only --fix` capability). Has open bugs (F1/F2 line-numbering corruption) and tradeoff decisions (F3–F5).
 - **[keyword-only-arguments.html](keyword-only-arguments.html)** — self-contained co-developer explainer: TL;DR, what/why, the rule, how it was enforced, the audit→consolidation→downstream-fix arc, and minimal diffs for the critical changes. Open in a browser.
 - **[downstream-consumer-breakage.md](downstream-consumer-breakage.md)** — the living cross-repo lockstep record. Which consumer call sites broke at each pipelex SHA, how each was fixed, and the at-release pin-swap checklist. This is the one doc with an open action.
 - **[positional-subject-suspects.md](positional-subject-suspects.md)** — RESOLVED. The consolidated shortlist of 59 "positional-subject abuse" suspects (functions that kept their subject positional only to satisfy the carve-out) and the adjudication that turned them all fully keyword-only.
