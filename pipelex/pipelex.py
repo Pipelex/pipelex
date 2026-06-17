@@ -11,7 +11,6 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -143,7 +142,7 @@ class Pipelex(metaclass=MetaSingleton):
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+    def _get_validation_error_msg(*, component_name: str, validation_exc: Exception) -> str:
         """Generate error message for invalid config files."""
         msg = ""
         cause_exc = validation_exc.__cause__
@@ -165,6 +164,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        *,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
         temporal_enabled: bool | None = None,
@@ -350,10 +350,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(msg) from routing_profile_exc
 
         except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            msg = self._get_validation_error_msg(component_name="inference backend library", validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
-            msg = self._get_validation_error_msg("model deck", deck_validation_exc)
+            msg = self._get_validation_error_msg(component_name="model deck", validation_exc=deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
 
@@ -367,18 +367,19 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
+        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
+        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
+        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
+        self.pipelex_hub.set_dry_run_forced(not needs_inference)
         if content_generator is None:
-            if not needs_inference:
-                content_generator = ContentGeneratorDry()
-            elif get_config().temporal.is_enabled:
+            if get_config().temporal.is_enabled:
                 from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
                     ContentGeneratorInWorkflowFactory,
                 )
 
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                    generated_content_factory=generated_content_factory,
-                )
+                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
@@ -510,6 +511,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
+        *,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
         temporal_enabled: bool | None = None,
@@ -538,10 +540,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            needs_inference: When False, disables inference functionality by using a mock
-                content generator and loading backends leniently (skipping those with missing
-                credentials). This skips gateway terms check and model deck validation.
-                Useful for commands like validate/show that don't call inference APIs.
+            needs_inference: When False, forces every run THIS process initiates to DRY mode
+                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
+                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (skipping those with missing credentials). This skips gateway terms check and model
+                deck validation. Useful for commands like validate/show that don't call inference
+                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
+                not constrain work this process executes as a Temporal worker.
             temporal_enabled: When provided, overrides the temporal.is_enabled config value.
                 True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference
@@ -561,7 +566,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers: Custom observers for pipeline events
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
-                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+                Per-call library_dirs in execute/start will override this default.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.

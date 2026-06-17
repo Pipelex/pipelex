@@ -61,6 +61,7 @@ class LLMPromptBlueprint(BaseModel):
     async def make_llm_prompt(
         self,
         output_concept_ref: str,
+        *,
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
         extra_params: dict[str, Any] | None = None,
@@ -278,6 +279,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_image(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -303,6 +305,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_list_images(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -346,6 +349,7 @@ class LLMPromptBlueprint(BaseModel):
 
     async def _unravel_text(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         jinja2_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
@@ -378,6 +382,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_document(
         self,
         doc_ref: DocumentReference,
+        *,
         context_provider: ContextProviderAbstract,
         prompt_user_documents: dict[str, PromptDocument],
     ) -> None:
@@ -405,6 +410,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_list_documents(
         self,
         doc_ref: DocumentReference,
+        *,
         context_provider: ContextProviderAbstract,
         prompt_user_documents: dict[str, PromptDocument],
     ) -> None:

@@ -11,18 +11,14 @@ from collections.abc import Generator
 import pytest
 from temporalio.client import Client as TemporalClient
 
-from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_required_concept
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle
-from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
+from tests.integration.pipelex.temporal.library_crate.helpers import make_prepared_greeting_job, rehydrate_pipe_output
 from tests.integration.pipelex.temporal.test_data import DeferredHydrationTestData
 
 
@@ -102,26 +98,9 @@ class TestWfDeferredHydration:
         is serialized via prepare_for_temporal(), sent through Temporal, and correctly
         hydrated on the worker before the pipe sequence runs.
         """
-        # Build a Stuff with the dynamic Greeting concept content
-        greeting_concept = get_required_concept(concept_ref=f"{DeferredHydrationTestData.DOMAIN}.Greeting")
-        greeting_content = StuffContentFactory.make_stuff_content_from_concept_required(
-            concept=greeting_concept,
-            value={"message": "Bonjour le monde", "language": "French"},
-        )
-        greeting_stuff = Stuff(
-            stuff_code="test_input",
-            stuff_name="greeting_result",
-            concept=greeting_concept,
-            content=greeting_content,
-        )
-
-        # Create a WorkingMemory with the dynamic-concept Stuff pre-populated
-        input_wm = WorkingMemory()
-        input_wm.root["greeting_result"] = greeting_stuff
-
-        # Copy the pipe job with pre-populated WM, then prepare for Temporal dispatch
-        pipe_job_with_input = pipe_job_with_dynamic_concept.model_copy(update={"working_memory": input_wm})
-        prepared_job = pipe_job_with_input.prepare_for_temporal()
+        # Build a WorkingMemory with a dynamic Greeting stuff pre-populated, then
+        # prepare the pipe job for Temporal dispatch
+        prepared_job = make_prepared_greeting_job(pipe_job_with_dynamic_concept, stuff_code="test_input")
 
         # Verify prepare_for_temporal converted WM to raw dict
         assert prepared_job.working_memory is None, "prepare_for_temporal should set working_memory to None"

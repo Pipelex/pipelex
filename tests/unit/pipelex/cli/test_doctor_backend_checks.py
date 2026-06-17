@@ -1,0 +1,212 @@
+"""Unit tests for doctor's backend credential / backend file / kit template checks."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from pipelex.cli.commands.doctor_cmd import (
+    check_backend_credentials,
+    check_backend_files,
+    check_kit_template_exists,
+    replace_backend_file,
+)
+from pipelex.cogt.exceptions import InferenceBackendLibraryError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+    from pytest_mock import MockerFixture
+
+BACKENDS_TOML = """
+[internal]
+enabled = true
+
+[openai]
+enabled = true
+api_key = "${TEST_DOCTOR_OPENAI_KEY}"
+
+[azure]
+enabled = false
+api_key = "${TEST_DOCTOR_AZURE_KEY}"
+"""
+
+
+def _write_backends_toml(config_dir: Path, content: str = BACKENDS_TOML) -> Path:
+    inference_dir = config_dir / "inference"
+    inference_dir.mkdir(parents=True, exist_ok=True)
+    backends_toml = inference_dir / "backends.toml"
+    backends_toml.write_text(content, encoding="utf-8")
+    return backends_toml
+
+
+class TestDoctorBackendChecks:
+    def test_credentials_backends_toml_missing(self, tmp_path: Path) -> None:
+        """No backends.toml means the credentials check fails with a clear message."""
+        healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert reports == {}
+        assert message == "Backend configuration file not found"
+
+    def test_credentials_all_valid(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """All env vars set with real values is healthy; internal and disabled backends are skipped."""
+        _write_backends_toml(tmp_path)
+        monkeypatch.setenv("TEST_DOCTOR_OPENAI_KEY", "sk-real-value")
+        monkeypatch.delenv("TEST_DOCTOR_AZURE_KEY", raising=False)
+
+        healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is True
+        assert set(reports.keys()) == {"openai"}
+        assert reports["openai"].all_credentials_valid is True
+        assert reports["openai"].required_vars == ["TEST_DOCTOR_OPENAI_KEY"]
+        assert message == "All 1 enabled backend(s) have valid credentials"
+
+    def test_credentials_missing_env_var(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An unset env var is reported as missing for its backend."""
+        _write_backends_toml(tmp_path)
+        monkeypatch.delenv("TEST_DOCTOR_OPENAI_KEY", raising=False)
+
+        healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert reports["openai"].missing_vars == ["TEST_DOCTOR_OPENAI_KEY"]
+        assert reports["openai"].all_credentials_valid is False
+        assert message == "1 backend(s) have missing or invalid credentials"
+
+    def test_credentials_placeholder_value(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An env var still holding a placeholder value is reported separately."""
+        _write_backends_toml(tmp_path)
+        monkeypatch.setenv("TEST_DOCTOR_OPENAI_KEY", "placeholder-for-TEST_DOCTOR_OPENAI_KEY")
+
+        healthy, reports, _ = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert reports["openai"].placeholder_vars == ["TEST_DOCTOR_OPENAI_KEY"]
+        assert reports["openai"].missing_vars == []
+
+    def test_credentials_broad_failure_reported(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Any unexpected failure during the scan becomes a finding, not a crash."""
+        _write_backends_toml(tmp_path)
+        mocker.patch("pipelex.cli.commands.doctor_cmd.load_toml_from_path", side_effect=RuntimeError("kaboom"))
+
+        healthy, reports, message = check_backend_credentials(config_dir=tmp_path)
+
+        assert healthy is False
+        assert reports == {}
+        assert message == "Error checking backend credentials: kaboom"
+
+    def test_backend_files_no_backends_dir(self, tmp_path: Path) -> None:
+        """A missing inference/backends directory is healthy (nothing to check)."""
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert reports == {}
+        assert message == "No backend files to check"
+
+    def test_backend_files_no_backends_toml(self, tmp_path: Path) -> None:
+        """A backends dir without backends.toml is healthy (nothing to check)."""
+        (tmp_path / "inference" / "backends").mkdir(parents=True)
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert reports == {}
+        assert message == "No backends.toml to check"
+
+    def test_backend_files_toml_error(self, tmp_path: Path) -> None:
+        """An unparseable backends.toml fails the check with a load error."""
+        _write_backends_toml(tmp_path, content="not [ valid toml")
+        (tmp_path / "inference" / "backends").mkdir(parents=True)
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert reports == {}
+        assert message.startswith("Error loading backends.toml:")
+
+    def _setup_backend_file(self, tmp_path: Path) -> Path:
+        _write_backends_toml(tmp_path)
+        backends_dir = tmp_path / "inference" / "backends"
+        backends_dir.mkdir(parents=True)
+        backend_file = backends_dir / "openai.toml"
+        backend_file.write_text("# openai backend specs\n", encoding="utf-8")
+        return backend_file
+
+    def test_backend_files_valid(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A backend file that loads cleanly is reported valid, with kit-template info."""
+        self._setup_backend_file(tmp_path)
+        library_mock = mocker.Mock()
+        mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert message == "All backend files are valid"
+        assert reports["openai"].is_valid is True
+        assert reports["openai"].error_message is None
+        # openai ships in the kit, so the template is found by the real probe
+        assert reports["openai"].has_kit_template is True
+
+    def test_backend_files_library_error_naming_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A library error naming the backend marks that file invalid."""
+        self._setup_backend_file(tmp_path)
+        library_mock = mocker.Mock()
+        library_mock.load.side_effect = InferenceBackendLibraryError("openai: invalid model spec")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
+
+        healthy, reports, message = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "1 backend file(s) have validation errors"
+        assert reports["openai"].is_valid is False
+        assert reports["openai"].error_message == "openai: invalid model spec"
+
+    def test_backend_files_library_error_not_naming_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A library error that names neither the backend nor its file leaves it valid."""
+        self._setup_backend_file(tmp_path)
+        library_mock = mocker.Mock()
+        library_mock.load.side_effect = InferenceBackendLibraryError("some unrelated failure")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.InferenceBackendLibrary.make_empty", return_value=library_mock)
+
+        healthy, reports, _ = check_backend_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert reports["openai"].is_valid is True
+
+    def test_kit_template_exists_for_shipped_backend(self) -> None:
+        """The kit ships an openai backend template."""
+        assert check_kit_template_exists("openai") is True
+
+    def test_kit_template_missing_for_unknown_backend(self) -> None:
+        """An unknown backend has no kit template."""
+        assert check_kit_template_exists("definitely_not_a_backend") is False
+
+    def test_kit_template_lookup_failure_returns_false(self, mocker: MockerFixture) -> None:
+        """A failing kit lookup degrades to 'no template'."""
+        mocker.patch("pipelex.cli.commands.doctor_cmd.get_kit_configs_dir", side_effect=RuntimeError("no kit"))
+
+        assert check_kit_template_exists("openai") is False
+
+    def test_replace_backend_file_writes_template(self, tmp_path: Path) -> None:
+        """Replacing a backend file copies the kit template into the config dir."""
+        success = replace_backend_file("openai", dry_run=False, config_dir=tmp_path)
+
+        assert success is True
+        target_file = tmp_path / "inference" / "backends" / "openai.toml"
+        assert target_file.is_file()
+        assert target_file.read_text(encoding="utf-8") != ""
+
+    def test_replace_backend_file_dry_run_does_not_write(self, tmp_path: Path) -> None:
+        """Dry-run reports success without touching the filesystem."""
+        success = replace_backend_file("openai", dry_run=True, config_dir=tmp_path)
+
+        assert success is True
+        assert not (tmp_path / "inference" / "backends" / "openai.toml").exists()
+
+    def test_replace_backend_file_missing_template(self, tmp_path: Path) -> None:
+        """A backend without a kit template cannot be replaced."""
+        success = replace_backend_file("definitely_not_a_backend", dry_run=False, config_dir=tmp_path)
+
+        assert success is False

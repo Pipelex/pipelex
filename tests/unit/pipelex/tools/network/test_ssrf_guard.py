@@ -24,7 +24,7 @@ class TestSsrfGuard:
             return _addrinfo("93.184.216.34", 443)
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
-        assert await resolve_to_allowed_ips("example.com", 443) == ["93.184.216.34"]
+        assert await resolve_to_allowed_ips("example.com", port=443) == ["93.184.216.34"]
 
     async def test_resolve_returns_all_public_ips_in_order(self, mocker: MockerFixture) -> None:
         # Every vetted IP is returned (not just the first) so the caller can fall back.
@@ -32,7 +32,7 @@ class TestSsrfGuard:
             return _addrinfo("93.184.216.34", 443) + _addrinfo("8.8.8.8", 443)
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
-        assert await resolve_to_allowed_ips("example.com", 443) == ["93.184.216.34", "8.8.8.8"]
+        assert await resolve_to_allowed_ips("example.com", port=443) == ["93.184.216.34", "8.8.8.8"]
 
     async def test_resolve_blocks_private_resolution(self, mocker: MockerFixture) -> None:
         def fake(*_args: object, **_kwargs: object) -> list[tuple[int, int, int, str, tuple[str, int]]]:
@@ -40,12 +40,12 @@ class TestSsrfGuard:
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
         with pytest.raises(SsrfBlockedError):
-            await resolve_to_allowed_ips("attacker.example", 80)
+            await resolve_to_allowed_ips("attacker.example", port=80)
 
     async def test_resolve_blocks_literal_private_host(self) -> None:
         # A literal private IP never needs resolution — blocked by the cheap rule.
         with pytest.raises(SsrfBlockedError):
-            await resolve_to_allowed_ips("10.0.0.5", 80)
+            await resolve_to_allowed_ips("10.0.0.5", port=80)
 
     async def test_resolve_blocks_mixed_public_and_private(self, mocker: MockerFixture) -> None:
         # A host resolving to both a public and a private IP is itself a rebinding
@@ -55,13 +55,13 @@ class TestSsrfGuard:
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
         with pytest.raises(SsrfBlockedError):
-            await resolve_to_allowed_ips("rebind.example", 80)
+            await resolve_to_allowed_ips("rebind.example", port=80)
 
     async def test_resolution_failure_maps_to_connect_error(self, mocker: MockerFixture) -> None:
         # A genuine DNS failure is not a security event — surface httpx's usual connect error.
         mocker.patch("socket.getaddrinfo", side_effect=socket.gaierror("name or service not known"))
         with pytest.raises(httpcore.ConnectError):
-            await resolve_to_allowed_ips("nonexistent.invalid", 80)
+            await resolve_to_allowed_ips("nonexistent.invalid", port=80)
 
     async def test_resolution_timeout_maps_to_connect_timeout(self, mocker: MockerFixture) -> None:
         # DNS resolution is bounded by the connect timeout; a slow resolver surfaces as
@@ -72,7 +72,7 @@ class TestSsrfGuard:
 
         mocker.patch("socket.getaddrinfo", side_effect=slow)
         with pytest.raises(httpcore.ConnectTimeout):
-            await resolve_to_allowed_ips("slow.example", 80, timeout=0.01)
+            await resolve_to_allowed_ips("slow.example", port=80, timeout=0.01)
 
     async def test_connect_falls_back_across_vetted_ips(self, mocker: MockerFixture) -> None:
         # First vetted IP is unreachable; the guard must fall back to the next vetted IP.

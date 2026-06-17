@@ -159,6 +159,7 @@ def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
 
 async def make_base64_url_from_any_uri(
     uri: str,
+    *,
     storage_provider: StorageProviderAbstract | None = None,
 ) -> str:
     """Convert a URI to a base64 data URL.

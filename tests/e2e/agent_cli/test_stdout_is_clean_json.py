@@ -1,6 +1,6 @@
 """E2E test that the agent CLI's stdout stays clean for JSON-emitting commands.
 
-Downstream tooling (e.g. ``mthds-js``'s ``PipelexRunner``) calls ``JSON.parse(stdout)``
+Downstream tooling (e.g. ``mthds-js``'s ``PipelexMTHDSProtocol``) calls ``JSON.parse(stdout)``
 on commands like ``pipelex-agent models --format json``. The package-default
 ``console_log_target`` / ``console_print_target`` must therefore route logs and rich
 prints to stderr — otherwise a single log line on a setup code path will break every
@@ -54,7 +54,7 @@ def _set_package_log_level(pipelex_toml_path: Path, *, package_name: str, level:
     """
     doc = load_toml_with_tomlkit(pipelex_toml_path)
     doc["pipelex"]["log_config"]["package_log_levels"][package_name] = level  # type: ignore[index]
-    save_toml_to_path(doc, pipelex_toml_path)
+    save_toml_to_path(doc, path=pipelex_toml_path)
 
 
 def _set_pipelex_package_log_level_to_debug(pipelex_toml_path: Path) -> None:

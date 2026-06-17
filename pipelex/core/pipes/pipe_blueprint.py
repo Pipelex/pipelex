@@ -10,11 +10,15 @@ from pipelex.core.pipes.validation import validate_input_name
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
 from pipelex.types import Self, StrEnum
 
+# A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
+# `PipeCategory`. This is the one extra `type` tag the parse-time allowlists admit beyond the
+# executable kinds (a signature blueprint carries `type = "PipeSignature"`, `pipe_category = None`).
+PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"
+
 
 class PipeCategory(StrEnum):
     PIPE_OPERATOR = "PipeOperator"
     PIPE_CONTROLLER = "PipeController"
-    PIPE_SIGNATURE = "PipeSignature"
 
     @classmethod
     def value_list(cls) -> list[str]:
@@ -25,7 +29,7 @@ class PipeCategory(StrEnum):
         match self:
             case PipeCategory.PIPE_CONTROLLER:
                 return True
-            case PipeCategory.PIPE_OPERATOR | PipeCategory.PIPE_SIGNATURE:
+            case PipeCategory.PIPE_OPERATOR:
                 return False
 
     @classmethod
@@ -51,7 +55,6 @@ class PipeType(StrEnum):
     PIPE_CONDITION = "PipeCondition"
     PIPE_PARALLEL = "PipeParallel"
     PIPE_SEQUENCE = "PipeSequence"
-    PIPE_SIGNATURE = "PipeSignature"
 
     @classmethod
     def value_list(cls) -> list[str]:
@@ -82,8 +85,15 @@ class PipeType(StrEnum):
                 return PipeCategory.PIPE_CONTROLLER
             case PipeType.PIPE_SEQUENCE:
                 return PipeCategory.PIPE_CONTROLLER
-            case PipeType.PIPE_SIGNATURE:
-                return PipeCategory.PIPE_SIGNATURE
+
+
+def valid_pipe_type_tags() -> list[str]:
+    """Every legal `type` string under `[pipe.X]`: the executable `PipeType` kinds plus the signature
+    tag. A signature is not an executable kind (see `PIPE_SIGNATURE_TYPE_TAG`), so it is not a `PipeType`
+    member — but `type = "PipeSignature"` is still a real thing to write, so it belongs in the allowlist.
+    Single source of truth for the three layers (`PipeBlueprint`, `PipeAbstract`, `PipeSpec`) that gate it.
+    """
+    return [*PipeType.value_list(), PIPE_SIGNATURE_TYPE_TAG]
 
 
 class PipeBlueprint(ABC, BaseModel):
@@ -106,7 +116,9 @@ class PipeBlueprint(ABC, BaseModel):
 
     @property
     def is_signature(self) -> bool:
-        return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
+        # Identity by class, not by enum field: the base is never a signature; `PipeSignatureBlueprint`
+        # overrides this to True. (`pipe_category` no longer encodes signature-ness.)
+        return False
 
     @property
     def pipe_dependencies(self) -> set[str]:
@@ -135,21 +147,29 @@ class PipeBlueprint(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in PipeType.value_list():
-            msg = f"Invalid pipe type '{value}'. Must be one of: {PipeType.value_list()}"
+        allowed = valid_pipe_type_tags()
+        if value not in allowed:
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed}"
             raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        if value not in PipeCategory.value_list():
+        # A signature carries `pipe_category = None` (no executable category); every executable pipe
+        # pins a `Literal["PipeOperator"|"PipeController"]`, so `None` unambiguously means "signature".
+        if value is not None and value not in PipeCategory.value_list():
             msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
+        if self.is_signature:
+            # Signatures sit outside the executable taxonomy: `type` is the signature tag (not a
+            # `PipeType`) and `pipe_category` is None, so the type↔category consistency check below
+            # (which coerces `PipeType(self.type)`) does not apply.
+            return self
         try:
             pipe_type = PipeType(self.type)
         except ValueError as exc:

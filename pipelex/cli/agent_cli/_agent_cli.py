@@ -56,7 +56,7 @@ class PipelexAgentCLI(TyperGroup):
             valid_commands = super().list_commands(ctx)
             agent_error(
                 f"Unknown command: {cmd_name}",
-                "UnknownCommandError",
+                error_type="UnknownCommandError",
                 valid_commands=valid_commands,
             )
         return cmd
@@ -126,7 +126,7 @@ def app_callback(
         valid_values = ", ".join(runner_type.value for runner_type in RunnerType)
         agent_error(
             f"Invalid runner '{runner}'. Valid values: {valid_values}",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
 
 

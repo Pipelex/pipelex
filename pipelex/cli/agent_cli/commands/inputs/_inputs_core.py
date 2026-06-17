@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
 async def inputs_core(
     pipe_code: str | None = None,
+    *,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:

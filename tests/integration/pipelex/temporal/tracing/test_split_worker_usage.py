@@ -32,7 +32,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.temporal.config_temporal import ActivityRouteConfig
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeStartEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
@@ -55,9 +54,9 @@ class TestSplitWorkerUsageEmission:
     """Cross-process emission: router on q_router, runner on q_runner.
 
     Each test uses its own pair of task queues (UUID-named) so concurrent
-    executions don't share queue state, and resets the per-process activity
-    event log cache so the writer_id is regenerated and the warn-once flag
-    re-arms for each test.
+    executions don't share queue state. The per-process activity event log
+    cache is reset around every test by the temporal conftest's autouse
+    ``reset_activity_event_log_cache`` fixture.
     """
 
     @pytest.fixture
@@ -69,12 +68,11 @@ class TestSplitWorkerUsageEmission:
     def live_sequence_tracing_job(self, is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
         """Like the class-scoped `sequence_tracing_job` but in LIVE mode.
 
-        DRY mode short-circuits the `act_llm_gen_text` activity dispatch
-        (`ContentGeneratorDry` reports inline inside the workflow), so the
-        cross-worker activity hop never fires. LIVE mode forces the workflow
-        to dispatch `act_llm_gen_text` directly via
-        `ContentGeneratorInWorkflow.make_llm_text`, which is what the
-        runner-side fallback pinned in this suite is supposed to exercise.
+        Since Part B, DRY also dispatches `act_llm_gen_text` (the leaf mocks
+        inside the activity) — but its synthetic usage is zero-token and
+        suppressed by design, so the *reportable*-usage assertions here need
+        LIVE mode, where the fake activity substitute synthesizes non-zero
+        usage on the runner side.
         The fake `act_llm_gen_text` substitute installed by
         `make_split_workers` returns a stub string and synthesizes the
         usage report, so no real LLM call is made.
@@ -105,19 +103,6 @@ class TestSplitWorkerUsageEmission:
             worker_config.activity_queues.pop(activity_name, None)
         else:
             worker_config.activity_queues[activity_name] = original_entry
-
-    @pytest.fixture(autouse=True)
-    def reset_activity_event_log(self) -> Generator[None, None, None]:
-        """Clear the per-process activity event log cache between tests.
-
-        The cache (writer_id, event log instance, warn-once flag) is class-level
-        on `ActivityEventLogCache`. Without this reset, two tests in the same
-        module would share a writer_id and the second test would find a stale,
-        possibly closed, event log handle.
-        """
-        ActivityEventLogCache.reset_for_tests()
-        yield
-        ActivityEventLogCache.reset_for_tests()
 
     async def _execute_split(
         self,

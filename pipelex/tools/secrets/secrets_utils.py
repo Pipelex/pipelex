@@ -21,6 +21,7 @@ class VarPrefix(StrEnum):
 
 def substitute_vars(
     content: str,
+    *,
     secrets_provider: SecretsProviderAbstract,
     raise_on_missing_var: bool = True,
 ) -> str:
@@ -53,7 +54,7 @@ def substitute_vars(
         try:
             # Check if it's a fallback pattern (contains |)
             if "|" in var_spec:
-                return _handle_fallback_pattern(var_spec, secrets_provider)
+                return _handle_fallback_pattern(var_spec, secrets_provider=secrets_provider)
 
             # Check if it has a prefix (env: or secret:)
             if ":" in var_spec:
@@ -73,10 +74,10 @@ def substitute_vars(
                     case VarPrefix.ENV:
                         return _get_env_var(var_name)
                     case VarPrefix.SECRET:
-                        return _get_secret(var_name, secrets_provider)
+                        return _get_secret(var_name, secrets_provider=secrets_provider)
             else:
                 # Default behavior: use secrets provider
-                return _get_secret(var_spec, secrets_provider)
+                return _get_secret(var_spec, secrets_provider=secrets_provider)
         except (VarNotFoundError, VarFallbackPatternError):
             if raise_on_missing_var:
                 raise
@@ -88,7 +89,7 @@ def substitute_vars(
     return re.sub(pattern, replace_var, content)
 
 
-def _handle_fallback_pattern(var_spec: str, secrets_provider: SecretsProviderAbstract) -> str:
+def _handle_fallback_pattern(var_spec: str, *, secrets_provider: SecretsProviderAbstract) -> str:
     """Handle fallback pattern like 'env:VAR|secret:VAR'."""
     parts = [part.strip() for part in var_spec.split("|")]
 
@@ -135,7 +136,7 @@ def _get_env_var(var_name: str) -> str:
         raise VarNotFoundError(message=msg, var_name=var_name) from exc
 
 
-def _get_secret(secret_name: str, secrets_provider: SecretsProviderAbstract) -> str:
+def _get_secret(secret_name: str, *, secrets_provider: SecretsProviderAbstract) -> str:
     """Get secret, raising VarNotFoundError if not found."""
     try:
         return secrets_provider.get_secret(secret_id=secret_name)

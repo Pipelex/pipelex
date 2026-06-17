@@ -24,7 +24,7 @@ class MistralConfig(ConfigModel):
     @field_validator("effort_to_level_map")
     @classmethod
     def validate_effort_map(cls, value: EffortToLevelMap) -> EffortToLevelMap:
-        return validate_effort_to_level_map(value, "mistral_config", level_type=MistralReasoningLevel)
+        return validate_effort_to_level_map(value, config_name="mistral_config", level_type=MistralReasoningLevel)
 
     def get_reasoning_level(self, effort: ReasoningEffort) -> MistralPromptMode | None:
         """Resolve a ReasoningEffort to a Mistral MistralPromptMode value.
@@ -33,7 +33,7 @@ class MistralConfig(ConfigModel):
             The Mistral prompt mode, or None if reasoning is disabled.
 
         """
-        level_str = get_reasoning_level_str(self.effort_to_level_map, effort)
+        level_str = get_reasoning_level_str(effort_to_level_map=self.effort_to_level_map, effort=effort)
         if level_str is None:
             return None
         mistral_level = MistralReasoningLevel(level_str)

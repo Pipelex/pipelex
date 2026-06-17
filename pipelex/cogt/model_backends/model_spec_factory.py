@@ -78,6 +78,7 @@ class InferenceModelSpecFactory(BaseModel):
     def make_inference_model_spec(
         cls,
         backend_name: str,
+        *,
         name: str,
         blueprint: InferenceModelSpecBlueprint,
         backend_listed_constraints: list[ListedConstraint],

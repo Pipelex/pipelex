@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic import ConfigDict, Field, ValidationError, field_validator, model_validator
 from rich.console import Group
 from rich.table import Table
@@ -9,12 +11,14 @@ from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 
 
 class PipelexBundleSpec(StructuredContent):
@@ -32,8 +36,8 @@ class PipelexBundleSpec(StructuredContent):
                       unless overridden at the pipe level.
         main_pipe: The main pipe of the bundle.
         concept: Dictionary of concept definitions used in this domain. Keys are concept
-                codes in PascalCase format, values are ConceptBlueprint instances or
-                string references to existing concepts.
+                codes in PascalCase format, values are ConceptSpec instances or plain
+                strings used as the concept's description.
         pipe: Dictionary of pipe definitions for data transformation. Keys are pipe
              codes in snake_case format, values are specific pipe spec types
              (PipeLLM, PipeImgGen, PipeSequence, etc.).
@@ -84,7 +88,8 @@ class PipelexBundleSpec(StructuredContent):
                 if isinstance(concept_spec_or_name, ConceptSpec):
                     concept[concept_code] = concept_spec_or_name.to_blueprint()
                 else:
-                    concept[concept_code] = ConceptBlueprint(description=concept_code, structure=concept_spec_or_name)
+                    # A bare string is a concept description — the blueprint layer accepts it as-is
+                    concept[concept_code] = concept_spec_or_name
 
         pipe: dict[str, PipeBlueprintUnion] | None = None
         if self.pipe:
@@ -116,7 +121,7 @@ class PipelexBundleSpec(StructuredContent):
             raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         bundle_group = Group()
 
         # Bundle header info
@@ -142,7 +147,7 @@ class PipelexBundleSpec(StructuredContent):
                     concept_rendered = concept_spec_or_name.rendered_pretty()
                     concepts_table.add_row(concept_rendered)
                 else:
-                    # Simple string concept reference
+                    # Plain string concept value: the string is the concept's description
                     concepts_table.add_row(Text.from_markup(f"[green]{concept_code}[/green]: {concept_spec_or_name}"))
 
             bundle_group.renderables.append(concepts_table)

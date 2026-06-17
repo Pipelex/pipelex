@@ -44,7 +44,7 @@ _STATUSLESS_TRANSPORT_TYPE_NAMES: frozenset[str] = frozenset(
 )
 
 
-def _resolve_sdk_exception_type(exc: BaseException, status_code: int | None) -> str:
+def _resolve_sdk_exception_type(exc: BaseException, *, status_code: int | None) -> str:
     """Return the ``sdk_exception_type`` name, normalizing status-less httpx transport errors.
 
     Some ``httpx.TransportError`` subclasses (``ReadError``, ``WriteError``,
@@ -100,11 +100,11 @@ class ProviderErrorMetadata(BaseModel):
             case ProviderName.GOOGLE:
                 return _is_quota_exhaustion_google(self.message)
             case ProviderName.MISTRAL:
-                return _is_quota_exhaustion_mistral(self.message, self.status_code or 0)
+                return _is_quota_exhaustion_mistral(self.message, status_code=self.status_code or 0)
             case ProviderName.BEDROCK:
-                return _is_quota_exhaustion_aws(self.message, self.provider_error_code)
+                return _is_quota_exhaustion_aws(self.message, provider_error_code=self.provider_error_code)
             case ProviderName.GATEWAY:
-                return _is_quota_exhaustion_gateway(self.message, self.status_code or 0)
+                return _is_quota_exhaustion_gateway(self.message, status_code=self.status_code or 0)
             case (
                 ProviderName.AZURE | ProviderName.FAL | ProviderName.HUGGINGFACE | ProviderName.LINKUP | ProviderName.DOCLING | ProviderName.PYPDFIUM2
             ):
@@ -246,7 +246,7 @@ def _is_quota_exhaustion_google(error_message: str) -> bool:
     return any(pattern in lower_message for pattern in _GOOGLE_QUOTA_PATTERNS)
 
 
-def _is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_mistral(error_message: str, *, status_code: int) -> bool:
     """Check if a Mistral error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -258,7 +258,7 @@ def _is_quota_exhaustion_mistral(error_message: str, status_code: int) -> bool:
     return status_code == 429 and any(pattern in lower_message for pattern in _MISTRAL_QUOTA_PATTERNS)
 
 
-def _is_quota_exhaustion_aws(error_message: str, provider_error_code: str | None) -> bool:
+def _is_quota_exhaustion_aws(error_message: str, *, provider_error_code: str | None) -> bool:
     """Check if an AWS error indicates quota/credits exhaustion rather than rate limiting.
 
     AWS botocore puts the canonical signal in the error ``Code`` (e.g.
@@ -273,7 +273,7 @@ def _is_quota_exhaustion_aws(error_message: str, provider_error_code: str | None
     return any(pattern in lower_message for pattern in _AWS_QUOTA_PATTERNS)
 
 
-def _is_quota_exhaustion_gateway(error_message: str, status_code: int) -> bool:
+def _is_quota_exhaustion_gateway(error_message: str, *, status_code: int) -> bool:
     """Check if a Portkey/Gateway error indicates quota/credits exhaustion.
 
     HTTP 402 (Payment Required) is a definitive quota signal.
@@ -557,7 +557,7 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
     details = getattr(exc, "details", None)
     return ProviderErrorMetadata(
         provider=ProviderName.GOOGLE,
-        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code),
+        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
         message=str(exc),
         status_code=status_code,
         request_id=request_id,
@@ -583,7 +583,7 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
+def extract_azure_metadata_from_response(response: Any, *, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Distill a *successful* Azure REST response into a ``ProviderErrorMetadata``.
 
     Used when the HTTP status was fine but the body failed to parse (malformed
@@ -594,7 +594,7 @@ def extract_azure_metadata_from_response(response: Any, sdk_exception_type: str,
     return _build_azure_metadata(response=response, sdk_exception_type=sdk_exception_type, message=message)
 
 
-def _build_azure_metadata(response: Any, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
+def _build_azure_metadata(response: Any, *, sdk_exception_type: str, message: str) -> ProviderErrorMetadata:
     """Read status code, headers, and body off an Azure ``httpx.Response`` on a best-effort basis."""
     status_code = getattr(response, "status_code", None)
     if not isinstance(status_code, int):
@@ -764,7 +764,7 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
             provider_error_code = _provider_error_code_from_flat_body(parsed_dict) or _provider_error_code_from_body(parsed_dict)
     return ProviderErrorMetadata(
         provider=ProviderName.MISTRAL,
-        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code),
+        sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
         message=str(exc),
         status_code=status_code,
         request_id=request_id,
@@ -875,7 +875,7 @@ _LOCAL_EXTRACT_TYPE_HIERARCHY: tuple[tuple[type[BaseException], str], ...] = (
 )
 
 
-def extract_local_extract_metadata(exc: BaseException, provider: ProviderName) -> ProviderErrorMetadata:
+def extract_local_extract_metadata(exc: BaseException, *, provider: ProviderName) -> ProviderErrorMetadata:
     """Distill a local (non-HTTP) extraction exception into a ``ProviderErrorMetadata``.
 
     Local extractors (``docling``, ``pypdfium2`` …) run in-process against the

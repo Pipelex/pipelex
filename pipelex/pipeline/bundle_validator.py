@@ -1,12 +1,12 @@
 """The batch validation service (D1) — the explicit home for the validation sweep.
 
 A validation sweep is **not** a run: it is a batch *policy* that *uses* runs. So
-``BundleValidator`` owns the sweep semantics (signature pre-pass, the
+``BundleValidator`` owns the sweep semantics (strict-mode signature exclusion, the
 ``validate_with_libraries`` wiring check, the per-pipe tolerant
 ``SUCCESS / FAILURE / SKIPPED`` aggregation, ``allowed_to_fail`` policy) and
 **composes** the shared execution seams (``acquire_library`` /
 ``prepare_pipe_job``) plus a direct, in-process ``PipeRun`` — the same execution
-core ``PipelexRunner`` reaches for a single run. It never forks the runner and
+core ``PipelexMTHDSProtocol`` reaches for a single run. It never forks the runner and
 never threads validation-only flags through it.
 
 Two lifecycles (D6):
@@ -34,6 +34,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.hub import (
@@ -43,6 +44,7 @@ from pipelex.hub import (
     get_library_manager,
     get_pipe_library,
     get_telemetry_manager,
+    scoped_content_generator,
     scoped_pipe_router,
     set_current_library,
 )
@@ -52,8 +54,6 @@ from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
-from pipelex.pipe_signature.signature_walk import collect_signature_paths, collect_signature_refs
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.configuration.configs import PipelineExecutionConfig
@@ -155,16 +155,14 @@ class BundleValidator:
         """Sweep every pipe in the already-open **current** library, **without** tearing it down.
 
         The public inner sweep over the active library (D6): the caller owns the library lifecycle —
-        this borrows the current library, classifies its pipes, and leaves it loaded. In strict mode
-        signatures are excluded (validating one directly would always trip the pre-check); in lenient
-        mode they stay (they dry-run trivially by minting a mock). This is the loaded-library twin of
-        :meth:`acquire_and_validate` (which acquires + tears down) and the shared core both the
-        ``validate --all`` CLI and downstream consumers (e.g. cocode) build on instead of re-deriving
-        ``get_pipes`` + signature filtering + ``validate_pipes`` by hand.
+        this borrows the current library, classifies its pipes, and leaves it loaded. Signature
+        filtering is delegated to :meth:`validate_pipes` (the single sweep entry): in strict mode
+        signature pipes are excluded from the sweep; in lenient mode they stay (they dry-run trivially
+        by minting a mock). This is the loaded-library twin of :meth:`acquire_and_validate` (which
+        acquires + tears down) and the shared core both the ``validate --all`` CLI and downstream
+        consumers (e.g. cocode) build on instead of re-deriving ``get_pipes`` + ``validate_pipes`` by hand.
         """
-        all_pipes = get_pipe_library().get_pipes()
-        pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
-        return await self.validate_pipes(pipes, library_id=get_current_library(), allow_signatures=allow_signatures)
+        return await self.validate_pipes(get_pipe_library().get_pipes(), library_id=get_current_library(), allow_signatures=allow_signatures)
 
     async def validate_pipes(
         self,
@@ -175,23 +173,35 @@ class BundleValidator:
     ) -> dict[str, DryRunOutput]:
         """Classify each pipe ``SUCCESS / FAILURE / SKIPPED`` against an already-open library.
 
-        Borrows the caller's open library and **never tears it down** (D6). Order (D7):
+        Borrows the caller's open library and **never tears it down** (D6). Order:
 
-        1. ``validate_with_libraries`` wiring pass (before the signature pre-pass, preserving
-           today's error precedence — a wiring error surfaces ahead of a signature error). A
-           controller referencing an unloaded cross-package sub-pipe is recorded SKIPPED and dropped
-           from the remaining steps rather than aborting the sweep.
-        2. Aggregated signature pre-pass (strict mode): one ``SignaturesNotAllowedError`` listing
-           every reached signature, never short-circuiting on the first.
-        3. One ``PIPE_DRY_RUN`` telemetry event for the whole sweep.
-        4. The per-pipe dry-run sweep, classifying each outcome.
-        5. Aggregation: a single ``allowed_to_fail`` match on the namespaced ``pipe_ref`` collecting
+        1. ``validate_with_libraries`` wiring pass. A controller referencing an unloaded
+           cross-package sub-pipe is recorded SKIPPED and dropped from the remaining steps rather
+           than aborting the sweep.
+        2. One ``PIPE_DRY_RUN`` telemetry event for the whole sweep.
+        3. The per-pipe dry-run sweep, classifying each outcome.
+        4. Aggregation: a single ``allowed_to_fail`` match on the namespaced ``pipe_ref`` collecting
            **all** unexpected failures into one ``DryRunError`` (never a per-pipe early abort).
 
-        Returns the per-pipe status map (carrying allowed failures + skips). Raises
-        ``SignaturesNotAllowedError`` (strict mode) or ``DryRunError`` (≥1 unexpected failure).
+        Signatures are **never an error** (D-B): ``allow_signatures`` is a sweep-mechanics flag, not a
+        verdict. In strict mode (``allow_signatures=False``) signature pipes are excluded from the
+        sweep up front — not mock-run, absent from the returned status map (and so from
+        ``validated_pipes``). In lenient mode they stay and dry-run trivially by minting a mock. Either
+        way the unsatisfied set is reported library-wide via ``pending_signatures`` + ``is_runnable``
+        by the caller, and the "is this a failure?" decision is the consumer's (the CLI exit-code gate;
+        the HTTP caller reading ``is_runnable``). A non-signature pipe that *reaches* a signature
+        dry-runs trivially in both modes (the signature mints a mock), so it is never a failure here.
+
+        Returns the per-pipe status map (carrying allowed failures + skips). Raises ``DryRunError``
+        on ≥1 unexpected failure.
         """
         start_time = time.time()
+
+        # allow_signatures is the sweep-mechanics flag (D-B): in strict mode signature pipes are
+        # excluded from the sweep entirely (not mock-run, absent from validated_pipes); in lenient
+        # mode they stay and dry-run trivially. Filter up front so a signature pipe is dropped from
+        # BOTH the wiring check and the dry-run sweep — never raised on, never an error.
+        sweep_candidates = pipes if allow_signatures else [pipe for pipe in pipes if not pipe.is_signature]
 
         # 1. Static library-wiring check. This is *more* than a dry run (the runner's DRY path does
         #    not perform it) — keeping it here preserves coverage and removes the old redundancy where
@@ -199,12 +209,11 @@ class BundleValidator:
         #    references an UNLOADED cross-package sub-pipe (PipeParallel / PipeBatch / PipeCondition
         #    resolve their sub-pipes with an unguarded get_required_pipe) raises PipeNotFoundError here.
         #    Same-package gaps already hard-fail earlier at library load, so the only case reaching this
-        #    catch is the intended cross-package one — record it SKIPPED and drop it from BOTH the
-        #    signature pre-pass and the sweep, matching the old per-pipe dry-run's PipeNotFoundError
-        #    tolerance instead of aborting the whole sweep (preserves the D7 wiring-before-signature order).
+        #    catch is the intended cross-package one — record it SKIPPED and drop it from the sweep,
+        #    matching the old per-pipe dry-run's PipeNotFoundError tolerance instead of aborting the sweep.
         sweepable_pipes: list[PipeAbstract] = []
         results: dict[str, DryRunOutput] = {}
-        for pipe in pipes:
+        for pipe in sweep_candidates:
             try:
                 pipe.validate_with_libraries()
             except PipeNotFoundError as not_found_error:
@@ -216,21 +225,10 @@ class BundleValidator:
                 continue
             sweepable_pipes.append(pipe)
 
-        # 2. Aggregated signature pre-pass (strict mode only). Run over the FULL `pipes` list — NOT just
-        #    the wiring survivors — so a pipe dropped to SKIPPED in step 1 for an unresolved cross-package
-        #    dependency still gets its signatures checked. Otherwise an unimplemented PipeSignature reached
-        #    through a resolved branch of a pipe whose OTHER branch has a wiring gap would silently pass
-        #    strict validation (collect_signature_refs tolerates the unresolved branch via get_optional_pipe,
-        #    so it still finds the signature). This restores the old dry_run_pipes precedence: the signature
-        #    pre-pass ran over all pipes, before the per-pipe SKIPPED tolerance. A wiring-SKIPPED pipe with no
-        #    signature is unaffected (the pre-pass finds nothing for it and it stays SKIPPED).
-        if not allow_signatures:
-            self._signature_pre_pass(pipes=pipes)
-
-        # 3. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
+        # 2. One validation telemetry event per sweep (relocated from the CLI's _validate_core).
         get_telemetry_manager().track_event(event_name=EventName.PIPE_DRY_RUN, properties={EventProperty.NB_PIPES: len(sweepable_pipes)})
 
-        # 4. The dry-run sweep. Each pipe is dry-run under a UNIQUE per-sweep pipeline run id (a
+        # 3. The dry-run sweep. Each pipe is dry-run under a UNIQUE per-sweep pipeline run id (a
         #    `dry_run_`-prefixed uuid, not a constant — self-describing if it ever surfaces in a log).
         #    The DRY leaf emits a synthetic zero-token LLM report; with the live registry gone (usage now
         #    rides on PipeOutput) the sweep accumulates no per-run state on the process-global reporting
@@ -250,45 +248,19 @@ class BundleValidator:
         # scope is contextvar-based, so concurrent /validate sweeps don't cross-contaminate, and the
         # asyncio tasks a batch fan-out spawns copy the context at creation (inside this scope) so they
         # inherit the override too.
-        with scoped_pipe_router(self._pipe_router):
+        # scoped_content_generator: the sweep is always DRY and must stay in-process, so its
+        # inference leaves resolve an inline ContentGenerator even under a Temporal-enabled hub
+        # (where get_content_generator() is ContentGeneratorInWorkflow) — same rationale as the
+        # router scope above. The DRY mock lives at the cogt leaf (Part B), so the inline
+        # generator's leaves mock without dispatching and without touching storage.
+        with scoped_pipe_router(self._pipe_router), scoped_content_generator(ContentGenerator.make_inline()):
             for pipe in sweepable_pipes:
                 results[pipe.pipe_ref] = await self._classify_pipe(
                     pipe=pipe, library_id=library_id, execution_config=execution_config, dry_run_pipeline_id=dry_run_pipeline_id
                 )
 
-        # 5. Aggregate + report.
+        # 4. Aggregate + report.
         return self._aggregate(results=results, start_time=start_time)
-
-    @classmethod
-    def _signature_pre_pass(cls, pipes: list[PipeAbstract]) -> None:
-        """Walk the selected pipes; raise one aggregated ``SignaturesNotAllowedError`` if any reached.
-
-        Aggregates across all pipes so the user sees every offender (and the longest, most informative
-        dep chain per signature) in a single error, rather than only the first one to fail.
-        """
-        all_signature_refs: set[str] = set()
-        all_dep_paths: dict[str, list[str]] = {}
-        offending_pipe_refs: set[str] = set()
-        for pipe in pipes:
-            sig_refs = collect_signature_refs(pipe=pipe)
-            if not sig_refs:
-                continue
-            # A signature is the placeholder itself, not an offender that "depends on" one.
-            if not pipe.is_signature:
-                offending_pipe_refs.add(pipe.pipe_ref)
-            all_signature_refs.update(sig_refs)
-            for sig_ref, path in collect_signature_paths(pipe=pipe).items():
-                # Prefer the longest known dep chain so the error shows the most informative path
-                # (a chain rooted at a controller beats an empty chain rooted at the signature itself).
-                existing = all_dep_paths.get(sig_ref)
-                if existing is None or len(path) > len(existing):
-                    all_dep_paths[sig_ref] = path
-        if all_signature_refs:
-            raise SignaturesNotAllowedError(
-                offending_pipe_refs=offending_pipe_refs,
-                signature_refs=all_signature_refs,
-                dep_paths=all_dep_paths,
-            )
 
     async def _classify_pipe(
         self, *, pipe: PipeAbstract, library_id: str, execution_config: PipelineExecutionConfig, dry_run_pipeline_id: str

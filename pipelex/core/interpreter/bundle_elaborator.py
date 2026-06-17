@@ -105,6 +105,7 @@ class BundleElaborator:
     def _elaborate_preliminary_text(
         cls,
         pipe_code: str,
+        *,
         pipe_blueprint: PipeLLMBlueprint,
         new_pipe_dict: dict[str, PipeBlueprintUnion],
         elaboration_metadata: dict[str, ElaborationMetadata],

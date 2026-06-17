@@ -35,12 +35,12 @@ def reject_bare_str_or_path(value: object, *, param_name: str) -> None:
 ########################################################
 
 
-def save_bytes_to_binary_file(file_path: Path, byte_data: bytes, create_directory: bool = False) -> Path:
+def save_bytes_to_binary_file(byte_data: bytes, *, file_path: Path, create_directory: bool = False) -> Path:
     """Write binary data to a file.
 
     Args:
-        file_path (Path): Path where the binary data will be saved
         byte_data (bytes): Binary data to be written
+        file_path (Path): Path where the binary data will be saved
         create_directory (bool, optional): Whether to create the directory if it doesn't exist.
             Defaults to False.
 
@@ -56,7 +56,7 @@ def save_bytes_to_binary_file(file_path: Path, byte_data: bytes, create_director
     return file_path
 
 
-def save_text_to_path(text: str, path: Path, create_directory: bool = False):
+def save_text_to_path(text: str, *, path: Path, create_directory: bool = False):
     """Writes text content to a file at the specified path.
 
     This function opens a file in write mode and writes the provided text to it.
@@ -130,7 +130,7 @@ async def load_binary_async(path: Path) -> bytes:
 ########################################################
 
 
-def copy_file(source_path: Path, target_path: Path, overwrite: bool = True) -> None:
+def copy_file(*, source_path: Path, target_path: Path, overwrite: bool = True) -> None:
     """Copies a file from the source path to the target path.
 
     Creates any necessary parent directories for the target path if they don't exist.
@@ -150,6 +150,7 @@ def copy_file(source_path: Path, target_path: Path, overwrite: bool = True) -> N
 
 def copy_file_from_package(
     package_name: str,
+    *,
     file_path_in_package: str,
     target_path: Path,
     overwrite: bool = True,
@@ -165,6 +166,7 @@ def copy_file_from_package(
 
 def copy_folder_from_package(
     package_name: str,
+    *,
     folder_path_in_package: str,
     target_dir: Path,
     overwrite: bool = True,
@@ -274,6 +276,7 @@ def _reraise_walk_error(walk_error: OSError) -> None:
 
 
 def mirror_dir(
+    *,
     source_dir: Path,
     target_dir: Path,
     exclude_files: frozenset[str] | None = None,
@@ -454,7 +457,7 @@ def path_exists(path_str: str | Path) -> bool:
     return Path(path_str).exists()
 
 
-def get_incremental_directory_path(base_path: Path, base_name: str, start_at: int = 1) -> Path:
+def get_incremental_directory_path(base_path: Path, *, base_name: str, start_at: int = 1) -> Path:
     """Generates a unique directory path by incrementing a counter until an unused path is found.
 
     This function creates a directory path in the format 'base_path/base_name_XX' where XX
@@ -482,6 +485,7 @@ def get_incremental_directory_path(base_path: Path, base_name: str, start_at: in
 
 def get_incremental_file_path(
     base_path: Path,
+    *,
     base_name: str,
     extension: str,
     start_at: int = 1,
@@ -527,6 +531,7 @@ def get_incremental_file_path(
 
 def find_files_in_dir(
     dir_path: Path,
+    *,
     pattern: str,
     is_recursive: bool = True,
     excluded_dirs: list[str] | None = None,

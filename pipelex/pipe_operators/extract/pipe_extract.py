@@ -3,8 +3,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import model_validator
 from typing_extensions import Self, override
 
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -120,12 +118,12 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeExtractOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
 
         image_uri: str | None = None
         pdf_uri: str | None = None
@@ -157,6 +155,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,
+            cogt_run_params=pipe_run_params.cogt_run_params,
             extract_handle=extract_setting.model,
             job_metadata=job_metadata,
             extract_job_params=extract_job_params,
@@ -184,36 +183,20 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             "should_include_page_views": self.should_include_page_views,
         }
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return PipeExtractOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeExtractOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
-
-    @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

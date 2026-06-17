@@ -214,6 +214,7 @@ class GraphTracer(GraphTracerProtocol):
     def setup(
         self,
         graph_id: str,
+        *,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -464,6 +465,7 @@ class GraphTracer(GraphTracerProtocol):
     def register_batch_item_extraction(
         self,
         list_stuff_code: str,
+        *,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -507,6 +509,7 @@ class GraphTracer(GraphTracerProtocol):
     def register_batch_aggregation(
         self,
         output_list_stuff_code: str,
+        *,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -550,6 +553,7 @@ class GraphTracer(GraphTracerProtocol):
     def register_parallel_combine(
         self,
         combined_stuff_code: str,
+        *,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
     ) -> None:
@@ -592,6 +596,7 @@ class GraphTracer(GraphTracerProtocol):
     def on_pipe_start(
         self,
         trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -606,7 +611,7 @@ class GraphTracer(GraphTracerProtocol):
         if not self._is_active:
             # Return dummy values when not active
             node_id = trace_context.make_node_id()
-            child_context = trace_context.copy_for_child(node_id, trace_context.node_sequence + 1)
+            child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1)
             return node_id, child_context
 
         # Generate node ID (includes workflow_id in Temporal mode)
@@ -680,6 +685,7 @@ class GraphTracer(GraphTracerProtocol):
     def register_execution_data(
         self,
         node_id: str,
+        *,
         execution_data: dict[str, Any],
     ) -> None:
         """Register execution metadata for a node."""
@@ -708,6 +714,7 @@ class GraphTracer(GraphTracerProtocol):
     def on_pipe_end_success(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
@@ -770,6 +777,7 @@ class GraphTracer(GraphTracerProtocol):
     def register_controller_output(
         self,
         node_id: str,
+        *,
         output_spec: IOSpec,
     ) -> None:
         """Register an additional output for a controller node.
@@ -811,6 +819,7 @@ class GraphTracer(GraphTracerProtocol):
     def on_pipe_end_error(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         error_type: str,
         error_message: str,
@@ -851,6 +860,7 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def add_edge(
         self,
+        *,
         source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
@@ -897,6 +907,7 @@ class GraphTracer(GraphTracerProtocol):
     def add_selected_outcome_edge(
         self,
         condition_node_id: str,
+        *,
         outcome_node_id: str,
         outcome_value: str,
     ) -> None:

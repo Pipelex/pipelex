@@ -17,7 +17,7 @@ PIPELEX_DIR = ".pipelex"
 KIT_CONFIGS_DIR = "pipelex/kit/configs"
 
 
-def _display_result(result: MirrorDirResult, quiet: bool) -> None:
+def _display_result(result: MirrorDirResult, *, quiet: bool) -> None:
     """Display the outcome of the kit config sync."""
     console = get_console()
     prefix = "(dry run) " if result.dry_run else ""
@@ -83,7 +83,7 @@ def _display_result(result: MirrorDirResult, quiet: bool) -> None:
     console.print()
 
 
-def sync_kit_configs_cmd(quiet: bool = False, dry_run: bool = False) -> None:
+def sync_kit_configs_cmd(quiet: bool = False, *, dry_run: bool = False) -> None:
     """Mirror the .pipelex/ directory into pipelex/kit/configs/.
 
     Copies new and changed files and deletes files absent from .pipelex/, using

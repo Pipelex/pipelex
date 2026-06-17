@@ -133,7 +133,7 @@ class QualifiedRef(BaseModel):
         return ref
 
     @classmethod
-    def from_domain_and_code(cls, domain_path: str, local_code: str) -> "QualifiedRef":
+    def from_domain_and_code(cls, domain_path: str, *, local_code: str) -> "QualifiedRef":
         """Build from already-known parts.
 
         Args:

@@ -14,6 +14,7 @@ class ImgGenWorkerFactory:
     def make_img_gen_worker(
         cls,
         inference_model: InferenceModelSpec,
+        *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ImgGenWorkerAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)

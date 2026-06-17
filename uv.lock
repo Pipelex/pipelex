@@ -1987,14 +1987,15 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.6.0"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
+    { name = "tzdata" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/8d/54/83c3b00f270c39037b699398e42e16837ef1109c8af47ac668fe3c14a817/kajson-0.6.0.tar.gz", hash = "sha256:7544a544e6f135f129015c9475ff2cc0a7fc8e76d6eea1d8d37f2e438ab4d936", size = 22567, upload-time = "2026-05-30T19:06:08.084Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d2/a4/da91af6dac42516e45a9897ba901d8ec2ee2b13b135caf6ce120867aac2b/kajson-0.7.0.tar.gz", hash = "sha256:1c8f80d157f980c9adb9fda0e77c1cc0078f50547d84ef548a5e19b5a84d8d37", size = 25071, upload-time = "2026-06-10T10:00:56.097Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/e9/fb/e325ef3bd84f2d40286a09fe78447a0a20e3a6ec12ce28e0d4ecc8bce620/kajson-0.6.0-py3-none-any.whl", hash = "sha256:77ddb0e12b274479ced061d84da091a250fdeb3f4dd7444ae0c6ca929ba73431", size = 29024, upload-time = "2026-05-30T19:06:06.645Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/1c/8251c0dadd1843e020edf4ef162aaa7dd0e98cbd2e1fe33d843807cd7ce9/kajson-0.7.0-py3-none-any.whl", hash = "sha256:d9903327bc7f182ec481ffafd074765347365600592e5f9f67866d5b0ae4f939", size = 31524, upload-time = "2026-06-10T10:00:54.952Z" },
 ]
 
 [[package]]
@@ -2656,7 +2657,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.3.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
@@ -2667,9 +2668,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5b/3c/eea615b49c011657246ff61371ca4a95ab3baa94d4b79541bd4b0f816ae5/mthds-0.3.0.tar.gz", hash = "sha256:de479f977b2ec3614b23bdb53ed3e28e2332a2f1653ee92e118c530fe3d5d820", size = 112693, upload-time = "2026-04-29T12:50:11.426Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/fc/7822e39bc733f5f62577ea1d064c7283d84b97493e5372ceb430ce0c1027/mthds-0.4.1.tar.gz", hash = "sha256:1aa43860fef97aeab561473e45552ea619dee7c624bc4acad806dd960bb2fe5f", size = 132336, upload-time = "2026-06-11T21:46:28.332Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f3/86/1184f31583d3089baea9316853b329720cb786d8e01f38f303a17f1e3f4c/mthds-0.3.0-py3-none-any.whl", hash = "sha256:3f9822c23beb82607ec4bafcff99717fb6531eed8d19b86086dc9deb7825b06b", size = 49356, upload-time = "2026-04-29T12:50:09.734Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/92/8d6521c63e71fc4b782d7a875b27ad5b61cf1af718eb3321a3522aa33391/mthds-0.4.1-py3-none-any.whl", hash = "sha256:fdbf4ec25f4139b620cf5771fb8dc9fa27c2c249c161ca96afac389f2cfc6d4f", size = 61176, upload-time = "2026-06-11T21:46:26.978Z" },
 ]
 
 [[package]]
@@ -3685,7 +3686,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.32.1"
+version = "0.34.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3843,7 +3844,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
     { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.20.0" },
-    { name = "kajson", specifier = "==0.6.0" },
+    { name = "kajson", specifier = "==0.7.0" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "lxml", marker = "extra == 'docling'", specifier = ">=6.1.0" },
     { name = "markdown", specifier = ">=3.6" },
@@ -3856,7 +3857,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.3.0" },
+    { name = "mthds", specifier = ">=0.4.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

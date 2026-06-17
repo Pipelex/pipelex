@@ -3,7 +3,7 @@ from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
 
 import shortuuid
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.protocol.pipeline_inputs import StuffContentOrData
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept
@@ -48,7 +48,7 @@ class StuffFactory:
         return Stuff.make_stuff_name(concept=concept)
 
     @classmethod
-    def make_from_str(cls, str_value: str, name: str) -> Stuff:
+    def make_from_str(cls, str_value: str, *, name: str) -> Stuff:
         return cls.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
             content=TextContent(text=str_value),
@@ -56,7 +56,7 @@ class StuffFactory:
         )
 
     @classmethod
-    def make_from_concept_ref(cls, concept_ref: str, name: str, content: StuffContent) -> Stuff:
+    def make_from_concept_ref(cls, concept_ref: str, *, name: str, content: StuffContent) -> Stuff:
         validate_concept_ref(concept_ref)
         concept = get_required_concept(concept_ref=concept_ref)
         return cls.make_stuff(
@@ -69,6 +69,7 @@ class StuffFactory:
     def make_stuff(
         cls,
         concept: Concept,
+        *,
         content: StuffContent,
         name: str | None = None,
         code: str | None = None,
@@ -113,8 +114,9 @@ class StuffFactory:
     @classmethod
     def combine_stuffs(
         cls,
-        concept: Concept,
         stuff_contents: dict[str, StuffContent],
+        *,
+        concept: Concept,
         name: str | None = None,
     ) -> Stuff:
         """Combine a dictionary of stuffs into a single stuff."""
@@ -134,6 +136,7 @@ class StuffFactory:
     def _try_make_csv_list_stuff(
         cls,
         concept: Concept,
+        *,
         content: dict[str, Any],
         name: str | None,
         code: str | None,
@@ -217,13 +220,14 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
-        list_content = list_content_from_csv(Path(resolved.path), row_model)
+        list_content = list_content_from_csv(Path(resolved.path), row_model=row_model)
         return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
 
     @classmethod
     def make_stuff_from_stuff_content_or_data(
         cls,
         stuff_content_or_data: StuffContentOrData,
+        *,
         name: str | None = None,
         code: str | None = None,
         search_domain_codes: list[str] | None = None,

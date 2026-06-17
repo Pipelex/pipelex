@@ -26,6 +26,7 @@ class TypedNamedStuffSpec(NamedStuffSpec):
     def make_from_named(
         cls,
         named: NamedStuffSpec,
+        *,
         structure_class: type[StuffContent],
     ) -> "TypedNamedStuffSpec":
         return cls(**named.model_dump(), structure_class=structure_class)
@@ -80,7 +81,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
-    def add_stuff_spec(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
+    def add_stuff_spec(self, variable_name: str, *, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
 
     @property

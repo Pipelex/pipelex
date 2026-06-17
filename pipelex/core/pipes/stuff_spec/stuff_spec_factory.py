@@ -11,6 +11,7 @@ class StuffSpecFactory:
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         output_string: str,
     ) -> StuffSpec:

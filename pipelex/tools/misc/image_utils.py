@@ -92,7 +92,7 @@ class ImageFormat(StrEnum):
             raise ValueError(msg)
 
 
-def pil_image_to_bytes(pil_image: Image.Image, image_format: ImageFormat | None) -> bytes:
+def pil_image_to_bytes(pil_image: Image.Image, *, image_format: ImageFormat | None) -> bytes:
     """Convert a PIL Image to bytes in the specified format.
 
     Args:

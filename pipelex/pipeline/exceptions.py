@@ -5,7 +5,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_signature.exceptions import SignaturesNotAllowedError
+from pipelex.pipeline.validation_errors import build_validation_error_items
 
 
 class PipeExecutionError(PipelexError):
@@ -77,8 +77,11 @@ class ValidateBundleError(PipelexError):
     - Pipe factory errors (from PipeFactoryError exceptions, e.g., missing concepts)
     - Pipe validation errors (from PipeValidationError exceptions)
     - Pipe/Concept instantiation errors (from Pydantic ValidationError during factory instantiation)
-    - Dry run errors
-    - Signature pre-check errors (strict-mode validation refused due to PipeSignature placeholders)
+    - Dry run errors (the residual message, projected as one ``dry_run`` item by the shared builder)
+
+    Signatures are **never** an error (D-B): an unimplemented ``PipeSignature`` reached during
+    validation is a runnability fact (reported library-wide via the report's ``pending_signatures``
+    + ``is_runnable``), not a validation failure — so this error no longer carries a signature channel.
 
     All errors are categorized and stored in their respective lists.
     """
@@ -100,7 +103,6 @@ class ValidateBundleError(PipelexError):
         pipe_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         pipe_concept_instantiation_errors: list[PipesAndConceptValidationErrorData] | None = None,
         dry_run_error_message: str | None = None,
-        signature_check_error: SignaturesNotAllowedError | None = None,
     ):
         self.pipelex_bundle_blueprint_validation_errors = pipelex_bundle_blueprint_validation_errors or []
         self.pipe_factory_errors = pipe_factory_errors or []
@@ -112,9 +114,6 @@ class ValidateBundleError(PipelexError):
 
         self.dry_run_error_message = dry_run_error_message
 
-        # Signature pre-check error (strict-mode validation refused due to PipeSignature placeholders)
-        self.signature_check_error = signature_check_error
-
         super().__init__(message)
 
     @property
@@ -125,3 +124,68 @@ class ValidateBundleError(PipelexError):
         """
         # TODO: refactor so we don't need this anymore?
         return self.pipe_validation_errors + self.pipe_concept_instantiation_errors
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        """Attach the structured ``validation_errors`` list onto the base report.
+
+        ``super().to_error_report()`` builds the report and enriches it from the
+        ``__cause__`` chain; this override then attaches the per-error structured
+        list — the same items the agent CLI emits, via the shared
+        ``build_validation_error_items`` builder — so the API 422 problem
+        document carries machine-mappable diagnostics. The list is set to
+        ``None`` when empty so it drops out of the ``exclude_none`` wire
+        projection (and the round-trip stays identical to a plain report).
+
+        The pipe-validation arm uses :attr:`pipe_validation_error_data` (pipe
+        validation **plus** pipe/concept instantiation errors) so the
+        instantiation category is not silently dropped from the wire. The
+        ``dry_run_error_message`` channel is a single message, not per-error data
+        with identity fields, so the shared builder projects it as one
+        ``dry_run``-category item **only** when no categorized error has data.
+        Finally ``fallback_message=self.message`` is passed so a parse-level
+        failure (TOML syntax, an empty blueprint, a bundle elaborator) — which
+        carries only a message — still surfaces one ``blueprint_validation``
+        residual item. Together these make the structured-info invariant
+        **total**: an invalid verdict never rides a bare ``detail`` with an empty
+        ``validation_errors[]``.
+        """
+        report = super().to_error_report()
+        validation_error_items = build_validation_error_items(
+            blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
+            factory_errors=self.pipe_factory_errors,
+            pipe_validation_errors=self.pipe_validation_error_data,
+            dry_run_error_message=self.dry_run_error_message,
+            fallback_message=self.message,
+        )
+        return report.model_copy(update={"validation_errors": validation_error_items or None})
+
+
+class PipeIOContractError(PipelexError):
+    """Raised when projecting a validated pipe into its `pipe_io_contracts` IO contract fails.
+
+    Wraps a JSON-Schema rendering failure (a pydantic schema-generation error on a
+    structure class) into a structured Pipelex error, so every validate surface —
+    direct and Temporal alike — reports it identically instead of leaking a raw
+    third-party exception (which the Temporal error boundary would not convert and
+    Temporal would pointlessly retry).
+    """
+
+
+class PipelineInputContentError(PipelexError):
+    """A pipeline input's content reference (url) is unusable.
+
+    Raised by the input normalizer when an Image/Document input carries a
+    blank url, or a local path that cannot be read. The caller supplied the
+    value — INPUT domain, so API servers answer 422, never a sanitized 500
+    (a blank url used to surface as IsADirectoryError('.') → 500).
+    """
+
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail=(
+            "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
+        ),
+    )
+    caller_facing_message = True

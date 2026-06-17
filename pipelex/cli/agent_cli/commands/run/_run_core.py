@@ -14,12 +14,13 @@ from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 async def run_pipeline_core(
     pipe_code: str,
+    *,
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
@@ -59,13 +60,13 @@ async def run_pipeline_core(
         mock_inputs=mock_inputs or None,
     )
 
-    runner = PipelexRunner(
+    runner = PipelexMTHDSProtocol(
         bundle_uris=bundle_uris,
         pipe_run_mode=pipe_run_mode,
         execution_config=execution_config,
         library_dirs=library_dirs,
     )
-    response = await runner.execute_pipeline(
+    response = await runner.execute(
         pipe_code=pipe_code,
         mthds_contents=mthds_contents,
         inputs=inputs,

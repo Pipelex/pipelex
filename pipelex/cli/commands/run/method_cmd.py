@@ -60,11 +60,12 @@ def run_method_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
-    mock_inference: Annotated[
+    mock_usage: Annotated[
         bool,
         typer.Option(
-            "--mock-inference",
-            help="Live run that fakes AI calls at the inference leaf with reportable synthetic usage. Mutually exclusive with --dry-run.",
+            "--mock-usage",
+            hidden=True,
+            help="Internal test trigger: dry run whose LLM leaf mocks report nonzero synthetic usage so the cost report renders. Requires --dry-run.",
         ),
     ] = False,
     mock_inputs: Annotated[
@@ -114,7 +115,7 @@ def run_method_cmd(
         pipelex run method my-method --inputs data.json
         pipelex run method my-method --dry-run
     """
-    validate_run_flag_combination(dry_run=dry_run, mock_inference=mock_inference, mock_inputs=mock_inputs)
+    validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
     # Resolve method name to pipe_code and library dirs
     pipe_code, method_library_dirs, _ = resolve_method_target(
@@ -153,7 +154,7 @@ def run_method_cmd(
         graph_full_data=graph_full_data,
         output_dir=effective_output_dir,
         dry_run=dry_run,
-        mock_inference=mock_inference,
+        mock_usage=mock_usage,
         mock_inputs=mock_inputs,
         library_dir=effective_library_dir,
         costs=costs,

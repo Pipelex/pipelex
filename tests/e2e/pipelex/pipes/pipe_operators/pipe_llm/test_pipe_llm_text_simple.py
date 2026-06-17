@@ -5,7 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 
 @pytest.mark.llm
@@ -22,9 +22,7 @@ class TestPipeLLMTextSimple:
     )
     async def test_write_haiku(self, pipe_run_mode: PipeRunMode, variant: str, pipe_code: str) -> None:
         """Test a simple text-to-text PipeLLM pipe that writes a haiku."""
-        pipeline_response = await PipelexRunner(
-            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"], pipe_run_mode=pipe_run_mode
-        ).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"], pipe_run_mode=pipe_run_mode).execute(
             pipe_code=pipe_code,
             inputs={
                 "topic": TextContent(text="hello world"),

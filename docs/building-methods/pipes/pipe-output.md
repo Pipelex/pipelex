@@ -24,10 +24,12 @@ The **main_stuff** is the final output produced by the last pipe in your pipelin
 When you execute a pipeline, you receive a `PipeOutput` object:
 
 ```python
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="process_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 The `PipeOutput` object provides methods to extract and work with the main output.
@@ -43,10 +45,12 @@ If the output concept was defined as a Python class (inheriting from `Structured
 ```python
 from my_project.finance.finance_struct import Invoice
 
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 
 # Extract with type safety
 invoice = pipe_output.main_stuff_as(content_type=Invoice)
@@ -58,10 +62,12 @@ invoice = pipe_output.main_stuff_as(content_type=Invoice)
 If the output concept was defined with [inline structures](../concepts/inline-structures.md) directly in the `.mthds` file, the generated class is not importable. Use the `PipeOutput` accessor methods instead:
 
 ```python
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_invoice",
-    inputs={...}
+    inputs={...},
 )
+pipe_output = response.pipe_output
 
 # Access as dictionary-like structure
 main_stuff = pipe_output.main_stuff

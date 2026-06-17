@@ -1,0 +1,10 @@
+domain      = "research"
+description = "Research method definitions"
+
+[pipe.find_key_findings]
+type        = "PipeLLM"
+description = "Find the key findings in a document."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"
+model       = "$quick-reasoning"
+prompt      = "List the key findings in $doc."

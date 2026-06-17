@@ -56,6 +56,7 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         class ObjectFactory(ModelFactory[schema]):  # type: ignore[valid-type]

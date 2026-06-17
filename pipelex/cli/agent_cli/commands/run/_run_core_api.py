@@ -8,14 +8,15 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from mthds.client.pipeline import MAIN_STUFF_NAME
-from mthds.runners.api_runner import ApiRunner
+from mthds.runners.api.client import MthdsAPIClient
+from mthds.runners.api.models import MAIN_STUFF_NAME
 
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 
 
 async def run_pipeline_core_api(
     pipe_code: str,
+    *,
     mthds_contents: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
     with_memory: bool = False,
@@ -36,17 +37,24 @@ async def run_pipeline_core_api(
         ClientAuthenticationError: If API credentials are invalid or missing.
         PipelineRequestError: If the pipeline request is malformed.
     """
-    runner = ApiRunner()
-    response = await runner.execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_contents=mthds_contents,
-        inputs=inputs,
-    )
+    async with MthdsAPIClient() as runner:
+        response = await runner.execute(
+            pipe_code=pipe_code,
+            mthds_contents=mthds_contents,
+            inputs=inputs,
+        )
+
+    pipe_output = response.pipe_output
+
+    # `main_stuff_name` and `state` are pipelex extension fields on the protocol's
+    # extension-open RunResult — they ride model_extra, never named by the SDK.
+    extensions: dict[str, Any] = response.model_extra or {}
 
     # Extract main stuff content from the working memory
     main_stuff_json: dict[str, Any] = {}
-    main_stuff_name = response.main_stuff_name or MAIN_STUFF_NAME
-    main_stuff = response.pipe_output.working_memory.root.get(main_stuff_name)
+    raw_main_stuff_name = extensions.get("main_stuff_name")
+    main_stuff_name = raw_main_stuff_name if isinstance(raw_main_stuff_name, str) else MAIN_STUFF_NAME
+    main_stuff = pipe_output.working_memory.root.get(main_stuff_name)
     if main_stuff is not None:
         main_stuff_json = {
             "json": main_stuff.content,
@@ -62,10 +70,10 @@ async def run_pipeline_core_api(
     return build_run_output(
         with_memory=with_memory,
         main_stuff_json=main_stuff_json,
-        working_memory_dump=response.pipe_output.working_memory.model_dump(),
+        working_memory_dump=pipe_output.working_memory.model_dump(),
         compact_result=compact_result,
         extra_metadata={
             "pipeline_run_id": response.pipeline_run_id,
-            "pipeline_state": response.pipeline_state,
+            "pipeline_state": extensions.get("state"),
         },
     )

@@ -49,6 +49,6 @@ def agent_models_cmd(
         raise
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(f"Failed to list models: {exc}", type(exc).__name__, cause=exc)
+        agent_error(f"Failed to list models: {exc}", error_type=type(exc).__name__, cause=exc)
     finally:
         Pipelex.teardown_if_needed()

@@ -5,12 +5,41 @@ from typing import Any
 
 from temporalio.client import Client as TemporalClient
 
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_required_concept
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.runtime_bridge.primitives.submitter_hydration import rehydrate_pipe_output_with_crate
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
+from tests.integration.pipelex.temporal.test_data import DeferredHydrationTestData
+
+
+def make_prepared_greeting_job(pipe_job: PipeJob, stuff_code: str) -> PipeJob:
+    """Copy ``pipe_job`` with an input WorkingMemory carrying a dynamic-concept Greeting
+    stuff, dehydrated for Temporal transit via ``prepare_for_temporal``.
+
+    The Greeting concept comes from the deferred-hydration bundle, so the receiving
+    workflow must hydrate the stuff inline after loading the crate — the deferred
+    hydration path.
+    """
+    greeting_concept = get_required_concept(concept_ref=f"{DeferredHydrationTestData.DOMAIN}.Greeting")
+    greeting_content = StuffContentFactory.make_stuff_content_from_concept_required(
+        concept=greeting_concept,
+        value={"message": "Bonjour le monde", "language": "French"},
+    )
+    greeting_stuff = Stuff(
+        stuff_code=stuff_code,
+        stuff_name="greeting_result",
+        concept=greeting_concept,
+        content=greeting_content,
+    )
+    input_memory = WorkingMemory()
+    input_memory.root["greeting_result"] = greeting_stuff
+    return pipe_job.model_copy(update={"working_memory": input_memory}).prepare_for_temporal()
 
 
 def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = None) -> PipeOutput:
@@ -21,7 +50,7 @@ def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = No
     that production submitters use.
     """
     library_crate = pipe_job.library_crate if pipe_job is not None else None
-    return rehydrate_pipe_output_with_crate(pipe_output, library_crate)
+    return rehydrate_pipe_output_with_crate(pipe_output, library_crate=library_crate)
 
 
 async def execute_workflow(

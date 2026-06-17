@@ -31,6 +31,17 @@ class LibraryManagerAbstract(ABC):
         """Open a library with the given library_id. Creates it if it doesn't exist. If no library_id is provided, it creates one."""
 
     @abstractmethod
+    def open_fresh_library(self, library_id: str) -> "Library":
+        """Open a library guaranteed to be empty, tearing down any pre-existing library under this id.
+
+        For callers that reuse a deterministic library_id across executions (e.g. a Temporal
+        workflow keyed by its workflow id): a pre-existing library under such an id can only be
+        the leftover of an interrupted predecessor execution whose cleanup never ran. Reusing it
+        is poison — its crate fingerprints would dedup-skip a fresh crate load while a freshly
+        attached ClassRegistry no longer holds the crate's dynamic classes.
+        """
+
+    @abstractmethod
     def get_library(self, library_id: str) -> "Library":
         """Get the Library object for a specific library_id."""
 
@@ -70,7 +81,7 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
@@ -82,11 +93,11 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def load_concepts_only_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
+    def load_concepts_only_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
         """Load only domains and concepts from blueprints, skipping pipes.
 
         This is a lightweight alternative to load_from_blueprints() that only processes
@@ -102,17 +113,18 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, library_id: str, *, blueprint: PipelexBundleBlueprint) -> None:
         pass
 
     @abstractmethod
-    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> None:
         pass
 
     @abstractmethod
     def load_libraries(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
@@ -122,6 +134,7 @@ class LibraryManagerAbstract(ABC):
     def load_libraries_concepts_only(
         self,
         library_id: str,
+        *,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list["Concept"]:

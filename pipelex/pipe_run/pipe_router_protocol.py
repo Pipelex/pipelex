@@ -24,6 +24,7 @@ class PipeRouterProtocol(Protocol):
     async def _after_successful_run(
         self,
         pipe_job: PipeJob,
+        *,
         pipe_output: PipeOutput,
     ) -> None:
         payload: PayloadType = {
@@ -36,6 +37,7 @@ class PipeRouterProtocol(Protocol):
     async def _after_failing_run(
         self,
         pipe_job: PipeJob,
+        *,
         error: Exception,
     ) -> None:
         payload: PayloadType = {
@@ -58,7 +60,7 @@ class PipeRouterProtocol(Protocol):
             # retry here. This handler is error propagation, not retry: a PipeRunError wraps into
             # PipeRouterError (preserving the pipe location context); a raw CogtError is re-raised
             # as-is so its cause chain is preserved. Resilience is the Temporal track's job.
-            await self._after_failing_run(pipe_job, exc)
+            await self._after_failing_run(pipe_job, error=exc)
             if isinstance(exc, PipeRunError):
                 raise PipeRouterError(
                     message=exc.message,
@@ -71,7 +73,7 @@ class PipeRouterProtocol(Protocol):
                 ) from exc
             raise
 
-        await self._after_successful_run(pipe_job, pipe_output)
+        await self._after_successful_run(pipe_job, pipe_output=pipe_output)
 
         return pipe_output
 

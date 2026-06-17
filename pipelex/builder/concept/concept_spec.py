@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
@@ -175,19 +175,19 @@ class ConceptStructureSpec(StructuredContent):
         match self.type:
             case ConceptStructureSpecFieldType.TEXT:
                 if not isinstance(self.default_value, str):
-                    self._raise_type_mismatch_error("str", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("str", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.INTEGER:
                 if not isinstance(self.default_value, int):
-                    self._raise_type_mismatch_error("int", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("int", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.BOOLEAN:
                 if not isinstance(self.default_value, bool):
-                    self._raise_type_mismatch_error("bool", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("bool", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
-                    self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("number (int or float)", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
-                    self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error("date", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
@@ -195,7 +195,7 @@ class ConceptStructureSpec(StructuredContent):
                 # LIST type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
 
-    def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
+    def _raise_type_mismatch_error(self, expected_type_name: str, *, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         raise ValueError(msg)
 
@@ -311,14 +311,19 @@ class ConceptSpec(StructuredContent):
 
     @model_validator(mode="before")
     @classmethod
-    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
-        if values.get("refines") and values.get("structure"):
+    def model_validate_spec(cls, values: Any) -> Any:
+        # mode="before" receives raw, unvalidated input — a non-dict (e.g. a plain string in a
+        # `ConceptSpec | str` union) must fall through untouched rather than crash on dict access
+        if not isinstance(values, dict):
+            return values
+        fields = cast("dict[str, Any]", values)
+        if fields.get("refines") and fields.get("structure"):
             msg = (
-                f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"
+                f"Forbidden to have refines and structure at the same time: `{fields.get('refines')}` "
+                f"and `{fields.get('structure')}` for concept that has the description `{fields.get('description')}`"
             )
             raise ConceptSpecError(msg)
-        return values
+        return fields
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
@@ -350,7 +355,7 @@ class ConceptSpec(StructuredContent):
                 return field_spec.type
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))

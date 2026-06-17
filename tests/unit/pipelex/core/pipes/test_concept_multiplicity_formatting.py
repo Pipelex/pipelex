@@ -40,4 +40,4 @@ class TestFormatConceptWithMultiplicity:
     )
     def test_format_concept_with_multiplicity(self, concept_code: str, multiplicity: int | bool | None, expected: str):
         """Test formatting concept codes with all multiplicity variations."""
-        assert format_concept_with_multiplicity(concept_code, multiplicity) == expected
+        assert format_concept_with_multiplicity(concept_code, multiplicity=multiplicity) == expected

@@ -49,7 +49,7 @@ def pipelex_routed_to_openai() -> Iterator[None]:
     routing_profiles_doc["active"] = routing_profile_name
     routing_override_dir = Path(tempfile.mkdtemp(prefix="pipelex-routing-pipe-img-gen-validation-"))
     routing_override_path = routing_override_dir / routing_profiles_path.name
-    save_toml_to_path(routing_profiles_doc, str(routing_override_path))
+    save_toml_to_path(routing_profiles_doc, path=str(routing_override_path))
     routing_monkeypatch.setattr(
         type(config_manager),
         "routing_profiles_file_path",

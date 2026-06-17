@@ -12,6 +12,7 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 def build_run_output(
+    *,
     with_memory: bool,
     main_stuff_json: dict[str, Any],
     working_memory_dump: dict[str, Any],
@@ -65,7 +66,7 @@ def _render_json_payload_lines(result_payload: Any) -> list[str]:
     return ["## Result", "", "```json", clean_json_dumps(result_payload, indent=2), "```"]
 
 
-def format_run_markdown(result: dict[str, Any], with_memory: bool) -> str:
+def format_run_markdown(result: dict[str, Any], *, with_memory: bool) -> str:
     """Render a pipeline-run result dict as agent-readable markdown.
 
     Handles both shapes ``build_run_output()`` produces, disambiguated by the

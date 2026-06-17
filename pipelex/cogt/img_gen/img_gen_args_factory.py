@@ -49,6 +49,7 @@ class ImgGenArgsFactory:
     async def make_args_for_model(
         cls,
         model_rules: ImgGenModelRules,
+        *,
         img_gen_job: ImgGenJob,
         nb_images: int,
         model_id: str,
@@ -195,7 +196,7 @@ class ImgGenArgsFactory:
         return args_dict
 
     @classmethod
-    def make_args_from_num_images(cls, num_images_taxonomy: NumImagesTaxonomy, nb_images: int) -> dict[str, Any]:
+    def make_args_from_num_images(cls, num_images_taxonomy: NumImagesTaxonomy, *, nb_images: int) -> dict[str, Any]:
         """Map number of images to provider-specific parameter name."""
         match num_images_taxonomy:
             case NumImagesTaxonomy.FAL:
@@ -207,6 +208,7 @@ class ImgGenArgsFactory:
     def make_args_from_prompt(
         cls,
         prompt_taxonomy: PromptTaxonomy,
+        *,
         positive_text: str,
         negative_text: str | None,
     ) -> dict[str, Any]:
@@ -236,6 +238,7 @@ class ImgGenArgsFactory:
     def make_args_from_model_name(
         cls,
         model_name_taxonomy: ModelChoiceTaxonomy,
+        *,
         model_id: str,
         model_name: str,
     ) -> dict[str, Any]:
@@ -247,7 +250,7 @@ class ImgGenArgsFactory:
                 return {"model": model_name}
 
     @classmethod
-    def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background, model_name: str) -> dict[str, Any]:
+    def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, *, background: Background, model_name: str) -> dict[str, Any]:
         """Map background setting to provider-specific parameter.
 
         Raises:
@@ -267,6 +270,7 @@ class ImgGenArgsFactory:
     def make_args_from_aspect_ratio(
         cls,
         aspect_ratio_taxonomy: AspectRatioTaxonomy,
+        *,
         aspect_ratio: AspectRatio,
         size: ImageSize | None,
         model_name: str,
@@ -369,6 +373,7 @@ class ImgGenArgsFactory:
     def make_args_from_inference(
         cls,
         inference_taxonomy: InferenceTaxonomy,
+        *,
         num_inference_steps: int | None,
         quality: Quality | None,
         guidance_scale: float | None,
@@ -420,6 +425,7 @@ class ImgGenArgsFactory:
     def make_args_from_safety_checker(
         cls,
         safety_checker_taxonomy: SafetyCheckerTaxonomy,
+        *,
         is_moderated: bool | None,
         safety_tolerance: int | None,
     ) -> dict[str, Any]:
@@ -448,6 +454,7 @@ class ImgGenArgsFactory:
     def make_args_from_output_format(
         cls,
         output_format_taxonomy: OutputFormatTaxonomy,
+        *,
         output_format: ImageFormat | None,
     ) -> dict[str, Any]:
         """Map output format to provider-specific parameter name and validate support.
@@ -518,6 +525,7 @@ class ImgGenArgsFactory:
     async def make_args_from_input_images(
         cls,
         input_images_taxonomy: InputImagesTaxonomy,
+        *,
         input_images: list[PromptImage] | None,
     ) -> dict[str, Any]:
         """Map input images to provider-specific API parameters for image-to-image generation.
@@ -576,6 +584,7 @@ class ImgGenArgsFactory:
     def make_args_from_input_fidelity(
         cls,
         input_fidelity_taxonomy: InputFidelityTaxonomy,
+        *,
         input_fidelity: InputFidelity | None,
         model_name: str,
     ) -> dict[str, Any]:

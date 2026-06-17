@@ -97,12 +97,12 @@ class TestEdgeCases:
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
-        save_toml_to_path(toml_doc, str(backends_path))
+        save_toml_to_path(toml_doc, path=str(backends_path))
 
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc_tel = load_toml_with_tomlkit(str(telemetry_path))
         toml_doc_tel["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
-        save_toml_to_path(toml_doc_tel, str(telemetry_path))
+        save_toml_to_path(toml_doc_tel, path=str(telemetry_path))
 
         # Get index for anthropic
         kit_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"

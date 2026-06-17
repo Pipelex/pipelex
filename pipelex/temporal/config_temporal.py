@@ -466,7 +466,7 @@ class WorkerConfig(ConfigModel):
                     result.update(handle_opts.retry_policy_config.non_retryable_error_types_extra)
         return result
 
-    def resolve_queue(self, activity_name: str, routing_key: str | None = None) -> str | None:
+    def resolve_queue(self, activity_name: str, *, routing_key: str | None = None) -> str | None:
         """Resolve which task queue an activity should dispatch to.
 
         Hybrid fallback semantic. When ``activity_queues`` is fully empty
@@ -508,6 +508,7 @@ class WorkerConfig(ConfigModel):
     def resolve_dispatch(
         self,
         activity_name: str,
+        *,
         routing_key: str | None = None,
         queue_options_by_queue: dict[str, "QueueOptions"] | None = None,
         is_traced: bool = False,

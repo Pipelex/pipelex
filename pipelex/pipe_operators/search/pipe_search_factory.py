@@ -19,6 +19,7 @@ class PipeSearchFactory(PipeFactoryProtocol[PipeSearchBlueprint, PipeSearch]):
     def make(
         cls,
         pipe_category: Any,
+        *,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,

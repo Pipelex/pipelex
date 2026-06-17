@@ -19,6 +19,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
+from pipelex.hub import get_event_log_override
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
@@ -81,7 +82,10 @@ def assemble_tracing(
     """
     result = TracingAssembly()
     tracing_config = get_config().pipelex.tracing_config
-    if not tracing_config.is_enabled:
+    # A scoped override (see hub.scoped_event_log) is the run's transport and implies
+    # tracing-enabled (D1) — it must not be skipped by the is_enabled early-return.
+    event_log_override = get_event_log_override()
+    if event_log_override is None and not tracing_config.is_enabled:
         return result
     if not (assemble_graph or assemble_usage):
         return result
@@ -92,11 +96,15 @@ def assemble_tracing(
     # inside ``DynamoDBEventLog.read_events`` — so the assembly layer catches the EventLogError base and
     # never imports boto3 itself; NDJSON read failures surface as OSError / JSONDecodeError.
     try:
-        event_log = make_event_log(tracing_config)
-        try:
-            events = event_log.read_events(pipeline_run_id)
-        finally:
-            event_log.close()
+        if event_log_override is not None:
+            # The scope owner keeps the instance's lifecycle: read without close().
+            events = event_log_override.read_events(pipeline_run_id)
+        else:
+            event_log = make_event_log(tracing_config)
+            try:
+                events = event_log.read_events(pipeline_run_id)
+            finally:
+                event_log.close()
     except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         message = f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}"
         log.warning(message)
@@ -133,8 +141,8 @@ def assemble_tracing(
 
 def assemble_tracing_on_output(
     pipe_output: PipeOutput,
-    pipeline_run_id: str,
     *,
+    pipeline_run_id: str,
     assemble_graph: bool,
     assemble_usage: bool,
     domain_code: str | None = None,

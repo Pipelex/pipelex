@@ -118,6 +118,7 @@ def categorize_pipe_validation_error(
 
 def _handle_pipe_errors(
     error: ErrorDetails,
+    *,
     pipe_code: str | None,
 ) -> PipesAndConceptValidationErrorData:
     """Handle all PIPE validation errors.

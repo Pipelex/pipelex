@@ -18,4 +18,4 @@ def lint_cmd(
     This is a thin wrapper around ``plxt lint`` that eliminates the need
     for agents to call the plxt binary directly.
     """
-    run_plxt("lint", file_path)
+    run_plxt("lint", file_path=file_path)

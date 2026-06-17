@@ -17,7 +17,7 @@ INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_F
 INIT_SKIP_DIRS: frozenset[str] = frozenset({"inference"})
 
 
-def init_config(reset: bool = False, dry_run: bool = False, target_dir: Path | None = None) -> int:
+def init_config(reset: bool = False, *, dry_run: bool = False, target_dir: Path | None = None) -> int:
     """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
 
     Args:
@@ -37,7 +37,7 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: Path | N
         copied_files: list[str] = []
         existing_files: list[str] = []
 
-        def copy_directory_structure(src_dir: Path, dst_dir: Path, relative_path: Path | None = None, dry_run: bool = False) -> None:
+        def copy_directory_structure(*, src_dir: Path, dst_dir: Path, relative_path: Path | None = None, dry_run: bool = False) -> None:
             """Recursively copy directory structure, handling existing files."""
             for src_item in src_dir.iterdir():
                 item = src_item.name
@@ -53,7 +53,7 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: Path | N
                         continue
                     if not dry_run:
                         dst_item.mkdir(parents=True, exist_ok=True)
-                    copy_directory_structure(src_item, dst_item, relative_item, dry_run)
+                    copy_directory_structure(src_dir=src_item, dst_dir=dst_item, relative_path=relative_item, dry_run=dry_run)
                 elif dst_item.exists() and not reset:
                     existing_files.append(relative_item.as_posix())
                 else:

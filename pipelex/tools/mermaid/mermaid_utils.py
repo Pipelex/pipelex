@@ -61,7 +61,7 @@ def make_mermaid_url(mermaid_code: str) -> str:
     return f"https://mermaid.ink/svg/{encoded}"
 
 
-def print_mermaid_url(url: str, title: str) -> None:
+def print_mermaid_url(url: str, *, title: str) -> None:
     """Print a Mermaid URL with a privacy warning.
 
     Args:

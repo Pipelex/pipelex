@@ -131,7 +131,7 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return await asyncio.to_thread(self._load_with_metadata_sync, key)
 
-    def _store_sync(self, data: bytes, key: str, content_type: str | None) -> None:
+    def _store_sync(self, data: bytes, *, key: str, content_type: str | None) -> None:
         """Synchronous implementation of store for use with to_thread.
 
         Args:
@@ -165,7 +165,7 @@ class GcpStorageProvider(StorageProviderAbstract):
         Raises:
             StorageGcpError: If the GCS operation fails.
         """
-        await asyncio.to_thread(self._store_sync, data, key, content_type)
+        await asyncio.to_thread(self._store_sync, data, key=key, content_type=content_type)
 
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for a GCS object.

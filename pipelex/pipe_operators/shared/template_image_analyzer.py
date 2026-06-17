@@ -34,6 +34,7 @@ class TemplateImageAnalyzer:
     def analyze_template_for_images(
         cls,
         template_source: str,
+        *,
         input_specs: dict[str, str],
         domain_code: str,
         template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
@@ -77,11 +78,11 @@ class TemplateImageAnalyzer:
             has_multiplicity = parsed_input.multiplicity is not None and parsed_input.multiplicity is not False
 
             # Resolve the concept for this variable
-            concept = cls._resolve_concept(input_spec, domain_code)
+            concept = cls._resolve_concept(input_spec, domain_code=domain_code)
 
             # Determine what type the variable path resolves to
             # For nested paths like "doc.cover", we need to traverse the structure
-            resolved_type_info = cls._resolve_variable_type(var_ref.path, root_var, concept)
+            resolved_type_info = cls._resolve_variable_type(var_ref.path, root_var=root_var, root_concept=concept)
             if resolved_type_info is None:
                 continue
 
@@ -136,6 +137,7 @@ class TemplateImageAnalyzer:
     def validate_unused_inputs(
         cls,
         template_sources: list[str],
+        *,
         input_specs: dict[str, str],
         template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     ) -> None:
@@ -169,7 +171,7 @@ class TemplateImageAnalyzer:
             raise UnusedInputError(msg)
 
     @classmethod
-    def _resolve_concept(cls, concept_ref_or_code: str, domain_code: str) -> Concept:
+    def _resolve_concept(cls, concept_ref_or_code: str, *, domain_code: str) -> Concept:
         """Resolve a concept reference to a Concept object.
 
         Handles multiplicity brackets like Image[] or Text[3] by stripping them.
@@ -193,6 +195,7 @@ class TemplateImageAnalyzer:
     def _resolve_variable_type(
         cls,
         var_path: str,
+        *,
         root_var: str,
         root_concept: Concept,
     ) -> tuple[bool, bool, bool, list[str] | None] | None:

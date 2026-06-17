@@ -18,6 +18,7 @@ class PromptImageFactory:
     def make_prompt_image(
         cls,
         uri: str | None = None,
+        *,
         base64_data: str | None = None,
         raw_bytes: bytes | None = None,
     ) -> PromptImage:

@@ -192,7 +192,7 @@ class StuffArtefact:
         msg = f"'{content_type}' content does not support indexing."
         raise TypeError(msg)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, *, default: Any = None) -> Any:
         """Dict-like get method.
 
         Args:
@@ -350,6 +350,7 @@ class StuffArtefact:
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,
     ) -> str:
         """Delegate to content's render_with_images.
@@ -372,7 +373,7 @@ class StuffArtefact:
                 f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
             )
             raise TypeError(msg)
-        return content.render_with_images(registry, text_format)
+        return content.render_with_images(registry, text_format=text_format)
 
     # -------------------------------------------------------------------------
     # Access to underlying Stuff

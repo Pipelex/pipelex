@@ -29,6 +29,7 @@ from pipelex.tools.uri.resolved_uri import (
 
 async def prepare_prompt_document(
     prompt_document: PromptDocument,
+    *,
     is_http_url_enabled: bool,
 ) -> PreparedFile:
     """Prepare a single prompt document for LLM API consumption.
@@ -94,6 +95,7 @@ async def prepare_prompt_document(
 
 async def prep_prompt_documents(
     prompt_documents: list[PromptDocument],
+    *,
     is_http_url_enabled: bool,
 ) -> list[PreparedFile]:
     """Prepare multiple prompt documents in parallel.

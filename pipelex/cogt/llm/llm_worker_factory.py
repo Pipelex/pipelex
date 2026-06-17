@@ -12,6 +12,7 @@ class LLMWorkerFactory:
     @staticmethod
     def make_llm_worker(
         inference_model: InferenceModelSpec,
+        *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> LLMWorkerInternalAbstract:
         plugin = Plugin.make_for_inference_model(inference_model=inference_model)

@@ -1,13 +1,15 @@
 from typing import TYPE_CHECKING
 
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.protocol.pipeline_inputs import PipelineInputs
 
+from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
+    get_event_log_override,
     get_library_manager,
     get_otel_tracer,
     get_pipeline_manager,
@@ -40,6 +42,7 @@ if TYPE_CHECKING:
 
 async def pipeline_run_setup(
     execution_config: PipelineExecutionConfig,
+    *,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -50,7 +53,7 @@ async def pipeline_run_setup(
     output_multiplicity: VariableMultiplicity | None = None,
     dynamic_output_concept_ref: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
-    is_mock_inference: bool = False,
+    is_mock_usage: bool = False,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
@@ -58,8 +61,8 @@ async def pipeline_run_setup(
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
-    This function handles all the common setup logic for both ``execute_pipeline``
-    and ``start_pipeline``, including library setup, pipe loading, working memory
+    This function handles all the common setup logic for both ``execute``
+    and ``start``, including library setup, pipe loading, working memory
     initialization, and pipe job creation.
 
     Parameters
@@ -104,12 +107,13 @@ async def pipeline_run_setup(
         Pipe run mode: ``PipeRunMode.LIVE`` or ``PipeRunMode.DRY``. If not specified,
         inferred from the environment variable ``PIPELEX_FORCE_DRY_RUN_MODE``. Defaults
         to ``PipeRunMode.LIVE`` if the environment variable is not set.
-    is_mock_inference:
-        The ``--mock-inference`` trigger: keep ``run_mode`` LIVE (operators dispatch
-        normally) but fake every AI call at the cogt leaf. Threaded onto
-        :attr:`JobMetadata.is_mock_inference`, which reaches the leaf in both direct and
-        Temporal modes. Distinct from ``--dry-run``: it exercises the live control flow and
-        emits reportable (non-zero) synthetic usage so a cost report renders.
+    is_mock_usage:
+        Internal sub-flag of ``run_mode=DRY`` — only CLI access is the hidden ``--mock-usage``
+        test trigger (requires ``--dry-run``, not shown in --help): when True, the dry
+        LLM leaves report *non-zero* synthetic usage so the end-of-run cost report renders —
+        the cheap, deterministic cross-worker cost-report validation affordance. Threaded onto
+        :attr:`CogtRunParams.is_mock_usage`, which rides every assignment to the leaf in both
+        direct and Temporal modes. Requires a DRY run; setting it on a LIVE run fails validation.
     search_domain_codes:
         List of domain codes to search for pipes. The executed pipe's domain is automatically
         added if not already present.
@@ -149,19 +153,21 @@ async def pipeline_run_setup(
     # acquire_library's own load-failure teardown).
     prev_library_id = get_current_library_id_or_none()
 
-    # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
-    library_id, qualified_main_pipe = acquire_library(
-        library_id=library_id,
-        library_dirs=library_dirs,
-        mthds_contents=mthds_contents,
-        bundle_uris=bundle_uris,
-    )
-
     library_manager = get_library_manager()
+    library_acquired = False
     trace_context: TraceContext | None = None
     event_log: EventLogProtocol | None = None
     success = False
     try:
+        # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
+        library_id, qualified_main_pipe = acquire_library(
+            library_id=library_id,
+            library_dirs=library_dirs,
+            mthds_contents=mthds_contents,
+            bundle_uris=bundle_uris,
+        )
+        library_acquired = True
+
         # Resolve the pipe to execute against the now-open library.
         pipe: PipeAbstract
         if mthds_contents:
@@ -196,7 +202,10 @@ async def pipeline_run_setup(
             # (node/edge) events and usage (cost) events.
             config = get_config()
             tracing_config = config.pipelex.tracing_config
-            if tracing_config.is_enabled:
+            # A scoped override (see hub.scoped_event_log) is the run's transport and implies
+            # tracing-enabled (D1); otherwise build the configured backend when tracing is on.
+            event_log = get_event_log_override()
+            if event_log is None and tracing_config.is_enabled:
                 event_log = make_event_log(tracing_config)
 
             graph_tracer_manager = GraphTracerManager.get_or_create_instance()
@@ -258,7 +267,7 @@ async def pipeline_run_setup(
             library_id=library_id,
             execution_config=execution_config,
             pipe_run_mode=pipe_run_mode,
-            is_mock_inference=is_mock_inference,
+            is_mock_usage=is_mock_usage,
             pipeline_run_id=pipeline_run_id,
             user_id=user_id,
             inputs=inputs,
@@ -281,25 +290,50 @@ async def pipeline_run_setup(
         return pipe_job, pipeline_run_id, library_id
     finally:
         if not success:
-            # Error-path-only cleanup for failures after the library was acquired: tear down the graph
-            # tracer, event-log state, and the library, and restore the outer current-library, then let
-            # the exception propagate. Uses try/finally (not except) so a BaseException — e.g.
-            # asyncio.CancelledError — is covered too. acquire_library owns teardown for load-time
-            # failures (before this try); this block owns the post-acquire window.
-            if trace_context is not None:
-                tracer_manager = GraphTracerManager.get_instance()
-                if tracer_manager is not None:
-                    tracer_manager.close_tracer(pipeline_run_id)
-            if event_log is not None:
-                get_report_delegate().clear_event_log(context_key=pipeline_run_id)
-            # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
-            # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
-            # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
-            # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
-            # passed a library_id equal to its own outer current-library, "restoring" it would leave the
-            # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
-            if prev_library_id is not None and prev_library_id != library_id:
-                set_current_library(library_id=prev_library_id)
-            else:
-                clear_current_library()
-            library_manager.teardown(library_id=library_id)
+            # Error-path-only cleanup for failures after the run was registered: tear down the graph
+            # tracer and event-log state, free the pipeline-manager entry, and restore + tear down the
+            # library, then let the exception propagate. Uses try/finally (not except) so a
+            # BaseException — e.g. asyncio.CancelledError — is covered too. acquire_library owns
+            # library teardown for its own load-time failures (the `library_acquired` guard); this
+            # block owns the post-acquire window.
+            try:
+                # close_tracer must run before remove_pipeline: while the entry is registered,
+                # add_new_pipeline's collision raise shields the live direct-mode tracer (keyed by the
+                # caller-suppliable pipeline_run_id) from open_tracer's stale-key pop-and-replace healing.
+                # It can also raise — GraphTracer.teardown closes the event log, and a file-backed
+                # transport's close() flushes to disk. The known OSError is suppressed below so it cannot
+                # mask the original setup failure (callers type-match: runner.py wraps PipelexError into
+                # PipelineExecutionError, the API maps error types to status codes — mirrors PipeRun.run).
+                # The registry free and library restore still live in the inner finally as a guarantee
+                # against any other teardown raise. Safe even then: close_tracer pops the tracer BEFORE
+                # teardown, so no stale tracer remains under the key when the id is freed.
+                if trace_context is not None:
+                    tracer_manager = GraphTracerManager.get_instance()
+                    if tracer_manager is not None:
+                        try:
+                            tracer_manager.close_tracer(pipeline_run_id)
+                        except OSError as tracer_close_error:
+                            log.error(
+                                f"close_tracer also failed for pipeline_run_id={pipeline_run_id} "
+                                f"during setup-failure cleanup; raising original setup error. "
+                                f"Suppressed tracer close error: {tracer_close_error}"
+                            )
+            finally:
+                if event_log is not None:
+                    get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+                # Free the per-run registry entry so the same pipeline_run_id can be resubmitted after
+                # this failure. Placed before the library block so a teardown raise cannot strand the
+                # entry (remove_pipeline itself is a pop-with-default and cannot raise).
+                get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
+                if library_acquired:
+                    # Restore the caller's outer current-library FIRST so the guarantee survives a teardown raise,
+                    # then tear the library down — mirroring validate_bundle. set_current_library cannot take None,
+                    # so route the "no outer was set" case through clear_current_library. The `!= library_id` guard
+                    # covers the collision validate_bundle never hits (it always opens a fresh uuid): when the caller
+                    # passed a library_id equal to its own outer current-library, "restoring" it would leave the
+                    # ContextVar pointing at the library we are about to tear down — so clear instead of dangling.
+                    if prev_library_id is not None and prev_library_id != library_id:
+                        set_current_library(library_id=prev_library_id)
+                    else:
+                        clear_current_library()
+                    library_manager.teardown(library_id=library_id)

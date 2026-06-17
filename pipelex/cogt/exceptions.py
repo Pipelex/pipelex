@@ -65,7 +65,7 @@ class CogtError(PipelexError):
         if provider_metadata is not None:
             self.provider_metadata = provider_metadata
 
-    def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+    def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
         """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
 
         Inference-failure leaf errors raised deep inside a provider plugin

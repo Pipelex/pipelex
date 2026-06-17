@@ -81,6 +81,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         log.dev(f"✨ {self.desc} ✨")
@@ -115,6 +116,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         pass

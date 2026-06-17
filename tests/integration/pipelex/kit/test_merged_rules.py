@@ -13,7 +13,7 @@ class TestMergedRules:
         """Test building merged rules with default set."""
         idx = load_index()
 
-        merged = build_merged_rules(idx)
+        merged = build_merged_rules(kit_index=idx)
         assert merged is not None
         assert len(merged) > 0
         assert merged.endswith("\n")
@@ -23,7 +23,7 @@ class TestMergedRules:
         idx = load_index()
 
         # Test with 'all' set
-        merged = build_merged_rules(idx, agent_set="all")
+        merged = build_merged_rules(kit_index=idx, agent_set="all")
         assert merged is not None
         assert len(merged) > 0
 
@@ -32,13 +32,13 @@ class TestMergedRules:
         idx = load_index()
 
         with pytest.raises(ValueError, match="Agent set 'nonexistent' not found"):
-            build_merged_rules(idx, agent_set="nonexistent")
+            build_merged_rules(kit_index=idx, agent_set="nonexistent")
 
     def test_merged_rules_contain_demoted_headings(self):
         """Test that merged rules have demoted headings."""
         idx = load_index()
 
-        merged = build_merged_rules(idx)
+        merged = build_merged_rules(kit_index=idx)
 
         # If demote is 1, check that we have ## headings (demoted from #)
         if idx.agent_rules.demote > 0:

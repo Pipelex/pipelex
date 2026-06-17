@@ -1,0 +1,13 @@
+domain      = "research"
+description = "Research method definitions"
+
+# Concrete definition of the same pipe code, satisfying the header. The contracts are written with
+# the *qualified* spellings (`native.Text`, `research.KeyFinding`) yet still reconcile with the
+# header's bare spellings — contracts are compared by normalized concept identity, not by string.
+[pipe.find_key_findings]
+type        = "PipeLLM"
+description = "Find the key findings in a document."
+inputs      = { doc = "native.Text" }
+output      = "research.KeyFinding"
+model       = "$quick-reasoning"
+prompt      = "List the key findings in $doc."

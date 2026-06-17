@@ -1,3 +1,7 @@
+import faulthandler
+import logging
+import os
+from pathlib import Path
 from typing import AsyncGenerator, Generator, cast
 
 import pytest
@@ -17,9 +21,71 @@ from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 from pipelex.temporal.tprl.namespace_check import RegistrationFailure, ensure_required_search_attributes_registered
 from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
+from pipelex.tracing.activity_event_log import ActivityEventLogCache
 
 TEMPORAL_SERVER_NONE = "none"
 TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
+
+HANG_DUMP_DIR_ENV_VAR = "PIPELEX_HANG_DUMP_DIR"
+HANG_DUMP_DELAY_SECONDS = 150.0
+
+
+@pytest.fixture(scope="session", autouse=True)
+def temporal_failure_log_capture() -> Generator[None, None, None]:
+    """Mirror temporalio WARNING+ logs (with tracebacks) to a file under the hang-dump dir.
+
+    Enabled only when ``PIPELEX_HANG_DUMP_DIR`` is set (CI hang debugging). A payload-conversion
+    error inside a workflow task makes Temporal retry the task forever — the test then hangs
+    until pytest-timeout's thread-method kill, which destroys pytest's captured logs along with
+    the process. temporalio logs each failed workflow activation WITH the offending traceback,
+    so mirroring its logger to a file preserves the actual error across the kill.
+    """
+    dump_dir_value = os.environ.get(HANG_DUMP_DIR_ENV_VAR)
+    if not dump_dir_value:
+        yield
+        return
+    dump_dir = Path(dump_dir_value)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(dump_dir / f"temporalio-pid{os.getpid()}.log", encoding="utf-8")
+    handler.setLevel(logging.WARNING)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    temporalio_logger = logging.getLogger("temporalio")
+    temporalio_logger.addHandler(handler)
+    try:
+        yield
+    finally:
+        temporalio_logger.removeHandler(handler)
+        handler.close()
+
+
+@pytest.fixture(autouse=True)
+def temporal_hang_watchdog(request: FixtureRequest) -> Generator[None, None, None]:
+    """Dump every thread's stack to a file when a temporal test exceeds the watchdog delay.
+
+    Enabled only when the ``PIPELEX_HANG_DUMP_DIR`` env var is set (CI hang debugging).
+    The delay sits below pytest-timeout's ``--timeout`` so the dump lands BEFORE the
+    thread-method kill (``os._exit``) destroys the process — pytest-xdist swallows worker
+    stderr on "node down", so a file under the dump dir is the only way to see where a
+    hung test was stuck on a remote runner. One file per worker process; each test appends
+    an armed/disarmed marker, so the hung test is the last armed entry without a disarm.
+    """
+    dump_dir_value = os.environ.get(HANG_DUMP_DIR_ENV_VAR)
+    if not dump_dir_value:
+        yield
+        return
+    test_id = cast("str", request.node.nodeid)  # pyright: ignore[reportUnknownMemberType]
+    dump_dir = Path(dump_dir_value)
+    dump_dir.mkdir(parents=True, exist_ok=True)
+    dump_path = dump_dir / f"hang-pid{os.getpid()}.txt"
+    with dump_path.open("a", encoding="utf-8") as dump_file:
+        dump_file.write(f"\n===== armed: {test_id} =====\n")
+        dump_file.flush()
+        faulthandler.dump_traceback_later(HANG_DUMP_DELAY_SECONDS, file=dump_file)
+        try:
+            yield
+        finally:
+            faulthandler.cancel_dump_traceback_later()
+            dump_file.write(f"===== disarmed: {test_id} =====\n")
 
 
 def pytest_addoption(parser: Parser) -> None:
@@ -66,8 +132,7 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     # 1. Sub-pipes dispatch as child workflows (not inline in the sandbox)
     # 2. Inference calls (LLM, img_gen, etc.) dispatch as activities (not inline)
     # This mirrors what a full Temporal-enabled Pipelex.make() would set up.
-    from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory  # noqa: PLC0415
-    from pipelex.hub import get_pipelex_hub, get_storage_provider  # noqa: PLC0415
+    from pipelex.hub import get_pipelex_hub  # noqa: PLC0415
     from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
         ContentGeneratorInWorkflowFactory,
     )
@@ -76,12 +141,7 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     pipelex_hub = get_pipelex_hub()
     pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
-    generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
-    pipelex_hub.set_content_generator(
-        ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-            generated_content_factory=generated_content_factory,
-        )
-    )
+    pipelex_hub.set_content_generator(ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow())
 
     yield
     manager.teardown()
@@ -97,6 +157,23 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
 
     get_inference_manager().teardown()
     get_plugin_manager().plugin_sdk_registry.teardown()
+
+
+@pytest.fixture(autouse=True)
+def reset_activity_event_log_cache() -> Generator[None, None, None]:
+    """Reset the per-process activity event log cache around every temporal test.
+
+    ReportingManager routes every activity-side usage emission through the per-process
+    fallback (even co-located activities — see audit finding H1), and the fallback's
+    event log is process-cached on ``ActivityEventLogCache`` with the traces_dir it was
+    first built with. Without this reset, a cache created by an earlier test would keep
+    writing into that test's directory and the current test's events would silently
+    land elsewhere. Hoisted to this conftest because any temporal test whose activities
+    report usage engages the cache, not just the ones under ``tracing/``.
+    """
+    ActivityEventLogCache.reset_for_tests()
+    yield
+    ActivityEventLogCache.reset_for_tests()
 
 
 @pytest_asyncio.fixture(scope="session")  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

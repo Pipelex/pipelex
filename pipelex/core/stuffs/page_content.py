@@ -15,7 +15,7 @@ class PageContent(StructuredContent):
     page_view: ImageContent | None = Field(default=None, description="The screenshot of the page")
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # If there's no page_view, just return the text_and_images rendering
         if self.page_view is None:
             return self.text_and_images.rendered_pretty(depth=depth)

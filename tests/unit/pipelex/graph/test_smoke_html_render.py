@@ -19,7 +19,7 @@ class TestSmokeHtmlRender:
         )
         config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
 
-        html = generate_reactflow_html(graph, config)
+        html = generate_reactflow_html(graph, config=config)
 
         assert "cdn.jsdelivr.net/npm/@pipelex/mthds-ui" in html
         assert "cdn.jsdelivr.net/npm/elkjs" in html

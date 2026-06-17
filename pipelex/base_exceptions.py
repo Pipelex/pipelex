@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
@@ -51,7 +51,25 @@ INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
 # Single source of truth for both STRICT branches. Adding a new top-level
 # ``ErrorReport`` field is one decision: include it here to surface it on both
 # branches, or leave it out to keep both branches consistently silent.
-_STRICT_KEPT_FIELDS: frozenset[str] = frozenset({"error_type", "title", "type_uri", "error_domain", "error_category", "retryable"})
+#
+# ``validation_errors`` IS surfaced: it describes the caller's own submitted
+# bundle (per-error diagnostics on a ``ValidateBundleError``), not server
+# internals, so redacting it would gut the hosted path's diagnostics. It only
+# ever rides a ``ValidateBundleError`` report (a caller-facing INPUT error), but
+# it is kept here — not by the caller-facing branch's bespoke logic — so the
+# decision lives in this one allowlist.
+#
+# Caveat — ``validation_errors[].source``: on the *in-memory* validate path
+# ``source`` is the caller-supplied logical source (e.g. ``api://bundle-0.mthds``),
+# which is the hosted/STRICT case and safe to surface. On the *on-disk* path it
+# is a real server filesystem path, and STRICT does NOT redact it (consistent
+# with ``DisclosureMode`` being a classification-projection, not a path-leak
+# shield — see its docstring). A hosted surface that validates from disk should
+# therefore use the in-memory path with logical sources rather than rely on STRICT
+# to scrub the path.
+_STRICT_KEPT_FIELDS: frozenset[str] = frozenset(
+    {"error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
+)
 
 # The curated subset of ``ProviderErrorMetadata`` that survives STRICT
 # projection. ``status_code`` and ``retry_after_seconds`` are actionable client
@@ -230,6 +248,63 @@ def error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool:
         return False
 
 
+class ValidationErrorCategory(StrEnum):
+    """Which validation stage produced a :class:`ValidationErrorItem`.
+
+    Mirrors the categorized error-data lists aggregated by ``ValidateBundleError``:
+    blueprint validation (from the interpreter), pipe-factory failures (e.g. a
+    missing concept), pipe/concept validation (e.g. a missing input variable
+    or a type mismatch), and the ``dry_run`` residual — a dry-run failure with no
+    structured locator (graph-level), carried as a single message-only item so an
+    invalid verdict always surfaces a non-empty ``validation_errors[]`` (the
+    structured-info invariant) instead of a bare ``detail``.
+    """
+
+    BLUEPRINT_VALIDATION = "blueprint_validation"
+    PIPE_FACTORY = "pipe_factory"
+    PIPE_VALIDATION = "pipe_validation"
+    DRY_RUN = "dry_run"
+
+
+class ValidationErrorItem(BaseModel):
+    """One structured bundle-validation error, projected onto the error wire.
+
+    The typed wire item carried by :attr:`ErrorReport.validation_errors`. Its
+    fields are the *union* across the three ``ValidateBundleError`` error-data
+    models (``PipelexBundleBlueprintValidationErrorData``, ``PipeFactoryErrorData``,
+    ``PipesAndConceptValidationErrorData``); a given item only populates the
+    subset its :attr:`category` produces, and the unset fields drop out of the
+    ``exclude_none`` wire projection.
+
+    Built exclusively by ``pipelex.pipeline.validation_errors.build_validation_error_items``,
+    which both the agent CLI (``extract_validation_errors``) and the API path
+    (``ValidateBundleError.to_error_report``) call — so the CLI's structured
+    output and the API's 422 ``validation_errors`` can never drift.
+
+    ``source`` is the declaring file path (CLI) or the per-content source the API
+    threads onto the in-memory load path — it hands a consumer the owning file
+    for cross-file diagnostics. Lives here, alongside :class:`ErrorReport`,
+    rather than next to the source error-data models because ``ErrorReport``
+    references it as a typed field and ``base_exceptions`` must not import the
+    ``pipelex.core`` error modules (which import back into this module).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    category: ValidationErrorCategory = Field(strict=False)
+    message: str
+    error_type: str | None = None
+    pipe_code: str | None = None
+    concept_code: str | None = None
+    domain_code: str | None = None
+    source: str | None = None
+    field_path: str | None = None
+    field_name: str | None = None
+    variable_names: list[str] | None = None
+    missing_concept_code: str | None = None
+    declared_concepts: list[str] | None = None
+
+
 class ErrorReport(BaseModel):
     """Structured error report — single source of truth for all error serialization.
 
@@ -264,6 +339,13 @@ class ErrorReport(BaseModel):
     # :class:`DisclosureMode`). Defaults to False so an unflagged report — and
     # any payload that predates the field — is redacted, never leaked.
     caller_facing_message: bool = False
+    # Structured per-error diagnostics on a bundle-validation failure. Populated
+    # only by ``ValidateBundleError.to_error_report`` (None on every other
+    # report), so the 422 problem document carries the same machine-mappable
+    # items the agent CLI emits. Surfaced under STRICT disclosure (see
+    # ``_STRICT_KEPT_FIELDS``): these describe the caller's own submitted bundle,
+    # not server internals.
+    validation_errors: list[ValidationErrorItem] | None = None
 
     def to_dict(self, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
         """Return a dict with only non-None fields, projected through ``disclosure_mode``.

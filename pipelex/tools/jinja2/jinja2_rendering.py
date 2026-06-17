@@ -21,7 +21,7 @@ from pipelex.tools.jinja2.jinja2_environment import (
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 
 
-def _add_to_templating_context(templating_context: dict[str, Any], jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
+def _add_to_templating_context(templating_context: dict[str, Any], *, jinja2_context_key: Jinja2ContextKey, value: Any) -> None:
     if jinja2_context_key in templating_context:
         msg = f"Jinja2 context key '{jinja2_context_key}' already in templating_context"
         raise Jinja2StuffError(msg)
@@ -36,8 +36,8 @@ class _Jinja2Template(Protocol):
 
 def _compile_jinja2_template(
     template_source: str,
-    template_category: TemplateCategory,
     *,
+    template_category: TemplateCategory,
     use_registry: bool = False,
     enable_async: bool = True,
     finalize: Callable[[Any], Any] | None = None,
@@ -65,6 +65,7 @@ def _compile_jinja2_template(
 
 def _prepare_templating_context(
     templating_context: dict[str, Any],
+    *,
     templating_style: TemplatingStyle | None,
 ) -> dict[str, Any]:
     # Create a copy to avoid mutating the caller's original dictionary
@@ -83,7 +84,7 @@ def _prepare_templating_context(
     return prepared_templating_context
 
 
-def _make_type_error_msg(template_source: str, templating_context: dict[str, Any], type_error: TypeError) -> str:
+def _make_type_error_msg(template_source: str, *, templating_context: dict[str, Any], type_error: TypeError) -> str:
     context_vars = ", ".join(f"'{key}'" for key in templating_context)
     return (
         f"Jinja2 render — type error: '{type_error}'. "
@@ -95,13 +96,14 @@ def _make_type_error_msg(template_source: str, templating_context: dict[str, Any
 
 def _make_non_type_error_msg(
     template_source: str,
+    *,
     error_label: str,
     error: Jinja2StuffError | TemplateSyntaxError | UndefinedError | Jinja2ContextError,
 ) -> str:
     return f"Jinja2 render — {error_label}: '{error}', template_source:\n{template_source}"
 
 
-def _render_template_sync(template_source: str, template: _Jinja2Template, templating_context: dict[str, Any]) -> str:
+def _render_template_sync(template_source: str, *, template: _Jinja2Template, templating_context: dict[str, Any]) -> str:
     try:
         generated_text: str = template.render(**templating_context)
     except Jinja2StuffError as exc:
@@ -122,7 +124,7 @@ def _render_template_sync(template_source: str, template: _Jinja2Template, templ
     return generated_text
 
 
-async def _render_template_async(template_source: str, template: _Jinja2Template, templating_context: dict[str, Any]) -> str:
+async def _render_template_async(template_source: str, *, template: _Jinja2Template, templating_context: dict[str, Any]) -> str:
     try:
         generated_text: str = await template.render_async(**templating_context)
     except Jinja2StuffError as exc:
@@ -145,10 +147,10 @@ async def _render_template_async(template_source: str, template: _Jinja2Template
 
 def render_jinja2_sync(
     template_source: str,
+    *,
     template_category: TemplateCategory,
     templating_context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
-    *,
     use_registry: bool = False,
 ) -> str:
     template = _compile_jinja2_template(
@@ -170,10 +172,10 @@ def render_jinja2_sync(
 
 async def render_jinja2_async(
     template_source: str,
+    *,
     template_category: TemplateCategory,
     templating_context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
-    *,
     use_registry: bool = False,
     finalize: Callable[[Any], Any] | None = None,
 ) -> str:

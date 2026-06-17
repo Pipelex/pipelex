@@ -70,7 +70,7 @@ class NdjsonEventLog(EventLogProtocol):
             return seq
 
     @staticmethod
-    def _file_name_for(workflow_id: str, writer_id: str) -> str:
+    def _file_name_for(workflow_id: str, *, writer_id: str) -> str:
         """File name for a (workflow_id, writer_id) pair.
 
         Workflow ids use ``_`` as their separator and so should not contain
@@ -107,7 +107,7 @@ class NdjsonEventLog(EventLogProtocol):
                 if handle is None:
                     run_dir = self._traces_dir / event.pipeline_run_id
                     run_dir.mkdir(parents=True, exist_ok=True)
-                    file_path = run_dir / self._file_name_for(event.workflow_id, event.writer_id)
+                    file_path = run_dir / self._file_name_for(event.workflow_id, writer_id=event.writer_id)
                     handle = open(file_path, "a", encoding="utf-8")  # noqa: SIM115
                     self._file_handles[cache_key] = handle
 

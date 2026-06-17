@@ -31,7 +31,7 @@ class TestEnumRoundTrip:
         deserializer cannot resolve the dynamic class and the round-trip fails.
         """
         schema = Pet.model_json_schema()
-        dynamic_pet_cls = SchemaToModelFactory.make_from_json_schema(schema, "Pet")
+        dynamic_pet_cls = SchemaToModelFactory.make_from_json_schema(schema, class_name="Pet")
         instance = dynamic_pet_cls(name="Rex", species=PetSpecies.DOG)
         pretty_print(instance, title="instance")
 

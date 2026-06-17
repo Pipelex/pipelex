@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -92,7 +93,7 @@ class PipeBatch(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_list_stuff_name = batch_params.input_list_stuff_name
@@ -115,6 +116,7 @@ class PipeBatch(PipeController):
     @override
     async def _live_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -147,7 +149,7 @@ class PipeBatch(PipeController):
                 f"for a workload this size, consider running on Temporal for durable, rate-limited execution."
             )
 
-        async def _run_branch(item_input_stuff: "Stuff", branch_output_item_code: str) -> PipeOutput:
+        async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
@@ -163,7 +165,6 @@ class PipeBatch(PipeController):
                     "output_multiplicity": None,
                 },
             )
-            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             return await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
@@ -202,7 +203,7 @@ class PipeBatch(PipeController):
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code))
+            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code=branch_output_item_code))
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
@@ -248,7 +249,7 @@ class PipeBatch(PipeController):
             "item_count": len(input_content.items),
             "branch_pipe_code": self.branch_pipe_code,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,
@@ -258,6 +259,7 @@ class PipeBatch(PipeController):
     @override
     async def _dry_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -271,20 +273,16 @@ class PipeBatch(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
-        # For dry run coordination: set the first item's pipe_code to "mock_main"
-        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
+        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
         main_stuff = pipe_output.main_stuff
         content = main_stuff.content
         if isinstance(content, ListContent):
             list_content = cast("ListContent[StuffContent]", content)
-            if list_content.items:
-                first_item = list_content.items[0]
-                if hasattr(first_item, "pipe_code"):
-                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            stamp_mock_main_coordination(list_content.items)
         return pipe_output
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

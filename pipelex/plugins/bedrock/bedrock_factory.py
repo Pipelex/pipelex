@@ -27,6 +27,7 @@ class BedrockFactory:
     def make_bedrock_client(
         cls,
         plugin: Plugin,
+        *,
         backend: InferenceBackend,
     ) -> BedrockClientProtocol:
         try:

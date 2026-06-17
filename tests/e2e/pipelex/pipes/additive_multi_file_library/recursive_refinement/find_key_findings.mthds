@@ -1,0 +1,13 @@
+domain = "market_research"
+
+# Concrete operator (leaf) satisfying the `find_key_findings` header declared in the controller file.
+[pipe.find_key_findings]
+type = "PipeLLM"
+description = "Extract the notable findings from a source document."
+inputs = { document = "Document" }
+output = "KeyFinding[]"
+prompt = """
+Read the document and list its notable findings, one per item.
+
+@document
+"""

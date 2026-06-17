@@ -4,8 +4,6 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
@@ -139,12 +137,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeImgGenOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
 
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity or False,
@@ -236,6 +234,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if nb_images > 1:
             image_content_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 nb_images=nb_images,
@@ -253,6 +252,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             image_content = await content_generator.make_single_image(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 img_gen_job_params=img_gen_job_params,
@@ -282,36 +282,20 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             "nb_images": nb_images,
         }
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return PipeImgGenOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeImgGenOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
-
-    @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

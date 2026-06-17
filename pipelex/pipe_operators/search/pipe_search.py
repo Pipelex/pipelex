@@ -4,8 +4,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import SearchAssignment
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
@@ -76,12 +74,12 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     async def _live_run_operator_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeSearchOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
 
         # 0. Log the search run
         search_choice_desc = self.search_choice or "default"
@@ -118,6 +116,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         # and lets its failures cross the workflow boundary as classified errors instead of hanging.
         search_assignment = SearchAssignment(
             job_metadata=job_metadata,
+            cogt_run_params=pipe_run_params.cogt_run_params,
             query=query_text,
             search_setting=search_setting,
             include_domains=self.include_domains,
@@ -153,38 +152,20 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             "is_structured_output": self.is_structured_output,
         }
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         return PipeSearchOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeSearchOutput:
-        # Dry run reuses the live path with the dry content generator — identical to PipeLLM — so the
-        # search mock now lives behind the same seam (ContentGeneratorDry.make_search_*) as every leaf.
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
-
-    @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

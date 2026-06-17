@@ -46,7 +46,7 @@ DEFAULT_ENCODING = "utf-8"
 DEFAULT_READ_ENCODING = "utf-8-sig"
 
 _NONE_TYPE = type(None)
-_UNION_TYPE = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
+_UnionType = getattr(types, "UnionType", None)  # Py3.10+: types.UnionType (PEP 604 `X | None`)
 # Scalar python types a CSV cell can round-trip. `bool` precedes `int` semantically
 # (bool is an int subclass) but membership here is by identity, so both are accepted.
 _FLAT_SCALAR_TYPES: frozenset[type] = frozenset({str, int, float, bool, date, datetime})
@@ -65,7 +65,7 @@ def _is_flat_annotation(annotation: Any) -> bool:
     containers, nested models, and ``Any``.
     """
     origin = get_origin(annotation)
-    if origin in {Union, _UNION_TYPE}:
+    if origin in {Union, _UnionType}:
         non_none_args = [arg for arg in get_args(annotation) if arg is not _NONE_TYPE]
         if len(non_none_args) != 1:
             # A genuine multi-type union (e.g. int | str) is not flat.
@@ -85,7 +85,7 @@ def _is_flat_annotation(annotation: Any) -> bool:
 
 def _annotation_allows_none(annotation: Any) -> bool:
     """Whether a field annotation accepts ``None`` (an ``Optional`` / ``... | None`` field)."""
-    if get_origin(annotation) in {Union, _UNION_TYPE}:
+    if get_origin(annotation) in {Union, _UnionType}:
         return any(arg is _NONE_TYPE for arg in get_args(annotation))
     return annotation is _NONE_TYPE
 
@@ -138,7 +138,7 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
         raise CsvError(msg)
 
 
-def _validate_header(header: list[str], path: Path) -> None:
+def _validate_header(header: list[str], *, path: Path) -> None:
     """Reject an empty header, or a header with a blank or duplicate column."""
     if not header:
         # An empty first row (a leading blank line, or a file that is just a newline) names no
@@ -199,7 +199,7 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
         raise CsvReadError(msg)
 
     header = numbered_rows[0][1]
-    _validate_header(header, path)
+    _validate_header(header, path=path)
 
     data_rows: list[tuple[int, list[str]]] = []
     for line_number, row in numbered_rows[1:]:
@@ -216,7 +216,7 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     return header, data_rows
 
 
-def _row_to_dict(header: list[str], data_row: list[str]) -> dict[str, str]:
+def _row_to_dict(data_row: list[str], *, header: list[str]) -> dict[str, str]:
     """Map a raw data row onto the header, padding a short row with empty cells."""
     return {column: (data_row[index] if index < len(data_row) else "") for index, column in enumerate(header)}
 
@@ -229,14 +229,14 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
     header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
-    return [_row_to_dict(header, row) for _, row in data_rows]
+    return [_row_to_dict(row, header=header) for _, row in data_rows]
 
 
 def write_rows(
+    *,
     path: Path,
     headers: list[str],
     rows: list[dict[str, str]],
-    *,
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_ENCODING,
 ) -> None:
@@ -311,8 +311,8 @@ def assert_supported_table_suffix(path: Path) -> None:
 
 def list_content_from_csv(
     path: Path,
-    row_model: type[StuffContentType],
     *,
+    row_model: type[StuffContentType],
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_READ_ENCODING,
 ) -> ListContent[StuffContentType]:
@@ -355,7 +355,7 @@ def list_content_from_csv(
 
     items: list[StuffContentType] = []
     for row_number, data_row in data_rows:
-        cell_map = _row_to_dict(header, data_row)
+        cell_map = _row_to_dict(data_row, header=header)
         # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required).
         row_data: dict[str, str | None] = {column: (value or None) for column, value in cell_map.items()}
         for omitted_field in omitted_nullable_fields:
@@ -378,9 +378,9 @@ def list_content_from_csv(
 
 def csv_from_list_content(
     list_content: ListContent[StuffContentType],
+    *,
     row_model: type[StuffContentType],
     path: Path,
-    *,
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_ENCODING,
 ) -> None:
@@ -401,7 +401,7 @@ def csv_from_list_content(
             raise CsvError(msg)
         dumped = item.model_dump(mode="json")
         rows.append({field_name: _to_cell(dumped.get(field_name)) for field_name in headers})
-    write_rows(path, headers, rows, delimiter=delimiter, encoding=encoding)
+    write_rows(path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)
 
 
 def _validation_error_label(error: "ErrorDetails") -> str:

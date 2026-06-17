@@ -22,7 +22,7 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_text_json(self) -> None:
         """Test JSON representation for native Text concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        result, _ = concept.render_concept_representation(ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
         assert result["concept"] == "native.Text"
         assert "content" in result
         assert "text" in result["content"]
@@ -30,7 +30,7 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_image_json(self) -> None:
         """Test JSON representation for native Image concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        result, _ = concept.render_concept_representation(ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
         assert result["concept"] == "native.Image"
         assert "content" in result
         assert "url" in result["content"]
@@ -38,7 +38,7 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_number_json(self) -> None:
         """Test JSON representation for native Number concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.NUMBER)
-        result, _ = concept.render_concept_representation(ConceptRepresentationFormat.JSON)
+        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON)
         assert result["concept"] == "native.Number"
         assert "content" in result
         assert "number" in result["content"]
@@ -46,7 +46,7 @@ class TestConceptGenerateInputRepresentationJson:
     def test_native_document_json_with_multiplicity(self) -> None:
         """Test JSON representation for Document with multiplicity - content should be a list."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
-        result, _ = concept.render_concept_representation(ConceptRepresentationFormat.JSON, is_multiple=True)
+        result, _ = concept.render_concept_representation(output_format=ConceptRepresentationFormat.JSON, is_multiple=True)
         assert result["concept"] == "native.Document"
         assert "content" in result
         # Content should be a list
@@ -62,7 +62,7 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_text_python(self) -> None:
         """Test Python representation for native Text concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
-        result, imports = concept.render_concept_representation(ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
         assert result["concept"] == "native.Text"
         assert "TextContent" in result["content"]
         assert "TextContent" in imports
@@ -70,7 +70,7 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_image_python(self) -> None:
         """Test Python representation for native Image concept."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.IMAGE)
-        result, imports = concept.render_concept_representation(ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
         assert result["concept"] == "native.Image"
         assert "ImageContent" in result["content"]
         assert "ImageContent" in imports
@@ -84,7 +84,7 @@ class TestConceptGenerateInputRepresentationPython:
             structure_class_name="TextContent",
             refines="native.Text",
         )
-        result, imports = concept.render_concept_representation(ConceptRepresentationFormat.PYTHON)
+        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON)
         assert result["concept"] == "test_domain.Question"
         assert "TextContent" in result["content"]
         assert "TextContent" in imports
@@ -92,7 +92,7 @@ class TestConceptGenerateInputRepresentationPython:
     def test_native_document_python_with_multiplicity(self) -> None:
         """Test Python representation for Document with multiplicity - for Python format, wrapping is handled by caller."""
         concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
-        result, imports = concept.render_concept_representation(ConceptRepresentationFormat.PYTHON, is_multiple=True)
+        result, imports = concept.render_concept_representation(output_format=ConceptRepresentationFormat.PYTHON, is_multiple=True)
         # For Python format, is_multiple doesn't wrap content (caller handles it)
         assert result["concept"] == "native.Document"
         assert "DocumentContent" in result["content"]
@@ -225,7 +225,7 @@ class TestGenerateRunnerCode:
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert "import asyncio" in runner_code
         assert "from pipelex.pipelex import Pipelex" in runner_code
-        assert "from pipelex.pipeline.runner import PipelexRunner" in runner_code
+        assert "from pipelex.pipeline.runner import PipelexMTHDSProtocol" in runner_code
 
     def test_runner_code_includes_structure_imports(self, mock_pipe_single_output: MagicMock) -> None:
         """Test that generated runner code includes structure class imports."""

@@ -62,7 +62,7 @@ def _is_multiple(multiplicity: VariableMultiplicity | None) -> bool:
     return multiplicity > 1
 
 
-def _format_representation_as_python(representation: dict[str, Any], is_multiple: bool = False) -> str:
+def _format_representation_as_python(representation: dict[str, Any], *, is_multiple: bool = False) -> str:
     """Format a representation dict as Python code.
 
     Args:
@@ -140,7 +140,7 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict
 
         # Get imports from the representation generator
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        generator.generate_representation(concept.concept_ref, structure_class)
+        generator.generate_representation(concept.concept_ref, structure_class=structure_class)
 
         for class_name in generator.imports_needed:
             if NativeConceptCode.is_native_structure_class(class_name):
@@ -155,7 +155,7 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict
     return native_classes, custom_classes
 
 
-def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
+def generate_runner_code(pipe: PipeAbstract, *, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
     """Generate the complete Python runner code for a pipe.
 
     This generates a runnable Python script with:
@@ -232,7 +232,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         [
             "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.runner import PipelexRunner",
+            "from pipelex.pipeline.runner import PipelexMTHDSProtocol",
         ]
     )
 
@@ -268,8 +268,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         "",
         "",
         f"async def run_{pipe.code}() -> {return_type}:",
-        "    runner = PipelexRunner()",
-        "    response = await runner.execute_pipeline(",
+        "    runner = PipelexMTHDSProtocol()",
+        "    response = await runner.execute(",
         f'        pipe_code="{pipe.code}",',
     ]
 

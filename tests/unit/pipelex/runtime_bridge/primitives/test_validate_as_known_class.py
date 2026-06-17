@@ -29,19 +29,19 @@ class TestValidateAsKnownClass:
     def test_returns_instance_when_class_identity_matches(self) -> None:
         """When type(raw_item) is item_class, return the instance as-is (no round-trip)."""
         instance = TextContent(text="hello")
-        result = _validate_as_known_class(TextContent, instance)
+        result = _validate_as_known_class(item_class=TextContent, raw_item=instance)
         assert result is instance
 
     def test_validates_dict_input(self) -> None:
         """When raw_item is a dict, validate it through model_validate."""
-        result = _validate_as_known_class(TextContent, {"text": "hello"})
+        result = _validate_as_known_class(item_class=TextContent, raw_item={"text": "hello"})
         assert isinstance(result, TextContent)
         assert result.text == "hello"
 
     def test_cross_exec_round_trip_basic(self) -> None:
         """Cross-exec instance (different class identity, same shape) round-trips correctly."""
         original = _OuterContent(meta=_StuffContentAllowExtra())
-        result = _validate_as_known_class(_RebuiltOuterContent, original)
+        result = _validate_as_known_class(item_class=_RebuiltOuterContent, raw_item=original)
         assert type(result) is _RebuiltOuterContent
 
     def test_cross_exec_preserves_nested_subclass_data(self) -> None:
@@ -55,7 +55,7 @@ class TestValidateAsKnownClass:
         implementation regressed back to ``model_dump()``.
         """
         instance = _OuterContent(meta=_SpecificMeta(flavor="vanilla"))
-        result = _validate_as_known_class(_RebuiltOuterContent, instance)
+        result = _validate_as_known_class(item_class=_RebuiltOuterContent, raw_item=instance)
 
         assert type(result) is _RebuiltOuterContent
         extras = result.meta.model_extra or {}

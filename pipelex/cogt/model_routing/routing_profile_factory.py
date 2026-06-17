@@ -38,6 +38,7 @@ class RoutingProfileFactory:
     def make_routing_profile(
         cls,
         name: str,
+        *,
         blueprint: RoutingProfileBlueprint,
     ) -> RoutingProfile:
         """Create a RoutingProfile from a blueprint.

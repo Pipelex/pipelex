@@ -23,7 +23,7 @@ class TestHashSha256:
     )
     def test_hash_sha256(self, input_string: str, length: int | None, expected: str) -> None:
         """Test SHA256 hashing with various inputs and truncation lengths."""
-        assert hash_sha256(input_string, length) == expected
+        assert hash_sha256(input_string, length=length) == expected
 
     def test_hash_sha256_deterministic(self) -> None:
         """Test that the same input always produces the same output."""

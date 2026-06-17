@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 class BlackboxaiCompletionsFactory(OpenAICompletionsFactory):
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         if isinstance(inference_job, ImgGenJob):
             if isinstance(inference_job.job_params.seed, int):

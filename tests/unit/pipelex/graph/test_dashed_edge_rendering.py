@@ -158,7 +158,7 @@ class TestDashedEdgeRendering:
         """Verify that each dashed-edge kind produces at least one dashed arrow."""
         graph = self._build_controller_graph_with_dashed_edge(edge_kind=edge_kind)
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         dashed_lines = self._extract_dashed_edges(result.mermaid_code)
         assert len(dashed_lines) >= 1, f"Expected at least one dashed edge for {topic}, got none"
@@ -175,7 +175,7 @@ class TestDashedEdgeRendering:
         """Verify that labeled dashed edges include the label in the mermaid syntax."""
         graph = self._build_controller_graph_with_dashed_edge(edge_kind=edge_kind, edge_label="my_label")
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         dashed_lines = self._extract_dashed_edges(result.mermaid_code)
         labeled = [line for line in dashed_lines if "my_label" in line]
@@ -193,7 +193,7 @@ class TestDashedEdgeRendering:
         """Verify that unlabeled dashed edges use plain dashed arrow syntax."""
         graph = self._build_controller_graph_with_dashed_edge(edge_kind=edge_kind)
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         dashed_lines = self._extract_dashed_edges(result.mermaid_code)
         # Unlabeled edges use `-.->` without a label string
@@ -209,7 +209,7 @@ class TestDashedEdgeRendering:
         for edge_kind in (EdgeKind.BATCH_ITEM, EdgeKind.BATCH_AGGREGATE, EdgeKind.PARALLEL_COMBINE):
             graph = self._build_controller_graph_with_dashed_edge(edge_kind=edge_kind, edge_label="test_label")
             graph_config = make_graph_config()
-            result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+            result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
             dashed_lines = self._extract_dashed_edges(result.mermaid_code)
             # Extract just the arrow operator from each line (e.g., `-."test_label".->` or `-.->`)
@@ -270,7 +270,7 @@ class TestDashedEdgeRendering:
             edges=[contains, aggregate_edge],
         )
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # The aggregated_output stuff should be rendered (resolved on the fly)
         assert "aggregated_output" in result.mermaid_code

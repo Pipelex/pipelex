@@ -9,6 +9,7 @@ class ExtractJobFactory:
     def make_extract_job(
         cls,
         extract_input: ExtractInput,
+        *,
         job_metadata: JobMetadata,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,

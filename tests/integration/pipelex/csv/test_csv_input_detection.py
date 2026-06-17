@@ -24,7 +24,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.tools.tabular.exceptions import CsvError
 
 if TYPE_CHECKING:
-    from mthds.models.pipeline_inputs import PipelineInputs
+    from mthds.protocol.pipeline_inputs import PipelineInputs
 
     from pipelex.core.stuffs.stuff_content import StuffContent
 
@@ -75,7 +75,7 @@ class TestCsvInputDetection:
         # rewritten into a local-looking path (which would defeat the remote guard) — the rejection
         # must still fire end to end.
         raw_inputs: dict[str, Any] = {"people": {"concept": "csv_demo.Person", "content": {"url": "s3://bucket/people.csv"}}}
-        resolved = resolve_inputs_paths(raw_inputs, Path("/some/base/dir"))
+        resolved = resolve_inputs_paths(raw_inputs, base_dir=Path("/some/base/dir"))
         assert resolved["people"]["content"]["url"] == "s3://bucket/people.csv"  # not rewritten
         inputs = cast("PipelineInputs", resolved)
         with pytest.raises(CsvError) as exc_info:

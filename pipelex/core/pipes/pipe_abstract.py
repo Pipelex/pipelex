@@ -14,7 +14,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
@@ -70,7 +70,9 @@ class PipeAbstract(ABC, BaseModel):
 
     @property
     def is_signature(self) -> bool:
-        return PipeCategory(self.pipe_category) is PipeCategory.PIPE_SIGNATURE
+        # Identity by class, not by enum field: the base is never a signature; `PipeSignature`
+        # overrides this to True. (`pipe_category` no longer encodes signature-ness.)
+        return False
 
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes that this pipe depends on.
@@ -98,7 +100,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
-    def _register_execution_data(self, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
+    def _register_execution_data(self, job_metadata: JobMetadata, *, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
@@ -147,21 +149,29 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in PipeType.value_list():
-            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {PipeType.value_list()}"
+        allowed = valid_pipe_type_tags()
+        if value not in allowed:
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed}"
             raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        if value not in PipeCategory.value_list():
-            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {PipeCategory.value_list()}"
+        # A signature carries `pipe_category = None` (no executable category); every executable pipe
+        # pins a `Literal["PipeOperator"|"PipeController"]`, so `None` unambiguously means "signature".
+        if value is not None and value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
+        if self.is_signature:
+            # Signatures sit outside the executable taxonomy: `type` is the signature tag (not a
+            # `PipeType`) and `pipe_category` is None, so the type↔category consistency check below
+            # (which coerces `PipeType(self.type)`) does not apply.
+            return self
         try:
             pipe_type = PipeType(self.type)
         except ValueError as exc:
@@ -202,7 +212,7 @@ class PipeAbstract(ABC, BaseModel):
         # First validate required variables are in the inputs (using prefix-based matching)
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
+            if not is_variable_satisfied_by_inputs(required_variable_path, input_names=input_names):
                 msg = (
                     f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
                     f"Current inputs: {self.inputs.format_for_display()}"
@@ -306,6 +316,7 @@ class PipeAbstract(ABC, BaseModel):
     async def validate_before_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -358,6 +369,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _validate_before_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -368,6 +380,7 @@ class PipeAbstract(ABC, BaseModel):
     async def validate_after_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -380,6 +393,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _validate_after_run(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -427,6 +441,7 @@ class PipeAbstract(ABC, BaseModel):
     async def run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -452,6 +467,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _run_pipe_traced(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -614,6 +630,7 @@ class PipeAbstract(ABC, BaseModel):
     async def live_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -686,6 +703,7 @@ class PipeAbstract(ABC, BaseModel):
     async def dry_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -705,6 +723,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _live_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -716,6 +735,7 @@ class PipeAbstract(ABC, BaseModel):
     async def _dry_run_pipe(
         self,
         job_metadata: JobMetadata,
+        *,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -726,6 +746,7 @@ class PipeAbstract(ABC, BaseModel):
     def _start_pipe_span(
         self,
         parent_otel_context: OtelContext,
+        *,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:
@@ -838,7 +859,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return span, is_root_span
 
-    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput, is_root_span: bool) -> None:
+    def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
         """End the pipe's OTel span with success status. Safe to call if span is None.
 
         Args:
@@ -872,7 +893,7 @@ class PipeAbstract(ABC, BaseModel):
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: Exception, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:

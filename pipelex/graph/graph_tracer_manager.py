@@ -3,6 +3,7 @@
 from datetime import datetime
 from typing import Any
 
+from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
@@ -93,6 +94,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def open_tracer(
         self,
         graph_id: str,
+        *,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -125,17 +127,29 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
-
-        Raises:
-            ValueError: If a tracer for this key already exists.
         """
         key = tracer_key or graph_id
+        # Collision-proof pop-and-replace: a stale tracer under this key can only be the
+        # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
+        # its finally-block close_tracer ran). Raising would let worker-local leak state
+        # decide whether tracing setup succeeds — a replay-determinism breach (audit
+        # finding M1). Delegate the eviction to close_tracer (the single teardown path).
+        # The warning is gated on key membership, not on close_tracer's return value: that
+        # value is ambiguous (None both when no tracer existed and when a costs-only tracer
+        # legitimately tears down without a GraphSpec).
         if key in self._tracers:
-            msg = f"Tracer for key '{key}' already exists"
-            raise ValueError(msg)
+            log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
+            try:
+                self.close_tracer(key)
+            except Exception as stale_teardown_exc:  # noqa: BLE001
+                # Best-effort: the stale tracer's teardown runs graph assembly over arbitrary
+                # half-built state from the interrupted execution — its failure must never
+                # fail the fresh run's setup (that would be the M1 class again: worker-local
+                # leak state deciding setup success). close_tracer pops before tearing down,
+                # so the key is free either way.
+                log.warning(f"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}")
 
         tracer = GraphTracer()
-        self._tracers[key] = tracer
 
         trace_context = tracer.setup(
             graph_id=graph_id,
@@ -151,6 +165,10 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
             trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
+
+        # Register only once setup has fully succeeded: a failure above must not leave
+        # an unusable tracer entry in the process-wide manager.
+        self._tracers[key] = tracer
         return trace_context
 
     def close_tracer(self, tracer_key: str) -> GraphSpec | None:
@@ -200,6 +218,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def on_pipe_start(
         self,
         trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -246,6 +265,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_success(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -283,6 +303,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_execution_data(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         execution_data: dict[str, Any],
@@ -303,6 +324,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_error(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -337,6 +359,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def add_edge(
         self,
+        *,
         lookup_key: str,
         source_node_id: str,
         target_node_id: str,
@@ -365,6 +388,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_controller_output(
         self,
+        *,
         lookup_key: str,
         node_id: str,
         output_spec: IOSpec,
@@ -386,6 +410,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_item_extraction(
         self,
+        *,
         lookup_key: str,
         list_stuff_code: str,
         item_stuff_code: str,
@@ -414,6 +439,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_aggregation(
         self,
+        *,
         lookup_key: str,
         output_list_stuff_code: str,
         item_stuff_code: str,
@@ -442,6 +468,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_parallel_combine(
         self,
+        *,
         lookup_key: str,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],

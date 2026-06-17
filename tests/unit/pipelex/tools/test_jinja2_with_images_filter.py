@@ -45,7 +45,7 @@ class TestWithImagesFilterValidation:
         context = self._make_context(registry=registry)
 
         with pytest.raises(Jinja2ContextError, match="undefined"):
-            with_images(context, Undefined())
+            with_images(context, value=Undefined())
 
     def test_with_images_raises_on_wrong_registry_type(self) -> None:
         """Test with_images raises if registry is wrong type."""
@@ -59,7 +59,7 @@ class TestWithImagesFilterValidation:
 
         # Pass a list (which is accepted by the filter) to trigger the registry type check
         with pytest.raises(Jinja2ContextError, match="Expected ImageRegistry"):
-            with_images(context, [])
+            with_images(context, value=[])
 
     def test_with_images_raises_on_string_input(self) -> None:
         """Test with_images raises error when receiving a plain string.
@@ -71,7 +71,7 @@ class TestWithImagesFilterValidation:
         context = self._make_context(registry=registry)
 
         with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
-            with_images(context, "This is a plain string")
+            with_images(context, value="This is a plain string")
 
     def test_with_images_raises_on_number_input(self) -> None:
         """Test with_images raises error when receiving a number."""
@@ -79,7 +79,7 @@ class TestWithImagesFilterValidation:
         context = self._make_context(registry=registry)
 
         with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
-            with_images(context, 42)
+            with_images(context, value=42)
 
     def test_with_images_raises_on_dict_input(self) -> None:
         """Test with_images raises error when receiving a plain dict."""
@@ -87,14 +87,14 @@ class TestWithImagesFilterValidation:
         context = self._make_context(registry=registry)
 
         with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
-            with_images(context, {"key": "value"})
+            with_images(context, value={"key": "value"})
 
     def test_with_images_accepts_empty_list(self) -> None:
         """Test with_images handles empty list gracefully."""
         registry = ImageRegistry()
         context = self._make_context(registry=registry)
 
-        result = with_images(context, [])
+        result = with_images(context, value=[])
 
         assert result == ""
         assert len(registry.images) == 0
@@ -107,7 +107,7 @@ class TestRenderSequenceWithImages:
         """Test empty list returns empty string."""
         registry = ImageRegistry()
 
-        result = _render_sequence_with_images([], registry, TextFormat.PLAIN)
+        result = _render_sequence_with_images([], registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == ""
         assert len(registry.images) == 0
@@ -116,7 +116,7 @@ class TestRenderSequenceWithImages:
         """Test empty tuple returns empty string."""
         registry = ImageRegistry()
 
-        result = _render_sequence_with_images((), registry, TextFormat.PLAIN)
+        result = _render_sequence_with_images((), registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == ""
         assert len(registry.images) == 0
@@ -125,7 +125,7 @@ class TestRenderSequenceWithImages:
         """Test that non-ImageRenderable items are converted to string."""
         registry = ImageRegistry()
 
-        result = _render_sequence_with_images(["hello", 42, None], registry, TextFormat.PLAIN)
+        result = _render_sequence_with_images(["hello", 42, None], registry=registry, text_format=TextFormat.PLAIN)
 
         # Items that convert to truthy strings are included
         assert "hello" in result

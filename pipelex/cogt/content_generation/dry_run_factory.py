@@ -71,7 +71,10 @@ class DryRunFactory:
         return result
 
     @staticmethod
-    def _main_pipe_from_pipe_dict(_field_name: str, values: dict[str, Any]) -> str:
+    def _main_pipe_from_pipe_dict(  # kw-only: ignore -- polyfactory PostGenerated invokes it positionally
+        _field_name: str,
+        values: dict[str, Any],
+    ) -> str:
         """PostGenerated callback that picks a key from the pipe dict for main_pipe."""
         pipe_dict: dict[str, Any] | None = values.get("pipe")
         if pipe_dict and len(pipe_dict) > 0:
@@ -194,6 +197,7 @@ class DryRunFactory:
     def _find_nested_base_model_classes(
         cls,
         object_class: type[BaseModel],
+        *,
         visited: set[type[BaseModel]] | None = None,
     ) -> set[type[BaseModel]]:
         """Recursively find all nested BaseModel classes in a model's field annotations.
@@ -226,7 +230,7 @@ class DryRunFactory:
                 if isinstance(type_to_check, type) and issubclass(type_to_check, BaseModel) and type_to_check not in visited:
                     nested_classes.add(type_to_check)
                     # Recursively find nested classes
-                    nested_classes.update(cls._find_nested_base_model_classes(type_to_check, visited))
+                    nested_classes.update(cls._find_nested_base_model_classes(type_to_check, visited=visited))
 
         return nested_classes
 
@@ -335,6 +339,7 @@ class DryRunFactory:
     def make_dry_run_factory(
         cls,
         object_class: type[BaseModelTypeVar],
+        *,
         snake_case_field_names: set[str] | None = None,
         pascal_case_field_names: set[str] | None = None,
     ) -> type[ModelFactory[BaseModelTypeVar]]:

@@ -64,7 +64,7 @@ flowchart TB
     subgraph FILTER["with_images Filter"]
         direction TB
         CHECK["isinstance(value, ImageRenderable)?"]
-        CALL["value.render_with_images(registry, format)"]
+        CALL["value.render_with_images(registry, text_format=format)"]
         CHECK --> CALL
     end
 
@@ -134,7 +134,7 @@ StuffArtefact supports bracket notation and iteration:
 | Method | Purpose |
 |--------|---------|
 | `artefact["field"]` | Bracket access (via `__getitem__`) |
-| `artefact.get("field", default)` | Safe access with default |
+| `artefact.get("field", default=...)` | Safe access with default |
 | `"field" in artefact` | Membership test |
 | `artefact.iter_keys()` | Iterate field names |
 | `artefact.iter_items()` | Iterate (key, value) pairs |
@@ -156,6 +156,7 @@ class ImageRenderable(Protocol):
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,
     ) -> str:
         """Render to string, registering images to the registry.
@@ -181,7 +182,7 @@ class ImageRenderable(Protocol):
 Self-registers and returns a token:
 
 ```python
-def render_with_images(self, registry, text_format) -> str:
+def render_with_images(self, registry, *, text_format) -> str:
     image_index = registry.register_image(self)
     return f"[Image {image_index + 1}]"
 ```
@@ -191,11 +192,11 @@ def render_with_images(self, registry, text_format) -> str:
 Iterates items, delegating to nested ImageRenderable objects:
 
 ```python
-def render_with_images(self, registry, text_format) -> str:
+def render_with_images(self, registry, *, text_format) -> str:
     parts: list[str] = []
     for item in self.items:
         if isinstance(item, ImageRenderable):
-            rendered = item.render_with_images(registry, text_format)
+            rendered = item.render_with_images(registry, text_format=text_format)
         else:
             rendered = str(item)
         if rendered:
@@ -208,7 +209,7 @@ def render_with_images(self, registry, text_format) -> str:
 Renders text first, then registers each image:
 
 ```python
-def render_with_images(self, registry, text_format) -> str:
+def render_with_images(self, registry, *, text_format) -> str:
     parts: list[str] = []
     if self.text:
         parts.append(self.text.rendered_plain())
@@ -224,14 +225,14 @@ def render_with_images(self, registry, text_format) -> str:
 Default implementation iterates Pydantic model fields:
 
 ```python
-def render_with_images(self, registry, text_format) -> str:
+def render_with_images(self, registry, *, text_format) -> str:
     parts: list[str] = []
     for field_name in type(self).model_fields:
         field_value = getattr(self, field_name)
         if field_value is None:
             continue
         if isinstance(field_value, ImageRenderable):
-            rendered = field_value.render_with_images(registry, text_format)
+            rendered = field_value.render_with_images(registry, text_format=text_format)
         else:
             rendered = str(field_value)
         if rendered:
@@ -287,7 +288,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
     # 4. Protocol-based rendering
     if isinstance(value, ImageRenderable):
-        return value.render_with_images(registry, text_format)
+        return value.render_with_images(registry, text_format=text_format)
 
     # 5. Handle plain sequences
     if isinstance(value, (list, tuple)):

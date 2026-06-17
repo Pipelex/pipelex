@@ -82,7 +82,6 @@ own page. Classes are grouped by subsystem.
 ## Pipe signatures
 
 - [`PipeSignatureNotExecutableError`](pipe-signature-not-executable-error.md) — Pipe signature not executable
-- [`SignaturesNotAllowedError`](signatures-not-allowed-error.md) — Signatures not allowed
 
 ## Builder
 

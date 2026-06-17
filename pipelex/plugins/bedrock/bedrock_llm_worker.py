@@ -90,6 +90,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # TODO: try with the newest instructor release

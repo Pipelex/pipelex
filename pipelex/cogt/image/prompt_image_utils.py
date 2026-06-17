@@ -29,6 +29,7 @@ from pipelex.tools.uri.resolved_uri import (
 
 async def prepare_prompt_image(
     prompt_image: PromptImage,
+    *,
     is_http_url_enabled: bool,
 ) -> PreparedFile:
     """Prepare a single prompt image for LLM API consumption.
@@ -95,6 +96,7 @@ async def prepare_prompt_image(
 
 async def prep_prompt_images(
     prompt_images: list[PromptImage],
+    *,
     is_http_url_enabled: bool,
 ) -> list[PreparedFile]:
     """Prepare multiple prompt images in parallel.

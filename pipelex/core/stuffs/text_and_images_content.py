@@ -36,7 +36,7 @@ class TextAndImagesContent(StuffContent):
         return ""
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         if self.text:
             return self.text.rendered_markdown(level=level, is_pretty=is_pretty)
         return ""
@@ -55,7 +55,7 @@ class TextAndImagesContent(StuffContent):
     # -------------------------------------------------------------------------------------
 
     @override
-    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, *, level: int = 1, is_pretty: bool = False) -> str:
         if self.text:
             rendered = await self.text.rendered_markdown_async(level=level, is_pretty=is_pretty)
         else:
@@ -76,6 +76,7 @@ class TextAndImagesContent(StuffContent):
     def render_with_images(
         self,
         registry: ImageRegistry,
+        *,
         text_format: TextFormat,
     ) -> str:
         """Render text, then register images."""
@@ -89,7 +90,7 @@ class TextAndImagesContent(StuffContent):
         return "\n".join(parts)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # If neither text nor images are present
         if not self.text and not self.images:
             return Text("(empty)", style="dim italic")

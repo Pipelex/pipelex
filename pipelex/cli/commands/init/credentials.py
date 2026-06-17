@@ -45,7 +45,7 @@ def read_env_file(env_path: Path) -> dict[str, str]:
     return entries
 
 
-def write_env_file(env_path: Path, entries: dict[str, str]) -> None:
+def write_env_file(env_path: Path, *, entries: dict[str, str]) -> None:
     """Write key-value pairs to a .env file with a header comment.
 
     Creates parent directories if needed. Sets file permissions to 0600 (user-only).
@@ -101,7 +101,7 @@ def get_required_vars_for_enabled_backends(backends_toml_path: Path) -> dict[str
     return var_to_backends
 
 
-def prompt_credentials(console: Console, backends_toml_path: Path) -> None:
+def prompt_credentials(console: Console, *, backends_toml_path: Path) -> None:
     """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
 
     Reads the backends.toml to find which env vars are needed by enabled backends,
@@ -146,7 +146,7 @@ def prompt_credentials(console: Console, backends_toml_path: Path) -> None:
             collected_count += 1
 
     if collected_count > 0:
-        write_env_file(global_env_path, entries)
+        write_env_file(global_env_path, entries=entries)
         console.print()
         console.print(f"[green]Saved {collected_count} credential(s) to {global_env_path}[/green]")
     else:

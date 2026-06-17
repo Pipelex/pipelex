@@ -28,7 +28,7 @@ def empty_list_factory_of(_: type[T]) -> Callable[[], list[T]]:
     return _factory
 
 
-def empty_dict_factory_of(_key: type[K], _val: type[V] | None = None) -> Callable[[], dict[K, Any]]:
+def empty_dict_factory_of(_key: type[K], *, _val: type[V] | None = None) -> Callable[[], dict[K, Any]]:
     """Create a typed empty dict factory.
 
     Args:
@@ -316,6 +316,7 @@ def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
 
 def serialize_model(
     obj: Any,
+    *,
     field_visibility: FieldVisibility = FieldVisibility.NO_HIDDEN_FIELDS,
     is_stringify_enums: bool = True,
 ) -> dict[str, Any] | list[Any] | Any:

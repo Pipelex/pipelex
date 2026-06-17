@@ -20,6 +20,7 @@ class PipeRunProtocol(Protocol):
     async def run(
         self,
         pipe_job: PipeJob,
+        *,
         delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipeOutput:
         """Execute a pipe job and, if `delivery_assignment` is provided, deliver the output.

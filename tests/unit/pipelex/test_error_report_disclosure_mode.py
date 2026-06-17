@@ -29,6 +29,8 @@ from pipelex.base_exceptions import (
     ErrorDomain,
     ErrorReport,
     PipelexUnexpectedError,
+    ValidationErrorCategory,
+    ValidationErrorItem,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
@@ -427,6 +429,43 @@ class TestErrorReportDisclosureMode:
         # ``message`` is on both (different values), ``user_action`` only on caller-facing —
         # those are the legitimate divergences. After removing them, the key sets must match.
         assert set(caller_facing_payload) - {"message", "user_action"} == set(redacted_payload) - {"message"}
+
+    @pytest.mark.parametrize(
+        "caller_facing",
+        [
+            pytest.param(True, id="caller-facing-branch"),
+            pytest.param(False, id="redacted-branch"),
+        ],
+    )
+    def test_strict_retains_validation_errors_on_both_branches(self, caller_facing: bool) -> None:
+        """``validation_errors`` survives STRICT on BOTH the caller-facing and redacted branches.
+
+        The structured per-error list describes the caller's own submitted bundle,
+        not server internals — so it is kept on the external surface via
+        ``_STRICT_KEPT_FIELDS`` rather than by the caller-facing branch's bespoke
+        message logic. A real ``ValidateBundleError`` only ever rides the
+        caller-facing branch, but the field must be branch-independent so a future
+        non-caller-facing report carrying it is not silently redacted.
+        """
+        report = ErrorReport(
+            error_type="ValidateBundleError",
+            message="bundle failed validation",
+            title="Validate bundle error",
+            type_uri="https://docs.pipelex.com/latest/errors/validate-bundle-error/",
+            error_domain=ErrorDomain.INPUT,
+            caller_facing_message=caller_facing,
+            validation_errors=[
+                ValidationErrorItem(
+                    category=ValidationErrorCategory.PIPE_VALIDATION,
+                    source="main.mthds",
+                    pipe_code="summarize",
+                    message="Missing input variable(s): doc.",
+                ),
+            ],
+        )
+        payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
+        assert "validation_errors" in payload
+        assert payload["validation_errors"][0]["source"] == "main.mthds"
 
     def test_receiver_rehydrates_verbose_payload_for_webhook(self) -> None:
         """An API-side receiver rebuilds the report from a VERBOSE webhook payload.

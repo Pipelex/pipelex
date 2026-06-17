@@ -119,12 +119,12 @@ def are_classes_equivalent(class_1: type[Any], class_2: type[Any]) -> bool:
         return True
 
 
-def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
-    """Check if class_1 has a field whose (possibly wrapped) type matches/subclasses class_2 or is structurally equivalent."""
-    if not hasattr(class_1, "model_fields"):
+def has_compatible_field(model_cls: type[Any], *, target_type: type[Any]) -> bool:
+    """Check if model_cls has a field whose (possibly wrapped) type matches/subclasses target_type or is structurally equivalent."""
+    if not hasattr(model_cls, "model_fields"):
         return False
 
-    fields: dict[str, FieldInfo] = class_1.model_fields  # type: ignore[attr-defined]
+    fields: dict[str, FieldInfo] = model_cls.model_fields  # type: ignore[attr-defined]
 
     def _is_compatible(type_param: Any) -> bool:
         # Unwrap Annotated[T, ...]
@@ -144,7 +144,7 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Base case: direct match / subclass
         try:
-            if type_param is class_2 or (isinstance(type_param, type) and issubclass(type_param, class_2)):
+            if type_param is target_type or (isinstance(type_param, type) and issubclass(type_param, target_type)):
                 return True
         except TypeError:
             # Not a class type (e.g., typing constructs you don't care about)
@@ -152,7 +152,7 @@ def has_compatible_field(class_1: type[Any], class_2: type[Any]) -> bool:
 
         # Also check for structural equivalence (same JSON schema)
         if isinstance(type_param, type) and hasattr(type_param, "model_fields"):
-            if are_classes_equivalent(type_param, class_2):
+            if are_classes_equivalent(type_param, class_2=target_type):
                 return True
 
         return False

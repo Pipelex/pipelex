@@ -29,7 +29,7 @@ def _get_next_output_folder() -> Path:
     Creates folders like: temp/test_outputs/graph_renderers/run_01, run_02, etc.
     """
     base_dir = Path(TEST_OUTPUTS_DIR) / "graph_renderers"
-    return get_incremental_directory_path(base_dir, "run")
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -83,7 +83,7 @@ class TestGraphRenderersFromJson:
         # ==================== MERMAID OUTPUTS ====================
 
         # Mermaidflow with data
-        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config=graph_config, direction=FlowchartDirection.TOP_DOWN)
         (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
         has_mermaidflow_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
         if has_mermaidflow_data:
@@ -104,7 +104,7 @@ class TestGraphRenderersFromJson:
         # Generate ReactFlow HTML directly from GraphSpec
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
-            graph_config.reactflow_config,
+            config=graph_config.reactflow_config,
             title=f"ReactFlow: {topic}",
         )
         reactflow_path = output_dir / "reactflow.html"

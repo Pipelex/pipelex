@@ -18,4 +18,4 @@ def fmt_cmd(
     This is a thin wrapper around ``plxt fmt`` that eliminates the need
     for agents to call the plxt binary directly.
     """
-    run_plxt("fmt", file_path)
+    run_plxt("fmt", file_path=file_path)

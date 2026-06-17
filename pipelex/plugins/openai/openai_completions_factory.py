@@ -113,6 +113,6 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return inference_model.extra_headers or {}, {}

@@ -132,7 +132,7 @@ class ModelDeck(ConfigModel):
             case ModelType.SEARCH:
                 return self.search_aliases, self.search_waterfalls
 
-    def is_model_handle_defined(self, model_handle: str, model_type: ModelType) -> bool:
+    def is_model_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
         """Check if a model handle is defined in the model deck.
 
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
@@ -219,6 +219,7 @@ class ModelDeck(ConfigModel):
     def _raise_handle_not_found_error(
         self,
         ref: ModelReference,
+        *,
         model_type: ModelType,
         presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
     ) -> NoReturn:
@@ -249,6 +250,7 @@ class ModelDeck(ConfigModel):
     def check_llm_choice(
         self,
         llm_choice: LLMModelChoice,
+        *,
         is_disabled_allowed: bool = False,
     ):
         if isinstance(llm_choice, LLMSetting):
@@ -519,7 +521,7 @@ class ModelDeck(ConfigModel):
     ############################################################
 
     @classmethod
-    def _validate_llm_setting(cls, llm_setting: LLMSetting, inference_model: InferenceModelSpec):
+    def _validate_llm_setting(cls, llm_setting: LLMSetting, *, inference_model: InferenceModelSpec):
         if inference_model.max_tokens is not None and (llm_setting_max_tokens := llm_setting.max_tokens):
             if llm_setting_max_tokens > inference_model.max_tokens:
                 msg = (
@@ -684,7 +686,7 @@ class ModelDeck(ConfigModel):
         """Return the set of backend names that have at least one model enabled."""
         return {model.backend_name for model in self.inference_models.values()}
 
-    def _is_model_available_in_backend(self, model_handle: str, backend_name: str) -> bool | None:
+    def _is_model_available_in_backend(self, model_handle: str, *, backend_name: str) -> bool | None:
         """Check if a model is available from a specific backend.
 
         This is a low-level check that reads the backend TOML file directly,
@@ -713,6 +715,7 @@ class ModelDeck(ConfigModel):
     def _resolve_waterfall(
         self,
         waterfall_name: str,
+        *,
         fallback_list: list[str],
         model_type: ModelType,
     ) -> InferenceModelSpec | None:
@@ -768,7 +771,7 @@ class ModelDeck(ConfigModel):
         )
         raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list)
 
-    def get_optional_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec | None:
+    def get_optional_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec | None:
         """Get an inference model spec, resolving aliases and waterfalls as needed.
 
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
@@ -783,6 +786,7 @@ class ModelDeck(ConfigModel):
     def _get_optional_inference_model(
         self,
         model_handle: str,
+        *,
         model_type: ModelType,
         _visited: frozenset[str],
     ) -> InferenceModelSpec | None:
@@ -855,11 +859,11 @@ class ModelDeck(ConfigModel):
         log.verbose(f"Skipping model handle '{model_handle}' because it's was not found in the model deck, it could be an external plugin.")
         return None
 
-    def is_handle_defined(self, model_handle: str, model_type: ModelType) -> bool:
+    def is_handle_defined(self, model_handle: str, *, model_type: ModelType) -> bool:
         aliases, waterfalls = self.get_aliases_and_waterfalls_for_type(model_type)
         return model_handle in self.inference_models or model_handle in aliases or model_handle in waterfalls
 
-    def get_required_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec:
+    def get_required_inference_model(self, model_handle: str, *, model_type: ModelType) -> InferenceModelSpec:
         inference_model = self.get_optional_inference_model(model_handle=model_handle, model_type=model_type)
         if inference_model is None:
             msg = (

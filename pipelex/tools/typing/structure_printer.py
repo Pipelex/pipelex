@@ -69,6 +69,7 @@ class StructurePrinter:
     def get_type_structure(
         self,
         tp: type[Any],
+        *,
         seen_types: set[str] | None = None,
         collected_types: dict[str, type[Any]] | None = None,
         collected_enums: dict[str, type[Enum]] | None = None,

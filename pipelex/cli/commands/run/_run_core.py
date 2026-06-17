@@ -31,7 +31,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -48,16 +48,17 @@ if TYPE_CHECKING:
 COMMAND = "run"
 
 
-def validate_run_flag_combination(*, dry_run: bool, mock_inference: bool, mock_inputs: bool) -> None:
-    """Reject illegal ``--dry-run`` / ``--mock-inference`` / ``--mock-inputs`` combinations.
+def validate_run_flag_combination(*, dry_run: bool, mock_usage: bool, mock_inputs: bool) -> None:
+    """Reject illegal ``--dry-run`` / ``--mock-usage`` / ``--mock-inputs`` combinations.
 
     Single owner of which run-flag combinations are legal, shared by the ``pipe`` / ``method`` / ``bundle``
     run subcommands so they can't drift:
 
-    - ``--mock-inputs`` requires ``--dry-run`` — it fills missing required inputs for the dry generator
-      that ``--dry-run`` swaps in pre-dispatch; without ``--dry-run`` there is nothing for it to feed.
-    - ``--mock-inference`` cannot be combined with ``--dry-run`` — ``--dry-run`` swaps the generator
-      pre-dispatch so the leaf is never reached, which would silently ignore ``--mock-inference``.
+    - ``--mock-inputs`` requires ``--dry-run`` — it synthesizes missing required inputs for a dry
+      run; a live run must be fed real inputs.
+    - ``--mock-usage`` (hidden test trigger) requires ``--dry-run`` — it is a sub-flag of the dry
+      run (non-zero synthetic usage so the cost report renders); on a live run it is a contract
+      violation.
 
     Prints the offending combination to stderr and raises ``typer.Exit(1)``; returns ``None`` when the
     combination is legal.
@@ -65,13 +66,14 @@ def validate_run_flag_combination(*, dry_run: bool, mock_inference: bool, mock_i
     if mock_inputs and not dry_run:
         typer.secho("Failed to run: --mock-inputs requires --dry-run", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-    if mock_inference and dry_run:
-        typer.secho("Failed to run: --mock-inference cannot be combined with --dry-run", fg=typer.colors.RED, err=True)
+    if mock_usage and not dry_run:
+        typer.secho("Failed to run: --mock-usage requires --dry-run", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
 
 async def _execute_run(
     pipe_code: str | None,
+    *,
     bundle_path: str | None,
     inputs: str | None,
     save_working_memory: bool,
@@ -82,12 +84,11 @@ async def _execute_run(
     graph_full_data: bool | None,
     output_dir: str,
     dry_run: bool,
-    mock_inference: bool,
+    mock_usage: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
     costs: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
-    *,
     save_csv: str | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
@@ -112,7 +113,7 @@ async def _execute_run(
         try:
             mthds_content = Path(bundle_path).read_text(encoding="utf-8")
             # Use lightweight parsing to extract main_pipe without full validation
-            # Full validation happens later during execute_pipeline
+            # Full validation happens later during execute
             if not pipe_code:
                 bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
                 main_pipe_code = bundle_blueprint.main_pipe
@@ -151,7 +152,7 @@ async def _execute_run(
                 pipeline_inputs = load_json_dict_from_path(Path(inputs))
                 # Resolve relative url paths against the inputs file's parent directory
                 base_dir = Path(inputs).parent.resolve()
-                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir)
+                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
                 print_traceback_if_requested(get_console())
@@ -174,14 +175,14 @@ async def _execute_run(
     )
 
     try:
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             bundle_uris=[bundle_path] if bundle_path else None,
             pipe_run_mode=pipe_run_mode,
-            is_mock_inference=mock_inference,
+            is_mock_usage=mock_usage,
             execution_config=execution_config,
             library_dirs=library_dir,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code=pipe_code,
             mthds_contents=[mthds_content] if mthds_content else None,
             inputs=pipeline_inputs,
@@ -342,6 +343,7 @@ async def _execute_run(
 
 def execute_run(
     pipe_code: str | None,
+    *,
     bundle_path: str | None,
     inputs: str | None,
     save_working_memory: bool,
@@ -352,14 +354,13 @@ def execute_run(
     graph_full_data: bool | None,
     output_dir: str,
     dry_run: bool,
-    mock_inference: bool,
+    mock_usage: bool,
     mock_inputs: bool,
     library_dir: list[str] | None,
     costs: bool | None = None,
     telemetry_command_label: str = COMMAND,
     temporal: bool | None = None,
     dynamic_output_concept_ref: str | None = None,
-    *,
     save_csv: str | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
@@ -386,7 +387,7 @@ def execute_run(
                     graph_full_data=graph_full_data,
                     output_dir=output_dir,
                     dry_run=dry_run,
-                    mock_inference=mock_inference,
+                    mock_usage=mock_usage,
                     mock_inputs=mock_inputs,
                     library_dir=library_dir,
                     costs=costs,

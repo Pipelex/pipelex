@@ -99,6 +99,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def register_function(
         self,
         func: Callable[..., Any],
+        *,
         name: str | None = None,
     ) -> None:
         """Registers a function in the registry with a name if it meets eligibility criteria."""
@@ -196,7 +197,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         return hasattr(func, PIPE_FUNC_MARKER) and getattr(func, PIPE_FUNC_MARKER) is True
 
     # TODO: refactor this into a subclass of FuncRegistry dedicated to pipe funcs, avoid the circular import issue, avoid the code-smell
-    def is_eligible_function(self, func: Any, require_decorator: bool = False) -> bool:
+    def is_eligible_function(self, func: Any, *, require_decorator: bool = False) -> bool:
         """Checks if a function matches the criteria for PipeFunc registration:
         - Must be callable
         - Exactly 1 parameter named "working_memory" with type WorkingMemory
@@ -346,6 +347,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def register_ineligible_function(
         self,
         func: Callable[..., Any],
+        *,
         reason: str,
         source_file: str | None = None,
     ) -> None:

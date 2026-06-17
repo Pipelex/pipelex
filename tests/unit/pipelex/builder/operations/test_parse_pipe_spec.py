@@ -31,29 +31,29 @@ class TestParsePipeSpec:
 
     def test_unknown_type_raises(self) -> None:
         with pytest.raises(ValueError, match="Invalid pipe type"):
-            parse_pipe_spec("PipeNonExistent", {"pipe_code": "x", "description": "x"})
+            parse_pipe_spec({"pipe_code": "x", "description": "x"}, pipe_type="PipeNonExistent")
 
     def test_error_lists_valid_types(self) -> None:
         with pytest.raises(ValueError, match="PipeLLM"):
-            parse_pipe_spec("PipeBogus", {"pipe_code": "x", "description": "x"})
+            parse_pipe_spec({"pipe_code": "x", "description": "x"}, pipe_type="PipeBogus")
 
     # -- pipe_code aliases ------------------------------------------------
 
     def test_canonical_pipe_code(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        result = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         assert result.pipe_code == "test_pipe"
 
     @pytest.mark.parametrize("alias", ["the_pipe_code", "code", "name", "pipe_name", "pipe_ref"])
     def test_pipe_code_alias_accepted(self, alias: str) -> None:
         spec = {key: val for key, val in _BASE_LLM.items() if key != "pipe_code"}
         spec[alias] = "via_alias"
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.pipe_code == "via_alias"
 
     def test_canonical_pipe_code_takes_precedence_over_alias(self) -> None:
         """When pipe_code is present, aliases are ignored and cleaned up."""
         spec = {**_BASE_LLM, "code": "alias_value", "name": "another_alias"}
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.pipe_code == "test_pipe"
 
     def test_first_alias_wins_when_no_canonical(self) -> None:
@@ -62,32 +62,32 @@ class TestParsePipeSpec:
         spec["code"] = "second"
         spec["the_pipe_code"] = "first"
         spec["name"] = "third"
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.pipe_code == "first"
 
     # -- output dict tolerance --------------------------------------------
 
     def test_output_as_string(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": "Article"})
+        result = parse_pipe_spec({**_BASE_LLM, "output": "Article"}, pipe_type="PipeLLM")
         assert result.output == "Article"
 
     def test_output_dict_with_type_key(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"type": "Article"}})
+        result = parse_pipe_spec({**_BASE_LLM, "output": {"type": "Article"}}, pipe_type="PipeLLM")
         assert result.output == "Article"
 
     def test_output_single_item_dict(self) -> None:
         """A single-item dict is unambiguous — extract the value."""
-        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"result": "Article"}})
+        result = parse_pipe_spec({**_BASE_LLM, "output": {"result": "Article"}}, pipe_type="PipeLLM")
         assert result.output == "Article"
 
     def test_output_multi_item_dict_raises(self) -> None:
         """A multi-item dict is ambiguous — validation fails."""
         with pytest.raises(ValidationError):
-            parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"a": "Text", "b": "Image"}})
+            parse_pipe_spec({**_BASE_LLM, "output": {"a": "Text", "b": "Image"}}, pipe_type="PipeLLM")
 
     def test_output_type_key_takes_precedence_in_dict(self) -> None:
         """When 'type' key is present in output dict, it wins even if other keys exist."""
-        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"type": "Article", "extra": "ignored"}})
+        result = parse_pipe_spec({**_BASE_LLM, "output": {"type": "Article", "extra": "ignored"}}, pipe_type="PipeLLM")
         assert result.output == "Article"
 
     # -- output field aliases -----------------------------------------------
@@ -97,14 +97,14 @@ class TestParsePipeSpec:
         """Each output alias resolves to the correct output value."""
         spec = {key: val for key, val in _BASE_LLM.items() if key != "output"}
         spec[alias] = "Article"
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.output == "Article"
 
     @pytest.mark.parametrize("alias", ["output_concept", "output_type"])
     def test_output_alias_tried_first_when_canonical_present(self, alias: str) -> None:
         """When both output and an alias exist, alias value is tried first."""
         spec = {**_BASE_LLM, alias: "AliasValue"}
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.output == "AliasValue"
 
     def test_first_output_alias_wins(self) -> None:
@@ -112,7 +112,7 @@ class TestParsePipeSpec:
         spec = {key: val for key, val in _BASE_LLM.items() if key != "output"}
         spec["output_type"] = "SecondAlias"
         spec["output_concept"] = "FirstAlias"
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.output == "FirstAlias"
 
     # -- prompt aliases ---------------------------------------------------
@@ -121,14 +121,14 @@ class TestParsePipeSpec:
         """`prompt_template` alone is promoted to `prompt` for PipeLLM."""
         spec = {key: val for key, val in _BASE_LLM.items() if key != "prompt"}
         spec["prompt_template"] = "Write about $text"
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert isinstance(result, PipeLLMSpec)
         assert result.prompt == "Write about $text"
 
     def test_canonical_prompt_takes_precedence_over_alias(self) -> None:
         """When both `prompt` and `prompt_template` are present, canonical wins and alias is dropped."""
         spec = {**_BASE_LLM, "prompt_template": "alias_value"}
-        result = parse_pipe_spec("PipeLLM", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert isinstance(result, PipeLLMSpec)
         assert result.prompt == _BASE_LLM["prompt"]
 
@@ -141,7 +141,7 @@ class TestParsePipeSpec:
             "output": "Image",
             "prompt_template": "Generate: $prompt_text",
         }
-        result = parse_pipe_spec("PipeImgGen", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeImgGen")
         assert isinstance(result, PipeImgGenSpec)
         assert result.prompt == "Generate: $prompt_text"
 
@@ -155,7 +155,7 @@ class TestParsePipeSpec:
             "output": "Text",
             "steps": [{"pipe_code": "step_one", "result": "intermediate"}],
         }
-        result = parse_pipe_spec("PipeSequence", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeSequence")
         assert isinstance(result, PipeSequenceSpec)
         assert result.steps[0].pipe_code == "step_one"
 
@@ -172,7 +172,7 @@ class TestParsePipeSpec:
                 {alias: "step_two", "result": "final"},
             ],
         }
-        result = parse_pipe_spec("PipeSequence", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeSequence")
         assert isinstance(result, PipeSequenceSpec)
         assert result.steps[0].pipe_code == "step_one"
         assert result.steps[1].pipe_code == "step_two"
@@ -191,7 +191,7 @@ class TestParsePipeSpec:
                 {alias: "branch_b", "result": "result_b"},
             ],
         }
-        result = parse_pipe_spec("PipeParallel", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeParallel")
         assert isinstance(result, PipeParallelSpec)
         assert result.branches[0].pipe_code == "branch_a"
         assert result.branches[1].pipe_code == "branch_b"
@@ -211,7 +211,7 @@ class TestParsePipeSpec:
                 {"pipe": "analyze_match", "result": "match_analysis"},
             ],
         }
-        result = parse_pipe_spec("PipeSequence", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeSequence")
         assert isinstance(result, PipeSequenceSpec)
         assert result.steps[0].pipe_code == "extract_cv"
         assert result.steps[1].pipe_code == "extract_job_offer"
@@ -227,7 +227,7 @@ class TestParsePipeSpec:
                 {"pipe": "branch_a", "inputs": {"doc": "doc"}, "result": "result_a"},
             ],
         }
-        result = parse_pipe_spec("PipeParallel", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeParallel")
         assert isinstance(result, PipeParallelSpec)
         assert result.branches[0].pipe_code == "branch_a"
 
@@ -238,32 +238,32 @@ class TestParsePipeSpec:
         """A non-list ``steps`` is a caller-input fault, surfaced as a typed PipeSpecError."""
         spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": bad_steps}
         with pytest.raises(PipeSpecError, match="'steps' must be a list of step mappings"):
-            parse_pipe_spec("PipeSequence", spec)
+            parse_pipe_spec(spec, pipe_type="PipeSequence")
 
     @pytest.mark.parametrize("bad_entry", [42, "astring", [1, 2]])
     def test_non_mapping_step_entry_raises_pipe_spec_error(self, bad_entry: Any) -> None:
         """A step entry that is not a mapping is a typed input error, not a bare TypeError."""
         spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": [bad_entry]}
         with pytest.raises(PipeSpecError, match="entry in pipe spec 'steps' must be a mapping"):
-            parse_pipe_spec("PipeSequence", spec)
+            parse_pipe_spec(spec, pipe_type="PipeSequence")
 
     @pytest.mark.parametrize("bad_branches", ["notalist", 42, {"a": "b"}])
     def test_non_list_branches_raises_pipe_spec_error(self, bad_branches: Any) -> None:
         spec: dict[str, Any] = {"pipe_code": "my_par", "description": "d", "output": "Text", "branches": bad_branches}
         with pytest.raises(PipeSpecError, match="'branches' must be a list of step mappings"):
-            parse_pipe_spec("PipeParallel", spec)
+            parse_pipe_spec(spec, pipe_type="PipeParallel")
 
     @pytest.mark.parametrize("bad_entry", [42, "astring", [1, 2]])
     def test_non_mapping_branch_entry_raises_pipe_spec_error(self, bad_entry: Any) -> None:
         spec: dict[str, Any] = {"pipe_code": "my_par", "description": "d", "output": "Text", "branches": [bad_entry]}
         with pytest.raises(PipeSpecError, match="entry in pipe spec 'branches' must be a mapping"):
-            parse_pipe_spec("PipeParallel", spec)
+            parse_pipe_spec(spec, pipe_type="PipeParallel")
 
     def test_malformed_steps_classifies_as_input_domain(self) -> None:
         """The raised error carries the INPUT domain so HTTP consumers render it as a 422."""
         spec: dict[str, Any] = {"pipe_code": "my_seq", "description": "d", "output": "Text", "steps": "notalist"}
         with pytest.raises(PipeSpecError) as exc_info:
-            parse_pipe_spec("PipeSequence", spec)
+            parse_pipe_spec(spec, pipe_type="PipeSequence")
         assert error_domain_is_input(exc_info.value.error_domain)
 
     # -- malformed top-level shape (typed, not bare TypeError/ValueError) --
@@ -272,11 +272,11 @@ class TestParsePipeSpec:
     def test_non_mapping_top_level_raises_pipe_spec_error(self, bad_spec: Any) -> None:
         """A non-mapping top-level spec leaks a bare TypeError/ValueError from dict() without the guard."""
         with pytest.raises(PipeSpecError, match="must be a mapping"):
-            parse_pipe_spec("PipeLLM", bad_spec)
+            parse_pipe_spec(bad_spec, pipe_type="PipeLLM")
 
     def test_non_mapping_top_level_classifies_as_input_domain(self) -> None:
         with pytest.raises(PipeSpecError) as exc_info:
-            parse_pipe_spec("PipeLLM", "not a mapping")
+            parse_pipe_spec("not a mapping", pipe_type="PipeLLM")
         assert error_domain_is_input(exc_info.value.error_domain)
 
     # -- PipeCondition expression alias -----------------------------------
@@ -292,19 +292,19 @@ class TestParsePipeSpec:
 
     def test_condition_expression_alias(self) -> None:
         spec = {**self._BASE_CONDITION, "expression": "{{ status }}"}
-        result = parse_pipe_spec("PipeCondition", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeCondition")
         assert isinstance(result, PipeConditionSpec)
         assert result.jinja2_expression_template == "{{ status }}"
 
     def test_condition_canonical_jinja2_field(self) -> None:
         spec = {**self._BASE_CONDITION, "jinja2_expression_template": "{{ status }}"}
-        result = parse_pipe_spec("PipeCondition", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeCondition")
         assert isinstance(result, PipeConditionSpec)
         assert result.jinja2_expression_template == "{{ status }}"
 
     def test_condition_canonical_takes_precedence(self) -> None:
         spec = {**self._BASE_CONDITION, "jinja2_expression_template": "{{ canonical }}", "expression": "{{ alias }}"}
-        result = parse_pipe_spec("PipeCondition", spec)
+        result = parse_pipe_spec(spec, pipe_type="PipeCondition")
         assert isinstance(result, PipeConditionSpec)
         assert result.jinja2_expression_template == "{{ canonical }}"
 
@@ -320,7 +320,7 @@ class TestParsePipeSpec:
             "prompt": "Write about $text",
         }
         snapshot = dict(original)
-        parse_pipe_spec("PipeLLM", original)
+        parse_pipe_spec(original, pipe_type="PipeLLM")
         assert original == snapshot
 
     def test_nested_step_dicts_not_mutated(self) -> None:
@@ -333,7 +333,7 @@ class TestParsePipeSpec:
             "steps": [step],
         }
         step_snapshot = dict(step)
-        parse_pipe_spec("PipeSequence", spec)
+        parse_pipe_spec(spec, pipe_type="PipeSequence")
         assert step == step_snapshot
 
     # -- returns correct subclass -----------------------------------------
@@ -394,5 +394,5 @@ class TestParsePipeSpec:
         ],
     )
     def test_correct_subclass(self, pipe_type: str, spec_data: dict[str, Any], expected_class: type) -> None:
-        result = parse_pipe_spec(pipe_type, spec_data)
+        result = parse_pipe_spec(spec_data, pipe_type=pipe_type)
         assert isinstance(result, expected_class)
