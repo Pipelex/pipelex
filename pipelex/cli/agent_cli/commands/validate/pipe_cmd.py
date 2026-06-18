@@ -14,7 +14,6 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     extract_validation_errors,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_all_core,
     validate_pipe_core,
@@ -26,6 +25,7 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import format_validate_markdown
 
 
 def validate_pipe_cmd(
@@ -75,7 +75,7 @@ def validate_pipe_cmd(
     # Handle --all flag
     if validate_all:
         if pipe_code:
-            agent_error("--all cannot be used with a pipe code", error_type="ArgumentError")
+            agent_error("--all cannot be used with a pipe code", error_type="ArgumentError", exit_code=2)
 
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
@@ -111,6 +111,7 @@ def validate_pipe_cmd(
                 pipe_code=exc.pipe_code,
                 model_type=str(exc.model_type),
                 model_choice=str(exc.model_choice),
+                exit_code=2,
             )
 
         except PipeOperatorModelAvailabilityError as exc:
@@ -120,6 +121,7 @@ def validate_pipe_cmd(
                 cause=exc,
                 pipe_code=exc.pipe_code,
                 model_handle=exc.model_handle,
+                exit_code=2,
             )
 
         except typer.Exit:
@@ -129,7 +131,7 @@ def validate_pipe_cmd(
 
         except Exception as exc:  # noqa: BLE001
             # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-            agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+            agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
         finally:
             Pipelex.teardown_if_needed()
@@ -139,6 +141,7 @@ def validate_pipe_cmd(
         agent_error(
             "No pipe code specified. Use --all to validate all pipes, or use 'validate bundle <path>' for bundle files.",
             error_type="ArgumentError",
+            exit_code=2,
         )
 
     # Helpful error if the user passes a path instead of a pipe code
@@ -148,6 +151,7 @@ def validate_pipe_cmd(
             f"'{pipe_code}' looks like a file path or directory. "
             f"Use 'validate bundle {pipe_code}' for bundles/directories, or 'validate pipe <code>' for pipe codes.",
             error_type="ArgumentError",
+            exit_code=2,
         )
 
     # Check installed methods' exports for additional library dirs
@@ -158,6 +162,7 @@ def validate_pipe_cmd(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             error_type="ArgumentError",
             cause=exc,
+            exit_code=2,
         )
     if export_dirs:
         export_paths = [Path(export_dir) for export_dir in export_dirs]
@@ -176,7 +181,7 @@ def validate_pipe_cmd(
         error_message = str(exc)
         if pipe_code == "all":
             error_message += " Did you mean '--all'?"
-        agent_error(error_message, error_type="PipeNotFoundError", cause=exc)
+        agent_error(error_message, error_type="PipeNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict (see the --all arm): structured failure envelope; validation_errors[] is the
@@ -197,6 +202,7 @@ def validate_pipe_cmd(
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
             model_choice=str(exc.model_choice),
+            exit_code=2,
         )
 
     except PipeOperatorModelAvailabilityError as exc:
@@ -208,14 +214,14 @@ def validate_pipe_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra, exit_code=2)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

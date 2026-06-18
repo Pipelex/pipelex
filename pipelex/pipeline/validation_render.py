@@ -1,4 +1,16 @@
-"""Shared output formatting helpers for agent CLI validate commands."""
+"""Public, non-CLI Markdown rendering for validation results.
+
+This is the public home of ``format_validate_markdown`` — lifted out of the
+agent CLI (``cli/agent_cli/commands/validate/_output_helpers.py``) so it can be
+imported by other surfaces (notably ``pipelex-api``'s ``/validate`` route, which
+attaches an opt-in ``rendered_markdown`` extra) WITHOUT pulling in Typer / the
+CLI internals. The agent CLI keeps using it for its ``--format markdown`` valid
+path, so the local-CLI and API-runner Markdown share one source of truth and
+cannot drift.
+
+It renders the **valid-arm** validation result. The invalid-arm rendering for
+the API is deferred to Phase 3 (see ``wip/validate-rendered-markdown-invalid-arm.md``).
+"""
 
 from __future__ import annotations
 

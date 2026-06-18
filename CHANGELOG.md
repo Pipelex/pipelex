@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed (pre-1.0 breaking)
+
+- **Validate exit-code policy (0 / 1 / 2)** — the `validate` surface (both the bare `pipelex validate {bundle,method,pipe}` group and `pipelex-agent validate`) now exits with three codes mirroring the hosted `/validate` 200-verdict-vs-non-2xx-no-verdict split: `0` = valid, `1` = a produced negative verdict (invalid bundle, or valid-but-not-runnable without `--allow-signatures`), `2` = no verdict (bad args, unresolvable target, setup/internal error). Previously every failure exited `1`. Notably, `pipelex validate bundle` **directory-resolution failures** (no `.mthds` found / multiple `.mthds` and no default `bundle.mthds` / a path that is neither a file nor a directory) now exit **2** instead of **1**. Both `1` and `2` remain non-zero, so consumers that only test zero-vs-non-zero are unaffected. The verdict remains in the structured `is_valid` field — machine consumers should read it rather than branch on the exit code.
+- **Validate Markdown renderer relocated** — `format_validate_markdown` moved from `pipelex.cli.agent_cli.commands.validate._output_helpers` to the public, non-CLI module `pipelex.pipeline.validation_render`, so other surfaces (e.g. `pipelex-api`'s `/validate` opt-in `rendered_markdown` extra) can import it without pulling in the CLI/Typer stack. Output is byte-identical; only the import path changed.
+
 ## [v0.34.0] - 2026-06-17
 
 ### Highlights

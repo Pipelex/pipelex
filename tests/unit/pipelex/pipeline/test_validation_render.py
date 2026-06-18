@@ -1,10 +1,10 @@
-"""Unit tests for the agent CLI validate markdown renderer (`format_validate_markdown`)."""
+"""Unit tests for the validate markdown renderer (`pipelex.pipeline.validation_render.format_validate_markdown`)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown  # noqa: PLC2701
+from pipelex.pipeline.validation_render import format_validate_markdown
 
 
 class TestFormatValidateMarkdown:

@@ -103,9 +103,9 @@ def do_validate_all_libraries_and_dry_run(
             signature_count = sum(1 for pipe in all_pipes if pipe.is_signature)
             typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
     except PipeOperatorModelAvailabilityError as exc:
-        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
 
 
 async def _validate_pipe_or_bundle(
@@ -147,7 +147,7 @@ async def _validate_pipe_or_bundle(
                 fg=typer.colors.RED,
                 err=True,
             )
-            raise typer.Exit(1) from exc
+            raise typer.Exit(2) from exc
         except ValidateBundleError as bundle_error:
             handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
     elif pipe_code:
@@ -180,7 +180,7 @@ async def _validate_pipe_or_bundle(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(2)
 
 
 def execute_validate(
@@ -228,10 +228,10 @@ def execute_validate(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1) from exc
+        raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
+        handle_model_choice_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     except PipeOperatorModelAvailabilityError as exc:
-        handle_model_availability_error(exc, context=ErrorContext.VALIDATION)
+        handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     finally:
         Pipelex.teardown_if_needed()
