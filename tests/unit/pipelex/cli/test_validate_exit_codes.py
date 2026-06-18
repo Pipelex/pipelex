@@ -24,6 +24,7 @@ from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_c
 from pipelex.cli.agent_cli.commands.validate.pipe_cmd import validate_pipe_cmd as agent_validate_pipe_cmd
 from pipelex.cli.commands.validate.bundle_cmd import validate_bundle_cmd as bare_validate_bundle_cmd
 from pipelex.cli.commands.validate.pipe_cmd import validate_pipe_cmd as bare_validate_pipe_cmd
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
 
 if TYPE_CHECKING:
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 AGENT_BUNDLE_MODULE = "pipelex.cli.agent_cli.commands.validate.bundle_cmd"
+AGENT_PIPE_MODULE = "pipelex.cli.agent_cli.commands.validate.pipe_cmd"
 
 
 def _make_dir(tmp_path: Path, name: str, mthds_files: list[str]) -> Path:
@@ -195,3 +197,26 @@ class TestValidateExitCodes:
         mocker.patch(f"{AGENT_BUNDLE_MODULE}.validate_bundle_core", new=mocker.AsyncMock(return_value=runnable))
         # Valid and runnable: returns normally (exit 0), no typer.Exit raised.
         agent_validate_bundle_cmd(path=str(self._bundle_file(tmp_path)), output_format=CliOutputFormat.JSON)
+
+    def _patch_pipe_boot(self, mocker: MockerFixture) -> None:
+        mocker.patch(f"{AGENT_PIPE_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{AGENT_PIPE_MODULE}.Pipelex.teardown_if_needed")
+
+    def test_agent_validate_all_dry_run_failure_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
+        # `validate --all` sweeps via validate_all_core → validate_current_library, which raises
+        # DryRunError directly. A dry-run failure is a produced negative verdict → exit 1, NOT the
+        # catch-all's no-verdict 2.
+        self._patch_pipe_boot(mocker)
+        mocker.patch(f"{AGENT_PIPE_MODULE}.validate_all_core", new=mocker.AsyncMock(side_effect=DryRunError("pipe dry-run failed")))
+        with pytest.raises(typer.Exit) as exc_info:
+            agent_validate_pipe_cmd(pipe_code=None, validate_all=True, output_format=CliOutputFormat.JSON)
+        assert exc_info.value.exit_code == 1
+
+    def test_agent_validate_pipe_dry_run_failure_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
+        # Single-pipe validate_pipe_core sweeps via validate_pipes, which raises DryRunError directly.
+        self._patch_pipe_boot(mocker)
+        mocker.patch(f"{AGENT_PIPE_MODULE}.resolve_pipe_from_exports", new=mocker.Mock(return_value=[]))
+        mocker.patch(f"{AGENT_PIPE_MODULE}.validate_pipe_core", new=mocker.AsyncMock(side_effect=DryRunError("pipe dry-run failed")))
+        with pytest.raises(typer.Exit) as exc_info:
+            agent_validate_pipe_cmd(pipe_code="my_pipe", output_format=CliOutputFormat.JSON)
+        assert exc_info.value.exit_code == 1

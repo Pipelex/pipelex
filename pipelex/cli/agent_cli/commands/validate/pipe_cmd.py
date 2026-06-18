@@ -23,6 +23,7 @@ from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import format_validate_markdown
@@ -124,6 +125,12 @@ def validate_pipe_cmd(
                 exit_code=2,
             )
 
+        except DryRunError as exc:
+            # A dry-run failure is a produced NEGATIVE VERDICT (a pipe is invalid) — exit 1, NOT the
+            # catch-all's no-verdict 2. `validate --all` sweeps via validate_current_library, which
+            # raises DryRunError directly (not wrapped in ValidateBundleError as the bundle path is).
+            agent_error(str(exc), error_type="DryRunError", cause=exc, is_valid=False, exit_code=1)
+
         except typer.Exit:
             # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
             # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
@@ -215,6 +222,12 @@ def validate_pipe_cmd(
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra, exit_code=2)
+
+    except DryRunError as exc:
+        # A dry-run failure is a produced NEGATIVE VERDICT (the pipe is invalid) — exit 1, NOT the
+        # catch-all's no-verdict 2. validate_pipe_core sweeps via validate_pipes, which raises
+        # DryRunError directly (not wrapped in ValidateBundleError as the bundle path is).
+        agent_error(str(exc), error_type="DryRunError", cause=exc, is_valid=False, exit_code=1)
 
     except typer.Exit:
         raise
