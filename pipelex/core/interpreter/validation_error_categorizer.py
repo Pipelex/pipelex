@@ -189,9 +189,11 @@ def categorize_blueprint_validation_error(
     loc = error["loc"]
     message = error["msg"]
 
-    # Extract pipe code from location if available (e.g., ('pipes', 'extract_details_of_task', ...))
+    # Extract pipe code from location if available (e.g., ('pipe', 'extract_details_of_task', ...)).
+    # The blueprint field is `pipe` (singular), so the loc key is "pipe" — the previous "pipes"
+    # never matched, silently dropping the pipe_code locator from every categorized pipe item.
     pipe_code: str | None = None
-    if len(loc) >= 2 and loc[0] == "pipes":
+    if len(loc) >= 2 and loc[0] == "pipe":
         pipe_code = str(loc[1])
 
     error_scope = get_error_scope(loc)
@@ -209,6 +211,18 @@ def categorize_blueprint_validation_error(
             )
         case ValidationErrorScope.PIPE | ValidationErrorScope.DOMAIN | ValidationErrorScope.MAIN_PIPE | ValidationErrorScope.BUNDLE:
             pass
+
+    # Unknown pipe `type`: a pydantic discriminated-union tag failure (the pipe declared a `type`
+    # matching no known pipe operator/controller). Carry it as a categorized blueprint item with the
+    # pipe_code locator instead of letting it fall through to a bare residual.
+    if error["type"] == "union_tag_invalid" and pipe_code is not None:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.UNKNOWN_PIPE_TYPE,
+            domain_code=domain,
+            source=source,
+            pipe_code=pipe_code,
+            message=message,
+        )
 
     # Try to categorize input validation errors (missing/unused inputs)
     input_error = _categorize_input_validation_error(
