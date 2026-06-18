@@ -61,12 +61,6 @@ dependencies = [
   "urllib3>=2.7.0",
 ]
 
-[tool.uv.sources]
-# Validate-render train (PR phase): pinned to the mthds-python feature-branch rev so
-# CI can resolve `mthds>=0.5.0` (unpublished on PyPI) from a public git checkout instead
-# of a local editable path. Phase 7 (release) replaces this with the published mthds 0.5.0.
-mthds = { git = "https://github.com/mthds-ai/mthds-python", rev = "fecbf2e0cf38caadf87aec53ec35958d6600ae40" }
-
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
