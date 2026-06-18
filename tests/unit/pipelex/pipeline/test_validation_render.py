@@ -28,11 +28,33 @@ class TestValidationRender:
         assert "## Pending signatures (2)" in markdown
         # Explicit negative verdict, with the count, immediately above the list.
         assert "⚠️ This method is NOT yet runnable" in markdown
-        assert "2 pipe(s) are still `PipeSignature` placeholders" in markdown
+        assert "2 pipes are still `PipeSignature` placeholders" in markdown
         assert "- `research.find_key_findings`" in markdown
         assert "- `research.rank_findings`" in markdown
         # The verdict must precede the verbatim heading — consumers expect the note directly above it.
         assert markdown.index("⚠️ This method is NOT yet runnable") < markdown.index("## Pending signatures")
+
+    def test_renders_single_pending_signature_with_singular_grammar(self):
+        """A single pending signature renders grammatically — "1 pipe is still a `PipeSignature`
+        placeholder" — with no "(s)", singular verb, and the article present.
+        """
+        result: dict[str, Any] = {
+            "success": True,
+            "bundle_path": "/fake/method.mthds",
+            "validated_pipes": [{"pipe_ref": "research.research_brief", "status": "SUCCESS"}],
+            "total_pipes": 1,
+            "pending_signatures": ["research.find_key_findings"],
+            "is_runnable": False,
+        }
+
+        markdown = format_validate_markdown(result)
+
+        # The count line also pluralizes: a single validated pipe is "1 pipe", not "1 pipe(s)".
+        assert "Validated 1 pipe:" in markdown
+        assert "1 pipe is still a `PipeSignature` placeholder" in markdown
+        assert "## Pending signatures (1)" in markdown
+        # No "(s)" shorthand anywhere in the rendered markdown.
+        assert "(s)" not in markdown
 
     def test_renders_runnable_verdict_for_complete_bundle(self):
         """A present-but-empty pending_signatures (complete bundle) renders an explicit runnable

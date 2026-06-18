@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from typing import Any, cast
 
+from pipelex.tools.misc.string_utils import count_with_noun
+
 
 def format_validate_markdown(result: dict[str, Any]) -> str:
     """Render a validation result dict as agent-readable markdown.
@@ -42,7 +44,7 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
 
     validated_pipes: list[dict[str, Any]] = result.get("validated_pipes") or []
     total_pipes = result.get("total_pipes", len(validated_pipes))
-    lines.append(f"Validated {total_pipes} pipe(s):")
+    lines.append(f"Validated {count_with_noun(total_pipes, singular='pipe')}:")
     lines.append("")
     for entry in validated_pipes:
         lines.append(f"- `{entry.get('pipe_ref')}` — {entry.get('status')}")
@@ -54,16 +56,21 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     if "pending_signatures" in result:
         pending_signatures: list[str] = result["pending_signatures"] or []
         if pending_signatures:
+            pending_count = len(pending_signatures)
+            if pending_count == 1:
+                verdict = "⚠️ This method is NOT yet runnable — 1 pipe is still a `PipeSignature` placeholder and must be implemented before running:"
+            else:
+                verdict = (
+                    f"⚠️ This method is NOT yet runnable — {pending_count} pipes are still "
+                    "`PipeSignature` placeholders and must be implemented before running:"
+                )
             # Verdict line is emitted immediately above the verbatim "Pending signatures" heading —
             # downstream consumers rely on that exact ordering (see agent_cli/CLAUDE.md).
             lines += [
                 "",
-                (
-                    f"⚠️ This method is NOT yet runnable — {len(pending_signatures)} pipe(s) are still "
-                    "`PipeSignature` placeholders and must be implemented before running:"
-                ),
+                verdict,
                 "",
-                f"## Pending signatures ({len(pending_signatures)})",
+                f"## Pending signatures ({pending_count})",
                 "",
             ]
             for pending_ref in pending_signatures:

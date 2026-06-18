@@ -36,6 +36,7 @@ from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
+from pipelex.tools.misc.string_utils import count_with_noun
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -78,7 +79,7 @@ def do_validate_all_libraries_and_dry_run(
             pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
-                typer.echo(f"Validating {len(pipes)} pipe(s) from: {dirs_str}")
+                typer.echo(f"Validating {count_with_noun(len(pipes), singular='pipe')} from: {dirs_str}")
 
             # validate_current_library owns the static wiring pass and the single PIPE_DRY_RUN telemetry
             # event — sweeping the library we just loaded, without teardown.
