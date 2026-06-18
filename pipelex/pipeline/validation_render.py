@@ -127,7 +127,9 @@ def render_invalid_validation_markdown(report: dict[str, Any]) -> str:
     # structured-info invariant: each item carries the locators it can attribute.
     locator_labels: list[tuple[str, str]] = [
         ("pipe", "pipe_code"),
+        ("missing pipe", "missing_pipe_code"),
         ("concept", "concept_code"),
+        ("missing concept", "missing_concept_code"),
         ("domain", "domain_code"),
         ("field", "field_name"),
         ("path", "field_path"),

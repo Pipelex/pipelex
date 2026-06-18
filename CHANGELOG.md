@@ -2,10 +2,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Structured wiring/concept/type validation errors** — bundle-validation failures that previously collapsed to a bare message-only `blueprint_validation` residual now emit a structured, categorized `validation_errors[]` item with identity locators. A **pipe-owned unresolved concept reference** (a pipe input/output) → `pipe_validation` / `unresolved_concept` (with the referencing `pipe_code`, the missing `concept_code`, and the `field_name`); a **concept-owned unresolved concept reference** (a concept's `refines` or a structure field's `concept_ref`) → `blueprint_validation` / `unresolved_concept` (with the owning `concept_code`); an **undefined pipe dependency** → `pipe_validation` / `unresolved_pipe_dependency` (with the referencing `pipe_code` and the missing dependency in the new `missing_pipe_code` locator); an **unknown pipe `type`** (a pydantic discriminated-union tag failure) → `blueprint_validation` / `unknown_pipe_type` (with the `pipe_code`). New `PipeValidationErrorType` values: `unresolved_concept`, `unresolved_pipe_dependency`, `unknown_pipe_type`. New `validation_errors[]` locator field: `missing_pipe_code`. `ConceptLibraryError` now extends `LibraryLoadingError` so it carries the per-reference structured items through the existing error cascade (its raised type and message are unchanged; sites that pass only a message behave as before). Machine consumers of `validation_errors[]` get `error_type` + locators for these cases instead of only a `message`.
+
 ### Changed (pre-1.0 breaking)
 
 - **Validate exit-code policy (0 / 1 / 2)** — the `validate` surface (both the bare `pipelex validate {bundle,method,pipe}` group and `pipelex-agent validate`) now exits with three codes mirroring the hosted `/validate` 200-verdict-vs-non-2xx-no-verdict split: `0` = valid, `1` = a produced negative verdict (invalid bundle, or valid-but-not-runnable without `--allow-signatures`), `2` = no verdict (bad args, unresolvable target, setup/internal error). Previously every failure exited `1`. Notably, `pipelex validate bundle` **directory-resolution failures** (no `.mthds` found / multiple `.mthds` and no default `bundle.mthds` / a path that is neither a file nor a directory) now exit **2** instead of **1**. Both `1` and `2` remain non-zero, so consumers that only test zero-vs-non-zero are unaffected. The verdict remains in the structured `is_valid` field — machine consumers should read it rather than branch on the exit code.
 - **Validate Markdown renderer relocated** — `format_validate_markdown` moved from `pipelex.cli.agent_cli.commands.validate._output_helpers` to the public, non-CLI module `pipelex.pipeline.validation_render`, so other surfaces (e.g. `pipelex-api`'s `/validate` opt-in `rendered_markdown` extra) can import it without pulling in the CLI/Typer stack. Output is byte-identical; only the import path changed.
+
+### Fixed
+
+- **`pipe_code` dropped on categorized pipe blueprint errors** — the blueprint validation-error categorizer matched the wrong pydantic `loc` key (`pipes` instead of the actual blueprint field name `pipe`), so every categorized pipe blueprint item (e.g. `missing_input_variable`) silently lost its `pipe_code` locator. It now populates correctly.
 
 ## [v0.34.0] - 2026-06-17
 

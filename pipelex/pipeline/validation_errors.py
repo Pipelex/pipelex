@@ -112,6 +112,7 @@ def build_validation_error_items(
                 error_type=pipe_error.error_type,
                 pipe_code=pipe_error.pipe_code,
                 concept_code=pipe_error.concept_code,
+                missing_pipe_code=pipe_error.missing_pipe_code,
                 domain_code=pipe_error.domain_code,
                 source=pipe_error.source,
                 field_path=pipe_error.field_path or None,

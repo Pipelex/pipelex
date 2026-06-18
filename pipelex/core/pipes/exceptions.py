@@ -111,7 +111,13 @@ class PipeValidationErrorType(StrEnum):
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
+
+    # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
+    # merged library (a referenced concept or dependency pipe does not resolve).
+    UNRESOLVED_CONCEPT = "unresolved_concept"
+    UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"

@@ -6,11 +6,13 @@ from pydantic import BaseModel, Field, PrivateAttr
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
-from pipelex.libraries.exceptions import LibraryError
+from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -137,7 +139,20 @@ class Library(BaseModel):
                         self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
                         msg = f"Error validating pipe '{pipe.code}' dependency pipe '{sub_pipe_code}' because of: {pipe_error}"
-                        raise LibraryError(msg) from pipe_error
+                        # Carry a structured item so an unresolved dependency surfaces as a categorized
+                        # `pipe_validation` item: `pipe_code` is the referencing controller and
+                        # `missing_pipe_code` is the dependency that does not resolve, so a machine
+                        # consumer can read both without parsing the message. LibraryLoadingError rides
+                        # the existing `except LibraryError` forwarding in _translate_to_validate_bundle_error.
+                        dependency_error_data = PipesAndConceptValidationErrorData(
+                            error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+                            domain_code=pipe.domain_code,
+                            pipe_code=pipe.code,
+                            missing_pipe_code=sub_pipe_code,
+                            message=msg,
+                            field_path=f"pipe.{pipe.code}",
+                        )
+                        raise LibraryLoadingError(message=msg, pipe_concept_validation_errors=[dependency_error_data]) from pipe_error
 
         for pipe in self.pipe_library.root.values():
             # Skip full validation for pipe controllers with unresolved cross-package dependencies

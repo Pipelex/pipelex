@@ -44,6 +44,9 @@ class PipesAndConceptValidationErrorData(BaseModel):
     # === Entity Context (what failed) ===
     pipe_code: str | None = Field(default=None, description="Pipe code if error is in a pipe")
     concept_code: str | None = Field(default=None, description="Concept code if error is in a concept")
+    missing_pipe_code: str | None = Field(
+        default=None, description="Referenced pipe code that does not resolve (for unresolved pipe-dependency errors)"
+    )
     field_name: str | None = Field(default=None, description="Specific field that failed")
 
     # === Error Classification ===
