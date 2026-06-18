@@ -75,7 +75,8 @@ class TestValidateBundleCmd:
                 output_format=CliOutputFormat.JSON,
             )
 
-        assert exc_info.value.exit_code == 1
+        # Graph generation failure is a no-verdict condition → exit 2 (validate 0/1/2 policy).
+        assert exc_info.value.exit_code == 2
 
         stderr_text = capsys.readouterr().err
         # Parse all JSON objects from stderr — there should be exactly one

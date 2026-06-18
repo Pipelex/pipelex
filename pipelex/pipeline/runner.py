@@ -335,6 +335,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self,
         mthds_contents: list[str],
         allow_signatures: bool = False,
+        extra: dict[str, Any] | None = None,
     ) -> PipelexValidationReport:
         """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
 
@@ -366,13 +367,19 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
             allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
+            extra: Rejected — the local runtime defines no extension args. Extension
+                args are server-specific; pass them to the server that defines them.
 
         Returns:
             PipelexValidationReport with the structural artifacts of a valid bundle.
 
         Raises:
+            PipelineRequestError: When extension args are passed (the local runtime accepts none).
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
         """
+        if extra:
+            msg = f"The local runtime defines no extension args; got {sorted(extra)}."
+            raise PipelineRequestError(msg)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # Delegate to the shared in-process orchestrator (library-window management,
         # graph arm, report assembly). The protocol `validate` interface carries only

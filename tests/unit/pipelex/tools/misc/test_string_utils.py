@@ -3,6 +3,7 @@ import pytest
 from pipelex.tools.misc.string_utils import (
     camel_to_snake_case,
     can_inject_text,
+    count_with_noun,
     get_root_from_dotted_path,
     is_none_or_has_text,
     is_not_none_and_has_text,
@@ -13,6 +14,7 @@ from pipelex.tools.misc.string_utils import (
     pascal_case_to_kebab,
     pascal_case_to_sentence,
     pascal_case_to_snake_case,
+    pluralize,
     snake_to_capitalize_first_letter,
     snake_to_pascal_case,
 )
@@ -254,6 +256,39 @@ def test_is_pascal_case(word: str, expected: bool) -> None:
 )
 def test_get_root_from_dotted_path(dotted_path: str, expected: str) -> None:
     assert get_root_from_dotted_path(dotted_path) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "singular", "plural", "expected"),
+    [
+        # Regular noun: singular at 1, default "+s" plural otherwise
+        (1, "pipe", None, "pipe"),
+        (2, "pipe", None, "pipes"),
+        (0, "pipe", None, "pipes"),
+        # Explicit irregular plural
+        (1, "entry", "entries", "entry"),
+        (3, "entry", "entries", "entries"),
+        # Verb agreement
+        (1, "is", "are", "is"),
+        (2, "is", "are", "are"),
+    ],
+)
+def test_pluralize(count: int, singular: str, plural: str | None, expected: str) -> None:
+    assert pluralize(count, singular=singular, plural=plural) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "singular", "plural", "expected"),
+    [
+        (1, "pipe", None, "1 pipe"),
+        (2, "pipe", None, "2 pipes"),
+        (0, "pipe", None, "0 pipes"),
+        (1, "entry", "entries", "1 entry"),
+        (5, "entry", "entries", "5 entries"),
+    ],
+)
+def test_count_with_noun(count: int, singular: str, plural: str | None, expected: str) -> None:
+    assert count_with_noun(count, singular=singular, plural=plural) == expected
 
 
 @pytest.mark.parametrize(

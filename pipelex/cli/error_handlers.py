@@ -121,12 +121,14 @@ def display_error_panel(
     console.print()
 
 
-def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: ErrorContext) -> NoReturn:
+def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: ErrorContext, exit_code: int = 1) -> NoReturn:
     """Handle and display PipeOperatorModelChoiceError with formatted output.
 
     Args:
         exc: The model choice error exception
         context: Context for the error message
+        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
+            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
     """
     console = get_console()
     print_traceback_if_requested(console)
@@ -149,15 +151,17 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
             ("Join our Discord for help", URLs.discord),
         ],
     )
-    raise typer.Exit(1) from exc
+    raise typer.Exit(exit_code) from exc
 
 
-def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, context: ErrorContext) -> NoReturn:
+def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, context: ErrorContext, exit_code: int = 1) -> NoReturn:
     """Handle and display PipeOperatorModelAvailabilityError with formatted output.
 
     Args:
         exc: The model availability error exception
         context: Context for the error message
+        exit_code: Process exit code. The validate surface passes 2 (a no-verdict
+            setup/config error per its 0/1/2 policy); other contexts keep the default 1.
     """
     console = get_console()
     print_traceback_if_requested(console)
@@ -186,7 +190,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
             ("Join our Discord for help", URLs.discord),
         ],
     )
-    raise typer.Exit(1) from exc
+    raise typer.Exit(exit_code) from exc
 
 
 def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:

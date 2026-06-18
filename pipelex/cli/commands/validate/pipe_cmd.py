@@ -65,7 +65,7 @@ def validate_pipe_cmd(
                 fg=typer.colors.RED,
                 err=True,
             )
-            raise typer.Exit(1)
+            raise typer.Exit(2)
         library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
         try:
             make_pipelex_for_cli(
@@ -90,7 +90,7 @@ def validate_pipe_cmd(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(2)
 
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
@@ -101,7 +101,7 @@ def validate_pipe_cmd(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(2)
 
     # Check installed methods' exports for additional library dirs
     try:
@@ -112,7 +112,7 @@ def validate_pipe_cmd(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1) from exc
+        raise typer.Exit(2) from exc
     if extra_dirs:
         if library_dir is None:
             library_dir = extra_dirs
