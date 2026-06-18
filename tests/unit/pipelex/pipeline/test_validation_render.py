@@ -1,13 +1,13 @@
-"""Unit tests for the validate markdown renderer (`pipelex.pipeline.validation_render.format_validate_markdown`)."""
+"""Unit tests for the validate markdown renderers in `pipelex.pipeline.validation_render`."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from pipelex.pipeline.validation_render import format_validate_markdown
+from pipelex.pipeline.validation_render import format_validate_markdown, render_invalid_validation_markdown
 
 
-class TestFormatValidateMarkdown:
+class TestValidationRender:
     def test_renders_pending_signatures_section_with_not_runnable_verdict(self):
         """A populated pending_signatures list renders the verbatim section heading, an explicit
         "NOT yet runnable" verdict, and each ref as a bullet.
@@ -71,3 +71,40 @@ class TestFormatValidateMarkdown:
         assert "runnable" not in markdown
         assert "✅" not in markdown
         assert "⚠️" not in markdown
+
+    def test_renders_invalid_report_with_locators_and_dry_run_residual(self):
+        """The invalid-arm renderer surfaces the message, an error count, and each item's
+        category + message with its present locators; a dry_run residual (no locators) renders too.
+        """
+        report: dict[str, Any] = {
+            "is_valid": False,
+            "message": "MTHDS validation found errors",
+            "validation_errors": [
+                {
+                    "category": "pipe_validation",
+                    "error_type": "PipeValidationError",
+                    "message": "Pipe references an unknown concept.",
+                    "pipe_code": "summarize",
+                    "concept_code": "Contractt",
+                    "field_name": "output",
+                    "source": "/fake/method.mthds",
+                },
+                {
+                    "category": "dry_run",
+                    "error_type": "DryRunError",
+                    "message": "Dry run failed: boom.",
+                },
+            ],
+        }
+
+        markdown = render_invalid_validation_markdown(report)
+
+        assert markdown.startswith("# Validation failed")
+        assert "MTHDS validation found errors" in markdown
+        assert "## Errors (2)" in markdown
+        assert "1. **pipe_validation** — Pipe references an unknown concept." in markdown
+        assert "   - pipe: `summarize`" in markdown
+        assert "   - concept: `Contractt`" in markdown
+        assert "   - source: `/fake/method.mthds`" in markdown
+        # The dry_run residual has no locators — it renders its category + message, no sub-bullets.
+        assert "2. **dry_run** — Dry run failed: boom." in markdown
