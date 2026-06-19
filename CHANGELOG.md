@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Blueprint-stage `PipeValidationError` lost its `error_type`:** A `PipeValidationError` raised inside a pydantic blueprint validator (the PipeBatch `input_item_name` == `input_list_name` collision, and the SubPipe `batch_over` == `batch_as` collision — both `batch_item_name_collision`) is wrapped by pydantic as a `value_error`, which the blueprint validation-error categorizer did not unwrap, so the item degraded to an uncategorized `blueprint_validation` residual with no `error_type`. The categorizer now unwraps the wrapped `PipeValidationError` from `ctx["error"]` (mirroring the pipe categorizer via the shared `extract_wrapped_pipe_validation_error`), so **any** blueprint-stage `PipeValidationError` keeps its structured `error_type` and recovers its `pipe_code` / `domain_code` / `source` locators from the parse context. The item stays in the `blueprint_validation` category because the fault genuinely surfaces at the parse boundary, before any pipe is instantiated.
+
 ## [v0.35.0] - 2026-06-18
 
 ### Added

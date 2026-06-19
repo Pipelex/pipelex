@@ -15,11 +15,18 @@ class ModelScope(StrEnum):
     CONCEPT = "concept"
 
 
-def _extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
+def extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
     """Extract a wrapped PipeValidationError from a pydantic error if present.
 
     When a PipeValidationError is raised inside a model validator, pydantic wraps it.
     This function attempts to extract the original PipeValidationError from the error context.
+
+    Shared by both validation-error categorizers — the pipe categorizer below
+    (Pipe/Concept model validation) and the blueprint categorizer
+    (``core.interpreter.validation_error_categorizer``, which unwraps a
+    blueprint-stage ``PipeValidationError`` raised by a pydantic validator on the
+    blueprint models, e.g. the PipeBatch / SubPipe batch-name collisions). One
+    definition so the two categorizers cannot drift on how pydantic wraps the error.
 
     Args:
         error: Pydantic error details that may contain a wrapped PipeValidationError
@@ -87,7 +94,7 @@ def categorize_pipe_validation_error(
     categorized_errors: list[PipesAndConceptValidationErrorData] = []
     for error in errors:
         # First, check if this is a wrapped PipeValidationError
-        wrapped_pipe_error = _extract_wrapped_pipe_validation_error(error)
+        wrapped_pipe_error = extract_wrapped_pipe_validation_error(error)
         if wrapped_pipe_error:
             categorized_error = categorize_pipe_validation_with_libraries_error(pipe_error=wrapped_pipe_error)
         elif model_scope == ModelScope.PIPE:
