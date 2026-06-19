@@ -12,7 +12,7 @@ _GUARD_SCRIPT = textwrap.dedent(
     import sys
     import importlib.abc
 
-    BLOCKED = ("anthropic", "mistralai", "google.genai", "boto3", "aioboto3", "fal_client", "huggingface_hub")
+    BLOCKED = ("anthropic", "mistralai", "google.genai", "boto3", "aioboto3", "fal_client", "huggingface_hub", "docling", "linkup")
 
     class _Blocker(importlib.abc.MetaPathFinder):
         def find_spec(self, fullname, path, target=None):

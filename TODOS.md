@@ -1,6 +1,6 @@
 # Pipelex plugin system — implementation TODOS
 
-**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 + Phase 1 complete (committed). Next: Phase 2 (ImgGen / Extract / Search).
+**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 + Phase 1 complete (committed). Phase 2 (ImgGen / Extract / Search) code + tests + docs done, uncommitted. Next: commit Phase 2, then Phase 3 (orchestrators).
 
 > **Delivery model for this branch.** Per the driving goal, all phases land on `refactor/Plugins` as **one commit per checkpoint** (not one PR per phase), and a **single PR to `dev`** opens once the tracker is done. Each phase's "PR: …" box below is satisfied by its checkpoint commit; the standalone-PR-per-phase wording in the original plan is superseded.
 
@@ -167,28 +167,28 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 >
 > **NEW vendor plugin modules to create:** `fal`, `huggingface`, `blackboxai`, `openrouter`, `azure_rest`, `docling`, `pypdfium2`, `linkup` (each `pipelex/plugins/<vendor>/<vendor>_plugin.py`, added to `BUILTIN_PLUGINS`). **EXTEND existing plugins** (one `register` adds across families — the cross-family-vendor coordination point): `openai` (+IMG_GEN), `gateway` (+IMG_GEN ×2, +EXTRACT, +SEARCH), `google` (+IMG_GEN), `mistral` (+EXTRACT), `linkup` (EXTRACT + SEARCH — one new plugin serving two families). None of these new SDKs are core-unconditional (only `openai` is). **Build-time check:** `azure_rest`/`pypdfium2`/`linkup`/blackboxai/openrouter closures must stay import-light at module load (lazy factory/worker imports), and the import-light subprocess guard's BLOCKED set should grow to cover `fal_client`, `huggingface_hub`, `docling`, `linkup` so the guard actually proves it.
 
-- [ ] **ImgGen (Lane A).** Collapse the `match`. **Fix the pre-existing huggingface bug (codex C10):** `img_gen_worker_factory.py` imports `huggingface_hub` with **no `find_spec` guard` → a missing extra raises raw `ImportError` instead of `MissingDependencyError`. Add `require_sdk(spec="huggingface_hub", extra="huggingface", …)` during migration. Provider-literal handling (`model_handle.variant` → provider) goes inside the closure. Substrate-reuse workers (`blackboxai`/`gateway_completions`/`openrouter` → `OpenAICompletionsImgGenWorker`) become closures capturing the per-vendor completions factory.
-- [ ] **Extract (Lane B).** Collapse the `match`. Stateless arms (`pypdfium2`, `linkup_fetch`) skip `get_or_create`.
-- [ ] **Search (Lane C) — normalize the call surface (codex C9).** `search_worker_factory.py` takes **no `reporting_delegate` param** and pulls `get_report_delegate()` from the hub; the uniform `MakeWorkerFn` passes it explicitly. Normalize `make_search_worker` + callers to accept `reporting_delegate` (removes search's hidden hub coupling — a strict improvement), so search fits the uniform signature.
-- [ ] Add each migrated driver to `BUILTIN_PLUGINS`. OpenAI is an always-on built-in driver, no privileged arm. The OpenAI-compat *substrate* stays an in-tree library the gateway/portkey/openrouter/blackboxai closures import (substrate extraction into a named module is deferred).
+- [x] **ImgGen (Lane A).** Collapse the `match`. **Fix the pre-existing huggingface bug (codex C10):** `img_gen_worker_factory.py` imports `huggingface_hub` with **no `find_spec` guard` → a missing extra raises raw `ImportError` instead of `MissingDependencyError`. Add `require_sdk(spec="huggingface_hub", extra="huggingface", …)` during migration. Provider-literal handling (`model_handle.variant` → provider) goes inside the closure. Substrate-reuse workers (`blackboxai`/`gateway_completions`/`openrouter` → `OpenAICompletionsImgGenWorker`) become closures capturing the per-vendor completions factory.
+- [x] **Extract (Lane B).** Collapse the `match`. Stateless arms (`pypdfium2`, `linkup_fetch`) skip `get_or_create`.
+- [x] **Search (Lane C) — normalize the call surface (codex C9).** `search_worker_factory.py` takes **no `reporting_delegate` param** and pulls `get_report_delegate()` from the hub; the uniform `MakeWorkerFn` passes it explicitly. Normalize `make_search_worker` + callers to accept `reporting_delegate` (removes search's hidden hub coupling — a strict improvement), so search fits the uniform signature.
+- [x] Add each migrated driver to `BUILTIN_PLUGINS`. OpenAI is an always-on built-in driver, no privileged arm. The OpenAI-compat *substrate* stays an in-tree library the gateway/portkey/openrouter/blackboxai closures import (substrate extraction into a named module is deferred).
 
 **Tests:**
 
-- [ ] Registry round-trip per family.
-- [ ] Import-light subprocess guard now covers all optional SDKs.
-- [ ] **huggingface error-parity** (missing `huggingface` extra now raises `MissingDependencyError` — proves the bug fix).
-- [ ] **Cross-family vendor** (e.g. `mistral` registers into both LLM and Extract from one `register`).
+- [x] Registry round-trip per family.
+- [x] Import-light subprocess guard now covers all optional SDKs.
+- [x] **huggingface error-parity** (missing `huggingface` extra now raises `MissingDependencyError` — proves the bug fix).
+- [x] **Cross-family vendor** (e.g. `mistral` registers into both LLM and Extract from one `register`).
 
 **Cross-cutting deliverable (ships with this phase):**
 
-- [ ] **Inference SPI reference** (design §9.1) + **plugin-authoring guide** + **minimal example backend plugin** (a backend plugin is the simplest example). Placement: authoring guide + SPI reference in a user-facing `docs/.../plugins/` Guide section; seam internals in `docs/under-the-hood/`; the example as runnable in-repo code.
+- [x] **Inference SPI reference** (design §9.1) + **plugin-authoring guide** + **minimal example backend plugin** — delivered as one comprehensive page `docs/under-the-hood/inference-backend-plugins.md` (seam walkthrough + SPI module/symbol table + authoring guide with a copy-pasteable `acme` example, the entry-point declaration, the denylist, and the fail-loud table), added to both mkdocs nav blocks under "Under the Hood". A standalone runnable example *package* was judged disproportionate for this checkpoint (the embedded example is complete and copy-pasteable) — flag as a follow-up if a separate example repo is wanted.
 
 ### 🛑 CHECKPOINT 2 — hard stop (natural session handoff — inference done)
 
-- [ ] **Verify:** `make agent-check` clean · `make agent-test` green. Confirm **all four** worker-factory `match` statements are gone, every backend goes via the registry, the huggingface guard bug is fixed, and search's hub coupling is removed.
-- [ ] **Capture cold-start context:** `### Phase 2 — as-built` note — which sub-PRs landed, any per-vendor plugin object shared across families (the lane-conflict flag), and where the SPI/authoring docs + example plugin live. This is a clean inference→orchestrator handoff; make the resume trivial.
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase 2 diff (or once per sub-PR). Emphasize the huggingface fix parity, the search call-surface normalization, and that no family changed behavior. Triage here.
-- [ ] **PR(s):** land each family sub-PR green. **Good point to end the session** before opening the orchestrator phase.
+- [x] **Verify:** `make agent-check` clean · `make agent-test` green (exit 0). All four worker-factory `match` statements gone, every backend goes via the registry, the huggingface guard bug is fixed (require_sdk added), and search's hub coupling is removed (factory takes `reporting_delegate`, caller supplies `get_report_delegate()`).
+- [x] **Capture cold-start context:** `### Phase 2 — as-built` note below — vendor plugins created/extended, cross-family coordination points, the search C9 normalization, test + docs locations.
+- [x] **Fan-out `/code-review`:** `pr-review-toolkit:code-reviewer` sub-agent reviewed the full Phase 2 working-tree diff, comparing every new closure against the pre-Phase-2 `match` arm via `git show HEAD:…`. **Verdict: clean — no blockers, no should-fix, no nits.** It confirmed byte-equivalent parity (worker classes, ctor kwargs, `is_http_url_enabled` flags), the C10 require_sdk fix + TYPE_CHECKING-only `PROVIDER_OR_POLICY_T`, import-light (no SDK at any plugin module top), every `# noqa: ARG001` justified by the old arm, C9 production-safety (real caller still supplies the delegate; the two integration tests assert on results not reporting so `None` is harmless), and cross-family non-collision (distinct `(family, sdk)` keys + distinct closure names).
+- [x] **Commit:** single checkpoint commit on `refactor/Plugins` (per the branch's one-commit-per-checkpoint delivery model). **Good point to end the session** before opening the orchestrator phase.
 
 ---
 
@@ -376,3 +376,39 @@ Phase 0 (rename) → Phase 1 (seam + LLM, merged) → Phase 2 (ImgGen/Extract/Se
 **Behavior unchanged** in LLM dispatch except the deliberate registry-miss error wording (was `"ModelHandle '<...>' is not supported"`, now `"No inference backend registered for sdk '<sdk>' ... Is its plugin installed?"`).
 
 **Deferred / notes for later phases:** docs (Inference SPI reference + plugin-authoring guide + example backend plugin) ship with **Phase 2** per plan — not written in Phase 1. The orchestrator registry/protocol is a skeleton; Phase 3 wires the bridge `match` collapse, slot-thunk apply-points (with injection-precedence), CLI-command harvesting, and adds `MissingOrchestratorError`.
+
+### Phase 2 — as-built
+
+**Status:** done, uncommitted on `refactor/Plugins`. `make agent-check` clean (ruff/plxt, pyright **0 errors**, mypy 0 over 2228 files, keyword-only pass) · `make tb` green · targeted plugins+cogt unit suite green (977 passed) · **full `make agent-test` green (exit 0, "All tests passed.")**. All four worker-factory `match` statements are gone — every inference backend now resolves through `get_inference_backend_registry().lookup(family, sdk)`.
+
+**Registry shape after Phase 2** — `BUILTIN_PLUGINS` now has 15 plugins contributing **30** `(family, sdk)` backends: LLM 14, IMG_GEN 9, EXTRACT 5, SEARCH 2.
+
+**New vendor plugin modules** (`pipelex/plugins/<vendor>/<vendor>_plugin.py`, each added to `BUILTIN_PLUGINS`):
+
+- `fal` → IMG_GEN `fal` (require_sdk `fal_client`/extra `fal`, dep name `fal-client`).
+- `huggingface` → IMG_GEN `huggingface_img_gen`. **C10 bug fixed:** added `require_sdk(spec="huggingface_hub", extra="huggingface")` (the old arm imported `huggingface_hub` with no guard). The `PROVIDER_OR_POLICY_T` annotation is a module-level `if TYPE_CHECKING` import (import-light at runtime); the `model_handle.variant → provider` resolution lives in the closure.
+- `blackboxai` → IMG_GEN `blackboxai_img_gen` (OpenAI-completions substrate, `BlackboxaiCompletionsFactory(is_http_url_enabled=True)`; no require_sdk — reuses OpenAI client).
+- `openrouter` → IMG_GEN `openrouter_img_gen` (same substrate shape, `OpenRouterCompletionsFactory(is_http_url_enabled=True)`).
+- `azure_rest` → IMG_GEN `azure_rest_img_gen`. **DIRECT construction** — `AzureImgGenWorker(model_handle=…)`, no `sdk_clients`/`get_or_create`; `backend` + `sdk_clients` params carry `# noqa: ARG001`.
+- `docling` → EXTRACT `docling_sdk` (require_sdk `docling`; `get_or_create(build=DoclingFactory.make_docling_sdk)`).
+- `pypdfium2` → EXTRACT `pypdfium2`. **STATELESS** — built directly, no `get_or_create`, no require_sdk; `sdk_clients` param `# noqa: ARG001`.
+- `linkup` → EXTRACT `linkup_fetch` (require_sdk `linkup`, stateless) **and** SEARCH `linkup` (stateless, **no** require_sdk — matches the original search arm exactly; raw `ImportError` if linkup absent, a deliberate no-behavior-change choice). One plugin, two families.
+
+**Extended existing vendor plugins** (one `register` now spans families — the cross-family coordination point):
+
+- `openai` += IMG_GEN `openai_img_gen`.
+- `gateway` += IMG_GEN `gateway_img_gen` + `gateway_completions`, EXTRACT `gateway_extract`, SEARCH `gateway_search` (now serves **all four** families). Closures named `_make_gateway_{img_gen,completions_img_gen,extract,search}_worker` (distinct from the existing LLM `_make_gateway_{completions,responses}_worker`).
+- `google` += IMG_GEN `google` (own missing-msg constant `_GOOGLE_IMG_GEN_MISSING_MSG`, distinct from the LLM one).
+- `mistral` += EXTRACT `mistral` (own `_MISTRAL_EXTRACT_MISSING_MSG`).
+
+Note: `gateway_completions` and `google` are SDK strings registered in **two** families each — distinct `(family, sdk)` keys, no conflict. The OpenAI-compat substrate (`OpenAICompletionsImgGenWorker`, the per-vendor `*CompletionsFactory`) stays an in-tree library the substrate-reuse closures import; extraction into a named module remains deferred.
+
+**Factory collapses** (`cogt/{img_gen,extract,search}/*_worker_factory.py`): each is now the LLM shape — derive `model_handle`, resolve `backend` via the models manager, `lookup(family=<FAM>, sdk=model_handle.sdk)`, call with `sdk_clients=get_sdk_client_manager().sdk_client_registry`, `cast` to the family worker abstract. Kept `@classmethod` (call sites unchanged). The per-family `case _:` wording ("is not supported …") is gone — registry miss now raises the uniform `NotImplementedError("… Is its plugin installed?")` from `InferenceBackendRegistry.lookup`.
+
+**Search C9 normalization:** `make_search_worker` now takes `*, reporting_delegate: ReportingProtocol | None = None` (default `None`, so existing test callers that omit it still work) and passes it through — the factory no longer pulls `get_report_delegate()` from the hub. The hub coupling moved to the caller: `cogt/content_generation/search_generate.py::_make_search_worker` now passes `reporting_delegate=get_report_delegate()` (import added). No production behavior change (the real caller still supplies the delegate); integration tests that call the factory directly get `None`, which the workers already accept.
+
+**Tests:** `tests/unit/pipelex/cogt/img_gen/test_img_gen_worker_factory.py` updated to build the real registry from `BUILTIN_PLUGINS` (new `build_builtin_inference_backend_registry` + patches `get_inference_backend_registry` in `patch_hub_getters`), the unknown-sdk assert switched to "Is its plugin installed?", and `huggingface_img_gen` added to the missing-dependency parametrize (proves the C10 fix). New `tests/unit/pipelex/plugins/test_inference_backend_coverage.py` pins the full 30-key `(family, sdk)` round-trip + the cross-family vendors (mistral LLM+EXTRACT, google/openai LLM+IMG_GEN, linkup EXTRACT+SEARCH, gateway all four). Import-light guard BLOCKED set grew `docling` + `linkup` (fal_client/huggingface_hub were already there) — proves the new vendor plugin modules import no optional SDK at boot.
+
+**Docs:** `docs/under-the-hood/inference-backend-plugins.md` (added to both mkdocs nav blocks) — the seam walkthrough, the `PipelexPlugin` contract, `MakeWorkerFn` + import-light/fail-at-use invariants, a complete copy-pasteable `acme` example (built-in + `[project.entry-points."pipelex.plugins"]` form), the `plugins.disabled` denylist, the SPI module/symbol table, and the fail-loud table.
+
+**No factory test modules for extract/search** existed before and none added — those families are covered by the new registry-coverage test + the integration suites (`test_search.py`, extract integration). Only img_gen had a routing test to update.

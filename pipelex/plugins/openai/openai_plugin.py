@@ -57,6 +57,28 @@ def _make_openai_responses_worker(
     )
 
 
+def _make_openai_img_gen_worker(
+    *,
+    inference_model: InferenceModelSpec,
+    backend: InferenceBackend,
+    sdk_clients: SdkClientRegistry,
+    reporting_delegate: ReportingProtocol | None,
+) -> InferenceWorkerAbstract:
+    from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
+    from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
+
+    model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
+    sdk_instance = sdk_clients.get_or_create(
+        handle=model_handle,
+        build=lambda: OpenAIClientFactory.make_openai_client(model_handle=model_handle, backend=backend),
+    )
+    return OpenAIImgGenWorker(
+        sdk_instance=sdk_instance,
+        inference_model=inference_model,
+        reporting_delegate=reporting_delegate,
+    )
+
+
 class OpenAIPlugin:
     """Always-on built-in driver for OpenAI and Azure OpenAI (no optional SDK)."""
 
@@ -68,3 +90,4 @@ class OpenAIPlugin:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="azure_openai", make_worker=_make_openai_completions_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="openai_responses", make_worker=_make_openai_responses_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="azure_openai_responses", make_worker=_make_openai_responses_worker)
+        registrar.add_inference_backend(family=InferenceFamily.IMG_GEN, sdk="openai_img_gen", make_worker=_make_openai_img_gen_worker)

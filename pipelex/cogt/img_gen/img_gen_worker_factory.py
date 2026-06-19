@@ -1,10 +1,9 @@
-import importlib.util
-from typing import TYPE_CHECKING
+from typing import cast
 
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_models_manager, get_sdk_client_manager
+from pipelex.hub import get_inference_backend_registry, get_models_manager, get_sdk_client_manager
+from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -19,192 +18,14 @@ class ImgGenWorkerFactory:
     ) -> ImgGenWorkerAbstract:
         model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        sdk_client_registry = get_sdk_client_manager().sdk_client_registry
-        img_gen_worker: ImgGenWorkerAbstract
-        match model_handle.sdk:
-            case "gateway_img_gen":
-                from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
-                from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
-                )
-
-                img_gen_worker = GatewayImgGenWorker(
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "fal":
-                if importlib.util.find_spec("fal_client") is None:
-                    lib_name = "fal-client"
-                    lib_extra_name = "fal"
-                    msg = "The fal-client SDK is required in order to use FAL models (generation of images)."
-                    raise MissingDependencyError(
-                        lib_name,
-                        lib_extra_name,
-                        msg,
-                    )
-
-                from fal_client import AsyncClient as FalAsyncClient  # noqa: PLC0415
-
-                from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=FalAsyncClient(key=backend.api_key),
-                )
-
-                img_gen_worker = FalImgGenWorker(
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "huggingface_img_gen":
-                from huggingface_hub import AsyncInferenceClient  # noqa: PLC0415
-
-                from pipelex.plugins.huggingface.huggingface_factory import HuggingFaceFactory  # noqa: PLC0415
-                from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker  # noqa: PLC0415
-
-                if TYPE_CHECKING:
-                    from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T  # noqa: PLC0415
-
-                provider_literal: PROVIDER_OR_POLICY_T
-                if provider_str := model_handle.variant:
-                    provider_literal = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider_str)
-                else:
-                    provider_literal = "auto"
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=AsyncInferenceClient(
-                        provider=provider_literal,
-                        token=backend.api_key,
-                    ),
-                )
-
-                img_gen_worker = HuggingFaceImgGenWorker(
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "openai_img_gen":
-                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=OpenAIClientFactory.make_openai_client(
-                        model_handle=model_handle,
-                        backend=backend,
-                    ),
-                )
-
-                img_gen_worker = OpenAIImgGenWorker(
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "blackboxai_img_gen":
-                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=OpenAIClientFactory.make_openai_client(
-                        model_handle=model_handle,
-                        backend=backend,
-                    ),
-                )
-
-                # Deferred import: avoid pulling heavy SDK at module-load time
-                from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory  # noqa: PLC0415
-
-                bbai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
-
-                img_gen_worker = OpenAICompletionsImgGenWorker(
-                    openai_completions_factory=bbai_completions_factory,
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "azure_rest_img_gen":
-                from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
-
-                img_gen_worker = AzureImgGenWorker(
-                    model_handle=model_handle,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "google":
-                if importlib.util.find_spec("google.genai") is None:
-                    lib_name = "google-genai"
-                    lib_extra_name = "google"
-                    msg = "The google-genai SDK is required in order to use Google Gemini Image models."
-                    raise MissingDependencyError(
-                        lib_name,
-                        lib_extra_name,
-                        msg,
-                    )
-
-                from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
-                from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=GoogleFactory.make_google_client(backend=backend),
-                )
-
-                img_gen_worker = GoogleImgGenWorker(
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "gateway_completions":
-                from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=GatewayCompletionsFactory.make_portkey_openai_client_for_completions(
-                        model_handle=model_handle,
-                        backend=backend,
-                    ),
-                )
-
-                gateway_completions_factory = GatewayCompletionsFactory(is_http_url_enabled=False)
-
-                img_gen_worker = OpenAICompletionsImgGenWorker(
-                    openai_completions_factory=gateway_completions_factory,
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case "openrouter_img_gen":
-                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
-                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
-
-                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
-                    model_handle=model_handle,
-                    sdk_instance=OpenAIClientFactory.make_openai_client(
-                        model_handle=model_handle,
-                        backend=backend,
-                    ),
-                )
-
-                # Deferred import: avoid pulling heavy SDK at module-load time
-                from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory  # noqa: PLC0415
-
-                openrouter_completions_factory = OpenRouterCompletionsFactory(is_http_url_enabled=True)
-
-                img_gen_worker = OpenAICompletionsImgGenWorker(
-                    openai_completions_factory=openrouter_completions_factory,
-                    sdk_instance=img_gen_sdk_instance,
-                    inference_model=inference_model,
-                    reporting_delegate=reporting_delegate,
-                )
-            case _:
-                msg = f"ModelHandle '{model_handle}' is not supported for image generation"
-                raise NotImplementedError(msg)
-
-        return img_gen_worker
+        make_worker = get_inference_backend_registry().lookup(family=InferenceFamily.IMG_GEN, sdk=model_handle.sdk)
+        worker = make_worker(
+            inference_model=inference_model,
+            backend=backend,
+            sdk_clients=get_sdk_client_manager().sdk_client_registry,
+            reporting_delegate=reporting_delegate,
+        )
+        # The IMG_GEN family registry only ever holds image generation workers (the
+        # (family, sdk) key guarantees it); the uniform MakeWorkerFn return type is
+        # widened to InferenceWorkerAbstract, so narrow it back here.
+        return cast("ImgGenWorkerAbstract", worker)
