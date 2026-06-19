@@ -82,6 +82,10 @@ own page. Classes are grouped by subsystem.
 - [`AzureCredentialsError`](azure-credentials-error.md) — Azure credentials
 - [`BedrockFactoryError`](bedrock-factory-error.md) — Bedrock factory
 - [`BedrockWorkerConfigurationError`](bedrock-worker-configuration-error.md) — Bedrock worker configuration
+- [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
+- [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
+- [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
+- [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
 - [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
 - [`GatewayError`](gateway-error.md) — Gateway
@@ -90,11 +94,14 @@ own page. Classes are grouped by subsystem.
 - [`GatewaySearchResponseError`](gateway-search-response-error.md) — Gateway search response
 - [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
 - [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
+- [`HubSlotAlreadyClaimedError`](hub-slot-already-claimed-error.md) — Hub slot already claimed
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
 - [`MistralWorkerConfigurationError`](mistral-worker-configuration-error.md) — Mistral worker configuration
 - [`OpenAIClientFactoryError`](open-ai-client-factory-error.md) — OpenAI client factory error
+- [`PluginApiVersionMismatchError`](plugin-api-version-mismatch-error.md) — Plugin api version mismatch
+- [`PluginError`](plugin-error.md) — Plugin error
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory

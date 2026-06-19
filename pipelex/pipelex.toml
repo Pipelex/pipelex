@@ -681,3 +681,8 @@ excluded_workflows = []
 excluded_activities = []
 disable_all_workflows = true
 disable_all_activities = false
+
+[plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []

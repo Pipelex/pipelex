@@ -49,6 +49,8 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+    from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
@@ -72,6 +74,8 @@ class PipelexHub:
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._sdk_client_manager: SdkClientManager | None = None
+        self._inference_backend_registry: InferenceBackendRegistry | None = None
+        self._orchestrator_registry: OrchestratorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -177,6 +181,12 @@ class PipelexHub:
 
     def set_sdk_client_manager(self, sdk_client_manager: SdkClientManager):
         self._sdk_client_manager = sdk_client_manager
+
+    def set_inference_backend_registry(self, inference_backend_registry: "InferenceBackendRegistry"):
+        self._inference_backend_registry = inference_backend_registry
+
+    def set_orchestrator_registry(self, orchestrator_registry: "OrchestratorRegistry"):
+        self._orchestrator_registry = orchestrator_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -291,6 +301,18 @@ class PipelexHub:
             msg = "SdkClientManager is not initialized"
             raise RuntimeError(msg)
         return self._sdk_client_manager
+
+    def get_inference_backend_registry(self) -> "InferenceBackendRegistry":
+        if self._inference_backend_registry is None:
+            msg = "InferenceBackendRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._inference_backend_registry
+
+    def get_orchestrator_registry(self) -> "OrchestratorRegistry":
+        if self._orchestrator_registry is None:
+            msg = "OrchestratorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._orchestrator_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -446,6 +468,14 @@ def get_model_deck() -> ModelDeck:
 
 def get_sdk_client_manager() -> SdkClientManager:
     return get_pipelex_hub().get_sdk_client_manager()
+
+
+def get_inference_backend_registry() -> "InferenceBackendRegistry":
+    return get_pipelex_hub().get_inference_backend_registry()
+
+
+def get_orchestrator_registry() -> "OrchestratorRegistry":
+    return get_pipelex_hub().get_orchestrator_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

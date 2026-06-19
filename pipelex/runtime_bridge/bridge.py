@@ -1,8 +1,8 @@
 """Framework-agnostic Pipelex runtime-bridge surface for host runtimes.
 
-This module contains the boundary types (``PipelexPipeRunInput`` /
-``PipelexPipeRunOutput``) and the dispatch entry-point
-(``run_pipe_via_bridge``) used by host runtimes (Mistral Workflows, raw
+This module re-exports the boundary types (``PipelexPipeRunInput`` /
+``PipelexPipeRunOutput``, defined in ``payloads.py``) and holds the dispatch
+entry-point (``run_pipe_via_bridge``) used by host runtimes (Mistral Workflows, raw
 Temporal, future plugins) to invoke Pipelex pipes from inside their own
 activities. It deliberately does NOT import any host-runtime-specific
 modules at module top-level so that callers can use the bridge directly
@@ -17,7 +17,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import shortuuid
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -41,6 +41,7 @@ from pipelex.runtime_bridge.exceptions import (
     PipelexBridgeDispatchError,
 )
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.payloads import PipelexPipeRunInput, PipelexPipeRunOutput
 from pipelex.runtime_bridge.primitives.scoped_library import scoped_library_for_crate
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
@@ -65,42 +66,6 @@ _PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
     PipeExecutionError,
     PipelineExecutionError,
 )
-
-
-class PipelexPipeRunInput(BaseModel):
-    """JSON-safe input crossing the host-runtime / Temporal boundary."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    pipe_code: str
-    inputs: dict[str, Any] = Field(default_factory=dict)
-    output_name: str | None = None
-    pipeline_run_id: str | None = None
-    user_id: str | None = None
-    library_crate_dump: dict[str, Any] | None = None
-    execution_mode: PipelexExecutionMode = PipelexExecutionMode.DIRECT
-    delivery_assignment_dump: dict[str, Any] | None = None
-
-
-class PipelexPipeRunOutput(BaseModel):
-    """JSON-safe output crossing the host-runtime / Temporal boundary."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    output_dict: dict[str, Any]
-    main_stuff_name: str | None = None
-    pipeline_run_id: str
-    workflow_id: str | None = None
-    is_completed: bool
-    graph_spec_dump: dict[str, Any] | None = None
-    # graph_assembly_error / usage_assembly_error mirror the same fields on PipeOutput: a non-None
-    # value means assembly of the graph / token usage failed, which a host must be able to tell
-    # apart from "assembly was off" (a None graph_spec_dump / tokens_usages_dump). tokens_usages_dump
-    # is the JSON-safe dump of the AnyTokensUsage discriminated union so a host can render the
-    # end-of-run cost report: None when cost reporting was off, [] when on but no inference happened.
-    graph_assembly_error: str | None = None
-    tokens_usages_dump: list[dict[str, Any]] | None = None
-    usage_assembly_error: str | None = None
 
 
 async def run_pipe_via_bridge(

@@ -350,3 +350,12 @@ managed_loggers = [
   "temporalio.workflow",
   "temporalio.worker._activity",
 ]
+
+####################################################################################################
+# Plugins
+####################################################################################################
+
+[plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []

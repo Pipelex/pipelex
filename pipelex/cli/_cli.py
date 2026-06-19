@@ -11,6 +11,7 @@ from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
+from pipelex.cli.commands.plugins_cmd import plugins_app
 from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.setup_temporal_namespace_cmd import setup_temporal_namespace_cmd
 from pipelex.cli.commands.show_cmd import show_app
@@ -42,6 +43,7 @@ class PipelexCLI(TyperGroup):
             "graph",
             "show",
             "which",
+            "plugins",
             "worker",
             "setup-temporal-namespace",
         ]
@@ -231,6 +233,7 @@ app.add_typer(run_app, name="run", help="Run a method or pipe, optionally provid
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
+app.add_typer(plugins_app, name="plugins", help="Inspect the discovered plugins (inference backends, orchestrators) and their contributions")
 app.command(name="worker", help="Start a Temporal worker for distributed workflow execution")(worker_cmd)
 app.command(
     name="setup-temporal-namespace",

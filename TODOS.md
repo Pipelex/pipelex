@@ -1,6 +1,6 @@
 # Pipelex plugin system — implementation TODOS
 
-**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 complete (committed). Next: Phase 1.
+**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 + Phase 1 complete (committed). Next: Phase 2 (ImgGen / Extract / Search).
 
 > **Delivery model for this branch.** Per the driving goal, all phases land on `refactor/Plugins` as **one commit per checkpoint** (not one PR per phase), and a **single PR to `dev`** opens once the tracker is done. Each phase's "PR: …" box below is satisfied by its checkpoint commit; the standalone-PR-per-phase wording in the original plan is superseded.
 
@@ -79,6 +79,8 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 
 **Goal:** build discovery + contract + registry machinery **and** migrate the LLM family through it in one PR, so the contract is proven against a real, messy family before it locks. No behavior change. Own PR.
 
+> ✅ **DONE — committed on `refactor/Plugins`.** Full record in **`### Phase 1 — as-built`** (As-built log). The unchecked boxes below are the original plan items; all are delivered (or noted as deferred to Phase 2/3) in the as-built.
+
 **New modules (all import-light — must not import any backend SDK or `temporalio`):**
 
 - [ ] `plugins/contract.py` — `PipelexPlugin` (`@runtime_checkable Protocol`: `name: str`, `targets_api: int`, `register(self, registrar) -> None`) + `PLUGIN_API_VERSION: int = 1`. Document the **side-effect-free `register`** invariant here.
@@ -123,10 +125,10 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 
 ### 🛑 CHECKPOINT 1 — hard stop (contract locks here)
 
-- [ ] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Confirm the import-light subprocess guard is green and the LLM `match` is gone.
-- [ ] **Capture cold-start context:** record an `### Phase 1 — as-built` note — the final `MakeWorkerFn` signature, the registrar menu surface, where `build_registrar` is called in `setup()`, and the `plugins.disabled`/`plugins list` shape. This contract is now the reference Phase 2–4 build against; write it down precisely.
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase 1 diff. Emphasize: side-effect-free `register`, import-light enforcement, fail-loud conflict/version policy, no behavior change in LLM dispatch. Triage findings here.
-- [ ] **PR:** open + land the merged seam+LLM PR green. The contract is locked against a real consumer before any other family touches it.
+- [x] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Import-light subprocess guard green; the LLM `match` is gone (replaced by a registry lookup).
+- [x] **Capture cold-start context:** see `### Phase 1 — as-built` in the As-built log.
+- [x] **Fan-out `/code-review`:** sub-agent ran `/code-review --fix` on the Phase 1 diff (see as-built for triage).
+- [x] **PR:** superseded — committed on `refactor/Plugins` (single PR to `dev` opens after the tracker is done).
 
 ---
 
@@ -309,3 +311,37 @@ Phase 0 (rename) → Phase 1 (seam + LLM, merged) → Phase 2 (ImgGen/Extract/Se
 **No behavior change.** Pure rename; the dispatch `match` statements, caching dance, and error surfaces are byte-equivalent modulo identifiers.
 
 **Deferred (still open):** P3 follow-up — collapse `SdkClientManager` into `SdkClientRegistry` (hub holds the registry directly), own commit after Phase 0. Not done here by D4.
+
+### Phase 1 — as-built
+
+**Status:** done, committed on `refactor/Plugins`. `make agent-check` clean (pyright 0 / mypy 0 over 2219 files / keyword-only pass) · `make tb` green · `make agent-test` fully green. `/code-review --fix` ran clean. This is the locked contract Phases 2–4 build against.
+
+**New seam modules** (all in `pipelex/plugins/`, all import-light — importing them imports no backend SDK or `temporalio`):
+
+- `contract.py` — `PipelexPlugin` (`@runtime_checkable Protocol`: `name: str`, `targets_api: int`, `register(self, registrar) -> None`) + `PLUGIN_API_VERSION: int = 1`. Docstring states the **side-effect-free `register`** invariant.
+- `inference_backend_registry.py` — `InferenceFamily(StrEnum)` = LLM/IMG_GEN/EXTRACT/SEARCH; `MakeWorkerFn: TypeAlias = Callable[..., InferenceWorkerAbstract]`; `InferenceBackendRegistry` keyed by `(family, sdk)` with `.lookup(*, family, sdk)` (miss → `NotImplementedError` "No inference backend registered for sdk '<sdk>' in the <family> family. Is its plugin installed?"), `.has(...)`, `.keys`. Also hosts **`require_sdk(*, spec, extra, msg, dependency_name=None)`** — `spec` accepts a `str` or a `Sequence[str]` (bedrock needs both `boto3`+`aioboto3`); `dependency_name` overrides the displayed package when it differs from the import name (google: spec `google.genai` / dep `google-genai`); raises `MissingDependencyError`.
+- `orchestrator_registry.py` — `OrchestratorProtocol` (`async def run(self, *, pipe_job, delivery_assignment) -> PipelexPipeRunOutput`) + `OrchestratorRegistry` keyed by `PipelexExecutionMode` (`.get_optional`, `.has`, `.modes`). **Skeleton only — not consumed until Phase 3.**
+- `registrar.py` — `PluginRegistrar` accumulator + `PluginDiscovery` (mutable BaseModel: name/origin/status/targets_api/contributions/detail), `HubSlot`/`PluginOrigin`/`PluginStatus` StrEnums, `CliCommand` NamedTuple. Menu surface: `add_inference_backend(*, family, sdk, make_worker)`, `add_orchestrator(*, mode, orchestrator)`, `claim_content_generator|pipe_router|pipe_run|task_manager(factory)` (D5 thunks), `add_cli_command(*, name, help, command)`, `add_teardown(callback)`. `begin_plugin(...)` (driven by `build_registrar`) sets the "active" discovery so contributions are attributed and **duplicate errors name both contributors**. Duplicate `(family,sdk)`/mode/slot each raise their fail-loud error.
+- `discovery.py` — **`build_registrar(*, config: PipelexConfig) -> PluginRegistrar`** (pure, idempotent, D3-safe). Iterates `BUILTIN_PLUGINS` then `importlib.metadata.entry_points(group="pipelex.plugins")` (external entry points resolve to a plugin instance or a zero-arg factory); version-checks each (`targets_api != PLUGIN_API_VERSION` → `PluginApiVersionMismatchError`); skips + logs names in `config.plugins.disabled` (raises `CoreUnconditionalPluginDisabledError` if the name is in `CORE_UNCONDITIONAL_PLUGIN_NAMES`); wraps any other failure in `BrokenPluginError` (the two sanctioned `except Exception` sites, annotated "Case 2"). The `_external_entry_points()` helper is the monkeypatch seam for tests.
+- `builtins.py` — `BUILTIN_PLUGINS` = the seven LLM driver plugin instances (OpenAI, Gateway, Portkey, Anthropic, Mistral, Bedrock, Google); `CORE_UNCONDITIONAL_PLUGIN_NAMES = frozenset({"openai"})`.
+- `exceptions.py` — `PluginError` base (CONFIG domain) + `PluginApiVersionMismatchError`, `DuplicateInferenceBackendError`, `DuplicateOrchestratorError`, `HubSlotAlreadyClaimedError`, `CoreUnconditionalPluginDisabledError`, `BrokenPluginError`. (`MissingOrchestratorError` is Phase 3, in `runtime_bridge/exceptions.py`.)
+
+**Driver plugins** (one per vendor, in `pipelex/plugins/<vendor>/<vendor>_plugin.py`): each is a tiny class (`name`, `targets_api`, `register`) whose `register` calls `add_inference_backend(family=LLM, sdk=..., make_worker=<module-level closure>)`. The closures do the lazy SDK imports (`# noqa: PLC0415`), the `require_sdk` guard (anthropic/mistral/bedrock/google), and `sdk_clients.get_or_create(handle=model_handle, build=lambda: ...)`. They are byte-equivalent to the old `match` arms. **Phase 2 extends these same vendor plugins** to register IMG_GEN/EXTRACT/SEARCH backends (the cross-family-vendor coordination point).
+
+**DRY helpers (design §6.2):** `SdkClientRegistry.get_or_create(*, handle, build)` (uses `is not None`, not truthiness) replaced the `get(...) or set(...)` dance; `require_sdk(...)` replaced the per-arm `find_spec` guard, moved **into** the closures so a missing extra fails at use.
+
+**`MakeWorkerFn` call shape (the locked contract):** `make_worker(*, inference_model, backend, sdk_clients, reporting_delegate)` → `InferenceWorkerAbstract`. The closure derives its own `model_handle` from `inference_model`. The dispatcher (`LLMWorkerFactory.make_llm_worker`) builds `model_handle`, resolves `backend` via the models manager, `lookup`s the registry, calls the closure with `sdk_clients=get_sdk_client_manager().sdk_client_registry`, and `cast`s the result to `LLMWorkerInternalAbstract`.
+
+**Boot wiring (`pipelex.py:setup()`):** `build_registrar(config=get_config())` is called **after** the gateway/model-setup checks (so `Pipelex.__new__(...).setup()` tests that expect `InferenceSetupRequiredError`/`GatewayTermsNotAcceptedError` still raise first) and **before** the content-generator/router/run hub setup points (right before `set_dry_run_forced`). The two registries are stored on the hub via `set_inference_backend_registry` / `set_orchestrator_registry`; the registrar is held on `self._plugin_registrar` for Phase 3's slot-thunk/CLI/teardown apply-points (empty in Phase 1).
+
+**Hub:** added `_inference_backend_registry` / `_orchestrator_registry` fields, `set_/get_inference_backend_registry`, `set_/get_orchestrator_registry` (raise if unset), and module-level `get_inference_backend_registry()` / `get_orchestrator_registry()`. Registry types imported under `TYPE_CHECKING` (hub is imported everywhere — avoids cycles).
+
+**Import-cycle break (not in the original plan, required):** `PipelexPipeRunInput` / `PipelexPipeRunOutput` were extracted from `runtime_bridge/bridge.py` into a new import-light **`runtime_bridge/payloads.py`**; `bridge.py` re-imports them (so `from ...bridge import PipelexPipeRunInput` still works for the existing tests). Without this, `orchestrator_registry → bridge → bootstrap → pipelex` was a `reportImportCycles` error.
+
+**Control surface (D7):** core-owned `PluginsConfig` (`disabled: list[str]`) added to `configs.py` as `PipelexConfig.plugins`; `[plugins] disabled = []` added to **both** `pipelex/pipelex.toml` and `.pipelex/pipelex.toml` (real default, not commented). New `pipelex plugins list` command (`cli/commands/plugins_cmd.py`, registered in `_cli.py` + `list_commands`) renders `build_registrar(...).discoveries` as a Rich table.
+
+**Tests:** `tests/unit/pipelex/plugins/test_plugin_discovery.py` (protocol satisfaction, version mismatch, duplicate backend/mode/slot naming both, broken plugin + broken entry point, **idempotent `build_registrar`**, denylist skip + core-unconditional raise, discoveries describe built-ins) and `tests/unit/pipelex/plugins/test_import_light_boot.py` (subprocess `sys.meta_path` import-blocker). The existing `test_llm_worker_factory.py` was updated to build the real registry from `BUILTIN_PLUGINS` and patch `get_inference_backend_registry` — so it exercises the real closures through the real lookup (registry round-trip + caching + huggingface-style missing-dependency parity + the registry-miss `NotImplementedError`). New error classes → `pipelex-dev generate-error-pages` regenerated `docs/errors/`.
+
+**Behavior unchanged** in LLM dispatch except the deliberate registry-miss error wording (was `"ModelHandle '<...>' is not supported"`, now `"No inference backend registered for sdk '<sdk>' ... Is its plugin installed?"`).
+
+**Deferred / notes for later phases:** docs (Inference SPI reference + plugin-authoring guide + example backend plugin) ship with **Phase 2** per plan — not written in Phase 1. The orchestrator registry/protocol is a skeleton; Phase 3 wires the bridge `match` collapse, slot-thunk apply-points (with injection-precedence), CLI-command harvesting, and adds `MissingOrchestratorError`.

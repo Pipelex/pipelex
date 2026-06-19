@@ -47,6 +47,9 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
+from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
@@ -372,6 +375,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
+        # --- Plugin discovery -----------------------------------------------------------------
+        # Build the plugin registrar from the fully-resolved config (pure and import-light:
+        # registering the built-ins imports no backend SDK). Runs after the gateway/model setup
+        # checks and before the hub setup points below — the family worker factories look their
+        # backends up on the hub registries at run time. The slot-claim thunks, CLI commands and
+        # teardown callbacks the registrar also accumulates are applied at their ordered
+        # apply-points in a later phase (no orchestrator plugin contributes any of them yet).
+        self._plugin_registrar = build_registrar(config=get_config())
+        self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(self._plugin_registrar.inference_backends))
+        self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(self._plugin_registrar.orchestrators))
+
         self.pipelex_hub.set_dry_run_forced(not needs_inference)
         if content_generator is None:
             if get_config().temporal.is_enabled:

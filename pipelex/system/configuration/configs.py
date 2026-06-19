@@ -244,9 +244,17 @@ class MigrationConfig(ConfigModel):
         return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
+class PluginsConfig(ConfigModel):
+    # Names of discovered plugins to skip at startup (a denylist; discovery is the
+    # source of truth for presence). Denylisting a plugin core requires
+    # unconditionally is a startup error. There is intentionally no allowlist.
+    disabled: list[str]
+
+
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
     temporal: Temporal
     pipelex: Pipelex
+    plugins: PluginsConfig
     migration: MigrationConfig
