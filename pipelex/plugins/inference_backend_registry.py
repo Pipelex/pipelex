@@ -41,7 +41,14 @@ def require_sdk(*, spec: str | Sequence[str], extra: str, msg: str, dependency_n
     - ``extra``: the pip extra to install (drives the ``pipelex[<extra>]`` hint).
     """
     specs = [spec] if isinstance(spec, str) else list(spec)
-    if any(importlib.util.find_spec(one_spec) is None for one_spec in specs):
+    try:
+        # ``find_spec`` imports the parent of a dotted spec (e.g. ``google`` for
+        # ``google.genai``); an entirely absent parent raises ModuleNotFoundError
+        # rather than returning None, so treat that as "missing" too.
+        is_missing = any(importlib.util.find_spec(one_spec) is None for one_spec in specs)
+    except ModuleNotFoundError:
+        is_missing = True
+    if is_missing:
         raise MissingDependencyError(dependency_name or ",".join(specs), extra, msg)
 
 

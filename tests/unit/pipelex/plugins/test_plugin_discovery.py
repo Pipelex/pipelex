@@ -155,6 +155,25 @@ class TestPluginDiscovery:
             build_registrar(config=_fake_config([]))
         assert "bad_ep" in str(exc_info.value)
 
+    def test_disabled_broken_external_entry_point_is_skipped_before_load(self, mocker: MockerFixture) -> None:
+        """A broken external entry point listed in plugins.disabled is skipped by its entry-point name
+        *before* load(), so the denylist can recover from a bad installed plugin instead of raising BrokenPluginError.
+        """
+
+        def _explode() -> object:
+            msg = "no such module"
+            raise ImportError(msg)
+
+        bad_entry_point = SimpleNamespace(name="bad_ep", load=_explode)
+        mocker.patch(f"{DISCOVERY_MODULE}.BUILTIN_PLUGINS", [])
+        mocker.patch(f"{DISCOVERY_MODULE}._external_entry_points", return_value=[bad_entry_point])
+
+        registrar = build_registrar(config=_fake_config(["bad_ep"]))
+
+        disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "bad_ep")
+        assert disabled_discovery.status == PluginStatus.DISABLED
+        assert disabled_discovery.origin == PluginOrigin.EXTERNAL
+
     def test_build_registrar_is_idempotent(self, mocker: MockerFixture) -> None:
         """Two builds produce equivalent registrars — register is side-effect-free (D3)."""
         _patch_builtins(mocker, [_InferencePlugin(name="synthetic", sdk="synthetic_sdk")])

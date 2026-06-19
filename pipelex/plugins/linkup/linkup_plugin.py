@@ -8,6 +8,7 @@ from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 _LINKUP_MISSING_MSG = "The linkup SDK is required in order to use Linkup Fetch extraction models."
+_LINKUP_SEARCH_MISSING_MSG = "The linkup SDK is required in order to use Linkup search models."
 
 
 def _make_linkup_extract_worker(
@@ -35,6 +36,8 @@ def _make_linkup_search_worker(
     sdk_clients: SdkClientRegistry,  # noqa: ARG001 - stateless worker, no SDK-client caching
     reporting_delegate: ReportingProtocol | None,
 ) -> InferenceWorkerAbstract:
+    require_sdk(spec="linkup", extra="linkup", msg=_LINKUP_SEARCH_MISSING_MSG)
+
     from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
 
     return LinkupSearchWorker(

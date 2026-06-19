@@ -167,6 +167,8 @@ The entry point may resolve to a plugin instance or a zero-argument factory. A b
 disabled = ["acme"]
 ```
 
+For external entry points the denylist is matched against the **entry-point name** *before* the plugin is loaded, so a broken or dependency-missing installed plugin can still be disabled to recover startup (it would otherwise raise `BrokenPluginError` at load). A working external plugin that sets a `name` different from its entry-point name is denylistable by **either** name.
+
 Disabling a core-unconditional plugin (`openai`) is a configuration error, not a no-op — it raises `CoreUnconditionalPluginDisabledError`. There is intentionally **no** allowlist: a plugin's presence (built-in or installed entry point) is what enables it.
 
 Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
