@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
-class Plugin(BaseModel):
+class ModelHandle(BaseModel):
     sdk: str
     backend: str
     variant: str | None = None
@@ -16,8 +16,8 @@ class Plugin(BaseModel):
             return f"{self.sdk}@{self.backend}"
 
     @classmethod
-    def make_for_inference_model(cls, inference_model: InferenceModelSpec) -> "Plugin":
-        return Plugin(
+    def make_for_inference_model(cls, inference_model: InferenceModelSpec) -> "ModelHandle":
+        return ModelHandle(
             sdk=inference_model.sdk,
             backend=inference_model.backend_name,
             variant=inference_model.variant,

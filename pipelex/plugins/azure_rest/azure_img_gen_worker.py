@@ -23,7 +23,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.config import get_config
 from pipelex.hub import get_models_manager
 from pipelex.plugins.azure_rest.azure_exceptions import AzureCredentialsError
-from pipelex.plugins.plugin import Plugin
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.log.log import log
 
@@ -31,17 +31,17 @@ from pipelex.tools.log.log import log
 class AzureImgGenWorker(ImgGenWorkerAbstract):
     def __init__(
         self,
-        plugin: Plugin,
+        model_handle: ModelHandle,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
-        if plugin.sdk != "azure_rest_img_gen":
-            msg = f"Plugin '{plugin}' is not supported for image generation"
+        if model_handle.sdk != "azure_rest_img_gen":
+            msg = f"ModelHandle '{model_handle}' is not supported for image generation"
             raise NotImplementedError(msg)
-        self.plugin = plugin
-        backend_name = self.plugin.backend
+        self.model_handle = model_handle
+        backend_name = self.model_handle.backend
         backend = get_models_manager().get_required_inference_backend(backend_name)
         self.endpoint = backend.endpoint
         self.api_version = backend.extra_config.get("api_version")

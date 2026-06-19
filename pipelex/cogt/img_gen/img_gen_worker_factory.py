@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_models_manager, get_plugin_manager
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.hub import get_models_manager, get_sdk_client_manager
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -17,17 +17,17 @@ class ImgGenWorkerFactory:
         *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ImgGenWorkerAbstract:
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
+        sdk_client_registry = get_sdk_client_manager().sdk_client_registry
         img_gen_worker: ImgGenWorkerAbstract
-        match plugin.sdk:
+        match model_handle.sdk:
             case "gateway_img_gen":
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_img_gen_worker import GatewayImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
 
@@ -51,8 +51,8 @@ class ImgGenWorkerFactory:
 
                 from pipelex.plugins.fal.fal_img_gen_worker import FalImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=FalAsyncClient(key=backend.api_key),
                 )
 
@@ -71,12 +71,12 @@ class ImgGenWorkerFactory:
                     from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T  # noqa: PLC0415
 
                 provider_literal: PROVIDER_OR_POLICY_T
-                if provider_str := plugin.variant:
+                if provider_str := model_handle.variant:
                     provider_literal = HuggingFaceFactory.make_huggingface_inference_provider(provider_str=provider_str)
                 else:
                     provider_literal = "auto"
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=AsyncInferenceClient(
                         provider=provider_literal,
                         token=backend.api_key,
@@ -92,10 +92,10 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_img_gen_worker import OpenAIImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=OpenAIClientFactory.make_openai_client(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -109,10 +109,10 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=OpenAIClientFactory.make_openai_client(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -132,7 +132,7 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.azure_rest.azure_img_gen_worker import AzureImgGenWorker  # noqa: PLC0415
 
                 img_gen_worker = AzureImgGenWorker(
-                    plugin=plugin,
+                    model_handle=model_handle,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
@@ -150,8 +150,8 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
                 from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GoogleFactory.make_google_client(backend=backend),
                 )
 
@@ -164,10 +164,10 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayCompletionsFactory.make_portkey_openai_client_for_completions(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -184,10 +184,10 @@ class ImgGenWorkerFactory:
                 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
 
-                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                img_gen_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=OpenAIClientFactory.make_openai_client(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -204,7 +204,7 @@ class ImgGenWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                msg = f"Plugin '{plugin}' is not supported for image generation"
+                msg = f"ModelHandle '{model_handle}' is not supported for image generation"
                 raise NotImplementedError(msg)
 
         return img_gen_worker

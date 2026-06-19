@@ -84,10 +84,10 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     manager.teardown()
     temporal_hub.reset()
 
-    from pipelex.hub import get_inference_manager, get_plugin_manager  # noqa: PLC0415
+    from pipelex.hub import get_inference_manager, get_sdk_client_manager  # noqa: PLC0415
 
     get_inference_manager().teardown()
-    get_plugin_manager().plugin_sdk_registry.teardown()
+    get_sdk_client_manager().sdk_client_registry.teardown()
 
 
 # ---------------------------------------------------------------------------

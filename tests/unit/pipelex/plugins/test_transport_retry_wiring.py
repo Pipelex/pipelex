@@ -40,10 +40,10 @@ class TestTransportRetryWiring:
             return_value=_config_with(mocker, 5),
         )
         mock_client = mocker.patch("pipelex.plugins.anthropic.anthropic_factory.AsyncAnthropic")
-        plugin = mocker.MagicMock()
-        plugin.sdk = "anthropic"
+        model_handle = mocker.MagicMock()
+        model_handle.sdk = "anthropic"
 
-        AnthropicFactory.make_anthropic_client(plugin=plugin, backend=mocker.MagicMock())
+        AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 5
@@ -54,10 +54,10 @@ class TestTransportRetryWiring:
             return_value=_config_with(mocker, 7),
         )
         mock_client = mocker.patch("openai.AsyncOpenAI")
-        plugin = mocker.MagicMock()
-        plugin.sdk = "openai"
+        model_handle = mocker.MagicMock()
+        model_handle.sdk = "openai"
 
-        OpenAIClientFactory.make_openai_client(plugin=plugin, backend=mocker.MagicMock())
+        OpenAIClientFactory.make_openai_client(model_handle=model_handle, backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 7
@@ -114,7 +114,7 @@ class TestTransportRetryWiring:
         mocker.patch("pipelex.plugins.portkey.portkey_completions_factory.PortkeyOpenAISdkVariant.is_completions", return_value=True)
         mock_client = mocker.patch("openai.AsyncOpenAI")
 
-        PortkeyCompletionsFactory.make_portkey_openai_client_for_completions(plugin=mocker.MagicMock(), backend=mocker.MagicMock())
+        PortkeyCompletionsFactory.make_portkey_openai_client_for_completions(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 6
@@ -130,7 +130,7 @@ class TestTransportRetryWiring:
         mocker.patch("pipelex.plugins.portkey.portkey_responses_factory.PortkeyOpenAISdkVariant.is_responses", return_value=True)
         mock_client = mocker.patch("openai.AsyncOpenAI")
 
-        PortkeyResponsesFactory.make_portkey_openai_client_for_responses(plugin=mocker.MagicMock(), backend=mocker.MagicMock())
+        PortkeyResponsesFactory.make_portkey_openai_client_for_responses(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 8
@@ -146,7 +146,7 @@ class TestTransportRetryWiring:
         mocker.patch("pipelex.plugins.gateway.gateway_completions_factory.GatewayOpenAISdkVariant.is_completions", return_value=True)
         mock_client = mocker.patch("openai.AsyncOpenAI")
 
-        GatewayCompletionsFactory.make_portkey_openai_client_for_completions(plugin=mocker.MagicMock(), backend=mocker.MagicMock())
+        GatewayCompletionsFactory.make_portkey_openai_client_for_completions(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 4
@@ -162,7 +162,7 @@ class TestTransportRetryWiring:
         mocker.patch("pipelex.plugins.gateway.gateway_responses_factory.GatewayOpenAISdkVariant.is_responses", return_value=True)
         mock_client = mocker.patch("openai.AsyncOpenAI")
 
-        GatewayResponsesFactory.make_portkey_openai_client_for_responses(plugin=mocker.MagicMock(), backend=mocker.MagicMock())
+        GatewayResponsesFactory.make_portkey_openai_client_for_responses(model_handle=mocker.MagicMock(), backend=mocker.MagicMock())
 
         mock_client.assert_called_once()
         assert mock_client.call_args.kwargs["max_retries"] == 9

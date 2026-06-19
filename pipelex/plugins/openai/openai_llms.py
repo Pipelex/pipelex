@@ -1,17 +1,17 @@
 from openai.types import Model
 
 from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory
-from pipelex.plugins.plugin_sdk_registry import Plugin
 
 
 async def openai_list_available_models(
-    plugin: Plugin,
+    model_handle: ModelHandle,
     *,
     backend: InferenceBackend,
 ) -> list[Model]:
     openai_client_async = OpenAIClientFactory.make_openai_client(
-        plugin=plugin,
+        model_handle=model_handle,
         backend=backend,
     )
 

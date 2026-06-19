@@ -3,8 +3,8 @@ import importlib.util
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_models_manager, get_plugin_manager
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.hub import get_models_manager, get_sdk_client_manager
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -16,17 +16,17 @@ class ExtractWorkerFactory:
         *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> ExtractWorkerAbstract:
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
+        sdk_client_registry = get_sdk_client_manager().sdk_client_registry
         extract_worker: ExtractWorkerAbstract
-        match plugin.sdk:
+        match model_handle.sdk:
             case "gateway_extract":
                 from pipelex.plugins.gateway.gateway_extract_worker import GatewayExtractWorker  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
 
-                extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                extract_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
 
@@ -50,8 +50,8 @@ class ExtractWorkerFactory:
                 from pipelex.plugins.mistral.mistral_extract_worker import MistralExtractWorker  # noqa: PLC0415
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
 
-                extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                extract_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=MistralFactory.make_mistral_client(backend=backend),
                 )
 
@@ -83,8 +83,8 @@ class ExtractWorkerFactory:
                 from pipelex.plugins.docling.docling_extract_worker import DoclingExtractWorker  # noqa: PLC0415
                 from pipelex.plugins.docling.docling_factory import DoclingFactory  # noqa: PLC0415
 
-                extract_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                extract_sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=DoclingFactory.make_docling_sdk(),
                 )
 
@@ -113,7 +113,7 @@ class ExtractWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                msg = f"Plugin '{plugin}' is not supported"
+                msg = f"ModelHandle '{model_handle}' is not supported"
                 raise NotImplementedError(msg)
 
         return extract_worker

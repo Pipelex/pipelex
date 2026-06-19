@@ -47,7 +47,7 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
@@ -126,8 +126,8 @@ class Pipelex(metaclass=MetaSingleton):
         self.class_registry: ClassRegistryAbstract | None = None
         self.func_registry: FuncRegistry | None = None
         # cogt
-        self.plugin_manager = PluginManager()
-        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
+        self.sdk_client_manager = SdkClientManager()
+        self.pipelex_hub.set_sdk_client_manager(self.sdk_client_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
@@ -324,7 +324,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- AI Models and Inference Management ------------------------------------------------
 
-        self.plugin_manager.setup()
+        self.sdk_client_manager.setup()
 
         self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
@@ -486,7 +486,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager.teardown()
         if self.reporting_delegate:
             self.reporting_delegate.teardown()
-        self.plugin_manager.teardown()
+        self.sdk_client_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()

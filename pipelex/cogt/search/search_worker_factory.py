@@ -1,7 +1,7 @@
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
-from pipelex.hub import get_models_manager, get_plugin_manager, get_report_delegate
-from pipelex.plugins.plugin import Plugin
+from pipelex.hub import get_models_manager, get_report_delegate, get_sdk_client_manager
+from pipelex.plugins.model_handle import ModelHandle
 
 
 class SearchWorkerFactory:
@@ -12,7 +12,7 @@ class SearchWorkerFactory:
     ) -> SearchWorkerAbstract:
         """Create a search worker for the given inference model.
 
-        Discriminates on plugin.sdk to select the appropriate implementation.
+        Discriminates on model_handle.sdk to select the appropriate implementation.
 
         Args:
             inference_model: The model spec from the backend configuration.
@@ -20,11 +20,11 @@ class SearchWorkerFactory:
         Returns:
             A SearchWorkerAbstract instance.
         """
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
+        sdk_client_registry = get_sdk_client_manager().sdk_client_registry
         search_worker: SearchWorkerAbstract
-        match plugin.sdk:
+        match model_handle.sdk:
             case "linkup":
                 from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
 
@@ -33,15 +33,15 @@ class SearchWorkerFactory:
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
                 )
                 search_worker = GatewaySearchWorker(
                     sdk_instance=sdk_instance, inference_model=inference_model, reporting_delegate=get_report_delegate()
                 )
             case _:
-                msg = f"Plugin '{plugin}' is not supported for search"
+                msg = f"ModelHandle '{model_handle}' is not supported for search"
                 raise NotImplementedError(msg)
 
         return search_worker

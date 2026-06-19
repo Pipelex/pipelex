@@ -1,6 +1,8 @@
 # Pipelex plugin system — implementation TODOS
 
-**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** not started — ready to begin Phase 0.
+**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 complete (committed). Next: Phase 1.
+
+> **Delivery model for this branch.** Per the driving goal, all phases land on `refactor/Plugins` as **one commit per checkpoint** (not one PR per phase), and a **single PR to `dev`** opens once the tracker is done. Each phase's "PR: …" box below is satisfied by its checkpoint commit; the standalone-PR-per-phase wording in the original plan is superseded.
 
 This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/implementation-plan.md`](wip/plugins/implementation-plan.md) (the reviewed, decision-locked plan), built from [`wip/plugins/design.md`](wip/plugins/design.md) (the single decided design). **Read the implementation-plan before starting any phase** — this file tracks progress against it, it does not replace it. Background assessment: [`wip/plugins/README.md`](wip/plugins/README.md), plus the per-area notes (`inference-backends-as-plugins.md`, `orchestrators-as-plugins.md`, `temporal-as-plugin.md`).
 
@@ -52,24 +54,24 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 
 **Goal:** kill the three-way "plugin" overload. Pure rename, **no behavior change**. Own PR.
 
-- [ ] **Grep the blast radius first** (codex C11 — it's bigger than the four factories): `grep -rn 'import Plugin\b' pipelex/` and `grep -rn 'plugin_sdk_registry\|plugin_manager\|PluginManager\|PluginSdkRegistry\|PluginFactoryAbstract' pipelex/`. Note every adapter module (`openai`, `bedrock`, `anthropic`, `gateway`, `portkey` list+factory) and `search_worker_factory.py` (uses the *correct* `plugins.plugin` path while llm/img_gen/extract use the *wrong* `plugins.plugin_sdk_registry` path).
-- [ ] `Plugin` (`plugins/plugin.py`) → `ModelHandle` (`plugins/model_handle.py`). Keep `make_for_inference_model`. It's a backend *selector* (`sdk`+`backend`+`variant`+`sdk_handle`), not a plugin.
-- [ ] `PluginManager` (`plugins/plugin_manager.py`) → `SdkClientManager` (`plugins/sdk_client_manager.py`).
-- [ ] `PluginSdkRegistry` (`plugins/plugin_sdk_registry.py`) → `SdkClientRegistry` (`plugins/sdk_client_registry.py`). Rename `get_sdk_instance`/`set_sdk_instance` → `get`/`set` (the DRY `get_or_create` lands in Phase 1, **not here**).
-- [ ] `PluginFactoryAbstract` (`plugins/plugin_factory_abstract.py`, the `make_extras` helper — unrelated to the new system) → `BackendExtrasFactory` (`plugins/backend_extras_factory.py`). Name-hygiene; it collides with the new vocabulary.
-- [ ] `hub.py`: `get_plugin_manager`/`set_plugin_manager` → `get_sdk_client_manager`/`set_sdk_client_manager`; **fix the `"PluginManager2 is not initialized"` message** → `"SdkClientManager is not initialized"`.
-- [ ] `pipelex.py`: update setup/teardown call sites.
-- [ ] Fix the wrong-path imports (llm/img_gen/extract → corrected registry path) — free win during the rename.
-- [ ] **D4 guard:** `SdkClientManager` stays a thin wrapper holding one `SdkClientRegistry`. Do **not** collapse it here — that's a tracked P3 follow-up (see "Deferred / out of scope").
+- [x] **Grep the blast radius first** (codex C11 — it's bigger than the four factories): `grep -rn 'import Plugin\b' pipelex/` and `grep -rn 'plugin_sdk_registry\|plugin_manager\|PluginManager\|PluginSdkRegistry\|PluginFactoryAbstract' pipelex/`. Note every adapter module (`openai`, `bedrock`, `anthropic`, `gateway`, `portkey` list+factory) and `search_worker_factory.py` (uses the *correct* `plugins.plugin` path while llm/img_gen/extract use the *wrong* `plugins.plugin_sdk_registry` path).
+- [x] `Plugin` (`plugins/plugin.py`) → `ModelHandle` (`plugins/model_handle.py`). Keep `make_for_inference_model`. It's a backend *selector* (`sdk`+`backend`+`variant`+`sdk_handle`), not a plugin.
+- [x] `PluginManager` (`plugins/plugin_manager.py`) → `SdkClientManager` (`plugins/sdk_client_manager.py`).
+- [x] `PluginSdkRegistry` (`plugins/plugin_sdk_registry.py`) → `SdkClientRegistry` (`plugins/sdk_client_registry.py`). Rename `get_sdk_instance`/`set_sdk_instance` → `get`/`set` (the DRY `get_or_create` lands in Phase 1, **not here**).
+- [x] `PluginFactoryAbstract` (`plugins/plugin_factory_abstract.py`, the `make_extras` helper — unrelated to the new system) → `BackendExtrasFactory` (`plugins/backend_extras_factory.py`). Name-hygiene; it collides with the new vocabulary.
+- [x] `hub.py`: `get_plugin_manager`/`set_plugin_manager` → `get_sdk_client_manager`/`set_sdk_client_manager`; **fix the `"PluginManager2 is not initialized"` message** → `"SdkClientManager is not initialized"`.
+- [x] `pipelex.py`: update setup/teardown call sites.
+- [x] Fix the wrong-path imports (llm/img_gen/extract → corrected registry path) — free win during the rename.
+- [x] **D4 guard:** `SdkClientManager` stays a thin wrapper holding one `SdkClientRegistry`. Do **not** collapse it here — that's a tracked P3 follow-up (see "Deferred / out of scope").
 
 **Tests:** no new tests. Existing suite + `make tb` stay green.
 
 ### 🛑 CHECKPOINT 0 — hard stop
 
-- [ ] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Confirm `PluginManager2` artifact gone (`grep -rn PluginManager2 pipelex/` → empty) and wrong-path `Plugin` imports fixed.
-- [ ] **Capture cold-start context:** update this file — tick the boxes, and under a new `### Phase 0 — as-built` note record the final module/class names, any rename that diverged from plan, and the exact P3-collapse follow-up location. Anyone resuming cold should not need to re-grep.
-- [ ] **Fan-out `/code-review`:** launch a sub-agent (Agent tool) to run the `/code-review` skill on the Phase 0 diff. Prompt it with the phase scope ("pure rename, no behavior change — flag any accidental semantic change, missed call site, or broken import path") and the `git diff` range. Triage findings into this file before opening the PR.
-- [ ] **PR:** open the standalone Phase 0 rename PR. Land green before Phase 1.
+- [x] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Confirm `PluginManager2` artifact gone (`grep -rn PluginManager2 pipelex/` → empty) and wrong-path `Plugin` imports fixed.
+- [x] **Capture cold-start context:** see `### Phase 0 — as-built` in the As-built log.
+- [x] **Fan-out `/code-review`:** sub-agent ran `/code-review --fix` on the Phase 0 diff (pure-rename scope). Findings triaged in the as-built note.
+- [x] **PR:** superseded — committed on `refactor/Plugins` (single PR to `dev` opens after the tracker is done).
 
 ---
 
@@ -280,4 +282,30 @@ Phase 0 (rename) → Phase 1 (seam + LLM, merged) → Phase 2 (ImgGen/Extract/Se
 
 ## As-built log (append per phase at each checkpoint — keep this current for cold starts)
 
-> _Nothing landed yet. Phase 0 not started. Each checkpoint appends an `### Phase N — as-built` subsection here with: final names/signatures, divergences from plan, test evidence, and anything a cold resume needs._
+> Each checkpoint appends an `### Phase N — as-built` subsection here with: final names/signatures, divergences from plan, test evidence, and anything a cold resume needs.
+
+### Phase 0 — as-built
+
+**Status:** done, committed on `refactor/Plugins`. `make agent-check` clean (ruff/plxt/pyright 0/mypy 0/keyword-only pass) · `make tb` green · `make agent-test` green.
+
+**Final module → class map** (`pipelex/plugins/`):
+
+| Old module / symbol | New module / symbol |
+|---|---|
+| `plugin.py` · `Plugin` | `model_handle.py` · `ModelHandle` |
+| `plugin_sdk_registry.py` · `PluginSdkRegistry` (`PluginSdkRegistryRoot`) | `sdk_client_registry.py` · `SdkClientRegistry` (`SdkClientRegistryRoot`) |
+| `plugin_manager.py` · `PluginManager` | `sdk_client_manager.py` · `SdkClientManager` |
+| `plugin_factory_abstract.py` · `PluginFactoryAbstract` | `backend_extras_factory.py` · `BackendExtrasFactory` |
+
+- `SdkClientRegistry.get_sdk_instance`/`set_sdk_instance` → **`get(self, model_handle)`** / **`set(self, *, model_handle, sdk_instance)`** (subject `model_handle` positional; the DRY `get_or_create` is still Phase 1, not added here).
+- `SdkClientManager.plugin_sdk_registry` attribute → **`sdk_client_registry`** (the D4 thin-wrapper shape preserved; collapse into the registry remains the deferred P3 commit).
+- `hub.py`: `get_plugin_manager`/`set_plugin_manager` → `get_sdk_client_manager`/`set_sdk_client_manager` (both the `PipelexHub` methods and the module-level functions); field `_plugin_manager` → `_sdk_client_manager`; the `"PluginManager2 is not initialized"` message is now `"SdkClientManager is not initialized"`.
+- `pipelex.py`: `self.plugin_manager` → `self.sdk_client_manager` at construction/setup/teardown call sites.
+
+**Scope beyond the literal rename (kept it a clean "free the word plugin"):** the `Plugin` *type* rename was carried through to the variables/params that held it — `plugin` → `model_handle` — across the four worker factories and every in-tree adapter (`openai`, `bedrock`, `anthropic`, `gateway`, `portkey`, `azure_rest`). The four wrong-path imports (`llm`/`img_gen`/`extract` imported `Plugin` from `plugin_sdk_registry`; `search` used the correct path) are all now `from pipelex.plugins.model_handle import ModelHandle`. Adapter error messages `f"Plugin '{...}'…"` → `f"ModelHandle '{...}'…"`. Prose/comment uses of "plugin" that mean the *future plugin concept* (e.g. `pipe_llm.py`, `provider_name.py`, `model_deck.py`, `cogt/exceptions.py`, `error_pages_generator.py`) were left untouched (one capital-P comment in `pipe_llm.py` was lowercased to read as the concept, not the type).
+
+**Tests touched:** symbol/kwarg renames in the worker-factory routing tests, the gateway/transport/azure error-handling tests, and the temporal teardown call sites. The `plugin=`→`model_handle=` kwarg flip and `client_kwargs["plugin"]`→`["model_handle"]` assertions track the renamed param. Fixtures `plugin_for_openai`/`plugin_for_anthropic` → `model_handle_for_openai`/`model_handle_for_anthropic`, and `tests/integration/pipelex/fixtures/plugin_fixtures.py` → `model_handle_fixtures.py` (conftest import + `__all__` updated). The `tests/integration/pipelex/plugins/` dir name was kept — it reads correctly as backend tests under the new vocabulary.
+
+**No behavior change.** Pure rename; the dispatch `match` statements, caching dance, and error surfaces are byte-equivalent modulo identifiers.
+
+**Deferred (still open):** P3 follow-up — collapse `SdkClientManager` into `SdkClientRegistry` (hub holds the registry directly), own commit after Phase 0. Not done here by D4.

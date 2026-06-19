@@ -3,8 +3,8 @@ import importlib.util
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_models_manager, get_plugin_manager
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.hub import get_models_manager, get_sdk_client_manager
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
@@ -15,19 +15,19 @@ class LLMWorkerFactory:
         *,
         reporting_delegate: ReportingProtocol | None = None,
     ) -> LLMWorkerInternalAbstract:
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
+        sdk_client_registry = get_sdk_client_manager().sdk_client_registry
         llm_worker: LLMWorkerInternalAbstract
-        match plugin.sdk:
+        match model_handle.sdk:
             case "gateway_completions":
                 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayCompletionsFactory.make_portkey_openai_client_for_completions(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -44,10 +44,10 @@ class LLMWorkerFactory:
                 from pipelex.plugins.gateway.gateway_responses_factory import GatewayResponsesFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GatewayResponsesFactory.make_portkey_openai_client_for_responses(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -64,10 +64,10 @@ class LLMWorkerFactory:
                 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
                 from pipelex.plugins.portkey.portkey_completions_factory import PortkeyCompletionsFactory  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=PortkeyCompletionsFactory.make_portkey_openai_client_for_completions(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -85,10 +85,10 @@ class LLMWorkerFactory:
                 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
                 from pipelex.plugins.portkey.portkey_responses_factory import PortkeyResponsesFactory  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=PortkeyResponsesFactory.make_portkey_openai_client_for_responses(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -106,10 +106,10 @@ class LLMWorkerFactory:
                 from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_responses_llm_worker import OpenAIResponsesLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=OpenAIClientFactory.make_openai_client(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -127,10 +127,10 @@ class LLMWorkerFactory:
                 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory  # noqa: PLC0415
                 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=OpenAIClientFactory.make_openai_client(
-                        plugin=plugin,
+                        model_handle=model_handle,
                         backend=backend,
                     ),
                 )
@@ -161,9 +161,9 @@ class LLMWorkerFactory:
                 from pipelex.plugins.anthropic.anthropic_factory import AnthropicFactory  # noqa: PLC0415
                 from pipelex.plugins.anthropic.anthropic_llm_worker import AnthropicLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
-                    sdk_instance=AnthropicFactory.make_anthropic_client(plugin=plugin, backend=backend),
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
+                    sdk_instance=AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=backend),
                 )
 
                 llm_worker = AnthropicLLMWorker(
@@ -190,8 +190,8 @@ class LLMWorkerFactory:
                 from pipelex.plugins.mistral.mistral_factory import MistralFactory  # noqa: PLC0415
                 from pipelex.plugins.mistral.mistral_llm_worker import MistralLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=MistralFactory.make_mistral_client(backend=backend),
                 )
 
@@ -215,9 +215,9 @@ class LLMWorkerFactory:
                 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory  # noqa: PLC0415
                 from pipelex.plugins.bedrock.bedrock_llm_worker import BedrockLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
-                    sdk_instance=BedrockFactory.make_bedrock_client(plugin=plugin, backend=backend),
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
+                    sdk_instance=BedrockFactory.make_bedrock_client(model_handle=model_handle, backend=backend),
                 )
 
                 llm_worker = BedrockLLMWorker(
@@ -239,8 +239,8 @@ class LLMWorkerFactory:
                 from pipelex.plugins.google.google_factory import GoogleFactory  # noqa: PLC0415
                 from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker  # noqa: PLC0415
 
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
+                sdk_instance = sdk_client_registry.get(model_handle=model_handle) or sdk_client_registry.set(
+                    model_handle=model_handle,
                     sdk_instance=GoogleFactory.make_google_client(backend=backend),
                 )
 
@@ -250,6 +250,6 @@ class LLMWorkerFactory:
                     reporting_delegate=reporting_delegate,
                 )
             case _:
-                msg = f"Plugin '{plugin}' is not supported"
+                msg = f"ModelHandle '{model_handle}' is not supported"
                 raise NotImplementedError(msg)
         return llm_worker
