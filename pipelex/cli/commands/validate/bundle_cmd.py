@@ -62,7 +62,7 @@ def validate_bundle_cmd(
                     fg=typer.colors.RED,
                     err=True,
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(2)
             if len(mthds_files) > 1:
                 mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
                 typer.secho(
@@ -72,7 +72,7 @@ def validate_bundle_cmd(
                     fg=typer.colors.RED,
                     err=True,
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(2)
             bundle_path = str(mthds_files[0])
 
         # Add directory as library dir
@@ -94,7 +94,7 @@ def validate_bundle_cmd(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(2)
 
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 

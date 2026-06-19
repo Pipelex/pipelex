@@ -15,7 +15,6 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     extract_validation_errors,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -28,6 +27,7 @@ from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
@@ -102,13 +102,14 @@ def validate_bundle_cmd(
         else:
             mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
             if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError")
+                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError", exit_code=2)
             if len(mthds_files) > 1:
                 mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
                 agent_error(
                     f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
                     f"Pass the .mthds file directly instead.",
                     error_type="ArgumentError",
+                    exit_code=2,
                 )
             bundle_path = str(mthds_files[0])
 
@@ -126,6 +127,7 @@ def validate_bundle_cmd(
             f"'{path}' is not a .mthds file or directory. "
             f"Use 'validate pipe <code>' for pipe codes, or 'validate bundle <path>' for .mthds files/directories.",
             error_type="ArgumentError",
+            exit_code=2,
         )
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
@@ -169,14 +171,14 @@ def validate_bundle_cmd(
                 if exc.__cause__:
                     graph_extra["cause_type"] = type(exc.__cause__).__name__
                     graph_extra["cause_message"] = str(exc.__cause__)
-                agent_error(f"Graph generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, **graph_extra)
+                agent_error(f"Graph generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **graph_extra)
             except PipelexInterpreterError as exc:
-                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc)
+                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
                 raise
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc)
+                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
         if view:
@@ -197,14 +199,14 @@ def validate_bundle_cmd(
                 if exc.__cause__:
                     view_extra["cause_type"] = type(exc.__cause__).__name__
                     view_extra["cause_message"] = str(exc.__cause__)
-                agent_error(f"View generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, **view_extra)
+                agent_error(f"View generation failed: {exc.message}", error_type="PipelineExecutionError", cause=exc, exit_code=2, **view_extra)
             except PipelexInterpreterError as exc:
-                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc)
+                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
             except typer.Exit:
                 raise
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc)
+                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
 
         agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
@@ -222,10 +224,10 @@ def validate_bundle_cmd(
             raise typer.Exit(1)
 
     except PipeNotFoundError as exc:
-        agent_error(str(exc), error_type="PipeNotFoundError", cause=exc)
+        agent_error(str(exc), error_type="PipeNotFoundError", cause=exc, exit_code=2)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict: emit the structured failure envelope. validation_errors[] is the shared
@@ -246,6 +248,7 @@ def validate_bundle_cmd(
             exc.message,
             error_type="PipeOperatorModelChoiceError",
             cause=exc,
+            exit_code=2,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
             model_choice=str(exc.model_choice),
@@ -260,14 +263,14 @@ def validate_bundle_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

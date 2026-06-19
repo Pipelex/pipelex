@@ -302,6 +302,7 @@ class ValidationErrorItem(BaseModel):
     field_name: str | None = None
     variable_names: list[str] | None = None
     missing_concept_code: str | None = None
+    missing_pipe_code: str | None = None
     declared_concepts: list[str] | None = None
 
 
