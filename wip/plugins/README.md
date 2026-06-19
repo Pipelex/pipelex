@@ -2,6 +2,8 @@
 
 **Status:** assessment / design notes (not started)
 
+> **The decided design lives in [`design.md`](design.md)** — a single unified design covering both inference (driver) plugins and orchestration (strategy) plugins, with decisions and rationale. **The executable [`implementation-plan.md`](implementation-plan.md)** is built from it (phases 0–5, grounded `file:line` refs, per-phase tests, decisions D1–D6, reviewed via `/plan-eng-review` + codex). The four documents here ([`README.md`](README.md), [`inference-backends-as-plugins.md`](inference-backends-as-plugins.md), [`orchestrators-as-plugins.md`](orchestrators-as-plugins.md), [`temporal-as-plugin.md`](temporal-as-plugin.md)) are the background assessment that fed the design. Start with `design.md`, then `implementation-plan.md`; read these for the deeper per-area analysis.
+
 Pipelex has two families of optional integrations that should become real, discoverable **plugins** behind a single shared seam:
 
 1. **[Orchestrators](orchestrators-as-plugins.md)** — *strategy* plugins. They decide *where/how* a pipe runs and replace core orchestration seams. Core ships only the in-process `DIRECT` orchestrator; the distributed ones are optional plugins. Two worked instances:
