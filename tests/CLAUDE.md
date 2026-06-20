@@ -31,7 +31,6 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 | `pipelex/pipeline/` | `tests/integration/pipelex/pipeline/` |
 | `pipelex/plugins/` | `tests/unit/pipelex/plugins/ tests/integration/pipelex/plugins/` |
 | `pipelex/system/` | `tests/unit/pipelex/system/ tests/integration/pipelex/system/` |
-| `pipelex/temporal/` | `tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/` |
 | `pipelex/tools/` | `tests/unit/pipelex/tools/ tests/integration/pipelex/tools/` |
 
 Note: `pipe_controllers/`, `pipe_operators/`, and `pipe_run/` share integration tests at `tests/integration/pipelex/pipes/` -- deduplicate the path when multiple of these areas are touched.

@@ -9,7 +9,7 @@ Pipelex methods run in-process by default — you call `pipelex run pipe ...` or
 
 ## Pipelex on Temporal
 
-**[Pipelex on Temporal](temporal/index.md)** runs Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud) — you own the control plane. Python 3.10+, installed with `pipelex[temporal]`. Generally available.
+**[Pipelex on Temporal](temporal/index.md)** runs Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud) — you own the control plane. Python 3.10+, installed with `pipelex-temporal`. Generally available.
 
 The same `.mthds` methods run distributed without rewriting. Pipelex's runtime bridge classifies controller pipes as child workflows and leaf operators (LLM calls, image generation, document extraction) as activities — so durability, retries, and observability attach at the right granularity.
 

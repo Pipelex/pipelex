@@ -9,12 +9,11 @@ class PipelexRuntimeBridgeError(PipelexError):
 class MissingOrchestratorError(PipelexRuntimeBridgeError):
     """Raised when no orchestrator is available for a requested execution mode.
 
-    Covers both situations uniformly: the bridge resolves no orchestrator for the
-    mode (e.g. ``MISTRAL_NATIVE`` when ``pipelex-mistralai-workflows`` is not
-    installed — its plugin contributes no orchestrator), and an in-tree
-    orchestrator that is registered but whose extra is absent (a ``TEMPORAL_*``
-    mode without the ``pipelex[temporal]`` extra). The message is derived from the
-    mode so each carries its exact, actionable install hint.
+    Both Temporal and Mistral orchestrators ship as external plugins, so this is the
+    uniform "that mode's plugin isn't installed" signal: ``MISTRAL_NATIVE`` when
+    ``pipelex-mistralai-workflows`` is absent, ``TEMPORAL_*`` when ``pipelex-temporal``
+    is absent — neither dist contributes its orchestrator. The message is derived from
+    the mode so each carries its exact, actionable install hint.
     """
 
     # The message carries the actionable pip-install hint; keep it under STRICT disclosure.
@@ -28,7 +27,7 @@ class MissingOrchestratorError(PipelexRuntimeBridgeError):
     def _build_message(*, mode: PipelexExecutionMode) -> str:
         match mode:
             case PipelexExecutionMode.TEMPORAL_BLOCKING | PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
-                return "TEMPORAL_* execution modes require the pipelex[temporal] extra. Install with: pip install 'pipelex[temporal]'"
+                return "TEMPORAL_* execution modes require the pipelex-temporal package. Install with: pip install pipelex-temporal"
             case PipelexExecutionMode.MISTRAL_NATIVE:
                 return (
                     "PipelexExecutionMode.MISTRAL_NATIVE requires the pipelex-mistralai-workflows "

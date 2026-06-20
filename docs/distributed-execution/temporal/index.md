@@ -11,9 +11,9 @@ This is the Temporal backend for distributed execution: you run **Pipelex's own 
 
 ## What it is
 
-Pipelex pipelines normally run in-process — you call `pipelex run pipe ...` or invoke a pipe from Python and everything happens in one Python process. With the optional `pipelex[temporal]` integration, the same pipelines run as **Temporal workflows**: each pipe execution becomes a workflow on a Temporal cluster, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes a Temporal activity executed on a worker. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work.
+Pipelex pipelines normally run in-process — you call `pipelex run pipe ...` or invoke a pipe from Python and everything happens in one Python process. With the optional `pipelex-temporal` integration, the same pipelines run as **Temporal workflows**: each pipe execution becomes a workflow on a Temporal cluster, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes a Temporal activity executed on a worker. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work.
 
-The whole layer is opt-in. Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex[temporal]`, and the same `.mthds` methods run distributed without changing a line.
+The whole layer is opt-in. Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex-temporal`, and the same `.mthds` methods run distributed without changing a line.
 
 ## When you'd want it
 

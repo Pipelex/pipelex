@@ -16,15 +16,16 @@ if TYPE_CHECKING:
 else:
     # Runtime placeholder so Pydantic resolves the ``DispatchOptions.retry_policy``
     # field annotation to ``Any`` (no validation, no isinstance) WITHOUT importing
-    # ``temporalio`` — keeping this module importable on installs that skipped the
-    # ``temporal`` extra. Type checkers see the real ``RetryPolicy`` above. With a
-    # bare forward ref instead, the model imports (deferred schema) but raises
-    # ``PydanticUserError`` the moment a ``DispatchOptions`` is constructed.
+    # ``temporalio`` — keeping this core config schema importable without ``temporalio``
+    # installed (it ships with the ``pipelex_temporal`` plugin, not core). Type checkers
+    # see the real ``RetryPolicy`` above. With a bare forward ref instead, the model
+    # imports (deferred schema) but raises ``PydanticUserError`` the moment a
+    # ``DispatchOptions`` is constructed.
     RetryPolicy = Any
 
 
 # Names of the five custom search attributes Pipelex knows how to populate.
-# Listed here (rather than in ``pipelex.temporal.tprl.namespace_check``) so the
+# Listed here (rather than in ``pipelex_temporal.tprl.namespace_check``) so the
 # ``SearchAttributesConfig`` validator can reference them without pulling
 # ``temporalio`` into the config-load path. Pipelex only knows how to populate
 # these five; arbitrary custom names are out of scope (they would require code

@@ -8,7 +8,7 @@ class PipelexExecutionMode(StrEnum):
         until the pipe completes. Fastest feedback, simplest ops.
     TEMPORAL_BLOCKING: dispatch the pipe as a Pipelex Temporal workflow; the
         activity awaits completion. Pipe runs durably on Pipelex's worker
-        fleet. Requires the pipelex[temporal] extra.
+        fleet. Requires the pipelex-temporal plugin.
     TEMPORAL_FIRE_AND_FORGET: dispatch the pipe as a Pipelex Temporal workflow
         and return immediately with the workflow_id. Activity does NOT wait;
         completion is signalled out-of-band via DeliveryAssignment (webhook /

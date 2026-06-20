@@ -192,18 +192,7 @@ class ConfigLoader:
         files.append(config_dir / "pipelex_temporary_override.toml")
         return files
 
-    def load_base_config_dict(self) -> dict[str, Any]:
-        """Load ONLY the package-default config (``pipelex/pipelex.toml``), no overrides, no side effects.
-
-        Used as the bulletproof fallback for the CLI plugin-command harvest: it never reads user
-        config and never creates ``~/.pipelex/``, so a broken or absent user config cannot brick
-        ``pipelex --help`` / ``pipelex init``. The shipped package default is always present and valid.
-        """
-        return load_toml_from_path_and_merge_with_overrides(paths=[self.pipelex_root_dir / CONFIG_NAME])
-
-    def load_config(
-        self, *, extra_overrides: dict[str, Any] | None = None, config_dir: Path | None = None, ensure_global_if_missing: bool = True
-    ) -> dict[str, Any]:
+    def load_config(self, *, extra_overrides: dict[str, Any] | None = None, config_dir: Path | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
 
         When ``config_dir`` is provided, the load is scoped to a single directory
@@ -239,10 +228,6 @@ class ConfigLoader:
             extra_overrides: Optional dict deep-merged on top as the final layer.
             config_dir: Optional explicit config dir. When given, project/global layering
                 is bypassed and only this directory is read.
-            ensure_global_if_missing: When True (default), create ``~/.pipelex/`` from the kit
-                templates if absent before reading (the boot behavior). Set False for a read-only
-                load that must not touch the filesystem — e.g. the CLI plugin-command harvest, which
-                runs on every ``pipelex`` invocation including ``--help`` and must not create config.
 
         Returns:
             dict[str, Any]: The merged configuration dictionary
@@ -257,8 +242,7 @@ class ConfigLoader:
                 self._override_files_for_dir(config_dir, include_run_mode=not is_unit_testing),
             )
         else:
-            if ensure_global_if_missing:
-                self.ensure_global_config_exists()
+            self.ensure_global_config_exists()
             project_dir = self.project_config_dir
 
             list_of_configs.append(self.global_config_dir / CONFIG_NAME)

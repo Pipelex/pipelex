@@ -44,7 +44,7 @@ Constructing the orchestrator instance must be **import-light** — it must not 
 
 ### Per-mode errors
 
-A mode with no registered orchestrator (its plugin is not installed), or an in-tree orchestrator whose extra is absent, raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message is derived from the mode, so each carries its exact, actionable install hint (`pip install 'pipelex[temporal]'` vs `pip install pipelex-mistralai-workflows`). The hint survives STRICT error disclosure.
+A mode with no registered orchestrator (its plugin is not installed), or an in-tree orchestrator whose extra is absent, raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message is derived from the mode, so each carries its exact, actionable install hint (`pip install 'pipelex-temporal'` vs `pip install pipelex-mistralai-workflows`). The hint survives STRICT error disclosure.
 
 ---
 

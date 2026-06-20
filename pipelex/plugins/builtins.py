@@ -15,11 +15,15 @@ from pipelex.plugins.openai.openai_plugin import OpenAIPlugin
 from pipelex.plugins.openrouter.openrouter_plugin import OpenRouterPlugin
 from pipelex.plugins.portkey.portkey_plugin import PortkeyPlugin
 from pipelex.plugins.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
-from pipelex.temporal.temporal_plugin import TemporalPlugin
 
 # The plugins Pipelex ships with — discovered at boot ahead of any external
 # entry-point plugin. Each is import-light: importing this module imports no
 # backend SDK (the SDKs load lazily inside the make_worker closures).
+#
+# Temporal is NOT here: it ships as the external ``pipelex-temporal`` distribution,
+# discovered via its ``pipelex.plugins`` entry point. Installing that dist makes the
+# TEMPORAL_* orchestrators (and, when ``temporal.is_enabled``, the worker runtime)
+# available — zero config, no core import of ``temporalio``.
 BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DirectOrchestratorPlugin(),
     OpenAIPlugin(),
@@ -37,7 +41,6 @@ BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DoclingPlugin(),
     Pypdfium2Plugin(),
     LinkupPlugin(),
-    TemporalPlugin(),
 ]
 
 # Built-in plugins that core requires unconditionally — naming one in

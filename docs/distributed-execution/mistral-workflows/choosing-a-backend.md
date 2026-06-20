@@ -12,7 +12,7 @@ Both distributed-execution backends are durable execution on Temporal underneath
 | | Pipelex on Temporal | Pipelex on Mistral Workflows |
 |---|---|---|
 | **Control plane** | You run it (self-hosted Temporal or Temporal Cloud) | Mistral runs it (managed) |
-| **Install** | `pipelex[temporal]` | `pipelex-mistralai-workflows` |
+| **Install** | `pipelex-temporal` | `pipelex-mistralai-workflows` |
 | **Python** | 3.10+ | 3.12+ |
 | **How you invoke** | Enable `[temporal] is_enabled` in `.pipelex/pipelex.toml` and call `pipe_run(...)` — it dispatches through the Temporal hub | Invoke a Pipelex pipe through the runtime bridge inside your Mistral Workflows activity |
 | **Best when** | You already operate Temporal, or want full control over the cluster | You're already building on Mistral's platform |

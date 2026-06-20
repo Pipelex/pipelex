@@ -16,8 +16,8 @@ Pipes are invoked through `run_pipe_via_bridge`, which takes a `PipelexPipeRunIn
 | Mode | What it does | Requires |
 |------|--------------|----------|
 | `direct` | Runs the pipe in-process, inside the calling activity, blocking until it completes. Fastest feedback, simplest ops. The default. | Pipelex core |
-| `temporal_blocking` | Dispatches the pipe as a Pipelex Temporal workflow and awaits completion. The pipe runs durably on your own Temporal worker fleet. | `pipelex[temporal]` |
-| `temporal_fire_and_forget` | Dispatches the pipe as a Pipelex Temporal workflow and returns immediately with the `workflow_id`. Completion is signalled out-of-band via a delivery assignment (webhook / storage). | `pipelex[temporal]`, and `delivery_assignment_dump` |
+| `temporal_blocking` | Dispatches the pipe as a Pipelex Temporal workflow and awaits completion. The pipe runs durably on your own Temporal worker fleet. | `pipelex-temporal` |
+| `temporal_fire_and_forget` | Dispatches the pipe as a Pipelex Temporal workflow and returns immediately with the `workflow_id`. Completion is signalled out-of-band via a delivery assignment (webhook / storage). | `pipelex-temporal`, and `delivery_assignment_dump` |
 | `mistral_native` | Decomposes the pipe into native Mistral Workflows primitives — controllers as child workflows, leaf operators as activities — surfacing per-step retry, signals, and cancellation through the host runtime. | `pipelex-mistralai-workflows` |
 
 The `Mode` values above are the literal strings you set on the `execution_mode` field — lowercase, matching the `PipelexExecutionMode` enum values. (Mode names written in uppercase elsewhere in this guide refer to the same modes by name.)
@@ -40,8 +40,8 @@ For local and most in-activity use, `direct` is the right default: the pipe simp
 
 The bridge fails loudly and helpfully when a mode's dependency isn't installed:
 
-- Requesting a `TEMPORAL_*` mode without the extra raises `MissingPipelexTemporalExtraError` — *"Install with: pip install 'pipelex[temporal]'"*.
-- Requesting `MISTRAL_NATIVE` without the plugin raises `MissingMistralWorkflowsPluginError` — *"Install with: pip install pipelex-mistralai-workflows"*.
+- Requesting a `TEMPORAL_*` mode without the plugin raises `MissingOrchestratorError` — *"Install with: pip install pipelex-temporal"*.
+- Requesting `MISTRAL_NATIVE` without the plugin raises `MissingOrchestratorError` — *"Install with: pip install pipelex-mistralai-workflows"*.
 - Requesting `TEMPORAL_FIRE_AND_FORGET` without a `delivery_assignment_dump` is rejected up front, so a completion is never silently dropped.
 
 !!! warning "MISTRAL_NATIVE is preview"

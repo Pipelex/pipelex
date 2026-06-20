@@ -23,7 +23,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.temporal.tprl_content_generation.content_generator_in_workflow import ContentGeneratorInWorkflow
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -75,15 +74,6 @@ class TestKeylessBootForcedDry:
                 user_id="test-user",
             )
             assert pipe_job.pipe_run_params.run_mode.is_dry
-        finally:
-            Pipelex.teardown_if_needed()
-
-    def test_keyless_temporal_boot_in_workflow_generator_and_forced_dry(self) -> None:
-        """Keyless + Temporal-enabled: the in-workflow generator is still selected (backend-keyed, D4)."""
-        try:
-            self._boot_keyless(temporal_enabled=True)
-            assert is_dry_run_forced()
-            assert isinstance(get_content_generator(), ContentGeneratorInWorkflow)
         finally:
             Pipelex.teardown_if_needed()
 

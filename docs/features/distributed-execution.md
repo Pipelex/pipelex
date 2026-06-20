@@ -15,12 +15,12 @@ Pipelex pipelines normally run in-process. When you need durability, retries tha
 
 Distributed execution runs on Temporal. Today there is one backend, with a managed option coming soon:
 
-- **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex[temporal]`. Generally available.
+- **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex-temporal`. Generally available.
 - **Pipelex on Mistral Workflows** *(coming soon)* — run pipes inside Mistral Workflows, Mistral's managed orchestration control plane (itself built on Temporal), with no cluster to operate. In active development; docs land once it ships.
 
 ## Pipelex on Temporal
 
-Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex[temporal]`, and the same methods run as Temporal workflows on workers you operate.
+Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex-temporal`, and the same methods run as Temporal workflows on workers you operate.
 
 ### Supported deployment patterns
 

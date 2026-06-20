@@ -9,8 +9,8 @@ class TestRuntimeBridgeExceptionDisclosure:
     @pytest.mark.parametrize(
         ("mode", "hint_fragment"),
         [
-            (PipelexExecutionMode.TEMPORAL_BLOCKING, "pip install 'pipelex[temporal]'"),
-            (PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET, "pip install 'pipelex[temporal]'"),
+            (PipelexExecutionMode.TEMPORAL_BLOCKING, "pip install pipelex-temporal"),
+            (PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET, "pip install pipelex-temporal"),
             (PipelexExecutionMode.MISTRAL_NATIVE, "pip install pipelex-mistralai-workflows"),
         ],
     )

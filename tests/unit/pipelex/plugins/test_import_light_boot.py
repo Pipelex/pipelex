@@ -1,9 +1,9 @@
 """Import-light guard (codex C12): discovering and registering the built-in plugins must
 not import any backend SDK (whether an optional extra like anthropic/linkup or a heavy core
 dep like openai/portkey_ai/pypdfium2 — each plugin must defer its import into make_worker) nor
-``temporalio`` (the Temporal plugin registers its orchestrators + CLI commands import-light and
-defers temporalio into the slot-claim thunks / orchestrator.run). Enforced in a subprocess whose
-meta-path finder raises on those SDKs, which is deterministic where an in-process sys.modules check is not.
+``temporalio`` (which ships only with the external ``pipelex-temporal`` plugin — core discovery
+must never pull the Temporal SDK). Enforced in a subprocess whose meta-path finder raises on those
+SDKs, which is deterministic where an in-process sys.modules check is not.
 """
 
 import subprocess  # noqa: S404
@@ -48,14 +48,15 @@ _GUARD_SCRIPT = textwrap.dedent(
     # whose load() could legitimately import an optional SDK.
     discovery._external_entry_points = lambda: []
 
-    # temporal.is_enabled=True exercises the Temporal plugin's slot-claim branch too: the claims are
-    # thunks, so even discovering + registering a Temporal-worker boot must not import temporalio.
+    # Temporal ships externally (pipelex-temporal); core's built-ins claim no hub slots. temporalio
+    # stays in the BLOCKED set above: core discovery must never pull the Temporal SDK, and
+    # temporal.is_enabled=True must not change that (no core built-in reads it). The slot-claim
+    # import-light guarantee for the Temporal thunks is pinned in the pipelex-temporal suite.
     config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]), temporal=SimpleNamespace(is_enabled=True))
     registrar = discovery.build_registrar(config=config)
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
     assert registrar.model_listers, "expected the built-in model listers to be registered import-light"
     assert registrar.orchestrators, "expected the built-in orchestrators to be registered"
-    assert registrar.slot_claims, "expected the Temporal plugin to claim hub slots when is_enabled"
     print("import-light OK")
     """
 )

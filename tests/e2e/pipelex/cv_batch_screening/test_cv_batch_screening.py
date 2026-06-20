@@ -1,9 +1,9 @@
 """Direct-mode e2e test for the CV batch screening pipeline.
 
 Runs the pipelex-demos example 21 pipeline through ``PipelexMTHDSProtocol`` without any
-Temporal layer. The same bundle is also exercised by the temporal in-process test
-(``tests/integration/pipelex/temporal/library_crate/test_wf_cv_batch_screening.py``)
-and by the ``/temporal-e2e-validate`` skill (distributed 3-process validation).
+Temporal layer. The same bundle is also exercised by the temporal in-process test in the
+``pipelex-temporal`` package and by the ``/temporal-e2e-validate`` skill (distributed
+3-process validation). Each repo keeps its own copy of the crate (see ``test_data.py``).
 """
 
 from pathlib import Path
@@ -17,7 +17,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from tests.cases.documents import DocumentTestCases
-from tests.integration.pipelex.temporal.test_data import CvBatchScreeningTemporalTestData
+from tests.e2e.pipelex.cv_batch_screening.test_data import CvBatchScreeningTemporalTestData
 
 
 @pytest.mark.dry_runnable
