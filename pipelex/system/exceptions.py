@@ -66,5 +66,5 @@ class ConfigValidationError(FatalError):
     pass
 
 
-class ConfigModelError(ValueError, FatalError):
+class ConfigModelError(FatalError, ValueError):
     pass

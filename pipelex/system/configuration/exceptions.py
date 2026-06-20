@@ -1,7 +1,7 @@
 from pipelex.base_exceptions import PipelexError
 
 
-class TemporalConfigError(ValueError, PipelexError):
+class TemporalConfigError(PipelexError, ValueError):
     """Raised when the ``[temporal]`` configuration section is invalid.
 
     Lives in core — outside the externalizable ``pipelex.temporal`` package — so
