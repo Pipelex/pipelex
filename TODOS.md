@@ -412,3 +412,18 @@ Note: `gateway_completions` and `google` are SDK strings registered in **two** f
 **Docs:** `docs/under-the-hood/inference-backend-plugins.md` (added to both mkdocs nav blocks) — the seam walkthrough, the `PipelexPlugin` contract, `MakeWorkerFn` + import-light/fail-at-use invariants, a complete copy-pasteable `acme` example (built-in + `[project.entry-points."pipelex.plugins"]` form), the `plugins.disabled` denylist, the SPI module/symbol table, and the fail-loud table.
 
 **No factory test modules for extract/search** existed before and none added — those families are covered by the new registry-coverage test + the integration suites (`test_search.py`, extract integration). Only img_gen had a routing test to update.
+
+#### Post-checkpoint xhigh `/code-review` (2026-06-20, on PR #997 = the whole Phases 0–2 diff)
+
+Beyond the per-phase CP reviews above, an **xhigh** whole-PR pass ran (10 finder angles → 35 candidates → independent verify → 13 kept). **No live correctness bug.** Three CONFIRMED pre-merge gaps fixed + committed as `94fa908df` (`make agent-check` green, 78 affected tests pass). These **supersede specifics in the CP2 record above**:
+
+- **Lookup-miss error (supersedes the line about `NotImplementedError("… Is its plugin installed?")`):** `InferenceBackendRegistry.lookup` now raises a structured **`InferenceBackendNotFoundError(PluginError)`** (new in `plugins/exceptions.py`, carries `family`/`sdk`, message ends "Is its plugin installed **and enabled?**"). Both factory miss-tests assert the structured type + `.sdk`.
+- **Import-light blocklist (supersedes "BLOCKED grew docling+linkup"):** added `openai`, `portkey_ai`, `pypdfium2` — the migrated plugins' deferred SDKs the guard wasn't covering. (The review said "openrouter," but that closure rides the `openai` SDK; verified by probe that none of the three are imported at registration time, so the invariant holds.) The guard docstring now says "any backend SDK (optional extra **or** heavy core dep)."
+- **Multi-spec `require_sdk`:** on a partial miss it named ALL specs; now collects + names only the absent one(s) (so a user with `boto3` but not `aioboto3` isn't told to reinstall `boto3`). New `test_require_sdk` multi-spec case.
+
+**Deferred follow-ups → `wip/plugins/phase-2-review-deferred.md`** (latent footguns reachable only via external entry-point plugins / future callers + quality cleanups). **Two bear on Phase 3 — read that doc before starting:**
+
+- `build_registrar` accumulates `cli_commands` / `slot_claims` / `teardown_callbacks` but boot only consumes `inference_backends` + `orchestrators` — i.e. those three menus are **wired for the first time in Phase 3** (CLI collapse / Boot-teardown collapse). The doc frames the current state as a teardown-leak footgun for *external* plugins; closing it is literally Phase 3 work. Until then, an external plugin contributing those is silently inert.
+- search `reporting_delegate` defaults to `None` (the C9 normalization above) — fine for the one real caller, but a future Temporal search-activity path that omits it gets silent zero-reporting. Relevant when Phase 3/5 routes search through a worker.
+
+(The `ModelHandle` double-construction cleanup is cross-referenced there to the existing `phase-1-review-deferred.md`; it dissolves if Phase 3 threads `model_handle` through `MakeWorkerFn`.)
