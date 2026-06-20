@@ -53,6 +53,7 @@ own page. Classes are grouped by subsystem.
 - [`ModelDeckPresetValidatonError`](model-deck-preset-validaton-error.md) — Model deck preset validaton
 - [`ModelDeckValidationError`](model-deck-validation-error.md) — Model deck validation
 - [`ModelDeckValidatonError`](model-deck-validaton-error.md) — Model deck validaton
+- [`ModelListingUnsupportedError`](model-listing-unsupported-error.md) — Model listing unsupported
 - [`ModelManagerError`](model-manager-error.md) — Model manager
 - [`ModelNotFoundError`](model-not-found-error.md) — Model not found
 - [`ModelReferenceParseError`](model-reference-parse-error.md) — Model reference parse
@@ -85,6 +86,7 @@ own page. Classes are grouped by subsystem.
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
+- [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
 - [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
 - [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck

@@ -60,6 +60,19 @@ def _make_google_img_gen_worker(
     )
 
 
+async def _list_google_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from pipelex.plugins.google.google_list import list_google_models  # noqa: PLC0415
+
+    await list_google_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+
+
 class GooglePlugin:
     """Built-in driver for Google Gemini models (LLM + image generation) via the google-genai SDK."""
 
@@ -69,3 +82,4 @@ class GooglePlugin:
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="google", make_worker=_make_google_worker)
         registrar.add_inference_backend(family=InferenceFamily.IMG_GEN, sdk="google", make_worker=_make_google_img_gen_worker)
+        registrar.add_model_lister(sdk="google", lister=_list_google_models)

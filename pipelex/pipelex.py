@@ -50,6 +50,7 @@ from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
@@ -390,6 +391,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         plugin_registrar = build_registrar(config=get_config())
         self._plugin_registrar = plugin_registrar
         self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
 
         self.pipelex_hub.set_dry_run_forced(not needs_inference)

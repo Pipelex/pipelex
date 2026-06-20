@@ -40,6 +40,26 @@ def _make_anthropic_worker(
     )
 
 
+async def _list_anthropic_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from pipelex.cogt.exceptions import ModelListingUnsupportedError  # noqa: PLC0415
+    from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # noqa: PLC0415
+    from pipelex.plugins.anthropic.anthropic_list import list_anthropic_models  # noqa: PLC0415
+
+    try:
+        await list_anthropic_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+    except AnthropicSDKUnsupportedError as exc:
+        # Translate the vendor "this client variant can't list" into the core soft signal the
+        # list-models loop understands, so core names no Anthropic-specific exception.
+        raise ModelListingUnsupportedError(sdk=sdk) from exc
+
+
 class AnthropicPlugin:
     """Built-in driver for Anthropic models via the anthropic SDK (also serves bedrock_anthropic)."""
 
@@ -49,3 +69,4 @@ class AnthropicPlugin:
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="anthropic", make_worker=_make_anthropic_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_anthropic", make_worker=_make_anthropic_worker)
+        registrar.add_model_lister(sdk="anthropic", lister=_list_anthropic_models)

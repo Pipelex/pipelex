@@ -1,6 +1,6 @@
 # Pipelex plugin system — implementation TODOS
 
-**Branch:** `refactor/Plugins-2` (worktree `_plugins`) · **Status:** Phases 0–3 complete + **Option A landed** (post-Phase-3). Phase 3 (orchestrators through the seam) = `5f61db323`. **Option A** — drop the CLI-command harvest entirely; Temporal `worker`/`setup-namespace` → standalone `pipelex-temporal` console script — = commit **`989c9beed`**; all gates green (`make agent-check`, `make tb`, `make agent-test` "All tests passed", Temporal suite **156 passed / 4 xpassed**, both `--help` smokes). The former **D3 is superseded** (see D1–D7). Full as-built + open follow-ups: [`wip/plugins/option-a-drop-cli-command-seam.md`](wip/plugins/option-a-drop-cli-command-seam.md) and the **Option A — as-built** note in the log below. **Next: Phase 4** (model_lists, the 5th seam, per D6).
+**Branch:** `refactor/Plugins-2` (worktree `_plugins`) · **Status:** Phases 0–3 complete + **Option A landed** (post-Phase-3). Phase 3 (orchestrators through the seam) = `5f61db323`. **Option A** — drop the CLI-command harvest entirely; Temporal `worker`/`setup-namespace` → standalone `pipelex-temporal` console script — = commit **`989c9beed`**; all gates green (`make agent-check`, `make tb`, `make agent-test` "All tests passed", Temporal suite **156 passed / 4 xpassed**, both `--help` smokes). The former **D3 is superseded** (see D1–D7). Full as-built + open follow-ups: [`wip/plugins/option-a-drop-cli-command-seam.md`](wip/plugins/option-a-drop-cli-command-seam.md) and the **Option A — as-built** note in the log below. **Phase 4 done** (model_lists, the 5th seam, per D6 — full record in `### Phase 4 — as-built` below; all gates green, committing at this checkpoint). With it, **core names no integration across every enumerated seam**; three pre-existing *unenumerated* core→vendor couplings remain, dispositioned in [`wip/plugins/phase-4-residual-core-vendor-couplings.md`](wip/plugins/phase-4-residual-core-vendor-couplings.md). **Next: Phase 5** (externalize Temporal → `pipelex-temporal`, cross-repo, gated on Checkpoint 3).
 
 > **Delivery model for this branch.** Per the driving goal, all phases land on `refactor/Plugins` as **one commit per checkpoint** (not one PR per phase), and a **single PR to `dev`** opens once the tracker is done. Each phase's "PR: …" box below is satisfied by its checkpoint commit; the standalone-PR-per-phase wording in the original plan is superseded.
 
@@ -19,7 +19,7 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 | Seam | File | Today |
 |---|---|---|
 | Inference dispatch (×4) | `cogt/{llm,img_gen,extract,search}/*_worker_factory.py` | `match plugin.sdk:` → lazy import + `find_spec` guard + client cache + build worker |
-| Model listing (5th seam) | `cogt/model_backends/model_lists.py` (`match sdk` ~`:58`) | hardcoded `pipelex.plugins.{openai,…}.*_list` imports (the `list-models` path) |
+| ~~Model listing (5th seam)~~ | `cogt/model_backends/model_lists.py` | **INVERTED — Phase 4.** `match sdk` → `get_model_lister_registry().get_optional(sdk=…)`; each backend plugin registers an optional `ListModelsFn` via `add_model_lister`. File names no integration. |
 | Orchestrator dispatch | `runtime_bridge/bridge.py` (`match` ~`:147`, `_run_mistral_native` `:408`, `_run_direct` `:270`, `_run_temporal_*` `:297/:330`) | `match execution_mode:` → hard Mistral import + lazy Temporal + per-mode install messages |
 | Boot/teardown hub swap | `pipelex.py` (~`:377-479`) | four `if get_config().temporal.is_enabled:` blocks + inlined teardown |
 | Config | `system/configuration/configs.py:14` | the one hard `from pipelex.temporal.config_temporal import Temporal` |
@@ -252,22 +252,22 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 
 **Goal:** close the goal. `model_lists.py`'s `match sdk:` (the `list-models` CLI path) still hardcodes `pipelex.plugins.{openai,anthropic,mistral,google,bedrock}.*_list` imports. Invert it so core names no integration *anywhere*. Own PR.
 
-- [ ] Add a **model-listing capability** to the inference contract: `add_model_lister(*, sdk, lister: ListModelsFn)` (callable mirroring `MakeWorkerFn` — import-light, lazy). A backend plugin that lists models registers its lister alongside its worker factory.
-- [ ] Collapse `ModelLister.list_models` (`model_lists.py`) to a registry lookup keyed by `sdk`; a miss → the same friendly "is its plugin installed?" guidance. Move the `find_spec` guards (already in this file) into each lister.
-- [ ] The contract grows by one **optional** method — backends without listing simply don't register a lister (progressive disclosure preserved).
+- [x] Add a **model-listing capability** to the inference contract: `add_model_lister(*, sdk, lister: ListModelsFn)` (callable mirroring `MakeWorkerFn` — import-light, lazy). A backend plugin that lists models registers its lister alongside its worker factory.
+- [x] Collapse `ModelLister.list_models` (`model_lists.py`) to a registry lookup keyed by `sdk`; a miss → the same friendly "is its plugin installed?" guidance. Move the `find_spec` guards (already in this file) into each lister.
+- [x] The contract grows by one **optional** method — backends without listing simply don't register a lister (progressive disclosure preserved).
 
 **Tests:**
 
-- [ ] Round-trip (a registered lister is invoked for its `sdk`).
-- [ ] A backend with no lister → the friendly miss.
-- [ ] Import-light subprocess guard still green (listers are lazy).
+- [x] Round-trip (a registered lister is invoked for its `sdk`).
+- [x] A backend with no lister → the friendly miss.
+- [x] Import-light subprocess guard still green (listers are lazy).
 
 ### 🛑 CHECKPOINT 4 — hard stop ("core names no integration" holds without an asterisk)
 
-- [ ] **Verify:** `make agent-check` clean · `make agent-test` green. Confirm `model_lists.py` names no integration; run a final sweep — `grep -rn 'pipelex.plugins.\(openai\|anthropic\|mistral\|google\|bedrock\)' pipelex/cogt pipelex/runtime_bridge pipelex/cli pipelex/pipelex.py pipelex/system` → only registry/contract code.
-- [ ] **Capture cold-start context:** `### Phase 4 — as-built` note — the `ListModelsFn` shape, which backends registered a lister, and a statement that the "no integration by import or string in core" invariant now holds.
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase 4 diff. Emphasize the optional-capability progressive-disclosure pattern and import-light preservation. Triage here.
-- [ ] **PR:** land green. Phases 0–4 complete — the in-`pipelex` work is done.
+- [x] **Verify:** `make agent-check` clean (pyright 0 over 2243 files / mypy 0 / keyword-only pass) · `make agent-test` green ("All tests passed.") · targeted plugins+cogt suite 715 passed. `model_lists.py` names no integration; the final sweep returns only **pre-existing, out-of-scope** vendor refs (`config_cogt.py` typed config = by-design D7; `img_gen_args_factory.py` + `backend_factory.py` = genuine but unenumerated couplings) — captured in [`wip/plugins/phase-4-residual-core-vendor-couplings.md`](wip/plugins/phase-4-residual-core-vendor-couplings.md). No dispatch-path leak remains.
+- [x] **Capture cold-start context:** `### Phase 4 — as-built` note below.
+- [x] **Fan-out `/code-review`:** `pr-review-toolkit:code-reviewer` reviewed the Phase 4 working-tree diff against HEAD. **Verdict: byte-equivalent and clean — no BLOCKER / no SHOULD-FIX.** It walked all five correctness questions against `git show HEAD:…model_lists.py` and confirmed: each lister's kwargs match its old `match` arm (mistral's no-`backend` + sync `# noqa: RUF029`, bedrock sync, the rest async); the deleted `find_spec` guards survive **byte-for-byte** inside each `list_*_models` fn (same lib/extra/message; openai has none in old or new); the anthropic `AnthropicSDKUnsupportedError`→`ModelListingUnsupportedError` translation is correct and core imports no anthropic symbol; `any_listed` threads identically (not set on the unsupported `continue`); the registered sdk keys are exactly the old arms' set. Plus import-light, `get_optional`-vs-`lookup`, keyword-only, and the Case-2 boundary (with `except PipelexCLIError: raise` ordering preserved so internal auth `PipelexCLIError`s aren't re-wrapped). One **NIT** (doc recommended `require_sdk` while the built-in listers reuse their `list_*_models` inline `find_spec` guard) — **applied**: the "Listing models" doc section now tells one story (recommends `require_sdk`, notes the built-ins reuse the existing inline guard). The wip residual-couplings doc was confirmed accurate.
+- [x] **PR:** checkpoint commit on `refactor/Plugins-2` (one-commit-per-checkpoint). Phases 0–4 complete — the in-`pipelex` work is done.
 
 ---
 
@@ -494,3 +494,36 @@ Applied: **S1** (the one should-fix) — added `test_harvest_config_falls_back_t
 3. **Legacy `pipelex/temporal/worker_cli.py`** (the `python -m pipelex.temporal.worker_cli` / `configure` entrypoint) is a unification candidate with the new `temporal_cli.py` — noted, not addressed.
 
 **Env gotchas for the next session:** (a) `uv sync --all-extras` materializes the `pipelex-temporal` console script into `.venv/bin/`; it also brings the venv up to the already-committed `uv.lock` (which had drifted on `cryptography`/`mthds`) — `uv.lock` itself unchanged. (b) `make cleanderived` deletes the gitignored `tests/integration/pipelex/fixtures/_generated_model_sets.py`; run `make regenerate-test-models-quiet` (alias `rtm`) before `make agent-check` or pyright fails on the missing import.
+
+### Phase 4 — as-built (the 5th seam: model listing)
+
+**Status:** done (working-tree, pre-commit at time of writing). `make agent-check` clean (ruff/plxt, **pyright 0 over 2243 files**, mypy 0, keyword-only pass) · `make tb` green · **full `make agent-test` green** ("All tests passed.") · targeted `tests/unit/pipelex/plugins/` + `tests/unit/pipelex/cogt/model_backends/` → 715 passed. `model_lists.py`'s `match sdk:` is gone — `pipelex show models <backend>` now dispatches through a registry on the hub.
+
+**The seam.** `cogt/model_backends/model_lists.py` `ModelLister.list_models` no longer branches on `match sdk:` with per-arm hardcoded `from pipelex.plugins.{openai,anthropic,mistral,google,bedrock}.*_list import …`. It now does `get_model_lister_registry().get_optional(sdk=sdk)` → `await lister(...)`, else (miss) → `unsupported_sdks`. The file names **no integration** (imports only `ModelListingUnsupportedError`/`ModelManagerError` from `cogt.exceptions`, `PipelexCLIError`, and the three hub getters).
+
+**New module** `plugins/model_lister_registry.py` (mirrors `inference_backend_registry.py` / `orchestrator_registry.py`, dependency-free):
+- `ListModelsFn: TypeAlias = Callable[..., Awaitable[None]]` — the uniform lister callable. Always `async` (the loop awaits it); import-light to reference, lazy inside. Call shape: `await lister(*, sdk, backend_name, backend, flat, any_listed)`.
+- `ModelListerRegistry` keyed by `sdk` alone (listing is per-SDK, not per-`(family, sdk)`). `get_optional(*, sdk) -> ListModelsFn | None` (a miss is a **soft** "unsupported-for-listing" outcome, mirroring `OrchestratorRegistry.get_optional` — **not** the inference registry's raising `lookup`), `has`, `sdks`.
+
+**Registrar** (`plugins/registrar.py`): new `add_model_lister(*, sdk, lister)` menu method + `model_listers: dict[str, ListModelsFn]` accumulator + `_model_lister_sources`. Duplicate `sdk` → `DuplicateModelListerError` naming both plugins. Contributions line `f"model lister {sdk}"` (so `pipelex plugins list` shows listers automatically).
+
+**Exceptions:** `DuplicateModelListerError(PluginError)` in `plugins/exceptions.py`; **`ModelListingUnsupportedError(CogtError)`** in `cogt/exceptions.py` — the core soft signal the loop catches (carries `sdk`). `pipelex-dev generate-error-pages` wrote 2 new pages (`duplicate-model-lister-error.md`, `model-listing-unsupported-error.md`) + the `inference-and-providers.md` index; 274 unchanged.
+
+**Hub + boot:** `_model_lister_registry` field + `set_/get_model_lister_registry` + module-level `get_model_lister_registry()`. `pipelex.py setup()` builds `ModelListerRegistry(plugin_registrar.model_listers)` and sets it on the hub, right after the inference-backend registry. The `show models` CLI path boots Pipelex via `make_pipelex_for_cli(needs_inference=True)`, so the registry is always set before `list_models` runs.
+
+**Vendor listers** — each of the 5 plugins grew one `async` lister closure that lazy-imports its `list_*_models` fn (`# noqa: PLC0415`) and registers it:
+- `openai` → `_list_openai_models` for sdks `openai`, `azure_openai`, `openai_responses`, `azure_openai_responses` (4 keys, one closure; async underlying).
+- `anthropic` → `_list_anthropic_models` for `anthropic`. **The one non-trivial case:** the closure catches the vendor `AnthropicSDKUnsupportedError` and re-raises core `ModelListingUnsupportedError(sdk=…)` — so core names no Anthropic-specific symbol while preserving the old "bedrock-backed Anthropic client can't list → unsupported_sdks" behavior.
+- `mistral` → `_list_mistral_models` for `mistral`. Underlying fn is **sync and takes no `backend`** → closure is `async def` with `# noqa: RUF029` and `backend: … # noqa: ARG001`.
+- `google` → `_list_google_models` for `google` (async underlying).
+- `bedrock` → `_list_bedrock_models` for `bedrock`, `bedrock_aioboto3` (2 keys; **sync** underlying → `# noqa: RUF029`).
+
+**Behavior preserved byte-for-byte** (verified against `git show HEAD:…model_lists.py`): the per-sdk `find_spec` guards removed from `model_lists.py` were **already duplicated inside each `list_*_models` fn** (same lib/extra/message for anthropic/mistral/google/bedrock; openai has none — always installed), so a missing extra still raises `MissingDependencyError` inside the lister and is wrapped by the loop's Case-2 `except Exception → PipelexCLIError` exactly as before. The `list_*_models` fns themselves are **unchanged**. `any_listed` threads identically (set `True` only after a successful `await`; not reached when the lister raises `ModelListingUnsupportedError`, matching the old `continue`). The unsupported-SDK display path is untouched.
+
+**Tests:** `tests/unit/pipelex/plugins/test_model_lister_coverage.py` (registry built from `BUILTIN_PLUGINS`: all 9 expected sdk keys resolve to a lister + exact-set assertion + 4 soft-miss cases) · `tests/unit/pipelex/cogt/model_backends/test_model_lister_dispatch.py` (behavioral: lister invoked with expected kwargs; `any_listed` progresses False→True across two SDKs; unknown sdk → unsupported message + lister not invoked; `ModelListingUnsupportedError` translate path → unsupported; generic lister failure → wrapped `PipelexCLIError`). `test_import_light_boot.py` grew an `assert registrar.model_listers` (proves listers register import-light).
+
+**Docs:** `docs/under-the-hood/inference-backend-plugins.md` gained a "Listing models — an optional capability" section (the `add_model_lister` call, the `ListModelsFn` shape, import-light/fail-at-use rules, the `ModelListingUnsupportedError` soft-signal); SPI table += `ListModelsFn` / `ModelListingUnsupportedError`; fail-loud table += `DuplicateModelListerError` (and fixed the adjacent stale `NotImplementedError` row → `InferenceBackendNotFoundError`).
+
+**CHECKPOINT-4 sweep result — "core names no integration" now holds for every enumerated seam.** The broad grep surfaces three **pre-existing, unchanged** `pipelex.plugins.<vendor>` refs that were never in the Phase 0–4 seam list: `cogt/config_cogt.py` (vendor typed-config models — **by design**, design D7), `cogt/img_gen/img_gen_args_factory.py` (`OpenAIImgGenFactory`) and `cogt/model_backends/backend_factory.py` (`VertexAIFactory`, lazy, vertexai auth) — the latter two genuine but **unenumerated** couplings (each would need its own contract capability to invert). Recorded with disposition in [`wip/plugins/phase-4-residual-core-vendor-couplings.md`](wip/plugins/phase-4-residual-core-vendor-couplings.md). **No dispatch-path integration remains.**
+
+**Notes for Phase 5:** Phase 4 is independent of the Temporal externalization. No new cross-repo surface. The model-lister registry is a pure additive capability — an external backend plugin can now contribute a lister via the same `register` it uses for `add_inference_backend`.

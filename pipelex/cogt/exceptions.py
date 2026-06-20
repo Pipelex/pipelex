@@ -438,6 +438,22 @@ class ModelManagerError(CogtError):
     pass
 
 
+class ModelListingUnsupportedError(CogtError):
+    """A registered lister cannot enumerate models for an SDK variant at runtime.
+
+    A *soft* control signal for the ``list-models`` loop: it is caught and the SDK
+    is reported as unsupported-for-remote-listing rather than failing the command.
+    Same outcome as a registry miss (no lister registered for the SDK at all). A
+    lister closure raises it when its client variant cannot list (e.g. a
+    bedrock-backed Anthropic client), translating any vendor-specific
+    "unsupported" exception so core names no integration.
+    """
+
+    def __init__(self, *, sdk: str) -> None:
+        self.sdk = sdk
+        super().__init__(f"The '{sdk}' SDK client does not support remote model listing.")
+
+
 class ModelDeckNotFoundError(CogtError):
     pass
 

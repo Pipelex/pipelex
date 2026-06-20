@@ -5,10 +5,12 @@ from pydantic import BaseModel, Field
 
 from pipelex.plugins.exceptions import (
     DuplicateInferenceBackendError,
+    DuplicateModelListerError,
     DuplicateOrchestratorError,
     HubSlotAlreadyClaimedError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
+from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 from pipelex.types import StrEnum
@@ -69,11 +71,13 @@ class PluginRegistrar:
     def __init__(self, *, config: "PipelexConfig"):
         self.config = config
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
+        self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[PipelexExecutionMode, OrchestratorProtocol] = {}
         self.slot_claims: dict[HubSlot, Callable[[], Any]] = {}
         self.teardown_callbacks: list[Callable[[], None]] = []
         self.discoveries: list[PluginDiscovery] = []
         self._inference_sources: dict[tuple[InferenceFamily, str], str] = {}
+        self._model_lister_sources: dict[str, str] = {}
         self._orchestrator_sources: dict[PipelexExecutionMode, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
@@ -101,6 +105,13 @@ class PluginRegistrar:
         self.inference_backends[key] = make_worker
         self._inference_sources[key] = self._active.name
         self._active.contributions.append(f"inference backend {family}:{sdk}")
+
+    def add_model_lister(self, *, sdk: str, lister: ListModelsFn) -> None:
+        if sdk in self.model_listers:
+            raise DuplicateModelListerError(sdk=sdk, first_plugin=self._model_lister_sources[sdk], second_plugin=self._active.name)
+        self.model_listers[sdk] = lister
+        self._model_lister_sources[sdk] = self._active.name
+        self._active.contributions.append(f"model lister {sdk}")
 
     def add_orchestrator(self, *, mode: PipelexExecutionMode, orchestrator: OrchestratorProtocol) -> None:
         if mode in self.orchestrators:

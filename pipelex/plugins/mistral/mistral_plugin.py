@@ -66,6 +66,20 @@ def _make_mistral_extract_worker(
     )
 
 
+# Async to satisfy the uniform ListModelsFn contract (the loop awaits it) even though Mistral lists synchronously.
+async def _list_mistral_models(  # noqa: RUF029
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,  # noqa: ARG001 — uniform lister signature; Mistral lists without a backend client
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from pipelex.plugins.mistral.mistral_list import list_mistral_models  # noqa: PLC0415
+
+    list_mistral_models(sdk=sdk, backend_name=backend_name, flat=flat, any_listed=any_listed)
+
+
 class MistralPlugin:
     """Built-in driver for Mistral models (LLM + OCR extraction) via the mistralai SDK."""
 
@@ -75,3 +89,4 @@ class MistralPlugin:
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="mistral", make_worker=_make_mistral_worker)
         registrar.add_inference_backend(family=InferenceFamily.EXTRACT, sdk="mistral", make_worker=_make_mistral_extract_worker)
+        registrar.add_model_lister(sdk="mistral", lister=_list_mistral_models)

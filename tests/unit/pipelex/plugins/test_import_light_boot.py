@@ -53,6 +53,7 @@ _GUARD_SCRIPT = textwrap.dedent(
     config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]), temporal=SimpleNamespace(is_enabled=True))
     registrar = discovery.build_registrar(config=config)
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
+    assert registrar.model_listers, "expected the built-in model listers to be registered import-light"
     assert registrar.orchestrators, "expected the built-in orchestrators to be registered"
     assert registrar.slot_claims, "expected the Temporal plugin to claim hub slots when is_enabled"
     print("import-light OK")

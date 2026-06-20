@@ -53,6 +53,20 @@ class DuplicateInferenceBackendError(PluginError):
         super().__init__(message)
 
 
+class DuplicateModelListerError(PluginError):
+    """Two plugins registered a model lister for the same sdk."""
+
+    def __init__(self, *, sdk: str, first_plugin: str, second_plugin: str):
+        self.sdk = sdk
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Model lister for sdk '{sdk}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each sdk must have a single lister."
+        )
+        super().__init__(message)
+
+
 class DuplicateOrchestratorError(PluginError):
     """Two plugins registered an orchestrator for the same execution mode."""
 

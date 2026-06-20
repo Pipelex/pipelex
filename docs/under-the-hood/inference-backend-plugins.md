@@ -93,6 +93,34 @@ Client memoization goes through `sdk_clients.get_or_create(handle=…, build=lam
 
 ---
 
+## Listing models — an optional capability
+
+Alongside its worker factory, a backend plugin **may** register a model lister — the callable behind `pipelex show models <backend>`. It is optional: a backend that cannot enumerate its models simply never calls `add_model_lister`, and the listing command reports that SDK as unsupported-for-listing. The contract grows by one *optional* method, so progressive disclosure is preserved.
+
+```python
+registrar.add_model_lister(sdk="acme", lister=_list_acme_models)
+```
+
+A `ListModelsFn` mirrors `MakeWorkerFn` — import-light to reference, lazy inside. It is always `async` (the listing loop awaits it) and is keyed by `sdk` alone (listing is per-SDK, not per-`(family, sdk)`):
+
+```python
+async def _list_acme_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from my_pkg.acme_list import list_acme_models  # noqa: PLC0415
+
+    await list_acme_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+```
+
+The same import-light / fail-at-use rules apply: a missing optional extra must raise `MissingDependencyError` only when the backend is actually listed — use the `require_sdk(...)` helper, or an equivalent `find_spec` guard inside the function the lister delegates to (the built-in listers do the latter, reusing the guard already in their `list_*_models` functions). If a registered lister's client variant cannot enumerate models at runtime (e.g. a Bedrock-backed Anthropic client), raise `ModelListingUnsupportedError(sdk=…)`: the loop treats that as the same soft "unsupported for listing" outcome as a missing lister — never a hard failure. A duplicate `sdk` lister fails loud with `DuplicateModelListerError` naming both plugins.
+
+---
+
 ## Authoring a backend plugin (minimal example)
 
 A complete LLM backend plugin for a hypothetical `acme` SDK:
@@ -184,6 +212,8 @@ What an out-of-tree backend plugin imports *is* the contract. The published surf
 | `PipelexPlugin`, `PLUGIN_API_VERSION` | `pipelex.plugins.contract` | the plugin protocol + version gate |
 | `PluginRegistrar` | `pipelex.plugins.registrar` | the accumulator `register` writes into |
 | `InferenceFamily`, `MakeWorkerFn`, `require_sdk` | `pipelex.plugins.inference_backend_registry` | family enum, callable type, dependency guard |
+| `ListModelsFn` | `pipelex.plugins.model_lister_registry` | the optional model-listing callable type |
+| `ModelListingUnsupportedError` | `pipelex.cogt.exceptions` | soft signal a lister raises when its client variant cannot list |
 | `ModelHandle` | `pipelex.plugins.model_handle` | the backend selector derived from a model spec |
 | `SdkClientRegistry` | `pipelex.plugins.sdk_client_registry` | per-handle client memoization |
 | `InferenceModelSpec` | `pipelex.cogt.model_backends.model_spec` | the resolved model record |
@@ -201,9 +231,10 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 |-----------|-------|
 | `targets_api` ≠ `PLUGIN_API_VERSION` | `PluginApiVersionMismatchError` |
 | duplicate `(family, sdk)` | `DuplicateInferenceBackendError` (names both plugins) |
+| duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
 | `name` in `plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
 | entry point raises while loading/registering | `BrokenPluginError` |
-| lookup for an unregistered `(family, sdk)` | `NotImplementedError` ("… Is its plugin installed?") |
+| lookup for an unregistered `(family, sdk)` | `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?") |
 | optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
 
 ---

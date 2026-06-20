@@ -79,6 +79,19 @@ def _make_openai_img_gen_worker(
     )
 
 
+async def _list_openai_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from pipelex.plugins.openai.openai_list import list_openai_models  # noqa: PLC0415
+
+    await list_openai_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+
+
 class OpenAIPlugin:
     """Always-on built-in driver for OpenAI and Azure OpenAI (no optional SDK)."""
 
@@ -91,3 +104,7 @@ class OpenAIPlugin:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="openai_responses", make_worker=_make_openai_responses_worker)
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="azure_openai_responses", make_worker=_make_openai_responses_worker)
         registrar.add_inference_backend(family=InferenceFamily.IMG_GEN, sdk="openai_img_gen", make_worker=_make_openai_img_gen_worker)
+        registrar.add_model_lister(sdk="openai", lister=_list_openai_models)
+        registrar.add_model_lister(sdk="azure_openai", lister=_list_openai_models)
+        registrar.add_model_lister(sdk="openai_responses", lister=_list_openai_models)
+        registrar.add_model_lister(sdk="azure_openai_responses", lister=_list_openai_models)
