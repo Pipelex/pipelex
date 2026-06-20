@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,10 @@ from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig
+
+
+_RegistryKeyT = TypeVar("_RegistryKeyT")
+_RegistryValueT = TypeVar("_RegistryValueT")
 
 
 class HubSlot(StrEnum):
@@ -99,26 +103,40 @@ class PluginRegistrar:
     # ------------------------------------------------------------------ #
 
     def add_inference_backend(self, *, family: InferenceFamily, sdk: str, make_worker: MakeWorkerFn) -> None:
-        key = (family, sdk)
-        if key in self.inference_backends:
-            raise DuplicateInferenceBackendError(family=family, sdk=sdk, first_plugin=self._inference_sources[key], second_plugin=self._active.name)
-        self.inference_backends[key] = make_worker
-        self._inference_sources[key] = self._active.name
-        self._active.contributions.append(f"inference backend {family}:{sdk}")
+        self._add(
+            store=self.inference_backends,
+            sources=self._inference_sources,
+            key=(family, sdk),
+            value=make_worker,
+            contribution=f"inference backend {family}:{sdk}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateInferenceBackendError(
+                family=family, sdk=sdk, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
 
     def add_model_lister(self, *, sdk: str, lister: ListModelsFn) -> None:
-        if sdk in self.model_listers:
-            raise DuplicateModelListerError(sdk=sdk, first_plugin=self._model_lister_sources[sdk], second_plugin=self._active.name)
-        self.model_listers[sdk] = lister
-        self._model_lister_sources[sdk] = self._active.name
-        self._active.contributions.append(f"model lister {sdk}")
+        self._add(
+            store=self.model_listers,
+            sources=self._model_lister_sources,
+            key=sdk,
+            value=lister,
+            contribution=f"model lister {sdk}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateModelListerError(
+                sdk=sdk, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
 
     def add_orchestrator(self, *, mode: PipelexExecutionMode, orchestrator: OrchestratorProtocol) -> None:
-        if mode in self.orchestrators:
-            raise DuplicateOrchestratorError(mode=mode, first_plugin=self._orchestrator_sources[mode], second_plugin=self._active.name)
-        self.orchestrators[mode] = orchestrator
-        self._orchestrator_sources[mode] = self._active.name
-        self._active.contributions.append(f"orchestrator {mode}")
+        self._add(
+            store=self.orchestrators,
+            sources=self._orchestrator_sources,
+            key=mode,
+            value=orchestrator,
+            contribution=f"orchestrator {mode}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateOrchestratorError(
+                mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
 
     def claim_content_generator(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.CONTENT_GENERATOR, factory=factory)
@@ -137,6 +155,29 @@ class PluginRegistrar:
         self._active.contributions.append("teardown callback")
 
     # ------------------------------------------------------------------ #
+
+    def _add(
+        self,
+        *,
+        store: dict[_RegistryKeyT, _RegistryValueT],
+        sources: dict[_RegistryKeyT, str],
+        key: _RegistryKeyT,
+        value: _RegistryValueT,
+        contribution: str,
+        on_duplicate: Callable[[str, str], Exception],
+    ) -> None:
+        """Shared body for the keyed registration menu methods (mirrors ``_claim`` for the slot menu).
+
+        Fail-loud duplicate detection, store, source attribution, and contribution
+        recording in one place; each ``add_*`` method supplies its keyed store, the
+        parallel sources dict, and a factory that builds its distinctly-typed
+        ``Duplicate*Error`` naming both contributing plugins.
+        """
+        if key in store:
+            raise on_duplicate(sources[key], self._active.name)
+        store[key] = value
+        sources[key] = self._active.name
+        self._active.contributions.append(contribution)
 
     def _claim(self, *, slot: HubSlot, factory: Callable[[], Any]) -> None:
         if slot in self.slot_claims:
