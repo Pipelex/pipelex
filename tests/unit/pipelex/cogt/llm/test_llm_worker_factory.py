@@ -43,9 +43,10 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
     This is exactly what boot does, so the routing tests below exercise the real
     plugin closures through the real registry lookup.
     """
-    # Stub config exposing only what a builtin's register() reads: TemporalPlugin checks
-    # ``config.temporal.is_enabled`` (False here → no slot claims, inference unaffected).
-    stub_config = cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False)))
+    # No builtin's register() reads config: Temporal — the only plugin that did, via
+    # ``temporal.is_enabled`` — now ships as the external pipelex-temporal dist. A bare
+    # stub config suffices.
+    stub_config = cast("PipelexConfig", SimpleNamespace())
     registrar = PluginRegistrar(config=stub_config)
     for plugin in BUILTIN_PLUGINS:
         plugin.register(registrar)

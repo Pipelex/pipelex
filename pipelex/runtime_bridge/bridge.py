@@ -12,10 +12,9 @@ host-runtime deps installed.
 Dispatch is by execution mode through the ``OrchestratorRegistry`` (on the hub):
 the bridge resolves the orchestrator for the requested mode and calls its ``run``.
 It names no integration — DIRECT is contributed by a core plugin, the TEMPORAL_*
-modes by the in-tree Temporal plugin, MISTRAL_NATIVE by the external
+modes by the external ``pipelex-temporal`` plugin, MISTRAL_NATIVE by the external
 ``pipelex-mistralai-workflows`` plugin. A mode with no registered orchestrator
-(or an in-tree orchestrator whose extra is absent) raises ``MissingOrchestratorError``
-carrying the mode's exact install hint.
+raises ``MissingOrchestratorError`` carrying the mode's exact install hint.
 """
 
 from __future__ import annotations

@@ -40,9 +40,10 @@ def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
 
 
 def _fake_config(disabled: list[str]) -> PipelexConfig:
-    # ``temporal.is_enabled`` is read by the built-in TemporalPlugin's register() (the only built-in
-    # that reads config); False keeps it from claiming hub slots in the build-registrar tests.
-    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled), temporal=SimpleNamespace(is_enabled=False)))
+    # Discovery reads ``config.plugins.disabled`` to apply the denylist. No builtin's
+    # register() reads config: Temporal — the only plugin that did, via ``temporal.is_enabled``
+    # — now ships as the external pipelex-temporal dist.
+    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled)))
 
 
 class _InferencePlugin:

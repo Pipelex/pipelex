@@ -1,8 +1,7 @@
 """Regression: ``pipelex.system.configuration.config_temporal`` MUST NOT import ``temporalio``
-at module level. ``temporalio`` is in ``[project.optional-dependencies].temporal``;
-``pipelex.system.configuration.configs`` imports this module unconditionally,
-so a top-level temporalio import breaks every install that didn't opt into the
-``temporal`` extra.
+at module level. ``temporalio`` is not a core dependency — it ships only with the external
+``pipelex-temporal`` plugin. ``pipelex.system.configuration.configs`` imports this module
+unconditionally, so a top-level ``temporalio`` import breaks every core install.
 """
 
 import ast
@@ -70,7 +69,7 @@ class TestConfigTemporalOptionalDep:
         _scan_for_runtime_temporalio_imports(tree.body, forbidden)
 
         assert not forbidden, (
-            "config_temporal.py imports temporalio at module level — "
-            "this breaks installs without the 'temporal' extra. "
+            "config_temporal.py imports temporalio at module level — this breaks every core "
+            "install (temporalio ships only with the external pipelex-temporal plugin). "
             f"Move under TYPE_CHECKING or into function bodies. Found: {forbidden}"
         )
