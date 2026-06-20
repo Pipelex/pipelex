@@ -1,8 +1,10 @@
-# Decision + cold-start plan — drop the CLI-command seam (Option A), Temporal ops commands become a console script
+# Option A — drop the CLI-command seam; Temporal ops as the `pipelex-temporal` console script (as-built)
 
-> **Status:** decided, not yet implemented. **Decision:** remove the plugin CLI-command-contribution seam (decision **D3**) entirely. The two Temporal operational commands it served (`worker`, `setup-temporal-namespace`) become a standalone `pipelex-temporal` console script, not harvested `pipelex` subcommands. This resolves the whole critical finding by **removing the surface**, not by hardening it.
+> ✅ **IMPLEMENTED.** Committed on `refactor/Plugins-2` as `989c9beed` ("Refactor CLI command handling and introduce standalone pipelex-temporal console script"). All gates green: `make agent-check` (pyright 0 / mypy 0 over 2240 files / keyword-only), `make tb`, `make agent-test` ("All tests passed."), `pytest tests/integration/pipelex/temporal/` (156 passed, 4 xpassed = the Phase-3 baseline xdist markers), plus both `--help` smokes. This is the faithful as-built record — the basis Phases 4–5 build on.
 >
-> Read [TODOS.md cold-start primer](../../TODOS.md#cold-start-primer-read-this-first-if-youre-new-to-the-session) for the plugin-seam vocabulary (registrar, `build_registrar`, `BUILTIN_PLUGINS`, slot-claims, D1–D7) and [`phase-3-critical-cli-harvest-fragility.md`](phase-3-critical-cli-harvest-fragility.md) for the full problem statement this supersedes.
+> **What it did:** removed the plugin CLI-command-contribution seam (the former decision **D3**) entirely. The two Temporal operational commands — `worker` and `setup-namespace` — now ship as a standalone `pipelex-temporal` console script (`[project.scripts]` → `pipelex.temporal.temporal_cli:app`), not harvested `pipelex` subcommands. This resolved the whole [critical finding](phase-3-critical-cli-harvest-fragility.md) by **removing the surface**, not hardening it: `pipelex --help` no longer loads config or scans entry points, and no plugin can shadow a core command or brick the recovery commands. The inference-backend / orchestrator / boot-slot seams are **untouched**.
+>
+> Read [TODOS.md cold-start primer](../../TODOS.md#cold-start-primer-read-this-first-if-youre-new-to-the-session) for the plugin-seam vocabulary (registrar, `build_registrar`, `BUILTIN_PLUGINS`, slot-claims, D1–D7).
 
 ## Why this, in one screen
 
@@ -12,7 +14,7 @@ The consumer that justified the seam is tiny and operational: `add_cli_command` 
 
 **Net effect of this change:** deletes the harvest, all four facets, the double-discovery, and the per-invocation config-load + entry-point-scan on `--help`. Strictly less code, strictly less fragility, strictly better Phase-5 alignment. The only real cost is one user-facing rename (`pipelex worker` → `pipelex-temporal worker`) and a one-line Dockerfile change in the `pipelex-worker` repo (gated on the release — see the cross-repo stage).
 
-## Target design (decisive — build exactly this)
+## The design (as built)
 
 A single grouped Temporal CLI exposed as a console script:
 
@@ -25,7 +27,7 @@ A single grouped Temporal CLI exposed as a console script:
 
 Both command callables are already import-light at module top (temporalio is pulled lazily inside their bodies), so importing `temporal_cli.py` when you run `pipelex-temporal` is import-light, and — crucially — `pipelex/cli/_cli.py` no longer references them at all, so `pipelex --help` cannot touch Temporal. The import-light *boot* guard is unaffected and still applies to boot.
 
-**Toggles already decided (do not re-litigate; defaults are chosen):**
+**Design choices (as built):**
 
 - *Grouped script vs two flat scripts.* Grouped `pipelex-temporal` (chosen) over flat `pipelex-worker` + `pipelex-setup-temporal-namespace`. Grouped maps 1:1 to the Phase-5 dist and avoids colliding with the `pipelex-worker` *repo/dist* name.
 - *Move the command modules vs leave them in `pipelex/cli/commands/`.* Move (chosen) — Phase-5-aligned, "solid over quick." Cost is mechanical: update import + mock paths in one test (`test_setup_temporal_namespace_cmd.py`).
@@ -42,7 +44,7 @@ The valuable coupling inversion stays exactly as shipped. **Touch none of it:**
 
 This change removes only the **CLI-command** contribution path. Everything else the seam does is consumed at boot/use where fail-loud is correct.
 
-## Implementation steps
+## Implementation steps (all done — retained as the record of what changed)
 
 ### Step 1 — Stand up the new Temporal CLI surface
 
@@ -80,14 +82,16 @@ This change removes only the **CLI-command** contribution path. Everything else 
 17. `phase-3-critical-cli-harvest-fragility.md`: add a top banner — **RESOLVED by removal**, pointing here.
 18. `phase-3-review-deferred.md`: mark the "Double discovery + import-time cost" Low item **resolved** (the import-time harvest is gone); mark the "SPI doc factually wrong" Medium item resolved (folded into step 14).
 
-### 🛑 CHECKPOINT — verify gate (hard stop)
+### ✅ CHECKPOINT — verify gate (PASSED)
 
-- `make agent-check` clean.
-- `make tb` green (registrar shape changed — boot/config sanity).
-- `make agent-test` green.
-- `.venv/bin/pytest tests/integration/pipelex/temporal/` green (the §14.5 Temporal gate — `temporal_plugin` + the worker command paths changed).
-- Manual smoke: `.venv/bin/pipelex --help` lists no `worker`/`setup-temporal-namespace` and does **not** load config or scan entry points; `.venv/bin/pipelex-temporal --help` lists `worker` + `setup-namespace`.
-- Commit on `refactor/Plugins-2` (one-commit-per-checkpoint delivery model).
+- ✅ `make agent-check` clean (pyright 0 / mypy 0 over 2240 files / ruff+plxt / keyword-only).
+- ✅ `make tb` green — 5 passed (registrar shape changed — boot/config sanity).
+- ✅ `make agent-test` green ("All tests passed.", exit 0).
+- ✅ `.venv/bin/pytest tests/integration/pipelex/temporal/` — **156 passed, 4 xpassed** (the §14.5 Temporal gate; the 4 xpassed are the pre-existing xdist class-registration flakiness markers, matching the Phase-3 baseline exactly).
+- ✅ Manual smoke: `.venv/bin/pipelex --help` lists core commands only — no `worker`/`setup-temporal-namespace`, no config load / entry-point scan; `.venv/bin/pipelex-temporal --help` lists `worker` + `setup-namespace`.
+- ✅ Committed on `refactor/Plugins-2` as `989c9beed` (one-commit-per-checkpoint delivery model).
+
+> **Note on the env:** materializing the new console script needs `uv sync --all-extras` (it regenerates `[project.scripts]` wrappers into `.venv/bin/`). That sync also brings the venv up to the already-committed `uv.lock` (it had drifted behind on `cryptography`/`mthds`); `uv.lock` itself is unchanged. Separately, `make cleanderived` deletes the gitignored generated fixture `tests/integration/pipelex/fixtures/_generated_model_sets.py` — regenerate it with `make regenerate-test-models-quiet` (alias `rtm`) before `make agent-check`, or pyright fails on the missing import.
 
 ## Cross-repo follow-up — GATED on the release that ships the script
 
