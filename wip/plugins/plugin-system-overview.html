@@ -90,7 +90,7 @@
   <ul>
     <li><strong>The mechanism:</strong> a <code>PipelexPlugin</code> contract + a <code>PluginRegistrar</code> menu + <code>build_registrar()</code> discovery over built-ins and <code>pipelex.plugins</code> entry points. Core looks plugins up in registries on the hub; it never branches on a vendor name.</li>
     <li><strong>The payoff:</strong> Temporal became its <strong>own distribution</strong>, <code>pipelex-temporal</code>, discovered purely via an entry point. Core has <em>no</em> <code>temporal</code> extra and imports no <code>temporalio</code> at boot.</li>
-    <li><strong>Status:</strong> Phases 0–5 are <strong>done, committed, and pushed</strong> on both repos; all gates green. The only thing left is the <strong>publish step</strong> (PyPI + downstream pin flips + the release) — intentionally <strong>paused</strong> for a go/no-go.</li>
+    <li><strong>Status:</strong> Phases 0–5 are <strong>done, committed, and pushed</strong> on both repos; all gates green. What remains is <strong>downstream wiring</strong>. <code>pipelex-temporal</code> is a <strong>private</strong> dist (<em>not</em> on PyPI): our hosted infra pins it via <code>git+ssh</code>, and the public packages drop the temporal coupling. Gated on the hosted-Temporal rollout, not a package publish.</li>
   </ul>
 </div>
 
@@ -98,7 +98,8 @@
   <span class="chip"><b>core</b> pipelex @ <code>refactor/Plugins-3</code> · pushed ✓</span>
   <span class="chip"><b>new dist</b> pipelex-temporal @ <code>main</code> · pushed ✓</span>
   <span class="chip">all gates <b class="status-ok">green</b></span>
-  <span class="chip">publish <b class="status-wait">paused</b></span>
+  <span class="chip">downstream wiring <b class="status-wait">pending</b></span>
+  <span class="chip"><b>pipelex-temporal</b> = private (git+ssh, not PyPI)</span>
 </div>
 
 <!-- ============================================================ -->
@@ -343,22 +344,24 @@ graph TB
     orr["OrchestratorRegistry (on hub)"]
     bridge --> orr
   end
-  subgraph pt["pipelex-temporal (new dist) — main"]
+  subgraph pt["pipelex-temporal (PRIVATE dist) — main"]
     tp["TemporalPlugin (entry point: pipelex.plugins)"]
     cli["console script: pipelex-temporal worker / setup-namespace"]
   end
-  tp -. "pip install: entry-point discovery" .-> orr
+  tp -. "install via git+ssh: entry-point discovery" .-> orr
   pt -- "depends on" --> core
-  subgraph down["downstream — publish-gated (pin flips pending)"]
+  subgraph priv["our private infra — installs pipelex-temporal via git+ssh"]
     w["pipelex-worker"]
-    mw["pipelex-mistralai-workflows"]
-    api["pipelex-api"]
+    hosted["pipelex-api-hosted"]
   end
-  w -. "pin flip pending" .-> pt
-  mw -. "pin flip pending" .-> pt
-  api -. "pin flip pending" .-> pt
+  subgraph pub["public packages (MIT) — drop the temporal coupling"]
+    api["pipelex-api"]
+    mw["pipelex-mistralai-workflows"]
+  end
+  w -. "git+ssh pin" .-> pt
+  hosted -. "git+ssh pin (runner enqueues)" .-> pt
 </pre>
-<figcaption>Core never imports Temporal. The dist plugs in through the <code>pipelex.plugins</code> entry point. Downstream consumers switch their pin from <code>pipelex[temporal]</code> to <code>pipelex-temporal</code> at publish time.</figcaption>
+<figcaption>Core never imports Temporal. The private dist plugs in through the <code>pipelex.plugins</code> entry point. Only <strong>our private infra</strong> installs it (via a <code>git+ssh</code> pin); the <strong>public MIT packages drop temporal</strong> — they can't depend on a private repo.</figcaption>
 
 <details>
   <summary>The key prerequisite (Step 0b): why the config schema had to move first</summary>
@@ -416,18 +419,21 @@ graph TB
   <tbody>
     <tr><td>pipelex (core)</td><td><code>refactor/Plugins-3</code> · <code>e410ae971</code></td><td class="status-ok">pushed, clean — full work (Phases 0–5 + finalize)</td></tr>
     <tr><td>pipelex-temporal</td><td><code>main</code> · <code>507c8ad</code></td><td class="status-ok">pushed, clean — initial dist + relocated skills</td></tr>
-    <tr><td>pipelex-worker</td><td>—</td><td class="status-wait">pin flip pending (publish-gated)</td></tr>
-    <tr><td>pipelex-mistralai-workflows</td><td>—</td><td class="status-wait">pin flip + import rewrites pending</td></tr>
-    <tr><td>pipelex-api</td><td>—</td><td class="status-wait">pin flip pending</td></tr>
+    <tr><td>pipelex-worker <span class="small">(private)</span></td><td>—</td><td class="status-wait">add <code>pipelex-temporal</code> via git+ssh + Dockerfile/Makefile <code>worker</code> flip</td></tr>
+    <tr><td>pipelex-api-hosted <span class="small">(private)</span></td><td>—</td><td class="status-wait">add <code>pipelex-temporal</code> via git+ssh in the child image (the runner enqueues Temporal)</td></tr>
+    <tr><td>pipelex-api <span class="small">(public, MIT)</span></td><td>—</td><td class="status-wait">DROP the <code>temporal</code> extra (can't depend on a private dist)</td></tr>
+    <tr><td>pipelex-mistralai-workflows <span class="small">(public, MIT)</span></td><td>—</td><td class="status-wait">DROP / internalize the <code>temporal</code> extra + its tests</td></tr>
   </tbody>
 </table>
 
-<h3>What's left — the publish step (intentionally paused)</h3>
+<h3>What's left — downstream wiring (private dist; gated on the hosted-Temporal rollout)</h3>
+<p class="small"><code>pipelex-temporal</code> is <strong>private / not open-source</strong>, so it is <strong>not published to PyPI</strong>. It travels by a pinned <code>git+ssh</code> reference — exactly how this workspace already pins <code>pipelex-shared</code> (<code>… @ git+ssh://git@github.com/Pipelex/infra-python-tools.git@&lt;ref&gt;</code>).</p>
 <ol>
-  <li>Publish <code>pipelex-temporal</code> to PyPI.</li>
-  <li>Flip downstream pins <code>pipelex[temporal]==X</code> → <code>pipelex-temporal==Y</code> in <code>pipelex-worker</code> (+ its Dockerfile/Makefile <code>pipelex worker</code> → <code>pipelex-temporal worker</code>), <code>pipelex-mistralai-workflows</code>, and <code>pipelex-api</code>.</li>
-  <li>Cut the <code>pipelex</code> release and open the PR <code>refactor/Plugins-3 → dev</code> (no PR exists for <code>-3</code> yet; <a href="https://github.com/Pipelex/pipelex/pull/997">PR #997</a> is the earlier Phases-0–2 snapshot on <code>refactor/Plugins</code>).</li>
-  <li>Run the consumer suites against the new pins <em>before</em> publishing.</li>
+  <li>Tag a release in the private <code>pipelex-temporal</code> repo (e.g. <code>v0.1.0</code>).</li>
+  <li><strong>Private infra installs it via git+ssh:</strong> <code>pipelex-worker</code> (<code>pipelex[dynamodb,s3]==X</code> + <code>pipelex-temporal @ git+ssh://…@v0.1.0</code>, plus the Dockerfile/Makefile <code>pipelex worker</code> → <code>pipelex-temporal worker</code> flip) and <code>pipelex-api-hosted</code>'s child image (the hosted runner enqueues Temporal workflows, so it needs the client too).</li>
+  <li><strong>Public packages drop temporal</strong> (a public MIT dist can't depend on a private repo): remove the <code>temporal</code> extra from <code>pipelex-api</code> and from <code>pipelex-mistralai-workflows</code> (its temporal tests become an internal git+ssh dev dep, or move out).</li>
+  <li>Cut the public <code>pipelex</code> release (its <code>temporal</code> extra is already removed) and open the PR <code>refactor/Plugins-3 → dev</code> (no PR for <code>-3</code> yet; <a href="https://github.com/Pipelex/pipelex/pull/997">PR #997</a> is the earlier Phases-0–2 snapshot).</li>
+  <li>Run the consumer suites against the new pins <em>before</em> deploying the hosted worker.</li>
 </ol>
 <p class="callout warn"><strong>One known follow-up:</strong> the Temporal dev <code>make</code> targets removed from core were not added to <code>pipelex-temporal</code>'s Makefile (they need a running Temporal server to verify, so they weren't shipped unverified). A shipped-module → <code>tests/</code> back-import in <code>pipelex-temporal</code> is deferred (pre-existing, dormant in production).</p>
 
@@ -436,7 +442,7 @@ graph TB
 <ul>
   <li><strong>pipelex (core):</strong> <a href="https://github.com/Pipelex/pipelex">github.com/Pipelex/pipelex</a> · branch <a href="https://github.com/Pipelex/pipelex/tree/refactor/Plugins-3">refactor/Plugins-3</a> · <a href="https://github.com/Pipelex/pipelex/pull/997">PR #997 (Phases 0–2 snapshot)</a></li>
   <li><strong>pipelex-temporal (new dist):</strong> <a href="https://github.com/Pipelex/pipelex-temporal">github.com/Pipelex/pipelex-temporal</a> · branch <a href="https://github.com/Pipelex/pipelex-temporal/tree/main">main</a> <span class="small">(no PR — canonical branch)</span></li>
-  <li><strong>Downstream (pin flips pending, publish-gated):</strong> <a href="https://github.com/Pipelex/pipelex-worker">pipelex-worker</a> · <a href="https://github.com/Pipelex/pipelex-mistralai-workflows">pipelex-mistralai-workflows</a> · <a href="https://github.com/Pipelex/pipelex-api">pipelex-api</a></li>
+  <li><strong>Downstream (wiring pending — private git+ssh pins / public drops):</strong> <a href="https://github.com/Pipelex/pipelex-worker">pipelex-worker</a> <span class="small">(private — git+ssh)</span> · <a href="https://github.com/Pipelex/pipelex-api-hosted">pipelex-api-hosted</a> <span class="small">(private — git+ssh; runner enqueues)</span> · <a href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> &amp; <a href="https://github.com/Pipelex/pipelex-mistralai-workflows">pipelex-mistralai-workflows</a> <span class="small">(public MIT — drop temporal)</span></li>
 </ul>
 
 <hr>
