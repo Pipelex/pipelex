@@ -37,7 +37,7 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
-from pipelex.temporal.config_temporal import QueueOptions
+from pipelex.system.configuration.config_temporal import QueueOptions
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.test_extras.temporal_test_tasks import TEMPORAL_TEST_WORKFLOWS
 from pipelex.temporal.test_extras.wf_test_content_generator_pdf_page_views import WfTestContentGeneratorPdfPageViews

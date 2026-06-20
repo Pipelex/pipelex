@@ -5,9 +5,10 @@ from temporalio.client import Client as TemporalClient
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_secret
+from pipelex.system.configuration.config_temporal import SecretMethod, TemporalServerConfig
+from pipelex.system.configuration.exceptions import TemporalConfigError
 from pipelex.system.environment import get_required_env
 from pipelex.temporal.codec.codec_factory import make_codec_from_config
-from pipelex.temporal.config_temporal import SecretMethod, TemporalConfigError, TemporalServerConfig
 from pipelex.temporal.exceptions import TemporalServerError
 from pipelex.temporal.temporal_data_converter import data_converter, make_data_converter
 

@@ -2,7 +2,7 @@
 
 The five built-in attributes (``PipeCode``, ``PipelineRunId``, ``SessionId``,
 ``UserId``, ``DomainCode``) are listed in
-``pipelex.temporal.config_temporal.BUILTIN_SEARCH_ATTRIBUTES``. The runtime
+``pipelex.system.configuration.config_temporal.BUILTIN_SEARCH_ATTRIBUTES``. The runtime
 check operates on the configured subset declared in
 ``[temporal.search_attributes].attributes``, not on the full built-in set.
 

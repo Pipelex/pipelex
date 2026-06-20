@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from pipelex.temporal.config_temporal import WorkerScope
+from pipelex.system.configuration.config_temporal import WorkerScope
 from pipelex.temporal.exceptions import WorkerScopeConfigError
 from pipelex.temporal.temporal_tasks import TaskPack, TemporalTasks
 

@@ -82,8 +82,10 @@ own page. Classes are grouped by subsystem.
 - [`RemoteConfigValidationError`](remote-config-validation-error.md) — Remote config validation
 - [`TelemetryConfigError`](telemetry-config-error.md) — Telemetry config
 - [`TelemetryConfigValidationError`](telemetry-config-validation-error.md) — Telemetry config validation
+- [`TemporalConfigError`](temporal-config-error.md) — Temporal config
 - [`ToolError`](tool-error.md) — Tool error
 - [`TracebackMessageError`](traceback-message-error.md) — Traceback message
+- [`WorkerTaskQueueUnknownError`](worker-task-queue-unknown-error.md) — Worker task queue unknown
 
 ## CLI
 

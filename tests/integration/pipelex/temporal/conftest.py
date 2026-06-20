@@ -12,8 +12,8 @@ from temporalio.testing import WorkflowEnvironment
 
 from pipelex import log
 from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_connect import connect_to_temporal_selected_server
 from pipelex.temporal.temporal_data_converter import data_converter

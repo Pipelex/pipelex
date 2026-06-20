@@ -40,13 +40,11 @@ own page. Classes are grouped by subsystem.
 
 - [`ContentGenerationError`](content-generation-error.md) — Content generation
 - [`SearchAttributeRegistrationError`](search-attribute-registration-error.md) — Search attribute registration
-- [`TemporalConfigError`](temporal-config-error.md) — Temporal config
 - [`TemporalFlowError`](temporal-flow-error.md) — Temporal flow
 - [`TemporalServerError`](temporal-server-error.md) — Temporal server
 - [`UnrecoverableWorkflowFailureError`](unrecoverable-workflow-failure-error.md) — Unrecoverable workflow failure
 - [`WorkerProfileConfigError`](worker-profile-config-error.md) — Worker profile config
 - [`WorkerScopeConfigError`](worker-scope-config-error.md) — Worker scope config
-- [`WorkerTaskQueueUnknownError`](worker-task-queue-unknown-error.md) — Worker task queue unknown
 - [`WorkflowExecutionError`](workflow-execution-error.md) — Workflow execution
 - [`WorkflowInputError`](workflow-input-error.md) — Workflow input
 

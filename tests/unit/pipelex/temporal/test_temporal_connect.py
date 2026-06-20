@@ -6,9 +6,10 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
+from pipelex.system.configuration.config_temporal import SecretMethod, TemporalServerConfig
+from pipelex.system.configuration.exceptions import TemporalConfigError
 from pipelex.temporal import temporal_connect
-from pipelex.temporal.config_temporal import SecretMethod, TemporalServerConfig
-from pipelex.temporal.exceptions import TemporalConfigError, TemporalServerError
+from pipelex.temporal.exceptions import TemporalServerError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

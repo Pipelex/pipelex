@@ -14,7 +14,7 @@ These tests cover only the log-severity union.
 
 from datetime import timedelta
 
-from pipelex.temporal.config_temporal import (
+from pipelex.system.configuration.config_temporal import (
     ActivityRouteConfig,
     HandleOptions,
     QueueOptions,

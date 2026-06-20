@@ -16,9 +16,9 @@ import pytest_asyncio
 from temporalio.testing import WorkflowEnvironment
 
 from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
-from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.temporal.temporal_hub import get_task_manager, temporal_hub

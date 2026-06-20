@@ -24,7 +24,7 @@ from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, NodeStatus, P
 from pipelex.graph.trace_context import TraceContext
 from pipelex.hub import get_report_delegate
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.temporal.config_temporal import ActivityRouteConfig
+from pipelex.system.configuration.config_temporal import ActivityRouteConfig
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg

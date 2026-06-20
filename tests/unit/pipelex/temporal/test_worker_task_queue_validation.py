@@ -11,7 +11,7 @@ code) benefit too.
 import pytest
 
 from pipelex.config import get_config
-from pipelex.temporal.exceptions import WorkerTaskQueueUnknownError
+from pipelex.system.configuration.exceptions import WorkerTaskQueueUnknownError
 
 
 class TestWorkerTaskQueueValidation:

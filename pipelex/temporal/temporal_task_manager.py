@@ -13,8 +13,8 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
+from pipelex.system.configuration.config_temporal import WorkerRuntimeProfile, WorkerScope
 from pipelex.system.runtime import WorkerMode, runtime_manager
-from pipelex.temporal.config_temporal import WorkerRuntimeProfile, WorkerScope
 from pipelex.temporal.exceptions import WorkerProfileConfigError, WorkerScopeConfigError, WorkflowExecutionError
 from pipelex.temporal.log_temporal import configure_temporal_logs
 from pipelex.temporal.sandbox_manager import sandbox_manager

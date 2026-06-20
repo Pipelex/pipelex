@@ -1,6 +1,7 @@
 from pipelex import log
-from pipelex.temporal.config_temporal import WorkerScope
-from pipelex.temporal.exceptions import TemporalConfigError, WorkerScopeConfigError
+from pipelex.system.configuration.config_temporal import WorkerScope
+from pipelex.system.configuration.exceptions import TemporalConfigError
+from pipelex.temporal.exceptions import WorkerScopeConfigError
 from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 

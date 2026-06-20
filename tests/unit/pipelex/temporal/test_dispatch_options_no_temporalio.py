@@ -46,7 +46,7 @@ _NO_TEMPORALIO_SCRIPT = textwrap.dedent(
 
     from datetime import timedelta
 
-    from pipelex.temporal.config_temporal import DispatchOptions
+    from pipelex.system.configuration.config_temporal import DispatchOptions
 
     # Construct + read back through to_execute_kwargs. retry_policy is Any at
     # runtime, so an arbitrary sentinel stands in for the temporalio RetryPolicy.

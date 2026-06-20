@@ -29,7 +29,7 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.temporal.config_temporal import ActivityRouteConfig
+from pipelex.system.configuration.config_temporal import ActivityRouteConfig
 from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog

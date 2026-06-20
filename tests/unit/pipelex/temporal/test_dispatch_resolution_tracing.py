@@ -10,7 +10,7 @@ from datetime import timedelta
 
 import pytest
 
-from pipelex.temporal.config_temporal import (
+from pipelex.system.configuration.config_temporal import (
     ActivityRouteConfig,
     HandleOptions,
     QueueOptions,

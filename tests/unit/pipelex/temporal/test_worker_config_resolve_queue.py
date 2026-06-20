@@ -16,7 +16,7 @@ from datetime import timedelta
 
 import pytest
 
-from pipelex.temporal.config_temporal import ActivityRouteConfig, RetryPolicyConfig, WorkerConfig
+from pipelex.system.configuration.config_temporal import ActivityRouteConfig, RetryPolicyConfig, WorkerConfig
 
 
 def _make_worker_config(activity_queues: dict[str, ActivityRouteConfig] | None = None) -> WorkerConfig:

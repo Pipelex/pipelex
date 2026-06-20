@@ -181,7 +181,7 @@ Do NOT start if already running — it will fail with a bind error.
 ### Step 2: Run the tests
 
 The conftest auto-registers the Pipelex custom search attributes listed in
-`pipelex.temporal.config_temporal.BUILTIN_SEARCH_ATTRIBUTES` on the first
+`pipelex.system.configuration.config_temporal.BUILTIN_SEARCH_ATTRIBUTES` on the first
 session that hits a fresh dev server. No manual setup needed.
 
 **Dry mode (fast, no LLM costs):**

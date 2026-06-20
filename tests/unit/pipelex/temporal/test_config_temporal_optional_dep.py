@@ -1,4 +1,4 @@
-"""Regression: ``pipelex.temporal.config_temporal`` MUST NOT import ``temporalio``
+"""Regression: ``pipelex.system.configuration.config_temporal`` MUST NOT import ``temporalio``
 at module level. ``temporalio`` is in ``[project.optional-dependencies].temporal``;
 ``pipelex.system.configuration.configs`` imports this module unconditionally,
 so a top-level temporalio import breaks every install that didn't opt into the
@@ -62,7 +62,7 @@ class TestConfigTemporalOptionalDep:
         / ``if`` branches other than ``if TYPE_CHECKING:``). ``TYPE_CHECKING``
         blocks and function-local imports are fine.
         """
-        source_path = Path(__file__).resolve().parents[4] / "pipelex" / "temporal" / "config_temporal.py"
+        source_path = Path(__file__).resolve().parents[4] / "pipelex" / "system" / "configuration" / "config_temporal.py"
         assert source_path.is_file(), f"expected config_temporal.py at {source_path}"
         tree = ast.parse(source_path.read_text())
 

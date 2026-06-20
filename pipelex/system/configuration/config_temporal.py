@@ -7,7 +7,7 @@ from pydantic.dataclasses import dataclass
 
 from pipelex import log
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.temporal.exceptions import TemporalConfigError, WorkerTaskQueueUnknownError
+from pipelex.system.configuration.exceptions import TemporalConfigError, WorkerTaskQueueUnknownError
 from pipelex.tools.storage.storage_config import StorageProviderConfig
 from pipelex.types import Self, StrEnum
 

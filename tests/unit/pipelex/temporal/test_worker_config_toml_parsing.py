@@ -20,7 +20,7 @@ from datetime import timedelta
 
 import tomli
 
-from pipelex.temporal.config_temporal import ActivityRouteConfig, HandleOptions, RetryPolicyConfig, RetryPolicyConfigOverlay, WorkerConfig
+from pipelex.system.configuration.config_temporal import ActivityRouteConfig, HandleOptions, RetryPolicyConfig, RetryPolicyConfigOverlay, WorkerConfig
 
 _TOML_FRAGMENT = """
 default_task_queue = "temporal_task_queue"

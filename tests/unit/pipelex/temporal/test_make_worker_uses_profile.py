@@ -12,7 +12,7 @@ from datetime import timedelta
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.temporal.config_temporal import QueueOptions, WorkerRuntimeProfile, WorkerTuningMode
+from pipelex.system.configuration.config_temporal import QueueOptions, WorkerRuntimeProfile, WorkerTuningMode
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 
 

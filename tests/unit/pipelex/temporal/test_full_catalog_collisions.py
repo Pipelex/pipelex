@@ -2,7 +2,7 @@ from typing import Any
 
 import pytest
 
-from pipelex.temporal.exceptions import TemporalConfigError
+from pipelex.system.configuration.exceptions import TemporalConfigError
 from pipelex.temporal.temporal_tasks import TaskPack, TemporalTasks
 from pipelex.temporal.temporal_types import ActivityType, WorkflowType
 

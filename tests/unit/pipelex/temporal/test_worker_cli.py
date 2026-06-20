@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from typer.testing import CliRunner
 
+from pipelex.system.configuration.exceptions import WorkerTaskQueueUnknownError
 from pipelex.system.runtime import RunMode
 from pipelex.temporal import worker_cli
-from pipelex.temporal.exceptions import WorkerTaskQueueUnknownError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

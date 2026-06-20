@@ -23,7 +23,7 @@ import pytest
 from pytest_mock import MockerFixture
 from temporalio.service import RPCError, RPCStatusCode
 
-from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
+from pipelex.system.configuration.config_temporal import BUILTIN_SEARCH_ATTRIBUTES
 from pipelex.temporal.exceptions import SearchAttributeRegistrationError
 from pipelex.temporal.tprl.namespace_check import check_required_search_attributes
 

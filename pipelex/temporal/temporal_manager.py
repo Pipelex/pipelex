@@ -3,8 +3,8 @@ from typing import ClassVar, Optional
 from temporalio.client import Client as TemporalClient
 
 from pipelex import log
+from pipelex.system.configuration.config_temporal import TemporalServerConfig
 from pipelex.system.runtime import RunMode, runtime_manager
-from pipelex.temporal.config_temporal import TemporalServerConfig
 from pipelex.temporal.temporal_connect import connect_to_temporal, connect_to_temporal_selected_server, connect_to_temporal_server
 from pipelex.types import StrEnum
 

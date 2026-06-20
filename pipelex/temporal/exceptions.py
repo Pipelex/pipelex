@@ -1,6 +1,7 @@
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError
+from pipelex.system.configuration.exceptions import TemporalConfigError
 
 
 class TemporalFlowError(PipelexError):
@@ -64,10 +65,6 @@ class ContentGenerationError(TemporalFlowError):
     pass
 
 
-class TemporalConfigError(ValueError, TemporalFlowError):
-    pass
-
-
 class TemporalServerError(TemporalFlowError):
     pass
 
@@ -77,10 +74,6 @@ class WorkerScopeConfigError(TemporalConfigError):
 
 
 class WorkerProfileConfigError(TemporalConfigError):
-    pass
-
-
-class WorkerTaskQueueUnknownError(TemporalConfigError):
     pass
 
 

@@ -17,9 +17,9 @@ from aiohttp import web
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.pipelex import Pipelex
+from pipelex.system.configuration.exceptions import TemporalConfigError
 from pipelex.temporal.codec.codec_factory import make_codec_from_config
 from pipelex.temporal.codec.codec_server import build_codec_server
-from pipelex.temporal.exceptions import TemporalConfigError
 
 app = typer.Typer()
 

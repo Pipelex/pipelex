@@ -16,7 +16,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from pipelex.temporal.config_temporal import (
+from pipelex.system.configuration.config_temporal import (
     BUILTIN_SEARCH_ATTRIBUTES,
     ActivityRouteConfig,
     PayloadCodecConfig,

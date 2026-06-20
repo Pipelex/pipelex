@@ -11,7 +11,7 @@ from datetime import timedelta
 import pytest
 from pydantic import ValidationError
 
-from pipelex.temporal.config_temporal import WorkerRuntimeProfile, WorkerTuningMode
+from pipelex.system.configuration.config_temporal import WorkerRuntimeProfile, WorkerTuningMode
 from pipelex.temporal.exceptions import WorkerProfileConfigError
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 

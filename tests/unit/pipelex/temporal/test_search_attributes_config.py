@@ -9,7 +9,7 @@ silently producing no attribute at workflow-start time.
 import pytest
 from pydantic import ValidationError
 
-from pipelex.temporal.config_temporal import BUILTIN_SEARCH_ATTRIBUTES, SearchAttributesConfig
+from pipelex.system.configuration.config_temporal import BUILTIN_SEARCH_ATTRIBUTES, SearchAttributesConfig
 
 
 class TestSearchAttributesConfig:
