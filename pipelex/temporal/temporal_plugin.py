@@ -3,16 +3,19 @@
 ``register`` is side-effect-free and import-light — it imports no ``temporalio``:
 
 - **always** (regardless of ``temporal.is_enabled``): contributes the TEMPORAL_*
-  orchestrators and the ``worker`` / ``setup-temporal-namespace`` CLI commands.
-  The orchestrator instances and command callables are import-light; the heavy
-  ``temporalio`` chain is pulled lazily inside ``orchestrator.run`` and inside the
-  command bodies.
+  orchestrators. The orchestrator instances are import-light; the heavy
+  ``temporalio`` chain is pulled lazily inside ``orchestrator.run``.
 - **only when ``config.temporal.is_enabled``** (i.e. boot *this* process as a
-  Temporal-default runtime — a worker): claims the four process-global hub slots
+  Temporal-default runtime — a worker): claims the process-global hub slots
   and registers the teardown callback. Each claim is a **thunk** (D5) that imports
   ``temporalio`` only when invoked at the boot apply-point, so discovering and
-  registering this plugin stays import-light even on a Temporal worker (and the
-  CLI-build harvest never constructs a Temporal impl).
+  registering this plugin stays import-light even on a Temporal worker.
+
+The ``worker`` / ``setup-namespace`` operational commands are NOT contributed through
+the plugin seam — they ship as the standalone ``pipelex-temporal`` console script
+(``pipelex/temporal/temporal_cli.py``). Keeping them off the host ``pipelex`` CLI means
+a broken/colliding install can never brick it, and the commands travel with this
+package when Temporal externalizes in Phase 5.
 """
 
 from typing import Any
@@ -70,7 +73,7 @@ def _teardown_temporal() -> None:
 
 
 class TemporalPlugin:
-    """Built-in plugin contributing the Temporal orchestrators, CLI commands and (when enabled) the worker runtime."""
+    """Built-in plugin contributing the Temporal orchestrators and (when enabled) the worker runtime."""
 
     name = "temporal"
     targets_api = PLUGIN_API_VERSION
@@ -78,19 +81,6 @@ class TemporalPlugin:
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_orchestrator(mode=PipelexExecutionMode.TEMPORAL_BLOCKING, orchestrator=TemporalBlockingOrchestrator())
         registrar.add_orchestrator(mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET, orchestrator=TemporalFireAndForgetOrchestrator())
-        # CLI commands are declared by ``module:attr`` path, not by importing the callable: the command
-        # modules boot Pipelex, and importing them here would cycle (builtins -> temporal_plugin ->
-        # worker_cmd -> pipelex -> discovery -> builtins). The CLI layer imports them lazily at CLI-build.
-        registrar.add_cli_command(
-            name="worker",
-            help="Start a Temporal worker for distributed workflow execution",
-            import_path="pipelex.cli.commands.worker_cmd:worker_cmd",
-        )
-        registrar.add_cli_command(
-            name="setup-temporal-namespace",
-            help="Register Pipelex's custom search attributes on the configured Temporal namespace",
-            import_path="pipelex.cli.commands.setup_temporal_namespace_cmd:setup_temporal_namespace_cmd",
-        )
 
         # ``temporal.is_enabled`` means "boot this process as a Temporal-default runtime" (a worker),
         # not "the temporal plugin is on". Only then do we claim the process-global hub slots so every

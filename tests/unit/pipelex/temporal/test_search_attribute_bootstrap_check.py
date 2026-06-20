@@ -4,9 +4,9 @@ Phase 6 contract:
 
 - All configured attributes present → no warning, no exception.
 - Some configured attributes missing on a reachable namespace → raise
-  ``SearchAttributeRegistrationError`` with both the ``pipelex
-  setup-temporal-namespace`` invocation and the equivalent raw ``temporal
-  operator search-attribute create`` command in the message.
+  ``SearchAttributeRegistrationError`` with both the
+  ``pipelex-temporal setup-namespace`` invocation and the equivalent raw
+  ``temporal operator search-attribute create`` command in the message.
 - ``RPCError`` from the operator service → worker boot continues, soft-fail
   warning logged.
 - Any other exception → propagates and crashes the worker (real bug).
@@ -79,7 +79,7 @@ class TestSearchAttributeBootstrapCheck:
         assert "UserId" in message
         assert "DomainCode" in message
         # The Pipelex CLI invocation is part of the actionable hint.
-        assert "pipelex setup-temporal-namespace" in message
+        assert "pipelex-temporal setup-namespace" in message
         # The equivalent raw Temporal CLI command is also embedded verbatim.
         assert "temporal operator search-attribute create" in message
         assert "--namespace default" in message

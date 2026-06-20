@@ -16,7 +16,7 @@ Two entry points:
   namespace was unreachable, not misconfigured. Anything else propagates.
 - ``ensure_required_search_attributes_registered`` — auto-register the missing
   attributes. Used by test infrastructure to set up the in-process Temporal
-  server before any tests run, and by the ``pipelex setup-temporal-namespace``
+  server before any tests run, and by the ``pipelex-temporal setup-namespace``
   CLI command. Catches ``RPCError(PERMISSION_DENIED)`` on either RPC
   (``ListSearchAttributes`` or ``AddSearchAttributes``) and returns a
   structured ``RegistrationFailure`` instead of raising so the CLI can format
@@ -44,7 +44,7 @@ from pipelex.temporal.exceptions import SearchAttributeRegistrationError
 # The Pipelex CLI invocation operators run when their config already points at
 # the right server. ``--dry-run`` prints the raw ``temporal`` CLI fallback
 # instead of executing.
-PIPELEX_SETUP_CLI_COMMAND: Final[str] = "pipelex setup-temporal-namespace"
+PIPELEX_SETUP_CLI_COMMAND: Final[str] = "pipelex-temporal setup-namespace"
 
 
 class RegistrationFailure(BaseModel):
@@ -104,9 +104,9 @@ async def check_required_search_attributes(
 
     - All configured attributes present → silent.
     - Some missing on a reachable namespace → raise
-      ``SearchAttributeRegistrationError`` with both the ``pipelex
-      setup-temporal-namespace`` invocation and the equivalent raw ``temporal
-      operator search-attribute create`` command in the message.
+      ``SearchAttributeRegistrationError`` with both the
+      ``pipelex-temporal setup-namespace`` invocation and the equivalent raw
+      ``temporal operator search-attribute create`` command in the message.
     - ``RPCError`` from the operator service (namespace unreachable, transient
       cluster issue) → log a warning, continue. Fast-failing here would block
       every worker boot during a control-plane outage; the cluster will reject
@@ -162,7 +162,7 @@ async def ensure_required_search_attributes_registered(
 
     Idempotent: calls ``ListSearchAttributes`` first and only adds the ones
     that are absent. Used by test infrastructure to set up the in-process
-    Temporal server and by the ``pipelex setup-temporal-namespace`` CLI
+    Temporal server and by the ``pipelex-temporal setup-namespace`` CLI
     command.
 
     Returns the tuple of newly-registered attribute names on success — an

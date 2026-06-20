@@ -16,8 +16,8 @@ The same `.mthds` methods run distributed without rewriting. Pipelex's runtime b
 ## Where to go next
 
 - **[Overview](temporal/index.md)** — what it is, when you'd want it, the big picture, quick start.
-- **[Cluster Setup](cluster-setup.md)** — search attributes and `pipelex setup-temporal-namespace`.
-- **[Worker Deployment](workers.md)** — `pipelex worker`, scopes, runtime profiles, multi-worker topologies.
+- **[Cluster Setup](cluster-setup.md)** — search attributes and `pipelex-temporal setup-namespace`.
+- **[Worker Deployment](workers.md)** — `pipelex-temporal worker`, scopes, runtime profiles, multi-worker topologies.
 - **[Task-Queue Routing](task-routing.md)** — per-activity routing, queue options, per-handle overrides.
 - **[Workflow Observability](observability.md)** — workflow ids, summary fields, search-attribute filtering.
 

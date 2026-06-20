@@ -36,8 +36,8 @@ All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 - `[temporal.worker_config]` — default task queue, workflow and activity timeouts, baseline retry policy.
 - `[temporal.activity_queues.<activity>]` — per-activity, per-handle task-queue routing.
 - `[temporal.queue_options.<queue>]` — per-queue timeout, retry, and rate-cap overlays.
-- `[temporal.worker_runtime_profiles.profiles.<name>]` — named runtime profiles for `pipelex worker --profile`.
-- `[temporal.worker_scopes.scopes.<name>]` — named scopes for `pipelex worker --scope`.
+- `[temporal.worker_runtime_profiles.profiles.<name>]` — named runtime profiles for `pipelex-temporal worker --profile`.
+- `[temporal.worker_scopes.scopes.<name>]` — named scopes for `pipelex-temporal worker --scope`.
 - `[temporal.temporal_config]` — server profiles (`local`, `testing`, …) and log toggles.
 
 ## Get started

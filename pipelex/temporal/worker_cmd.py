@@ -1,4 +1,4 @@
-"""pipelex worker — Start a Temporal worker."""
+"""pipelex-temporal worker — Start a Temporal worker."""
 
 import asyncio
 from typing import Annotated
@@ -42,11 +42,11 @@ def worker_cmd(
     a worker that listens for workflow and activity tasks.
 
     Examples:
-        pipelex worker
-        pipelex worker --no-sandbox
-        pipelex worker --task-queue my_queue
-        pipelex worker --scope router
-        pipelex worker --profile anthropic-tier4 --scope runner-llm --task-queue anthropic_q
+        pipelex-temporal worker
+        pipelex-temporal worker --no-sandbox
+        pipelex-temporal worker --task-queue my_queue
+        pipelex-temporal worker --scope router
+        pipelex-temporal worker --profile anthropic-tier4 --scope runner-llm --task-queue anthropic_q
     """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, temporal_enabled=True)
 

@@ -23,14 +23,14 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 | Orchestrator dispatch | `runtime_bridge/bridge.py` (`match` ~`:147`, `_run_mistral_native` `:408`, `_run_direct` `:270`, `_run_temporal_*` `:297/:330`) | `match execution_mode:` → hard Mistral import + lazy Temporal + per-mode install messages |
 | Boot/teardown hub swap | `pipelex.py` (~`:377-479`) | four `if get_config().temporal.is_enabled:` blocks + inlined teardown |
 | Config | `system/configuration/configs.py:14` | the one hard `from pipelex.temporal.config_temporal import Temporal` |
-| CLI | `cli/_cli.py:15,20` + `list_commands` | two hard imports register `worker` + `setup-temporal-namespace`; order hardcoded |
+| ~~CLI~~ | `pipelex/temporal/temporal_cli.py` | **REMOVED — Option A.** No CLI-command seam/harvest at all; Temporal's `worker` + `setup-namespace` ship as the standalone `pipelex-temporal` console script ([doc](wip/plugins/option-a-drop-cli-command-seam.md)). |
 | Naming overload | `plugins/{plugin,plugin_manager,plugin_sdk_registry,plugin_factory_abstract}.py`, `hub.py` `"PluginManager2 is not initialized"` | three-way "plugin" overload to kill |
 
 **Locked decisions (D1–D7)** — do not re-litigate, see plan for full text:
 
 - **D1** — inference factory = a typed callable `MakeWorkerFn`, not a one-method Protocol object (kills ~30 classes).
 - **D2** — Phase 1 PR = seam machinery **merged** with the LLM family (contract meets a real backend before locking).
-- **D3** — plugin CLI commands harvested by running the **pure `build_registrar`** at CLI-build (after config load); same fn runs again at boot.
+- **D3** — ~~plugin CLI commands harvested by running the pure `build_registrar` at CLI-build~~ **SUPERSEDED → Option A** ([`wip/plugins/option-a-drop-cli-command-seam.md`](wip/plugins/option-a-drop-cli-command-seam.md), landed post-Phase-3): the CLI-command *contribution path* was **removed**, not hardened. Temporal's `worker` + `setup-namespace` are now a standalone `pipelex-temporal` console script (`[project.scripts]`), so `pipelex --help` no longer loads config or scans entry points and a broken/colliding plugin can't brick the host CLI. The inference-backend / orchestrator / boot-slot seams and `pipelex plugins list` are **unchanged**; `add_cli_command` / `CliCommand` are gone from the registrar. Downstream `pipelex-worker` Dockerfile/Makefile flip is release-gated (see the plan's cross-repo section).
 - **D4** — Phase 0 keeps `SdkClientManager` a **pure rename**; collapsing it into the registry is a **P3 follow-up commit**, not bundled.
 - **D5** — hub slot claims are **deferred thunks** (`claim_*(factory: Callable[[], Impl])`), invoked only at the setup apply-point → `register` stays import-light (never imports `temporalio`).
 - **D6** — the 5th seam (`model_lists.py`) is **inverted too**, as Phase 4, via a model-listing capability on the inference contract.
@@ -457,6 +457,11 @@ Beyond the per-phase CP reviews above, an **xhigh** whole-PR pass ran (10 finder
 **Deferred-doc items closed by Phase 3:** the three previously-unconsumed registrar menus are now wired — `cli_commands` (consumed by `_cli.py` harvest), `slot_claims` + `teardown_callbacks` (consumed by `pipelex.py` boot/teardown). So an external plugin contributing those is no longer silently inert.
 
 **Notes for Phase 4/5:** Phase 4 (model_lists 5th seam) is independent. Phase 5 externalizes `pipelex/temporal/` → `pipelex-temporal`: the Temporal plugin + orchestrators + commands are already a self-contained unit behind the seam; the move is (a) relocate the Temporal config schema out of `pipelex.temporal` (codex C6 — `configs.py:14` still imports `pipelex.temporal.config_temporal`), then (b) ship `pipelex/temporal/` + declare the `pipelex.plugins` entry point in the new dist (today Temporal is an in-tree builtin, not yet an entry point). Gate: this CHECKPOINT-3 Temporal-green evidence.
+
+**Post-checkpoint xhigh `/code-review` follow-ups (separate from the CHECKPOINT-3 reviewer pass above).** A later xhigh `/code-review` over the Phase 3 commit surfaced a dominant correctness cluster plus medium/low items, captured for triage:
+
+- 🔴 **Critical — read before Phase 5 / before externalizing any plugin:** [`wip/plugins/phase-3-critical-cli-harvest-fragility.md`](wip/plugins/phase-3-critical-cli-harvest-fragility.md). The import-time CLI plugin-command harvest (D3) is an unguarded surface: a broken/incompatible/colliding **external** plugin or an unreadable user config can brick *every* `pipelex` command — including the `--help`/`doctor`/`plugins`/`init` recovery commands — and `add_cli_command` has no collision guard, so a plugin can silently shadow a core command (`run`, …). Latent for in-tree-only installs (suite green), live the moment Phase 5 ships an external dist. **Cold-start problem statement only — solution to be explored in a fresh session.**
+- 🟡 **Medium/low deferred items → [`wip/plugins/phase-3-review-deferred.md`](wip/plugins/phase-3-review-deferred.md):** the misleading `MISTRAL_NATIVE` "install a package you already have" hint (dead mode until the Mistral plugin lands), the bridge dropping its orchestrator error-wrap (external-orchestrator contract), `teardown()` with no `try`/`finally`, `_teardown_temporal` re-fetching from the global hub, the wrong SPI doc about Temporal entry-point discovery, an enum identity comparison, double-discovery/import-time cost (coupled to the critical fix), a dead `serialize_pipe_output` re-export, and a hardcoded slot count.
 
 #### CHECKPOINT-3 `/code-review` (pr-review-toolkit:code-reviewer, on the Phase 3 working-tree diff)
 

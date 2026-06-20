@@ -1,4 +1,4 @@
-"""Unit tests for the ``pipelex setup-temporal-namespace`` CLI command.
+"""Unit tests for the ``pipelex-temporal setup-namespace`` CLI command.
 
 The command wraps ``ensure_required_search_attributes_registered`` with a
 copy-paste-ready dry-run output and a permission-denied fallback runbook so
@@ -13,7 +13,7 @@ import pytest
 import typer
 from pytest_mock import MockerFixture
 
-from pipelex.cli.commands.setup_temporal_namespace_cmd import setup_temporal_namespace_cmd
+from pipelex.temporal.setup_namespace_cmd import setup_namespace_cmd
 from pipelex.temporal.tprl.namespace_check import RegistrationFailure
 
 
@@ -26,8 +26,8 @@ class TestSetupTemporalNamespaceCmd:
         test exercises — we care about the search-attribute registration logic
         and the dry-run / permission-denied branches.
         """
-        mocker.patch("pipelex.cli.commands.setup_temporal_namespace_cmd.make_pipelex_for_cli")
-        mocker.patch("pipelex.cli.commands.setup_temporal_namespace_cmd.Pipelex.teardown_if_needed")
+        mocker.patch("pipelex.temporal.setup_namespace_cmd.make_pipelex_for_cli")
+        mocker.patch("pipelex.temporal.setup_namespace_cmd.Pipelex.teardown_if_needed")
 
     def _patch_config(
         self,
@@ -48,7 +48,7 @@ class TestSetupTemporalNamespaceCmd:
         server_config = mocker.MagicMock()
         server_config.namespace = namespace
         config_root.temporal.temporal_config.temporal_server_configs = {selected_server: server_config}
-        mocker.patch("pipelex.cli.commands.setup_temporal_namespace_cmd.get_config", return_value=config_root)
+        mocker.patch("pipelex.temporal.setup_namespace_cmd.get_config", return_value=config_root)
         return config_root
 
     @pytest.mark.usefixtures("patch_pipelex_lifecycle")
@@ -63,7 +63,7 @@ class TestSetupTemporalNamespaceCmd:
             new=mocker.AsyncMock(),
         )
 
-        setup_temporal_namespace_cmd(dry_run=True, server=None)
+        setup_namespace_cmd(dry_run=True, server=None)
 
         captured = capsys.readouterr().out
         assert "temporal operator search-attribute create" in captured
@@ -89,7 +89,7 @@ class TestSetupTemporalNamespaceCmd:
             new=mocker.AsyncMock(return_value=("SessionId", "DomainCode")),
         )
 
-        setup_temporal_namespace_cmd(dry_run=False, server=None)
+        setup_namespace_cmd(dry_run=False, server=None)
 
         connect_mock.assert_awaited_once()
         register_mock.assert_awaited_once()
@@ -120,7 +120,7 @@ class TestSetupTemporalNamespaceCmd:
             new=mocker.AsyncMock(return_value=()),
         )
 
-        setup_temporal_namespace_cmd(dry_run=False, server=None)
+        setup_namespace_cmd(dry_run=False, server=None)
 
         out = capsys.readouterr().out
         assert "already registered" in out
@@ -144,7 +144,7 @@ class TestSetupTemporalNamespaceCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            setup_temporal_namespace_cmd(dry_run=False, server=None)
+            setup_namespace_cmd(dry_run=False, server=None)
 
         assert exc_info.value.exit_code == 1
         err = capsys.readouterr().err
@@ -163,7 +163,7 @@ class TestSetupTemporalNamespaceCmd:
             new=mocker.AsyncMock(),
         )
 
-        setup_temporal_namespace_cmd(dry_run=False, server=None)
+        setup_namespace_cmd(dry_run=False, server=None)
 
         connect_mock.assert_not_called()
         assert "enabled = false" in capsys.readouterr().err
@@ -187,7 +187,7 @@ class TestSetupTemporalNamespaceCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            setup_temporal_namespace_cmd(dry_run=False, server=None)
+            setup_namespace_cmd(dry_run=False, server=None)
 
         assert exc_info.value.exit_code == 1
         err = capsys.readouterr().err
@@ -203,7 +203,7 @@ class TestSetupTemporalNamespaceCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            setup_temporal_namespace_cmd(dry_run=False, server="does_not_exist")
+            setup_namespace_cmd(dry_run=False, server="does_not_exist")
 
         assert exc_info.value.exit_code == 1
         err = capsys.readouterr().err

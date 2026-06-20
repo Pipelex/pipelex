@@ -87,7 +87,7 @@ class WorkerTaskQueueUnknownError(TemporalConfigError):
 class SearchAttributeRegistrationError(TemporalConfigError):
     """Raised at worker boot when the namespace is reachable but missing a
     configured custom search attribute. The error message includes both the
-    ``pipelex setup-temporal-namespace`` invocation and the equivalent raw
+    ``pipelex-temporal setup-namespace`` invocation and the equivalent raw
     ``temporal operator search-attribute create`` command so operators on
     either side of the fence can fix the gap.
     """

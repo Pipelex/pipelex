@@ -7,7 +7,7 @@ description: "Reference for the `SearchAttributeRegistrationError` Pipelex error
 
 # Search attribute registration
 
-Raised at worker boot when the namespace is reachable but missing a configured custom search attribute. The error message includes both the ``pipelex setup-temporal-namespace`` invocation and the equivalent raw ``temporal operator search-attribute create`` command so operators on either side of the fence can fix the gap.
+Raised at worker boot when the namespace is reachable but missing a configured custom search attribute. The error message includes both the ``pipelex-temporal setup-namespace`` invocation and the equivalent raw ``temporal operator search-attribute create`` command so operators on either side of the fence can fix the gap.
 
 | Field | Value |
 |---|---|

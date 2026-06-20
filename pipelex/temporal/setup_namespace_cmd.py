@@ -1,4 +1,4 @@
-"""pipelex setup-temporal-namespace — Register Pipelex's custom search
+"""pipelex-temporal setup-namespace — Register Pipelex's custom search
 attributes on the configured Temporal namespace.
 
 Wraps the same ``ensure_required_search_attributes_registered`` helper used by
@@ -34,7 +34,7 @@ from pipelex.config import get_config
 from pipelex.pipelex import Pipelex
 
 
-def setup_temporal_namespace_cmd(
+def setup_namespace_cmd(
     dry_run: Annotated[
         bool,
         typer.Option(
@@ -53,9 +53,9 @@ def setup_temporal_namespace_cmd(
     """Register Pipelex's custom search attributes on the Temporal namespace.
 
     Examples:
-        pipelex setup-temporal-namespace
-        pipelex setup-temporal-namespace --dry-run
-        pipelex setup-temporal-namespace --server testing
+        pipelex-temporal setup-namespace
+        pipelex-temporal setup-namespace --dry-run
+        pipelex-temporal setup-namespace --server testing
     """
     # ``needs_inference=False``: namespace registration only needs the Temporal
     # config; forcing inference setup (gateway/telemetry/credentials) would make

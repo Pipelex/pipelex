@@ -220,7 +220,7 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     # bootstrap. Idempotent: only adds attributes that are missing.
     # ``RegistrationFailure`` is returned (not raised) when the API key lacks
     # ``AddSearchAttributes`` permission (Temporal Cloud read-only key); surface
-    # it as a warning so the operator runs ``pipelex setup-temporal-namespace``
+    # it as a warning so the operator runs ``pipelex-temporal setup-namespace``
     # with an admin key before rerunning the tests. For in-process and
     # time-skipping servers the caller is always admin, so this branch is
     # unreachable there — but handling it uniformly keeps the call site honest
@@ -234,7 +234,7 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
         msg = (
             f"Could not auto-register Temporal search attributes on namespace "
             f"'{registration_result.namespace}' (missing: {list(registration_result.missing)}). "
-            f"Workflow starts will fail at dispatch. Run `pipelex setup-temporal-namespace` "
+            f"Workflow starts will fail at dispatch. Run `pipelex-temporal setup-namespace` "
             f"with an admin API key, then rerun the tests. RPC error: "
             f"{registration_result.rpc_error_message}"
         )

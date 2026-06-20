@@ -136,6 +136,7 @@ dev = [
 pipelex = "pipelex.cli._cli:app"
 pipelex-agent = "pipelex.cli.agent_cli._agent_cli:app"
 pipelex-dev = "pipelex.cli.dev_cli._dev_cli:app"
+pipelex-temporal = "pipelex.temporal.temporal_cli:app"
 
 [build-system]
 requires = ["hatchling"]

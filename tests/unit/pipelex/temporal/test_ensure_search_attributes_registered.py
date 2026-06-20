@@ -1,7 +1,7 @@
 """Unit tests for ``ensure_required_search_attributes_registered``.
 
 The helper is used both by the test conftest (in-process server bootstrap) and
-by the ``pipelex setup-temporal-namespace`` CLI command. It MUST:
+by the ``pipelex-temporal setup-namespace`` CLI command. It MUST:
 
 - Return the tuple of newly-registered attribute names on success.
 - Return an empty tuple on the idempotent "everything already registered" no-op

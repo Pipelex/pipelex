@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, NamedTuple
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
@@ -37,16 +37,6 @@ class PluginStatus(StrEnum):
     BROKEN = "broken"
 
 
-class CliCommand(NamedTuple):
-    name: str
-    help: str
-    # Declarative ``module:attr`` path to the Typer command callable, imported lazily by the CLI layer
-    # at CLI-build. A plugin declares where its command lives WITHOUT importing it, so a plugin that is
-    # statically reachable from boot (a builtin) can contribute a command whose module boots Pipelex
-    # without forming an import cycle (the import is resolved dynamically, off the static graph).
-    import_path: str
-
-
 class PluginDiscovery(BaseModel):
     """Observability record of one discovered plugin and what it contributed.
 
@@ -70,7 +60,7 @@ class PluginRegistrar:
     one plugin at a time (setting the "active" discovery so contributions are
     attributed and duplicate conflicts can name both contributors), then boot
     turns the accumulated ``inference_backends`` / ``orchestrators`` into the two
-    keyed registries and applies the slot-claim thunks / CLI commands / teardown
+    keyed registries and applies the slot-claim thunks / teardown
     callbacks at their ordered apply-points.
 
     All duplicate detection is fail-loud and names both contributing plugins.
@@ -81,7 +71,6 @@ class PluginRegistrar:
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.orchestrators: dict[PipelexExecutionMode, OrchestratorProtocol] = {}
         self.slot_claims: dict[HubSlot, Callable[[], Any]] = {}
-        self.cli_commands: list[CliCommand] = []
         self.teardown_callbacks: list[Callable[[], None]] = []
         self.discoveries: list[PluginDiscovery] = []
         self._inference_sources: dict[tuple[InferenceFamily, str], str] = {}
@@ -131,10 +120,6 @@ class PluginRegistrar:
 
     def claim_task_manager(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.TASK_MANAGER, factory=factory)
-
-    def add_cli_command(self, *, name: str, help: str, import_path: str) -> None:  # noqa: A002 - "help" mirrors typer's parameter name
-        self.cli_commands.append(CliCommand(name=name, help=help, import_path=import_path))
-        self._active.contributions.append(f"cli command {name}")
 
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)

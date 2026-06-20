@@ -1,13 +1,10 @@
-import importlib
 from typing import Annotated
 
 import typer
 from click import Command, Context
-from pydantic import ValidationError
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
@@ -24,15 +21,9 @@ from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
-from pipelex.plugins.discovery import build_registrar
-from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).
-# Plugin-contributed commands (e.g. Temporal's ``worker`` / ``setup-temporal-namespace``) are appended
-# after these, in discovery order — see ``_register_discovered_cli_commands``.
 _CORE_COMMAND_ORDER: list[str] = [
     "login",
     "init",
@@ -53,7 +44,7 @@ class PipelexCLI(TyperGroup):
 
     @override
     def list_commands(self, ctx: Context) -> list[str]:
-        return [*_CORE_COMMAND_ORDER, *_PLUGIN_COMMAND_NAMES]
+        return list(_CORE_COMMAND_ORDER)
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -241,40 +232,3 @@ app.add_typer(graph_app, name="graph", help="Generate and render execution graph
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
 app.add_typer(plugins_app, name="plugins", help="Inspect the discovered plugins (inference backends, orchestrators) and their contributions")
-
-
-def _config_for_cli_harvest() -> PipelexConfig:
-    """Load config for the plugin-command harvest without side effects.
-
-    Runs on every ``pipelex`` invocation (including ``--help`` / ``init``), so it must never create
-    ``~/.pipelex/`` (``ensure_global_if_missing=False``) and must survive a broken user config — a
-    malformed override must not brick the very commands (``init``/``doctor``) that fix it. On any load
-    or validation failure it falls back to the shipped package defaults, which always validate.
-    """
-    try:
-        config_dict = config_manager.load_config(ensure_global_if_missing=False)
-        return PipelexConfig.model_validate(config_dict)
-    except (TomlError, ValidationError) as exc:
-        log.debug(f"Plugin CLI harvest: user config unreadable ({exc}); using package defaults.")
-        return PipelexConfig.model_validate(config_manager.load_base_config_dict())
-
-
-def _register_discovered_cli_commands() -> list[str]:
-    """Harvest plugin-contributed CLI commands at CLI-build time (D3) and register them on ``app``.
-
-    Runs the pure ``build_registrar`` once after loading config — the same function boot runs. D5's
-    deferred slot-claim thunks mean this never constructs a host-runtime impl (no ``temporalio`` import)
-    even when ``temporal.is_enabled``: only ``add_cli_command`` (import-light command callables) feeds
-    the harvest. Returns the registered command names, in discovery order, for ``list_commands``.
-    """
-    registrar = build_registrar(config=_config_for_cli_harvest())
-    names: list[str] = []
-    for cli_command in registrar.cli_commands:
-        module_path, _, attribute = cli_command.import_path.partition(":")
-        command = getattr(importlib.import_module(module_path), attribute)
-        app.command(name=cli_command.name, help=cli_command.help)(command)
-        names.append(cli_command.name)
-    return names
-
-
-_PLUGIN_COMMAND_NAMES: list[str] = _register_discovered_cli_commands()

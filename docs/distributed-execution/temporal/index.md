@@ -48,8 +48,8 @@ A submitter (your app or `pipelex run`) starts a workflow; one or more worker pr
 
 Three things, in this order:
 
-- **[Cluster Setup](../cluster-setup.md)** — one-time namespace prerequisites: register the custom search attributes Pipelex needs for the dashboard view. Run `pipelex setup-temporal-namespace` and you're done.
-- **[Worker Deployment](../workers.md)** — how to run `pipelex worker`, what `--scope` and `--profile` do, and how to compose multiple workers into a deployment.
+- **[Cluster Setup](../cluster-setup.md)** — one-time namespace prerequisites: register the custom search attributes Pipelex needs for the dashboard view. Run `pipelex-temporal setup-namespace` and you're done.
+- **[Worker Deployment](../workers.md)** — how to run `pipelex-temporal worker`, what `--scope` and `--profile` do, and how to compose multiple workers into a deployment.
 - **[Task-Queue Routing](../task-routing.md)** — when you outgrow a single queue: per-activity routing, per-queue timeouts and retry policies, per-handle overrides. Skip on day one; revisit when you need to isolate workloads.
 
 ## What you'll see in the Temporal dashboard
@@ -79,21 +79,21 @@ api_key_method = "none"
 Register the custom search attributes once (assumes Temporal is reachable):
 
 ```bash
-pipelex setup-temporal-namespace
+pipelex-temporal setup-namespace
 ```
 
 Boot a worker against the default task queue:
 
 ```bash
-pipelex worker
+pipelex-temporal worker
 ```
 
 Submit work from your application — the same `pipe_run(...)` you'd use locally now executes as a Temporal workflow because `[temporal] is_enabled = true`. The Pipelex Python API automatically dispatches through the Temporal hub.
 
 ## Where to go next
 
-- **[Cluster Setup](../cluster-setup.md)** — search attributes, `pipelex setup-temporal-namespace`, Temporal Cloud permission model.
-- **[Worker Deployment](../workers.md)** — `pipelex worker`, scopes, runtime profiles, multi-worker topologies.
+- **[Cluster Setup](../cluster-setup.md)** — search attributes, `pipelex-temporal setup-namespace`, Temporal Cloud permission model.
+- **[Worker Deployment](../workers.md)** — `pipelex-temporal worker`, scopes, runtime profiles, multi-worker topologies.
 - **[Task-Queue Routing](../task-routing.md)** — `activity_queues`, queue options, per-handle overrides, dispatch tracing.
 - **[Workflow Observability](../observability.md)** — workflow ids, activity ids, summary fields, search-attribute filtering.
 
