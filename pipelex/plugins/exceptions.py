@@ -23,6 +23,21 @@ class PluginApiVersionMismatchError(PluginError):
         super().__init__(message)
 
 
+class InferenceBackendNotFoundError(PluginError):
+    """No inference backend is registered for a requested (family, sdk).
+
+    Raised by the family worker factories on a registry-lookup miss — typically a
+    model whose backend plugin is not installed or was disabled via
+    ``plugins.disabled``.
+    """
+
+    def __init__(self, *, family: str, sdk: str):
+        self.family = family
+        self.sdk = sdk
+        message = f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed and enabled?"
+        super().__init__(message)
+
+
 class DuplicateInferenceBackendError(PluginError):
     """Two plugins registered an inference backend for the same (family, sdk)."""
 

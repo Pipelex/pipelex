@@ -1,6 +1,8 @@
 """Import-light guard (codex C12): discovering and registering the built-in plugins must
-not import any optional backend SDK. Enforced in a subprocess whose meta-path finder raises
-on the optional SDKs, which is deterministic where an in-process sys.modules check is not.
+not import any backend SDK (whether an optional extra like anthropic/linkup or a heavy core
+dep like openai/portkey_ai/pypdfium2 — each plugin must defer its import into make_worker).
+Enforced in a subprocess whose meta-path finder raises on those SDKs, which is deterministic
+where an in-process sys.modules check is not.
 """
 
 import subprocess  # noqa: S404
@@ -12,7 +14,20 @@ _GUARD_SCRIPT = textwrap.dedent(
     import sys
     import importlib.abc
 
-    BLOCKED = ("anthropic", "mistralai", "google.genai", "boto3", "aioboto3", "fal_client", "huggingface_hub", "docling", "linkup")
+    BLOCKED = (
+        "anthropic",
+        "mistralai",
+        "google.genai",
+        "boto3",
+        "aioboto3",
+        "fal_client",
+        "huggingface_hub",
+        "docling",
+        "linkup",
+        "openai",
+        "portkey_ai",
+        "pypdfium2",
+    )
 
     class _Blocker(importlib.abc.MetaPathFinder):
         def find_spec(self, fullname, path, target=None):

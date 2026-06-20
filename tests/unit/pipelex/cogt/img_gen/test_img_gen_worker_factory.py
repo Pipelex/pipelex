@@ -18,6 +18,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.exceptions import MissingDependencyError
 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
 from pipelex.plugins.builtins import BUILTIN_PLUGINS
+from pipelex.plugins.exceptions import InferenceBackendNotFoundError
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_handle import ModelHandle
@@ -270,14 +271,15 @@ class TestImgGenWorkerFactory:
         assert exc_info.value.extra_name == expected_extra
         assert f"pipelex[{expected_extra}]" in str(exc_info.value)
 
-    def test_unknown_sdk_raises_not_implemented(self, mocker: MockerFixture) -> None:
-        """An unrecognized SDK string raises NotImplementedError naming the SDK (a registry miss)."""
+    def test_unknown_sdk_raises_backend_not_found(self, mocker: MockerFixture) -> None:
+        """An unrecognized SDK string raises a structured InferenceBackendNotFoundError naming the SDK (a registry miss)."""
         backend = make_backend()
         patch_hub_getters(mocker, backend=backend)
         inference_model = make_img_gen_model_spec(sdk="definitely_not_an_sdk")
 
-        with pytest.raises(NotImplementedError) as exc_info:
+        with pytest.raises(InferenceBackendNotFoundError) as exc_info:
             ImgGenWorkerFactory.make_img_gen_worker(inference_model=inference_model)
 
+        assert exc_info.value.sdk == "definitely_not_an_sdk"
         assert "definitely_not_an_sdk" in str(exc_info.value)
-        assert "Is its plugin installed?" in str(exc_info.value)
+        assert "Is its plugin installed and enabled?" in str(exc_info.value)

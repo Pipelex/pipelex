@@ -41,3 +41,19 @@ class TestRequireSdk:
         message = str(exc_info.value)
         assert "google-genai" in message
         assert "pipelex[google]" in message
+
+    def test_multi_spec_partial_missing_names_only_absent(self, mocker: MockerFixture) -> None:
+        """With several required specs and no explicit dependency_name, the error names ONLY the
+        absent spec(s) — a user who already has one of them must not be told to (re)install it.
+        """
+
+        def fake_find_spec(name: str) -> object | None:
+            return None if name == "aioboto3" else object()
+
+        mocker.patch(f"{REGISTRY_MODULE}.importlib.util.find_spec", side_effect=fake_find_spec)
+        with pytest.raises(MissingDependencyError) as exc_info:
+            require_sdk(spec=["boto3", "aioboto3"], extra="bedrock", msg="install it")
+        # boto3 is present, so only aioboto3 should be named (the trailing comma proves the old
+        # joined "boto3,aioboto3" form is gone — "boto3" alone is a substring of "aioboto3").
+        assert exc_info.value.dependency_name == "aioboto3"
+        assert "boto3," not in str(exc_info.value)

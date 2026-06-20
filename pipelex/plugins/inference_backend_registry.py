@@ -3,6 +3,7 @@ from collections.abc import Callable, Sequence
 from typing import TypeAlias
 
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.plugins.exceptions import InferenceBackendNotFoundError
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.types import StrEnum
 
@@ -35,21 +36,26 @@ def require_sdk(*, spec: str | Sequence[str], extra: str, msg: str, dependency_n
     - ``spec``: the import name(s) to probe (e.g. ``"anthropic"`` or
       ``["boto3", "aioboto3"]`` when several are required together).
     - ``dependency_name``: the human-facing package name shown in the error;
-      defaults to the joined ``spec`` (override when the import name differs from
-      the distribution name, e.g. spec ``"google.genai"`` / dependency
-      ``"google-genai"``).
+      defaults to the joined names of the *missing* specs only (override when the
+      import name differs from the distribution name, e.g. spec
+      ``"google.genai"`` / dependency ``"google-genai"``).
     - ``extra``: the pip extra to install (drives the ``pipelex[<extra>]`` hint).
     """
     specs = [spec] if isinstance(spec, str) else list(spec)
-    try:
-        # ``find_spec`` imports the parent of a dotted spec (e.g. ``google`` for
-        # ``google.genai``); an entirely absent parent raises ModuleNotFoundError
-        # rather than returning None, so treat that as "missing" too.
-        is_missing = any(importlib.util.find_spec(one_spec) is None for one_spec in specs)
-    except ModuleNotFoundError:
-        is_missing = True
-    if is_missing:
-        raise MissingDependencyError(dependency_name or ",".join(specs), extra, msg)
+    missing: list[str] = []
+    for one_spec in specs:
+        try:
+            if importlib.util.find_spec(one_spec) is None:
+                missing.append(one_spec)
+        except ModuleNotFoundError:
+            # ``find_spec`` imports the parent of a dotted spec (e.g. ``google`` for
+            # ``google.genai``); an entirely absent parent raises ModuleNotFoundError
+            # rather than returning None, so treat that as "missing" too.
+            missing.append(one_spec)
+    if missing:
+        # Name only the specs that are actually absent, so a user who already has
+        # one of several required SDKs is not told to (re)install it.
+        raise MissingDependencyError(dependency_name or ",".join(missing), extra, msg)
 
 
 class InferenceBackendRegistry:
@@ -67,8 +73,7 @@ class InferenceBackendRegistry:
     def lookup(self, *, family: InferenceFamily, sdk: str) -> MakeWorkerFn:
         make_worker = self._backends.get((family, sdk))
         if make_worker is None:
-            msg = f"No inference backend registered for sdk '{sdk}' in the {family} family. Is its plugin installed?"
-            raise NotImplementedError(msg)
+            raise InferenceBackendNotFoundError(family=family, sdk=sdk)
         return make_worker
 
     def has(self, *, family: InferenceFamily, sdk: str) -> bool:
