@@ -52,8 +52,7 @@ own page. Classes are grouped by subsystem.
 
 ## Runtime bridge
 
-- [`MissingMistralWorkflowsPluginError`](missing-mistral-workflows-plugin-error.md) — Missing mistral workflows plugin
-- [`MissingPipelexTemporalExtraError`](missing-pipelex-temporal-extra-error.md) — Missing pipelex temporal extra
+- [`MissingOrchestratorError`](missing-orchestrator-error.md) — Missing orchestrator
 - [`PipelexBridgeDispatchError`](pipelex-bridge-dispatch-error.md) — Pipelex bridge dispatch
 - [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
 

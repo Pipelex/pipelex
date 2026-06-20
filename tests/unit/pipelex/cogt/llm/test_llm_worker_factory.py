@@ -5,6 +5,7 @@ caching the SDK instance in the SDK client registry.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -42,7 +43,10 @@ def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
     This is exactly what boot does, so the routing tests below exercise the real
     plugin closures through the real registry lookup.
     """
-    registrar = PluginRegistrar(config=cast("PipelexConfig", None))
+    # Stub config exposing only what a builtin's register() reads: TemporalPlugin checks
+    # ``config.temporal.is_enabled`` (False here → no slot claims, inference unaffected).
+    stub_config = cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False)))
+    registrar = PluginRegistrar(config=stub_config)
     for plugin in BUILTIN_PLUGINS:
         plugin.register(registrar)
     return InferenceBackendRegistry(registrar.inference_backends)

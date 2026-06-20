@@ -1,6 +1,6 @@
 # Pipelex plugin system — implementation TODOS
 
-**Branch:** `refactor/Plugins` (worktree `_plugins`) · **Status:** Phase 0 + Phase 1 complete (committed). Phase 2 (ImgGen / Extract / Search) code + tests + docs done, uncommitted. Next: commit Phase 2, then Phase 3 (orchestrators).
+**Branch:** `refactor/Plugins-2` (worktree `_plugins`) · **Status:** Phases 0–3 complete (committed). Phase 3 (orchestrators through the seam) = checkpoint commit `19e6ca66b` — `make agent-check` + full `make agent-test` + Temporal integration suite all green; CHECKPOINT 3 cleared (verify ✓, cold-start as-built ✓, `/code-review` clean + S1/N1/N2 applied ✓, commit ✓). Next: Phase 4 (model_lists 5th seam).
 
 > **Delivery model for this branch.** Per the driving goal, all phases land on `refactor/Plugins` as **one commit per checkpoint** (not one PR per phase), and a **single PR to `dev`** opens once the tracker is done. Each phase's "PR: …" box below is satisfied by its checkpoint commit; the standalone-PR-per-phase wording in the original plan is superseded.
 
@@ -200,51 +200,51 @@ This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/imp
 
 **Extract orchestrators (verbatim bodies):**
 
-- [ ] `DirectOrchestrator.run` from `_run_direct` (`bridge.py:270-294`). **Correctness landmine (design §8.1): keep `with scoped_pipe_router(PipeRouter())` verbatim** — dropping it leaks DIRECT-mode nested sub-pipes to Temporal inside a Temporal worker. Registered in core, always-on.
-- [ ] `TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` from `_run_temporal_*` (`:297-355`), keeping the `WorkflowExecutionError` catch and `make_workflow_id` recompute.
-- [ ] (`MistralWorkflowsOrchestrator` is authored in `pipelex-mistralai-workflows`, **not here** — Phase 5 cross-repo.)
+- [x] `DirectOrchestrator.run` from `_run_direct` → `runtime_bridge/direct_orchestrator.py`. **Landmine kept verbatim:** `with scoped_pipe_router(PipeRouter())`. Registered in core by `plugins/direct/direct_plugin.py` (`name="direct"`, in `CORE_UNCONDITIONAL_PLUGIN_NAMES`).
+- [x] `TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` from `_run_temporal_*` → `temporal/temporal_orchestrators.py`, keeping the `WorkflowExecutionError` catch + `make_workflow_id` recompute. Each `run` first calls `_require_temporal_extra(mode=...)` (find_spec → `MissingOrchestratorError` if the extra is absent).
+- [x] (`MistralWorkflowsOrchestrator` authored in `pipelex-mistralai-workflows` — Phase 5.)
 
 **Bridge + Mistral:**
 
-- [ ] Collapse the bridge `match` (design §8.1) to a registry lookup. After it, `bridge.py` names no integration.
-- [ ] **Preserve per-mode error quality (codex C7 — a generic hint is a regression):** today `bridge.py:399/:417` carry exact per-mode install messages ("install `pipelex[temporal]`" vs "install `pipelex-mistralai-workflows`"). `MissingOrchestratorError` takes the `mode` and maps it to its exact message via `PipelexExecutionMode.requires_*` properties. One message per mode, verbatim.
-- [ ] **Mistral → entry-point discovery (this repo's side):** remove the `_run_mistral_native` hard import (`bridge.py:408/:414`). Uninstalled (CI default) → `MISTRAL_NATIVE` absent → `MissingOrchestratorError` with the exact Mistral message. pipelex's suite proves dispatch with a *fake* registered orchestrator.
+- [x] Collapsed the bridge `match` → `get_orchestrator_registry().get_optional(mode=...)` → `orchestrator.run`, else `MissingOrchestratorError(mode)`. `bridge.py` names no integration (only docstrings/comments mention temporal/mistral). Serialize helpers extracted to `runtime_bridge/serialization.py` (breaks the `bridge→bootstrap→pipelex` cycle that the orchestrators would otherwise re-form); `serialize_pipe_output` re-exported from bridge for back-compat.
+- [x] **Per-mode error quality (C7):** `MissingOrchestratorError(*, mode)` maps mode→exact message via match/case (temporal modes → `pip install 'pipelex[temporal]'`; mistral → `pip install pipelex-mistralai-workflows`; direct → boot-problem msg). `_authors_caller_facing_message=True`.
+- [x] **Mistral → discovery:** the `_run_mistral_native` hard import is gone. MISTRAL_NATIVE has no in-core orchestrator → registry miss → `MissingOrchestratorError(MISTRAL_NATIVE)`. Suite proves dispatch with a fake orchestrator (`test_orchestrator_dispatch.py`).
 
-**The Temporal plugin (`TemporalOrchestrator`), its `register`:**
+**The Temporal plugin (`temporal/temporal_plugin.py`), its `register`:**
 
-- [ ] **always** `add_orchestrator(TEMPORAL_BLOCKING|TEMPORAL_FIRE_AND_FORGET, …)` + `add_cli_command("worker"|"setup-temporal-namespace", …)`.
-- [ ] **if `config.temporal.is_enabled`:** `claim_content_generator | pipe_router | pipe_run | task_manager(factory)` + `add_teardown(...)` — **D5: each `claim_*` gets a thunk** (e.g. `claim_content_generator(lambda: ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow())`), so `register` never imports `temporalio`. The thunk runs at the setup apply-point.
+- [x] **always** `add_orchestrator(TEMPORAL_BLOCKING|TEMPORAL_FIRE_AND_FORGET, …)` + `add_cli_command(worker|setup-temporal-namespace, import_path=…)`.
+- [x] **if `config.temporal.is_enabled`:** `claim_content_generator|task_manager|pipe_router|pipe_run(thunk)` + `add_teardown(thunk)` — each a module-level zero-arg thunk that lazy-imports `temporalio`; `register` imports no temporalio (proven by the import-light guard with `is_enabled=True`).
 
-**Boot/teardown collapse (codex C8 — explicit injection precedence):**
+**Boot/teardown collapse (C8 — explicit injection precedence):**
 
-- [ ] The four `if get_config().temporal.is_enabled:` blocks (`pipelex.py:377-466`) become, at each ordered point (content generator → task manager → router → run): **explicit `setup()` param (`:376/:450`) > plugin slot-claim thunk > core default.** The slot claim must **not** silently override an explicit injection — pin in a test.
-- [ ] The inlined teardown (`:471-479`) becomes a registered teardown callback run **LIFO**.
+- [x] The four `if temporal.is_enabled:` boot blocks → `_resolve_hub_slot(slot, default)` (generic over `_HubSlotImplT`) at each ordered point. Precedence: explicit `setup()` param > slot-claim thunk > core default. TASK_MANAGER runs its thunk (full temporal-hub wiring); no core default/param. Pinned by `test_hub_slot_injection_precedence.py`.
+- [x] The inlined teardown → registered teardown callbacks run **LIFO** (`for cb in reversed(self._plugin_registrar.teardown_callbacks)`). `pipelex.py` teardown names no integration. `temporal_hub.get_optional_task_manager()` added so the temporal teardown thunk re-fetches the tm.
 
-**CLI collapse (codex C4 + D3):**
+**CLI collapse (C4 + D3):**
 
-- [ ] The two hard imports in `_cli.py:15,20` become plugin-contributed commands. Rework `PipelexCLI.list_commands` (hardcodes order) to merge core commands with `registrar.cli_commands` deterministically (stable order, clean `--help`, unknown-command behavior intact).
-- [ ] CLI entry point loads config then runs the pure `build_registrar` once to harvest `registrar.cli_commands`; D5's thunks mean this never constructs a Temporal impl even when `temporal.is_enabled`.
+- [x] The two hard temporal-command imports + static registrations + hardcoded `list_commands` entries are gone. `_cli.py` harvests plugin commands at module load via `build_registrar` (`_register_discovered_cli_commands`), importing each `import_path` lazily; `list_commands` returns `_CORE_COMMAND_ORDER + _PLUGIN_COMMAND_NAMES`.
+- [x] CLI-build config load is side-effect-free (`config_manager.load_config(ensure_global_if_missing=False)`, new param) with a bulletproof `load_base_config_dict()` fallback so a broken/absent user config can't brick `--help`/`init`. D5 thunks ⇒ harvest constructs no temporal impl (proven: `worker` harvested with temporalio import-blocked).
 
 **SPI:**
 
-- [ ] **Publish the orchestrator SPI** (design §9.2, sized to Mistral's *measured* imports): `runtime_bridge.*` incl. `runtime_bridge.primitives.*`; execution protocols; boundary/core payload types; library-crate access + hub scoping; tracing hooks. Documented module/symbol list. Add `MissingOrchestratorError` to `runtime_bridge/exceptions.py` (replaces the two old typed errors).
+- [x] Orchestrator SPI published: `docs/under-the-hood/orchestrator-plugins.md` (seam, contract, boot-orchestrator slot claims, injection precedence, CLI-by-import-path, the SPI module/symbol table from design §9.2, the Temporal worked example, out-of-tree authoring) — added to both mkdocs nav blocks. `MissingOrchestratorError` added to `runtime_bridge/exceptions.py`; `MissingPipelexTemporalExtraError` + `MissingMistralWorkflowsPluginError` removed (error pages regenerated).
 
 **Tests:**
 
-- [ ] Bridge dispatch by mode (fake orchestrator).
-- [ ] **Per-mode error parity** (each missing mode → its exact message — C7).
-- [ ] DIRECT router scoping (the landmine) + DIRECT parity (byte-identical).
-- [ ] **Injection-precedence** (explicit param wins over a slot claim — C8).
-- [ ] Boot-via-slots (stripped env → DIRECT + core backends; temporal-enabled → four slots resolve to Temporal impls via thunks) + teardown LIFO order.
-- [ ] **CLI-command contribution** (`worker` in `--help` when plugin discoverable, absent otherwise — pins D3).
-- [ ] **Full Temporal suite green in-tree** (§14.5 — the extraction gate; Phase 5 does not start until this is green).
+- [x] Bridge dispatch by mode (fake orchestrator) — `test_orchestrator_dispatch.py`.
+- [x] **Per-mode error parity** — `test_orchestrator_dispatch.py` (per-mode miss) + `test_exceptions_disclosure.py` (per-mode hint survives STRICT).
+- [x] DIRECT router scoping (`test_direct_router_scoping.py`, unchanged + green) + DIRECT parity (`test_dispatch.py`, `test_bridge_direct.py`).
+- [x] **Injection-precedence** (explicit param wins over slot claim — C8) — `test_hub_slot_injection_precedence.py`.
+- [x] Boot-via-slots (temporal-enabled → content-generator slot resolves to `ContentGeneratorInWorkflow`) — existing `test_keyless_boot_forced_dry.py::test_keyless_temporal_boot_*` (green through the new seam) + slot-claim arm in the precedence test; teardown LIFO pinned there.
+- [x] **CLI-command contribution** (`worker`/`setup-temporal-namespace` harvested, in order) — `test_plugin_cli_command_harvest.py`. Import-light guard extended with `temporalio` + `is_enabled=True` slot-claim arm.
+- [x] **Full Temporal suite green in-tree** (§14.5 — the extraction gate) — `.venv/bin/pytest tests/integration/pipelex/temporal/` → **156 passed, 4 xpassed** (the xpassed are pre-existing xdist class-registration flakiness markers, unrelated to this phase); also green inside the full `make agent-test`.
 
 ### 🛑 CHECKPOINT 3 — hard stop (THE gate before externalization)
 
-- [ ] **Verify:** `make agent-check` clean · `make agent-test` green · **full Temporal suite green through the seam** (`.venv/bin/pytest tests/integration/pipelex/temporal/`, see `_plugins/CLAUDE.md` for `--temporal-server` options). Confirm bridge + boot/teardown + CLI name **no** integration (`grep` for `temporal`/`mistral` in those files → only via registry/config).
-- [ ] **Capture cold-start context:** `### Phase 3 — as-built` note — the final injection-precedence ordering, where slot thunks apply in `setup()`, the CLI-merge mechanism, the orchestrator SPI module/symbol list, and the exact §14.5 green-state evidence. This is the externalization gate; the next session must trust this record.
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase 3 diff. This is the riskiest phase — emphasize the DIRECT `scoped_pipe_router` landmine, per-mode error parity, injection precedence, thunk import-light preservation, and CLI determinism. Triage carefully here.
-- [ ] **PR:** land green. **Do NOT begin Phase 5** until this checkpoint's Temporal-green gate is recorded as passed.
+- [x] **Verify:** `make agent-check` clean · `make agent-test` green ("All tests passed", exit 0) · **full Temporal suite green through the seam** (`.venv/bin/pytest tests/integration/pipelex/temporal/` → 156 passed, 4 xpassed). bridge + boot/teardown + CLI name **no** integration (only docstrings/comments mention temporal/mistral; dispatch/boot/teardown go via the registry + slot thunks + config).
+- [x] **Capture cold-start context:** `### Phase 3 — as-built` note above — dispatch seam, verbatim extractions, the cycle-break (serialization.py + `import_path` CLI), injection-precedence ordering + where slot thunks apply, the CLI harvest mechanism, the orchestrator SPI doc, and the §14.5 green evidence.
+- [x] **Fan-out `/code-review`:** `pr-review-toolkit:code-reviewer` reviewed the full Phase 3 diff against `HEAD` — **clean, no BLOCKERs**; byte-equivalence + all landmines verified. S1/N1/N2 applied, N3 deliberate (see the CHECKPOINT-3 `/code-review` note in the as-built).
+- [x] **Commit:** checkpoint commit `19e6ca66b` on `refactor/Plugins-2` (one-commit-per-checkpoint delivery model). **Do NOT begin Phase 5** until this Temporal-green gate is recorded (it is, above). Phase 4 (model_lists) may start next.
 
 ---
 
@@ -427,3 +427,39 @@ Beyond the per-phase CP reviews above, an **xhigh** whole-PR pass ran (10 finder
 - search `reporting_delegate` defaults to `None` (the C9 normalization above) — fine for the one real caller, but a future Temporal search-activity path that omits it gets silent zero-reporting. Relevant when Phase 3/5 routes search through a worker.
 
 (The `ModelHandle` double-construction cleanup is cross-referenced there to the existing `phase-1-review-deferred.md`; it dissolves if Phase 3 threads `model_handle` through `MakeWorkerFn`.)
+
+### Phase 3 — as-built
+
+**Status:** done, checkpoint commit `19e6ca66b` on `refactor/Plugins-2`. `make agent-check` clean (ruff/plxt, **pyright 0**, mypy 0 over 2239 files, keyword-only pass) · `make tb` green · **full `make agent-test` green** ("All tests passed", exit 0) · **Temporal integration suite green** (`tests/integration/pipelex/temporal/` → 156 passed) · `/code-review` clean (no BLOCKERs; S1/N1/N2 applied).
+
+**The dispatch seam.** `bridge.py`'s `match execution_mode:` is gone. `run_pipe_via_bridge` now does `get_orchestrator_registry().get_optional(mode=…)` → `orchestrator.run(...)`, else `MissingOrchestratorError(mode=…)`. `bridge.py` names no integration (only docstrings/comments). `build_pipe_job_from_input`, `_validate_input`, `_decode_*` stay; `serialize_pipe_output` is re-exported (`# noqa: F401`/`TC001`) for host-runtime back-compat.
+
+**Orchestrators (verbatim extraction):**
+
+- `runtime_bridge/direct_orchestrator.py::DirectOrchestrator` — body of the old `_run_direct`, **`scoped_pipe_router(PipeRouter())` landmine kept verbatim**. Core, always-on.
+- `temporal/temporal_orchestrators.py::TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` — bodies of `_run_temporal_*`, lazy `temporalio`/`make_temporal_pipe_run`/`WorkflowExecutionError` inside `run`; each `run` first calls `_require_temporal_extra(mode=…)` (`importlib.util.find_spec("temporalio")` → `MissingOrchestratorError` on absence — no relabelling of deeper import bugs).
+
+**Cycle break (the one non-obvious structural move).** Two extractions were forced by `reportImportCycles` (pyright counts **function-level** imports too — verified empirically; lazy-import does NOT break a pyright cycle, only a runtime one):
+
+1. `runtime_bridge/serialization.py` — `PIPE_DISPATCH_ERRORS`, `serialize_pipe_output`, `resolve_main_stuff_root_key`, `serialize_completed_output` (import-light: core memory + pipe/pipeline exceptions + payloads). Both DIRECT and Temporal orchestrators serialize through it, so they never import `bridge.py` (which would re-form `bridge→bootstrap→pipelex→discovery→builtins→orchestrator→bridge`).
+2. **CLI commands declared by `import_path` string, not by importing the callable.** A builtin Temporal plugin contributing `worker`/`setup-temporal-namespace` (whose modules boot Pipelex) would cycle `builtins→temporal_plugin→worker_cmd→pipelex→discovery→builtins`. Fix: `CliCommand.command: Callable` → `CliCommand.import_path: str` (`"module:attr"`); `_cli.py` resolves it via `importlib.import_module` at harvest (dynamic ⇒ off pyright's static graph). The two command modules are unchanged from `main`. Temporal stays a **builtin** (not an entry point) — the plan's Phase-3 intent.
+
+**Plugins:** `plugins/direct/direct_plugin.py::DirectOrchestratorPlugin` (`name="direct"`) + `temporal/temporal_plugin.py::TemporalPlugin` (`name="temporal"`) added to `BUILTIN_PLUGINS`; `CORE_UNCONDITIONAL_PLUGIN_NAMES = {"direct", "openai"}`. `TemporalPlugin.register`: always two `add_orchestrator` + two `add_cli_command(import_path=…)`; iff `registrar.config.temporal.is_enabled`, four `claim_*` thunks + `add_teardown` (all module-level zero-arg thunks lazy-importing temporalio).
+
+**Boot/teardown (`pipelex.py`):** the four `temporal.is_enabled` blocks → injection-precedence at each ordered point via `_resolve_hub_slot(*, slot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT` (explicit param > slot thunk > core default). TASK_MANAGER just runs its thunk (full temporal-hub wiring inside it). `teardown` runs `reversed(self._plugin_registrar.teardown_callbacks)` (LIFO) in place of the old temporal block. `_temporal_task_manager` attribute removed; `_plugin_registrar` now declared `PluginRegistrar | None` in `__init__` and assigned via a local in `setup` (narrowing). `temporal_hub.get_optional_task_manager()` added (+ `teardown()` promoted onto the `TaskManager` protocol with `@override` on the impl).
+
+**CLI (`_cli.py`):** `_CORE_COMMAND_ORDER` (core block) + harvested `_PLUGIN_COMMAND_NAMES`; `list_commands` returns their concatenation. `_register_discovered_cli_commands()` runs `build_registrar(config=_config_for_cli_harvest())` at module load and `app.command(...)`-registers each resolved callable. `_config_for_cli_harvest` = `load_config(ensure_global_if_missing=False)` (new side-effect-free param) with `(TomlError, ValidationError)` → `load_base_config_dict()` fallback (new method; package-default only, always valid).
+
+**Exceptions:** `MissingOrchestratorError(*, mode)` (mode→message match/case, `_authors_caller_facing_message=True`) replaces `MissingPipelexTemporalExtraError` + `MissingMistralWorkflowsPluginError` (both removed). `pipelex-dev generate-error-pages` regenerated `docs/errors/` (the two old pages removed, `missing-orchestrator-error.md` added; also picked up `inference-backend-not-found-error.md` from CP2).
+
+**Tests:** new `test_orchestrator_dispatch.py` (fake-orchestrator dispatch + per-mode miss parity), `test_hub_slot_injection_precedence.py` (explicit>slot>default at content-generator/pipe-router + teardown LIFO, fake registrar via patched `build_registrar`), `test_plugin_cli_command_harvest.py` (worker/setup-temporal-namespace harvested, in order, after core). Updated: `test_dispatch.py` (mistral → `MissingOrchestratorError`), `test_exceptions_disclosure.py` (per-mode `MissingOrchestratorError`), `test_output_serialization.py` (import from `serialization`), `test_import_light_boot.py` (BLOCKED += `temporalio`; config stub gains `temporal.is_enabled=True` to exercise the slot-claim branch import-light), `test_inference_backend_coverage.py` + `test_plugin_discovery.py` (stub configs gain `temporal` so the now-builtin TemporalPlugin's `register` can read `config.temporal.is_enabled` — closes deferred-doc item 4 for these two tests). Boot-via-slots for the temporal content generator is already covered end-to-end by `test_keyless_boot_forced_dry.py` (green through the new seam).
+
+**Deferred-doc items closed by Phase 3:** the three previously-unconsumed registrar menus are now wired — `cli_commands` (consumed by `_cli.py` harvest), `slot_claims` + `teardown_callbacks` (consumed by `pipelex.py` boot/teardown). So an external plugin contributing those is no longer silently inert.
+
+**Notes for Phase 4/5:** Phase 4 (model_lists 5th seam) is independent. Phase 5 externalizes `pipelex/temporal/` → `pipelex-temporal`: the Temporal plugin + orchestrators + commands are already a self-contained unit behind the seam; the move is (a) relocate the Temporal config schema out of `pipelex.temporal` (codex C6 — `configs.py:14` still imports `pipelex.temporal.config_temporal`), then (b) ship `pipelex/temporal/` + declare the `pipelex.plugins` entry point in the new dist (today Temporal is an in-tree builtin, not yet an entry point). Gate: this CHECKPOINT-3 Temporal-green evidence.
+
+#### CHECKPOINT-3 `/code-review` (pr-review-toolkit:code-reviewer, on the Phase 3 working-tree diff)
+
+**Verdict: clean — no BLOCKERs.** The reviewer compared every extracted body against `git show HEAD:…bridge.py` and confirmed **byte-equivalence** of all four orchestrator bodies (modulo the `_PIPE_DISPATCH_ERRORS`→`PIPE_DISPATCH_ERRORS` rename + the added `_require_temporal_extra` guard) and verified all named landmines: DIRECT `scoped_pipe_router` preserved, temporal-blocking `make_workflow_id` recompute + `WorkflowExecutionError` catch verbatim, per-mode error parity (exact deleted hint strings, `_authors_caller_facing_message=True`), injection precedence (explicit>slot>default at all four points), import-light (no module-top temporalio; register reads only `config.temporal.is_enabled`), CLI determinism, teardown LIFO + no-integration.
+
+Applied: **S1** (the one should-fix) — added `test_harvest_config_falls_back_to_base_on_broken_user_config` pinning the malformed-user-config fallback in `_config_for_cli_harvest` (named Phase-3 risk #6, previously untested); **N1** — fixed the two stale `runtime_bridge.bridge._run_direct` doc references in `bundle_validator.py` → `runtime_bridge.direct_orchestrator.DirectOrchestrator.run`; **N2** — re-anchored the harvest-order test on "plugin commands are the last registrations" (`names[-2:]`) rather than the brittle `which` positional. **N3** (unused `OrchestratorRegistry.has`/`.modes`) left as a deliberate read-API symmetry surface mirroring `InferenceBackendRegistry`. The reviewer also confirmed the `if pipe_router:`-truthy vs `if content_generator is None:` asymmetry is **pre-existing** (identical in HEAD), not a Phase-3 regression.

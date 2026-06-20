@@ -1,8 +1,9 @@
 """Import-light guard (codex C12): discovering and registering the built-in plugins must
 not import any backend SDK (whether an optional extra like anthropic/linkup or a heavy core
-dep like openai/portkey_ai/pypdfium2 — each plugin must defer its import into make_worker).
-Enforced in a subprocess whose meta-path finder raises on those SDKs, which is deterministic
-where an in-process sys.modules check is not.
+dep like openai/portkey_ai/pypdfium2 — each plugin must defer its import into make_worker) nor
+``temporalio`` (the Temporal plugin registers its orchestrators + CLI commands import-light and
+defers temporalio into the slot-claim thunks / orchestrator.run). Enforced in a subprocess whose
+meta-path finder raises on those SDKs, which is deterministic where an in-process sys.modules check is not.
 """
 
 import subprocess  # noqa: S404
@@ -27,6 +28,7 @@ _GUARD_SCRIPT = textwrap.dedent(
         "openai",
         "portkey_ai",
         "pypdfium2",
+        "temporalio",
     )
 
     class _Blocker(importlib.abc.MetaPathFinder):
@@ -46,9 +48,13 @@ _GUARD_SCRIPT = textwrap.dedent(
     # whose load() could legitimately import an optional SDK.
     discovery._external_entry_points = lambda: []
 
-    config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]))
+    # temporal.is_enabled=True exercises the Temporal plugin's slot-claim branch too: the claims are
+    # thunks, so even discovering + registering a Temporal-worker boot must not import temporalio.
+    config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]), temporal=SimpleNamespace(is_enabled=True))
     registrar = discovery.build_registrar(config=config)
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
+    assert registrar.orchestrators, "expected the built-in orchestrators to be registered"
+    assert registrar.slot_claims, "expected the Temporal plugin to claim hub slots when is_enabled"
     print("import-light OK")
     """
 )

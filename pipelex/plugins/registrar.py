@@ -40,7 +40,11 @@ class PluginStatus(StrEnum):
 class CliCommand(NamedTuple):
     name: str
     help: str
-    command: Callable[..., Any]
+    # Declarative ``module:attr`` path to the Typer command callable, imported lazily by the CLI layer
+    # at CLI-build. A plugin declares where its command lives WITHOUT importing it, so a plugin that is
+    # statically reachable from boot (a builtin) can contribute a command whose module boots Pipelex
+    # without forming an import cycle (the import is resolved dynamically, off the static graph).
+    import_path: str
 
 
 class PluginDiscovery(BaseModel):
@@ -128,8 +132,8 @@ class PluginRegistrar:
     def claim_task_manager(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.TASK_MANAGER, factory=factory)
 
-    def add_cli_command(self, *, name: str, help: str, command: Callable[..., Any]) -> None:  # noqa: A002 - "help" mirrors typer's parameter name
-        self.cli_commands.append(CliCommand(name=name, help=help, command=command))
+    def add_cli_command(self, *, name: str, help: str, import_path: str) -> None:  # noqa: A002 - "help" mirrors typer's parameter name
+        self.cli_commands.append(CliCommand(name=name, help=help, import_path=import_path))
         self._active.contributions.append(f"cli command {name}")
 
     def add_teardown(self, callback: Callable[[], None]) -> None:

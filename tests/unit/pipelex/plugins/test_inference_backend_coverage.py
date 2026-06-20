@@ -6,6 +6,7 @@ family they serve from their single ``register`` call.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
@@ -19,7 +20,10 @@ if TYPE_CHECKING:
 
 
 def _build_registry() -> InferenceBackendRegistry:
-    registrar = PluginRegistrar(config=cast("PipelexConfig", None))
+    # Stub config exposing only what a builtin's register() reads: TemporalPlugin checks
+    # ``config.temporal.is_enabled`` (False here → no slot claims, inference unaffected).
+    stub_config = cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False)))
+    registrar = PluginRegistrar(config=stub_config)
     for plugin in BUILTIN_PLUGINS:
         plugin.register(registrar)
     return InferenceBackendRegistry(registrar.inference_backends)

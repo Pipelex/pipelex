@@ -1,7 +1,8 @@
 import types
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -50,6 +51,7 @@ from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
@@ -95,6 +97,8 @@ if TYPE_CHECKING:
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
+_HubSlotImplT = TypeVar("_HubSlotImplT")
+
 
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
@@ -128,6 +132,9 @@ class Pipelex(metaclass=MetaSingleton):
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
         self.func_registry: FuncRegistry | None = None
+        # plugins — the registrar is built in setup() (build_registrar); held for the slot-claim /
+        # CLI-command / teardown apply-points. Declared here so teardown() can guard on it.
+        self._plugin_registrar: PluginRegistrar | None = None
         # cogt
         self.sdk_client_manager = SdkClientManager()
         self.pipelex_hub.set_sdk_client_manager(self.sdk_client_manager)
@@ -197,8 +204,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             config = get_config()
             updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
             config.temporal = updated_temporal
-
-        self._temporal_task_manager: object | None = None
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -382,21 +387,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # backends up on the hub registries at run time. The slot-claim thunks, CLI commands and
         # teardown callbacks the registrar also accumulates are applied at their ordered
         # apply-points in a later phase (no orchestrator plugin contributes any of them yet).
-        self._plugin_registrar = build_registrar(config=get_config())
-        self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(self._plugin_registrar.inference_backends))
-        self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(self._plugin_registrar.orchestrators))
+        plugin_registrar = build_registrar(config=get_config())
+        self._plugin_registrar = plugin_registrar
+        self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
 
         self.pipelex_hub.set_dry_run_forced(not needs_inference)
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
+        # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
+        # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
         if content_generator is None:
-            if get_config().temporal.is_enabled:
-                from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
-                    ContentGeneratorInWorkflowFactory,
-                )
-
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
-            else:
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+            content_generator = self._resolve_hub_slot(
+                slot=HubSlot.CONTENT_GENERATOR,
+                default=lambda: ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=storage_provider)),
+            )
         self.pipelex_hub.set_content_generator(content_generator)
 
         self.inference_manager = inference_manager or InferenceManager()
@@ -442,54 +446,54 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
-        # --- Temporal --------------------------------------------------------------------------
+        # --- Task Manager ----------------------------------------------------------------------
+        # The TASK_MANAGER slot is claimed only by a boot-orchestrator plugin running this process as
+        # its runtime (a Temporal worker). The thunk does the full wiring on the plugin's own hub and
+        # is torn down via a registered teardown callback (LIFO) — no core default, no explicit param.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
-
-            temporal_task_manager = TemporalTaskManager()
-            temporal_hub.set_task_manager(temporal_task_manager)
-            temporal_task_manager.complement_catalog(
-                extra_catalog=Tasks.TASK_PACKS,
-                extra_workflows=[],
-                extra_activities=[],
-            )
-            temporal_task_manager.setup()
-            self._temporal_task_manager = temporal_task_manager
+        task_manager_factory = plugin_registrar.slot_claims.get(HubSlot.TASK_MANAGER)
+        if task_manager_factory is not None:
+            task_manager_factory()
 
         # --- Pipe Router -----------------------------------------------------------------------
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
 
         if pipe_router:
             self.pipelex_hub.set_pipe_router(pipe_router)
-        elif get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_router(make_temporal_pipe_router())
         else:
-            self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
+            self.pipelex_hub.set_pipe_router(self._resolve_hub_slot(slot=HubSlot.PIPE_ROUTER, default=lambda: PipeRouter(observer=multi_observer)))
 
         # --- Pipe Run --------------------------------------------------------------------------
+        # No explicit param for pipe_run: plugin slot-claim thunk > core default.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_run(make_temporal_pipe_run())
-        else:
-            self.pipelex_hub.set_pipe_run(PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        self.pipelex_hub.set_pipe_run(
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        )
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
-    def teardown(self):
-        # temporal
-        if self._temporal_task_manager is not None:
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+    def _resolve_hub_slot(self, *, slot: HubSlot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT:
+        """Resolve a process-global hub slot: a plugin's claimed thunk if present, else the core default.
 
-            if isinstance(self._temporal_task_manager, TemporalTaskManager):
-                self._temporal_task_manager.teardown()
-            temporal_hub.reset()
+        Call sites apply explicit-injection precedence first (an explicit ``setup()`` param wins),
+        so this only arbitrates plugin-claim vs core-default. The claim is a thunk invoked here at the
+        boot apply-point — never during ``register`` — so a non-worker boot constructs no plugin impl.
+        The return type follows the core ``default`` (the claimed thunk is typed ``Any`` and adopts it).
+        """
+        if self._plugin_registrar is not None:
+            factory = self._plugin_registrar.slot_claims.get(slot)
+            if factory is not None:
+                return cast("_HubSlotImplT", factory())
+        return default()
+
+    def teardown(self):
+        # Plugin-contributed teardown callbacks (LIFO) — e.g. a Temporal worker tears down its task
+        # manager + resets its hub. Names no integration: the callbacks were registered by whichever
+        # boot-orchestrator plugin claimed the runtime, and run before core teardown so a worker's
+        # in-flight Temporal resources release first.
+        if self._plugin_registrar is not None:
+            for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
+                teardown_callback()
 
         # pipelex
         self.pipeline_manager.teardown()

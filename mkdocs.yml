@@ -311,6 +311,7 @@ plugins:
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
+        - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/temporal-integration.md: "Temporal Integration"
         - under-the-hood/temporal-deployment.md: "Temporal Deployment"
@@ -560,6 +561,7 @@ nav:
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
+      - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Temporal Integration: under-the-hood/temporal-integration.md
       - Distributed Content Generation: under-the-hood/distributed-content-generation.md

@@ -61,7 +61,8 @@ class TemporalTaskManager(TaskManager):
         TemporalManager.setup(session_id=get_config().session_id)
         log.info("TemporalTaskManager setup done")
 
-    def teardown(self):
+    @override
+    def teardown(self) -> None:
         TemporalManager.teardown()
         log.info("TemporalTaskManager teardown done")
 

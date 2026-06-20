@@ -40,7 +40,9 @@ def _noop_make_worker(**_kwargs: object) -> InferenceWorkerAbstract:
 
 
 def _fake_config(disabled: list[str]) -> PipelexConfig:
-    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled)))
+    # ``temporal.is_enabled`` is read by the built-in TemporalPlugin's register() (the only built-in
+    # that reads config); False keeps it from claiming hub slots in the build-registrar tests.
+    return cast("PipelexConfig", SimpleNamespace(plugins=SimpleNamespace(disabled=disabled), temporal=SimpleNamespace(is_enabled=False)))
 
 
 class _InferencePlugin:

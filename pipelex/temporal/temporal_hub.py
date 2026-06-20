@@ -31,6 +31,10 @@ class TemporalHub:
             raise RuntimeError(msg)
         return self._task_manager
 
+    def get_optional_task_manager(self) -> TaskManager | None:
+        """Return the task manager if set, else ``None`` — for teardown, which must not raise."""
+        return self._task_manager
+
 
 temporal_hub = TemporalHub()
 

@@ -95,6 +95,7 @@ own page. Classes are grouped by subsystem.
 - [`GoogleImgGenWorkerError`](google-img-gen-worker-error.md) — Google img gen worker
 - [`GoogleLLMWorkerError`](google-llm-worker-error.md) — Google LLM worker
 - [`HubSlotAlreadyClaimedError`](hub-slot-already-claimed-error.md) — Hub slot already claimed
+- [`InferenceBackendNotFoundError`](inference-backend-not-found-error.md) — Inference backend not found
 - [`MistralExtractResponseError`](mistral-extract-response-error.md) — Mistral extract response
 - [`MistralModelListingError`](mistral-model-listing-error.md) — Mistral model listing
 - [`MistralPluginError`](mistral-plugin-error.md) — Mistral plugin
