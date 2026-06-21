@@ -1,6 +1,6 @@
 # Plan — `/execute` honors per-request `execution_mode` (extend F1)
 
-**Status:** **READY for a fresh session.** Design is locked; nothing coded yet. **Plan 2 of 2** — its sibling `wip/plugins/orchestrator-dispatched-validate.md` is now **DONE** (V0–V3 implemented + committed across all three repos: core PR **#998** vs `refactor/Plugins-4` with CI green + Greptile happy; `pipelex-api` tip `72c0efc` and `pipelex-temporal` tip `459e04d`, both on `feature/Orchestrator-dispatched-validate`, pushed). This plan **extends locked decision F1** of the orchestrator-agnostic-runner effort (tracker: `_plugins/TODOS.md`; parent plan: `_plugins/wip/plugins/orchestrator-agnostic-runner-and-flavors.md`).
+**Status:** **Phase E0 DONE (uncommitted at time of writing → see commit).** Implemented in `pipelex-api` on branch `feature/Execute-per-request-mode` (off the validate tip `72c0efc`). All gates green: `make agent-check`, `make agent-test`, `openapi-check`, `pylint 10/10`. As-built recorded in §"As-built (Phase E0)" below; deferred/flagged items in `execute-per-request-mode-deferred.md`. **Plan 2 of 2** — its sibling `wip/plugins/orchestrator-dispatched-validate.md` is now **DONE** (V0–V3 implemented + committed across all three repos: core PR **#998** vs `refactor/Plugins-4` with CI green + Greptile happy; `pipelex-api` tip `72c0efc` and `pipelex-temporal` tip `459e04d`, both on `feature/Orchestrator-dispatched-validate`, pushed). This plan **extends locked decision F1** of the orchestrator-agnostic-runner effort (tracker: `_plugins/TODOS.md`; parent plan: `_plugins/wip/plugins/orchestrator-agnostic-runner-and-flavors.md`).
 
 > **START HERE (cold start).** Read this whole doc. This is a **single-repo change in `pipelex-api`** — no core (`pipelex`) and no `pipelex-temporal` change. It converts `POST /execute` from the boot-global pipe-run hub slot to the **per-call `OrchestratorRegistry`** (the same seam `/start` already uses), so `/execute` honors a per-request `execution_mode` (policy-gated), exactly like `/start`. The change reuses the **existing** orchestrator seam — the validate work added a *parallel* `BundleValidatorRegistry` and never touched the `OrchestratorRegistry` — so it is logically independent of the validate plan. **But both edit `pipeline.py`**, so branch off the now-pushed validate tip (`72c0efc`, see §"Cross-repo state") rather than the older Phase-C base `a39841e`, to stack cleanly and avoid a `pipeline.py` merge. The execute change is still its own commit (the plan's "don't bundle" intent holds — stacking ≠ bundling). Begin on the branch named in §"Cross-repo state".
 
@@ -68,6 +68,26 @@ Single contained phase (one repo, one commit).
 - Gates: `make agent-check`, `make agent-test`.
 
 > **Checkpoint E-A** (the gate for `/execute`): `/execute` resolves and dispatches by `execution_mode`, honors the policy-gated override symmetrically with `/start`, rejects fire-and-forget, all gates green, docs + changelog updated. Clean-context `/code-review` on the `pipelex-api` diff. Capture an as-built (final signature, the output-mapping decision, test evidence).
+
+---
+
+## As-built (Phase E0)
+
+**Repo / branch:** `pipelex-api` @ `feature/Execute-per-request-mode` (off validate tip `72c0efc`). Single repo; no core / `pipelex-temporal` change.
+
+**Final shape (`api/routes/pipelex/pipeline.py`):**
+
+- `ApiRunner.execute` is now an `@override` taking `requested_execution_mode: PipelexExecutionMode | None = None` (trailing optional param, LSP-compatible with the base). Body: resolve `execution_mode` FIRST (403 on forbidden override), refuse fire-and-forget with a 400 (`is_fire_and_forget`, not `==`), look up the orchestrator (`MissingOrchestratorError` if absent), then **inject it as `self._pipe_run` and delegate to `super().execute(...)`** — so the base owns the entire run lifecycle (library setup/teardown, tracer close, pipeline-manager cleanup, telemetry, error mapping). The `ApiRunner` is per-request, so mutating `_pipe_run` is request-scoped.
+- `_OrchestratorPipeRun(PipeRunProtocol)` — the injected adapter: its `run(pipe_job, *, delivery_assignment)` calls `orchestrator.run(...)` and rehydrates the result.
+- `_pipe_output_from_run_output(run_output)` — **the output-mapping decision (the §3 hinge):** the orchestrator returns the JSON-safe `PipelexPipeRunOutput`; this rebuilds the rich `PipeOutput` via `hydrate_working_memory(output_dict)` (same routine the Temporal workers use; runs while the run library is still open) + `PipeOutput.model_validate({...}, strict=False)`. `strict=False` is **required** to reverse the orchestrator's `model_dump(mode="json")` of `graph_spec` (its `created_at: datetime` is `strict=True`; str→datetime is rejected under strict). Confirmed empirically. The base `execute` then wraps this into `PipelexRunResultExecute` exactly as before, so `created_at`/`finished_at`/`state`/telemetry are identical to the old path.
+- Route `execute()` now threads `requested_execution_mode=extras.execution_mode` (stopped discarding the parsed extras).
+- New `ErrorType.FIRE_AND_FORGET_NOT_SUPPORTED` (400, via `raise_bad_request`).
+
+**Why inject-and-delegate (not a full re-implementation):** the base `execute`'s teardown is correct and battle-tested; duplicating it risks drift, and the orchestrator seam differs from the boot slot only in (a) which backend runs and (b) the serialized vs rich output. The adapter bridges exactly those two; everything else is inherited.
+
+**Test evidence:** `tests/unit/test_execute_dispatch.py` (new, mirrors `test_validate_dispatch.py`): direct dispatch returns the rehydrated full output (real `serialize_completed_output` → `hydrate_working_memory` round-trip), per-request override honored when policy allows, forbidden override → 403, fire-and-forget → 400, missing orchestrator → `MissingOrchestratorError`. Existing `test_pipeline_routes.py` / `test_protocol_conformance.py` unaffected (they mock the runner). Full `make agent-test` green.
+
+**Deferred / flagged:** see `execute-per-request-mode-deferred.md` — DIRECT round-trip cost (accepted), `strict=False` rationale, a pre-existing `/start` DIRECT-path resource leak (flagged, not fixed — out of scope), and the absorbed pre-existing `/validate` OpenAPI + config-doc drift.
 
 ---
 
