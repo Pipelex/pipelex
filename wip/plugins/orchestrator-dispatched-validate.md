@@ -184,3 +184,31 @@ Each phase lands in its own repo on its own branch, one commit per checkpoint. C
 - **Decision B sanity check:** if in-plugin assembly (Temporal arm calls `build_validation_report`) proves more tangled than expected, the fallback is in-route assembly (route gets `DryValidateResult` and assembles) — but that would re-expose worker payloads to the API, so prefer in-plugin. Flag if you hit friction.
 - **Protocol `validate` fate:** keep as a raise-based conformance wrapper delegating to `validate_verdict`, or simplify if the route is its only caller. Confirm callers first.
 - **`execution_mode` on the validate request:** confirm the request model/extras plumbing matches `/start`'s, and that the override policy (403 on forbidden override) applies identically.
+
+---
+
+## 9. Progress / as-built (live)
+
+> Appended at each checkpoint. Final names, divergences, test evidence — enough to cold-resume.
+
+### Phase V0 — core seam — DONE (uncommitted at Checkpoint V-A)
+
+Mirrors the orchestrator seam file-for-file. Final names/locations:
+
+- `pipelex/plugins/bundle_validator_registry.py` — `BundleValidatorProtocol` (`@runtime_checkable`, single async `validate_bundles(*, mthds_contents, mthds_sources, allow_signatures, library_dirs)`), `BundleValidatorRegistry` (`get_optional` / `has` / `modes`), and the `BundleValidationVerdict` type alias.
+- `pipelex/pipeline/direct_bundle_validator.py` — `DirectBundleValidator` (calls `validate_bundles_in_process(..., log_context="API validate")`; catches `ValidateBundleError` → returns `exc.to_error_report()`; other exceptions propagate).
+- `pipelex/plugins/exceptions.py` — `DuplicateBundleValidatorError`. `pipelex/plugins/registrar.py` — `bundle_validators` store + `_bundle_validator_sources` + `add_bundle_validator` (reuses the `_add` dup-guard). `pipelex/plugins/direct/direct_plugin.py` — registers `DirectBundleValidator` under DIRECT alongside `DirectOrchestrator`.
+- `pipelex/runtime_bridge/exceptions.py` — `MissingBundleValidatorError(mode=...)` (per-mode install hint, mirrors `MissingOrchestratorError`). `pipelex/hub.py` — field + setter + getter + module `get_bundle_validator_registry()`. `pipelex/pipelex.py` — boot wiring `set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))` next to the orchestrator registry.
+
+**Divergence from §4.1 (the only one, forced by `reportImportCycles = true`):** the verdict's valid arm is typed at the **MTHDS-protocol base `ValidationReport`** (a leaf type), NOT the concrete `PipelexValidationReport`. Naming the concrete envelope from the hub-reachable registry closes a real import cycle (`hub → bundle_validator_registry → validation_report → bundle_validator → pipe_run → hub`) — pyright follows `TYPE_CHECKING` edges, so the cycle gates. This mirrors how the orchestrator seam returns the leaf `PipelexPipeRunOutput`, and is brand-correct (the generic seam speaks the protocol report; the Pipelex envelope is recovered at the API edge). `DirectBundleValidator` still returns the precise `PipelexValidationReport | ErrorReport` (a covariant narrowing); the API route recovers the precise valid arm for its `isinstance(verdict, PipelexValidationReport)` narrowing. Acceptance note for V2: `ApiRunner.validate_verdict` will narrow/cast the protocol's `ValidationReport` valid arm back to `PipelexValidationReport` (single documented point).
+
+Tests: `tests/unit/pipelex/plugins/test_bundle_validator_registry.py` (registrar+registry+dup), `tests/unit/pipelex/pipeline/test_direct_bundle_validator.py` (verdict-as-value branches, mocked sweep), `tests/unit/pipelex/runtime_bridge/test_missing_bundle_validator_error.py` (per-mode hints). Gates: `make agent-check` green, `make tb` green, `make agent-test` green.
+
+### Phase V1 — Temporal validator — DONE (uncommitted at Checkpoint V-A)
+
+- `pipelex-temporal/pipelex_temporal/temporal_bundle_validator.py` — `TemporalBundleValidator` (import-light; `temporalio` + dispatch/wire/exception types resolved lazily inside `validate_bundles`, mirroring the orchestrators). Dispatches `dispatch_dry_validate(DryValidateArg(...))`; on success parses blueprints cheaply (`PipelexInterpreter.make_pipelex_bundle_blueprint`, threading `mthds_sources`) → `build_validation_report(...)`; on `WorkflowExecutionError` recovers the report and **returns** it iff `error_type == ValidateBundleError.__name__` (invalid verdict), else **re-raises** (genuine fault → 5xx). `library_dirs` ignored (worker loads its own library). Copied verbatim from the old dual-path `ApiRunner.validate` Temporal arm, but as a returned verdict (decision A).
+- `temporal_plugin.py` — registers the SAME instance under **both** `TEMPORAL_BLOCKING` and `TEMPORAL_FIRE_AND_FORGET` (decision D), unconditionally, claims no hub slot.
+
+Tests: `tests/integration/pipelex_temporal/test_temporal_bundle_validator_in_memory.py` (real worker, in-memory server: valid → assembled `PipelexValidationReport`; invalid → `ErrorReport` verdict; patches `is_temporal_boot_active` + `get_temporal_client` to route the validator's own `dispatch_dry_validate` through the in-memory env), `tests/unit/pipelex_temporal/test_temporal_bundle_validator.py` (verdict-vs-fault branching, mocked dispatch). Gates: `make agent-check` green, `make agent-test` green.
+
+**Deferred observation:** dispatched `/validate` effectively requires `boot_orchestrator == "temporal"` (the reused executor's `is_temporal_boot_active()` guard), slightly at odds with the plan's decision #5 "not a runner booted-as-Temporal" — but identical to the run orchestrators' behavior, pre-existing, out of scope. Captured in [`validate-dispatch-requires-boot-active.md`](validate-dispatch-requires-boot-active.md).

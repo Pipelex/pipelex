@@ -48,6 +48,7 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
+from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_lister_registry import ModelListerRegistry
@@ -393,6 +394,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
         self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
+        self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
 
         self.pipelex_hub.set_dry_run_forced(not needs_inference)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
