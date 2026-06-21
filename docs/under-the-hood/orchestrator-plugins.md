@@ -50,10 +50,10 @@ A mode with no registered orchestrator (its plugin is not installed), or an in-t
 
 ## Boot-orchestrator plugins: claiming the runtime
 
-Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when its own config says this process is that runtime (`temporal.is_enabled` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on"):
+Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when the core-owned boot gate names it. `plugins.boot_orchestrator == self.name` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on". The gate is a backend-agnostic name-match — core names no orchestrator, and `register` reads no config file (the rich orchestrator config self-loads inside the thunks):
 
 ```python
-if registrar.config.temporal.is_enabled:
+if registrar.config.plugins.boot_orchestrator == self.name:
     registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)
@@ -83,7 +83,7 @@ The in-tree Temporal plugin follows this rule: its `worker` and `setup-namespace
 
 ```toml
 [project.scripts]
-pipelex-temporal = "pipelex.temporal.temporal_cli:app"
+pipelex-temporal = "pipelex_temporal.temporal_cli:app"
 ```
 
 When Temporal externalizes to its own `pipelex-temporal` distribution (Phase 5), that dist owns this console script natively — nothing in core to move.
@@ -109,12 +109,12 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 ## Worked example: the in-tree Temporal plugin
 
-`pipelex/temporal/temporal_plugin.py` is the reference orchestrator plugin. Its `register`:
+`pipelex_temporal/temporal_plugin.py` (in the externalized `pipelex-temporal` distribution) is the reference orchestrator plugin. Its `register`:
 
-- **always** (regardless of `temporal.is_enabled`): contributes `TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` (import-light; `temporalio` is pulled lazily inside `run`);
-- **only when `temporal.is_enabled`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
+- **always** (regardless of the boot gate): contributes `TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` (import-light; `temporalio` is pulled lazily inside `run`);
+- **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
 
-The orchestrators themselves (`pipelex/temporal/temporal_orchestrators.py`) are extracted verbatim from the bridge's former `_run_temporal_*` arms, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute. They serialize their `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
+The orchestrators themselves (`pipelex_temporal/temporal_orchestrators.py`) are extracted verbatim from the bridge's former `_run_temporal_*` arms, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute. They serialize their `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
 The Temporal plugin is in-tree today and discovered through `BUILTIN_PLUGINS` (a hardcoded list in `pipelex/plugins/builtins.py`) — pipelex declares **no** `[project.entry-points."pipelex.plugins"]` on itself. Externalizing it into a `pipelex-temporal` distribution (Phase 5) is therefore not "the same entry point from a new dist": it means *removing* the plugin from `BUILTIN_PLUGINS` and *adding* a `pipelex.plugins` entry point in the new dist's `pyproject.toml`. Its operational `worker` / `setup-namespace` commands already ship as the standalone `pipelex-temporal` console script, so they travel with that dist unchanged.
 

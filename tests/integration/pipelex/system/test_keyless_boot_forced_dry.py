@@ -38,19 +38,18 @@ def _test_integration_mode() -> IntegrationMode:
 
 
 class TestKeylessBootForcedDry:
-    def _boot_keyless(self, *, temporal_enabled: bool) -> None:
+    def _boot_keyless(self) -> None:
         Pipelex.teardown_if_needed()
         Pipelex.make(
             integration_mode=_test_integration_mode(),
             needs_inference=False,
-            temporal_enabled=temporal_enabled,
         )
 
     @pytest.mark.asyncio
     async def test_keyless_direct_boot_inline_generator_and_forced_dry(self) -> None:
         """Keyless + direct: inline generator, forced-DRY flag set, and a LIVE-requested job prepared as DRY."""
         try:
-            self._boot_keyless(temporal_enabled=False)
+            self._boot_keyless()
             assert is_dry_run_forced()
             assert isinstance(get_content_generator(), ContentGenerator)
 

@@ -1,6 +1,8 @@
 # Move Temporal config out of core (fix the core→`temporalio` type-check coupling)
 
-**Status:** planned, not started. **Branch:** `refactor/Plugins-3` (core, worktree `_plugins`) + `main` (worktree-less sibling `pipelex-temporal`). **Priority:** ship-blocker for the plugin-system effort — it falsifies the effort's headline invariant ("core names no integration — not by import, not by string — anywhere").
+**Status:** **Phases 1 & 2 DONE + verified green (Checkpoint 1 + Checkpoint 2). UNCOMMITTED. Phase 3 (re-merge) not started — gated on user.** **Branch:** `refactor/Plugins-3` (core, worktree `_plugins`) + `main` (worktree-less sibling `pipelex-temporal`). **Priority:** ship-blocker for the plugin-system effort — it falsifies the effort's headline invariant ("core names no integration — not by import, not by string — anywhere").
+
+> **As-built summary (see the "As-built" section at the bottom for detail).** The `temporalio` type-coupling is gone from core: `config_temporal.py` deleted, no `temporal` field on `PipelexConfig`, core `make agent-check` (pyright + mypy) clean, `make tb` / `make agent-test` green, `make gep` + `make check-config-sync` green. `pipelex-temporal` now owns the rich config (`config_temporal.py` + `temporal.toml` + `load_temporal_config` + `temporal_hub` cache) and gates on the generic core `plugins.boot_orchestrator` selector; its `make agent-check` + `make agent-test` are green against the editable new core. Both CLIs smoke clean (`--temporal/--no-temporal` → `--orchestrator`).
 
 ## The defect
 
@@ -82,5 +84,50 @@ The key property: the rich Temporal schema (the one with the `temporalio` import
 ## Deferred (out of scope, follow-ups)
 
 - **Tracing naming axis:** `TracingBackend.TEMPORAL_DYNAMODB`, `TemporalDynamoDBTracingConfig`, `tracing_config.temporal_dynamodb` are string/naming couplings (no `temporalio` import, don't break the build). Whether a fully-externalized Temporal should still have core's tracing system name a `temporal_dynamodb` backend is a separate question — leave for later.
-- **Exact `--orchestrator` vocabulary** for force-in-process (`direct` vs `none`) — settle during Phase 2; the gate is a name-match either way.
+- **Exact `--orchestrator` vocabulary** for force-in-process (`direct` vs `none`) — settled: the flag takes any plugin name; `--orchestrator temporal` boots Temporal, omitting it (or any non-boot-orchestrator name) runs in-process. No sentinel keyword is reserved.
 - **Whether other (inference) plugin config should also leave `PipelexConfig`** — user explicitly scoped this pass to Temporal only.
+
+## As-built (Phases 1 & 2 complete, uncommitted)
+
+### What landed
+
+**`pipelex-temporal` now owns the rich Temporal config** (new files):
+
+- `pipelex_temporal/config_temporal.py` — the 760-line schema, relocated from core. The `temporalio.common.RetryPolicy` type-import now sits where `temporalio` is a real dependency. `is_enabled` dropped from the `Temporal` model (the gate moved to core).
+- `pipelex_temporal/temporal.toml` — the packaged default (the old core `[temporal]` block, prefix-stripped to root tables, `is_enabled` removed). Shipped in the wheel; loaded as the base layer.
+- `pipelex_temporal/temporal_config_loader.py` — `load_temporal_config()`: packaged default deep-merged with an optional `.pipelex/temporal.toml` override (project→global via `config_manager.resolve_config_file`). Mirrors `backends.toml` / `routing_profiles.toml`.
+- `pipelex_temporal/temporal_activation.py` — `is_temporal_boot_active()` + `TEMPORAL_PLUGIN_NAME = "temporal"`. The runtime gate (`config.plugins.boot_orchestrator == "temporal"`), replacing the old `config.temporal.is_enabled` guard.
+- `temporal_hub` caches the loaded `Temporal` (lazy-load + `set_temporal_config` for tests, cleared by `reset()`). All ~130 runtime `get_config().temporal.X` reads → `get_temporal_config().X`. Exceptions `TemporalConfigError` / `WorkerTaskQueueUnknownError` moved into `pipelex_temporal/exceptions.py`.
+- Plugin gate flipped to `registrar.config.plugins.boot_orchestrator == self.name`; `worker_cli` / `worker_cmd` / `setup_namespace_cmd` / `codec_server_cli` boot with `Pipelex.make(boot_orchestrator=TEMPORAL_PLUGIN_NAME)`. The old `worker_cli` `is_enabled` force-on block is gone (redundant under the explicit boot gate).
+
+**Core (`pipelex`) shed everything Temporal-config**:
+
+- `PluginsConfig += boot_orchestrator: str | None = None` (generic gate; absent from `pipelex.toml`, set programmatically).
+- Deleted `pipelex/system/configuration/config_temporal.py` **and** `pipelex/system/configuration/exceptions.py` (its only importer was `config_temporal`); removed `temporal: Temporal` from `PipelexConfig`.
+- CLI: `--temporal/--no-temporal` (`bool|None`) → `--orchestrator` (`str|None`); `temporal_enabled` → `boot_orchestrator` through `cli_factory` → `Pipelex.make`/`setup`; the `pipelex.py` override sets `config.plugins.boot_orchestrator`.
+- Removed every `[temporal]` block from `pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `.pipelex/pipelex_override.toml`, `pipelex/kit/configs/pipelex.toml`; `tracing_config.temporal_dynamodb` stays. `make check-config-sync` green.
+- `make gep` regenerated: removed the 2 relocated core exceptions **and** 9 pre-existing stale `pipelex-temporal` flow-error pages (left over from the Phase-5 externalization) — core's error catalog now names no Temporal error.
+
+### Deviations from the written plan (deliberate)
+
+- **Phase 1 did more than "repoint imports."** Repointing only the schema *imports* to the local module while still reading `get_config().temporal` would create nominal-type conflicts (core `WorkerScope` vs local `WorkerScope`). So Phase 1 also rewired all rich reads to `get_temporal_config()` (local). The gate/guards stayed on core `is_enabled` through Phase 1 (faithful copy keeps `is_enabled` in the local schema); `is_enabled` was dropped in Phase 2 with the gate flip. Checkpoint 1 (pipelex-temporal green, core untouched) held.
+- **Phase 2 = core cut-over (Step B) + pipelex-temporal gate flip (Step C), landed together.** Core green on its own; the editable pin means pipelex-temporal's gate flip had to land with it. Both verified green together at Checkpoint 2.
+
+### Local-environment migration (one-off, done)
+
+The config loader also merges the **global** `~/.pipelex/pipelex.toml`, which was seeded from an old kit and still carried `[temporal]` → `extra="forbid"` boot failure. Backed up to `~/.pipelex/pipelex.toml.pre-temporal-cut.bak` and removed the stale block. CI is unaffected (fresh global is kit-seeded from the now-clean kit). **Any developer/deployment upgrading past this change must drop `[temporal]` from their `~/.pipelex/pipelex.toml`** (breaking change, no back-compat per repo policy).
+
+### Headline invariant — verified
+
+Core has **no** `from temporalio... import` anywhere and **no** `temporal` config field. Remaining `temporal` mentions are all out of scope: the intentional `sys.modules.get("temporalio.activity")` *sniff* in `reporting_manager` (a string lookup that explicitly avoids importing — the crash-free-without-temporalio pattern), the execution-mode enum's `requires_pipelex_temporal` mode vocabulary, prose comments/docstrings, and the deferred `temporal_dynamodb` tracing axis. None is a type-check coupling.
+
+### Gates (all green)
+
+- core: `make agent-check` (pyright 0 / mypy 0 / keyword-only / plxt), `make tb`, `make agent-test` (exit 0), `make gep`, `make check-config-sync`; `pipelex run pipe --help` / `validate pipe --help` show `--orchestrator`.
+- pipelex-temporal: `make agent-check` (pyright 0 / mypy 0), `make agent-test` (unit + integration time-skipping) against editable new core; `pipelex-temporal --help` smokes.
+
+### Not done
+
+- **Commits** — both repos are green but UNCOMMITTED (`_plugins` on `refactor/Plugins-3`, `pipelex-temporal` on `main`).
+- **Phase 3** (re-merge `refactor/Plugins-3` → `feature/mistralai-2x-bump` in `_workflows`, then resume the mistralai entry-point task) — not started.
+- **Docs follow-up (deferred).** Updated `docs/under-the-hood/orchestrator-plugins.md` (gate + module paths). Still stale and not touched this pass: `docs/under-the-hood/pipe-routing-and-execution.md` and `docs/distributed-execution/task-routing.md` still show `temporal.is_enabled` and `[temporal.worker_config.*]` / `[temporal.queue_options.*]` TOML examples. Those config tables now live at **root** in `pipelex-temporal`'s `temporal.toml` (no `[temporal.]` prefix), so the examples need rewriting — and the distributed-execution config docs arguably belong in the `pipelex-temporal` repo now. Left as a separate docs pass (involves a relocation decision).

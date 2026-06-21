@@ -41,12 +41,12 @@ def validate_pipe_cmd(
             help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
         ),
     ] = False,
-    temporal: Annotated[
-        bool | None,
+    orchestrator: Annotated[
+        str | None,
         typer.Option(
-            "--temporal/--no-temporal",
-            help="Override config temporal.is_enabled for the boot. The sweep stays in-process either way; "
-            "use it to verify validation does not dispatch to Temporal under a Temporal-enabled hub.",
+            "--orchestrator",
+            help="Boot this process under the named orchestrator plugin (e.g. 'temporal'). The validation sweep "
+            "stays in-process either way; use it to verify validation does not dispatch to an orchestrator runtime.",
         ),
     ] = None,
 ) -> None:
@@ -73,7 +73,7 @@ def validate_pipe_cmd(
                 library_dirs=library_dirs_paths,
                 needs_inference=False,
                 needs_model_specs=True,
-                temporal_enabled=temporal,
+                boot_orchestrator=orchestrator,
             )
             do_validate_all_libraries_and_dry_run(
                 library_dirs=library_dirs_paths,
@@ -127,5 +127,5 @@ def validate_pipe_cmd(
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} pipe",
         allow_signatures=allow_signatures,
-        temporal=temporal,
+        orchestrator=orchestrator,
     )

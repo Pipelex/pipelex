@@ -11,7 +11,6 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.config_temporal import Temporal
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.storage.storage_config import StorageConfig
@@ -250,11 +249,18 @@ class PluginsConfig(ConfigModel):
     # unconditionally is a startup error. There is intentionally no allowlist.
     disabled: list[str]
 
+    # Boot *this process* under the orchestrator plugin of this name. A boot-orchestrator
+    # plugin (e.g. the Temporal plugin) claims the process-global hub slots in its
+    # ``register`` iff ``plugins.boot_orchestrator == <its own name>``; any other value
+    # (or ``None``) leaves execution in-process. Core names no orchestrator — the gate is
+    # a plain name match, set programmatically (CLI ``--orchestrator`` / ``Pipelex.setup``),
+    # not from ``pipelex.toml``. Optional, so it stays absent from the TOML defaults.
+    boot_orchestrator: str | None = None
+
 
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
-    temporal: Temporal
     pipelex: Pipelex
     plugins: PluginsConfig
     migration: MigrationConfig

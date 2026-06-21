@@ -178,7 +178,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         *,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -200,11 +200,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # Override temporal.is_enabled if temporal_enabled is explicitly provided
-        if temporal_enabled is not None:
-            config = get_config()
-            updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
-            config.temporal = updated_temporal
+        # Boot this process under the named orchestrator plugin, when explicitly provided.
+        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
+        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
+        if boot_orchestrator is not None:
+            get_config().plugins.boot_orchestrator = boot_orchestrator
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -534,7 +534,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         *,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -567,8 +567,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
                 not constrain work this process executes as a Temporal worker.
-            temporal_enabled: When provided, overrides the temporal.is_enabled config value.
-                True forces Temporal workflow execution, False forces direct execution.
+            boot_orchestrator: When provided, boots this process under the orchestrator plugin
+                of this name (e.g. "temporal" to run pipes through the Temporal worker runtime).
+                Any other value (or None) leaves execution in-process. Core names no orchestrator;
+                the matching plugin gates on its own name.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate
                 commands that need gateway-provided model specs without enabling full inference.
@@ -608,7 +610,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
-                temporal_enabled=temporal_enabled,
+                boot_orchestrator=boot_orchestrator,
                 needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,

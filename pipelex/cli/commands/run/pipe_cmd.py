@@ -73,9 +73,9 @@ def run_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
-    temporal: Annotated[
-        bool | None,
-        typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
+    orchestrator: Annotated[
+        str | None,
+        typer.Option("--orchestrator", help="Boot this process under the named orchestrator plugin (e.g. 'temporal'); omit for in-process execution"),
     ] = None,
     dynamic_output_concept_ref: Annotated[
         str | None,
@@ -154,7 +154,7 @@ def run_pipe_cmd(
         library_dir=library_dir,
         costs=costs,
         telemetry_command_label=f"{COMMAND} pipe",
-        temporal=temporal,
+        orchestrator=orchestrator,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
         save_csv=save_csv,
     )
