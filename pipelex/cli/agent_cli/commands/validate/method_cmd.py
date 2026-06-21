@@ -16,7 +16,6 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     extract_validation_errors,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -26,6 +25,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import format_validate_markdown
 
 
 def validate_method_cmd(
@@ -76,7 +76,7 @@ def validate_method_cmd(
         library_dirs=library_dir,
     )
     if not method.mthds_files:
-        agent_error(f"Method '{name}' has no .mthds bundle files.", error_type="MethodError")
+        agent_error(f"Method '{name}' has no .mthds bundle files.", error_type="MethodError", exit_code=2)
 
     bundle_path = method.mthds_files[0]
 
@@ -114,7 +114,7 @@ def validate_method_cmd(
             raise typer.Exit(1)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict (see bundle_cmd): structured failure envelope; validation_errors[] is the
@@ -133,6 +133,7 @@ def validate_method_cmd(
             exc.message,
             error_type="PipeOperatorModelChoiceError",
             cause=exc,
+            exit_code=2,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
             model_choice=str(exc.model_choice),
@@ -147,7 +148,7 @@ def validate_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
 
     except typer.Exit:
         # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
@@ -156,7 +157,7 @@ def validate_method_cmd(
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

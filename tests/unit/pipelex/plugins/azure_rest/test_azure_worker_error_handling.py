@@ -35,7 +35,7 @@ def _make_azure_img_gen_worker(mocker: MockerFixture) -> AzureImgGenWorker:
     worker.api_key = "test-api-key"
     worker.endpoint = "https://test.azure.com"
     worker.api_version = "2024-02-01"
-    worker.plugin = mocker.MagicMock()
+    worker.model_handle = mocker.MagicMock()
     return worker
 
 

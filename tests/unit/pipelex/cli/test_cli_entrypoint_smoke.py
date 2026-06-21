@@ -4,7 +4,7 @@ Regression guard for the "no active click context" crash. Under
 typer >= 0.26 / click >= 8.4 the group callback (`app_callback`) ran without an
 active *global* click context, so it raised `RuntimeError: There is no active
 click context` and **every subcommand exited 1 before doing anything** — root
-`--help` happened to survive, but `pipelex build --help`, `pipelex worker --help`,
+`--help` happened to survive, but `pipelex build --help`, `pipelex validate --help`,
 etc. did not. A fresh `pip install pipelex` pulls those versions, so the shipped
 CLI was broken for end users while our `uv.lock` (older typer) masked it locally.
 
@@ -59,7 +59,6 @@ class TestCliEntrypointStarts:
             ["run", "--help"],
             ["validate", "--help"],
             ["init", "--help"],
-            ["worker", "--help"],
         ],
     )
     def test_subcommand_starts_and_exits_zero(self, args: list[str]) -> None:

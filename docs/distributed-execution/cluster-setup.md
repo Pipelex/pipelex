@@ -1,6 +1,6 @@
 ---
 title: "Cluster Setup"
-description: "One-time Temporal namespace prerequisites for Pipelex: custom search attributes, the strict worker-boot check, and the `pipelex setup-temporal-namespace` registration command."
+description: "One-time Temporal namespace prerequisites for Pipelex: custom search attributes, the strict worker-boot check, and the `pipelex-temporal setup-namespace` registration command."
 ---
 
 # Cluster Setup
@@ -72,21 +72,21 @@ The check runs **once per worker process at boot**. There is no caching across p
 
 Two equivalent registration paths. Pick whichever fits your operator topology.
 
-### Path 1 — `pipelex setup-temporal-namespace`
+### Path 1 — `pipelex-temporal setup-namespace`
 
 Run this on the same host (and same `pipelex.toml`) the worker will use. It reads `[temporal.search_attributes].attributes` and `[temporal.temporal_config]`, connects via the same `connect_to_temporal_selected_server` helper as the worker, and registers the missing attributes via `OperatorService.AddSearchAttributes`. Idempotent — re-running after success is a no-op.
 
 ```bash
 # Default: register against the selected server profile
-pipelex setup-temporal-namespace
+pipelex-temporal setup-namespace
 
 # Print the equivalent `temporal operator search-attribute create` invocation
 # without executing — useful when the namespace admin needs to register on
 # the operator's behalf.
-pipelex setup-temporal-namespace --dry-run
+pipelex-temporal setup-namespace --dry-run
 
 # Target a non-default server profile from temporal_server_configs.
-pipelex setup-temporal-namespace --server testing
+pipelex-temporal setup-namespace --server testing
 ```
 
 Use this when the API key your worker uses has the `OperatorService.AddSearchAttributes` permission. On self-hosted Temporal that is usually the case. On Temporal Cloud, worker API keys typically do **not** have this permission — see Path 2.
@@ -119,9 +119,9 @@ tcld namespace search-attributes add \
 
 or the Cloud UI: **Namespace → Custom Search Attributes**.
 
-### Path 3 — `pipelex setup-temporal-namespace` falls back to the runbook
+### Path 3 — `pipelex-temporal setup-namespace` falls back to the runbook
 
-When `pipelex setup-temporal-namespace` runs against a Temporal Cloud namespace and the worker API key lacks `OperatorService.AddSearchAttributes` permission, the command catches the `PERMISSION_DENIED` RPC error and prints the exact Path 2 commands. Forward the output to your namespace admin — they can copy-paste it.
+When `pipelex-temporal setup-namespace` runs against a Temporal Cloud namespace and the worker API key lacks `OperatorService.AddSearchAttributes` permission, the command catches the `PERMISSION_DENIED` RPC error and prints the exact Path 2 commands. Forward the output to your namespace admin — they can copy-paste it.
 
 ---
 
@@ -131,7 +131,7 @@ If you run Pipelex workers against a Temporal Cloud namespace your own customer 
 
 - The customer issues you an API key scoped to "workflow start / activity execution" — enough to dispatch workflows but **not** to register search attributes.
 - The first time you stand up a worker against a fresh namespace, worker boot will fail with `SearchAttributeRegistrationError` listing the five attribute names.
-- You run `pipelex setup-temporal-namespace --dry-run` and send the output to the customer's namespace admin.
+- You run `pipelex-temporal setup-namespace --dry-run` and send the output to the customer's namespace admin.
 - The admin runs `tcld namespace search-attributes add ...` (or uses the Cloud UI) — a one-time setup.
 - Subsequent worker boots are silent.
 
@@ -141,7 +141,7 @@ Set `[temporal.search_attributes] enabled = false` if the customer refuses to re
 
 ## Bootstrap scripts for production
 
-For production environments — Pipelex Cloud, Temporal Cloud, self-hosted Temporal — the registration step belongs in the namespace bootstrap script alongside other one-time namespace setup (replication config, retention policies, audit hooks). `pipelex setup-temporal-namespace` is a fine choice for that script; it shares the worker's `pipelex.toml` so the names registered there can never drift from the names the worker will dispatch with.
+For production environments — Pipelex Cloud, Temporal Cloud, self-hosted Temporal — the registration step belongs in the namespace bootstrap script alongside other one-time namespace setup (replication config, retention policies, audit hooks). `pipelex-temporal setup-namespace` is a fine choice for that script; it shares the worker's `pipelex.toml` so the names registered there can never drift from the names the worker will dispatch with.
 
 ---
 

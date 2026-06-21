@@ -6,6 +6,28 @@
 
 - **`mistralai` bumped to 2.x (`>=2.4.4`).** The Mistral provider (LLM + OCR/extract workers, factory, config) is migrated to the mistralai 2.x client layout (`mistralai.client.*`), making `pipelex[mistralai]` co-installable with the Mistral Workflows SDK (`mistralai-workflows`), which resolves mistralai 2.x. While the upstream `instructor` release lacks mistralai-2.x support, `instructor` is pinned to a git fork via `[tool.uv.sources]` — so this work must not be published until [567-labs/instructor#2298](https://github.com/567-labs/instructor/pull/2298) ships to PyPI. Local/editable use is unaffected.
 
+## [v0.35.0] - 2026-06-18
+
+### Added
+
+- **Structured validation errors:** Bundle validation failures now emit categorized `validation_errors[]` items with identity locators, so machine consumers can read `error_type` and locators instead of parsing text. Categories: unresolved concept reference (`pipe_validation`/`unresolved_concept` with `pipe_code`, `concept_code`, `field_name`; or `blueprint_validation`/`unresolved_concept` with owning `concept_code`), undefined pipe dependency (`pipe_validation`/`unresolved_pipe_dependency` with `pipe_code` and the new `missing_pipe_code` locator), and unknown pipe type (`blueprint_validation`/`unknown_pipe_type` with `pipe_code`).
+- **New error locators and types:** Added the `missing_pipe_code` locator field and the `PipeValidationErrorType` values `unresolved_concept`, `unresolved_pipe_dependency`, and `unknown_pipe_type`.
+- **String utilities:** Added `pluralize` and `count_with_noun` to `pipelex.tools.misc.string_utils` for correct CLI output grammar (e.g. "1 pipe" instead of "1 pipe(s)").
+- **Documentation:** Documented the 0/1/2 exit-code policy in `docs/under-the-hood/error-model.md` and added `wip/structured-validation-errors-deferred-findings.md` tracking deferred follow-ups.
+
+### Changed
+
+- **Validate exit-code policy (pre-1.0 breaking):** Both `pipelex validate` and `pipelex-agent validate` now use a three-tier exit code mirroring the hosted `/validate` API: `0` = valid (including valid-but-not-runnable with `--allow-signatures`), `1` = negative verdict (invalid, or valid-but-not-runnable without `--allow-signatures`), `2` = no verdict (bad arguments, unresolvable target, or setup/internal errors). Consumers testing zero vs. non-zero are unaffected; machine consumers should rely on the structured `is_valid` JSON field.
+- **Relocated markdown renderer:** Moved `format_validate_markdown` from CLI internals to the public `pipelex.pipeline.validation_render` module so other surfaces (e.g. the `pipelex-api` `/validate` route) can use it without Typer/CLI dependencies, and added `render_invalid_validation_markdown` for invalid verdicts.
+- **Error class hierarchy:** `ConceptLibraryError` now extends `LibraryLoadingError` (instead of `LibraryError`) so it can carry per-reference structured items through the existing error cascade.
+- **Strict protocol arguments:** `PipelexMTHDSProtocol` now rejects `extra` extension arguments, raising `PipelineRequestError`, since the local runtime defines no extension arguments.
+- Bumped `mthds` dependency from `>=0.4.1` to `>=0.5.0`.
+
+### Fixed
+
+- **Dropped `pipe_code` on blueprint errors:** The blueprint validation-error categorizer matched the wrong Pydantic `loc` key (`pipes` instead of `pipe`), causing categorized items (e.g. `missing_input_variable`) to silently lose their `pipe_code` locator; it now populates correctly.
+- **CLI output grammar:** Validation CLI output now uses the new string utilities, fixing awkward pluralizations (e.g. "Validated 1 pipe(s)" is now "Validated 1 pipe").
+
 ## [v0.34.0] - 2026-06-17
 
 ### Highlights

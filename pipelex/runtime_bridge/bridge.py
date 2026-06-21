@@ -1,106 +1,51 @@
 """Framework-agnostic Pipelex runtime-bridge surface for host runtimes.
 
-This module contains the boundary types (``PipelexPipeRunInput`` /
-``PipelexPipeRunOutput``) and the dispatch entry-point
-(``run_pipe_via_bridge``) used by host runtimes (Mistral Workflows, raw
+This module re-exports the boundary types (``PipelexPipeRunInput`` /
+``PipelexPipeRunOutput``, defined in ``payloads.py``) and holds the dispatch
+entry-point (``run_pipe_via_bridge``) used by host runtimes (Mistral Workflows, raw
 Temporal, future plugins) to invoke Pipelex pipes from inside their own
 activities. It deliberately does NOT import any host-runtime-specific
 modules at module top-level so that callers can use the bridge directly
 (Tier 3 usage) and so that unit tests can exercise it without optional
 host-runtime deps installed.
 
-The Temporal extra is lazy-imported only inside the temporal-mode branches.
+Dispatch is by execution mode through the ``OrchestratorRegistry`` (on the hub):
+the bridge resolves the orchestrator for the requested mode and calls its ``run``.
+It names no integration — DIRECT is contributed by a core plugin, the TEMPORAL_*
+modes by the external ``pipelex-temporal`` plugin, MISTRAL_NATIVE by the external
+``pipelex-mistralai-workflows`` plugin. A mode with no registered orchestrator
+raises ``MissingOrchestratorError`` carrying the mode's exact install hint.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any
 
 import shortuuid
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import ValidationError
 
-from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import (
-    get_required_pipe,
-    scoped_pipe_router,
-)
+from pipelex.hub import get_orchestrator_registry, get_required_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
-from pipelex.pipe_run.exceptions import PipeJobError, PipeRouterError, PipeRunError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_router import PipeRouter
-from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
-from pipelex.runtime_bridge.exceptions import (
-    MissingMistralWorkflowsPluginError,
-    MissingPipelexTemporalExtraError,
-    PipelexBridgeDispatchError,
-)
+from pipelex.runtime_bridge.exceptions import MissingOrchestratorError, PipelexBridgeDispatchError
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.payloads import (  # noqa: TC001 — re-exported at runtime for host-runtime back-compat
+    PipelexPipeRunInput,
+    PipelexPipeRunOutput,
+)
 from pipelex.runtime_bridge.primitives.scoped_library import scoped_library_for_crate
+from pipelex.runtime_bridge.serialization import serialize_pipe_output  # noqa: F401 — re-exported for the orchestrator SPI / host-runtime back-compat
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:
-    from pipelex.base_exceptions import PipelexError
     from pipelex.core.memory.working_memory import WorkingMemory
-    from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.trace_context import TraceContext
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
-
-
-# Pipe-execution failures the bridge converts into PipelexBridgeDispatchError so a host can catch a
-# single error type regardless of execution mode. The Temporal branches additionally catch
-# WorkflowExecutionError (lazy-imported there to keep temporal off the module import path); wrapping
-# it with ``from exc`` loses no signal — the structured ErrorReport stays reachable via ``__cause__``
-# and is surfaced by PipelexBridgeDispatchError.to_error_report()'s cause-chain enrichment.
-_PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
-    PipeRunError,
-    PipeJobError,
-    PipeRouterError,
-    PipeExecutionError,
-    PipelineExecutionError,
-)
-
-
-class PipelexPipeRunInput(BaseModel):
-    """JSON-safe input crossing the host-runtime / Temporal boundary."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    pipe_code: str
-    inputs: dict[str, Any] = Field(default_factory=dict)
-    output_name: str | None = None
-    pipeline_run_id: str | None = None
-    user_id: str | None = None
-    library_crate_dump: dict[str, Any] | None = None
-    execution_mode: PipelexExecutionMode = PipelexExecutionMode.DIRECT
-    delivery_assignment_dump: dict[str, Any] | None = None
-
-
-class PipelexPipeRunOutput(BaseModel):
-    """JSON-safe output crossing the host-runtime / Temporal boundary."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    output_dict: dict[str, Any]
-    main_stuff_name: str | None = None
-    pipeline_run_id: str
-    workflow_id: str | None = None
-    is_completed: bool
-    graph_spec_dump: dict[str, Any] | None = None
-    # graph_assembly_error / usage_assembly_error mirror the same fields on PipeOutput: a non-None
-    # value means assembly of the graph / token usage failed, which a host must be able to tell
-    # apart from "assembly was off" (a None graph_spec_dump / tokens_usages_dump). tokens_usages_dump
-    # is the JSON-safe dump of the AnyTokensUsage discriminated union so a host can render the
-    # end-of-run cost report: None when cost reporting was off, [] when on but no inference happened.
-    graph_assembly_error: str | None = None
-    tokens_usages_dump: list[dict[str, Any]] | None = None
-    usage_assembly_error: str | None = None
 
 
 async def run_pipe_via_bridge(
@@ -144,17 +89,10 @@ async def run_pipe_via_bridge(
             trace_context=trace_context if is_direct else None,
         )
 
-        match input_payload.execution_mode:
-            case PipelexExecutionMode.DIRECT:
-                return await _run_direct(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-            case PipelexExecutionMode.TEMPORAL_BLOCKING:
-                _require_pipelex_temporal_extra()
-                return await _run_temporal_blocking(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-            case PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
-                _require_pipelex_temporal_extra()
-                return await _run_temporal_fire_and_forget(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-            case PipelexExecutionMode.MISTRAL_NATIVE:
-                return await _run_mistral_native(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.execution_mode)
+        if orchestrator is None:
+            raise MissingOrchestratorError(mode=input_payload.execution_mode)
+        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
 
 
 def build_pipe_job_from_input(
@@ -222,21 +160,6 @@ def build_pipe_job_from_input(
     )
 
 
-def serialize_pipe_output(pipe_output: PipeOutput) -> dict[str, Any]:
-    """Dehydrate a PipeOutput's working memory to a JSON-safe dict.
-
-    Always uses ``WorkingMemory.dump_for_temporal()`` — the same format Pipelex
-    uses internally for Temporal transit. The shape is stable regardless of
-    whether a ``library_crate`` was attached:
-    ``{"root": {stuff_name: {"content": {...}, ...}}, "aliases": {...}}``.
-
-    Type metadata embedded by ``dump_for_temporal`` lets callers reconstruct a
-    typed ``WorkingMemory`` when they have the matching class registry in
-    scope (e.g. via ``hydrate_working_memory``).
-    """
-    return pipe_output.working_memory.dump_for_temporal()
-
-
 def _validate_input(input_payload: PipelexPipeRunInput, *, delivery_assignment: DeliveryAssignment | None) -> None:
     if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
         if delivery_assignment is None or not delivery_assignment.has_delivery_target:
@@ -265,171 +188,3 @@ def _decode_delivery_assignment(delivery_assignment_dump: dict[str, Any] | None)
     except ValidationError as exc:
         msg = f"Invalid delivery_assignment_dump passed to the runtime bridge: {exc}"
         raise PipelexBridgeDispatchError(msg) from exc
-
-
-async def _run_direct(
-    pipe_job: PipeJob,
-    *,
-    delivery_assignment: DeliveryAssignment | None,
-) -> PipelexPipeRunOutput:
-    # DIRECT mode forces in-process execution even inside a Temporal-enabled
-    # worker. Scope the in-process router as the active router for the WHOLE
-    # run so nested controller sub-pipes — which dispatch through
-    # get_pipe_router() — resolve THIS router rather than falling back to the
-    # hub default. Without the scope, the hub default in a Temporal-enabled
-    # worker is the Temporal router, so a DIRECT-mode sequence/batch would leak
-    # its nested pipes to Temporal, defeating the point of DIRECT.
-    direct_router = PipeRouter()
-    with scoped_pipe_router(direct_router):
-        pipe_run = PipeRun(pipe_router=direct_router)
-        try:
-            pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-        except _PIPE_DISPATCH_ERRORS as exc:
-            msg = f"Pipe execution failed in DIRECT mode for pipe '{pipe_job.pipe.code}': {exc}"
-            raise PipelexBridgeDispatchError(msg) from exc
-
-    return _serialize_completed_output(
-        pipe_output=pipe_output,
-        workflow_id=None,
-    )
-
-
-async def _run_temporal_blocking(
-    pipe_job: PipeJob,
-    *,
-    delivery_assignment: DeliveryAssignment | None,
-) -> PipelexPipeRunOutput:
-    from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
-    from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
-
-    # A pipe failure inside the Temporal workflow surfaces as WorkflowExecutionError (a
-    # TemporalFlowError, not in _PIPE_DISPATCH_ERRORS); catch it too so a Temporal-mode failure is
-    # wrapped just like DIRECT/mistral. `from exc` keeps its structured ErrorReport reachable.
-    dispatch_errors: tuple[type[PipelexError], ...] = (*_PIPE_DISPATCH_ERRORS, WorkflowExecutionError)
-    temporal_pipe_run = make_temporal_pipe_run()
-    try:
-        pipe_output = await temporal_pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except dispatch_errors as exc:
-        msg = f"Pipe execution failed in TEMPORAL_BLOCKING mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeDispatchError(msg) from exc
-
-    # Report the actual Temporal workflow id, not the bare pipeline_run_id. run() started the
-    # workflow with make_workflow_id(pipeline_run_id), which prefixes the id in non-NORMAL run modes
-    # (ut-/ci-/cc-/cct- — see temporal_manager.make_top_workflow_id); the bare pipeline_run_id would
-    # not resolve there. Recomputing via the same make_workflow_id keeps a single source of truth and
-    # matches the id fire-and-forget returns from start(). In production (RunMode.NORMAL) the prefix
-    # is empty, so this equals pipeline_run_id.
-    workflow_id = temporal_pipe_run.make_workflow_id(pipeline_run_id=pipe_job.job_metadata.pipeline_run_id)
-
-    return _serialize_completed_output(
-        pipe_output=pipe_output,
-        workflow_id=workflow_id,
-    )
-
-
-async def _run_temporal_fire_and_forget(
-    pipe_job: PipeJob,
-    *,
-    delivery_assignment: DeliveryAssignment | None,
-) -> PipelexPipeRunOutput:
-    from pipelex.temporal.exceptions import WorkflowExecutionError  # noqa: PLC0415
-    from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
-
-    # start() raises WorkflowExecutionError on a dispatch failure (a TemporalFlowError, not in
-    # _PIPE_DISPATCH_ERRORS); catch it too so fire-and-forget dispatch failures wrap uniformly.
-    dispatch_errors: tuple[type[PipelexError], ...] = (*_PIPE_DISPATCH_ERRORS, WorkflowExecutionError)
-    temporal_pipe_run = make_temporal_pipe_run()
-    try:
-        workflow_id, _handle = await temporal_pipe_run.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except dispatch_errors as exc:
-        msg = f"Pipe dispatch failed in TEMPORAL_FIRE_AND_FORGET mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeDispatchError(msg) from exc
-
-    return PipelexPipeRunOutput(
-        output_dict={},
-        main_stuff_name=None,
-        pipeline_run_id=pipe_job.job_metadata.pipeline_run_id,
-        workflow_id=workflow_id,
-        is_completed=False,
-        graph_spec_dump=None,
-    )
-
-
-def _serialize_completed_output(
-    pipe_output: PipeOutput,
-    *,
-    workflow_id: str | None,
-) -> PipelexPipeRunOutput:
-    output_dict = serialize_pipe_output(pipe_output=pipe_output)
-
-    main_stuff_name = _resolve_main_stuff_root_key(pipe_output=pipe_output)
-
-    graph_spec_dump = pipe_output.graph_spec.model_dump(mode="json") if pipe_output.graph_spec is not None else None
-    tokens_usages_dump = [usage.model_dump(mode="json") for usage in pipe_output.tokens_usages] if pipe_output.tokens_usages is not None else None
-
-    return PipelexPipeRunOutput(
-        output_dict=output_dict,
-        main_stuff_name=main_stuff_name,
-        pipeline_run_id=pipe_output.pipeline_run_id,
-        workflow_id=workflow_id,
-        is_completed=True,
-        graph_spec_dump=graph_spec_dump,
-        graph_assembly_error=pipe_output.graph_assembly_error,
-        tokens_usages_dump=tokens_usages_dump,
-        usage_assembly_error=pipe_output.usage_assembly_error,
-    )
-
-
-def _resolve_main_stuff_root_key(pipe_output: PipeOutput) -> str | None:
-    """Return the actual ``root`` dict key under which the main stuff lives.
-
-    The main stuff can either sit directly at ``root[MAIN_STUFF_NAME]`` or be
-    referenced via ``aliases[MAIN_STUFF_NAME]`` pointing at its real name.
-    Callers indexing the output_dict need the actual root key, not the
-    stuff's display ``stuff_name``.
-    """
-    working_memory = pipe_output.working_memory
-    if MAIN_STUFF_NAME in working_memory.root:
-        return MAIN_STUFF_NAME
-    aliased_target = working_memory.aliases.get(MAIN_STUFF_NAME)
-    if aliased_target is not None and aliased_target in working_memory.root:
-        return aliased_target
-    return None
-
-
-def _require_pipelex_temporal_extra() -> None:
-    try:
-        import temporalio  # noqa: F401, PLC0415
-    except ImportError as exc:
-        msg = "TEMPORAL_* execution modes require the pipelex[temporal] extra. Install with: pip install 'pipelex[temporal]'"
-        raise MissingPipelexTemporalExtraError(msg) from exc
-
-
-async def _run_mistral_native(
-    pipe_job: PipeJob,
-    *,
-    delivery_assignment: DeliveryAssignment | None,
-) -> PipelexPipeRunOutput:
-    try:
-        from pipelex_mistralai_workflows.primitives.pipe_run import (  # type: ignore[import-not-found]  # noqa: PLC0415  # pyright: ignore[reportMissingImports]
-            make_mistral_workflows_pipe_run as _make_pipe_run_untyped,  # pyright: ignore[reportUnknownVariableType]
-        )
-    except ImportError as exc:
-        msg = (
-            "PipelexExecutionMode.MISTRAL_NATIVE requires the pipelex-mistralai-workflows "
-            "package. Install with: pip install pipelex-mistralai-workflows"
-        )
-        raise MissingMistralWorkflowsPluginError(msg) from exc
-
-    make_pipe_run = cast("Callable[[], PipeRunProtocol]", _make_pipe_run_untyped)
-    pipe_run = make_pipe_run()
-    try:
-        pipe_output = await pipe_run.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
-    except (PipeRunError, PipeJobError, PipeRouterError, PipeExecutionError, PipelineExecutionError) as exc:
-        msg = f"Pipe execution failed in MISTRAL_NATIVE mode for pipe '{pipe_job.pipe.code}': {exc}"
-        raise PipelexBridgeDispatchError(msg) from exc
-
-    return _serialize_completed_output(
-        pipe_output=pipe_output,
-        workflow_id=pipe_output.pipeline_run_id,
-    )

@@ -2,7 +2,7 @@
 
 The classifier answers a single question: "should this pipe be dispatched
 as a child workflow (controller) or as an activity (leaf)?". Both
-``pipelex.temporal`` and ``pipelex_mistralai_workflows.primitives`` rely
+``pipelex_temporal`` and ``pipelex_mistralai_workflows.primitives`` rely
 on it to make that branching decision (see `wip/mistral-native-plan.md`
 §1.2 row classification), so the test pins down all four controllers and
 several leaf operators.

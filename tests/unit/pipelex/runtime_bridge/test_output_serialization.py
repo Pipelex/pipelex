@@ -1,8 +1,6 @@
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.runtime_bridge.bridge import (
-    _serialize_completed_output,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-)
+from pipelex.runtime_bridge.serialization import serialize_completed_output
 
 
 class TestSerializeCompletedOutput:
@@ -21,7 +19,7 @@ class TestSerializeCompletedOutput:
             graph_assembly_error="graph boom",
         )
 
-        dto = _serialize_completed_output(
+        dto = serialize_completed_output(
             pipe_output=pipe_output,
             workflow_id=None,
         )
@@ -39,7 +37,7 @@ class TestSerializeCompletedOutput:
             pipeline_run_id="run-without-usage",
         )
 
-        dto = _serialize_completed_output(
+        dto = serialize_completed_output(
             pipe_output=pipe_output,
             workflow_id=None,
         )

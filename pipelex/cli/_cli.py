@@ -11,18 +11,32 @@ from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
+from pipelex.cli.commands.plugins_cmd import plugins_app
 from pipelex.cli.commands.run.app import run_app
-from pipelex.cli.commands.setup_temporal_namespace_cmd import setup_temporal_namespace_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
-from pipelex.cli.commands.worker_cmd import worker_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
+
+# Core commands in display order (natural ordering doesn't work between Typer groups and commands).
+_CORE_COMMAND_ORDER: list[str] = [
+    "login",
+    "init",
+    "doctor",
+    "update",
+    "build",
+    "validate",
+    "run",
+    "graph",
+    "show",
+    "which",
+    "plugins",
+]
 
 
 class PipelexCLI(TyperGroup):
@@ -30,21 +44,7 @@ class PipelexCLI(TyperGroup):
 
     @override
     def list_commands(self, ctx: Context) -> list[str]:
-        # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return [
-            "login",
-            "init",
-            "doctor",
-            "update",
-            "build",
-            "validate",
-            "run",
-            "graph",
-            "show",
-            "which",
-            "worker",
-            "setup-temporal-namespace",
-        ]
+        return list(_CORE_COMMAND_ORDER)
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -231,8 +231,4 @@ app.add_typer(run_app, name="run", help="Run a method or pipe, optionally provid
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
-app.command(name="worker", help="Start a Temporal worker for distributed workflow execution")(worker_cmd)
-app.command(
-    name="setup-temporal-namespace",
-    help="Register Pipelex's custom search attributes on the configured Temporal namespace",
-)(setup_temporal_namespace_cmd)
+app.add_typer(plugins_app, name="plugins", help="Inspect the discovered plugins (inference backends, orchestrators) and their contributions")

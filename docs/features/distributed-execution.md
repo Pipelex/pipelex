@@ -15,12 +15,12 @@ Pipelex pipelines normally run in-process. When you need durability, retries tha
 
 Distributed execution runs on Temporal. Today there is one backend, with a managed option coming soon:
 
-- **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex[temporal]`. Generally available.
+- **[Pipelex on Temporal](../distributed-execution/temporal/index.md)** — you run Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud). Python 3.10+, `pipelex-temporal`. Generally available.
 - **Pipelex on Mistral Workflows** *(coming soon)* — run pipes inside Mistral Workflows, Mistral's managed orchestration control plane (itself built on Temporal), with no cluster to operate. In active development; docs land once it ships.
 
 ## Pipelex on Temporal
 
-Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex[temporal]`, and the same methods run as Temporal workflows on workers you operate.
+Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex-temporal`, and the same methods run as Temporal workflows on workers you operate.
 
 ### Supported deployment patterns
 
@@ -36,8 +36,8 @@ All knobs live under `[temporal.*]` in `.pipelex/pipelex.toml`:
 - `[temporal.worker_config]` — default task queue, workflow and activity timeouts, baseline retry policy.
 - `[temporal.activity_queues.<activity>]` — per-activity, per-handle task-queue routing.
 - `[temporal.queue_options.<queue>]` — per-queue timeout, retry, and rate-cap overlays.
-- `[temporal.worker_runtime_profiles.profiles.<name>]` — named runtime profiles for `pipelex worker --profile`.
-- `[temporal.worker_scopes.scopes.<name>]` — named scopes for `pipelex worker --scope`.
+- `[temporal.worker_runtime_profiles.profiles.<name>]` — named runtime profiles for `pipelex-temporal worker --profile`.
+- `[temporal.worker_scopes.scopes.<name>]` — named scopes for `pipelex-temporal worker --scope`.
 - `[temporal.temporal_config]` — server profiles (`local`, `testing`, …) and log toggles.
 
 ## Get started

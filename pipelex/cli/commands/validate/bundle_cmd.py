@@ -30,12 +30,12 @@ def validate_bundle_cmd(
             help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
         ),
     ] = False,
-    temporal: Annotated[
-        bool | None,
+    orchestrator: Annotated[
+        str | None,
         typer.Option(
-            "--temporal/--no-temporal",
-            help="Override config temporal.is_enabled for the boot. The sweep stays in-process either way; "
-            "use it to verify validation does not dispatch to Temporal under a Temporal-enabled hub.",
+            "--orchestrator",
+            help="Boot this process under the named orchestrator plugin (e.g. 'temporal'). The validation sweep "
+            "stays in-process either way; use it to verify validation does not dispatch to an orchestrator runtime.",
         ),
     ] = None,
 ) -> None:
@@ -62,7 +62,7 @@ def validate_bundle_cmd(
                     fg=typer.colors.RED,
                     err=True,
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(2)
             if len(mthds_files) > 1:
                 mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
                 typer.secho(
@@ -72,7 +72,7 @@ def validate_bundle_cmd(
                     fg=typer.colors.RED,
                     err=True,
                 )
-                raise typer.Exit(1)
+                raise typer.Exit(2)
             bundle_path = str(mthds_files[0])
 
         # Add directory as library dir
@@ -94,7 +94,7 @@ def validate_bundle_cmd(
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1)
+        raise typer.Exit(2)
 
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
@@ -104,5 +104,5 @@ def validate_bundle_cmd(
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} bundle",
         allow_signatures=allow_signatures,
-        temporal=temporal,
+        orchestrator=orchestrator,
     )

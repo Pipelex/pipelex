@@ -1,6 +1,6 @@
 ---
 title: "Worker Deployment"
-description: "Run and tune Pipelex Temporal worker processes — the `pipelex worker` CLI, default task queue, worker scopes, and named runtime profiles."
+description: "Run and tune Pipelex Temporal worker processes — the `pipelex-temporal worker` CLI, default task queue, worker scopes, and named runtime profiles."
 ---
 
 # Worker Deployment
@@ -16,7 +16,7 @@ For the cluster-side prerequisites that must be in place before a worker can boo
 The simplest invocation reads everything from `pipelex.toml`:
 
 ```bash
-pipelex worker
+pipelex-temporal worker
 ```
 
 This boots a worker that polls `[temporal.worker_config].default_task_queue`, uses the `[temporal.worker_scopes].default_scope` worker scope, and applies the `[temporal.worker_runtime_profiles].default_profile` runtime profile. For a single-machine deployment that's all you need.
@@ -34,7 +34,7 @@ Available flags:
 Example:
 
 ```bash
-pipelex worker --task-queue anthropic_q --scope runner-llm --profile anthropic-tier4
+pipelex-temporal worker --task-queue anthropic_q --scope runner-llm --profile anthropic-tier4
 ```
 
 ---
@@ -54,7 +54,7 @@ The key was previously named `task_queue`; the migration map in `pipelex.toml` r
 
 ## Strict `--task-queue` validation
 
-`pipelex worker --task-queue <q>` fast-fails with `WorkerTaskQueueUnknownError` when `<q>` is not declared anywhere in the Temporal config — not in `default_task_queue`, not in any `[temporal.activity_queues.<activity>]` entry, and not in any `[temporal.queue_options.<queue>]` overlay. The error message includes a Levenshtein "Did you mean?" suggestion when a close match exists.
+`pipelex-temporal worker --task-queue <q>` fast-fails with `WorkerTaskQueueUnknownError` when `<q>` is not declared anywhere in the Temporal config — not in `default_task_queue`, not in any `[temporal.activity_queues.<activity>]` entry, and not in any `[temporal.queue_options.<queue>]` overlay. The error message includes a Levenshtein "Did you mean?" suggestion when a close match exists.
 
 This catches operator typos in seconds rather than after a multi-second library boot. Programmatic callers (tests, library code) get the same check inside `TemporalTaskManager.run_worker`.
 
@@ -129,7 +129,7 @@ graceful_shutdown_timeout = "0:30:00"
 Select it on the worker process:
 
 ```bash
-pipelex worker --profile anthropic-tier4
+pipelex-temporal worker --profile anthropic-tier4
 ```
 
 `tuning_mode` must be `"explicit"` in this release. A `"resource_based"` value is reserved but not implemented yet — the config validator rejects it with a clear message.
@@ -168,16 +168,16 @@ Boot four workers — typically one process each, on its own machine or containe
 
 ```bash
 # Router: orchestrates workflows, no activity execution
-pipelex worker --scope router --task-queue temporal_task_queue
+pipelex-temporal worker --scope router --task-queue temporal_task_queue
 
 # OpenAI LLM pool
-pipelex worker --scope runner-llm --task-queue openai_q --profile openai-pool
+pipelex-temporal worker --scope runner-llm --task-queue openai_q --profile openai-pool
 
 # Anthropic LLM pool
-pipelex worker --scope runner-llm --task-queue anthropic_q --profile anthropic-tier4
+pipelex-temporal worker --scope runner-llm --task-queue anthropic_q --profile anthropic-tier4
 
 # Image generation pool
-pipelex worker --scope runner-img-gen --task-queue imggen_q
+pipelex-temporal worker --scope runner-img-gen --task-queue imggen_q
 ```
 
 The router worker hosts every workflow; each runner worker hosts only the activities its scope declares; routing decides which runner pool receives each activity at dispatch time.

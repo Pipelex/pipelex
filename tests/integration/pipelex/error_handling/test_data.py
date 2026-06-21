@@ -3,8 +3,8 @@
 A single deliberately-failing ``PipeLLM`` call is the source of truth for both
 arms of the parity check:
 
-- the Temporal full-chain test
-  (``tests/integration/pipelex/temporal/test_workflow_error_report_full_chain.py``),
+- the Temporal full-chain test (now in the external ``pipelex-temporal`` distribution:
+  ``tests/integration/pipelex_temporal/test_workflow_error_report_full_chain.py``),
 - the local full-chain test
   (``tests/integration/pipelex/error_handling/test_error_report_local_full_chain.py``).
 
@@ -24,9 +24,10 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 class ErrorReportParityTestData:
     """Constants driving both arms of the local / Temporal ``ErrorReport`` parity test."""
 
-    # The failing pipe: an existing native-Text PipeSequence whose first step is a
-    # PipeLLM. Reused as-is — no new .mthds bundle needed.
-    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds"
+    # The failing pipe: a native-Text PipeSequence whose first step is a PipeLLM. The
+    # bundle lives beside this test; it was shared with the Temporal parity arm, now in
+    # the external ``pipelex-temporal`` distribution (cross-repo parity via shared constants).
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_text_sequence.mthds"
     PIPE_CODE: ClassVar[str] = "native_text_sequence"
 
     # The worker-side failure injected into the LLM call. CONFIGURATION is
@@ -73,7 +74,7 @@ class SearchErrorReportParityTestData:
     """
 
     # A single-step PipeSearch bundle over the native SearchResult concept — no inputs, no dynamic classes.
-    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/library_crate/native_search.mthds"
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_search.mthds"
     PIPE_CODE: ClassVar[str] = "native_search"
 
     # The worker-side failure injected into the search call. CONFIGURATION is non-retryable, so the

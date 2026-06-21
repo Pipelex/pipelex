@@ -38,14 +38,14 @@ class TestGatewayCompletionsClient:
     """Client construction validates the SDK variant and wires Portkey headers."""
 
     def test_wrong_sdk_variant_raises_factory_error(self, mocker: MockerFixture) -> None:
-        """A plugin whose sdk is not the completions variant is rejected before any client is built."""
+        """A model handle whose sdk is not the completions variant is rejected before any client is built."""
         _patch_gateway_accessors(mocker, is_debug_enabled=False, endpoint="https://gateway.test", api_key="gw-test")
         mock_client = mocker.patch("openai.AsyncOpenAI")
-        plugin = mocker.MagicMock()
-        plugin.sdk = "gateway_responses"
+        model_handle = mocker.MagicMock()
+        model_handle.sdk = "gateway_responses"
 
         with pytest.raises(GatewayFactoryError, match="is not supported by 'GatewayCompletionsFactory'"):
-            GatewayCompletionsFactory.make_portkey_openai_client_for_completions(plugin=plugin, backend=mocker.MagicMock())
+            GatewayCompletionsFactory.make_portkey_openai_client_for_completions(model_handle=model_handle, backend=mocker.MagicMock())
 
         mock_client.assert_not_called()
 
@@ -67,10 +67,10 @@ class TestGatewayCompletionsClient:
         """
         _patch_gateway_accessors(mocker, is_debug_enabled=is_debug_enabled, endpoint="https://gateway.example/v1", api_key="pk-secret")
         mock_client = mocker.patch("openai.AsyncOpenAI")
-        plugin = mocker.MagicMock()
-        plugin.sdk = "gateway_completions"
+        model_handle = mocker.MagicMock()
+        model_handle.sdk = "gateway_completions"
 
-        client = GatewayCompletionsFactory.make_portkey_openai_client_for_completions(plugin=plugin, backend=mocker.MagicMock())
+        client = GatewayCompletionsFactory.make_portkey_openai_client_for_completions(model_handle=model_handle, backend=mocker.MagicMock())
 
         assert client is mock_client.return_value
         mock_client.assert_called_once()

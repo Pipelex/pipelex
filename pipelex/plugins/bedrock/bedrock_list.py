@@ -10,7 +10,7 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 if TYPE_CHECKING:
@@ -40,7 +40,7 @@ def list_bedrock_models(
 
     from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
 
-    plugin = Plugin(sdk=sdk, backend=backend_name)
+    model_handle = ModelHandle(sdk=sdk, backend=backend_name)
 
     try:
         # Get AWS region for display
@@ -51,9 +51,9 @@ def list_bedrock_models(
         raise PipelexCLIError(msg) from exc
 
     try:
-        # List available models using the plugin-specific function
+        # List available models using the SDK-specific function
         bedrock_models_list = bedrock_list_available_models(
-            plugin=plugin,
+            model_handle=model_handle,
             backend=backend,
         )
 

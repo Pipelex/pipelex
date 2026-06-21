@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-    from pipelex.plugins.plugin_sdk_registry import Plugin
+    from pipelex.plugins.model_handle import ModelHandle
 
 
 class PortkeyCompletionsFactory(OpenAICompletionsFactory):
@@ -94,7 +94,7 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
     @classmethod
     def make_portkey_openai_client_for_completions(
         cls,
-        plugin: Plugin,
+        model_handle: ModelHandle,
         *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
@@ -105,8 +105,8 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
         endpoint = PortkeyFactory.get_endpoint(backend=backend)
         api_key = PortkeyFactory.get_api_key(backend=backend)
 
-        if not PortkeyOpenAISdkVariant.is_completions(plugin.sdk):
-            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
+        if not PortkeyOpenAISdkVariant.is_completions(model_handle.sdk):
+            msg = f"ModelHandle '{model_handle}' is not supported by '{cls.__name__}'"
             raise PortkeyFactoryError(msg)
 
         return openai.AsyncOpenAI(
