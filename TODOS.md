@@ -9,6 +9,8 @@
 This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/orchestrator-agnostic-runner-and-flavors.md`](wip/plugins/orchestrator-agnostic-runner-and-flavors.md) (the reviewed, decision-locked plan). **Read that doc before starting any phase** — this file tracks progress against it; it does not replace it. Adjacent background: [`wip/plugins/temporal-config-out-of-core.md`](wip/plugins/temporal-config-out-of-core.md) (the boot-gate refactor that immediately precedes this work) and the plugin-system design/SPI docs in [`wip/plugins/`](wip/plugins/).
 
 > **How to use this file.** Tick boxes as you land work. **Do not skip a `🛑 CHECKPOINT`** — each is a hard stop with three mandatory actions (verify · capture cold-start context · fan-out `/code-review`). Three checkpoints are flagged **MAJOR GATE** — they are the points the source plan calls out as the ones that must hold before the effort can continue.
+>
+> **Fan-out convention for `/code-review`.** Spawn each review sub-agent with **no inherited context** — hand it only a pointer to the changes under review (the phase's commit SHA, `git diff <base>..HEAD`, or the unstaged/working-tree files), never the plan, the rationale, or your own conclusions. A clean-context reviewer reviews the code as written, not your story about it — that independence is the point of fanning it out.
 
 ---
 
