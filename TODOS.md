@@ -2,9 +2,9 @@
 
 **Effort:** make `pipelex-api` an orchestrator-agnostic base, then build N thin deployment flavors on top of it (Temporal today, Mistral next). The *consumer-side* sequel to the plugin-system externalization (that tracker is archived at [`wip/archive/plugin-system-implementation-tracker.md`](wip/archive/plugin-system-implementation-tracker.md)).
 
-**Status:** plan locked, not yet started in any repo. The in-`pipelex` plugin system (seams inverted, Temporal externalized to the private `pipelex-temporal` plugin, `plugins.boot_orchestrator` gate in core) is the foundation this builds on — all of that is done and committed on `refactor/Plugins-3`.
+**Status:** **Phase A + Phase B DONE (through MAJOR GATE 1 / Checkpoint B).** Core seams added + refined on `refactor/Plugins-4` (`4b5449f88` Phase A; `75196e2e3` lazy-provider seam refinement; `7378afdd8` Phase B docs); `pipelex-temporal` adopts both seams on `refactor/own-temporal-config` (`6d9adff`). Both `/code-review`s clean, all gates green. **NEXT = Phase C** (`pipelex-api` decoupling — THE gate). The in-`pipelex` plugin-system foundation (seams inverted, Temporal externalized, `plugins.boot_orchestrator` gate) was done on `refactor/Plugins-3`; Phase A/B built on it from `refactor/Plugins-4`.
 
-**Current `pipelex` branch:** `refactor/Plugins-3` (worktree `_plugins`). Phase A (core changes) lands here; each other phase lands in its own repo.
+**Current `pipelex` branch:** `refactor/Plugins-4` (worktree `_plugins`), cut from `refactor/Plugins-3`. Phase A + the F3 seam refinement land here; each other phase lands in its own repo. Nothing pushed yet.
 
 This is the **execution tracker**. The *why* and *how* live in [`wip/plugins/orchestrator-agnostic-runner-and-flavors.md`](wip/plugins/orchestrator-agnostic-runner-and-flavors.md) (the reviewed, decision-locked plan). **Read that doc before starting any phase** — this file tracks progress against it; it does not replace it. Adjacent background: [`wip/plugins/temporal-config-out-of-core.md`](wip/plugins/temporal-config-out-of-core.md) (the boot-gate refactor that immediately precedes this work) and the plugin-system design/SPI docs in [`wip/plugins/`](wip/plugins/).
 
@@ -106,10 +106,10 @@ pipelex/pipelex-api:<ver>          (public base, orchestrator-agnostic, Docker H
 
 ### 🛑 CHECKPOINT B — hard stop · **MAJOR GATE 1** (source-doc Checkpoint 1)
 
-- [ ] **Verify:** `pipelex-temporal` `make agent-check` + `make agent-test` green against the Phase A `pipelex`. The seam now has a real consumer: a `pipelex-temporal` install contributes its mapper through `add_http_error_mapper` and self-loads `temporal_{env}.toml`. Import-light `register` still proven (no `temporalio` at registration).
-- [ ] **Capture cold-start context:** append `### Phase B — as-built` (the mapper's exact `ErrorReport` classification, the `temporal_{env}.toml` file set, the editable-pin setup). Natural session boundary **before** the `pipelex-api` refactor.
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the `pipelex-temporal` diff. Triage as above.
-- [ ] **Commit** in `pipelex-temporal` (its own branch).
+- [x] **Verify:** `pipelex-temporal` `make agent-check` + `make agent-test` green against the Phase A `pipelex`. The seam now has a real consumer: a `pipelex-temporal` install contributes its mapper through `add_http_error_mapper` and self-loads `temporal_{env}.toml`. Import-light `register` still proven (no `temporalio` at registration) — subprocess blocks `temporalio` and runs `register` to completion.
+- [x] **Capture cold-start context:** `### Phase B — as-built` appended below.
+- [x] **Fan-out `/code-review`:** two forked `/code-review`s (core seam refinement + pipelex-temporal diff) — both **clean, no bugs**. Triage recorded in the Phase B as-built (one NIT applied: slot-claim count in the import-light test; rest deferred).
+- [x] **Commit** in `pipelex-temporal` (`refactor/own-temporal-config`, `6d9adff`). Core seam refinement + Phase B docs on `refactor/Plugins-4` (`75196e2e3`, `7378afdd8`).
 
 ---
 
