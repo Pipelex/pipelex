@@ -1,4 +1,4 @@
-"""Tests for the F3 HTTP-error-mapper seam: the registrar collects framework-agnostic exc->ErrorReport mappers."""
+"""Tests for the F3 HTTP-error-mapper seam: the registrar collects exc->ErrorReport mappers, resolving the exc type lazily (import-light register)."""
 
 from __future__ import annotations
 
@@ -35,14 +35,14 @@ def _to_report(exc: Exception) -> ErrorReport:
 
 
 class TestHttpErrorMapperSeam:
-    """A plugin contributes an exc->ErrorReport mapper; the registrar collects it, returns a copy, and fails loud on duplicates."""
+    """A plugin contributes an exc->ErrorReport mapper via a lazy exc-type provider; the registrar resolves it on read, fail-loud on dups."""
 
     def test_add_and_get_mapper(self) -> None:
-        """A registered mapper is returned keyed by its exc_type and produces the classified ErrorReport when invoked."""
+        """A registered mapper is returned keyed by its resolved exc_type and produces the classified ErrorReport when invoked."""
         registrar = _make_registrar()
         registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
 
-        registrar.add_http_error_mapper(exc_type=_FakeTransportError, to_error_report=_to_report)
+        registrar.add_http_error_mapper(exc_type_provider=lambda: _FakeTransportError, to_error_report=_to_report)
 
         mappers = registrar.get_http_error_mappers()
         assert set(mappers) == {_FakeTransportError}
@@ -51,34 +51,56 @@ class TestHttpErrorMapperSeam:
         assert report.message == "server unreachable"
         assert report.type_uri == "https://errors.pipelex.com/fake-transport-error"
 
-    def test_contribution_is_recorded(self) -> None:
-        """Adding a mapper records a contribution line on the active plugin's discovery."""
+    def test_provider_resolved_lazily_not_at_registration(self) -> None:
+        """The exc-type provider runs only on get_http_error_mappers (read time), never at register — the import-light invariant."""
+        registrar = _make_registrar()
+        registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+
+        resolutions: list[int] = []
+
+        def _provider() -> type[Exception]:
+            resolutions.append(1)
+            return _FakeTransportError
+
+        registrar.add_http_error_mapper(exc_type_provider=_provider, to_error_report=_to_report)
+        assert resolutions == []  # registration must not have called the provider
+
+        resolved = registrar.get_http_error_mappers()
+        assert resolutions == [1]  # resolution happens only on read
+        assert set(resolved) == {_FakeTransportError}
+
+    def test_contribution_is_recorded_without_resolving(self) -> None:
+        """Adding a mapper records a contribution line on the active plugin's discovery — and does so without resolving the exc type."""
         registrar = _make_registrar()
         discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
 
-        registrar.add_http_error_mapper(exc_type=_FakeTransportError, to_error_report=_to_report)
+        def _exploding_provider() -> type[Exception]:
+            pytest.fail("provider must not run at registration")
 
-        assert any("http error mapper" in contribution and "_FakeTransportError" in contribution for contribution in discovery.contributions)
+        registrar.add_http_error_mapper(exc_type_provider=_exploding_provider, to_error_report=_to_report)
+
+        assert "http error mapper" in discovery.contributions
 
     def test_duplicate_exc_type_fails_loud_naming_both_plugins(self) -> None:
-        """Two plugins mapping the same exception type is a fail-loud conflict naming both."""
+        """Two plugins resolving to the same exception type is a fail-loud conflict naming both — detected at resolution time."""
         registrar = _make_registrar()
         registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
-        registrar.add_http_error_mapper(exc_type=_FakeTransportError, to_error_report=_to_report)
+        registrar.add_http_error_mapper(exc_type_provider=lambda: _FakeTransportError, to_error_report=_to_report)
         registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
+        registrar.add_http_error_mapper(exc_type_provider=lambda: _FakeTransportError, to_error_report=_to_report)
 
         with pytest.raises(DuplicateHttpErrorMapperError) as exc_info:
-            registrar.add_http_error_mapper(exc_type=_FakeTransportError, to_error_report=_to_report)
+            registrar.get_http_error_mappers()
 
         assert exc_info.value.first_plugin == "alpha"
         assert exc_info.value.second_plugin == "beta"
         assert "_FakeTransportError" in exc_info.value.exc_type
 
-    def test_get_returns_a_copy(self) -> None:
-        """The accessor hands back a copy, so a consumer cannot mutate the registrar's accumulated state."""
+    def test_get_returns_a_fresh_dict(self) -> None:
+        """The accessor hands back a freshly built dict, so a consumer cannot mutate the registrar's accumulated state."""
         registrar = _make_registrar()
         registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
-        registrar.add_http_error_mapper(exc_type=_FakeTransportError, to_error_report=_to_report)
+        registrar.add_http_error_mapper(exc_type_provider=lambda: _FakeTransportError, to_error_report=_to_report)
 
         snapshot = registrar.get_http_error_mappers()
         snapshot.clear()
@@ -86,7 +108,7 @@ class TestHttpErrorMapperSeam:
         assert registrar.get_http_error_mappers() == {_FakeTransportError: _to_report}
 
     def test_no_mappers_by_default(self) -> None:
-        """A registrar with no contributions exposes an empty mapper set (host wraps nothing)."""
+        """A registrar with no contributions exposes an empty mapper set (host wraps nothing, resolves nothing)."""
         registrar = _make_registrar()
 
         assert registrar.get_http_error_mappers() == {}

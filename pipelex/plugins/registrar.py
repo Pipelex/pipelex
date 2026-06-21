@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -29,6 +29,28 @@ _RegistryValueT = TypeVar("_RegistryValueT")
 # into its own HTTP error response (RFC 7807 + disclosure) — so core and the plugin
 # name no web framework.
 HttpErrorMapperFn = Callable[[Exception], ErrorReport]
+
+# A thunk returning the concrete exception class a mapper applies to. The mapper is
+# registered with this *provider* rather than the bare type so a plugin whose
+# exception lives in a heavy orchestrator SDK (``temporalio``) can keep its
+# ``register`` import-light: the provider — and any SDK import it performs to name
+# the class — is invoked only when a host runtime resolves the mappers via
+# ``get_http_error_mappers`` (i.e. at app construction), never at registration.
+HttpErrorTypeProviderFn = Callable[[], type[Exception]]
+
+
+class _HttpErrorMapperContribution(NamedTuple):
+    """One plugin's deferred HTTP-error-mapper contribution.
+
+    A ``NamedTuple`` (not a model) because it holds two callables and is never
+    serialized. ``exc_type_provider`` is resolved — and any SDK import it incurs
+    paid — only by ``get_http_error_mappers``, which is what keeps a contributing
+    plugin's ``register`` import-light.
+    """
+
+    exc_type_provider: HttpErrorTypeProviderFn
+    to_error_report: HttpErrorMapperFn
+    source_plugin: str
 
 
 class HubSlot(StrEnum):
@@ -85,14 +107,16 @@ class PluginRegistrar:
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[PipelexExecutionMode, OrchestratorProtocol] = {}
-        self.http_error_mappers: dict[type[Exception], HttpErrorMapperFn] = {}
+        # Ordered list (not a type-keyed dict) because the exception types are
+        # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
+        # so duplicate-by-type detection is deferred to resolution time too.
+        self.http_error_mappers: list[_HttpErrorMapperContribution] = []
         self.slot_claims: dict[HubSlot, Callable[[], Any]] = {}
         self.teardown_callbacks: list[Callable[[], None]] = []
         self.discoveries: list[PluginDiscovery] = []
         self._inference_sources: dict[tuple[InferenceFamily, str], str] = {}
         self._model_lister_sources: dict[str, str] = {}
         self._orchestrator_sources: dict[PipelexExecutionMode, str] = {}
-        self._http_error_mapper_sources: dict[type[Exception], str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -148,26 +172,27 @@ class PluginRegistrar:
             ),
         )
 
-    def add_http_error_mapper(self, *, exc_type: type[Exception], to_error_report: HttpErrorMapperFn) -> None:
+    def add_http_error_mapper(self, *, exc_type_provider: HttpErrorTypeProviderFn, to_error_report: HttpErrorMapperFn) -> None:
         """Contribute a mapping from a transport/runtime exception to a structured ``ErrorReport``.
 
-        A host runtime (``pipelex-api``) iterates the collected mappers at app
-        construction and wraps each into one framework error handler (FastAPI, …)
-        using its own RFC 7807 + disclosure rendering — so core and the plugin name
-        no web framework. Keeps the plugin import-light: ``register`` only records
-        the closure, which may import the orchestrator SDK lazily when first
-        invoked, never at registration time.
+        ``exc_type_provider`` is a thunk returning the concrete exception class the
+        mapper applies to. It is resolved *lazily* by ``get_http_error_mappers`` (at a
+        host runtime's app-construction time), never here — which is what keeps a
+        plugin's ``register`` import-light: a plugin whose exception type lives in a
+        heavy orchestrator SDK (``temporalio``) passes ``lambda: TemporalError`` and the
+        SDK import is deferred until a host runtime actually consumes the mappers. The
+        ``to_error_report`` closure is likewise uninvoked until an error is rendered.
+
+        A host runtime (``pipelex-api``) iterates the resolved mappers at app
+        construction and wraps each into one framework error handler (FastAPI, …) using
+        its own RFC 7807 + disclosure rendering — so core and the plugin name no web
+        framework. Duplicate-by-type detection is deferred to ``get_http_error_mappers``
+        (the providers must run first); it stays fail-loud and names both plugins.
         """
-        self._add(
-            store=self.http_error_mappers,
-            sources=self._http_error_mapper_sources,
-            key=exc_type,
-            value=to_error_report,
-            contribution=f"http error mapper {exc_type.__qualname__}",
-            on_duplicate=lambda first_plugin, second_plugin: DuplicateHttpErrorMapperError(
-                exc_type=exc_type.__qualname__, first_plugin=first_plugin, second_plugin=second_plugin
-            ),
+        self.http_error_mappers.append(
+            _HttpErrorMapperContribution(exc_type_provider=exc_type_provider, to_error_report=to_error_report, source_plugin=self._active.name)
         )
+        self._active.contributions.append("http error mapper")
 
     def claim_content_generator(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.CONTENT_GENERATOR, factory=factory)
@@ -190,13 +215,29 @@ class PluginRegistrar:
     # ------------------------------------------------------------------ #
 
     def get_http_error_mappers(self) -> dict[type[Exception], HttpErrorMapperFn]:
-        """Return a copy of the HTTP-error mappers contributed by discovered plugins.
+        """Resolve every contributed exc-type provider into a ``{exc_type: mapper}`` dict.
 
-        The read view a host runtime (``pipelex-api``) iterates at app construction
-        to register one framework error handler per exception type. A copy, so a
-        consumer cannot mutate the registrar's accumulated state.
+        The read view a host runtime (``pipelex-api``) iterates at app construction to
+        register one framework error handler per exception type. Resolving the
+        providers *here* (never at registration) is what lets a contributing plugin's
+        ``register`` stay import-light: any orchestrator-SDK import a provider performs
+        to name its concrete exception class is deferred to this call — which a host
+        runtime makes only when it actually has the plugin (and therefore the SDK)
+        installed, so the import always resolves. A freshly built dict, so a consumer
+        cannot mutate the registrar's state. Fail-loud naming both plugins when two map
+        the same resolved exception type.
         """
-        return dict(self.http_error_mappers)
+        resolved: dict[type[Exception], HttpErrorMapperFn] = {}
+        sources: dict[type[Exception], str] = {}
+        for contribution in self.http_error_mappers:
+            exc_type = contribution.exc_type_provider()
+            if exc_type in resolved:
+                raise DuplicateHttpErrorMapperError(
+                    exc_type=exc_type.__qualname__, first_plugin=sources[exc_type], second_plugin=contribution.source_plugin
+                )
+            resolved[exc_type] = contribution.to_error_report
+            sources[exc_type] = contribution.source_plugin
+        return resolved
 
     # ------------------------------------------------------------------ #
 

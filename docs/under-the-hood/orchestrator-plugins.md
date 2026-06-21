@@ -56,16 +56,18 @@ The plugin bridges that gap by contributing a **framework-agnostic mapper** — 
 
 ```python
 registrar.add_http_error_mapper(
-    exc_type=TemporalError,                       # imported lazily inside the closure, never at register
+    exc_type_provider=lambda: TemporalError,      # SDK imported only when a host resolves the mappers, never at register
     to_error_report=lambda exc: ErrorReport(...), # classified transient / RUNTIME
 )
 ```
 
+The exc type is supplied as a **provider thunk**, not the bare class, on purpose: naming `temporalio.TemporalError` requires importing `temporalio` (the whole SDK), so a bare `exc_type=` would force that import at `register` — breaking the import-light invariant for a plugin that hard-depends on a heavy SDK. The provider defers the import to read time (a host runtime's app construction), where the plugin — and therefore its SDK — is by definition installed.
+
 The contract is deliberately split so no layer overreaches:
 
-- **The plugin** owns *classification* — which exception, transient or not, which error domain. It stays import-light: `register` only records the closure; the SDK import happens lazily when the mapper is first invoked.
-- **Core** owns *transport* — it collects the mappers keyed by `exc_type` (fail-loud on a duplicate exception type, naming both plugins) and exposes them via `registrar.get_http_error_mappers()`. `ErrorReport` is a core type, so the seam carries **no** web-framework import.
-- **The host runtime** owns *presentation* — at app construction it iterates the collected mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the `ErrorReport` through its own RFC 7807 + `DisclosureMode` path. FastAPI / Starlette stays only in the host; core and the plugin import neither.
+- **The plugin** owns *classification* — which exception, transient or not, which error domain. It stays import-light: `register` only records the provider + closure; the SDK import happens when the provider runs at read time (and the `to_error_report` closure when the mapper is first invoked), never at registration.
+- **Core** owns *transport* — `registrar.get_http_error_mappers()` runs every provider, builds the `{exc_type: mapper}` dict, and is fail-loud on a duplicate *resolved* exception type (naming both plugins). `ErrorReport` is a core type, so the seam carries **no** web-framework import.
+- **The host runtime** owns *presentation* — at app construction it iterates the resolved mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the `ErrorReport` through its own RFC 7807 + `DisclosureMode` path. FastAPI / Starlette stays only in the host; core and the plugin import neither.
 
 This is what lets the public `pipelex-api` base be orchestrator-agnostic and still render a Temporal (or Mistral) transport fault correctly: install the flavor's plugin and its mapper rides in; install none and there is simply nothing to wrap. The capability is optional, so it grew the plugin contract by one method → `PLUGIN_API_VERSION` is now **2**.
 
