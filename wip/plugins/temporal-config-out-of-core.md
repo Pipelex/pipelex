@@ -1,6 +1,6 @@
 # Move Temporal config out of core (fix the core→`temporalio` type-check coupling)
 
-**Status:** **Phases 1 & 2 DONE + verified green (Checkpoint 1 + Checkpoint 2). UNCOMMITTED. Phase 3 (re-merge) not started — gated on user.** **Branch:** `refactor/Plugins-3` (core, worktree `_plugins`) + `main` (worktree-less sibling `pipelex-temporal`). **Priority:** ship-blocker for the plugin-system effort — it falsifies the effort's headline invariant ("core names no integration — not by import, not by string — anywhere").
+**Status:** **Phases 1 & 2 DONE + verified green (Checkpoint 1 + Checkpoint 2) + COMMITTED (not pushed). Phase 3 (re-merge) deferred to a fresh session.** Core commit `eaa671d10` on `refactor/Plugins-3` (worktree `_plugins`); pipelex-temporal commit `187e846` on `refactor/own-temporal-config` (branched off `main`). **Priority:** ship-blocker for the plugin-system effort — it falsifies the effort's headline invariant ("core names no integration — not by import, not by string — anywhere").
 
 > **As-built summary (see the "As-built" section at the bottom for detail).** The `temporalio` type-coupling is gone from core: `config_temporal.py` deleted, no `temporal` field on `PipelexConfig`, core `make agent-check` (pyright + mypy) clean, `make tb` / `make agent-test` green, `make gep` + `make check-config-sync` green. `pipelex-temporal` now owns the rich config (`config_temporal.py` + `temporal.toml` + `load_temporal_config` + `temporal_hub` cache) and gates on the generic core `plugins.boot_orchestrator` selector; its `make agent-check` + `make agent-test` are green against the editable new core. Both CLIs smoke clean (`--temporal/--no-temporal` → `--orchestrator`).
 
@@ -126,8 +126,12 @@ Core has **no** `from temporalio... import` anywhere and **no** `temporal` confi
 - core: `make agent-check` (pyright 0 / mypy 0 / keyword-only / plxt), `make tb`, `make agent-test` (exit 0), `make gep`, `make check-config-sync`; `pipelex run pipe --help` / `validate pipe --help` show `--orchestrator`.
 - pipelex-temporal: `make agent-check` (pyright 0 / mypy 0), `make agent-test` (unit + integration time-skipping) against editable new core; `pipelex-temporal --help` smokes.
 
-### Not done
+### Committed (not pushed)
 
-- **Commits** — both repos are green but UNCOMMITTED (`_plugins` on `refactor/Plugins-3`, `pipelex-temporal` on `main`).
-- **Phase 3** (re-merge `refactor/Plugins-3` → `feature/mistralai-2x-bump` in `_workflows`, then resume the mistralai entry-point task) — not started.
+- Core: `eaa671d10` on `refactor/Plugins-3` (`_plugins`) — the doc update lands in the immediate follow-up commit.
+- pipelex-temporal: `187e846` on `refactor/own-temporal-config` (branched off `main`).
+
+### Phase 3 — pickup for a fresh session (NOT started)
+
+Re-merge `refactor/Plugins-3` → `feature/mistralai-2x-bump` (worktree `_workflows`); the only expected conflict is `CHANGELOG.md` (union, `[Unreleased]` on top). `uv sync --all-extras` in `_workflows`, then `make tb` + `make agent-check` + `make agent-test`. The base is now the corrected post-temporal-cut tree, so the clean sync that previously surfaced the defect (dropping `temporalio`) will pass. Then resume the original task: make `pipelex-mistralai-workflows` a discoverable `pipelex.plugins` entry-point plugin.
 - **Docs follow-up (deferred).** Updated `docs/under-the-hood/orchestrator-plugins.md` (gate + module paths). Still stale and not touched this pass: `docs/under-the-hood/pipe-routing-and-execution.md` and `docs/distributed-execution/task-routing.md` still show `temporal.is_enabled` and `[temporal.worker_config.*]` / `[temporal.queue_options.*]` TOML examples. Those config tables now live at **root** in `pipelex-temporal`'s `temporal.toml` (no `[temporal.]` prefix), so the examples need rewriting — and the distributed-execution config docs arguably belong in the `pipelex-temporal` repo now. Left as a separate docs pass (involves a relocation decision).
