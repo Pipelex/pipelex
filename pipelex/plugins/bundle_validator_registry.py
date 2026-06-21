@@ -25,24 +25,23 @@ canonical ``PipelexValidationReport`` (a ``ValidationReport`` subtype); the API 
 that precise type at its edge.
 """
 
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, TypeAlias, runtime_checkable
 
+from mthds.protocol.models import ValidationReport
+
+from pipelex.base_exceptions import ErrorReport
 from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
     from pathlib import Path
-    from typing import TypeAlias
 
-    from mthds.protocol.models import ValidationReport
-
-    from pipelex.base_exceptions import ErrorReport
-
-    # The verdict a validator returns: valid arm = the protocol validation report (at
-    # runtime always the canonical PipelexValidationReport subtype), invalid arm = the
-    # structured ErrorReport. Both are leaf types w.r.t. the hub, so this hub-reachable
-    # seam stays import-acyclic.
-    BundleValidationVerdict: TypeAlias = ValidationReport | ErrorReport
+# The verdict a validator returns: valid arm = the protocol validation report (at runtime
+# always the canonical PipelexValidationReport subtype), invalid arm = the structured
+# ErrorReport. Bound at runtime (not just under TYPE_CHECKING) so an external validator
+# plugin can import it to annotate its own validate_bundles. Both arms are leaf types w.r.t.
+# the hub, so this hub-reachable seam stays import-acyclic even with the runtime imports.
+BundleValidationVerdict: TypeAlias = ValidationReport | ErrorReport
 
 
 @runtime_checkable
@@ -65,7 +64,7 @@ class BundleValidatorProtocol(Protocol):
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
-    ) -> "BundleValidationVerdict": ...
+    ) -> BundleValidationVerdict: ...
 
 
 class BundleValidatorRegistry:
