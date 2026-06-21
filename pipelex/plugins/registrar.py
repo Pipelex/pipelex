@@ -3,7 +3,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 
 from pydantic import BaseModel, Field
 
+from pipelex.base_exceptions import ErrorReport
 from pipelex.plugins.exceptions import (
+    DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
     DuplicateModelListerError,
     DuplicateOrchestratorError,
@@ -21,6 +23,12 @@ if TYPE_CHECKING:
 
 _RegistryKeyT = TypeVar("_RegistryKeyT")
 _RegistryValueT = TypeVar("_RegistryValueT")
+
+# A plugin's framework-agnostic mapping from one transport/runtime exception to a
+# structured ``ErrorReport``. A host runtime (``pipelex-api``) renders the report
+# into its own HTTP error response (RFC 7807 + disclosure) — so core and the plugin
+# name no web framework.
+HttpErrorMapperFn = Callable[[Exception], ErrorReport]
 
 
 class HubSlot(StrEnum):
@@ -77,12 +85,14 @@ class PluginRegistrar:
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
         self.orchestrators: dict[PipelexExecutionMode, OrchestratorProtocol] = {}
+        self.http_error_mappers: dict[type[Exception], HttpErrorMapperFn] = {}
         self.slot_claims: dict[HubSlot, Callable[[], Any]] = {}
         self.teardown_callbacks: list[Callable[[], None]] = []
         self.discoveries: list[PluginDiscovery] = []
         self._inference_sources: dict[tuple[InferenceFamily, str], str] = {}
         self._model_lister_sources: dict[str, str] = {}
         self._orchestrator_sources: dict[PipelexExecutionMode, str] = {}
+        self._http_error_mapper_sources: dict[type[Exception], str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -138,6 +148,27 @@ class PluginRegistrar:
             ),
         )
 
+    def add_http_error_mapper(self, *, exc_type: type[Exception], to_error_report: HttpErrorMapperFn) -> None:
+        """Contribute a mapping from a transport/runtime exception to a structured ``ErrorReport``.
+
+        A host runtime (``pipelex-api``) iterates the collected mappers at app
+        construction and wraps each into one framework error handler (FastAPI, …)
+        using its own RFC 7807 + disclosure rendering — so core and the plugin name
+        no web framework. Keeps the plugin import-light: ``register`` only records
+        the closure, which may import the orchestrator SDK lazily when first
+        invoked, never at registration time.
+        """
+        self._add(
+            store=self.http_error_mappers,
+            sources=self._http_error_mapper_sources,
+            key=exc_type,
+            value=to_error_report,
+            contribution=f"http error mapper {exc_type.__qualname__}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateHttpErrorMapperError(
+                exc_type=exc_type.__qualname__, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
     def claim_content_generator(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.CONTENT_GENERATOR, factory=factory)
 
@@ -153,6 +184,19 @@ class PluginRegistrar:
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)
         self._active.contributions.append("teardown callback")
+
+    # ------------------------------------------------------------------ #
+    # Read accessors (for host runtimes consuming plugin contributions)
+    # ------------------------------------------------------------------ #
+
+    def get_http_error_mappers(self) -> dict[type[Exception], HttpErrorMapperFn]:
+        """Return a copy of the HTTP-error mappers contributed by discovered plugins.
+
+        The read view a host runtime (``pipelex-api``) iterates at app construction
+        to register one framework error handler per exception type. A copy, so a
+        consumer cannot mutate the registrar's accumulated state.
+        """
+        return dict(self.http_error_mappers)
 
     # ------------------------------------------------------------------ #
 

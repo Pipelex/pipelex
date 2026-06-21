@@ -7,16 +7,20 @@ if TYPE_CHECKING:
 # it targets via ``targets_api``; discovery fails loud on a mismatch (see
 # ``PluginApiVersionMismatchError``). Bump this only on a breaking change to the
 # registrar menu or the plugin contract.
-PLUGIN_API_VERSION: int = 1
+#
+# v2 added the optional ``add_http_error_mapper`` capability (a framework-agnostic
+# transport-fault → ``ErrorReport`` mapping a host runtime renders into its own
+# HTTP error response).
+PLUGIN_API_VERSION: int = 2
 
 
 @runtime_checkable
 class PipelexPlugin(Protocol):
     """A unit of optional capability discovered at startup.
 
-    A plugin contributes inference backends, orchestrators, hub-slot claims, CLI
-    commands and teardown callbacks by calling the menu methods on the
-    ``PluginRegistrar`` it is handed.
+    A plugin contributes inference backends, model listers, orchestrators,
+    hub-slot claims, HTTP-error mappers and teardown callbacks by calling the menu
+    methods on the ``PluginRegistrar`` it is handed.
 
     **Invariant — ``register`` is side-effect-free.** It may *only* call
     registrar menu methods: no hub access, no I/O, no SDK/client construction.

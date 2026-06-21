@@ -81,17 +81,17 @@ pipelex/pipelex-api:<ver>          (public base, orchestrator-agnostic, Docker H
 
 **Goal:** add the two seams `pipelex-api` will consume, in the public core, with no orchestrator named and no FastAPI imported. Lands on `refactor/Plugins-3`.
 
-- [ ] **D2 — env-aware plugin config loader.** Add a reusable helper on `ConfigManager` (e.g. `load_plugin_config(*, name, schema)`) resolving `name.toml` (the calling plugin's packaged default) → `name_{environment}.toml` → `name_override.toml` with deep-merge, mirroring `load_config`'s env layering. Anchor: `pipelex/system/configuration/config_loader.py` (`_override_files_for_dir` / `load_config`, keyed on `runtime_manager.environment`).
-- [ ] **F3 — HTTP-error-mapper seam.** Add `add_http_error_mapper(*, exc_type: type[Exception], to_error_report: Callable[[Exception], ErrorReport])` to `PluginRegistrar` (`pipelex/plugins/registrar.py`, alongside the existing menu methods) plus a read accessor for the collected mappers. Signature uses `ErrorReport` (`pipelex/base_exceptions.py`) — **no FastAPI import.**
-- [ ] **Bump `PLUGIN_API_VERSION`** (`pipelex/plugins/contract.py:10`, `1 → 2`) and document the new optional capability in the orchestrator SPI doc (`docs/under-the-hood/orchestrator-plugins.md`). Note the contract bump means every plugin's `targets_api` must be re-confirmed (built-ins + `pipelex-temporal` in Phase B).
-- [ ] **Tests:** env-layered plugin-config round-trip (packaged default → `_{env}` → `_override` deep-merge); registrar collects/returns mappers; import-light boot still green (the seam adds no SDK/HTTP import — extend the existing import-light subprocess guard if needed).
+- [x] **D2 — env-aware plugin config loader.** Add a reusable helper on `ConfigManager` (e.g. `load_plugin_config(*, name, schema)`) resolving `name.toml` (the calling plugin's packaged default) → `name_{environment}.toml` → `name_override.toml` with deep-merge, mirroring `load_config`'s env layering. Anchor: `pipelex/system/configuration/config_loader.py` (`_override_files_for_dir` / `load_config`, keyed on `runtime_manager.environment`).
+- [x] **F3 — HTTP-error-mapper seam.** Add `add_http_error_mapper(*, exc_type: type[Exception], to_error_report: Callable[[Exception], ErrorReport])` to `PluginRegistrar` (`pipelex/plugins/registrar.py`, alongside the existing menu methods) plus a read accessor for the collected mappers. Signature uses `ErrorReport` (`pipelex/base_exceptions.py`) — **no FastAPI import.**
+- [x] **Bump `PLUGIN_API_VERSION`** (`pipelex/plugins/contract.py:10`, `1 → 2`) and document the new optional capability in the orchestrator SPI doc (`docs/under-the-hood/orchestrator-plugins.md`). Note the contract bump means every plugin's `targets_api` must be re-confirmed (built-ins + `pipelex-temporal` in Phase B).
+- [x] **Tests:** env-layered plugin-config round-trip (packaged default → `_{env}` → `_override` deep-merge); registrar collects/returns mappers; import-light boot still green (the seam adds no SDK/HTTP import — extend the existing import-light subprocess guard if needed).
 
 ### 🛑 CHECKPOINT A — hard stop (core seams exist; consumed at B/C)
 
-- [ ] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Core still names **no** orchestrator and imports **no** FastAPI (`grep -rn "fastapi\|starlette" pipelex/` → empty; `grep` for temporal in core unchanged from before). The seam's *end-to-end* exercise lands at Checkpoint B (when the plugin contributes through it) — don't expect integration proof here.
-- [ ] **Capture cold-start context:** append `### Phase A — as-built` below (final helper name/signature, the registrar method + accessor signature, the `PLUGIN_API_VERSION` value, which plugins' `targets_api` still need re-confirming, test locations).
-- [ ] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase A `pipelex` diff. Triage findings into the as-built (apply cheap ones; defer design-tradeoffs to a `wip/plugins/` follow-up per the deferral convention).
-- [ ] **Commit** on `refactor/Plugins-3`. This is a natural session boundary before switching to the `pipelex-temporal` repo.
+- [x] **Verify:** `make agent-check` clean · `make tb` green · `make agent-test` green. Core still names **no** orchestrator and imports **no** FastAPI (`grep -rn "fastapi\|starlette" pipelex/` → only telemetry labels + `WorkerMode.FASTAPI` enum, no imports; temporal refs in core unchanged). The seam's *end-to-end* exercise lands at Checkpoint B (when the plugin contributes through it) — don't expect integration proof here.
+- [x] **Capture cold-start context:** append `### Phase A — as-built` below (final helper name/signature, the registrar method + accessor signature, the `PLUGIN_API_VERSION` value, which plugins' `targets_api` still need re-confirming, test locations).
+- [x] **Fan-out `/code-review`:** sub-agent runs `/code-review` on the Phase A `pipelex` diff. Triage findings into the as-built (apply cheap ones; defer design-tradeoffs to a `wip/plugins/` follow-up per the deferral convention). _(done — verdict clean; nit #2 applied; tradeoff #1 deferred to `wip/plugins/phase-c-http-error-mapper-consumer-path.md`)_
+- [x] **Commit** on `refactor/Plugins-4`. This is a natural session boundary before switching to the `pipelex-temporal` repo.
 
 ---
 
@@ -218,4 +218,43 @@ First flavor boots end-to-end — validates the whole chain before replicating f
 
 ## As-built log (append per phase at each checkpoint — keep this current for cold starts)
 
-> Each checkpoint appends an `### Phase N — as-built` subsection here with: final names/signatures, divergences from plan, test evidence, and anything a cold resume needs. (Empty until Phase A lands.)
+> Each checkpoint appends an `### Phase N — as-built` subsection here with: final names/signatures, divergences from plan, test evidence, and anything a cold resume needs.
+
+### Phase A — as-built
+
+**Branch:** `refactor/Plugins-4` (worktree `_plugins`), cut from `refactor/Plugins-3`. One commit for the whole phase.
+
+**D2 — env-aware plugin config loader.** `pipelex/system/configuration/config_loader.py`:
+
+- `ConfigLoader.load_plugin_config(*, name: str, package_dir: Path, schema: type[_PluginConfigT], extra_overrides: dict[str, Any] | None = None) -> _PluginConfigT` — loads, deep-merges and **validates** (returns the `schema` instance, not a raw dict — the `schema` param from the plan is honored as a validated return).
+- **Signature divergence from the plan sketch `load_plugin_config(*, name, schema)`:** added `package_dir: Path`. The packaged default `{name}.toml` lives inside the *plugin's own* distribution; core cannot locate it, so the plugin passes its package dir (`Path(__file__).parent`). This is necessary, not optional.
+- Layering (later wins per leaf, via `deep_update`): `{package_dir}/{name}.toml` → global `~/.pipelex/{name}_{env}.toml` → global `~/.pipelex/{name}_override.toml` → project `.pipelex/{name}_{env}.toml` → project `.pipelex/{name}_override.toml` (project only if distinct from global) → `extra_overrides`. `env` = `runtime_manager.environment`.
+- Helper `ConfigLoader._plugin_override_files_for_dir(config_dir, *, name)` mirrors `_override_files_for_dir` but is **intentionally narrower**: only `{name}_{env}` + `{name}_override` — no `local` / `run_mode` / `temporary` tiers (a plugin config is env-selected + deployment-baked, not developer-scratch-layered). Missing files at any tier are skipped, so the packaged default alone is valid. Does **not** call `ensure_global_config_exists()` (no kit-template copy for plugin configs).
+- New module-level `_PluginConfigT = TypeVar(..., bound=BaseModel)`; added `from pydantic import BaseModel`.
+
+**F3 — HTTP-error-mapper seam.** `pipelex/plugins/registrar.py`:
+
+- Module-level type alias `HttpErrorMapperFn = Callable[[Exception], ErrorReport]` (`ErrorReport` imported from `pipelex.base_exceptions` — a core type, no cycle, no FastAPI/SDK pull).
+- Menu method `PluginRegistrar.add_http_error_mapper(*, exc_type: type[Exception], to_error_report: HttpErrorMapperFn) -> None` — reuses the shared `_add` helper (store `self.http_error_mappers: dict[type[Exception], HttpErrorMapperFn]`, sources `self._http_error_mapper_sources`, fail-loud `DuplicateHttpErrorMapperError` naming both plugins, contribution line `http error mapper {exc_type.__qualname__}`).
+- Read accessor `PluginRegistrar.get_http_error_mappers() -> dict[type[Exception], HttpErrorMapperFn]` returns a **copy** (consumer can't mutate registrar state). New section comment "Read accessors (for host runtimes consuming plugin contributions)".
+- New error class `DuplicateHttpErrorMapperError(PluginError)` in `pipelex/plugins/exceptions.py` (mirrors `DuplicateOrchestratorError`; fields `exc_type`/`first_plugin`/`second_plugin`).
+
+**No hub wiring (deliberate).** Phase A is exactly the planned surface: registrar method + accessor. The mappers are **not** pushed onto the hub. **How `pipelex-api` reaches them in Phase C:** call `build_registrar(config=get_config())` at app construction (documented pure/repeatable fn; `cli/commands/plugins_cmd.py` already does this standalone) and iterate `registrar.get_http_error_mappers()`. No further core exposure needed → Phase C stays pipelex-api-only. If Phase C prefers reading the boot registrar instead of rebuilding, that needs a *new* public getter (the registrar is `Pipelex._plugin_registrar`, private today) — small follow-up, decide in Phase C.
+
+**Version bump.** `pipelex/plugins/contract.py`: `PLUGIN_API_VERSION: int = 1 → 2` (+ comment noting v2 = the optional `add_http_error_mapper` capability). `PipelexPlugin` docstring corrected (dropped the stale "CLI commands" mention removed by Option A; added "model listers" and "HTTP-error mappers"). **`targets_api` re-confirmation:** all built-ins set `targets_api = PLUGIN_API_VERSION` (auto-tracks the bump — verified). **Still to re-confirm in Phase B:** the external `pipelex-temporal` plugin (and `pipelex-mistralai-workflows`, already an entry-point plugin) — both import `PLUGIN_API_VERSION` from core, so an editable-pinned core gives them `2` automatically, but their suites must run against the Phase A core to confirm.
+
+**SPI doc.** `docs/under-the-hood/orchestrator-plugins.md`: new section "HTTP error mappers: rendering an orchestrator's transport faults" (plugin owns classification / core owns transport / host owns presentation), the registrar-menu table row now lists `add_http_error_mapper` + `get_http_error_mappers`, and the `PLUGIN_API_VERSION = 2` note. Error reference page `docs/errors/duplicate-http-error-mapper-error.md` generated via `pipelex-dev generate-error-pages` (+ index line in `inference-and-providers.md`).
+
+**Tests (all green).**
+
+- `tests/unit/pipelex/system/test_plugin_config_loader.py` — `TestPluginConfigLoader`: packaged-default-only, env-file deep-merge + sibling-env-ignored, override-beats-env, project-beats-global, extra_overrides-win-last, validation-after-merge. Hermetic via `PropertyMock` on `global_config_dir`/`project_config_dir`/`runtime_manager.environment`.
+- `tests/unit/pipelex/plugins/test_http_error_mapper_seam.py` — `TestHttpErrorMapperSeam`: add+get, contribution recorded, duplicate fails loud naming both, accessor returns a copy, empty-by-default.
+- `tests/unit/pipelex/plugins/test_import_light_boot.py` — extended the BLOCKED set with `fastapi`/`starlette` so the subprocess guard now also proves registration imports no web framework (locks the F3 invariant at the discovery layer).
+
+**Gates:** `make agent-check` clean (ruff/plxt/pyright 0/mypy 0/keyword-only ✓) · `make tb` green · `make agent-test` green. Core names no orchestrator; no `import fastapi`/`starlette` anywhere in core (the only `fastapi` strings are telemetry-integration labels + the `WorkerMode.FASTAPI` enum value, not imports).
+
+**Code-review triage** (forked `/code-review`, high effort — verdict: clean, correct, faithful to D1/D2/F1/F2/F3; no bugs):
+
+- **Applied:** test `begin_plugin(targets_api=…)` now uses `PLUGIN_API_VERSION` instead of a literal `2` (nit #2 — latent stale-on-bump).
+- **Deferred (design tradeoff):** the Phase-C consumer path for the mappers (registrar has the accessor but it isn't on the hub and the boot registrar is private) → captured in [`wip/plugins/phase-c-http-error-mapper-consumer-path.md`](wip/plugins/phase-c-http-error-mapper-consumer-path.md). Recommended default: Phase C calls `build_registrar(config=get_config())` and iterates `get_http_error_mappers()` (keeps Phase C pipelex-api-only).
+- **Info / no action:** `DuplicateHttpErrorMapperError` message uses `__qualname__` (only ever fires on a true same-class dup, so unambiguous); `load_plugin_config` has no `is_unit_testing` hermetic branch (correct — no run_mode tier; Phase B tests must mock the config dirs); D2 intentionally has no `.pipelex/{name}.toml` *base* tier (packaged default is the only base — worth a one-line plugin-authoring-doc callout when Phase B lands).

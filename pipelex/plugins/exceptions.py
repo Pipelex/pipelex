@@ -81,6 +81,20 @@ class DuplicateOrchestratorError(PluginError):
         super().__init__(message)
 
 
+class DuplicateHttpErrorMapperError(PluginError):
+    """Two plugins registered an HTTP-error mapper for the same exception type."""
+
+    def __init__(self, *, exc_type: str, first_plugin: str, second_plugin: str):
+        self.exc_type = exc_type
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"HTTP-error mapper for exception type '{exc_type}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each exception type must have a single mapper."
+        )
+        super().__init__(message)
+
+
 class HubSlotAlreadyClaimedError(PluginError):
     """Two plugins claimed the same hub slot."""
 
