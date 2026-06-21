@@ -14,10 +14,12 @@ For *why* this shape (why `feature/Mistral-workflows-merge-4` was retired instea
 
 | Repo | Branch | Commit | What it carries |
 |---|---|---|---|
-| `_workflows` (this repo) | `feature/mistralai-2x-bump` (off `origin/dev`) | `e13587f4b` | The mistralai-2.x HOLD group only: Mistral provider migrated to the 2.x `mistralai.client.*` layout, `mistralai>=2.4.4`, and the `instructor` git-fork pin. |
-| `pipelex-mistralai-workflows` | `feature/Mistral-native` | `11902f6` | Plugin reconciled onto the post-#969 bridge, re-pinned to the editable `../_workflows` (so it consumes the branch above), gains Mistral-native cost reporting. |
+| `_workflows` (this repo) | `feature/mistralai-2x-bump` (off `origin/dev`) | `b7d57c577` | The mistralai-2.x HOLD group (Mistral provider on the 2.x `mistralai.client.*` layout, `mistralai>=2.4.4`, the `instructor` git-fork pin) **plus the `refactor/Plugins-3` merge** (`a34ca9a7e`) — the whole plugin system + the Temporal-config-out-of-core externalization. See `wip/plugins/temporal-config-out-of-core.md` "Phase 3 — as-built". |
+| `pipelex-mistralai-workflows` | `feature/Mistral-native` | `272c72d` | Plugin reconciled onto the post-#969 bridge **and** the Temporal externalization, **now a discoverable `pipelex.plugins` entry-point plugin** (registers the `MISTRAL_NATIVE` orchestrator); re-pinned to the editable `../_workflows` (consumes the branch above); Mistral-native cost reporting. |
 
-Plus a doc commit on this branch for this folder.
+Plus doc commits on this branch for this folder and `wip/plugins/`.
+
+> **Note (2026-06-21).** Earlier rows pointed at `e13587f4b` / `11902f6`, before `refactor/Plugins-3` was merged into this branch and the plugin was made entry-point-discoverable. The publish gate below is unchanged.
 
 > **Drift note.** `feature/mistralai-2x-bump` was cut off `origin/dev` on 2026-06-09 and carries only the SDK bump, so it falls *behind* `dev` as `dev` advances (`git status -sb` shows the count). That is expected for a parked branch — the HOLD group barely intersects anything else, so a rebase onto current `dev` is cheap and is the first un-gate step below. Re-run both gates after any rebase.
 
