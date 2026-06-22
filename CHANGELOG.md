@@ -5,6 +5,7 @@
 ### Removed
 
 - **Dead `PipeValidationErrorType` value `img_gen_input_not_text_compatible` (pre-1.0 breaking):** Removed the enum value, which had **zero raise sites** — `PipeImgGen.validate_inputs_with_library` was a no-op. The value encoded an "img-gen inputs must be text-compatible" rule that the current design contradicts: `PipeImgGen` accepts image inputs as a first-class feature (`image_references` / `input_images` for reference images and image editing). The output-side guardrails that *do* hold remain (`llm_output_cannot_be_image`, `inadequate_output_concept`). The value was never emitted, so no real validation output changes.
+- **Native concept `ImgGenPrompt` (pre-1.0 breaking):** Removed `native.ImgGenPrompt`. It was structurally identical to `Text` (no dedicated content class; the factory mapped it to `TextContent`), so it added a brand-new built-in concept with no semantic payload. `PipeImgGen` never depended on it — its inputs are ordinary `Text`-compatible variables and its only concept guard is an `Image`-compatible output. Migration: replace `ImgGenPrompt` / `refines = "ImgGenPrompt"` with `Text` in any `.mthds`. Unrelated and unchanged: the `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` template category, and `ImgGenPromptError`.
 
 ### Fixed
 
