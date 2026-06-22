@@ -1,4 +1,4 @@
-# Writing tests
+# Writing Tests
 
 ## Unit test generalities
 
@@ -29,7 +29,7 @@ Apply the appropriate markers:
 - "inference: uses either an LLM or an image generation AI"
 - never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
-Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
+Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference` and `llm`.
 
 ### Important rules
 
