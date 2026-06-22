@@ -1,15 +1,19 @@
 # Changelog
 
-## [Unreleased]
+## [v0.35.1] - 2026-06-22
 
-### Removed
+### Changed
 
-- **Dead `PipeValidationErrorType` value `img_gen_input_not_text_compatible` (pre-1.0 breaking):** Removed the enum value, which had **zero raise sites** — `PipeImgGen.validate_inputs_with_library` was a no-op. The value encoded an "img-gen inputs must be text-compatible" rule that the current design contradicts: `PipeImgGen` accepts image inputs as a first-class feature (`image_references` / `input_images` for reference images and image editing). The output-side guardrails that *do* hold remain (`llm_output_cannot_be_image`, `inadequate_output_concept`). The value was never emitted, so no real validation output changes.
-- **Native concept `ImgGenPrompt` (pre-1.0 breaking):** Removed `native.ImgGenPrompt`. It was structurally identical to `Text` (no dedicated content class; the factory mapped it to `TextContent`), so it added a brand-new built-in concept with no semantic payload. `PipeImgGen` never depended on it — its inputs are ordinary `Text`-compatible variables and its only concept guard is an `Image`-compatible output. Migration: replace `ImgGenPrompt` / `refines = "ImgGenPrompt"` with `Text` in any `.mthds`. Unrelated and unchanged: the `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` template category, and `ImgGenPromptError`.
+- **`PipeImgGen` documentation:** Rewrote the docs to clarify how inputs are consumed. `PipeImgGen` has no dedicated "prompt concept"; it uses a `prompt` string template into which declared `inputs` are injected at runtime — `Text` variables are interpolated directly, while `Image` variables (single or lists) are injected as reference images to enable image-to-image and editing workflows. Added examples demonstrating this vision pattern.
 
 ### Fixed
 
-- **Blueprint-stage `PipeValidationError` lost its `error_type`:** A `PipeValidationError` raised inside a pydantic blueprint validator (the PipeBatch `input_item_name` == `input_list_name` collision, and the SubPipe `batch_over` == `batch_as` collision — both `batch_item_name_collision`) is wrapped by pydantic as a `value_error`, which the blueprint validation-error categorizer did not unwrap, so the item degraded to an uncategorized `blueprint_validation` residual with no `error_type`. The categorizer now unwraps the wrapped `PipeValidationError` from `ctx["error"]` (mirroring the pipe categorizer via the shared `extract_wrapped_pipe_validation_error`), so **any** blueprint-stage `PipeValidationError` keeps its structured `error_type` and recovers its `pipe_code` / `domain_code` / `source` locators from the parse context. The item stays in the `blueprint_validation` category because the fault genuinely surfaces at the parse boundary, before any pipe is instantiated.
+- **Blueprint-stage validation error categorization:** `PipeValidationError`s raised during blueprint parsing (e.g. `PipeBatch` or `SubPipe` item name collisions) previously lost their `error_type` because Pydantic wrapped them in a generic `value_error`, degrading them to uncategorized residual errors. The categorizer now unwraps them, preserving their structured `error_type`, `pipe_code`, `domain_code`, and `source` locators.
+
+### Removed
+
+- **Native concept `ImgGenPrompt` (pre-1.0 breaking):** Removed the built-in `native.ImgGenPrompt` concept. It was structurally identical to `Text` (mapped to `TextContent`) and added no unique semantics; `PipeImgGen` never depended on it. **Migration:** replace `ImgGenPrompt` (or `refines = "ImgGenPrompt"`) with `Text` in your `.mthds` files. The internal `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` category, and `ImgGenPromptError` are unchanged.
+- **Dead validation error type (pre-1.0 breaking):** Removed the `PipeValidationErrorType.img_gen_input_not_text_compatible` enum value. It had no raise sites and contradicted the current design, where `PipeImgGen` accepts image inputs as a first-class feature.
 
 ## [v0.35.0] - 2026-06-18
 
