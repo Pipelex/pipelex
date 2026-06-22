@@ -1,10 +1,10 @@
 """Per-call validate seam, mirroring the ``OrchestratorRegistry`` for ``/validate``.
 
-A bundle validator produces a validation verdict for one execution mode, the way an
+A bundle validator produces a validation verdict for one orchestration mode, the way an
 orchestrator runs a pipe for one mode. The seam is generic across orchestrators: the
-core ``direct`` plugin contributes the in-process validator (DIRECT), the external
-``pipelex-temporal`` plugin contributes the worker-dispatched validator (under both
-TEMPORAL_* modes), and a Mistral validator can slot in later — none of which core or a
+core ``direct`` plugin contributes the in-process validator (``"direct"``), the external
+``pipelex-temporal`` plugin contributes the worker-dispatched validator (under
+``"temporal"``), and a Mistral validator can slot in later — none of which core or a
 host runtime names.
 
 Verdict-as-value (not raise): ``validate_bundles`` *returns* the verdict — the valid
@@ -30,7 +30,7 @@ from typing import TYPE_CHECKING, Protocol, TypeAlias, runtime_checkable
 from mthds.protocol.models import ValidationReport
 
 from pipelex.base_exceptions import ErrorReport
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -46,12 +46,13 @@ BundleValidationVerdict: TypeAlias = ValidationReport | ErrorReport
 
 @runtime_checkable
 class BundleValidatorProtocol(Protocol):
-    """How ``/validate`` produces a verdict under one execution mode.
+    """How ``/validate`` produces a verdict under one orchestration mode.
 
-    A validator plugin registers one of these per ``PipelexExecutionMode`` it serves
-    (DIRECT in core; TEMPORAL_* from ``pipelex-temporal``; MISTRAL_NATIVE later). The
-    API resolves the mode and dispatches through the ``BundleValidatorRegistry`` instead
-    of branching on a backend.
+    A validator plugin registers one of these per ``orchestration_mode`` token it serves
+    (``"direct"`` in core; ``"temporal"`` from ``pipelex-temporal``;
+    ``"mistralai-workflows"`` later). The API resolves the mode and dispatches through the
+    ``BundleValidatorRegistry`` instead of branching on a backend. Validation is inherently
+    blocking, so there is no ``delivery`` axis here (unlike ``OrchestratorProtocol.run``).
 
     ``library_dirs`` is host context the in-process arm needs to load the method library;
     a dispatched arm (Temporal) ignores it — its worker loads its own library.
@@ -70,19 +71,19 @@ class BundleValidatorProtocol(Protocol):
 class BundleValidatorRegistry:
     """Read view over the bundle validators contributed by discovered plugins.
 
-    Keyed by ``PipelexExecutionMode``. Built once at boot from the registrar's
-    accumulated validators and stored on the hub.
+    Keyed by the open ``OrchestrationMode`` token (a ``str``). Built once at boot from
+    the registrar's accumulated validators and stored on the hub.
     """
 
-    def __init__(self, validators: dict[PipelexExecutionMode, BundleValidatorProtocol]):
-        self._validators: dict[PipelexExecutionMode, BundleValidatorProtocol] = dict(validators)
+    def __init__(self, validators: dict[OrchestrationMode, BundleValidatorProtocol]):
+        self._validators: dict[OrchestrationMode, BundleValidatorProtocol] = dict(validators)
 
-    def get_optional(self, *, mode: PipelexExecutionMode) -> BundleValidatorProtocol | None:
+    def get_optional(self, *, mode: OrchestrationMode) -> BundleValidatorProtocol | None:
         return self._validators.get(mode)
 
-    def has(self, *, mode: PipelexExecutionMode) -> bool:
+    def has(self, *, mode: OrchestrationMode) -> bool:
         return mode in self._validators
 
     @property
-    def modes(self) -> list[PipelexExecutionMode]:
+    def modes(self) -> list[OrchestrationMode]:
         return list(self._validators)

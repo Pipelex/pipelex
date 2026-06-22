@@ -68,28 +68,28 @@ class DuplicateModelListerError(PluginError):
 
 
 class DuplicateOrchestratorError(PluginError):
-    """Two plugins registered an orchestrator for the same execution mode."""
+    """Two plugins registered an orchestrator for the same orchestration mode."""
 
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
         self.first_plugin = first_plugin
         self.second_plugin = second_plugin
         message = (
-            f"Orchestrator for execution mode '{mode}' is registered by both plugin "
+            f"Orchestrator for orchestration mode '{mode}' is registered by both plugin "
             f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single orchestrator."
         )
         super().__init__(message)
 
 
 class DuplicateBundleValidatorError(PluginError):
-    """Two plugins registered a bundle validator for the same execution mode."""
+    """Two plugins registered a bundle validator for the same orchestration mode."""
 
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
         self.first_plugin = first_plugin
         self.second_plugin = second_plugin
         message = (
-            f"Bundle validator for execution mode '{mode}' is registered by both plugin "
+            f"Bundle validator for orchestration mode '{mode}' is registered by both plugin "
             f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single validator."
         )
         super().__init__(message)
