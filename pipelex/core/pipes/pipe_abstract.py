@@ -19,6 +19,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
@@ -39,7 +40,6 @@ from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.graph.trace_context import TraceContext
-    from pipelex.libraries.library_crate import LibraryCrate
 
 PipeAbstractType = type["PipeAbstract"]
 
@@ -118,18 +118,31 @@ class PipeAbstract(ABC, BaseModel):
             execution_data=execution_data,
         )
 
-    def _make_single_concept_data_for_registry(self, concept: Concept) -> dict[str, Any]:
+    def _make_pipe_data_for_registry(self, *, library_crate: LibraryCrate | None) -> dict[str, Any]:
+        """Serialize this pipe for the graph registry, including declaration source when known."""
+        pipe_data = self.model_dump(mode="json", serialize_as_any=True)
+        if library_crate is not None:
+            source = library_crate.source_map.get(self.pipe_ref)
+            if source:
+                pipe_data["source"] = source
+        return pipe_data
+
+    def _make_single_concept_data_for_registry(self, concept: Concept, *, library_crate: LibraryCrate | None) -> dict[str, Any]:
         """Serialize a single concept for the graph registry, including its JSON Schema."""
-        concept_dict = concept.model_dump(mode="json")
+        concept_dict = concept.model_dump(mode="json", serialize_as_any=True)
+        if library_crate is not None:
+            source = library_crate.source_map.get(concept.concept_ref)
+            if source:
+                concept_dict["source"] = source
         try:
             concept_dict["json_schema"] = concept.get_structure_class().model_json_schema()
         except (TypeError, ValueError):
             concept_dict["json_schema"] = None
         return concept_dict
 
-    def _make_concept_data_for_registry(self) -> list[dict[str, Any]]:
+    def _make_concept_data_for_registry(self, *, library_crate: LibraryCrate | None) -> list[dict[str, Any]]:
         """Serialize all unique concepts from this pipe for the graph registry."""
-        return [self._make_single_concept_data_for_registry(concept) for concept in self.concept_dependencies]
+        return [self._make_single_concept_data_for_registry(concept, library_crate=library_crate) for concept in self.concept_dependencies]
 
     @field_validator("code", mode="before")
     @classmethod
@@ -445,7 +458,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         # Push the pipe's frame onto the stack, run it, and always pop it — even on failure —
         # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
@@ -471,7 +484,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         """Run the pipe with graph tracing — the inner body of `run_pipe()`.
 
@@ -522,8 +535,8 @@ class PipeAbstract(ABC, BaseModel):
                 pipe_data: dict[str, Any] | None = None
                 concept_data: list[dict[str, Any]] | None = None
                 if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry:
-                    pipe_data = self.model_dump(mode="json")
-                    concept_data = self._make_concept_data_for_registry()
+                    pipe_data = self._make_pipe_data_for_registry(library_crate=library_crate)
+                    concept_data = self._make_concept_data_for_registry(library_crate=library_crate)
 
                 graph_node_id, child_trace_context = tracer_manager.on_pipe_start(
                     trace_context=parent_trace_context,
@@ -614,7 +627,7 @@ class PipeAbstract(ABC, BaseModel):
             # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
             output_concept_data: dict[str, Any] | None = None
             if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
-                output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept)
+                output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept, library_crate=library_crate)
 
             tracer_manager.on_pipe_end_success(
                 lookup_key=parent_trace_context.lookup_key,
@@ -634,7 +647,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
@@ -707,7 +720,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
@@ -727,7 +740,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         pass
 
@@ -739,7 +752,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         pass
 

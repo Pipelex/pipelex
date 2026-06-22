@@ -69,6 +69,54 @@ class TestGraphSpecAssembler:
         assert result.nodes == []
         assert result.edges == []
 
+    def test_registry_source_payloads_survive_assembly(self) -> None:
+        """PipeStartEvent and PipeEndSuccessEvent registry payloads are copied unchanged."""
+        pipe_source = "/fake/sourceful_pipe.mthds"
+        input_concept_source = "/fake/input_concepts.mthds"
+        output_concept_source = "/fake/output_concepts.mthds"
+        node_id = _node_id(_WF_A, 0)
+
+        result = GraphSpecAssembler.assemble(
+            events=[
+                PipeStartEvent(
+                    **_base(_WF_A, 0),
+                    node_id=node_id,
+                    pipe_code="sourceful_pipe",
+                    pipe_type="PipeLLM",
+                    node_kind=NodeKind.OPERATOR,
+                    domain_code="sourceful",
+                    pipe_data={
+                        "code": "sourceful_pipe",
+                        "domain_code": "sourceful",
+                        "type": "PipeLLM",
+                        "source": pipe_source,
+                    },
+                    concept_data=[
+                        {
+                            "code": "InputConcept",
+                            "domain_code": "sourceful",
+                            "source": input_concept_source,
+                        }
+                    ],
+                ),
+                PipeEndSuccessEvent(
+                    **_base(_WF_A, 1),
+                    node_id=node_id,
+                    ended_at=_time_at(1),
+                    output_concept_data={
+                        "code": "OutputConcept",
+                        "domain_code": "sourceful",
+                        "source": output_concept_source,
+                    },
+                ),
+            ],
+            graph_id=_GRAPH_ID,
+        )
+
+        assert result.pipe_registry["sourceful.sourceful_pipe"]["source"] == pipe_source
+        assert result.concept_registry["sourceful.InputConcept"]["source"] == input_concept_source
+        assert result.concept_registry["sourceful.OutputConcept"]["source"] == output_concept_source
+
     def test_simple_sequence(self) -> None:
         """3 child pipes in sequence under a parent.
 

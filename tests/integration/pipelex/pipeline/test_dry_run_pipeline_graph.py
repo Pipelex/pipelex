@@ -49,6 +49,9 @@ class TestDryRunPipelineGraphTransport:
         assert pipe_code == f"{_DRY_RUN_GRAPH_DOMAIN}.echo_subject"
         traced_pipe_codes = {node.pipe_code for node in graph_spec.nodes if node.pipe_code}
         assert "echo_subject" in traced_pipe_codes
+        assert "source" not in graph_spec.pipe_registry[f"{_DRY_RUN_GRAPH_DOMAIN}.echo_subject"]
+        for concept_data in graph_spec.concept_registry.values():
+            assert "source" not in concept_data
 
     async def test_scoped_log_takes_priority_over_enabled_backend(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:
         """With tracing enabled, the scoped in-memory log still owns the run — no trace files written."""

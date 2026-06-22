@@ -1,0 +1,5 @@
+.env
+.pipelex/pipelex_override.toml
+.pipelex/pipelex_service.toml
+.pipelex/telemetry_override.toml
+.pipelex-dev/test_profiles_override.toml
