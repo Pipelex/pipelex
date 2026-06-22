@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Orchestration & Delivery split (pre-1.0 breaking, plugin SPI):** The flat execution-mode axis is split into an open `orchestration_mode` token (which orchestrator runs the job — `direct` in core, `temporal`/`mistralai-workflows` from plugins) and a closed `DeliveryMode` enum (the wait-semantics axis — `BLOCKING` / `FIRE_AND_FORGET`). The orchestrator plugin contract changes accordingly: `OrchestratorProtocol.run` now takes a required `delivery: DeliveryMode` keyword, an orchestrator must declare a `supports_fire_and_forget: bool` capability, and the registries are re-keyed by the open `orchestration_mode` token (the former `PipelexExecutionMode` enum is removed). A plugin built against the prior contract is incompatible and must be rebuilt. `PipelexPipeRunInput` now carries `orchestration_mode` + `delivery`.
+- **Honest fire-and-forget rejection:** `/start` now rejects a fire-and-forget request when the resolved orchestrator cannot do genuine async (e.g. the in-process `direct` mode), returning a 4xx instead of silently running to completion and falsely acking.
+
+### Added
+
+- **Orchestrator-dispatched `/validate`:** A new per-call bundle-validator seam (`BundleValidatorProtocol` / `BundleValidatorRegistry`) makes `/validate` dispatch by `orchestration_mode` the way `/start` runs a pipe — `direct` validates in-process, distributed modes dispatch the job to a worker — with a byte-identical verdict across backends. The core `direct` plugin registers an in-process `DirectBundleValidator`.
+
 ## [v0.35.0] - 2026-06-18
 
 ### Added

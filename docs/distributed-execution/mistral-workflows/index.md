@@ -26,7 +26,7 @@ You don't rewrite your methods. The same pipes that run in-process locally run u
 ## What you get
 
 - **Durable execution** — pipe runs survive worker restarts and transient failures, resuming from history.
-- **Automatic retries** — what retries depends on the execution mode: in `direct` mode the whole pipe runs inside one host activity that retries as a unit; in `mistral_native` mode each leaf operator (LLM call, extraction, image generation) runs as its own host activity and retries independently. See [Execution Modes](execution-modes.md).
+- **Automatic retries** — what retries depends on the orchestration mode: in `direct` mode the whole pipe runs inside one host activity that retries as a unit; in `mistralai-workflows` mode each leaf operator (LLM call, extraction, image generation) runs as its own host activity and retries independently. See [Orchestration & Delivery](execution-modes.md).
 - **Streaming progress** — surface live pipe progress through the Workflows Task event API. See [Streaming Progress](streaming.md).
 - **The same methods, unchanged** — your `.mthds` bundles don't change between local, Temporal, and Mistral Workflows execution.
 
@@ -34,5 +34,5 @@ You don't rewrite your methods. The same pipes that run in-process locally run u
 
 - **[Installation & Preview Status](installation.md)** — install the preview package and its prerequisites.
 - **[Your First Pipelex Workflow](your-first-pipelex-workflow.md)** — register a Pipelex activity and run a pipe end to end.
-- **[Execution Modes](execution-modes.md)** — how a pipe runs inside an activity, and what each mode requires.
+- **[Orchestration & Delivery](execution-modes.md)** — how a pipe runs inside an activity, and what each mode requires.
 - **[Choosing a Backend](choosing-a-backend.md)** — Mistral Workflows vs your own Temporal cluster.

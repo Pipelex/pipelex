@@ -4,7 +4,9 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import ErrorReport
+from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
+    DuplicateBundleValidatorError,
     DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
     DuplicateModelListerError,
@@ -14,7 +16,7 @@ from pipelex.plugins.exceptions import (
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -106,7 +108,8 @@ class PluginRegistrar:
         self.config = config
         self.inference_backends: dict[tuple[InferenceFamily, str], MakeWorkerFn] = {}
         self.model_listers: dict[str, ListModelsFn] = {}
-        self.orchestrators: dict[PipelexExecutionMode, OrchestratorProtocol] = {}
+        self.orchestrators: dict[OrchestrationMode, OrchestratorProtocol] = {}
+        self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -116,7 +119,8 @@ class PluginRegistrar:
         self.discoveries: list[PluginDiscovery] = []
         self._inference_sources: dict[tuple[InferenceFamily, str], str] = {}
         self._model_lister_sources: dict[str, str] = {}
-        self._orchestrator_sources: dict[PipelexExecutionMode, str] = {}
+        self._orchestrator_sources: dict[OrchestrationMode, str] = {}
+        self._bundle_validator_sources: dict[OrchestrationMode, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -160,7 +164,7 @@ class PluginRegistrar:
             ),
         )
 
-    def add_orchestrator(self, *, mode: PipelexExecutionMode, orchestrator: OrchestratorProtocol) -> None:
+    def add_orchestrator(self, *, mode: OrchestrationMode, orchestrator: OrchestratorProtocol) -> None:
         self._add(
             store=self.orchestrators,
             sources=self._orchestrator_sources,
@@ -168,6 +172,18 @@ class PluginRegistrar:
             value=orchestrator,
             contribution=f"orchestrator {mode}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateOrchestratorError(
+                mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_bundle_validator(self, *, mode: OrchestrationMode, validator: BundleValidatorProtocol) -> None:
+        self._add(
+            store=self.bundle_validators,
+            sources=self._bundle_validator_sources,
+            key=mode,
+            value=validator,
+            contribution=f"bundle validator {mode}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateBundleValidatorError(
                 mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )

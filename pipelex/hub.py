@@ -49,6 +49,7 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
     from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -78,6 +79,7 @@ class PipelexHub:
         self._inference_backend_registry: InferenceBackendRegistry | None = None
         self._model_lister_registry: ModelListerRegistry | None = None
         self._orchestrator_registry: OrchestratorRegistry | None = None
+        self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -192,6 +194,9 @@ class PipelexHub:
 
     def set_orchestrator_registry(self, orchestrator_registry: "OrchestratorRegistry"):
         self._orchestrator_registry = orchestrator_registry
+
+    def set_bundle_validator_registry(self, bundle_validator_registry: "BundleValidatorRegistry"):
+        self._bundle_validator_registry = bundle_validator_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -324,6 +329,12 @@ class PipelexHub:
             msg = "OrchestratorRegistry is not initialized"
             raise RuntimeError(msg)
         return self._orchestrator_registry
+
+    def get_bundle_validator_registry(self) -> "BundleValidatorRegistry":
+        if self._bundle_validator_registry is None:
+            msg = "BundleValidatorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._bundle_validator_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -491,6 +502,10 @@ def get_model_lister_registry() -> "ModelListerRegistry":
 
 def get_orchestrator_registry() -> "OrchestratorRegistry":
     return get_pipelex_hub().get_orchestrator_registry()
+
+
+def get_bundle_validator_registry() -> "BundleValidatorRegistry":
+    return get_pipelex_hub().get_bundle_validator_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

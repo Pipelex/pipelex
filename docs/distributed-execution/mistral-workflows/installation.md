@@ -14,7 +14,7 @@ Before installing, make sure you have:
 
 - **Python 3.12 or later.** Mistral Workflows requires 3.12+. Pipelex core supports 3.10+, but this orchestration path needs 3.12 because of the Workflows SDK.
 - **A Mistral Workflows setup** — a workspace and API key from the [Mistral Console](https://console.mistral.ai/), and the `mistralai-workflows` SDK. Follow Mistral's own Workflows installation and first-workflow guides for the worker, console, and `.env` setup; this guide does not duplicate them.
-- **A Pipelex method to run** — a `.mthds` bundle available on your `PIPELEXPATH`, or passed at call time as a library crate (see [Execution Modes](execution-modes.md)).
+- **A Pipelex method to run** — a `.mthds` bundle available on your `PIPELEXPATH`, or passed at call time as a library crate (see [Orchestration & Delivery](execution-modes.md)).
 
 ## Install
 

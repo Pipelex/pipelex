@@ -20,13 +20,19 @@ from pipelex.runtime_bridge.serialization import PIPE_DISPATCH_ERRORS, serialize
 if TYPE_CHECKING:
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.runtime_bridge.delivery_mode import DeliveryMode
     from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
 
 
 class DirectOrchestrator:
     """In-process execution; no Temporal involved on Pipelex's side."""
 
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:
+    # In-process execution has no genuine async path — it always blocks until the pipe
+    # completes — so it cannot honor FIRE_AND_FORGET. ``/start`` reads this and rejects
+    # rather than running blocking and falsely acking.
+    supports_fire_and_forget = False
+
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None, delivery: DeliveryMode) -> PipelexPipeRunOutput:  # noqa: ARG002 — delivery accepted for protocol uniformity; in-process always blocks
         # DIRECT mode forces in-process execution even inside a Temporal-enabled
         # worker. Scope the in-process router as the active router for the WHOLE
         # run so nested controller sub-pipes — which dispatch through

@@ -22,7 +22,6 @@ from pipelex.runtime_bridge.bridge import (
     run_pipe_via_bridge,
 )
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 PIPE_REF = "mistralai_workflows_bridge_test.bridge_func_pipe"
 ENVELOPE_PIPE_REF = "mistralai_workflows_bridge_test.bridge_envelope_pipe"
@@ -40,7 +39,7 @@ class TestBridgeDirect:
             PipelexPipeRunInput(
                 pipe_code=PIPE_REF,
                 inputs={"input_text": "hello world"},
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
@@ -73,7 +72,7 @@ class TestBridgeDirect:
                 pipe_code=PIPE_REF,
                 inputs={"input_text": "via crate"},
                 library_crate_dump=crate_dump,
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
@@ -93,7 +92,7 @@ class TestBridgeDirect:
                 pipe_code=PIPE_REF,
                 inputs={"input_text": "trace me"},
                 pipeline_run_id=caller_run_id,
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
@@ -122,7 +121,7 @@ class TestBridgeDirect:
                 pipe_code=envelope_pipe_ref,
                 inputs={"input_text": "wrapped"},
                 library_crate_dump=crate_dump,
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
@@ -155,7 +154,7 @@ class TestBridgeDirect:
                 pipe_code=PIPE_REF,
                 inputs={"input_text": "restore me"},
                 library_crate_dump=crate_dump,
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
@@ -231,7 +230,7 @@ class TestBridgeDirect:
                 PipelexPipeRunInput(
                     pipe_code=RAISE_PIPE_REF,
                     inputs={"input_text": "boom"},
-                    execution_mode=PipelexExecutionMode.DIRECT,
+                    orchestration_mode="direct",
                 )
             )
 
@@ -262,7 +261,7 @@ class TestBridgeDirect:
                 pipe_code=ENVELOPE_PIPE_REF,
                 inputs={"input_text": "probe"},
                 library_crate_dump=probe_dump,
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
             )
         )
 
