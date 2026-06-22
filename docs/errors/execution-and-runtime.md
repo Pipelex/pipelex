@@ -38,6 +38,7 @@ own page. Classes are grouped by subsystem.
 
 ## Runtime bridge
 
+- [`MissingBundleValidatorError`](missing-bundle-validator-error.md) — Missing bundle validator
 - [`MissingOrchestratorError`](missing-orchestrator-error.md) — Missing orchestrator
 - [`PipelexBridgeDispatchError`](pipelex-bridge-dispatch-error.md) — Pipelex bridge dispatch
 - [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
