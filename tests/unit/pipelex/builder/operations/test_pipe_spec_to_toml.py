@@ -148,7 +148,7 @@ class TestPipeSpecToToml:
             {
                 "pipe_code": "gen_image",
                 "description": "Generate image",
-                "inputs": {"prompt_text": "ImgGenPrompt"},
+                "inputs": {"prompt_text": "Text"},
                 "output": "Image",
                 "model": "$gen-image",
                 "prompt": "Generate: $prompt_text",
@@ -164,7 +164,7 @@ class TestPipeSpecToToml:
             {
                 "pipe_code": "gen_image",
                 "description": "Generate image",
-                "inputs": {"prompt_text": "ImgGenPrompt"},
+                "inputs": {"prompt_text": "Text"},
                 "output": "Image",
                 "prompt": "Generate: $prompt_text",
             },

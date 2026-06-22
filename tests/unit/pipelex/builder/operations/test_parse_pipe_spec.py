@@ -137,7 +137,7 @@ class TestParsePipeSpec:
         spec: dict[str, Any] = {
             "pipe_code": "my_img",
             "description": "Generate image",
-            "inputs": {"prompt_text": "ImgGenPrompt"},
+            "inputs": {"prompt_text": "Text"},
             "output": "Image",
             "prompt_template": "Generate: $prompt_text",
         }
@@ -356,7 +356,7 @@ class TestParsePipeSpec:
                 {
                     "pipe_code": "my_img",
                     "description": "Generate image",
-                    "inputs": {"prompt_text": "ImgGenPrompt"},
+                    "inputs": {"prompt_text": "Text"},
                     "output": "Image",
                     "prompt": "Generate: $prompt_text",
                 },

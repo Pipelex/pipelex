@@ -37,6 +37,6 @@ Generated images can be automatically uploaded to AWS S3 or Google Cloud Storage
 
 ## Usage in Pipelines
 
-Use PipeImgGen in your `.mthds` files to generate images as part of a pipeline. The operator accepts a text prompt (or an ImgGenPrompt concept) and outputs an Image concept. Model presets let you configure quality levels and default models in `2_img_gen_deck.toml`.
+Use PipeImgGen in your `.mthds` files to generate images as part of a pipeline. The operator takes a `prompt` string template and outputs an `Image` concept. Declared inputs are injected into the template — `Text` variables as interpolated text, and `Image` variables as reference images for image-to-image generation. Model presets let you configure quality levels and default models in `2_img_gen_deck.toml`.
 
 See [PipeImgGen reference](../building-methods/pipes/pipe-operators/PipeImgGen.md).
