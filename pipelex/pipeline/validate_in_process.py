@@ -107,7 +107,7 @@ async def validate_bundles_in_process(
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
-        graph_target_ref = graph_pipe_code or select_primary_blueprint(result.blueprints).main_pipe_ref
+        graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
             pipe_ref=graph_target_ref,
             library_id=validation_library_id,

@@ -96,4 +96,9 @@ async def dry_run_pipeline(
         msg = "Pipeline execution did not produce a graph spec"
         raise DryRunGraphNotProducedError(msg)
 
-    return pipe_output.graph_spec, pipe_ref
+    resolved_pipe_ref = pipe_ref
+    pipeline_ref = pipe_output.graph_spec.pipeline_ref
+    if pipeline_ref.domain and pipeline_ref.main_pipe:
+        resolved_pipe_ref = f"{pipeline_ref.domain}.{pipeline_ref.main_pipe}"
+
+    return pipe_output.graph_spec, resolved_pipe_ref

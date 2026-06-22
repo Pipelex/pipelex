@@ -55,6 +55,18 @@ class TestRunnerProtocolSurfaces:
 
         assert str(exc_info.value) == "The local runtime defines no extension args; got ['abc', 'zed']."
 
+    async def test_validate_rejects_blank_graph_pipe_code_extra(self) -> None:
+        """A blank explicit graph target must not silently fall back to main_pipe."""
+        runner = PipelexMTHDSProtocol()
+
+        with pytest.raises(PipelineRequestError) as exc_info:
+            await runner.validate(
+                mthds_contents=['domain = "blank_graph_target"'],
+                extra={"graph_pipe_code": "   "},
+            )
+
+        assert str(exc_info.value) == "validate extra 'graph_pipe_code' must not be blank when provided."
+
     async def test_start_raises_not_implemented_pointing_at_execute(self) -> None:
         """The local runtime does not implement async start; the message redirects to execute."""
         runner = PipelexMTHDSProtocol()

@@ -91,6 +91,9 @@ def _extract_validate_graph_pipe_code(extra: dict[str, Any] | None) -> str | Non
     if graph_pipe_code is not None and not isinstance(graph_pipe_code, str):
         msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must be a string when provided."
         raise PipelineRequestError(msg)
+    if graph_pipe_code is not None and not graph_pipe_code.strip():
+        msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must not be blank when provided."
+        raise PipelineRequestError(msg)
     return graph_pipe_code
 
 

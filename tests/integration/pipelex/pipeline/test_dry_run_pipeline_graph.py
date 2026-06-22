@@ -85,7 +85,7 @@ class TestDryRunPipelineGraphTransport:
 
         graph_spec, pipe_code = await dry_run_pipeline(
             mthds_contents=[_DRY_RUN_GRAPH_NO_MAIN_MTHDS],
-            pipe_code=f"{_DRY_RUN_GRAPH_DOMAIN}_no_main.echo_subject",
+            pipe_code="echo_subject",
         )
 
         assert pipe_code == f"{_DRY_RUN_GRAPH_DOMAIN}_no_main.echo_subject"
