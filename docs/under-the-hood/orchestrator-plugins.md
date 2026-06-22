@@ -143,10 +143,10 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 `pipelex_temporal/temporal_plugin.py` (in the externalized `pipelex-temporal` distribution) is the reference orchestrator plugin. Its `register`:
 
-- **always** (regardless of the boot gate): contributes `TemporalBlockingOrchestrator` / `TemporalFireAndForgetOrchestrator` (import-light; `temporalio` is pulled lazily inside `run`);
+- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`). It advertises `supports_fire_and_forget = True`, and its `run` branches on the endpoint-chosen `delivery`: `BLOCKING` awaits completion and reports `make_workflow_id(...)`; `FIRE_AND_FORGET` calls `.start(...)` and returns an `is_completed=False` output carrying the workflow id;
 - **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
 
-The orchestrators themselves (`pipelex_temporal/temporal_orchestrators.py`) are extracted verbatim from the bridge's former `_run_temporal_*` arms, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute. They serialize their `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
+The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) carries both delivery bodies behind one exhaustive `match delivery`, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
 The Temporal plugin is in-tree today and discovered through `BUILTIN_PLUGINS` (a hardcoded list in `pipelex/plugins/builtins.py`) — pipelex declares **no** `[project.entry-points."pipelex.plugins"]` on itself. Externalizing it into a `pipelex-temporal` distribution (Phase 5) is therefore not "the same entry point from a new dist": it means *removing* the plugin from `BUILTIN_PLUGINS` and *adding* a `pipelex.plugins` entry point in the new dist's `pyproject.toml`. Its operational `worker` / `setup-namespace` commands already ship as the standalone `pipelex-temporal` console script, so they travel with that dist unchanged.
 

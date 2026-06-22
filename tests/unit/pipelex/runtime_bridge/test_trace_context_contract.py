@@ -9,8 +9,24 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
-from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
+from pipelex.runtime_bridge.delivery_mode import DeliveryMode
+from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
+
+
+class _FakeOrchestrator:
+    supports_fire_and_forget = True
+
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: object, delivery: DeliveryMode) -> PipelexPipeRunOutput:  # noqa: ARG002
+        return PipelexPipeRunOutput(
+            output_dict={},
+            main_stuff_name=None,
+            pipeline_run_id="run-id",
+            workflow_id="fake-wf",
+            is_completed=True,
+            graph_spec_dump=None,
+        )
 
 
 def _make_trace_context() -> TraceContext:
@@ -74,15 +90,16 @@ class TestTraceContextContract:
 
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", side_effect=spy)
 
-        # "temporal" has no orchestrator registered in core (Temporal is the external
-        # pipelex-temporal plugin), so dispatch raises MissingOrchestratorError — but only
-        # AFTER build_pipe_job_from_input runs, by which point the bridge has already nulled
-        # the host trace_context for the non-"direct" mode. This pins the
-        # ``trace_context if is_direct else None`` guard against cross-graph contamination.
-        with pytest.raises(MissingOrchestratorError):
-            await run_pipe_via_bridge(
-                PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="temporal"),
-                trace_context=trace_context,
-            )
+        # Register a stand-in orchestrator under the non-"direct" "temporal" token so dispatch
+        # reaches the pipe-job build. The bridge nulls the host trace_context for any non-"direct"
+        # mode, pinning the ``trace_context if is_direct else None`` guard against cross-graph
+        # contamination (a distributed mode owns its own event-log infrastructure).
+        registry = OrchestratorRegistry({"temporal": _FakeOrchestrator()})
+        mocker.patch("pipelex.runtime_bridge.bridge.get_orchestrator_registry", return_value=registry)
+
+        await run_pipe_via_bridge(
+            PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="temporal"),
+            trace_context=trace_context,
+        )
 
         assert captured["trace_context"] is None

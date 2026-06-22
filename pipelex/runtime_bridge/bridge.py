@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.graph.trace_context import TraceContext
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 
 
 async def run_pipe_via_bridge(
@@ -75,7 +76,15 @@ async def run_pipe_via_bridge(
 
     library_crate = _decode_library_crate(input_payload.library_crate_dump)
     delivery_assignment = _decode_delivery_assignment(input_payload.delivery_assignment_dump)
-    _validate_input(input_payload, delivery_assignment=delivery_assignment)
+
+    # Resolve the orchestrator up front so _validate_input can reject an impossible
+    # (mode, delivery) pair — fire-and-forget on a blocking-only orchestrator — before opening
+    # the scoped library or building the pipe job for a doomed request. This is the Tier-3
+    # counterpart of the /start endpoint's capability check.
+    orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.orchestration_mode)
+    if orchestrator is None:
+        raise MissingOrchestratorError(mode=input_payload.orchestration_mode)
+    _validate_input(input_payload, orchestrator=orchestrator, delivery_assignment=delivery_assignment)
 
     with scoped_library_for_crate(library_crate, library_id_prefix="runtime_bridge"):
         # trace_context is honored for the "direct" mode only. A distributed mode has its
@@ -90,10 +99,6 @@ async def run_pipe_via_bridge(
             library_crate=library_crate,
             trace_context=trace_context if is_direct else None,
         )
-
-        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.orchestration_mode)
-        if orchestrator is None:
-            raise MissingOrchestratorError(mode=input_payload.orchestration_mode)
         return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment, delivery=input_payload.delivery)
 
 
@@ -162,8 +167,21 @@ def build_pipe_job_from_input(
     )
 
 
-def _validate_input(input_payload: PipelexPipeRunInput, *, delivery_assignment: DeliveryAssignment | None) -> None:
+def _validate_input(
+    input_payload: PipelexPipeRunInput, *, orchestrator: OrchestratorProtocol, delivery_assignment: DeliveryAssignment | None
+) -> None:
     if input_payload.delivery is DeliveryMode.FIRE_AND_FORGET:
+        # Capability gate first: a blocking-only orchestrator (e.g. the core "direct" mode) has no
+        # genuine async path — it would run the pipe to completion and return is_completed=True while
+        # never invoking the delivery target, i.e. block the caller AND falsely ack. Reject honestly
+        # regardless of whether a target was supplied (the mode, not the target, is the problem).
+        if not orchestrator.supports_fire_and_forget:
+            msg = (
+                f"Orchestration mode '{input_payload.orchestration_mode}' cannot honor fire-and-forget delivery: "
+                "its orchestrator runs in-process and always blocks until completion. Use blocking delivery, or "
+                "request an async-capable orchestration mode (e.g. 'temporal')."
+            )
+            raise PipelexBridgeDispatchError(msg)
         if delivery_assignment is None or not delivery_assignment.has_delivery_target:
             msg = (
                 "Fire-and-forget delivery requires a delivery_assignment_dump with at least one "

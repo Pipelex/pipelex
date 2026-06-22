@@ -15,7 +15,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
-from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
+from pipelex.runtime_bridge.exceptions import MissingOrchestratorError, PipelexBridgeDispatchError
 from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
 
@@ -33,6 +33,26 @@ class _FakeOrchestrator:
             main_stuff_name=None,
             pipeline_run_id="fake-run",
             workflow_id="fake-wf",
+            is_completed=True,
+            graph_spec_dump=None,
+        )
+
+
+class _BlockingOnlyOrchestrator:
+    """A blocking-only orchestrator (like the core DirectOrchestrator): cannot honor fire-and-forget."""
+
+    supports_fire_and_forget = False
+
+    def __init__(self) -> None:
+        self.calls: list[PipeJob] = []
+
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: object, delivery: DeliveryMode) -> PipelexPipeRunOutput:  # noqa: ARG002
+        self.calls.append(pipe_job)
+        return PipelexPipeRunOutput(
+            output_dict={},
+            main_stuff_name=None,
+            pipeline_run_id="fake-run",
+            workflow_id=None,
             is_completed=True,
             graph_spec_dump=None,
         )
@@ -92,3 +112,27 @@ class TestOrchestratorDispatch:
         assert exc_info.value.mode == mode
         assert mode in str(exc_info.value)
         assert "is its plugin installed?" in str(exc_info.value)
+
+    async def test_fire_and_forget_on_blocking_only_orchestrator_is_rejected_before_dispatch(self, mocker: MockerFixture) -> None:
+        """A blocking-only orchestrator never has its run() awaited for a fire-and-forget request: the
+        capability gate rejects first, so it cannot silently run blocking and falsely ack is_completed=True.
+        """
+        fake_job = _fake_pipe_job(mocker)
+        mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", return_value=fake_job)
+
+        blocking_only = _BlockingOnlyOrchestrator()
+        registry = OrchestratorRegistry({DIRECT_ORCHESTRATION_MODE: blocking_only})
+        mocker.patch("pipelex.runtime_bridge.bridge.get_orchestrator_registry", return_value=registry)
+
+        with pytest.raises(PipelexBridgeDispatchError, match="cannot honor fire-and-forget"):
+            await run_pipe_via_bridge(
+                PipelexPipeRunInput(
+                    pipe_code="fake_pipe",
+                    orchestration_mode="direct",
+                    delivery=DeliveryMode.FIRE_AND_FORGET,
+                    # A valid delivery target does NOT rescue a blocking-only orchestrator.
+                    delivery_assignment_dump={"webhooks": [], "storage": {"key_prefix": "runs/abc"}},
+                ),
+            )
+
+        assert blocking_only.calls == []  # run() never awaited — no blocking run, no false completion ack
