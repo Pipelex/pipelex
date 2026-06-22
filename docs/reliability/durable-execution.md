@@ -14,7 +14,7 @@ Stay on direct execution while you are developing, prototyping, or running short
 Move to a [durable backend](../distributed-execution/index.md) when you need:
 
 - **Crash survival** — a long pipeline resumes exactly where it left off after a worker restart.
-- **Retry under failure** — each LLM call, extraction, or image generation retries independently, with per-activity timeouts and a retry policy keyed off the [error category](failure-classification.md). (This per-leaf retry is the Temporal model, where each leaf maps to one host activity. On Mistral Workflows in `direct` mode the whole pipe runs inside a single host activity, so it retries as a unit; per-leaf retry there needs `mistral_native` mode.)
+- **Retry under failure** — each LLM call, extraction, or image generation retries independently, with per-activity timeouts and a retry policy keyed off the [error category](failure-classification.md). (This per-leaf retry is the Temporal model, where each leaf maps to one host activity. On Mistral Workflows in `direct` mode the whole pipe runs inside a single host activity, so it retries as a unit; per-leaf retry there needs `mistralai-workflows` mode.)
 - **Large durable batches** — running a pipe over thousands of items, durably and rate-limited.
 - **Horizontal scale** — fan work out across multiple worker machines.
 
