@@ -28,11 +28,12 @@ async def dry_run_pipeline(
     *,
     bundle_uris: list[str] | None = None,
     library_dirs: list[str] | None = None,
+    pipe_code: str | None = None,
 ) -> tuple[GraphSpec, str]:
     """Dry-run a full pipeline from MTHDS content, producing a GraphSpec.
 
-    Parses the content, identifies the main pipe, and executes the pipeline
-    in dry-run mode with graph tracing enabled and mock inputs.
+    Parses the content, identifies the requested or main pipe, and executes the
+    pipeline in dry-run mode with graph tracing enabled and mock inputs.
 
     All contents are parsed into blueprints and loaded together; the main_pipe
     is found from the first blueprint that declares one.
@@ -41,6 +42,9 @@ async def dry_run_pipeline(
         mthds_contents: List of MTHDS bundle contents as strings.
         bundle_uris: Optional list of URIs for the bundles (used by runner for dedup).
         library_dirs: Optional library directories for pipe resolution.
+        pipe_code: Optional explicit pipe target. When omitted, the first selected
+            `main_pipe` remains the default. Bare and qualified refs are accepted
+            according to the loaded pipe library's normal resolution rules.
 
     Returns:
         Tuple of (GraphSpec, domain-qualified main-pipe ref).
@@ -54,18 +58,16 @@ async def dry_run_pipeline(
         msg = "mthds_contents must be provided"
         raise ValueError(msg)
 
-    # Pre-parse contents to extract the main pipe's domain-qualified ref via the one shared
-    # selection rule. Note: pipeline_run_setup will re-parse these contents. The double-parse
-    # is accepted because the runner interface requires the pipe ref upfront and does not
-    # expose the internally-resolved pipe ref in its response.
+    # Pre-parse contents to extract the default main pipe's domain-qualified ref via the one
+    # shared selection rule. Note: pipeline_run_setup will re-parse these contents. The
+    # double-parse is accepted because the runner interface requires the pipe ref upfront
+    # and does not expose the internally-resolved pipe ref in its response.
     blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-    main_pipe_ref = select_primary_blueprint(blueprints).main_pipe_ref
+    pipe_ref = pipe_code or select_primary_blueprint(blueprints).main_pipe_ref
 
-    if not main_pipe_ref:
+    if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
         raise PipelexInterpreterError(msg)
-
-    pipe_ref: str = main_pipe_ref
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,

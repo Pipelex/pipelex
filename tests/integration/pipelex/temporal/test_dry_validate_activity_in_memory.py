@@ -330,6 +330,30 @@ class TestDryValidateActivityInMemory:
         assert result.dry_run_outputs["dry_validate_no_main.lone_pipe"].status == DryRunStatus.SUCCESS
         assert result.graph_spec is None
 
+    async def test_no_main_pipe_with_explicit_pipe_code_produces_graph(self, temporal_client: TemporalClient) -> None:
+        """An explicit pipe_code graphs a no-main bundle in the Temporal validate activity."""
+        result = await self._execute(
+            temporal_client,
+            DryValidateArg(mthds_contents=[_NO_MAIN_MTHDS], pipe_code="dry_validate_no_main.lone_pipe"),
+        )
+
+        assert result.dry_run_outputs["dry_validate_no_main.lone_pipe"].status == DryRunStatus.SUCCESS
+        assert result.graph_spec is not None
+        traced_pipe_codes = {node.pipe_code for node in result.graph_spec.nodes if node.pipe_code}
+        assert traced_pipe_codes == {"lone_pipe"}
+
+    async def test_explicit_pipe_code_overrides_main_pipe(self, temporal_client: TemporalClient) -> None:
+        """The Temporal graph arm targets the explicit pipe_code rather than the bundle main_pipe."""
+        result = await self._execute(
+            temporal_client,
+            DryValidateArg(mthds_contents=[_ALPHA_MTHDS], pipe_code="dry_validate_alpha.alpha_second"),
+        )
+
+        assert result.dry_run_outputs["dry_validate_alpha.alpha_sequence"].status == DryRunStatus.SUCCESS
+        assert result.graph_spec is not None
+        traced_pipe_codes = {node.pipe_code for node in result.graph_spec.nodes if node.pipe_code}
+        assert traced_pipe_codes == {"alpha_second"}
+
     async def test_unknown_explicit_pipe_code_degrades_to_no_graph(self, temporal_client: TemporalClient) -> None:
         """Graph-arm parity: an unknown explicit pipe_code is a graph-arm domain failure
         (PipeNotFoundError, a PipelexError) and degrades to graph_spec=None with validation

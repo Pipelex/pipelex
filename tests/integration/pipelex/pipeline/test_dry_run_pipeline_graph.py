@@ -31,6 +31,17 @@ output = "Text"
 prompt = "Echo something"
 """
 
+_DRY_RUN_GRAPH_NO_MAIN_MTHDS = f"""
+domain = "{_DRY_RUN_GRAPH_DOMAIN}_no_main"
+description = "No-main bundle for explicit dry_run_pipeline graph target tests"
+
+[pipe.echo_subject]
+type = "PipeLLM"
+description = "Pipe used to exercise explicit graph target generation"
+output = "Text"
+prompt = "Echo something"
+"""
+
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryRunPipelineGraphTransport:
@@ -66,3 +77,17 @@ class TestDryRunPipelineGraphTransport:
 
         assert graph_spec.nodes
         assert not list(traces_dir.iterdir()), "the configured ndjson backend must not be touched"
+
+    async def test_explicit_pipe_code_without_main_pipe_produces_graph(self, mocker: MockerFixture) -> None:
+        """An explicit graph target removes the main_pipe requirement for graph generation."""
+        mocker.patch.object(get_config().pipelex.tracing_config, "is_enabled", False)
+        self._forbid_event_log_factory(mocker)
+
+        graph_spec, pipe_code = await dry_run_pipeline(
+            mthds_contents=[_DRY_RUN_GRAPH_NO_MAIN_MTHDS],
+            pipe_code=f"{_DRY_RUN_GRAPH_DOMAIN}_no_main.echo_subject",
+        )
+
+        assert pipe_code == f"{_DRY_RUN_GRAPH_DOMAIN}_no_main.echo_subject"
+        traced_pipe_codes = {node.pipe_code for node in graph_spec.nodes if node.pipe_code}
+        assert traced_pipe_codes == {"echo_subject"}

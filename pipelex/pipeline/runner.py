@@ -76,6 +76,24 @@ class PipelexVersionInfo(VersionInfo):
     runtime_version: str | None = None
 
 
+_VALIDATE_EXTRA_GRAPH_PIPE_CODE = "graph_pipe_code"
+
+
+def _extract_validate_graph_pipe_code(extra: dict[str, Any] | None) -> str | None:
+    """Parse local Pipelex validate extension args."""
+    if not extra:
+        return None
+    unknown_keys = sorted(key for key in extra if key != _VALIDATE_EXTRA_GRAPH_PIPE_CODE)
+    if unknown_keys:
+        msg = f"The local runtime defines no extension args for: {unknown_keys}."
+        raise PipelineRequestError(msg)
+    graph_pipe_code = extra.get(_VALIDATE_EXTRA_GRAPH_PIPE_CODE)
+    if graph_pipe_code is not None and not isinstance(graph_pipe_code, str):
+        msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must be a string when provided."
+        raise PipelineRequestError(msg)
+    return graph_pipe_code
+
+
 class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     """Pipelex implementation of the mthds MTHDSProtocol.
 
@@ -353,33 +371,34 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         failure?" decision is the consumer's (the CLI gates its exit code on
         `is_runnable`; this protocol method just reports it).
 
-        `graph_spec` is best-effort: when the batch declares a `main_pipe`
-        (primary-selection rule: first blueprint declaring one), it is dry-run
-        in-process via `dry_run_pipe_in_process` against the validation library
-        and the resulting graph rides on the report. A graph-arm domain failure
+        `graph_spec` is best-effort: when `extra={"graph_pipe_code": "..."}`
+        is supplied, that pipe is dry-run as the graph target; otherwise, when
+        the batch declares a `main_pipe` (primary-selection rule: first
+        blueprint declaring one), that pipe is dry-run in-process via
+        `dry_run_pipe_in_process` against the validation library and the
+        resulting graph rides on the report. A graph-arm domain failure
         (`PipelexError`, polyfactory `FactoryException`, or any `ValueError` —
         covering pydantic `ValidationError` and the ValueError-family domain
         errors of the mock-input mint and schema resolution) degrades to
         `graph_spec=None` with validation still successful — the same contract
         as the Temporal validate activity, so every backend answers identically
-        for the same bundle. No declared `main_pipe` means no graph.
+        for the same bundle. No explicit graph target and no declared
+        `main_pipe` means no graph.
 
         Args:
             mthds_contents: MTHDS contents to load (always a list, even for one file).
             allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
-            extra: Rejected — the local runtime defines no extension args. Extension
-                args are server-specific; pass them to the server that defines them.
+            extra: Optional local runtime extension args. The only accepted key is
+                `graph_pipe_code`, an explicit pipe target for graph generation.
 
         Returns:
             PipelexValidationReport with the structural artifacts of a valid bundle.
 
         Raises:
-            PipelineRequestError: When extension args are passed (the local runtime accepts none).
+            PipelineRequestError: When unsupported or invalid extension args are passed.
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
         """
-        if extra:
-            msg = f"The local runtime defines no extension args; got {sorted(extra)}."
-            raise PipelineRequestError(msg)
+        graph_pipe_code = _extract_validate_graph_pipe_code(extra)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # Delegate to the shared in-process orchestrator (library-window management,
         # graph arm, report assembly). The protocol `validate` interface carries only
@@ -391,6 +410,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             mthds_contents=mthds_contents,
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
+            graph_pipe_code=graph_pipe_code,
             log_context="Protocol validate",
         )
 
