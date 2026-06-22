@@ -9,12 +9,13 @@ modules at module top-level so that callers can use the bridge directly
 (Tier 3 usage) and so that unit tests can exercise it without optional
 host-runtime deps installed.
 
-Dispatch is by execution mode through the ``OrchestratorRegistry`` (on the hub):
-the bridge resolves the orchestrator for the requested mode and calls its ``run``.
-It names no integration — DIRECT is contributed by a core plugin, the TEMPORAL_*
-modes by the external ``pipelex-temporal`` plugin, MISTRAL_NATIVE by the external
-``pipelex-mistralai-workflows`` plugin. A mode with no registered orchestrator
-raises ``MissingOrchestratorError`` carrying the mode's exact install hint.
+Dispatch is by orchestration mode through the ``OrchestratorRegistry`` (on the hub):
+the bridge resolves the orchestrator for the requested token and calls its ``run``,
+passing the ``delivery`` axis (BLOCKING vs FIRE_AND_FORGET) the orchestrator honors per
+its nature. It names no integration — ``"direct"`` is contributed by a core plugin,
+``"temporal"`` by the external ``pipelex-temporal`` plugin,
+``"mistralai-workflows"`` by the external ``pipelex-mistralai-workflows`` plugin. A mode
+with no registered orchestrator raises a generic ``MissingOrchestratorError``.
 """
 
 from __future__ import annotations
@@ -32,8 +33,9 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
+from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError, PipelexBridgeDispatchError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.payloads import (  # noqa: TC001 — re-exported at runtime for host-runtime back-compat
     PipelexPipeRunInput,
     PipelexPipeRunOutput,
@@ -57,17 +59,17 @@ async def run_pipe_via_bridge(
 
     Booting Pipelex on first call (no-op if already initialized); validating
     the input; opening a per-call scoped library if a ``library_crate_dump``
-    is provided; then dispatching to the requested execution mode.
+    is provided; then dispatching to the requested orchestration mode.
 
     The optional ``trace_context`` is plumbed into ``JobMetadata`` so callers
     (e.g. a streaming activity) that already opened a ``GraphTracerManager``
     tracer for this pipeline run get per-step graph/usage trace events flowing
-    through the configured event log. ``trace_context`` is honored for ``DIRECT``
-    mode only — it is deliberately nulled for the Temporal modes, which have
-    their own event-log infrastructure via ``pipeline_run_setup``. Forwarding
-    a host ``trace_context`` to a Temporal mode would make Pipelex's Temporal
-    workflow open its tracer under the host's graph id and merge its trace
-    events into the host's graph, so the bridge does not thread it through.
+    through the configured event log. ``trace_context`` is honored for the
+    ``"direct"`` mode only — it is deliberately nulled for a distributed mode
+    (e.g. ``"temporal"``), which has its own event-log infrastructure via
+    ``pipeline_run_setup``. Forwarding a host ``trace_context`` to such a mode
+    would make its workflow open its tracer under the host's graph id and merge
+    its trace events into the host's graph, so the bridge does not thread it through.
     """
     ensure_pipelex_booted()
 
@@ -76,23 +78,23 @@ async def run_pipe_via_bridge(
     _validate_input(input_payload, delivery_assignment=delivery_assignment)
 
     with scoped_library_for_crate(library_crate, library_id_prefix="runtime_bridge"):
-        # trace_context is honored for DIRECT only. The Temporal modes have their
+        # trace_context is honored for the "direct" mode only. A distributed mode has its
         # own event-log infrastructure (via pipeline_run_setup); forwarding a host
         # trace_context there would make WfPipeRouter open its tracer under the
-        # host's graph_id and merge Pipelex's Temporal trace events into the host
+        # host's graph_id and merge the distributed trace events into the host
         # graph — exactly the cross-contamination the contract forbids. Null it
-        # for the non-DIRECT modes.
-        is_direct = input_payload.execution_mode is PipelexExecutionMode.DIRECT
+        # for the non-"direct" modes.
+        is_direct = input_payload.orchestration_mode == DIRECT_ORCHESTRATION_MODE
         pipe_job = build_pipe_job_from_input(
             input_payload=input_payload,
             library_crate=library_crate,
             trace_context=trace_context if is_direct else None,
         )
 
-        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.execution_mode)
+        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.orchestration_mode)
         if orchestrator is None:
-            raise MissingOrchestratorError(mode=input_payload.execution_mode)
-        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            raise MissingOrchestratorError(mode=input_payload.orchestration_mode)
+        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment, delivery=input_payload.delivery)
 
 
 def build_pipe_job_from_input(
@@ -161,10 +163,10 @@ def build_pipe_job_from_input(
 
 
 def _validate_input(input_payload: PipelexPipeRunInput, *, delivery_assignment: DeliveryAssignment | None) -> None:
-    if input_payload.execution_mode is PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
+    if input_payload.delivery is DeliveryMode.FIRE_AND_FORGET:
         if delivery_assignment is None or not delivery_assignment.has_delivery_target:
             msg = (
-                "PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET requires a delivery_assignment_dump with at least one "
+                "Fire-and-forget delivery requires a delivery_assignment_dump with at least one "
                 "delivery target (storage or a webhook); otherwise the pipe completion would be silently dropped."
             )
             raise PipelexBridgeDispatchError(msg)

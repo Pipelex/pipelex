@@ -22,7 +22,6 @@ from pipelex.plugins.exceptions import (
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar, PluginStatus
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -62,7 +61,7 @@ class _OrchestratorPlugin:
         self.targets_api = PLUGIN_API_VERSION
 
     def register(self, registrar: PluginRegistrar) -> None:
-        registrar.add_orchestrator(mode=PipelexExecutionMode.TEMPORAL_BLOCKING, orchestrator=cast("OrchestratorProtocol", object()))
+        registrar.add_orchestrator(mode="temporal", orchestrator=cast("OrchestratorProtocol", object()))
 
 
 class _SlotPlugin:

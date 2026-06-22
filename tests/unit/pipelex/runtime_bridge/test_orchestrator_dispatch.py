@@ -1,8 +1,8 @@
-"""The bridge dispatches by execution mode through the OrchestratorRegistry (not a match).
+"""The bridge dispatches by orchestration mode through the OrchestratorRegistry (not a match).
 
-Pins the seam independent of the real DIRECT/Temporal orchestrators: an arbitrary orchestrator
-registered for a mode is the one the bridge calls; a mode with no registered orchestrator raises
-``MissingOrchestratorError`` carrying that mode's exact install hint (per-mode error parity, C7).
+Pins the seam independent of the real direct/temporal orchestrators: an arbitrary orchestrator
+registered for a token is the one the bridge calls; a token with no registered orchestrator raises
+a generic ``MissingOrchestratorError`` naming the token but no orchestrator (D-F).
 """
 
 import pytest
@@ -14,16 +14,19 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
+from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
 
 
 class _FakeOrchestrator:
+    supports_fire_and_forget = True
+
     def __init__(self) -> None:
         self.calls: list[PipeJob] = []
 
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: object) -> PipelexPipeRunOutput:  # noqa: ARG002
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: object, delivery: DeliveryMode) -> PipelexPipeRunOutput:  # noqa: ARG002
         self.calls.append(pipe_job)
         return PipelexPipeRunOutput(
             output_dict={},
@@ -56,38 +59,36 @@ class TestOrchestratorDispatch:
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", return_value=fake_job)
 
         fake_orchestrator = _FakeOrchestrator()
-        registry = OrchestratorRegistry({PipelexExecutionMode.DIRECT: fake_orchestrator})
+        registry = OrchestratorRegistry({DIRECT_ORCHESTRATION_MODE: fake_orchestrator})
         mocker.patch("pipelex.runtime_bridge.bridge.get_orchestrator_registry", return_value=registry)
 
         result = await run_pipe_via_bridge(
-            PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.DIRECT),
+            PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="direct"),
         )
 
         assert fake_orchestrator.calls == [fake_job]
         assert result.workflow_id == "fake-wf"
 
     @pytest.mark.parametrize(
-        ("mode", "hint_fragment"),
+        "mode",
         [
-            (PipelexExecutionMode.TEMPORAL_BLOCKING, "pip install pipelex-temporal"),
-            (PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET, "pip install pipelex-temporal"),
-            (PipelexExecutionMode.MISTRAL_NATIVE, "pip install pipelex-mistralai-workflows"),
+            "temporal",
+            "mistralai-workflows",
+            "acme",
         ],
     )
-    async def test_unregistered_mode_raises_with_its_exact_hint(self, mocker: MockerFixture, mode: PipelexExecutionMode, hint_fragment: str) -> None:
-        """A mode with no registered orchestrator raises MissingOrchestratorError with that mode's install hint."""
+    async def test_unregistered_mode_raises_with_generic_plugin_hint(self, mocker: MockerFixture, mode: str) -> None:
+        """A token with no registered orchestrator raises a generic MissingOrchestratorError naming the token."""
         fake_job = _fake_pipe_job(mocker)
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", return_value=fake_job)
-        # Empty registry: no mode is registered, so every mode misses.
+        # Empty registry: no mode is registered, so every token misses.
         mocker.patch("pipelex.runtime_bridge.bridge.get_orchestrator_registry", return_value=OrchestratorRegistry({}))
 
-        # TEMPORAL_FIRE_AND_FORGET validates a delivery target before dispatch; supply one so the test
-        # exercises the registry miss, not the delivery-validation guard.
-        delivery_dump = {"webhooks": [{"url": "https://example.test/hook"}], "storage": None}
         with pytest.raises(MissingOrchestratorError) as exc_info:
             await run_pipe_via_bridge(
-                PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=mode, delivery_assignment_dump=delivery_dump),
+                PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode=mode),
             )
 
-        assert exc_info.value.mode is mode
-        assert hint_fragment in str(exc_info.value)
+        assert exc_info.value.mode == mode
+        assert mode in str(exc_info.value)
+        assert "is its plugin installed?" in str(exc_info.value)

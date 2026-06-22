@@ -1,13 +1,16 @@
 ---
 title: "Orchestrator Plugins"
-description: "How Pipelex dispatches a pipe run by execution mode through the orchestrator seam, the Orchestrator SPI a host-runtime plugin compiles against, and how the in-tree Temporal plugin rides it."
+description: "How Pipelex dispatches a pipe run by orchestration mode through the orchestrator seam, the Orchestrator SPI a host-runtime plugin compiles against, and how the in-tree Temporal plugin rides it."
 ---
 
 # Orchestrator Plugins
 
-Every pipe a host runtime invokes through the runtime bridge runs under an **execution mode** — `DIRECT` (in-process), `TEMPORAL_BLOCKING` / `TEMPORAL_FIRE_AND_FORGET` (durable, on a Temporal worker fleet), or `MISTRAL_NATIVE` (decomposed into Mistral Workflows primitives). An **orchestrator** is what knows how to run a pipe under one mode. Which orchestrator handles a given run is decided entirely by the mode on the request.
+A pipe a host runtime invokes through the runtime bridge runs along **two orthogonal axes**:
 
-Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested mode from a registry and calls its `run` — DIRECT is contributed by a core plugin, the `TEMPORAL_*` modes by the in-tree Temporal plugin, `MISTRAL_NATIVE` by the external `pipelex-mistralai-workflows` plugin. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
+- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — `"temporal"` (durable, on a Temporal worker fleet) by `pipelex-temporal`, `"mistralai-workflows"` (decomposed into Mistral Workflows primitives) by `pipelex-mistralai-workflows`.
+- **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`), set by the endpoint and passed as a parameter to `run`, never received from a caller. An orchestrator honors it per its nature; `supports_fire_and_forget` advertises whether it can do genuine async.
+
+An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `run` — `"direct"` is contributed by a core plugin, `"temporal"` by the Temporal plugin, `"mistralai-workflows"` by the external `pipelex-mistralai-workflows` plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
 
 ---
 
@@ -16,12 +19,12 @@ Core names no orchestrator by import or by string. The bridge resolves the orche
 ```
 run_pipe_via_bridge(input_payload)            # pipelex/runtime_bridge/bridge.py
   → build the PipeJob (boundary decode + library scope + trace_context)
-  → orchestrator = get_orchestrator_registry().get_optional(mode=execution_mode)
-  → if orchestrator is None: raise MissingOrchestratorError(mode)   # per-mode install hint
-  → return await orchestrator.run(pipe_job=..., delivery_assignment=...)
+  → orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
+  → if orchestrator is None: raise MissingOrchestratorError(mode)   # generic, names no orchestrator
+  → return await orchestrator.run(pipe_job=..., delivery_assignment=..., delivery=...)
 ```
 
-The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match execution_mode:` anywhere in the bridge — adding a mode's behavior means registering an orchestrator for it, nothing in core changes.
+The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
 
 ---
 
@@ -31,20 +34,24 @@ An orchestrator satisfies `OrchestratorProtocol` (`pipelex/plugins/orchestrator_
 
 ```python
 class OrchestratorProtocol(Protocol):
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput: ...
+    supports_fire_and_forget: bool
+
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None, delivery: DeliveryMode) -> PipelexPipeRunOutput: ...
 ```
 
-A plugin contributes one per mode it serves by calling the registrar menu in its `register`:
+`run` honors the endpoint-chosen `delivery` per the orchestrator's nature (in-process always blocks; a distributed orchestrator awaits completion for `BLOCKING` and returns a workflow id for `FIRE_AND_FORGET`). `supports_fire_and_forget` is the capability a runner reads *before* dispatch — `/start` rejects honestly (4xx) when the resolved mode cannot do genuine async, instead of silently running blocking and acking.
+
+A plugin contributes one per token it serves by calling the registrar menu in its `register`, passing the token as a raw string (no enum, no cast):
 
 ```python
-registrar.add_orchestrator(mode=PipelexExecutionMode.TEMPORAL_BLOCKING, orchestrator=TemporalBlockingOrchestrator())
+registrar.add_orchestrator(mode="temporal", orchestrator=TemporalOrchestrator())
 ```
 
 Constructing the orchestrator instance must be **import-light** — it must not import the host-runtime SDK (`temporalio`, …) at module scope or in its `__init__`. The heavy import happens lazily inside `run` (and a friendly `MissingOrchestratorError` is raised there if the mode's extra is absent), so discovering and registering the plugin never pulls the SDK. This is what keeps boot import-light even on a process that will never use the mode.
 
-### Per-mode errors
+### A missing orchestrator is a generic, plugin-decoupled error
 
-A mode with no registered orchestrator (its plugin is not installed), or an in-tree orchestrator whose extra is absent, raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message is derived from the mode, so each carries its exact, actionable install hint (`pip install 'pipelex-temporal'` vs `pip install pipelex-mistralai-workflows`). The hint survives STRICT error disclosure.
+A token with no registered orchestrator (its plugin is not installed) raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message names the token but **no orchestrator** — *"No orchestrator is registered for orchestration mode '{mode}'; is its plugin installed?"* — so core stays fully decoupled from its plugins (it never spells out `pipelex-temporal` / `pipelex-mistralai-workflows`). The one special case is the core `"direct"` token: its orchestrator is always present, so a miss there reports a boot/discovery fault. The message survives STRICT error disclosure.
 
 ---
 
@@ -122,7 +129,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 | Area | Modules / symbols |
 |---|---|
 | Bridge entry + boundary | `pipelex.runtime_bridge.bridge` (`run_pipe_via_bridge`, `build_pipe_job_from_input`, `serialize_pipe_output`), `pipelex.runtime_bridge.serialization` (`serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
-| Mode + errors | `pipelex.runtime_bridge.execution_mode` (`PipelexExecutionMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
+| Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
 | Host-runtime primitives | `pipelex.runtime_bridge.primitives.*` (`delivery`, `hydration`, `pipe_classification`, `submitter_hydration`, `trace_flush`) |
 | Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`) |
 | Execution protocols | `PipeRouterProtocol`, `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |

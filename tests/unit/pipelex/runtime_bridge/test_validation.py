@@ -9,25 +9,27 @@ from pipelex.runtime_bridge.bridge import (
     _validate_input,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     run_pipe_via_bridge,
 )
+from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
 class TestBridgeValidationAndDecoding:
-    def test_validate_input_passes_for_direct_without_delivery(self):
-        payload = PipelexPipeRunInput(pipe_code="any", execution_mode=PipelexExecutionMode.DIRECT)
+    def test_validate_input_passes_for_blocking_without_delivery(self):
+        # Delivery, not orchestration mode, gates the delivery-target requirement: a BLOCKING
+        # call needs no target regardless of which orchestrator runs it.
+        payload = PipelexPipeRunInput(pipe_code="any", orchestration_mode="direct", delivery=DeliveryMode.BLOCKING)
         _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_validate_input_passes_for_temporal_blocking_without_delivery(self):
-        payload = PipelexPipeRunInput(pipe_code="any", execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING)
+        payload = PipelexPipeRunInput(pipe_code="any", orchestration_mode="temporal", delivery=DeliveryMode.BLOCKING)
         _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
 
     def test_validate_input_rejects_fire_and_forget_without_delivery(self):
         payload = PipelexPipeRunInput(
             pipe_code="any",
-            execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
+            delivery=DeliveryMode.FIRE_AND_FORGET,
         )
-        with pytest.raises(PipelexBridgeDispatchError, match="TEMPORAL_FIRE_AND_FORGET"):
+        with pytest.raises(PipelexBridgeDispatchError, match="Fire-and-forget"):
             _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))
 
     def test_validate_input_rejects_fire_and_forget_with_empty_delivery(self):
@@ -35,7 +37,7 @@ class TestBridgeValidationAndDecoding:
         # be silently dropped, so it must be rejected just like a missing dump.
         payload = PipelexPipeRunInput(
             pipe_code="any",
-            execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
+            delivery=DeliveryMode.FIRE_AND_FORGET,
             delivery_assignment_dump={"webhooks": [], "storage": None},
         )
         with pytest.raises(PipelexBridgeDispatchError, match="delivery target"):
@@ -44,7 +46,7 @@ class TestBridgeValidationAndDecoding:
     def test_validate_input_accepts_fire_and_forget_with_storage_target(self):
         payload = PipelexPipeRunInput(
             pipe_code="any",
-            execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
+            delivery=DeliveryMode.FIRE_AND_FORGET,
             delivery_assignment_dump={"webhooks": [], "storage": {"key_prefix": "runs/abc"}},
         )
         _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
@@ -52,7 +54,7 @@ class TestBridgeValidationAndDecoding:
     def test_validate_input_accepts_fire_and_forget_with_webhook_target(self):
         payload = PipelexPipeRunInput(
             pipe_code="any",
-            execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
+            delivery=DeliveryMode.FIRE_AND_FORGET,
             delivery_assignment_dump={"webhooks": [{"url": "https://example.test/hook"}], "storage": None},
         )
         _validate_input(payload, delivery_assignment=_decode_delivery_assignment(payload.delivery_assignment_dump))  # must not raise
@@ -88,7 +90,7 @@ class TestBridgeValidationAndDecoding:
     async def test_run_pipe_via_bridge_rejects_fire_and_forget_without_delivery(self):
         payload = PipelexPipeRunInput(
             pipe_code="any",
-            execution_mode=PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET,
+            delivery=DeliveryMode.FIRE_AND_FORGET,
         )
-        with pytest.raises(PipelexBridgeDispatchError, match="TEMPORAL_FIRE_AND_FORGET"):
+        with pytest.raises(PipelexBridgeDispatchError, match="Fire-and-forget"):
             await run_pipe_via_bridge(payload)

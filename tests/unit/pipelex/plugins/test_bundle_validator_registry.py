@@ -16,7 +16,7 @@ from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.exceptions import DuplicateBundleValidatorError
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -52,40 +52,40 @@ class TestBundleValidatorRegistry:
         registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
         validator = _FakeBundleValidator()
 
-        registrar.add_bundle_validator(mode=PipelexExecutionMode.DIRECT, validator=validator)
+        registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=validator)
 
         registry = BundleValidatorRegistry(registrar.bundle_validators)
-        assert registry.get_optional(mode=PipelexExecutionMode.DIRECT) is validator
-        assert registry.has(mode=PipelexExecutionMode.DIRECT)
-        assert registry.modes == [PipelexExecutionMode.DIRECT]
+        assert registry.get_optional(mode=DIRECT_ORCHESTRATION_MODE) is validator
+        assert registry.has(mode=DIRECT_ORCHESTRATION_MODE)
+        assert registry.modes == [DIRECT_ORCHESTRATION_MODE]
 
     def test_contribution_recorded_on_the_active_plugin(self) -> None:
         """Registering a validator records a ``bundle validator <mode>`` contribution line on the plugin's discovery."""
         registrar = _make_registrar()
         discovery = registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
 
-        registrar.add_bundle_validator(mode=PipelexExecutionMode.TEMPORAL_BLOCKING, validator=_FakeBundleValidator())
+        registrar.add_bundle_validator(mode="temporal", validator=_FakeBundleValidator())
 
-        assert f"bundle validator {PipelexExecutionMode.TEMPORAL_BLOCKING}" in discovery.contributions
+        assert "bundle validator temporal" in discovery.contributions
 
     def test_duplicate_mode_fails_loud_naming_both_plugins(self) -> None:
         """Two plugins registering a validator for the same mode is a fail-loud conflict naming both."""
         registrar = _make_registrar()
         registrar.begin_plugin(name="alpha", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
-        registrar.add_bundle_validator(mode=PipelexExecutionMode.DIRECT, validator=_FakeBundleValidator())
+        registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=_FakeBundleValidator())
         registrar.begin_plugin(name="beta", origin=PluginOrigin.EXTERNAL, targets_api=PLUGIN_API_VERSION)
 
         with pytest.raises(DuplicateBundleValidatorError) as exc_info:
-            registrar.add_bundle_validator(mode=PipelexExecutionMode.DIRECT, validator=_FakeBundleValidator())
+            registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=_FakeBundleValidator())
 
         assert exc_info.value.first_plugin == "alpha"
         assert exc_info.value.second_plugin == "beta"
-        assert exc_info.value.mode == PipelexExecutionMode.DIRECT
+        assert exc_info.value.mode == DIRECT_ORCHESTRATION_MODE
 
     def test_empty_registry_reports_mode_absent(self) -> None:
         """A registry with no validators misses every mode (the API maps a miss to MissingBundleValidatorError)."""
         registry = BundleValidatorRegistry({})
 
-        assert registry.get_optional(mode=PipelexExecutionMode.DIRECT) is None
-        assert not registry.has(mode=PipelexExecutionMode.TEMPORAL_BLOCKING)
+        assert registry.get_optional(mode=DIRECT_ORCHESTRATION_MODE) is None
+        assert not registry.has(mode="temporal")
         assert registry.modes == []

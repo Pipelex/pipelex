@@ -11,7 +11,6 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
 def _make_trace_context() -> TraceContext:
@@ -58,7 +57,7 @@ class TestTraceContextContract:
         )
 
         await run_pipe_via_bridge(
-            PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.DIRECT),
+            PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="direct"),
             trace_context=trace_context,
         )
 
@@ -75,14 +74,14 @@ class TestTraceContextContract:
 
         mocker.patch("pipelex.runtime_bridge.bridge.build_pipe_job_from_input", side_effect=spy)
 
-        # TEMPORAL_BLOCKING has no orchestrator registered in core (Temporal is now the
-        # external pipelex-temporal plugin), so dispatch raises MissingOrchestratorError —
-        # but only AFTER build_pipe_job_from_input runs, by which point the bridge has
-        # already nulled the host trace_context for the non-DIRECT mode. This pins the
+        # "temporal" has no orchestrator registered in core (Temporal is the external
+        # pipelex-temporal plugin), so dispatch raises MissingOrchestratorError — but only
+        # AFTER build_pipe_job_from_input runs, by which point the bridge has already nulled
+        # the host trace_context for the non-"direct" mode. This pins the
         # ``trace_context if is_direct else None`` guard against cross-graph contamination.
         with pytest.raises(MissingOrchestratorError):
             await run_pipe_via_bridge(
-                PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING),
+                PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="temporal"),
                 trace_context=trace_context,
             )
 
