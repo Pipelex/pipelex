@@ -24,6 +24,7 @@ VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
+HEARTBEAT_INTERVAL ?= 20
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -43,6 +44,29 @@ define PRINT_TITLE
     $(eval PADDED_TITLE := $(FULL_TITLE)$(PADDING))
     @echo ""
     @echo "$(PADDED_TITLE)"
+endef
+
+define WAIT_WITH_HEARTBEAT
+	start_time=$$(date +%s); \
+	$(1) & \
+	cmd_pid=$$!; \
+	( while kill -0 "$$cmd_pid" 2>/dev/null; do \
+		sleep $(HEARTBEAT_INTERVAL); \
+		if kill -0 "$$cmd_pid" 2>/dev/null; then \
+			elapsed=$$(( $$(date +%s) - $$start_time )); \
+			echo "• $(2) still running ($${elapsed}s elapsed)"; \
+		fi; \
+	done ) & \
+	heartbeat_pid=$$!; \
+	wait "$$cmd_pid"; \
+	exit_code=$$?; \
+	kill "$$heartbeat_pid" 2>/dev/null || true; \
+	wait "$$heartbeat_pid" 2>/dev/null || true
+endef
+
+define RUN_WITH_HEARTBEAT
+	@$(call WAIT_WITH_HEARTBEAT,$(1),$(2)); \
+	exit $$exit_code
 endef
 
 define HELP
@@ -721,8 +745,7 @@ ta: test-pipelex-api
 agent-test: env
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
-	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
-	exit_code=$$?; \
+	$(call WAIT_WITH_HEARTBEAT,$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1,agent-test); \
 	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
@@ -880,15 +903,18 @@ lint: ruff-lint plxt-lint
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+	@echo "$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml,pyright)
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	@echo "$(VENV_MYPY) --config-file pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_MYPY) --config-file pyproject.toml,mypy)
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
+	@echo "$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests,pylint)
 
 
 ##########################################################################################
