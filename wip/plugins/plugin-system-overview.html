@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Pipelex Plugin System &amp; Temporal Externalization — what we built</title>
+<title>Pipelex Plugin System, Orchestrators, and Deployment Flavors — current state</title>
 <style>
   :root{
     --bg:#0d1117; --ink:#e6edf3; --muted:#9aa7b4; --line:#283039;
@@ -45,6 +45,7 @@
   th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
   th{background:#1c232c;font-weight:600}
   td code{font-size:12.5px}
+  .seam-table th:first-child,.seam-table td:first-child{width:38%;min-width:290px}
   .status-ok{color:var(--good);font-weight:600}
   .status-wait{color:var(--warn);font-weight:600}
   /* diff blocks */
@@ -81,24 +82,25 @@
 <body>
 <div class="wrap">
 
-<h1>Pipelex Plugin System &amp; Temporal Externalization</h1>
-<p class="sub">What we built, why, and where it stands — a guide for co-developers · branch <code>refactor/Plugins-3</code></p>
+<h1>Pipelex Plugin System, Orchestrators, and Deployment Flavors</h1>
+<p class="sub">What we built, what changed since the first overview, and where it stands · branch <code>refactor/Plugins-4</code></p>
 
 <div class="tldr">
   <h2>TL;DR</h2>
-  <p>We turned Pipelex's two families of <em>optional integrations</em> — inference backends (Anthropic, OpenAI, Mistral, Google, Bedrock, FAL, …) and execution orchestrators (Direct, Temporal, Mistral&nbsp;Workflows) — into a real <strong>plugin system</strong>, so that <strong>core names no integration anywhere</strong>: not by import, not by a <code>match</code> string. Every backend and orchestrator now <em>registers itself</em> into a hub registry through one tiny contract.</p>
+  <p><strong>Pipelex core no longer dispatches by vendor branches.</strong></p>
+  <p>Backends, orchestrators, validators, model listers, boot-runtime claims, and HTTP error mappers now register themselves through one plugin contract. Core installs registries and looks up capabilities by data.</p>
   <ul>
-    <li><strong>The mechanism:</strong> a <code>PipelexPlugin</code> contract + a <code>PluginRegistrar</code> menu + <code>build_registrar()</code> discovery over built-ins and <code>pipelex.plugins</code> entry points. Core looks plugins up in registries on the hub; it never branches on a vendor name.</li>
-    <li><strong>The payoff:</strong> Temporal became its <strong>own distribution</strong>, <code>pipelex-temporal</code>, discovered purely via an entry point. Core has <em>no</em> <code>temporal</code> extra and imports no <code>temporalio</code> at boot.</li>
-    <li><strong>Status:</strong> Phases 0–5 are <strong>done, committed, and pushed</strong> on both repos; all gates green. What remains is <strong>downstream wiring</strong>. <code>pipelex-temporal</code> is a <strong>private</strong> dist (<em>not</em> on PyPI): our hosted infra pins it via <code>git+ssh</code>, and the public packages drop the temporal coupling. Gated on the hosted-Temporal rollout, not a package publish.</li>
+    <li><strong>Mechanism:</strong> <code>PipelexPlugin</code> + <code>PluginRegistrar</code> + <code>build_registrar()</code>. Built-ins and <code>pipelex.plugins</code> entry points use the same path.</li>
+    <li><strong>New since the first overview:</strong> plugin API v2, lazy HTTP error mappers, env-aware plugin configs, <code>plugins.boot_orchestrator</code>, <code>orchestration_mode</code> + <code>DeliveryMode</code>, and <code>BundleValidatorRegistry</code>.</li>
+    <li><strong>Status:</strong> core is current on <code>refactor/Plugins-4</code>. Temporal is a private <code>pipelex-temporal</code> git+ssh dist. The public base is orchestrator-agnostic; deployment-flavor wiring and release pin flips remain.</li>
   </ul>
 </div>
 
 <div class="chips">
-  <span class="chip"><b>core</b> pipelex @ <code>refactor/Plugins-3</code> · pushed ✓</span>
-  <span class="chip"><b>new dist</b> pipelex-temporal @ <code>main</code> · pushed ✓</span>
+  <span class="chip"><b>core</b> pipelex @ <code>refactor/Plugins-4</code> · pushed ✓</span>
+  <span class="chip"><b>plugin API</b> <code>2</code> · HTTP mappers + validators</span>
   <span class="chip">all gates <b class="status-ok">green</b></span>
-  <span class="chip">downstream wiring <b class="status-wait">pending</b></span>
+  <span class="chip">deployment flavors <b class="status-wait">pending</b></span>
   <span class="chip"><b>pipelex-temporal</b> = private (git+ssh, not PyPI)</span>
 </div>
 
@@ -153,17 +155,20 @@
 <figcaption>The inversion in one picture: the <code>match</code> fan-out becomes a registry that plugins populate.</figcaption>
 </figure>
 
-<table>
+<table class="seam-table">
   <thead><tr><th>Seam (where core named an integration)</th><th>File(s)</th><th>How it's resolved now</th></tr></thead>
   <tbody>
     <tr><td>Inference dispatch — 4 families (LLM, image-gen, extract, search)</td><td><code>cogt/{llm,img_gen,extract,search}/*_worker_factory.py</code></td><td><code>InferenceBackendRegistry.lookup(family, sdk)</code></td></tr>
     <tr><td>Model listing (the <code>show models</code> path)</td><td><code>cogt/model_backends/model_lists.py</code></td><td><code>ModelListerRegistry.get_optional(sdk)</code></td></tr>
-    <tr><td>Orchestrator dispatch (Direct / Temporal / Mistral)</td><td><code>runtime_bridge/bridge.py</code></td><td><code>OrchestratorRegistry.get_optional(mode)</code></td></tr>
+    <tr><td>Orchestrator dispatch (Direct / Temporal / Mistral)</td><td><code>runtime_bridge/bridge.py</code></td><td><code>OrchestratorRegistry.get_optional(mode)</code> + <code>DeliveryMode</code></td></tr>
+    <tr><td>Bundle validation dispatch (<code>/validate</code>)</td><td><code>pipeline/*</code>, <code>runtime_bridge/*</code></td><td><code>BundleValidatorRegistry.get_optional(mode)</code></td></tr>
+    <tr><td>HTTP transport-fault rendering</td><td>host runtimes such as <code>pipelex-api</code></td><td>plugin-contributed lazy <code>ErrorReport</code> mappers</td></tr>
     <tr><td>Boot / teardown hub-swap (Temporal runtime)</td><td><code>pipelex.py</code></td><td>hub-slot claims + LIFO teardown callbacks</td></tr>
-    <tr><td>Config schema + CLI commands</td><td><code>configs.py</code>, <code>cli/_cli.py</code></td><td>schema relocated to core; ops commands → console script</td></tr>
+    <tr><td>Config schema + plugin config files</td><td><code>configs.py</code>, <code>config_loader.py</code></td><td>Temporal schema relocated to core; plugin TOMLs load through env-aware layering</td></tr>
+    <tr><td>Operational CLI commands</td><td>external plugin packages</td><td>ops commands ship as plugin-owned console scripts, not harvested onto <code>pipelex</code></td></tr>
   </tbody>
 </table>
-<p class="legend">Every row above used to contain a vendor or <code>temporalio</code> name. After the refactor, the only place an integration name appears in core is typed config and prose comments.</p>
+<p class="legend">Every row above used to contain a vendor or <code>temporalio</code> branch. After the refactor, dispatch and boot paths use registries; built-in vendors are named only by their plugin modules/list, typed config, and prose.</p>
 
 <!-- ============================================================ -->
 <h2>2 · The design — one contract, one registrar, one discovery pass</h2>
@@ -171,7 +176,7 @@
 
 <h3>The contract</h3>
 <div class="code"><pre><code><span class="cmt"># pipelex/plugins/contract.py</span>
-PLUGIN_API_VERSION: int = 1
+PLUGIN_API_VERSION: int = 2
 
 @runtime_checkable
 <span class="kw">class</span> <span class="fn">PipelexPlugin</span>(Protocol):
@@ -180,7 +185,8 @@ PLUGIN_API_VERSION: int = 1
     <span class="kw">def</span> <span class="fn">register</span>(self, registrar: "PluginRegistrar") -&gt; None: ...
     <span class="cmt"># INVARIANT: register is side-effect-free — it may ONLY call registrar</span>
     <span class="cmt"># menu methods. No hub access, no I/O, no SDK/client construction.</span>
-    <span class="cmt"># Heavy work happens lazily inside the closures register hands over.</span></code></pre></div>
+    <span class="cmt"># Heavy work happens lazily inside worker closures, slot thunks,</span>
+    <span class="cmt"># plugin config loaders, and HTTP-error type providers.</span></code></pre></div>
 
 <h3>The discovery → boot flow</h3>
 <pre class="mermaid">
@@ -198,8 +204,8 @@ sequenceDiagram
   Disc->>EP: iterate installed dists (e.g. pipelex-temporal)
   EP->>Reg: plugin.register(registrar)
   Note over Reg: side-effect-free — menu calls only, imports no SDK
-  Disc-->>Boot: registrar (registries + slot thunks + teardown cbs)
-  Boot->>Hub: set inference / orchestrator / model-lister registries
+  Disc-->>Boot: registrar (registries + slot thunks + teardown cbs + mapper providers)
+  Boot->>Hub: set inference / orchestrator / validator / model-lister registries
   Boot->>Hub: resolve hub slots (explicit param &gt; slot thunk &gt; core default)
 </pre>
 <figcaption>One pure pass builds the registrar; boot installs the result. Because <code>register</code> is side-effect-free, the pass is safely repeatable.</figcaption>
@@ -209,8 +215,10 @@ sequenceDiagram
   <thead><tr><th>Menu method</th><th>Contribution</th></tr></thead>
   <tbody>
     <tr><td><code>add_inference_backend(family, sdk, make_worker)</code></td><td>a backend driver, keyed by <code>(family, sdk)</code></td></tr>
-    <tr><td><code>add_orchestrator(mode, orchestrator)</code></td><td>an execution strategy, keyed by <code>execution_mode</code></td></tr>
+    <tr><td><code>add_orchestrator(mode, orchestrator)</code></td><td>an execution strategy, keyed by open <code>orchestration_mode</code></td></tr>
+    <tr><td><code>add_bundle_validator(mode, validator)</code></td><td>a <code>/validate</code> strategy, keyed by <code>orchestration_mode</code></td></tr>
     <tr><td><code>add_model_lister(sdk, lister)</code></td><td>an optional model-listing capability</td></tr>
+    <tr><td><code>add_http_error_mapper(exc_type_provider, to_error_report)</code></td><td>a lazy transport-exception → <code>ErrorReport</code> mapping for host runtimes</td></tr>
     <tr><td><code>claim_content_generator / pipe_router / pipe_run / task_manager(factory)</code></td><td>a hub-slot claim — a <em>deferred thunk</em>, run only if the slot is taken</td></tr>
     <tr><td><code>add_teardown(callback)</code></td><td>a teardown hook, run LIFO at shutdown</td></tr>
   </tbody>
@@ -251,7 +259,7 @@ sequenceDiagram
   </div>
 
   <div class="tab-panel">
-    <p class="small"><code>runtime_bridge/bridge.py</code> — the <code>match execution_mode</code> (with its <em>hard</em> <code>temporalio</code> and <code>mistral</code> imports) becomes a registry lookup. This is what let Temporal leave the repo.</p>
+    <p class="small"><code>runtime_bridge/bridge.py</code> — the old <code>match execution_mode</code> (with hard <code>temporalio</code> / Mistral imports) became a registry lookup. Since then, the flat mode enum was split into an open <code>orchestration_mode</code> token plus a closed <code>DeliveryMode</code>.</p>
     <div class="code"><pre><code><span class="del">-        match execution_mode:</span>
 <span class="del">-            case PipelexExecutionMode.DIRECT:</span>
 <span class="del">-                return await _run_direct(...)</span>
@@ -261,11 +269,13 @@ sequenceDiagram
 <span class="del">-                return await _run_temporal_fire_and_forget(...)</span>
 <span class="del">-            case PipelexExecutionMode.MISTRAL_NATIVE:</span>
 <span class="del">-                return await _run_mistral_native(...)           # imported mistral</span>
-<span class="add">+        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.execution_mode)</span>
+<span class="add">+        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.orchestration_mode)</span>
 <span class="add">+        if orchestrator is None:</span>
-<span class="add">+            raise MissingOrchestratorError(mode=input_payload.execution_mode)</span>
-<span class="add">+        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)</span></code></pre></div>
-    <p class="small"><code>MissingOrchestratorError</code> carries the mode's exact install hint (e.g. <code>pip install pipelex-temporal</code>). The Direct and Temporal orchestrator bodies were extracted <em>byte-for-byte</em> into their own modules.</p>
+<span class="add">+            raise MissingOrchestratorError(mode=input_payload.orchestration_mode)</span>
+<span class="add">+        _validate_input(input_payload, orchestrator=orchestrator, delivery_assignment=delivery_assignment)</span>
+<span class="add">+        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment,</span>
+<span class="add">+                                      delivery=input_payload.delivery)</span></code></pre></div>
+    <p class="small"><code>MissingOrchestratorError</code> is generic and plugin-decoupled. Fire-and-forget is checked against <code>supports_fire_and_forget</code> before dispatch, so blocking-only modes reject honestly instead of pretending to enqueue.</p>
   </div>
 
   <div class="tab-panel">
@@ -290,7 +300,7 @@ sequenceDiagram
   </div>
 
   <div class="tab-panel">
-    <p class="small">Once orchestrators went through the registry, Temporal no longer needed to live in core. It became its own distribution, discovered by an entry point.</p>
+    <p class="small">Once orchestrators went through the registry, Temporal no longer needed to live in core. It became its own private distribution, discovered by an entry point.</p>
     <div class="code"><pre><code><span class="cmt"># pipelex (core) — pyproject.toml: the temporal extra is gone</span>
 <span class="ctx"> [project.optional-dependencies]</span>
 <span class="del">-temporal = ["temporalio==1.24.0", "aiohttp&gt;=3.14.0"]</span>
@@ -331,16 +341,16 @@ BUILTIN_PLUGINS: list[PipelexPlugin] = [
 ]
 <span class="cmt"># Naming one of these in plugins.disabled is a config error, not a no-op:</span>
 CORE_UNCONDITIONAL_PLUGIN_NAMES = frozenset({"direct", "openai"})</code></pre></div>
-<p class="small">Between them these built-ins register every <code>(family, sdk)</code> inference backend across the four families. <code>direct</code> owns the in-process execution mode; <code>openai</code> is the always-on default driver. Observability: <code class="kbd">pipelex plugins list</code> shows what's discovered, what each registered, and the denylist state.</p>
+<p class="small">Between them these built-ins register every <code>(family, sdk)</code> inference backend across the four families. <code>direct</code> owns the in-process orchestration mode and bundle validator; <code>openai</code> is the always-on default driver. Observability: <code class="kbd">pipelex plugins list</code> shows what's discovered, what each registered, and the denylist state.</p>
 
 <!-- ============================================================ -->
 <h2>5 · Temporal as an external plugin</h2>
-<p>Phase 5 lifted <code>pipelex/temporal/</code> into a sibling distribution, <strong>pipelex-temporal</strong> (top-level package <code>pipelex_temporal</code>). It depends <em>on</em> core; core depends on nothing Temporal. Installing the dist makes the <code>TEMPORAL_*</code> orchestrators appear by discovery — no core change, no config.</p>
+<p>Phase 5 lifted <code>pipelex/temporal/</code> into a sibling distribution, <strong>pipelex-temporal</strong> (top-level package <code>pipelex_temporal</code>). It depends <em>on</em> core; core depends on nothing Temporal. Installing the dist contributes the <code>"temporal"</code> orchestration mode, its async delivery capability, its bundle validator, and its optional boot-runtime slot claims — no core change.</p>
 
 <pre class="mermaid">
 graph TB
-  subgraph core["pipelex (core, MIT) — refactor/Plugins-3"]
-    bridge["runtime_bridge dispatch"]
+  subgraph core["pipelex (core, MIT) — refactor/Plugins-4"]
+    bridge["runtime_bridge dispatch + validate"]
     orr["OrchestratorRegistry (on hub)"]
     bridge --> orr
   end
@@ -371,7 +381,7 @@ graph TB
 
 <details>
   <summary>"Option A": why operational commands are a console script, not a plugin contribution</summary>
-  <p>An earlier design harvested plugin-contributed CLI commands by running discovery at <em>CLI-build time</em>, on every <code>pipelex</code> invocation. A review found this brittle: one broken or colliding external plugin (or an unreadable user config) could brick <em>every</em> command — including the <code>--help</code>/<code>doctor</code>/<code>plugins</code> recovery commands. <strong>We removed the surface instead of hardening it.</strong> Temporal's <code>worker</code> and <code>setup-namespace</code> now ship as a standalone <code>pipelex-temporal</code> console script (<code>[project.scripts]</code>), so <code>pipelex --help</code> no longer loads config or scans entry points, and a third party can't shadow a core command.</p>
+  <p>An earlier design harvested plugin-contributed CLI commands by running discovery while building the <code>pipelex</code> CLI. A review found this brittle: one broken or colliding external plugin (or an unreadable user config) could brick <em>every</em> command — including the <code>--help</code>/<code>doctor</code>/<code>plugins</code> recovery commands. <strong>We removed the surface instead of hardening it.</strong> Temporal's <code>worker</code> and <code>setup-namespace</code> now ship as a standalone <code>pipelex-temporal</code> console script (<code>[project.scripts]</code>), so <code>pipelex --help</code> no longer loads config or scans entry points, and a third party can't shadow a core command.</p>
 </details>
 
 <!-- ============================================================ -->
@@ -386,15 +396,15 @@ graph TB
   <tbody>
     <tr><td>Is a plugin <em>present</em>?</td><td>It's in <code>BUILTIN_PLUGINS</code> or an installed dist exposes the <code>pipelex.plugins</code> entry point. Zero config.</td></tr>
     <tr><td>When does an inference backend <em>activate</em>?</td><td>By data — a model names its <code>sdk</code>; the registry resolves it.</td></tr>
-    <tr><td>When does an orchestrator <em>activate</em>?</td><td>Per call — the request's <code>execution_mode</code> selects it.</td></tr>
-    <tr><td>When does the Temporal <em>runtime</em> boot?</td><td>Only when <code>temporal.is_enabled</code> — a per-process "boot as a Temporal worker" gate, not a generic on/off toggle.</td></tr>
+    <tr><td>When does an orchestrator <em>activate</em>?</td><td>Per call — the request's open <code>orchestration_mode</code> selects the plugin; the endpoint-selected <code>DeliveryMode</code> says whether the caller waits.</td></tr>
+    <tr><td>When does the Temporal <em>runtime</em> boot?</td><td>Only when <code>plugins.boot_orchestrator = "temporal"</code> — a per-process "boot as a Temporal worker" gate, not a generic on/off toggle.</td></tr>
     <tr><td>Can I turn a plugin off?</td><td>A narrow <code>plugins.disabled</code> denylist (can't disable a core-unconditional plugin). There is deliberately no redundant allowlist.</td></tr>
   </tbody>
 </table>
 
 <!-- ============================================================ -->
 <h2>7 · Phase history</h2>
-<p>Delivered as one commit per checkpoint (the branch evolved <code>refactor/Plugins</code> → <code>-2</code> → <code>-3</code>; the latter contains everything). Each phase landed green with its own <code>/code-review</code> fan-out.</p>
+<p>The original plugin-system phases landed as checkpoint commits on <code>refactor/Plugins-3</code>. <code>refactor/Plugins-4</code> then added the consumer-facing seams needed for an orchestrator-agnostic API base and deployment flavors.</p>
 <table>
   <thead><tr><th>Phase</th><th>What it did</th><th>Checkpoint commit</th></tr></thead>
   <tbody>
@@ -407,46 +417,49 @@ graph TB
     <tr><td><b>5</b> · Step 0b</td><td>Relocated the Temporal config schema into core (the move's prerequisite)</td><td><code>7d64eb6ac</code></td></tr>
     <tr><td><b>5</b> · Cut-over</td><td>Externalized <code>pipelex/temporal/</code> → the <code>pipelex-temporal</code> dist</td><td><code>a8382d1a1</code>, <code>27da150a5</code></td></tr>
     <tr><td><b>5</b> · Finalize</td><td>Removed dead Temporal dev-tooling from core (skills + Makefile targets → relocated)</td><td><code>e410ae971</code></td></tr>
+    <tr><td><b>Plugins-4 A</b></td><td>Added env-aware plugin-config loading and the HTTP error mapper seam; bumped <code>PLUGIN_API_VERSION</code> to 2</td><td><code>4b5449f88</code>, <code>75196e2e3</code></td></tr>
+    <tr><td><b>Boot gate</b></td><td>Moved Temporal runtime activation from <code>temporal.is_enabled</code> to <code>plugins.boot_orchestrator</code></td><td><code>eaa671d10</code></td></tr>
+    <tr><td><b>Mode split</b></td><td>Split flat <code>PipelexExecutionMode</code> into open <code>orchestration_mode</code> plus closed <code>DeliveryMode</code></td><td><code>bd4e52827</code></td></tr>
+    <tr><td><b>Validate</b></td><td>Added per-call <code>BundleValidatorRegistry</code> dispatch for orchestrator-aware <code>/validate</code></td><td><code>bbe44c929</code></td></tr>
   </tbody>
 </table>
 
 <!-- ============================================================ -->
 <h2>8 · Where we stand</h2>
-<div class="callout good"><strong>Done, committed, pushed, and green on both repos.</strong> Core full <code>make agent-test</code> passes; <code>pipelex-temporal</code> <code>make agent-check</code> + suite pass. The <code>pipelex-temporal</code> side was independently code-reviewed → <strong>SHIP</strong> (the wheel was built offline; the dev cross-pin was verified <em>not</em> to leak into published METADATA; import-light proven at runtime).</div>
+<div class="callout good"><strong>Core foundation current.</strong> In this repo, built-in inference plugins, direct orchestration, model listing, HTTP mapper contributions, bundle validators, slot claims, and plugin discovery are wired through the registrar. The public core still imports no Temporal SDK at boot.</div>
 
 <table>
   <thead><tr><th>Repo</th><th>Branch · tip</th><th>State</th></tr></thead>
   <tbody>
-    <tr><td>pipelex (core)</td><td><code>refactor/Plugins-3</code> · <code>e410ae971</code></td><td class="status-ok">pushed, clean — full work (Phases 0–5 + finalize)</td></tr>
-    <tr><td>pipelex-temporal</td><td><code>main</code> · <code>507c8ad</code></td><td class="status-ok">pushed, clean — initial dist + relocated skills</td></tr>
-    <tr><td>pipelex-worker <span class="small">(private)</span></td><td>—</td><td class="status-wait">add <code>pipelex-temporal</code> via git+ssh + Dockerfile/Makefile <code>worker</code> flip</td></tr>
-    <tr><td>pipelex-api-hosted <span class="small">(private)</span></td><td>—</td><td class="status-wait">add <code>pipelex-temporal</code> via git+ssh in the child image (the runner enqueues Temporal)</td></tr>
-    <tr><td>pipelex-api <span class="small">(public, MIT)</span></td><td>—</td><td class="status-wait">DROP the <code>temporal</code> extra (can't depend on a private dist)</td></tr>
-    <tr><td>pipelex-mistralai-workflows <span class="small">(public, MIT)</span></td><td>—</td><td class="status-wait">DROP / internalize the <code>temporal</code> extra + its tests</td></tr>
+    <tr><td>pipelex (core)</td><td><code>refactor/Plugins-4</code> · <code>221a2c611</code></td><td class="status-ok">pushed — plugin API v2, mode/delivery split, bundle validator seam</td></tr>
+    <tr><td>pipelex-temporal <span class="small">(private)</span></td><td><code>feature/Orchestrator-dispatched-validate</code></td><td class="status-ok">adopts the v2 seams: env-aware config, lazy Temporal error mapper, Temporal validator</td></tr>
+    <tr><td>pipelex-api <span class="small">(public base)</span></td><td><code>refactor/orchestrator-agnostic-base</code> + follow-ons</td><td class="status-ok">Temporal dependency removed; consumes mapper and dispatch seams; follow-on execute/start work stacked</td></tr>
+    <tr><td>pipelex-api-hosted <span class="small">(private flavor)</span></td><td>—</td><td class="status-wait">build Temporal flavor image: install <code>pipelex-temporal</code> via git+ssh and bake <code>pipelex_{env}.toml</code> + <code>temporal_{env}.toml</code></td></tr>
+    <tr><td>pipelex-worker <span class="small">(private)</span></td><td>—</td><td class="status-wait">flip pin from <code>pipelex[temporal]</code> to <code>pipelex</code> + <code>pipelex-temporal</code>; CLI becomes <code>pipelex-temporal worker</code></td></tr>
+    <tr><td>pipelex-mistralai-workflows <span class="small">(public)</span></td><td>feature branch</td><td class="status-ok">migrated to the open <code>orchestration_mode</code> / <code>DeliveryMode</code> surface in its plugin work</td></tr>
   </tbody>
 </table>
 
-<h3>What's left — downstream wiring (private dist; gated on the hosted-Temporal rollout)</h3>
+<h3>What's left — deployment flavors and release pins</h3>
 <p class="small"><code>pipelex-temporal</code> is <strong>private / not open-source</strong>, so it is <strong>not published to PyPI</strong>. It travels by a pinned <code>git+ssh</code> reference — exactly how this workspace already pins <code>pipelex-shared</code> (<code>… @ git+ssh://git@github.com/Pipelex/infra-python-tools.git@&lt;ref&gt;</code>).</p>
 <ol>
-  <li>Tag a release in the private <code>pipelex-temporal</code> repo (e.g. <code>v0.1.0</code>).</li>
-  <li><strong>Private infra installs it via git+ssh:</strong> <code>pipelex-worker</code> (<code>pipelex[dynamodb,s3]==X</code> + <code>pipelex-temporal @ git+ssh://…@v0.1.0</code>, plus the Dockerfile/Makefile <code>pipelex worker</code> → <code>pipelex-temporal worker</code> flip) and <code>pipelex-api-hosted</code>'s child image (the hosted runner enqueues Temporal workflows, so it needs the client too).</li>
-  <li><strong>Public packages drop temporal</strong> (a public MIT dist can't depend on a private repo): remove the <code>temporal</code> extra from <code>pipelex-api</code> and from <code>pipelex-mistralai-workflows</code> (its temporal tests become an internal git+ssh dev dep, or move out).</li>
-  <li>Cut the public <code>pipelex</code> release (its <code>temporal</code> extra is already removed) and open the PR <code>refactor/Plugins-3 → dev</code> (no PR for <code>-3</code> yet; <a href="https://github.com/Pipelex/pipelex/pull/997">PR #997</a> is the earlier Phases-0–2 snapshot).</li>
-  <li>Run the consumer suites against the new pins <em>before</em> deploying the hosted worker.</li>
+  <li>Build the private Temporal API flavor: base <code>pipelex-api</code> image + one <code>pipelex-temporal</code> git+ssh install + env config child images.</li>
+  <li>Move Temporal connection settings into plugin-owned <code>temporal_{env}.toml</code>; the main <code>pipelex_{env}.toml</code> keeps only core/base settings such as <code>[plugins] boot_orchestrator = "temporal"</code>.</li>
+  <li>Flip <code>pipelex-worker</code> to the external plugin in the same release window as the public core/API pins.</li>
+  <li>Run consumer suites against the exact public version + private plugin ref pair before deploying hosted Temporal.</li>
 </ol>
-<p class="callout warn"><strong>One known follow-up:</strong> the Temporal dev <code>make</code> targets removed from core were not added to <code>pipelex-temporal</code>'s Makefile (they need a running Temporal server to verify, so they weren't shipped unverified). A shipped-module → <code>tests/</code> back-import in <code>pipelex-temporal</code> is deferred (pre-existing, dormant in production).</p>
+<p class="callout warn"><strong>Known boundary:</strong> the plugin system now supports both private and public orchestrator plugins, but the release/install channel is still per plugin. Private Temporal rides git+ssh; public Mistral rides PyPI once published. Do not add a central allowlist or a generic "enable plugin" flag to bridge that packaging difference.</p>
 
 <!-- ============================================================ -->
 <h2>9 · Links</h2>
 <ul>
-  <li><strong>pipelex (core):</strong> <a href="https://github.com/Pipelex/pipelex">github.com/Pipelex/pipelex</a> · branch <a href="https://github.com/Pipelex/pipelex/tree/refactor/Plugins-3">refactor/Plugins-3</a> · <a href="https://github.com/Pipelex/pipelex/pull/997">PR #997 (Phases 0–2 snapshot)</a></li>
-  <li><strong>pipelex-temporal (new dist):</strong> <a href="https://github.com/Pipelex/pipelex-temporal">github.com/Pipelex/pipelex-temporal</a> · branch <a href="https://github.com/Pipelex/pipelex-temporal/tree/main">main</a> <span class="small">(no PR — canonical branch)</span></li>
-  <li><strong>Downstream (wiring pending — private git+ssh pins / public drops):</strong> <a href="https://github.com/Pipelex/pipelex-worker">pipelex-worker</a> <span class="small">(private — git+ssh)</span> · <a href="https://github.com/Pipelex/pipelex-api-hosted">pipelex-api-hosted</a> <span class="small">(private — git+ssh; runner enqueues)</span> · <a href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> &amp; <a href="https://github.com/Pipelex/pipelex-mistralai-workflows">pipelex-mistralai-workflows</a> <span class="small">(public MIT — drop temporal)</span></li>
+  <li><strong>pipelex (core):</strong> <a href="https://github.com/Pipelex/pipelex">github.com/Pipelex/pipelex</a> · branch <a href="https://github.com/Pipelex/pipelex/tree/refactor/Plugins-4">refactor/Plugins-4</a></li>
+  <li><strong>pipelex-temporal:</strong> <a href="https://github.com/Pipelex/pipelex-temporal">github.com/Pipelex/pipelex-temporal</a> <span class="small">(private — git+ssh install)</span></li>
+  <li><strong>Deployment consumers:</strong> <a href="https://github.com/Pipelex/pipelex-worker">pipelex-worker</a> <span class="small">(private)</span> · <a href="https://github.com/Pipelex/pipelex-api-hosted">pipelex-api-hosted</a> <span class="small">(private Temporal flavor)</span> · <a href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> <span class="small">(public base)</span> · <a href="https://github.com/Pipelex/pipelex-mistralai-workflows">pipelex-mistralai-workflows</a> <span class="small">(public plugin)</span></li>
 </ul>
 
 <hr>
-<p class="small">Generated for co-developer review · core <code>refactor/Plugins-3</code> @ <code>e410ae971</code> · pipelex-temporal <code>main</code> @ <code>507c8ad</code>. Diagrams render with Mermaid (loaded from CDN when this file is opened in a browser).</p>
+<p class="small">Updated for co-developer review · core <code>refactor/Plugins-4</code> @ <code>221a2c611</code>. Diagrams render with Mermaid (loaded from CDN when this file is opened in a browser).</p>
 
 </div>
 
