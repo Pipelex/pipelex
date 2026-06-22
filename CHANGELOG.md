@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.35.1] - 2026-06-22
+
+### Changed
+
+- **`PipeImgGen` documentation:** Rewrote the docs to clarify how inputs are consumed. `PipeImgGen` has no dedicated "prompt concept"; it uses a `prompt` string template into which declared `inputs` are injected at runtime — `Text` variables are interpolated directly, while `Image` variables (single or lists) are injected as reference images to enable image-to-image and editing workflows. Added examples demonstrating this vision pattern.
+
+### Fixed
+
+- **Blueprint-stage validation error categorization:** `PipeValidationError`s raised during blueprint parsing (e.g. `PipeBatch` or `SubPipe` item name collisions) previously lost their `error_type` because Pydantic wrapped them in a generic `value_error`, degrading them to uncategorized residual errors. The categorizer now unwraps them, preserving their structured `error_type`, `pipe_code`, `domain_code`, and `source` locators.
+
+### Removed
+
+- **Native concept `ImgGenPrompt` (Breaking):** Removed the built-in `native.ImgGenPrompt` concept. It was structurally identical to `Text` (mapped to `TextContent`) and added no unique semantics; `PipeImgGen` never depended on it. **Migration:** replace `ImgGenPrompt` (or `refines = "ImgGenPrompt"`) with `Text` in your `.mthds` files. The internal `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` category, and `ImgGenPromptError` are unchanged.
+- **Dead validation error type (Breaking):** Removed the `PipeValidationErrorType.img_gen_input_not_text_compatible` enum value. It had no raise sites and contradicted the current design, where `PipeImgGen` accepts image inputs as a first-class feature.
+
 ## [v0.35.0] - 2026-06-18
 
 ### Added
@@ -11,7 +26,7 @@
 
 ### Changed
 
-- **Validate exit-code policy (pre-1.0 breaking):** Both `pipelex validate` and `pipelex-agent validate` now use a three-tier exit code mirroring the hosted `/validate` API: `0` = valid (including valid-but-not-runnable with `--allow-signatures`), `1` = negative verdict (invalid, or valid-but-not-runnable without `--allow-signatures`), `2` = no verdict (bad arguments, unresolvable target, or setup/internal errors). Consumers testing zero vs. non-zero are unaffected; machine consumers should rely on the structured `is_valid` JSON field.
+- **Validate exit-code policy (Breaking):** Both `pipelex validate` and `pipelex-agent validate` now use a three-tier exit code mirroring the hosted `/validate` API: `0` = valid (including valid-but-not-runnable with `--allow-signatures`), `1` = negative verdict (invalid, or valid-but-not-runnable without `--allow-signatures`), `2` = no verdict (bad arguments, unresolvable target, or setup/internal errors). Consumers testing zero vs. non-zero are unaffected; machine consumers should rely on the structured `is_valid` JSON field.
 - **Relocated markdown renderer:** Moved `format_validate_markdown` from CLI internals to the public `pipelex.pipeline.validation_render` module so other surfaces (e.g. the `pipelex-api` `/validate` route) can use it without Typer/CLI dependencies, and added `render_invalid_validation_markdown` for invalid verdicts.
 - **Error class hierarchy:** `ConceptLibraryError` now extends `LibraryLoadingError` (instead of `LibraryError`) so it can carry per-reference structured items through the existing error cascade.
 - **Strict protocol arguments:** `PipelexMTHDSProtocol` now rejects `extra` extension arguments, raising `PipelineRequestError`, since the local runtime defines no extension arguments.

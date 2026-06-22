@@ -23,7 +23,6 @@ class NativeConceptCode(StrEnum):
     HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
-    IMG_GEN_PROMPT = "ImgGenPrompt"
     PAGE = "Page"
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
@@ -69,8 +68,8 @@ class NativeConceptCode(StrEnum):
                 return JSONContent
             case NativeConceptCode.SEARCH_RESULT:
                 return SearchResultContent
-            case NativeConceptCode.IMG_GEN_PROMPT | NativeConceptCode.ANYTHING:
-                # These don't have dedicated content classes
+            case NativeConceptCode.ANYTHING:
+                # This doesn't have a dedicated content class
                 return None
 
     @classmethod
@@ -120,7 +119,6 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
@@ -143,7 +141,6 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.IMG_GEN_PROMPT
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
