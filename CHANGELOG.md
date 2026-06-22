@@ -2,14 +2,23 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Orchestrator-dispatched `/validate`:** A new per-call bundle-validator seam (`BundleValidatorProtocol` / `BundleValidatorRegistry`) makes `/validate` dispatch by `orchestration_mode` the way `/start` runs a pipe — `direct` validates in-process, distributed modes dispatch the job to a worker — with a byte-identical verdict across backends. The core `direct` plugin registers an in-process `DirectBundleValidator`.
+
 ### Changed
 
 - **Orchestration & Delivery split (pre-1.0 breaking, plugin SPI):** The flat execution-mode axis is split into an open `orchestration_mode` token (which orchestrator runs the job — `direct` in core, `temporal`/`mistralai-workflows` from plugins) and a closed `DeliveryMode` enum (the wait-semantics axis — `BLOCKING` / `FIRE_AND_FORGET`). The orchestrator plugin contract changes accordingly: `OrchestratorProtocol.run` now takes a required `delivery: DeliveryMode` keyword, an orchestrator must declare a `supports_fire_and_forget: bool` capability, and the registries are re-keyed by the open `orchestration_mode` token (the former `PipelexExecutionMode` enum is removed). A plugin built against the prior contract is incompatible and must be rebuilt. `PipelexPipeRunInput` now carries `orchestration_mode` + `delivery`.
 - **Honest fire-and-forget rejection:** `/start` now rejects a fire-and-forget request when the resolved orchestrator cannot do genuine async (e.g. the in-process `direct` mode), returning a 4xx instead of silently running to completion and falsely acking.
 
-### Added
+### Removed
 
-- **Orchestrator-dispatched `/validate`:** A new per-call bundle-validator seam (`BundleValidatorProtocol` / `BundleValidatorRegistry`) makes `/validate` dispatch by `orchestration_mode` the way `/start` runs a pipe — `direct` validates in-process, distributed modes dispatch the job to a worker — with a byte-identical verdict across backends. The core `direct` plugin registers an in-process `DirectBundleValidator`.
+- **Dead `PipeValidationErrorType` value `img_gen_input_not_text_compatible` (pre-1.0 breaking):** Removed the enum value, which had **zero raise sites** — `PipeImgGen.validate_inputs_with_library` was a no-op. The value encoded an "img-gen inputs must be text-compatible" rule that the current design contradicts: `PipeImgGen` accepts image inputs as a first-class feature (`image_references` / `input_images` for reference images and image editing). The output-side guardrails that *do* hold remain (`llm_output_cannot_be_image`, `inadequate_output_concept`). The value was never emitted, so no real validation output changes.
+- **Native concept `ImgGenPrompt` (pre-1.0 breaking):** Removed `native.ImgGenPrompt`. It was structurally identical to `Text` (no dedicated content class; the factory mapped it to `TextContent`), so it added a brand-new built-in concept with no semantic payload. `PipeImgGen` never depended on it — its inputs are ordinary `Text`-compatible variables and its only concept guard is an `Image`-compatible output. Migration: replace `ImgGenPrompt` / `refines = "ImgGenPrompt"` with `Text` in any `.mthds`. Unrelated and unchanged: the `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` template category, and `ImgGenPromptError`.
+
+### Fixed
+
+- **Blueprint-stage `PipeValidationError` lost its `error_type`:** A `PipeValidationError` raised inside a pydantic blueprint validator (the PipeBatch `input_item_name` == `input_list_name` collision, and the SubPipe `batch_over` == `batch_as` collision — both `batch_item_name_collision`) is wrapped by pydantic as a `value_error`, which the blueprint validation-error categorizer did not unwrap, so the item degraded to an uncategorized `blueprint_validation` residual with no `error_type`. The categorizer now unwraps the wrapped `PipeValidationError` from `ctx["error"]` (mirroring the pipe categorizer via the shared `extract_wrapped_pipe_validation_error`), so **any** blueprint-stage `PipeValidationError` keeps its structured `error_type` and recovers its `pipe_code` / `domain_code` / `source` locators from the parse context. The item stays in the `blueprint_validation` category because the fault genuinely surfaces at the parse boundary, before any pipe is instantiated.
 
 ## [v0.35.0] - 2026-06-18
 
