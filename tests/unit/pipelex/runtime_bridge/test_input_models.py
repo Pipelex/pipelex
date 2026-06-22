@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, PipelexPipeRunOutput
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 
 
 class TestInputOutputModels:
@@ -14,7 +14,8 @@ class TestInputOutputModels:
         assert payload.pipeline_run_id is None
         assert payload.user_id is None
         assert payload.library_crate_dump is None
-        assert payload.execution_mode is PipelexExecutionMode.DIRECT
+        assert payload.orchestration_mode == "direct"
+        assert payload.delivery is DeliveryMode.BLOCKING
         assert payload.delivery_assignment_dump is None
 
     def test_input_forbids_extra_fields(self):
@@ -34,7 +35,8 @@ class TestInputOutputModels:
         original = PipelexPipeRunInput(
             pipe_code="some_pipe",
             inputs={"foo": "bar"},
-            execution_mode=PipelexExecutionMode.TEMPORAL_BLOCKING,
+            orchestration_mode="temporal",
+            delivery=DeliveryMode.FIRE_AND_FORGET,
             pipeline_run_id="run-123",
             user_id="alice",
         )

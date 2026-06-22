@@ -11,7 +11,6 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bootstrap import ensure_pipelex_booted
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
 @pytest.mark.asyncio
@@ -56,7 +55,7 @@ class TestDirectRouterScoping:
         mocker.patch.object(PipeRun, "run", new=capture_active_router)
 
         await run_pipe_via_bridge(
-            PipelexPipeRunInput(pipe_code="fake_pipe", execution_mode=PipelexExecutionMode.DIRECT),
+            PipelexPipeRunInput(pipe_code="fake_pipe", orchestration_mode="direct"),
         )
 
         router_during_run = captured["router_during_run"]

@@ -68,15 +68,43 @@ class DuplicateModelListerError(PluginError):
 
 
 class DuplicateOrchestratorError(PluginError):
-    """Two plugins registered an orchestrator for the same execution mode."""
+    """Two plugins registered an orchestrator for the same orchestration mode."""
 
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
         self.first_plugin = first_plugin
         self.second_plugin = second_plugin
         message = (
-            f"Orchestrator for execution mode '{mode}' is registered by both plugin "
+            f"Orchestrator for orchestration mode '{mode}' is registered by both plugin "
             f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single orchestrator."
+        )
+        super().__init__(message)
+
+
+class DuplicateBundleValidatorError(PluginError):
+    """Two plugins registered a bundle validator for the same orchestration mode."""
+
+    def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
+        self.mode = mode
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Bundle validator for orchestration mode '{mode}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single validator."
+        )
+        super().__init__(message)
+
+
+class DuplicateHttpErrorMapperError(PluginError):
+    """Two plugins registered an HTTP-error mapper for the same exception type."""
+
+    def __init__(self, *, exc_type: str, first_plugin: str, second_plugin: str):
+        self.exc_type = exc_type
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"HTTP-error mapper for exception type '{exc_type}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each exception type must have a single mapper."
         )
         super().__init__(message)
 

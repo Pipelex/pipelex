@@ -29,6 +29,11 @@ _GUARD_SCRIPT = textwrap.dedent(
         "portkey_ai",
         "pypdfium2",
         "temporalio",
+        # No web framework either: the F3 HTTP-error-mapper seam is framework-agnostic
+        # (it carries the core ``ErrorReport`` type). A host runtime owns FastAPI/Starlette;
+        # discovery/registration in core must never pull one in.
+        "fastapi",
+        "starlette",
     )
 
     class _Blocker(importlib.abc.MetaPathFinder):

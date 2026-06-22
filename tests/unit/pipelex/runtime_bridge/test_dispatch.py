@@ -9,7 +9,6 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, run_pipe_via_bridge
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
 
 
 def _make_fake_pipe_job(mocker: MockerFixture, pipe_code: str, pipeline_run_id: str) -> PipeJob:
@@ -50,7 +49,7 @@ class TestDispatch:
         result = await run_pipe_via_bridge(
             PipelexPipeRunInput(
                 pipe_code="fake_pipe",
-                execution_mode=PipelexExecutionMode.DIRECT,
+                orchestration_mode="direct",
                 pipeline_run_id="caller-run-id",
             )
         )
@@ -67,24 +66,25 @@ class TestDispatch:
         assert result.workflow_id is None
         assert result.graph_spec_dump is None
 
-    async def test_mistral_native_without_plugin_raises_with_install_hint(self, mocker: MockerFixture) -> None:
+    async def test_unregistered_mode_raises_with_generic_plugin_hint(self, mocker: MockerFixture) -> None:
         fake_job = _make_fake_pipe_job(mocker=mocker, pipe_code="fake_pipe", pipeline_run_id="caller-run-id")
         mocker.patch(
             "pipelex.runtime_bridge.bridge.build_pipe_job_from_input",
             return_value=fake_job,
         )
 
-        # MISTRAL_NATIVE is contributed by the external pipelex-mistralai-workflows plugin, which is
-        # not installed in core's test env — so the orchestrator registry has no entry for it and the
-        # bridge raises MissingOrchestratorError, which maps the mode to its exact install hint.
+        # "mistralai-workflows" is contributed by the external pipelex-mistralai-workflows plugin, which
+        # is not installed in core's test env — so the orchestrator registry has no entry for it and the
+        # bridge raises a generic MissingOrchestratorError naming the token but no orchestrator (D-F:
+        # core stays decoupled from its plugins).
         with pytest.raises(MissingOrchestratorError) as exc_info:
             await run_pipe_via_bridge(
                 PipelexPipeRunInput(
                     pipe_code="fake_pipe",
-                    execution_mode=PipelexExecutionMode.MISTRAL_NATIVE,
+                    orchestration_mode="mistralai-workflows",
                 )
             )
 
-        assert exc_info.value.mode is PipelexExecutionMode.MISTRAL_NATIVE
-        assert "pipelex-mistralai-workflows" in str(exc_info.value)
-        assert "pip install" in str(exc_info.value)
+        assert exc_info.value.mode == "mistralai-workflows"
+        assert "mistralai-workflows" in str(exc_info.value)
+        assert "is its plugin installed?" in str(exc_info.value)

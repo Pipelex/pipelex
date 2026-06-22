@@ -1,5 +1,5 @@
 from pipelex.base_exceptions import PipelexError
-from pipelex.runtime_bridge.execution_mode import PipelexExecutionMode
+from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE, OrchestrationMode
 
 
 class PipelexRuntimeBridgeError(PipelexError):
@@ -7,37 +7,51 @@ class PipelexRuntimeBridgeError(PipelexError):
 
 
 class MissingOrchestratorError(PipelexRuntimeBridgeError):
-    """Raised when no orchestrator is available for a requested execution mode.
+    """Raised when no orchestrator is registered for a requested orchestration mode.
 
-    Both Temporal and Mistral orchestrators ship as external plugins, so this is the
-    uniform "that mode's plugin isn't installed" signal: ``MISTRAL_NATIVE`` when
-    ``pipelex-mistralai-workflows`` is absent, ``TEMPORAL_*`` when ``pipelex-temporal``
-    is absent — neither dist contributes its orchestrator. The message is derived from
-    the mode so each carries its exact, actionable install hint.
+    ``orchestration_mode`` is an open token: ``"direct"`` is contributed by core, and every
+    other token by the plugin that owns its orchestrator (``"temporal"`` →
+    ``pipelex-temporal``, ``"mistralai-workflows"`` → ``pipelex-mistralai-workflows``). A
+    lookup miss therefore means *that mode's plugin is not installed* — the message is
+    generic and names no orchestrator, so core stays fully decoupled from its plugins. The
+    one special case is ``"direct"``: its orchestrator is core and always present, so a miss
+    is a boot/discovery fault, not a missing plugin.
     """
 
-    # The message carries the actionable pip-install hint; keep it under STRICT disclosure.
+    # The message is caller-actionable ("is its plugin installed?"); keep it under STRICT disclosure.
     _authors_caller_facing_message = True
 
-    def __init__(self, *, mode: PipelexExecutionMode):
+    def __init__(self, *, mode: OrchestrationMode):
         self.mode = mode
-        super().__init__(self._build_message(mode=mode))
+        super().__init__(_build_missing_message(noun="orchestrator", mode=mode))
 
-    @staticmethod
-    def _build_message(*, mode: PipelexExecutionMode) -> str:
-        match mode:
-            case PipelexExecutionMode.TEMPORAL_BLOCKING | PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:
-                return "TEMPORAL_* execution modes require the pipelex-temporal package. Install with: pip install pipelex-temporal"
-            case PipelexExecutionMode.MISTRAL_NATIVE:
-                return (
-                    "PipelexExecutionMode.MISTRAL_NATIVE requires the pipelex-mistralai-workflows "
-                    "package. Install with: pip install pipelex-mistralai-workflows"
-                )
-            case PipelexExecutionMode.DIRECT:
-                return (
-                    "No orchestrator is registered for DIRECT mode. DIRECT is a core orchestrator that is always "
-                    "available; this indicates a boot or plugin-discovery problem."
-                )
+
+class MissingBundleValidatorError(PipelexRuntimeBridgeError):
+    """Raised when no bundle validator is registered for a requested orchestration mode.
+
+    The ``/validate`` counterpart of ``MissingOrchestratorError``: ``"direct"`` is contributed
+    by core and every other token by its owning plugin, so a lookup miss means that mode's
+    plugin is not installed. The message is generic and names no orchestrator; ``"direct"`` is
+    the boot/discovery special case (its validator is core and always present).
+    """
+
+    # The message is caller-actionable ("is its plugin installed?"); keep it under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, mode: OrchestrationMode):
+        self.mode = mode
+        super().__init__(_build_missing_message(noun="bundle validator", mode=mode))
+
+
+def _build_missing_message(*, noun: str, mode: OrchestrationMode) -> str:
+    """Generic, plugin-decoupled message shared by both Missing* errors (D-F).
+
+    A plain string compare on ``"direct"`` (not an enum ``match``) — core's one built-in
+    token — singles out the boot/discovery fault from the missing-plugin case.
+    """
+    if mode == DIRECT_ORCHESTRATION_MODE:
+        return f"No {noun} is registered for the core '{DIRECT_ORCHESTRATION_MODE}' mode; this indicates a boot or plugin-discovery problem."
+    return f"No {noun} is registered for orchestration mode '{mode}'; is its plugin installed?"
 
 
 class PipelexBridgeDispatchError(PipelexRuntimeBridgeError):
