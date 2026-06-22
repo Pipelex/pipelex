@@ -1975,7 +1975,6 @@ Pre-built universal concepts available in every Pipelex project:
 - **Html** — HTML content
 - **TextAndImages** — Combined text and image content in a single structure
 - **Number** — Numeric value
-- **ImgGenPrompt** — A prompt specifically crafted for image generation models
 - **Page** — A single page extracted from a document, with markdown text and optional images
 - **JSON** — Arbitrary JSON data
 - **SearchResult** — Web search result with source citations
@@ -2274,7 +2273,7 @@ Generated images can be automatically uploaded to AWS S3 or Google Cloud Storage
 
 ## Usage in Pipelines
 
-Use PipeImgGen in your `.mthds` files to generate images as part of a pipeline. The operator accepts a text prompt (or an ImgGenPrompt concept) and outputs an Image concept. Model presets let you configure quality levels and default models in `2_img_gen_deck.toml`.
+Use PipeImgGen in your `.mthds` files to generate images as part of a pipeline. The operator takes a `prompt` string template and outputs an `Image` concept. Declared inputs are injected into the template — `Text` variables as interpolated text, and `Image` variables as reference images for image-to-image generation. Model presets let you configure quality levels and default models in `2_img_gen_deck.toml`.
 
 See [PipeImgGen reference](../building-methods/pipes/pipe-operators/PipeImgGen.md).
 
@@ -3431,7 +3430,7 @@ The refined concept inherits the structure of the base concept while adding sema
 
 ## Native Concepts
 
-Pipelex includes 12 built-in native concepts: `Text`, `Image`, `Document`, `Html`, `TextAndImages`, `Number`, `ImgGenPrompt`, `Page`, `Dynamic`, `JSON`, `SearchResult`, and `Anything`.
+Pipelex includes these built-in native concepts: `Text`, `Image`, `Document`, `Html`, `TextAndImages`, `Number`, `Page`, `Dynamic`, `JSON`, `SearchResult`, and `Anything`.
 
 These concepts are automatically available in all pipelines—no setup required. You can use them directly in your pipes or refine them to create more specific concepts.
 
@@ -4049,7 +4048,6 @@ Here are all the native concepts you can use out of the box:
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
 | `Html` | HTML content with inner HTML and CSS class | `HtmlContent` |
-| `ImgGenPrompt` | A prompt for image generation | *No specific implementation* |
 | `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
@@ -4197,12 +4195,6 @@ class HtmlContent(StuffContent):
 - `css_class`: The CSS class applied to the wrapping element
 
 **Use for:** Rendered HTML fragments, styled content blocks, HTML-based reports.
-
-### ImgGenPrompt
-
-A prompt for image generation. This concept is used as an intermediate representation in image generation pipelines (e.g., with `PipeImgGen`). It does not have a dedicated content class.
-
-**Use for:** Storing and passing image generation prompts between pipes.
 
 ### SearchResultContent
 
@@ -7755,9 +7747,14 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 
 ## How it works
 
-`PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like GPT Image or Flux) to create one or more images.
+`PipeImgGen` takes a required `prompt` **string template** (plus an optional `negative_prompt`) and a set of parameters, then calls an underlying image generation service (like GPT Image or Flux) to create one or more images. It does **not** consume a dedicated "prompt concept" — the prompt is a template you write directly on the pipe.
 
-The pipe can be configured to generate a single image or a list of images.
+The variables you declare in `inputs` are **injected into that template** at run time:
+
+- **Text inputs** (concept `Text`, or anything refining it) are interpolated into the prompt string — reference them with `$var` (or `@var` / `{{ var }}`).
+- **Image inputs** (concept `Image`, single or a list) are referenced in the prompt the same way. Each referenced image is pulled from working memory, replaced in the text by an `[Image N]` placeholder token, and passed alongside the rendered text to the generator. This is the **same vision pattern** used for image inputs to `PipeLLM`, and it is what enables image-to-image, reference-image, and image-editing generation (e.g. Flux / GPT Image with reference images), bounded by the model's `max_prompt_images`.
+
+The pipe can be configured to generate a single image or a list of images. Its only concept constraints are that declared image inputs must be `Image`-compatible and the `output` must be `Image`-compatible.
 
 ## Configuration
 
@@ -7772,7 +7769,7 @@ The pipe can be configured to generate a single image or a list of images.
 ```toml
 [pipe.render_slide]
 type = "PipeImgGen"
-inputs = { img_prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "Text" }
 output = "Image"
 model = "$gen-image"
 # ERROR: Missing required field 'prompt'
@@ -7783,7 +7780,7 @@ model = "$gen-image"
 ```toml
 [pipe.render_slide]
 type = "PipeImgGen"
-inputs = { img_prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "Text" }
 output = "Image"
 prompt = "$img_prompt"
 model = "$gen-image"
@@ -7845,7 +7842,7 @@ This pipe takes a text prompt as input and generates an image.
 [pipe.generate_from_description]
 type = "PipeImgGen"
 description = "Generate an image from a description"
-inputs = { description = "ImgGenPrompt" }
+inputs = { description = "Text" }
 output = "Image"
 prompt = "$description"
 model = "$gen-image"
@@ -7859,7 +7856,7 @@ You can combine static text with dynamic variables in the prompt:
 [pipe.generate_sketch]
 type = "PipeImgGen"
 description = "Generate a black and white sketch from a description"
-inputs = { subject = "ImgGenPrompt" }
+inputs = { subject = "Text" }
 output = "Image"
 prompt = "Create a black and white pencil sketch of: $subject"
 model = "$gen-image"
@@ -7873,16 +7870,46 @@ This pipe takes a text prompt as input and generates three variations of the ima
 [pipe.generate_logo_variations]
 type = "PipeImgGen"
 description = "Generate three logo variations from a prompt"
-inputs = { img_prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "Text" }
 output = "Image[3]"
 prompt = "$img_prompt"
 model = "$gen-image"
 aspect_ratio = "square"
 ```
 
-The output of the PipeImgGen has to be a concept compatible with the native `Image` concept. A concept is compatible with the `Image` concept if it refines the `Image` concept.
+### Example: Image-to-image with a reference image
 
-To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the input stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
+Declare an `Image` input and reference it in the prompt. At run time the referenced image is pulled from working memory, replaced in the text by an `[Image N]` placeholder, and passed to the generator alongside the rendered text — enabling image-to-image, reference-image, and editing generation.
+
+```toml
+[pipe.restyle_photo]
+type = "PipeImgGen"
+description = "Restyle a reference photo as an oil painting"
+inputs = { ref = "Image" }
+output = "Image"
+prompt = "Repaint this photo as an oil painting in the style of Van Gogh: $ref"
+model = "$gen-image"
+```
+
+You can also reference several images by declaring a list input. Each referenced image becomes its own `[Image N]` token, up to the model's `max_prompt_images`:
+
+```toml
+[pipe.blend_references]
+type = "PipeImgGen"
+description = "Blend multiple reference images into one scene"
+inputs = { refs = "Image[]" }
+output = "Image"
+prompt = "Combine the styles of these reference images into a single coherent scene: $refs"
+model = "$gen-image"
+```
+
+Image references also work through a dotted path to a nested image field (e.g. `$page.page_view` when `page` is a `Page`), and through any of the `$var`, `@var`, or `{{ var }}` syntaxes.
+
+### Inputs and outputs
+
+The `output` of `PipeImgGen` has to be a concept compatible with the native `Image` concept — a concept is compatible if it refines `Image`. Its inputs are ordinary variables injected into the `prompt` template: `Text`-compatible variables are interpolated as text, and `Image`-compatible variables are injected as reference images (as shown above). There is no dedicated prompt concept anywhere in this flow.
+
+To use the multiple-images example above, you would reference an ordinary `Text` stuff (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") from the `prompt` template. After running, the output will be a list containing three generated `ImageContent` objects.
 
 ## Related Documentation
 
@@ -17600,7 +17627,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 A bundle-validation failure (`ValidateBundleError`) aggregates per-error data across stages and projects it onto `validation_errors` as a list of typed `ValidationErrorItem`s, so the structured error report an HTTP API surfaces carries machine-mappable diagnostics (not just a single `detail` string). Each item's `category` is one of the **closed** `ValidationErrorCategory` set:
 
-- `blueprint_validation` — interpreter / blueprint-validation faults. This also serves as the **last-resort residual**: a parse-level failure (a TOML-syntax error, an empty blueprint, a bundle-elaborator failure) is raised with only a message and no categorized data, so when *nothing else* produced an item the builder projects that message as one `blueprint_validation` item (no `error_type`, no `source` — the bundle could not become a blueprint at all).
+- `blueprint_validation` — interpreter / blueprint-validation faults. A blueprint-stage `PipeValidationError` raised *inside* a pydantic model validator (e.g. the PipeBatch `input_item_name` == `input_list_name` collision, or the SubPipe `batch_over` == `batch_as` collision — both `batch_item_name_collision`) is wrapped by pydantic as a `value_error`; the blueprint categorizer unwraps it (`ctx["error"]`) so the item keeps its structured `error_type` and `pipe_code` / `domain_code` locators instead of degrading to the no-`error_type` residual. The item stays in `blueprint_validation` (not `pipe_validation`) because the fault genuinely surfaced at the parse boundary, before any pipe was instantiated — only the `error_type` is recovered, not the stage. This category also serves as the **last-resort residual**: a parse-level failure (a TOML-syntax error, an empty blueprint, a bundle-elaborator failure) is raised with only a message and no categorized data, so when *nothing else* produced an item the builder projects that message as one `blueprint_validation` item (no `error_type`, no `source` — the bundle could not become a blueprint at all).
 - `pipe_factory` — pipe-factory failures (e.g. a missing concept).
 - `pipe_validation` — pipe/concept validation (missing input variable, type mismatch).
 - `dry_run` — the **residual** dry-run failure (`DryRunError` / `PipeRunError`) with no structured locator. It is projected as one message-only item **only when no categorized error has data**. It is graph-level, so it typically carries **no `source`**.
