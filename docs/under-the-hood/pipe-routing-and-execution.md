@@ -5,7 +5,7 @@ description: "How PipeJobs are created, routed, and executed — covering both d
 
 # Pipe Routing & Execution
 
-Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime today is your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)); a managed Mistral Workflows backend (also built on Temporal) is coming soon. Both reach pipe execution through the same framework-agnostic runtime bridge.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime is a durable backend — Temporal-backed execution or a Mistral Workflows integration — delivered through the Pipelex platform (see [Distributed Execution](../distributed-execution/index.md)). Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
