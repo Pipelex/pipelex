@@ -1,179 +1,91 @@
-# Remove the `ImgGenPrompt` native concept
+# Active plan — GraphSpec source paths + explicit validate graph target
 
-**Goal:** Delete `NativeConceptCode.IMG_GEN_PROMPT` (`"ImgGenPrompt"`) — the native *concept* `native.ImgGenPrompt`. It has no business being a native concept: it is structurally identical to `Text` (just a renamed alias), and nothing in the runtime requires it.
+> **Status: ready to start (2026-06-23).** This is a two-part Pipelex runtime graph/validation plan. Work from the Pipelex repo root (`/Users/lchoquel/repos/Pipelex/pipelex`). Start by reading the two design notes: `wip/graph/graphspec-source-map-enrichment.md` and `wip/graph/validate-explicit-graph-target.md`. Implement them in that order: source-map enrichment first, explicit graph target second.
 
-**Status:** Not started (plan approved, awaiting go-ahead to execute). Single-session task, low risk, bounded blast radius.
+## Cold-Start Context
 
-**Branch:** create a feature branch off `dev` (e.g. `refactor/drop-imggenprompt-native-concept`) — do not work directly on `dev`.
+Today `GraphSpec` is an execution trace for one root pipe. It has `nodes[]`, `edges[]`, `pipe_registry`, and `concept_registry`. It does not currently include the `.mthds` bundle path where each pipe or concept was declared. The path information exists elsewhere: `LibraryCrate.source_map` maps `domain.pipe_code` and `domain.ConceptCode` to source paths, `LibraryManager.get_pipe_source()` exposes pipe origins for diagnostics, and `PipeJob.library_crate` is already attached by `prepare_pipe_job()` and crosses the Temporal boundary.
 
-**Decisions confirmed (settled — do not re-litigate):**
+Validation graph generation also has a separate root-selection constraint. The validation report graph arm currently uses `select_primary_blueprint(result.blueprints).main_pipe_ref`: first blueprint declaring `main_pipe`, else `None`. `best_effort_graph_spec(pipe_ref=None, ...)` returns `None`, so protocol/API validation succeeds without a graph when no `main_pipe` exists. CLI graph/view helpers are stricter: `dry_run_pipeline()` raises `PipelexInterpreterError("Bundle does not declare a main_pipe, cannot generate graph")` when graph output is explicitly requested and no `main_pipe` exists.
 
-- Test fixture `multiplicity.mthds` outputs migrate to `Text` (not a locally-redefined `ImgGenPrompt` concept).
-- `PipeImgGen.md` doc examples migrate their input concept from `ImgGenPrompt` → `Text` (full doc cleanup, not minimal).
+The product direction is: keep `GraphSpec` as an execution-trace artifact, but make it more useful. First, enrich existing registries with declaration source paths. Second, let callers request a graph for a specific pipe, so bundles without `main_pipe` can still validate and graph a selected pipe.
 
----
+## Work Order
 
-## Cold-start context (read this first)
+1. **Source-map enrichment first.** This is additive and low-risk. It uses existing `LibraryCrate.source_map` and existing free-form registry payloads. It should not change root selection or validation behavior.
+2. **Explicit graph target second.** This changes validation/graph routing across direct, Temporal/API, and CLI surfaces. It benefits from the source-enriched registries once graphs can target non-`main_pipe` pipes.
 
-### What `native.ImgGenPrompt` actually is
+## Phase 1 — Enrich GraphSpec Registries With Source Paths
 
-It's a native concept that carries **zero structural distinction** from `Text`:
+Goal: when `pipe_and_concept_registry` is enabled and a `LibraryCrate.source_map` entry exists, `graph_spec.pipe_registry[pipe_ref]["source"]` and `graph_spec.concept_registry[concept_ref]["source"]` carry the source bundle path. If source is unavailable, omit the field rather than emitting `source: null`.
 
-- `NativeConceptCode.structure_class` returns `None` for it — no dedicated content class (`pipelex/core/concepts/native/concept_native.py:72-74`).
-- `ConceptFactory.make_native_concept` maps it to **`TextContent`** with the description "A prompt for an image generator" (`pipelex/core/concepts/concept_factory.py:150-156`, the structure class name is literally `NativeConceptCode.TEXT.structure_class_name`).
+Implementation shape:
 
-So `native.ImgGenPrompt` is a semantic alias for `Text`. That's exactly why it doesn't belong as a built-in native concept — a user concept refining `Text` does the same job. **Migration for any consumer = replace `ImgGenPrompt` with `Text`.**
+- In `pipelex/core/pipes/pipe_abstract.py`, add a source-aware pipe registry helper. It should start from `self.model_dump(mode="json")`, look up `library_crate.source_map.get(self.pipe_ref)`, and add `source` only when present.
+- Update `_make_single_concept_data_for_registry()` and `_make_concept_data_for_registry()` to accept `library_crate: LibraryCrate | None`, look up `concept.concept_ref`, and add `source` only when present. Keep the existing `json_schema` behavior.
+- In `_run_pipe_traced()`, replace `pipe_data = self.model_dump(mode="json")` and `concept_data = self._make_concept_data_for_registry()` with the source-aware helpers, passing the existing `library_crate` parameter.
+- Do not add `source` to `NodeSpec`. A node is an invocation; the source path is declaration metadata, so it belongs in `pipe_registry` / `concept_registry`.
+- Do not change `GraphSpec` model fields. The registries are already `dict[str, dict[str, Any]]`, and `PipeStartEvent.pipe_data` / `concept_data` already carry generic dictionaries.
 
-### The name-collision trap (critical — do NOT over-scope)
+Tests:
 
-Three unrelated things share the name "ImgGenPrompt". **Only the first is being removed.** A naive grep audit conflates them and wildly overstates the blast radius ("requires refactoring the image-gen architecture" — this is FALSE).
+- Add focused coverage proving registry entries include `source` when a fake or real `LibraryCrate.source_map` provides entries.
+- Add a direct/in-process graph test using a real `.mthds` file loaded from disk: assert the pipe registry source is the bundle path and declared concept registry source is present.
+- Add or extend Temporal/event-assembled coverage so `PipeStartEvent.pipe_data` / `concept_data` with `source` survive through `GraphSpecAssembler`.
+- Add a sourceless path check: raw in-memory `mthds_contents` without sources still produces a graph and omits `source`.
 
-| Thing | What it is | Action |
-|---|---|---|
-| `NativeConceptCode.IMG_GEN_PROMPT` | the native **concept** `native.ImgGenPrompt` | **REMOVE — the target** |
-| `ImgGenPrompt` (BaseModel, `pipelex/cogt/img_gen/img_gen_prompt.py`) | runtime payload (positive/negative text + input images) that `PipeImgGen` builds and sends to the image generator | **LEAVE UNTOUCHED** |
-| `TemplateCategory.IMG_GEN_PROMPT` (`pipelex/cogt/templating/template_category.py`) | Jinja2 template category for prompt rendering | **LEAVE UNTOUCHED — different enum** |
+> **Checkpoint A — source paths in registries. DONE (2026-06-23).** Direct graph registry payloads now enrich pipes and concepts from `LibraryCrate.source_map`; event-assembled graph paths preserve `source` because `PipeStartEvent.pipe_data` / `concept_data` and `PipeEndSuccessEvent.output_concept_data` are copied unchanged by `GraphSpecAssembler`; sourceless in-memory bundle graphs still omit `source`. Edge-case decision: source enrichment uses only the executing job's active `LibraryCrate.source_map`; dependency or native entries with no source-map entry keep the previous behavior and omit `source` rather than emitting `source = null`. Verification: `CI=true .venv/bin/pytest tests/unit/pipelex/tracing/test_graphspec_assembler.py::TestGraphSpecAssembler::test_registry_source_payloads_survive_assembly tests/integration/pipelex/pipeline/test_dry_run_pipeline_graph.py::TestDryRunPipelineGraphTransport::test_graph_produced_with_tracing_disabled tests/integration/pipelex/pipeline/test_validate_graph_registry_sources.py -q` passed; `CI=true make agent-check` passed. `CI=true make agent-test` was attempted in the sandbox and reached unrelated environment failures (Temporal dev server `Operation not permitted`, restricted DNS/network HTTP tests, local HTTP server permission errors); unsandboxed rerun was rejected by approval policy because the broad suite contacts external services and starts local/networked servers.
 
-Also leave untouched: `ImgGenPromptError` (`pipelex/cogt/exceptions.py`) and its docs — that's the exception class for the runtime model, unrelated to the native concept.
+## Phase 2 — Add Explicit Graph Target Support
 
-### How `PipeImgGen` actually consumes inputs (corrected mental model — the docs got this wrong)
+Goal: callers can request graph generation for a specific pipe. The default remains unchanged: use the selected `main_pipe` when no explicit target is provided. If neither explicit target nor `main_pipe` exists, protocol/API validation should keep returning `graph_spec=None`, while CLI `--graph` / `--view` should keep failing clearly because the user explicitly requested a graph.
 
-**`PipeImgGen` does NOT take an "`ImgGenPrompt` concept" as input.** The old docs implied you load a prompt into an `ImgGenPrompt`-typed stuff and feed it in. That framing is wrong and is a big reason this concept looked load-bearing when it isn't.
+Implementation shape:
 
-What actually happens:
+- Add `graph_pipe_code: str | None = None` to `pipelex/pipeline/validate_in_process.py::validate_bundles_in_process()`. Compute `graph_target_ref = graph_pipe_code or select_primary_blueprint(result.blueprints).main_pipe_ref`, then pass it to `best_effort_graph_spec()`.
+- Decide how `PipelexMTHDSProtocol.validate()` exposes this. If using protocol `extra`, validate and accept only a known key such as `graph_pipe_code`; otherwise keep protocol unchanged and expose the option only on concrete API/CLI surfaces.
+- Temporal path already has `DryValidateArg.pipe_code`; ensure the hosted/API dispatch layer maps the explicit graph target into it. Rename only if the surrounding API request field also uses `graph_pipe_code`; avoid churn otherwise.
+- Update `pipelex/pipeline/dry_run_pipeline.py` to accept `pipe_code: str | None = None`. If provided, execute that pipe; otherwise preserve the current `main_pipe` selection and missing-main error.
+- Update `pipelex/graph/graph_rendering.py` helpers (`_dry_run_bundle()`, `generate_graph_for_bundle()`, `generate_view_for_bundle()`) to accept/pass the pipe override.
+- Update `pipelex/cli/agent_cli/commands/validate/bundle_cmd.py` so `validate bundle --pipe X --graph` and `--view` graph `X` instead of ignoring `--pipe` and falling back to `main_pipe`.
+- Decide and document bare vs qualified target behavior. Recommended: accept both; bare targets must be unique in the loaded library; existing ambiguity errors can surface on explicit CLI graph requests and degrade on best-effort report paths.
 
-- `PipeImgGenBlueprint` (`pipelex/pipe_operators/img_gen/pipe_img_gen_blueprint.py`) has a **required `prompt: str`** field (a Jinja2/sigil **template**) and an optional `negative_prompt: str`. There is no prompt-concept input.
-- Declared `inputs = { ... }` are the variables the template may reference, and they get **injected into the template** at run time (`PipeImgGenFactory.make` → `pipe_img_gen_factory.py:41-93`, then `ImgGenPromptBlueprint.make_img_gen_prompt` → `img_gen_prompt_blueprint.py:65-196`):
-  - **Text inputs** are interpolated into the prompt string via `$var` / Jinja.
-  - **Image inputs** are detected by `TemplateImageAnalyzer.analyze_template_for_images` (`pipelex/pipe_operators/shared/template_image_analyzer.py`), classified as `DIRECT` (one image), `DIRECT_LIST` (a list/tuple of images), or `NESTED` (a dotted path like `page.page_view`). At run time each referenced `ImageContent` is pulled from working memory, registered in an `ImageRegistry`, the reference in the text is replaced with an `[Image N]` placeholder token, and every image is collected into `ImgGenPrompt.input_images`.
-- This is **exactly the vision pattern** used for image inputs to `PipeLLM`: images declared as inputs and referenced in the prompt are extracted and passed alongside the rendered text. It enables image-to-image, reference-image, and image-editing generation (e.g. Flux / GPT-Image with reference images), bounded by the model's `max_prompt_images`.
-- The resulting runtime `ImgGenPrompt` model (`positive_text`, `negative_text`, `input_images`) is what's sent to the generator.
+Tests:
 
-So `PipeImgGen`'s only concept constraints are: declared image inputs must be `Image`-compatible (enforced at extraction time by the `ImageContent` type check), and its **output** must be `native.Image`-compatible (`pipe_img_gen.py:116-134`). It has **no** input-concept tie to `ImgGenPrompt`. The `IMG_GEN_PROMPT` symbols inside `pipe_img_gen_factory.py` / `pipe_img_gen_blueprint.py` are all `TemplateCategory.IMG_GEN_PROMPT` (the Jinja2 category), not the native concept. **Removing the native concept does not touch image generation behavior.**
+- Protocol/direct validation: no `main_pipe` plus explicit graph target produces non-null `graph_spec`; explicit graph target overrides declared `main_pipe`; unknown explicit target degrades to `graph_spec=None` on best-effort validation reports.
+- Agent CLI: `validate bundle no_main.mthds --pipe some_pipe --view` succeeds and includes `graphspec`; `validate bundle no_main.mthds --view` still errors; `validate bundle bundle_with_main.mthds --pipe other_pipe --view` graphs `other_pipe`.
+- Temporal/API path: explicit graph target maps to `DryValidateArg.pipe_code`; direct and Temporal modes agree on the target behavior.
 
-Reference example to base accurate docs on: `tests/integration/pipelex/pipes/img_gen_prompt_inputs/test_img_gen_prompt_image_extraction.py` (exercises image injection into the prompt).
+> **Checkpoint B — explicit graph target parity. DONE (2026-06-23).** Direct/protocol validation now accepts `extra = {"graph_pipe_code": "..."}` as the only local runtime validate extension and passes it to `validate_bundles_in_process(graph_pipe_code=...)`; unknown, non-string, and blank validate extension args are rejected. The shared in-process graph arm targets `graph_pipe_code` first, else the selected `main_pipe`, else keeps `graph_spec = None`. CLI graph/view generation now passes `validate bundle --pipe X` into `generate_graph_for_bundle(..., pipe_code=X)` / `generate_view_for_bundle(..., pipe_code=X)`, and `dry_run_pipeline(..., pipe_code=X)` can graph bundles without `main_pipe`. Bare explicit dry-run targets now return the resolved domain-qualified graph target, so callers do not report the original ambiguous ref. Temporal keeps the existing wire field `DryValidateArg.pipe_code` as the explicit graph target to avoid churn; no field rename was made. Bare and qualified targets are both accepted via the existing pipe-library resolver; ambiguous or missing explicit targets degrade on best-effort validation report paths and surface as graph/view errors on explicit CLI graph requests. Tests were added for direct/protocol no-main, override, blank, and missing-target behavior; dry-run no-main explicit target; CLI pipe override passthrough; graph-rendering passthrough; and Temporal no-main/override behavior. Per user instruction, pytest was not run for this phase. Verification run: `CI=true make agent-check` passed.
 
-### Why removal is allowed
+## Non-Goals
 
-Per workspace `CLAUDE.md`: "No backward compatibility … Breaking changes must be noted in changelogs but there is no deprecation transition period." Removing a native concept is a breaking change for any out-in-the-wild `.mthds` using `native.ImgGenPrompt` or `refines = "ImgGenPrompt"`, but that's acceptable with a CHANGELOG note. Migration is trivial (`→ Text`).
+- Do not infer a root from "the only pipe in the bundle" unless a product decision explicitly asks for that. It creates a hidden second default alongside `main_pipe`.
+- Do not create a static all-pipes `GraphSpec` under the same field. That would overload an execution-trace artifact with non-execution semantics.
+- Do not require `main_pipe` to validate a bundle. Current validation correctly supports concept-only files, membership-only files, and top-down partial bundles.
+- Do not move declaration source onto runtime `PipeAbstract` / `Concept` models unless registry enrichment proves insufficient. The source-map already exists on `LibraryCrate`.
 
-### Scope facts already verified (so you don't re-check)
+## Verification Guidance
 
-- **Not** present in `derived/mthds_schema.json` → **no `pipelex-dev generate-mthds-schema` regen needed.**
-- No shipped/library/kit/cookbook/methods/test-bed `.mthds` uses it as a concept. The **only** `.mthds` usage anywhere is one test fixture (see step 3).
-- `tests/unit/pipelex/core/concepts/test_concept.py:101` iterates `NativeConceptCode.values_list()` dynamically → adapts automatically, no edit needed.
-- No test hardcodes the native-concept count or the `IMG_GEN_PROMPT` member by name.
+Follow Pipelex repo standards: use `make agent-test`, not `make test`. For narrow iterations, run the smallest relevant pytest path through the repo's supported agent-test entrypoint if available, then run broader graph/validation coverage before handing off. Likely target areas: `tests/unit/pipelex/graph/`, `tests/integration/pipelex/pipeline/`, `tests/integration/pipelex/temporal/`, and agent CLI validate tests. If implementation touches hosted API request mapping, also update and verify the matching `../pipelex-api` surface in a separate repo change.
 
----
+## Files Likely To Touch
 
-## Implementation checklist
+- `pipelex/core/pipes/pipe_abstract.py`
+- `pipelex/pipeline/validate_in_process.py`
+- `pipelex/pipeline/runner.py`
+- `pipelex/pipeline/dry_run_pipeline.py`
+- `pipelex/graph/graph_rendering.py`
+- `pipelex/cli/agent_cli/commands/validate/bundle_cmd.py`
+- `pipelex/temporal/tprl_pipe/act_dry_validate.py` only if field naming changes
+- tests under `tests/unit/pipelex/graph/`, `tests/integration/pipelex/pipeline/`, `tests/integration/pipelex/temporal/`, and agent CLI validate coverage
+- hosted API validate request/dispatch mapping in `../pipelex-api` if this is exposed over the public API
 
-### 1. Code — `pipelex/core/concepts/native/concept_native.py`
+## Definition Of Done
 
-These three `match`/`case` blocks are **exhaustive with no `case _:` allowed** (project rule), so the member must be removed from the enum *and* from every arm in lockstep, or linting fails.
-
-- [ ] Remove the enum member: line 26 `IMG_GEN_PROMPT = "ImgGenPrompt"`
-- [ ] `structure_class` property: collapse `case NativeConceptCode.IMG_GEN_PROMPT | NativeConceptCode.ANYTHING:` (line ~72) → `case NativeConceptCode.ANYTHING:` (still returns `None`)
-- [ ] `is_text_concept` classmethod: drop `| NativeConceptCode.IMG_GEN_PROMPT` from the `False` alternation (line ~123)
-- [ ] `is_dynamic_concept` classmethod: drop `| NativeConceptCode.IMG_GEN_PROMPT` from the `False` alternation (line ~146)
-
-### 2. Code — `pipelex/core/concepts/concept_factory.py`
-
-- [ ] Delete the `case NativeConceptCode.IMG_GEN_PROMPT:` arm at lines ~150-156 (otherwise `make_native_concept`'s match is non-exhaustive and references a dead member)
-
-### 3. Test fixture — the only real runtime break
-
-`tests/integration/pipelex/pipes/pipelines/multiplicity.mthds` outputs `ImgGenPrompt` in three pipes; after removal the bundle fails to resolve the concept at test load time.
-
-- [ ] Change `output = "ImgGenPrompt"` → `output = "Text"` at lines 44, 56, 66 (it was structurally `Text` anyway; the prompts produce a sentence of text)
-
-### 4. Spec authoring metadata — `pipelex/builder/concept/concept_spec.py`
-
-Not enforced and won't break linting, but leaving it advertises a concept that no longer exists to the spec/builder agent.
-
-- [ ] Remove `ImgGenPrompt` from the `refines` field description string (line ~250) and from the `examples=[...]` list (line ~253)
-
-### 5. Docs (this repo) — update `docs/`
-
-This step has two parts: (a) the mechanical removal of the native concept from concept reference docs, and (b) a **substantive rewrite** of the PipeImgGen docs to teach the correct prompt-template + input-injection model (see "How `PipeImgGen` actually consumes inputs" above).
-
-**(a) Concept-reference removal (mechanical):**
-
-- [ ] `docs/building-methods/concepts/native-concepts.md` — remove the table row at line 37 (`| `ImgGenPrompt` | … |`) AND the `### ImgGenPrompt` section (lines 186-190)
-- [ ] `docs/building-methods/concepts/define_your_concepts.md:150` — remove `ImgGenPrompt` from the inline list; also **drop the hardcoded "12"** count (project writing rule: no hardcoded counts) — rephrase to "Pipelex includes these built-in native concepts: …"
-- [ ] `docs/features/concepts.md:25` — remove the `**ImgGenPrompt** — …` bullet
-
-**(b) PipeImgGen rewrite (substantive — fix the misleading "feed it an ImgGenPrompt concept" framing):**
-
-- [ ] `docs/building-methods/pipes/pipe-operators/PipeImgGen.md`:
-  - "How it works" (lines 9-13) — rewrite to state the truth: `PipeImgGen` takes a **`prompt` string template** (+ optional `negative_prompt`); declared `inputs` are **injected into the template** — text via `$var` interpolation, images via reference-and-inject (the vision pattern). It does not consume a dedicated prompt concept.
-  - Example inputs currently typed `"ImgGenPrompt"` (lines 28, 39, 101, 115, 129) → `"Text"`. These show *text* prompt inputs, so `Text` is the correct concept.
-  - **Add a new example: image inputs (image-to-image / reference image).** Show `inputs = { ref = "Image" }` (and a list variant, e.g. `refs = "Image[]"`), reference the image(s) in the `prompt` template, and explain that each referenced image is injected as an `[Image N]` token and passed to the generator — bounded by the model's `max_prompt_images`. Base it on `tests/integration/pipelex/pipes/img_gen_prompt_inputs/test_img_gen_prompt_image_extraction.py` so it's accurate.
-  - Line 138 prose ("you would first load a text prompt … into the input stuff (`ImgGenPrompt` concept)") — rewrite: the input is an ordinary `Text` stuff referenced by the `prompt` template; there is no `ImgGenPrompt` concept.
-- [ ] `docs/features/image-generation.md:40` — reword "(or an ImgGenPrompt concept)". Replace with the correct model: PipeImgGen takes a prompt template and can inject both text and image inputs (reference images for image-to-image). Do not imply a prompt-concept input.
-- [ ] **Do NOT touch** `docs/errors/img-gen-prompt-error.md` or `docs/errors/inference-and-providers.md:34` — those document `ImgGenPromptError` (the runtime exception), which stays.
-
-### 6. CHANGELOG
-
-- [ ] Add a `### Removed` bullet under `## [Unreleased]` in `CHANGELOG.md` (there is already a `### Removed` section there — append to it). Draft:
-
-  > **Native concept `ImgGenPrompt` (pre-1.0 breaking):** Removed `native.ImgGenPrompt`. It was structurally identical to `Text` (no dedicated content class; the factory mapped it to `TextContent`), so it added a brand-new built-in concept with no semantic payload. `PipeImgGen` never depended on it — its inputs are ordinary `Text`-compatible variables and its only concept guard is an `Image`-compatible output. Migration: replace `ImgGenPrompt` / `refines = "ImgGenPrompt"` with `Text` in any `.mthds`. Unrelated and unchanged: the `ImgGenPrompt` runtime model, the `TemplateCategory.IMG_GEN_PROMPT` template category, and `ImgGenPromptError`.
-
-### 7. Verify
-
-- [ ] `make agent-check` (lint/format/pyright/mypy/plxt — catches any non-exhaustive match)
-- [ ] `make tb` (boot/config sanity; cheap)
-- [ ] Targeted tests for the touched areas (core + pipes + builder), e.g.:
-      `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/core/ tests/integration/pipelex/core/ tests/integration/pipelex/pipes/ tests/unit/pipelex/builder/ tests/integration/pipelex/builder/`
-- [ ] If broad/uncertain, fall back to full `make agent-test`
-- [ ] Final grep sanity: `rg -n '\bImgGenPrompt\b' pipelex/ tests/ docs/` should return ONLY runtime-model / `TemplateCategory` / `ImgGenPromptError` hits — no `native.ImgGenPrompt` concept refs and no `NativeConceptCode.IMG_GEN_PROMPT`.
-
-### 8. Land
-
-- [ ] Commit on the feature branch, push, open PR to `dev`
-- [ ] Hand off the recap below to downstream repos (see next section)
-
----
-
-## Handoff recap (paste into ../mthds-plugins and other repos)
-
-> **Heads-up: `ImgGenPrompt` is no longer a Pipelex native concept (breaking, pre-1.0).**
->
-> As of pipelex `<next version>`, `native.ImgGenPrompt` has been removed from `NativeConceptCode`. It was a structural duplicate of `Text` (no dedicated content class — the factory mapped it to `TextContent`), so it was a built-in concept with no semantic payload beyond its name.
->
-> **What this means for you:** any `.mthds` that uses `ImgGenPrompt` as an input/output concept, or `refines = "ImgGenPrompt"`, will fail validation against the new pipelex. **Fix = replace `ImgGenPrompt` with `Text`.**
->
-> **What did NOT change** (do not "fix" these — they are unrelated things that happen to share the name):
-> - the `ImgGenPrompt` runtime model (`pipelex.cogt.img_gen.img_gen_prompt.ImgGenPrompt`) — still how `PipeImgGen` builds the generator payload;
-> - the `TemplateCategory.IMG_GEN_PROMPT` Jinja2 template category;
-> - the `ImgGenPromptError` exception class.
->
-> **Corrected mental model for `PipeImgGen` (the old docs were misleading — please fix yours too):** `PipeImgGen` does **not** consume a dedicated "prompt concept". It has a required **`prompt` string template** (+ optional `negative_prompt`), and its declared `inputs` are **injected into that template**:
-> - **text inputs** (concept `Text`) are interpolated via `$var` / Jinja;
-> - **image inputs** (concept `Image`, single or list) are referenced in the prompt and injected — each referenced image becomes an `[Image N]` token and is passed to the generator alongside the rendered text (this is the **same vision pattern** as image inputs to `PipeLLM`, and is what enables image-to-image / reference-image / editing, bounded by the model's `max_prompt_images`).
->
-> So the right way to teach/author `PipeImgGen` is: write a `prompt` template, declare `Text` and/or `Image` inputs, reference them in the template. There is no `ImgGenPrompt` concept anywhere in that flow. If any of your docs/examples say "load a prompt into an `ImgGenPrompt` concept and feed it to PipeImgGen", that was always wrong — replace it with the template-injection model above.
->
-> `PipeImgGen`'s only concept constraints: declared image inputs must be `Image`-compatible, and the output must be `Image`-compatible. The operator's runtime behavior is unchanged by this removal.
->
-> **Where to check in your repo** (grep for `ImgGenPrompt` and judge by context — concept ref vs. the model/category/error above):
-> - `mthds-plugins/` — any skill, prompt, or doc that enumerates native concepts (e.g. build/check/explain skills), or example `.mthds` snippets using `ImgGenPrompt` as a concept.
-> - `mthds/` (spec docs site) — native-concepts reference page / any built-in concept list.
-> - `mthds-js/`, `mthds-python/` — hardcoded native-concept lists used for validation or codegen.
-> - `vscode-pipelex/` (`plxt` CLI / LSP) — native-concept completion/validation tables.
-> - `conformance/` — fixtures or expected-output corpora referencing `native.ImgGenPrompt`.
-> - `pipelex-cookbook/`, `methods/`, `test-bed/`, `pipelex-starter-python/` — example `.mthds` files (pipelex's own bundled libraries were already verified clean).
->
-> Migration in all cases is the same: `ImgGenPrompt` (as a concept) → `Text`.
-
----
-
-## DO-NOT-TOUCH guardrail (the conflation traps, restated)
-
-If you find yourself editing any of these, STOP — you've drifted into the name collision:
-
-- `pipelex/cogt/img_gen/img_gen_prompt.py` (the `ImgGenPrompt` BaseModel) and everything that imports it (`img_gen_job.py`, `img_gen_job_factory.py`, `img_gen_prompt_blueprint.py`, `content_generator.py`, `pipe_img_gen.py`, `pipe_img_gen_factory.py`, and their tests).
-- `pipelex/cogt/templating/template_category.py` + `pipelex/tools/jinja2/jinja2_environment.py` (`TemplateCategory.IMG_GEN_PROMPT`).
-- `pipelex/cogt/exceptions.py` `ImgGenPromptError` + `docs/errors/img-gen-prompt-error.md` + `docs/errors/inference-and-providers.md`.
-
-These all stay exactly as they are.
+- `GraphSpec.pipe_registry` and `GraphSpec.concept_registry` include `source` when a source-map entry exists and omit it when not available.
+- Source enrichment works through direct in-memory graphs and event-assembled Temporal graphs.
+- Validation can graph an explicit pipe target without `main_pipe`.
+- Default validation behavior stays unchanged when no explicit target is provided.
+- CLI `validate bundle --pipe X --graph/--view` graphs `X`.
+- Tests pin source enrichment, no-main explicit target, target-overrides-main, missing target degradation/error behavior, and direct/Temporal parity.

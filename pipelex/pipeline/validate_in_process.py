@@ -47,6 +47,7 @@ async def validate_bundles_in_process(
     mthds_sources: list[str] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
+    graph_pipe_code: str | None = None,
     log_context: str = "validate",
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
@@ -67,6 +68,10 @@ async def validate_bundles_in_process(
             (so `source` stays `None` on that path).
         library_dirs: Resolved library directories to load before the bundle.
         allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
+        graph_pipe_code: Optional explicit pipe target for the best-effort graph arm.
+            When omitted, the graph arm keeps the existing default of targeting the
+            selected bundle `main_pipe`. Bare and qualified refs are accepted according
+            to the loaded pipe library's normal resolution rules.
         log_context: Label used in graph-arm degradation and teardown-failure logs.
 
     Returns:
@@ -102,8 +107,9 @@ async def validate_bundles_in_process(
         # something inside the window later moves the contextvar.
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
+        graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
-            pipe_ref=select_primary_blueprint(result.blueprints).main_pipe_ref,
+            pipe_ref=graph_target_ref,
             library_id=validation_library_id,
             log_context=log_context,
         )
