@@ -19,7 +19,7 @@ def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffC
 
     The Temporal hot path now ships ListContent items as plain dicts with
     pipelex-private ``__pipelex_class__`` / ``__pipelex_module__`` markers
-    (see ``WorkingMemory.dump_for_temporal``), so kajson never eagerly rehydrates
+    (see ``WorkingMemory.dump_for_transport``), so kajson never eagerly rehydrates
     them — the ``isinstance(raw_item, StuffContent)`` branch below is defensive,
     kept for direct (non-Temporal) callers and for any future path where kajson
     might still produce an instance whose class identity drifted across execs.
@@ -40,7 +40,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     """Hydrate a single list item for Anything[] results.
 
     Resolves the item class from the pipelex-private ``__pipelex_class__`` /
-    ``__pipelex_module__`` markers written by ``dump_for_temporal``. Falls back
+    ``__pipelex_module__`` markers written by ``dump_for_transport``. Falls back
     to TextContent for plain text or dicts with a 'text' key (the common case
     for Anything outputs without explicit type metadata).
     """
@@ -76,7 +76,7 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
     """Hydrate a single StuffContent from a raw value.
 
     Handles both plain content and ListContent.  The Temporal serialization
-    format (produced by ``WorkingMemory.dump_for_temporal()``) encodes
+    format (produced by ``WorkingMemory.dump_for_transport()``) encodes
     ListContent as a plain JSON list and single StuffContent as a dict,
     so the type check is unambiguous — no heuristic required.  ListContent
     items carry pipelex-private ``__pipelex_class__`` / ``__pipelex_module__``

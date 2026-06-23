@@ -1,15 +1,12 @@
-"""Boundary (de)serialization shared by the bridge and its orchestrators.
+"""Boundary (de)serialization shared by the orchestrators.
 
-Extracted from ``bridge.py`` so the orchestrator implementations (DIRECT in core,
-TEMPORAL_* / future plugins) can serialize their ``PipeOutput`` into the JSON-safe
-``PipelexPipeRunOutput`` without importing ``bridge.py`` — which pulls the bootstrap
-path (``bridge`` → ``bootstrap`` → ``pipelex`` → plugin discovery → ``builtins``)
-and would form an import cycle. This module is deliberately import-light: core
+Kept separate from the dispatch entry-point (``run_pipe_via_bridge``, now in the
+closed ``pipelex-transport`` library) so the orchestrator implementations (DIRECT
+in core, the distributed modes in the plugins) can serialize their ``PipeOutput``
+into the JSON-safe ``PipelexPipeRunOutput`` without pulling the bootstrap path
+(which would form an import cycle). This module is deliberately import-light: core
 working-memory + the pipe-execution error types + ``payloads``; no bootstrap, no
 plugin discovery, no host-runtime SDK.
-
-``bridge.py`` re-exports ``serialize_pipe_output`` so existing
-``from pipelex.runtime_bridge.bridge import serialize_pipe_output`` imports keep working.
 """
 
 from __future__ import annotations
@@ -43,16 +40,16 @@ PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
 def serialize_pipe_output(pipe_output: PipeOutput) -> dict[str, Any]:
     """Dehydrate a PipeOutput's working memory to a JSON-safe dict.
 
-    Always uses ``WorkingMemory.dump_for_temporal()`` — the same format Pipelex
-    uses internally for Temporal transit. The shape is stable regardless of
+    Always uses ``WorkingMemory.dump_for_transport()`` — the same format Pipelex
+    uses internally for cross-process transit. The shape is stable regardless of
     whether a ``library_crate`` was attached:
     ``{"root": {stuff_name: {"content": {...}, ...}}, "aliases": {...}}``.
 
-    Type metadata embedded by ``dump_for_temporal`` lets callers reconstruct a
+    Type metadata embedded by ``dump_for_transport`` lets callers reconstruct a
     typed ``WorkingMemory`` when they have the matching class registry in
     scope (e.g. via ``hydrate_working_memory``).
     """
-    return pipe_output.working_memory.dump_for_temporal()
+    return pipe_output.working_memory.dump_for_transport()
 
 
 def serialize_completed_output(
