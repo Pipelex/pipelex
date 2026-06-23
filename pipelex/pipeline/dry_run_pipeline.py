@@ -63,7 +63,10 @@ async def dry_run_pipeline(
     # double-parse is accepted because the runner interface requires the pipe ref upfront
     # and does not expose the internally-resolved pipe ref in its response.
     blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-    pipe_ref = pipe_code or select_primary_blueprint(blueprints).main_pipe_ref
+    if pipe_code is not None and not pipe_code.strip():
+        msg = "pipe_code must not be blank when provided"
+        raise PipelexInterpreterError(msg)
+    pipe_ref = pipe_code if pipe_code is not None else select_primary_blueprint(blueprints).main_pipe_ref
 
     if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"

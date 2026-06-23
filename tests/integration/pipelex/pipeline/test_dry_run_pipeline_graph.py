@@ -15,6 +15,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 
@@ -91,3 +92,13 @@ class TestDryRunPipelineGraphTransport:
         assert pipe_code == f"{_DRY_RUN_GRAPH_DOMAIN}_no_main.echo_subject"
         traced_pipe_codes = {node.pipe_code for node in graph_spec.nodes if node.pipe_code}
         assert traced_pipe_codes == {"echo_subject"}
+
+    async def test_blank_explicit_pipe_code_is_rejected(self) -> None:
+        """A blank explicit target must not silently fall back to main_pipe."""
+        with pytest.raises(PipelexInterpreterError) as exc_info:
+            await dry_run_pipeline(
+                mthds_contents=[_DRY_RUN_GRAPH_MTHDS],
+                pipe_code="   ",
+            )
+
+        assert str(exc_info.value) == "pipe_code must not be blank when provided"
