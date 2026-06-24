@@ -147,7 +147,6 @@ plugins:
         'home/6-build-reliable-ai-workflows/pipes/provide-inputs.md': 'building-methods/pipes/provide-inputs.md'
         'home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md': 'building-methods/pipes/understanding-multiplicity.md'
         'home/6-build-reliable-ai-workflows/pipes/working-memory.md': 'building-methods/pipes/working-memory.md'
-        'home/7-configuration/config-advanced/feature-config.md': 'configuration/config-advanced/feature-config.md'
         'home/7-configuration/config-pipeline-validation/dry-run-config.md': 'configuration/config-pipeline-validation/dry-run-config.md'
         'home/7-configuration/config-practical/logging-config.md': 'configuration/config-practical/logging-config.md'
         'home/7-configuration/config-practical/pipe-run-config.md': 'configuration/config-practical/pipe-run-config.md'
@@ -290,7 +289,6 @@ plugins:
         - configuration/config-technical/cogt-config.md: "Cogt Configuration"
         - configuration/config-technical/inference-backend-config.md: "LLM Providers & Models Configuration"
         - configuration/config-technical/library-config.md: "Library Configuration"
-        - configuration/config-advanced/feature-config.md: "Feature Configuration"
         - tools/plxt.md: "plxt (Formatter & Linter)"
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
@@ -526,7 +524,6 @@ nav:
         - Cogt: configuration/config-technical/cogt-config.md
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
-        - Feature: configuration/config-advanced/feature-config.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md

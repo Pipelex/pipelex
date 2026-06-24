@@ -85,10 +85,6 @@ class PromptingConfig(ConfigModel):
         return None
 
 
-class FeatureConfig(ConfigModel):
-    is_reporting_enabled: bool
-
-
 class ReportingConfig(ConfigModel):
     is_log_costs_to_console: bool
     is_generate_cost_report_file_enabled: bool
@@ -209,7 +205,6 @@ class PipelineExecutionConfig(ConfigModel):
 
 class Pipelex(ConfigModel):
     storage_config: StorageConfig
-    feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 

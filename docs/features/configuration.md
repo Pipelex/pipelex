@@ -32,6 +32,5 @@ Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environmen
 - **[Telemetry](../configuration/config-practical/telemetry-config.md)** — Observability settings
 - **[Reporting](../configuration/config-practical/reporting-config.md)** — Cost tracking and reports
 - **[Dry Run](../configuration/config-pipeline-validation/dry-run-config.md)** — Mock generation settings
-- **[Features](../configuration/config-advanced/feature-config.md)** — Feature flags
 
 For full configuration reference, see [Configuration](../configuration/index.md).

@@ -52,10 +52,6 @@ default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
-[pipelex.feature_config]
-# WIP/Experimental feature flags
-is_reporting_enabled = true
-
 [pipelex.reporting_config]
 is_log_costs_to_console = true
 is_generate_cost_report_file_enabled = false
