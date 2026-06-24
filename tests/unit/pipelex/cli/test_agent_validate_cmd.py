@@ -101,3 +101,43 @@ class TestValidateBundleCmd:
         assert error_obj["error"] is True
         assert error_obj["error_type"] == "PipelineExecutionError"
         assert "graph" in error_obj["message"].lower()
+
+    def test_view_generation_uses_pipe_override(
+        self,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        tmp_path: Path,
+    ) -> None:
+        """Validate bundle --pipe X --view should graph X instead of falling back to main_pipe."""
+        mthds_file = tmp_path / "bundle.mthds"
+        mthds_file.write_text('[bundle]\nmain_pipe = "main_pipe"\n[domain]\ncode = "test"')
+
+        mocker.patch(f"{VALIDATE_BUNDLE_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{VALIDATE_BUNDLE_CMD_MODULE}.Pipelex.teardown_if_needed")
+
+        validation_result: dict[str, Any] = {
+            "success": True,
+            "bundle_path": str(mthds_file),
+            "validated_pipes": [{"pipe_ref": "other_pipe", "status": "SUCCESS"}],
+            "total_pipes": 1,
+        }
+        mocker.patch(
+            f"{VALIDATE_BUNDLE_CMD_MODULE}.validate_pipe_in_bundle_core",
+            new=mocker.AsyncMock(return_value=validation_result),
+        )
+        view_mock = mocker.patch(
+            f"{VALIDATE_BUNDLE_CMD_MODULE}.generate_view_for_bundle",
+            new=mocker.AsyncMock(return_value={"graphspec": {}, "pipe_code": "other_pipe"}),
+        )
+
+        validate_bundle_cmd(
+            path=str(mthds_file),
+            pipe="other_pipe",
+            view=True,
+            output_format=CliOutputFormat.JSON,
+        )
+
+        view_mock.assert_awaited_once()
+        assert view_mock.call_args.kwargs["pipe_code"] == "other_pipe"
+        output = json.loads(capsys.readouterr().out)
+        assert output["pipe_code"] == "other_pipe"

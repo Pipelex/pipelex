@@ -7,7 +7,7 @@ description: "Reference for the `DuplicateOrchestratorError` Pipelex error class
 
 # Duplicate orchestrator
 
-Two plugins registered an orchestrator for the same execution mode.
+Two plugins registered an orchestrator for the same orchestration mode.
 
 | Field | Value |
 |---|---|

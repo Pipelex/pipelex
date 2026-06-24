@@ -1,8 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.runtime_bridge.bridge import PipelexPipeRunInput, PipelexPipeRunOutput
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
+from pipelex.runtime_bridge.payloads import PipelexPipeRunInput, PipelexPipeRunOutput
 
 
 class TestInputOutputModels:

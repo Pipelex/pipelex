@@ -104,6 +104,7 @@ async def _dry_run_bundle(
     bundle_path: Path,
     *,
     library_dirs: list[str] | None = None,
+    pipe_code: str | None = None,
 ) -> tuple[GraphSpec, str]:
     """Dry-run a bundle file to produce a GraphSpec.
 
@@ -113,6 +114,7 @@ async def _dry_run_bundle(
     Args:
         bundle_path: Path to the .mthds bundle file.
         library_dirs: Optional library directories for pipe resolution.
+        pipe_code: Optional explicit pipe target for graph generation.
 
     Returns:
         Tuple of (GraphSpec, pipe_code).
@@ -134,6 +136,7 @@ async def _dry_run_bundle(
         mthds_contents=[mthds_content],
         bundle_uris=[str(bundle_path)],
         library_dirs=effective_library_dirs,
+        pipe_code=pipe_code,
     )
 
 
@@ -142,6 +145,7 @@ async def generate_graph_for_bundle(
     *,
     graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
+    pipe_code: str | None = None,
     direction: FlowchartDirection | None = None,
     graph_name: str = "dry_run.html",
 ) -> dict[str, Any]:
@@ -154,6 +158,7 @@ async def generate_graph_for_bundle(
         bundle_path: Path to the .mthds bundle file.
         graph_format: Which graph format(s) to generate.
         library_dirs: Optional library directories for pipe resolution.
+        pipe_code: Optional explicit pipe target for graph generation.
         direction: Flowchart layout direction (default: None, uses TB).
         graph_name: Filename for the generated HTML graph (default: "dry_run.html").
 
@@ -165,7 +170,7 @@ async def generate_graph_for_bundle(
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
-    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs)
+    graph_spec, resolved_pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs, pipe_code=pipe_code)
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
@@ -192,7 +197,7 @@ async def generate_graph_for_bundle(
         include_mermaidflow=include_mermaidflow,
         include_reactflow=include_reactflow,
         output_dir=output_dir,
-        pipe_code=pipe_code,
+        pipe_code=resolved_pipe_code,
         direction=direction,
     )
 
@@ -207,7 +212,7 @@ async def generate_graph_for_bundle(
     return {
         "graph_files": {key: str(path) for key, path in saved_files.items()},
         "graph_output_dir": str(output_dir),
-        "pipe_code": pipe_code,
+        "pipe_code": resolved_pipe_code,
         "direction": str(direction) if direction else None,
     }
 
@@ -216,6 +221,7 @@ async def generate_view_for_bundle(
     bundle_path: Path,
     *,
     library_dirs: list[str] | None = None,
+    pipe_code: str | None = None,
     direction: FlowchartDirection | None = None,
 ) -> dict[str, Any]:
     """Generate a GraphSpec for a bundle via dry-run pipeline execution.
@@ -226,6 +232,7 @@ async def generate_view_for_bundle(
     Args:
         bundle_path: Path to the .mthds bundle file.
         library_dirs: Optional library directories for pipe resolution.
+        pipe_code: Optional explicit pipe target for graph generation.
         direction: Flowchart layout direction (default: None, uses config default).
 
     Returns:
@@ -236,7 +243,7 @@ async def generate_view_for_bundle(
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
-    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs)
+    graph_spec, resolved_pipe_code = await _dry_run_bundle(bundle_path, library_dirs=library_dirs, pipe_code=pipe_code)
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=True,
@@ -247,6 +254,6 @@ async def generate_view_for_bundle(
 
     return {
         "graphspec": graph_spec.model_dump(mode="json", by_alias=True),
-        "pipe_code": pipe_code,
+        "pipe_code": resolved_pipe_code,
         "direction": str(effective_direction) if effective_direction else None,
     }

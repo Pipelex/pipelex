@@ -68,7 +68,7 @@ Classification happens once, at **Layer 1**. Layers 2–5 are wrappers: they att
 
 A bundle-validation failure (`ValidateBundleError`) aggregates per-error data across stages and projects it onto `validation_errors` as a list of typed `ValidationErrorItem`s, so the structured error report an HTTP API surfaces carries machine-mappable diagnostics (not just a single `detail` string). Each item's `category` is one of the **closed** `ValidationErrorCategory` set:
 
-- `blueprint_validation` — interpreter / blueprint-validation faults. This also serves as the **last-resort residual**: a parse-level failure (a TOML-syntax error, an empty blueprint, a bundle-elaborator failure) is raised with only a message and no categorized data, so when *nothing else* produced an item the builder projects that message as one `blueprint_validation` item (no `error_type`, no `source` — the bundle could not become a blueprint at all).
+- `blueprint_validation` — interpreter / blueprint-validation faults. A blueprint-stage `PipeValidationError` raised *inside* a pydantic model validator (e.g. the PipeBatch `input_item_name` == `input_list_name` collision, or the SubPipe `batch_over` == `batch_as` collision — both `batch_item_name_collision`) is wrapped by pydantic as a `value_error`; the blueprint categorizer unwraps it (`ctx["error"]`) so the item keeps its structured `error_type` and `pipe_code` / `domain_code` locators instead of degrading to the no-`error_type` residual. The item stays in `blueprint_validation` (not `pipe_validation`) because the fault genuinely surfaced at the parse boundary, before any pipe was instantiated — only the `error_type` is recovered, not the stage. This category also serves as the **last-resort residual**: a parse-level failure (a TOML-syntax error, an empty blueprint, a bundle-elaborator failure) is raised with only a message and no categorized data, so when *nothing else* produced an item the builder projects that message as one `blueprint_validation` item (no `error_type`, no `source` — the bundle could not become a blueprint at all).
 - `pipe_factory` — pipe-factory failures (e.g. a missing concept).
 - `pipe_validation` — pipe/concept validation (missing input variable, type mismatch).
 - `dry_run` — the **residual** dry-run failure (`DryRunError` / `PipeRunError`) with no structured locator. It is projected as one message-only item **only when no categorized error has data**. It is graph-level, so it typically carries **no `source`**.
@@ -333,7 +333,7 @@ A downstream FastAPI exception handler calls `ErrorReport.http_status` and is a 
 
 **Inputs.** `to_error_report()` takes a live `PipelexError`. `recover_error_report()` takes any `BaseException` and walks its `__cause__` chain. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift.
 
-**Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(...)` — code 1 by default, or the validate surface's 0/1/2 policy (see [Validate exit-code policy](#validate-exit-code-policy-0--1--2)).
+**Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(...)` — code 1 by default, or the validate surface's 0/1/2 policy (see [Validate exit-code policy](#validate-exit-code-policy-0-1-2)).
 
 ---
 
@@ -436,9 +436,9 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
-| `pipelex/temporal/tprl/temporal_error.py` | `TemporalError`, `from_message_exception`, `recover_error_report` |
-| `pipelex/temporal/tprl/activity_error_boundary.py` | `convert_pipelex_errors` decorator |
-| `pipelex/temporal/tprl/workflow_caller.py` | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
+| `pipelex_temporal/tprl/temporal_error.py` *(in the closed `pipelex-temporal` plugin)* | `TemporalError`, `from_message_exception`, `recover_error_report` |
+| `pipelex_temporal/tprl/activity_error_boundary.py` *(plugin)* | `convert_pipelex_errors` decorator |
+| `pipelex_temporal/tprl/workflow_caller.py` *(plugin)* | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
 
@@ -462,6 +462,6 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 ## Next Steps
 
 - [Pipe Routing & Execution](./pipe-routing-and-execution.md) — the layer model errors rise through
-- [Temporal Integration](./temporal-integration.md) — the activity → workflow boundary the error bridge spans
+- [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) — the process boundary the error bridge spans (the per-backend error converters live in the host-runtime plugins)
 - [Cogt Configuration](../configuration/config-technical/cogt-config.md) — `transport_max_retries` and the Tier 1 retry policy
 - [Agent CLI](../tools/cli/agent-cli.md) — the JSON / markdown error contract

@@ -22,8 +22,9 @@ from pipelex.plugins.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
 #
 # Temporal is NOT here: it ships as the external ``pipelex-temporal`` distribution,
 # discovered via its ``pipelex.plugins`` entry point. Installing that dist makes the
-# TEMPORAL_* orchestrators (and, when ``temporal.is_enabled``, the worker runtime)
-# available — zero config, no core import of ``temporalio``.
+# ``"temporal"`` orchestrator (and, when a process is booted under it via
+# ``plugins.boot_orchestrator = "temporal"``, the worker runtime) available — zero
+# config, no core import of ``temporalio``.
 BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DirectOrchestratorPlugin(),
     OpenAIPlugin(),

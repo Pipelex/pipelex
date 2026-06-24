@@ -85,6 +85,7 @@ own page. Classes are grouped by subsystem.
 - [`BedrockWorkerConfigurationError`](bedrock-worker-configuration-error.md) — Bedrock worker configuration
 - [`BrokenPluginError`](broken-plugin-error.md) — Broken plugin
 - [`CoreUnconditionalPluginDisabledError`](core-unconditional-plugin-disabled-error.md) — Core unconditional plugin disabled
+- [`DuplicateBundleValidatorError`](duplicate-bundle-validator-error.md) — Duplicate bundle validator
 - [`DuplicateHttpErrorMapperError`](duplicate-http-error-mapper-error.md) — Duplicate http error mapper
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister

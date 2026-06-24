@@ -7,7 +7,7 @@ description: "Reference for the `MissingOrchestratorError` Pipelex error class."
 
 # Missing orchestrator
 
-Raised when no orchestrator is available for a requested execution mode.
+Raised when no orchestrator is registered for a requested orchestration mode.
 
 | Field | Value |
 |---|---|

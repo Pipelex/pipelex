@@ -9,6 +9,7 @@ from pipelex.core.bundles.exceptions import (
 )
 from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validation_error
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
@@ -195,6 +196,33 @@ def categorize_blueprint_validation_error(
     pipe_code: str | None = None
     if len(loc) >= 2 and loc[0] == "pipe":
         pipe_code = str(loc[1])
+
+    # A blueprint-stage ``PipeValidationError`` (e.g. the PipeBatch ``input_item_name`` ==
+    # ``input_list_name`` collision raised by ``PipeBatchBlueprint.validate_inputs``, or the SubPipe
+    # ``batch_over`` == ``batch_as`` collision raised by ``SubPipeBlueprint.validate_batch_params``) is
+    # raised *inside* a pydantic model validator, so pydantic wraps it as a ``value_error`` with the
+    # original exception in ``ctx["error"]``. Unwrap it — mirroring the pipe categorizer's
+    # ``extract_wrapped_pipe_validation_error`` (one shared helper) — so its structured ``error_type``
+    # and locators survive instead of degrading to an uncategorized residual (``error_type`` absent).
+    # This recovers the ``error_type`` for ANY blueprint-stage ``PipeValidationError``, not just batch.
+    #
+    # Category decision: the recovered item stays ``blueprint_validation`` (the only shape this
+    # categorizer emits), NOT re-bucketed to ``pipe_validation``. The fault genuinely surfaced at the
+    # blueprint-parse boundary — inside ``PipelexBundleBlueprint.model_validate``, before any pipe was
+    # instantiated — so ``blueprint_validation`` is the honest stage; we recover the ``error_type``,
+    # not the stage. The wrapped error carries no ``pipe_code`` / ``domain_code`` of its own at this
+    # boundary, so backfill the locators from the pydantic ``loc`` (the ``pipe.<code>`` prefix) and the
+    # bundle dict, preferring any the error does carry.
+    wrapped_pipe_error = extract_wrapped_pipe_validation_error(error)
+    if wrapped_pipe_error is not None:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=wrapped_pipe_error.error_type,
+            domain_code=wrapped_pipe_error.domain_code or domain,
+            source=wrapped_pipe_error.file_path or source,
+            pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
+            message=wrapped_pipe_error.explanation or str(wrapped_pipe_error),
+            variable_names=wrapped_pipe_error.variable_names,
+        )
 
     error_scope = get_error_scope(loc)
 

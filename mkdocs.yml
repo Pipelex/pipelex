@@ -58,7 +58,13 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
-        'under-the-hood/temporal-deployment.md': 'distributed-execution/cluster-setup.md'
+        'under-the-hood/temporal-deployment.md': 'distributed-execution/index.md'
+        'distributed-execution/temporal/index.md': 'distributed-execution/index.md'
+        'distributed-execution/cluster-setup.md': 'distributed-execution/index.md'
+        'distributed-execution/workers.md': 'distributed-execution/index.md'
+        'distributed-execution/task-routing.md': 'distributed-execution/index.md'
+        'distributed-execution/observability.md': 'distributed-execution/index.md'
+        'under-the-hood/temporal-integration.md': 'under-the-hood/runtime-bridge-and-transport.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
         'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
@@ -313,9 +319,8 @@ plugins:
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/error-model.md: "Error Model"
-        - under-the-hood/temporal-integration.md: "Temporal Integration"
-        - under-the-hood/temporal-deployment.md: "Temporal Deployment"
-        - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
+        - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
+        - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
@@ -369,16 +374,6 @@ not_in_nav: |
   !errors/inference-and-providers.md
   !errors/platform-and-tooling.md
   agents/*.md
-
-# exclude_docs: forward-looking pages kept in the repo but NOT built or served on
-#   the live site yet. The Mistral Workflows backend ships as a separate package
-#   (pipelex-mistralai-workflows) that is not published yet, so its user docs are
-#   held back to avoid advertising an unreleased package. Re-publish them — delete
-#   this block and restore the "Mistral Workflows" nav entries under Distributed
-#   Execution — once the package lands. See
-#   wip/distributed-execution/bridge-changes-sibling-repo-reconciliation.md.
-exclude_docs: |
-  distributed-execution/mistral-workflows/
 
 nav:
   - Get Started:
@@ -487,14 +482,7 @@ nav:
       - Automatic Retries: reliability/automatic-retries.md
       - Failure Classification: reliability/failure-classification.md
       - Durable Execution: reliability/durable-execution.md
-    - Distributed Execution:
-      - Overview: distributed-execution/index.md
-      - Temporal:
-        - Overview: distributed-execution/temporal/index.md
-        - Cluster Setup: distributed-execution/cluster-setup.md
-        - Worker Deployment: distributed-execution/workers.md
-        - Task-Queue Routing: distributed-execution/task-routing.md
-        - Workflow Observability: distributed-execution/observability.md
+    - Distributed Execution: distributed-execution/index.md
   - Reference:
     - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
@@ -563,8 +551,8 @@ nav:
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Error Model: under-the-hood/error-model.md
-      - Temporal Integration: under-the-hood/temporal-integration.md
-      - Distributed Content Generation: under-the-hood/distributed-content-generation.md
+      - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
+      - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md

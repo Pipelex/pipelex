@@ -3,12 +3,11 @@ is flattened to text and never delivered to a downstream PipeImgGen.
 
 Scenario (reported by a user):
   1. A PipeCompose builds the image-generation prompt from a template that references
-     an Image via `@source_image`. Its output concept is `ImgGenPrompt`, which refines
-     `Text`.
+     an Image via `@source_image`. Its output concept is `Text`.
   2. A PipeImgGen receives ONLY that composed prompt (`$gen_prompt`); it does not declare
      the image as a direct input.
 
-Because `ImgGenPrompt` is text-typed, the `@source_image` reference is rendered into a
+Because `Text` is text-typed, the `@source_image` reference is rendered into a
 plain URL string during composition and the live image binding is lost. The PipeImgGen
 then has no image reference of its own, so the image never reaches the model: the
 generator hallucinates from text alone.
@@ -52,7 +51,7 @@ SOURCE_IMAGE_URL = "https://example.com/secret-token-glyph-7q2x.png"
 async def _compose_then_build_img_gen_prompt(job_metadata: JobMetadata) -> tuple[str, ImgGenPrompt]:
     """Run the reported chain offline and return (composed_prompt_text, img_gen_prompt).
 
-    Step 1 — PipeCompose embeds the image in its template and outputs an ImgGenPrompt.
+    Step 1 — PipeCompose embeds the image in its template and outputs a Text.
     Step 2 — PipeImgGen receives only the composed prompt and builds the ImgGenPrompt that
              would be sent to the model. No model is called.
     """
@@ -74,7 +73,7 @@ async def _compose_then_build_img_gen_prompt(job_metadata: JobMetadata) -> tuple
             templating_style=TemplatingStyle(tag_style=TagStyle.TICKS, text_format=TextFormat.MARKDOWN),
             category=TemplateCategory.IMG_GEN_PROMPT,
         ),
-        output=NativeConceptCode.IMG_GEN_PROMPT,
+        output=NativeConceptCode.TEXT,
     )
     compose_job = PipeJobFactory.make_pipe_job(
         pipe=PipeFactory[PipeCompose].make_from_blueprint(
@@ -96,7 +95,7 @@ async def _compose_then_build_img_gen_prompt(job_metadata: JobMetadata) -> tuple
         pipe_code="adhoc_img_gen_from_composed_prompt",
         blueprint=PipeImgGenBlueprint(
             description="Generate from the composed prompt only — no direct image input",
-            inputs={"gen_prompt": "ImgGenPrompt"},
+            inputs={"gen_prompt": "Text"},
             output="Image",
             prompt="$gen_prompt",
         ),

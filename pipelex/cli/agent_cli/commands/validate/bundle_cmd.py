@@ -159,6 +159,7 @@ def validate_bundle_cmd(
                         bundle_path=Path(bundle_path),  # type: ignore[arg-type]
                         graph_format=graph_format,
                         library_dirs=library_dir_strings,
+                        pipe_code=pipe,
                         direction=direction,
                     )
                 )
@@ -187,6 +188,7 @@ def validate_bundle_cmd(
                     generate_view_for_bundle(
                         bundle_path=Path(bundle_path),  # type: ignore[arg-type]
                         library_dirs=library_dir_strings,
+                        pipe_code=pipe,
                         direction=direction,
                     )
                 )

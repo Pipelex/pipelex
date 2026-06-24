@@ -22,7 +22,6 @@ Pre-built universal concepts available in every Pipelex project:
 - **Html** — HTML content
 - **TextAndImages** — Combined text and image content in a single structure
 - **Number** — Numeric value
-- **ImgGenPrompt** — A prompt specifically crafted for image generation models
 - **Page** — A single page extracted from a document, with markdown text and optional images
 - **JSON** — Arbitrary JSON data
 - **SearchResult** — Web search result with source citations

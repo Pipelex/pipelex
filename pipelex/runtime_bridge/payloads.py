@@ -1,12 +1,11 @@
 """JSON-safe boundary payloads for the runtime bridge.
 
-Extracted from ``bridge.py`` so they can be referenced (e.g. by the orchestrator
-SPI / ``OrchestratorProtocol``) without importing the bridge's dispatch logic —
-which pulls the bootstrap path and would form an import cycle. This module is
-deliberately import-light: pydantic, the orchestration/delivery types, stdlib typing.
-
-``bridge.py`` re-exports both names, so existing
-``from pipelex.runtime_bridge.bridge import PipelexPipeRunInput`` imports keep working.
+The SPI boundary contract between core's ``DirectOrchestrator`` (and the open
+``pipelex-api`` runner) and the cross-process dispatch entry-point that now lives
+in the closed ``pipelex-transport`` library. Kept import-light and separate from
+any dispatch logic so they can be referenced (e.g. by the orchestrator SPI /
+``OrchestratorProtocol``) without pulling the bootstrap path — which would form an
+import cycle: pydantic, the orchestration/delivery types, stdlib typing only.
 """
 
 from typing import Any

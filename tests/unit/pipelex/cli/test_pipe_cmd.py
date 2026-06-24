@@ -77,7 +77,7 @@ class TestCliPipeCmd:
             {
                 "pipe_code": "my_img_gen",
                 "description": "Image gen pipe",
-                "inputs": {"prompt_text": "ImgGenPrompt"},
+                "inputs": {"prompt_text": "Text"},
                 "output": "Image",
                 "model": "$gen-image",
                 "prompt": "Generate: $prompt_text",
@@ -190,12 +190,12 @@ class TestCliPipeCmd:
             "description": "Generate an image prompt from an idea",
             "model": "$writing-creative",
             "inputs": {"idea": "Text"},
-            "output": {"type": "ImgGenPrompt"},
+            "output": {"type": "Text"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
         result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         assert result.model == "$writing-creative"  # type: ignore[attr-defined]
-        assert result.output == "ImgGenPrompt"
+        assert result.output == "Text"
 
     def test_toml_output_has_correct_model(self) -> None:
         """The TOML should contain the model preset directly."""
@@ -204,10 +204,10 @@ class TestCliPipeCmd:
             "description": "Generate an image prompt from an idea",
             "model": "$writing-creative",
             "inputs": {"idea": "Text"},
-            "output": {"type": "ImgGenPrompt"},
+            "output": {"type": "Text"},
             "prompt": "Generate a creative image prompt based on $idea",
         }
         result = parse_pipe_spec(spec, pipe_type="PipeLLM")
         toml = _pipe_spec_to_toml(result)
         assert 'model = "$writing-creative"' in toml
-        assert 'output = "ImgGenPrompt"' in toml
+        assert 'output = "Text"' in toml
