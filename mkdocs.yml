@@ -64,6 +64,7 @@ plugins:
         'distributed-execution/workers.md': 'distributed-execution/index.md'
         'distributed-execution/task-routing.md': 'distributed-execution/index.md'
         'distributed-execution/observability.md': 'distributed-execution/index.md'
+        'under-the-hood/temporal-integration.md': 'under-the-hood/runtime-bridge-and-transport.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
         'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
@@ -318,8 +319,8 @@ plugins:
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/error-model.md: "Error Model"
-        - under-the-hood/temporal-integration.md: "Temporal Integration"
-        - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
+        - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
+        - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
@@ -550,8 +551,8 @@ nav:
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Error Model: under-the-hood/error-model.md
-      - Temporal Integration: under-the-hood/temporal-integration.md
-      - Distributed Content Generation: under-the-hood/distributed-content-generation.md
+      - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
+      - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md

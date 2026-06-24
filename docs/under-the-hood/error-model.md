@@ -436,9 +436,9 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
-| `pipelex/temporal/tprl/temporal_error.py` | `TemporalError`, `from_message_exception`, `recover_error_report` |
-| `pipelex/temporal/tprl/activity_error_boundary.py` | `convert_pipelex_errors` decorator |
-| `pipelex/temporal/tprl/workflow_caller.py` | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
+| `pipelex_temporal/tprl/temporal_error.py` *(in the closed `pipelex-temporal` plugin)* | `TemporalError`, `from_message_exception`, `recover_error_report` |
+| `pipelex_temporal/tprl/activity_error_boundary.py` *(plugin)* | `convert_pipelex_errors` decorator |
+| `pipelex_temporal/tprl/workflow_caller.py` *(plugin)* | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
 
@@ -462,6 +462,6 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 ## Next Steps
 
 - [Pipe Routing & Execution](./pipe-routing-and-execution.md) — the layer model errors rise through
-- [Temporal Integration](./temporal-integration.md) — the activity → workflow boundary the error bridge spans
+- [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) — the process boundary the error bridge spans (the per-backend error converters live in the host-runtime plugins)
 - [Cogt Configuration](../configuration/config-technical/cogt-config.md) — `transport_max_retries` and the Tier 1 retry policy
 - [Agent CLI](../tools/cli/agent-cli.md) — the JSON / markdown error contract

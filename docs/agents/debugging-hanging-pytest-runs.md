@@ -117,9 +117,10 @@ echo "exit=$?"  # 0=pass, 1=fail, 124=outer timeout
 # 3. If any failures, grep by error class name
 grep -B 2 -A 10 "YourErrorClass" /tmp/pytest_unit.log
 
-# 4. If integration temporal tests are in scope, run them serially with shorter timeout
-timeout 240 .venv/bin/pytest --timeout=60 --timeout-method=thread -q \
-  tests/integration/pipelex/temporal/ > /tmp/pytest_temporal.log 2>&1
+# 4. The Temporal integration tests live in the sibling `pipelex-temporal` repo —
+#    if they're in scope, run them there, serially, with a shorter timeout
+( cd ../pipelex-temporal && timeout 240 .venv/bin/pytest --timeout=60 --timeout-method=thread -q \
+  tests/integration/pipelex_temporal/ > /tmp/pytest_temporal.log 2>&1 )
 echo "exit=$?"
 ```
 
@@ -158,7 +159,7 @@ In all four cases, write up what you know in 3–4 sentences and surface to the 
 ## Codebase-specific notes (Pipelex / Temporal)
 
 - `make agent-test` uses `-n auto -q` — both buffer output and obscure progress. For debug runs, invoke pytest directly with `-v` and direct file redirect.
-- `boot_temporal` fixture teardown (in `tests/integration/pipelex/temporal/conftest.py`) is the known fixture-teardown hang point. If a hang traceback mentions `manager.teardown()` or `temporal_hub.reset()`, it's this.
+- `boot_temporal` fixture teardown (in the sibling `pipelex-temporal` repo's `tests/integration/pipelex_temporal/conftest.py`) is the known fixture-teardown hang point. If a hang traceback mentions `manager.teardown()` or `temporal_hub.reset()`, it's this.
 - xdist worker crashes on integration temporal tests often show as `[gw N] node down: Not properly terminated` followed by `replacing crashed worker`. Treat as infrastructure flake until you've proven otherwise serially.
 - `is_in_temporal_workflow()` is the right gate for code that might be invoked from inside a Temporal sandbox — `get_config()` is unsafe to read from inside, and many singletons return sandboxed-empty copies. This was the actual bug I hit; it would have been caught instantly by the playbook above if I'd run the integration tests serially on first iteration instead of trusting the xdist run.
 - **A payload-conversion error inside a workflow task looks like a clean hang, not a failure.** When the data converter raises while decoding an activity result (or workflow argument), Temporal fails the *workflow task* and retries it indefinitely — the submitter's `execute_workflow` never returns, pytest-timeout's thread-method kill fires, and xdist reports `node down` with the real traceback destroyed along with the process. Historical trigger: kajson ≤ 0.6.0 decoded tz-aware datetimes via `ZoneInfo(...)`, which needs the IANA tz database — absent on slim containers and uv-managed standalone Pythons. Fixed upstream in kajson 0.7.0 (self-sufficient timezone wire format + `tzdata` declared as kajson's own dependency), but any other deterministic decode error (registry miss, schema drift) still presents as this same hang. To diagnose this class of hang on a remote runner, set `PIPELEX_HANG_DUMP_DIR=<dir>`: the temporal integration conftest arms a per-test watchdog that dumps all thread stacks to a file before the kill AND mirrors temporalio's failure logs (which carry the workflow-task traceback) into the same directory; the tests workflow prints the directory on job failure. To reproduce a missing-tz-database environment locally, run with `PYTHONTZPATH=/nonexistent` after uninstalling `tzdata`.
