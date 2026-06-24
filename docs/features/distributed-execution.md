@@ -20,8 +20,8 @@ Pipelex pipelines normally run in-process. When you need durability, retries tha
 
 ## Backends
 
-Distributed execution is delivered through the Pipelex platform, on proven orchestration engines — Temporal-backed durable execution, and a Mistral Workflows integration that runs your pipes inside Mistral's managed Workflows. Both run the identical methods through the same Pipelex runtime, so the durability model and the error contract are the same whichever one executes your work.
+Distributed execution is delivered through the Pipelex platform, on proven orchestration engines — [Temporal-backed durable execution](https://pipelex.com/products#temporal), and a [Mistral Workflows](https://pipelex.com/products#mistral-workflows) integration that runs your pipes inside Mistral's managed Workflows. Both run the identical methods through the same Pipelex runtime, so the durability model and the error contract are the same whichever one executes your work.
 
 ## Get started
 
-See the **[Distributed Execution](../distributed-execution/index.md)** capability guide, or explore the platform at **[Pipelex products](https://pipelex.com/products)**.
+See the **[Distributed Execution](../distributed-execution/index.md)** capability guide, or explore the platform at **[Pipelex products](https://pipelex.com/products#durable-execution)**.

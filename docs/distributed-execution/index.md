@@ -22,13 +22,13 @@ You don't change your methods. Under the hood, Pipelex maps each method onto a d
 
 Distributed execution is delivered through the Pipelex platform, on top of proven orchestration engines:
 
-- **Temporal-backed execution** — run your methods as durable workflows on a Temporal control plane, with per-step retries and full replay history.
-- **Mistral Workflows** — run your pipes inside Mistral's managed Workflows orchestration, so there's no control plane for you to operate.
+- **[Temporal-backed execution](https://pipelex.com/products#temporal)** — run your methods as durable workflows on a Temporal control plane, with per-step retries and full replay history.
+- **[Mistral Workflows](https://pipelex.com/products#mistral-workflows)** — run your pipes inside Mistral's managed Workflows orchestration, so there's no control plane for you to operate.
 
 Both run the identical `.mthds` methods through the same Pipelex runtime, so the durability model and the [error contract](../reliability/failure-classification.md) are the same whichever one executes your work.
 
 ## Get started
 
-Distributed and durable execution is part of the Pipelex platform rather than something you wire up yourself. To run your methods durably at scale — or to talk through which backend fits your deployment — see **[Pipelex products](https://pipelex.com/products)**.
+Distributed and durable execution is part of the Pipelex platform rather than something you wire up yourself. To run your methods durably at scale — or to talk through which backend fits your deployment — see **[Pipelex products](https://pipelex.com/products#durable-execution)**.
 
 For the failure-handling model that durable execution builds on, see [Retries & Resilience](../reliability/retries-and-resilience.md).
