@@ -6,7 +6,7 @@ The work is framed as three parts (D-plan **A/B/C**). **Part A — the in-proces
 
 - **What exists now** → [`consolidation-as-built.md`](./consolidation-as-built.md) (the as-built architecture + the decisions that hold).
 - **Why it's shaped this way + the full Part B/C design** → [`D-plan.md`](./D-plan.md) (the design source).
-- **Rendered PR recap** → [`PR-bundle-validator.html`](./PR-bundle-validator.html) (a point-in-time snapshot of the consolidation PR).
+- **Rendered PR recap** → [`../history/PR-bundle-validator.html`](../history/PR-bundle-validator.html) (a point-in-time snapshot of the consolidation PR).
 
 ---
 
