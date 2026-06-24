@@ -191,17 +191,17 @@ def execute_validate(
     library_dirs: list[Path] | None,
     telemetry_command_label: str = COMMAND,
     allow_signatures: bool = False,
-    temporal: bool | None = None,
+    orchestrator: str | None = None,
 ) -> None:
     """Synchronous entry point wrapping the async validation with Pipelex setup/teardown.
 
-    ``temporal`` overrides ``temporal.is_enabled`` for the boot (mirroring ``run``). The
-    validation sweep itself always runs in-process — under a Temporal-enabled hub it scopes
-    its own in-process router so nested controller sub-pipes do not dispatch to Temporal — so
-    this flag does not change *what* validation does; it controls how Pipelex boots, which is
-    the lever for exercising the "validation stays in-process on a Temporal backend" contract.
+    ``orchestrator`` boots this process under the named orchestrator plugin (mirroring ``run``).
+    The validation sweep itself always runs in-process — under an orchestrator-backed hub it scopes
+    its own in-process router so nested controller sub-pipes do not dispatch to the orchestrator
+    runtime — so this flag does not change *what* validation does; it controls how Pipelex boots,
+    which is the lever for exercising the "validation stays in-process on an orchestrator backend" contract.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True, temporal_enabled=temporal)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, needs_model_specs=True, boot_orchestrator=orchestrator)
 
     try:
         with get_telemetry_manager().telemetry_context():

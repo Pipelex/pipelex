@@ -1,0 +1,128 @@
+# Plan — `/execute` honors per-request `execution_mode` (extend F1)
+
+> **⚠️ SUPERSEDED (2026-06-22) by [`orchestration-mode-and-delivery-split.md`](orchestration-mode-and-delivery-split.md).** This plan shipped a working surface on top of the **flat** `PipelexExecutionMode` enum. The orchestration-mode/delivery split (now DONE across all repos, incl. Phase 4 — the `pipelex-mistralai-workflows` migration) **removed that flatness**: `PipelexExecutionMode` is gone, replaced by an open `orchestration_mode` string token (the backend) + an endpoint-set `DeliveryMode` (the wait-semantics). The `/execute` change this plan made still stands conceptually (per-call orchestration via the `OrchestratorRegistry`), but its wire field is now `orchestration_mode` and the f&f-rejection workaround it relied on (`FIRE_AND_FORGET_NOT_SUPPORTED`) is deleted — delivery is no longer a requestable mode value. Read the split plan for the current surface; this doc is kept for history.
+
+**Status:** **Phase E0 DONE — PR #27 MERGE-READY.** Implemented in `pipelex-api` on `feature/Execute-per-request-mode` (off the validate tip `72c0efc`); **PR [#27](https://github.com/Pipelex/pipelex-api/pull/27) → `feature/Orchestrator-dispatched-validate`**. CI green (Lint/Tests/doc-check across 3.11–3.13); review bots satisfied — **Greptile 5/5 "safe to merge"**, Codex's findings addressed (the OpenAPI `execution_mode`-advertisement gap fixed; the dangling-`$defs`-ref + error-wrapping items deferred as pre-existing/cross-endpoint), no open threads. gstack pre-landing `/review`: **merge-ready, no blockers.** All gates green: `make agent-check`, `make agent-test`/`make check` (openapi-check + pylint 10/10). PR head `191c900`. As-built in §"As-built (Phase E0)"; deferred/flagged items (incl. review findings #5–#9) in `execute-per-request-mode-deferred.md`. **Not merged** (targets a feature branch; user's call). The git-SHA `pipelex` pin (`c60be1f`) reverts to the PyPI `==<ver>` pin once core ships. **Plan 2 of 2** — its sibling `wip/plugins/orchestrator-dispatched-validate.md` is now **DONE** (V0–V3 implemented + committed across all three repos: core PR **#998** vs `refactor/Plugins-4` with CI green + Greptile happy; `pipelex-api` tip `72c0efc` and `pipelex-temporal` tip `459e04d`, both on `feature/Orchestrator-dispatched-validate`, pushed). This plan **extends locked decision F1** of the orchestrator-agnostic-runner effort (tracker: `_plugins/TODOS.md`; parent plan: `_plugins/wip/plugins/orchestrator-agnostic-runner-and-flavors.md`).
+
+> **START HERE (cold start).** Read this whole doc. This is a **single-repo change in `pipelex-api`** — no core (`pipelex`) and no `pipelex-temporal` change. It converts `POST /execute` from the boot-global pipe-run hub slot to the **per-call `OrchestratorRegistry`** (the same seam `/start` already uses), so `/execute` honors a per-request `execution_mode` (policy-gated), exactly like `/start`. The change reuses the **existing** orchestrator seam — the validate work added a *parallel* `BundleValidatorRegistry` and never touched the `OrchestratorRegistry` — so it is logically independent of the validate plan. **But both edit `pipeline.py`**, so branch off the now-pushed validate tip (`72c0efc`, see §"Cross-repo state") rather than the older Phase-C base `a39841e`, to stack cleanly and avoid a `pipeline.py` merge. The execute change is still its own commit (the plan's "don't bundle" intent holds — stacking ≠ bundling). Begin on the branch named in §"Cross-repo state".
+
+> **⚠️ Anchors below were refreshed against the post-validate `pipeline.py` (tip `72c0efc`).** If you instead branch off the clean `a39841e`, the validate work is absent there: `ApiRunner.validate` (the `@override`) still exists at the old line, `validate_verdict` does not, and the line numbers are the pre-validate ones — re-derive them. Prefer the stacked tip.
+
+---
+
+## 1. The ask + locked decisions
+
+**The ask (user):** make `/execute` honor a per-request `execution_mode`, for consistency with `/start`. Today `/start` resolves the mode per request through the `OrchestratorRegistry`, but `/execute` runs through the **boot-global** `get_pipe_run()` hub slot and ignores any requested mode. Unify them.
+
+**Locked decisions:**
+
+- **Convert `/execute` to the per-call `OrchestratorRegistry`** (the `/start` family), so `execution_mode` (not `boot_orchestrator`) is the single source of truth for top-level dispatch backend. `boot_orchestrator` narrows to its real job — the *execution stack* used wherever the pipe actually runs (worker-side, and the in-process scoping inside `DirectOrchestrator`).
+- **`/execute` honors a per-request override**, gated by the existing deployment policy (`allow_request_execution_mode_override`), **symmetric with `/start`**. The user chose this explicitly over keeping the asymmetry.
+- **Reject fire-and-forget on `/execute`.** `/execute` is synchronous (it returns the full output); `temporal_fire_and_forget` is meaningless for it. Resolve the mode, then refuse a fire-and-forget resolution with a clear 4xx ("`/execute` is synchronous; use `/start` for fire-and-forget"). (Alternative — coerce f&f→blocking — is listed in §"Open sub-decisions"; default is reject.)
+- **Keep it a separate change from `/validate`.** `/validate` adds a *new* seam; `/execute` *reuses* the existing one. They share only `resolve_execution_mode` (already shipped). Do not bundle them.
+
+**Why this is the cleaner direction (context for the cold session):** the asymmetry is *incidental*, not principled. Phase C had to move `/start` to the registry (it needs per-request mode, the override policy, fire-and-forget, and a `workflow_id` return). `/execute` was *already* orchestrator-agnostic through the boot slot (`get_pipe_run()` returns whatever's installed; the base imports no `temporalio`), so Phase C had no forcing reason to touch it. This plan finishes that unification. The boot slots do **not** go away — they remain the execution stack on workers and for in-process runs; this only changes how the top-level `/execute` *entry* selects a backend.
+
+---
+
+## 2. Current state
+
+All anchors in `pipelex-api/api/routes/pipelex/pipeline.py` unless noted.
+
+- **`/execute` route** (`370-388`): `async def execute(request)` (`370`) calls `_parse_request(request)` and **discards the extras** — line `376`: `run_request, _extras = await _parse_request(request)` — then calls `runner.execute(...)` **without** any `requested_execution_mode`. So the wire **already parses** `PipelineApiExtras.execution_mode`; `/execute` simply throws it away.
+- **`ApiRunner.execute` is NOT overridden.** `ApiRunner(PipelexMTHDSProtocol)` (line `67`) overrides `start` (`@override`, `82`) and defines `validate_verdict` (`185`, **not** an `@override`) but **not** `execute` — so `/execute` falls through to the base `PipelexMTHDSProtocol.execute` in core `_plugins/pipelex/pipeline/runner.py:112`. (Note: the validate work **dropped** the old `ApiRunner.validate` `@override` in favor of `validate_verdict`; `ApiRunner` now inherits the base `validate`. That does not affect this plan — `execute` is still un-overridden and still falls through to the boot slot.)
+- **The base `execute`** (core `runner.py:112` ff.) does `pipeline_run_setup(...)` → `effective_pipe_run = self._pipe_run or get_pipe_run()` (`205`) → `pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=…)` (`206`) → wraps `pipe_output` into `PipelexRunResultExecute`. `get_pipe_run()` is the **boot-global** hub slot (Temporal claims it only when `boot_orchestrator == "temporal"`; else in-process). No `resolve_execution_mode`, no registry.
+- **`/start` (the model to mirror)** — `ApiRunner.start` (`82` ff.): `resolve_execution_mode(requested_execution_mode, config=get_api_config())` (`125`) → `pipeline_run_setup(...)` (rich `PipeJob`) → `orchestrator = get_orchestrator_registry().get_optional(mode=execution_mode)` (`173`) → `MissingOrchestratorError` if absent (`175`) → `run_output = await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment)` (`176`) → returns `PipelexRunResultStart(..., workflow_id=run_output.workflow_id)`. The `/start` route passes `requested_execution_mode=extras.execution_mode` (`439`). The `/validate` route (now `validate.py`, post-validate work) is a **second** in-file example of threading `execution_mode` through `resolve_execution_mode` — but it uses the typed `ValidateRequest` model, whereas `/execute` mirrors `/start`'s raw-body `_parse_request` + `PipelineApiExtras.execution_mode` path.
+- **`resolve_execution_mode`** — `pipelex-api/api/api_config.py:81-99`: `resolve_execution_mode(requested, *, config) -> PipelexExecutionMode`. Deployment default wins unless the caller supplied a *different* mode **and** `config.allow_request_execution_mode_override` is true; a forbidden override raises **403** (`EXECUTION_MODE_OVERRIDE_FORBIDDEN`). `ApiConfig` (`40-53`) + `api.toml` (base: `execution_mode = "direct"`, `allow_request_execution_mode_override = false`).
+- **The orchestrators already return the full output.** `_plugins/pipelex/runtime_bridge/direct_orchestrator.py`: `DirectOrchestrator.run` returns `serialize_completed_output(pipe_output=…, workflow_id=None)`. `/start` only reads `.workflow_id`; `/execute` will read the **output** off the same `PipelexPipeRunOutput`. `PipelexExecutionMode`: `DIRECT`, `TEMPORAL_BLOCKING`, `TEMPORAL_FIRE_AND_FORGET`, `MISTRAL_NATIVE` (`_plugins/pipelex/runtime_bridge/execution_mode.py:4-27`).
+
+For full orientation on the two dispatch seams (per-call registry vs boot-global hub slots), see §3 "Background" of the sibling plan `wip/plugins/orchestrator-dispatched-validate.md`.
+
+---
+
+## 3. The design (locked)
+
+A **single-repo override in `pipelex-api`**, mirroring `ApiRunner.start`. No core or `pipelex-temporal` change — the `DirectOrchestrator` / `TemporalBlockingOrchestrator` / `MistralNativeOrchestrator` in the registry already do everything needed.
+
+- **Override `ApiRunner.execute`** (`@override`, alongside `start` and `validate`) with a `requested_execution_mode: PipelexExecutionMode | None = None` parameter. Body mirrors `start`:
+    - `execution_mode = resolve_execution_mode(requested_execution_mode, config=get_api_config())` — **first**, so a forbidden per-request override 403s before any library load / run setup (exactly like `start`).
+    - **Reject fire-and-forget:** if `execution_mode` resolves to `TEMPORAL_FIRE_AND_FORGET` (use a `match`/`is_*` on the enum — do not `==`-compare per the StrEnum standard), refuse with a 4xx (`/execute` is synchronous). See §"Open sub-decisions" for the coerce-to-blocking alternative.
+    - `pipe_job, resolved_pipeline_run_id, _ = await pipeline_run_setup(...)` — build the rich `PipeJob` as `start` does.
+    - `orchestrator = get_orchestrator_registry().get_optional(mode=execution_mode)`; `MissingOrchestratorError(mode=...)` if `None`.
+    - `run_output = await orchestrator.run(pipe_job=pipe_job, delivery_assignment=None)` — `/execute` is synchronous, no delivery webhooks.
+    - **Map `run_output` (`PipelexPipeRunOutput`) → `PipelexRunResultExecute`** (the protocol's execute result wrapping the full pipe output). This mapping is the one integration detail to verify (the orchestrator returns a *serialized* `PipelexPipeRunOutput` via `serialize_completed_output`, whereas the base `execute` wraps the raw `pipe_output`); confirm `PipelexPipeRunOutput` carries everything `PipelexRunResultExecute` needs and write the conversion. **This is the "clean vs more-complex-than-expected" hinge** — check it early.
+- **Route** (`execute`, `340-373`): stop discarding extras. Parse like `/start` does (`run_request, extras = await _parse_request(request)`), then pass `requested_execution_mode=extras.execution_mode` into `runner.execute(...)`. No new wire field — `/execute` simply starts honoring the `execution_mode` extra it already parses.
+- **Base `execute` stays untouched** in core (`runner.py:112`) — the local/CLI runtime legitimately uses the boot slot (it is not mode-dispatched). Only `ApiRunner` overrides, mirroring how it overrides `start`/`validate`.
+
+**Behavior shift to call out (changelog + docs):** `/execute`'s backend is now selected by `execution_mode` (resolved from `api.toml` + optional policy-gated per-request override), **not** by `boot_orchestrator`. For a correctly-configured deployment these already agree (a Temporal deployment that runs `/start` distributed sets `execution_mode = "temporal_blocking"`), so the real-world delta is ~nil — but it removes the two-knobs-can-silently-disagree footgun and makes `execution_mode` authoritative. The base `api.toml` keeps `allow_request_execution_mode_override = false`, so per-request override only takes effect where a deployment opts in.
+
+---
+
+## 4. Phase + checkpoint
+
+Single contained phase (one repo, one commit).
+
+### Phase E0 — `pipelex-api` (branch off the validate tip `72c0efc` on `feature/Orchestrator-dispatched-validate`)
+
+- Add the `ApiRunner.execute` override + fire-and-forget rejection + the `PipelexPipeRunOutput → PipelexRunResultExecute` mapping; rewire the `/execute` route to thread `extras.execution_mode`.
+- Tests (see §"Testing").
+- Docs: changelog entry (`/execute` now honors `execution_mode`, rejects fire-and-forget); document the dual-knob model (`execution_mode` authoritative for top-level dispatch; `boot_orchestrator` = execution stack) where `/execute`/`execution_mode` is described — likely `pipelex-api/docs/` and, if a section exists, the relevant `docs/specs/` doc (see §"Spec/conformance").
+- Gates: `make agent-check`, `make agent-test`.
+
+> **Checkpoint E-A** (the gate for `/execute`): `/execute` resolves and dispatches by `execution_mode`, honors the policy-gated override symmetrically with `/start`, rejects fire-and-forget, all gates green, docs + changelog updated. Clean-context `/code-review` on the `pipelex-api` diff. Capture an as-built (final signature, the output-mapping decision, test evidence).
+
+---
+
+## As-built (Phase E0)
+
+**Repo / branch:** `pipelex-api` @ `feature/Execute-per-request-mode` (off validate tip `72c0efc`). Single repo; no core / `pipelex-temporal` change.
+
+**Final shape (`api/routes/pipelex/pipeline.py`):**
+
+- `ApiRunner.execute` is now an `@override` taking `requested_execution_mode: PipelexExecutionMode | None = None` (trailing optional param, LSP-compatible with the base). Body: resolve `execution_mode` FIRST (403 on forbidden override), refuse fire-and-forget with a 400 (`is_fire_and_forget`, not `==`), look up the orchestrator (`MissingOrchestratorError` if absent), then **inject it as `self._pipe_run` and delegate to `super().execute(...)`** — so the base owns the entire run lifecycle (library setup/teardown, tracer close, pipeline-manager cleanup, telemetry, error mapping). The `ApiRunner` is per-request, so mutating `_pipe_run` is request-scoped.
+- `_OrchestratorPipeRun(PipeRunProtocol)` — the injected adapter: its `run(pipe_job, *, delivery_assignment)` calls `orchestrator.run(...)` and rehydrates the result.
+- `_pipe_output_from_run_output(run_output)` — **the output-mapping decision (the §3 hinge):** the orchestrator returns the JSON-safe `PipelexPipeRunOutput`; this rebuilds the rich `PipeOutput` via `hydrate_working_memory(output_dict)` (same routine the Temporal workers use; runs while the run library is still open) + `PipeOutput.model_validate({...}, strict=False)`. `strict=False` is **required** to reverse the orchestrator's `model_dump(mode="json")` of `graph_spec` (its `created_at: datetime` is `strict=True`; str→datetime is rejected under strict). Confirmed empirically. The base `execute` then wraps this into `PipelexRunResultExecute` exactly as before, so `created_at`/`finished_at`/`state`/telemetry are identical to the old path.
+- Route `execute()` now threads `requested_execution_mode=extras.execution_mode` (stopped discarding the parsed extras).
+- New `ErrorType.FIRE_AND_FORGET_NOT_SUPPORTED` (400, via `raise_bad_request`).
+
+**Why inject-and-delegate (not a full re-implementation):** the base `execute`'s teardown is correct and battle-tested; duplicating it risks drift, and the orchestrator seam differs from the boot slot only in (a) which backend runs and (b) the serialized vs rich output. The adapter bridges exactly those two; everything else is inherited.
+
+**Test evidence:** `tests/unit/test_execute_dispatch.py` (new, mirrors `test_validate_dispatch.py`): direct dispatch returns the rehydrated full output (real `serialize_completed_output` → `hydrate_working_memory` round-trip), per-request override honored when policy allows, forbidden override → 403, fire-and-forget → 400, missing orchestrator → `MissingOrchestratorError`. Existing `test_pipeline_routes.py` / `test_protocol_conformance.py` unaffected (they mock the runner). Full `make agent-test` green.
+
+**Deferred / flagged:** see `execute-per-request-mode-deferred.md` — DIRECT round-trip cost (accepted), `strict=False` rationale, a pre-existing `/start` DIRECT-path resource leak (flagged, not fixed — out of scope), and the absorbed pre-existing `/validate` OpenAPI + config-doc drift.
+
+---
+
+## 5. Cross-repo state, pins, gates
+
+- **Branch:** cut a new branch (e.g. `feature/Execute-per-request-mode`) in `pipelex-api` off `feature/Orchestrator-dispatched-validate` @ `72c0efc` (the now-pushed validate tip), **not** off the clean Phase-C base `a39841e`. Rationale: both changes edit `pipeline.py` (the validate work dropped the `validate` override + added `validate_verdict` + adjusted imports; this adds an `execute` override), so stacking avoids a `pipeline.py` merge. The execute change reuses the existing `OrchestratorRegistry` and depends on **none** of the validate seam's logic, so it stays an independent commit (own PR). This is the only repo touched. *(If you deliberately want full independence from validate, branch off `a39841e` instead and accept a small `pipeline.py` merge when both land — and re-derive the §2 anchors, which are written against the post-validate tip.)*
+- **Pins:** `pipelex-api/pyproject.toml` pins `pipelex = { path = "../_plugins", editable = true }`, so the core orchestrators/registry are live without a republish. No `pipelex-temporal` dependency is added (the `TemporalBlockingOrchestrator` is exercised by its own repo's tests; the API change is testable with `DirectOrchestrator` + a stub).
+- **Gates:** `make agent-check`, `make agent-test` (in `pipelex-api`). If a `docs/specs/` heading is touched, run `make check-spec-links` (in `conformance/`).
+
+---
+
+## 6. Spec / conformance
+
+- **No spec pins `/execute`'s backend-selection today.** The `/validate` verdict spec (`docs/specs/pipelex-mthds-protocol.md`) doesn't cover `/execute`; `/execute` dispatch lives in `pipelex-platform-api.md` / `pipelex-hosted-config.md`, where the HTTP arm is Phase-3-deferred and per-request override is not yet detailed. So this is **low conformance risk** and adds **no new wire field** (the `execution_mode` extra already exists; `/execute` just stops ignoring it).
+- **Add documentation** of the new behavior: `/execute` honors a policy-gated per-request `execution_mode` and rejects fire-and-forget; `execution_mode` is authoritative for top-level dispatch while `boot_orchestrator` selects the execution stack. Put it where `/execute` / `execution_mode` is described (a `pipelex-api/docs/` page, and the hosted-config spec if you extend it). If you add or edit a spec heading, wire a `> Verified by:` link to a test and a matching `pytest.mark.spec(...)`, then `make check-spec-links`.
+- **Conformance:** there is **no** `/execute` conformance module yet (deferred with the HTTP arm). Don't invent the deferred HTTP conformance arm here; cover the behavior with `pipelex-api`'s own tests (§"Testing"). If you later add a conformance surface for `/execute`'s mode-selection, link it bidirectionally.
+
+---
+
+## 7. Testing
+
+In `pipelex-api` (no Temporal needed):
+
+- **Direct dispatch:** `/execute` with `execution_mode` unset (or `direct`) runs in-process via `DirectOrchestrator` and returns the full output — equivalent result to today's boot-slot path on the direct base.
+- **Per-request override, policy on:** with `allow_request_execution_mode_override = true`, a requested mode is honored; with it `false`, a *different* requested mode 403s (`EXECUTION_MODE_OVERRIDE_FORBIDDEN`) — reuse/mirror the existing `/start` override-policy tests.
+- **Fire-and-forget rejection:** a resolved `temporal_fire_and_forget` on `/execute` returns the chosen 4xx, not a hang or a silent coerce (unless the coerce alternative is chosen — then assert blocking semantics).
+- **Missing orchestrator:** a mode with no registered orchestrator raises `MissingOrchestratorError` with the install hint.
+- **Output mapping:** assert the `PipelexPipeRunOutput → PipelexRunResultExecute` mapping preserves the full output (the integration hinge from §3). Use `DirectOrchestrator` (or a stub orchestrator returning a known `PipelexPipeRunOutput`).
+
+---
+
+## 8. Open sub-decisions for the implementing session
+
+- **Fire-and-forget on `/execute`: reject (default) vs coerce-to-blocking.** Reject is more honest (you asked for something incompatible with a synchronous endpoint). Coerce-to-blocking is more lenient (execute always waits anyway, so f&f could just mean `temporal_blocking` here). Plan defaults to **reject** with a clear 4xx; flip only with a reason.
+- **Output mapping shape.** Confirm `PipelexPipeRunOutput` (from `serialize_completed_output`) carries everything `PipelexRunResultExecute` needs. If it doesn't, decide whether to enrich the orchestrator output or to keep a thin execute-specific adapter — and note it in the as-built. This determines whether the change stays "clean" or grows.
+- **Deployment-config coherence.** Note for Phase D (hosted Temporal flavor, in the parent plan): the hosted runner's `api.toml execution_mode` must be set coherently (it already is for `/start`); after this change it also governs `/execute`. `boot_orchestrator` remains for the execution stack. No code change here — just a deployment note so the two knobs are set with intent. **Related runtime constraint** (surfaced by the validate work, see `validate-dispatch-requires-boot-active.md`): the shared `WorkflowExecutor` hard-requires `boot_orchestrator == "temporal"` (`is_temporal_boot_active()`) to open its client, so a resolved `temporal_blocking` `/execute` on a runner **not** booted under Temporal would fail the same way a temporal-mode `/start` or `/validate` does. That is pre-existing and out of scope here (the agnostic base tests use `DirectOrchestrator`), but it reinforces why `execution_mode = temporal_*` and `boot_orchestrator = "temporal"` must be set together on a Temporal flavor.

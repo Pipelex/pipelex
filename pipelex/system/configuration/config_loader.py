@@ -1,10 +1,14 @@
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
+
+from pydantic import BaseModel
 
 from pipelex.system.runtime import runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
+
+_PluginConfigT = TypeVar("_PluginConfigT", bound=BaseModel)
 
 CONFIG_DIR_NAME = ".pipelex"
 CONFIG_NAME = "pipelex.toml"
@@ -191,6 +195,78 @@ class ConfigLoader:
         files.append(config_dir / "pipelex_override.toml")
         files.append(config_dir / "pipelex_temporary_override.toml")
         return files
+
+    @classmethod
+    def _plugin_override_files_for_dir(cls, config_dir: Path, *, name: str) -> list[Path]:
+        """Build the plugin-config override sequence for one ``.pipelex`` dir.
+
+        Order matters: later files win on key collisions during deep-merge. Mirrors
+        ``_override_files_for_dir`` but keyed on a plugin's config ``name`` rather
+        than ``"pipelex"``, and intentionally narrower — a plugin config carries no
+        local / run_mode / temporary tiers (it is env-selected and deployment-baked,
+        not developer-scratch-layered).
+
+        Returns:
+            Ordered list of candidate file paths (missing files are ignored at load time).
+        """
+        return [
+            config_dir / f"{name}_{runtime_manager.environment}.toml",
+            config_dir / f"{name}_override.toml",
+        ]
+
+    def load_plugin_config(
+        self,
+        *,
+        name: str,
+        package_dir: Path,
+        schema: type[_PluginConfigT],
+        extra_overrides: dict[str, Any] | None = None,
+    ) -> _PluginConfigT:
+        """Load, deep-merge and validate a plugin's config with env layering.
+
+        Mirrors ``load_config``'s env-keyed layering for an arbitrary plugin whose
+        config base name is ``name`` (e.g. ``"temporal"``). Every discovered plugin
+        self-loads its config through this one helper so they all inherit identical
+        env semantics: one image bakes every env file and ``PIPELEX_ENV``
+        (``runtime_manager.environment``) selects which ``{name}_{env}.toml`` wins
+        at runtime.
+
+        Layers, deep-merged in order (later wins per leaf key):
+
+        1. Packaged default: ``{package_dir}/{name}.toml`` — the plugin's bundled
+           default, shipped inside its own distribution.
+        2. Global override sequence from ``~/.pipelex/``:
+           ``{name}_{environment}.toml`` then ``{name}_override.toml``.
+        3. Project override sequence from ``{project_root}/.pipelex/`` (same two
+           files), when a project dir is found and distinct from the global dir.
+        4. Programmatic ``extra_overrides``, if any.
+
+        Missing files at any tier are skipped, so the packaged default alone is a
+        valid, fully-resolved config. Unlike ``load_config`` this never creates the
+        global config dir or copies kit templates — a plugin config is purely
+        additive layering over its own packaged default.
+
+        Args:
+            name: The plugin config base name, used for both the packaged default
+                filename (``{name}.toml``) and the ``.pipelex`` override filenames.
+            package_dir: Directory holding the plugin's packaged ``{name}.toml``
+                (typically ``Path(__file__).parent`` in the plugin).
+            schema: The pydantic model the merged config is validated into.
+            extra_overrides: Optional dict deep-merged on top as the final layer.
+
+        Returns:
+            The merged config validated into ``schema``.
+        """
+        list_of_configs: list[Path] = [package_dir / f"{name}.toml"]
+        list_of_configs.extend(self._plugin_override_files_for_dir(self.global_config_dir, name=name))
+        project_dir = self.project_config_dir
+        if project_dir is not None and project_dir != self.global_config_dir:
+            list_of_configs.extend(self._plugin_override_files_for_dir(project_dir, name=name))
+
+        merged = load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
+        if extra_overrides:
+            deep_update(merged, updates=extra_overrides)
+        return schema.model_validate(merged)
 
     def load_config(self, *, extra_overrides: dict[str, Any] | None = None, config_dir: Path | None = None) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.

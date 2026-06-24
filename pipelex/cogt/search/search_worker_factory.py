@@ -1,7 +1,11 @@
+from typing import cast
+
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
-from pipelex.hub import get_models_manager, get_plugin_manager, get_report_delegate
-from pipelex.plugins.plugin import Plugin
+from pipelex.hub import get_inference_backend_registry, get_models_manager, get_sdk_client_manager
+from pipelex.plugins.inference_backend_registry import InferenceFamily
+from pipelex.plugins.model_handle import ModelHandle
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class SearchWorkerFactory:
@@ -9,39 +13,29 @@ class SearchWorkerFactory:
     def make_search_worker(
         cls,
         inference_model: InferenceModelSpec,
+        *,
+        reporting_delegate: ReportingProtocol | None = None,
     ) -> SearchWorkerAbstract:
-        """Create a search worker for the given inference model.
-
-        Discriminates on plugin.sdk to select the appropriate implementation.
+        """Create a search worker for the given inference model via the inference-backend registry.
 
         Args:
             inference_model: The model spec from the backend configuration.
+            reporting_delegate: The reporting delegate passed through to the worker
+                (supplied by the caller — the factory no longer reaches into the hub).
 
         Returns:
             A SearchWorkerAbstract instance.
         """
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)
-        plugin_sdk_registry = get_plugin_manager().plugin_sdk_registry
-        search_worker: SearchWorkerAbstract
-        match plugin.sdk:
-            case "linkup":
-                from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
-
-                search_worker = LinkupSearchWorker(inference_model=inference_model, reporting_delegate=get_report_delegate())
-            case "gateway_search":
-                from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
-                from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker  # noqa: PLC0415
-
-                sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
-                    plugin=plugin,
-                    sdk_instance=GatewayFactory.make_portkey_client(backend=backend),
-                )
-                search_worker = GatewaySearchWorker(
-                    sdk_instance=sdk_instance, inference_model=inference_model, reporting_delegate=get_report_delegate()
-                )
-            case _:
-                msg = f"Plugin '{plugin}' is not supported for search"
-                raise NotImplementedError(msg)
-
-        return search_worker
+        make_worker = get_inference_backend_registry().lookup(family=InferenceFamily.SEARCH, sdk=model_handle.sdk)
+        worker = make_worker(
+            inference_model=inference_model,
+            backend=backend,
+            sdk_clients=get_sdk_client_manager().sdk_client_registry,
+            reporting_delegate=reporting_delegate,
+        )
+        # The SEARCH family registry only ever holds search workers (the
+        # (family, sdk) key guarantees it); the uniform MakeWorkerFn return type is
+        # widened to InferenceWorkerAbstract, so narrow it back here.
+        return cast("SearchWorkerAbstract", worker)

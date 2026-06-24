@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipelex Plugin System, Orchestrators, and Deployment Flavors — current state</title>
+<style>
+  :root{
+    --bg:#0d1117; --ink:#e6edf3; --muted:#9aa7b4; --line:#283039;
+    --brand:#7c9bff; --brand-soft:#16203a; --good:#3fb950; --good-soft:#102a17;
+    --bad:#ff7b72; --bad-soft:#2d1416; --warn:#e3b341; --warn-soft:#2a2412;
+    --code-bg:#010409; --code-ink:#e6edf3; --chip:#1c232c; --panel:#161b22;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:980px;margin:0 auto;padding:40px 22px 90px}
+  h1{font-size:30px;line-height:1.2;margin:0 0 6px}
+  h2{font-size:22px;margin:46px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  h3{font-size:17px;margin:26px 0 8px}
+  p{margin:12px 0}
+  a{color:var(--brand);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .sub{color:var(--muted);font-size:15px;margin:0 0 22px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13.5px;
+    background:var(--chip);padding:1px 6px;border-radius:5px}
+  pre{margin:0;overflow:auto}
+  pre code{background:none;padding:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:16px 0;
+    box-shadow:0 1px 2px rgba(0,0,0,.3)}
+  .tldr{background:linear-gradient(180deg,#172244,#11161f);border:1px solid #2b3a5e;border-left:5px solid var(--brand);
+    border-radius:12px;padding:20px 22px;margin:18px 0 8px}
+  .tldr h2{border:0;margin:0 0 8px;font-size:19px;color:var(--brand)}
+  .tldr ul{margin:8px 0 0;padding-left:20px}
+  .tldr li{margin:5px 0}
+  .callout{border-radius:10px;padding:12px 16px;margin:16px 0;font-size:14.5px}
+  .callout.good{background:var(--good-soft);border:1px solid #1f6f33}
+  .callout.warn{background:var(--warn-soft);border:1px solid #5a4d1a}
+  .callout.info{background:var(--brand-soft);border:1px solid #2b3a5e}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+  .chip{background:var(--chip);border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-size:13px;color:var(--muted)}
+  .chip b{color:var(--ink)}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:#1c232c;font-weight:600}
+  td code{font-size:12.5px}
+  .seam-table th:first-child,.seam-table td:first-child{width:38%;min-width:290px}
+  .status-ok{color:var(--good);font-weight:600}
+  .status-wait{color:var(--warn);font-weight:600}
+  /* diff blocks */
+  .code{background:var(--code-bg);color:var(--code-ink);border-radius:10px;padding:14px 16px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px;line-height:1.55;overflow:auto}
+  .code .del{display:block;color:#ffb4ab;background:rgba(207,34,46,.16);margin:0 -16px;padding:0 16px}
+  .code .add{display:block;color:#7ee2a8;background:rgba(26,127,55,.18);margin:0 -16px;padding:0 16px}
+  .code .ctx{display:block;color:#9fb0c0}
+  .code .cmt{color:#7d8c9c;font-style:italic}
+  .code .kw{color:#ff9b72}
+  .code .fn{color:#7cc7ff}
+  /* tabs */
+  .tabs{margin:16px 0}
+  .tab-bar{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);margin-bottom:0}
+  .tab-btn{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;font:inherit;font-size:14px;
+    color:var(--muted);cursor:pointer}
+  .tab-btn:hover{color:var(--ink)}
+  .tab-btn.active{color:var(--brand);border-bottom-color:var(--brand);font-weight:600}
+  .tab-panel{display:none;padding-top:14px}
+  .tab-panel.active{display:block}
+  details{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:2px 16px;margin:12px 0}
+  details[open]{padding-bottom:14px}
+  summary{cursor:pointer;font-weight:600;padding:12px 0;color:var(--ink)}
+  summary::marker{color:var(--brand)}
+  .mermaid{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;margin:16px 0;text-align:center}
+  figcaption{color:var(--muted);font-size:13px;text-align:center;margin-top:6px}
+  .small{font-size:13px;color:var(--muted)}
+  hr{border:0;border-top:1px solid var(--line);margin:40px 0}
+  .legend{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .kbd{font-family:ui-monospace,monospace;font-size:12px;background:var(--chip);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Pipelex Plugin System, Orchestrators, and Deployment Flavors</h1>
+<p class="sub">What we built, what changed since the first overview, and where it stands · branch <code>refactor/Plugins-4</code></p>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <p><strong>Pipelex core no longer dispatches by vendor branches.</strong></p>
+  <p>Backends, orchestrators, validators, model listers, boot-runtime claims, and HTTP error mappers now register themselves through one plugin contract. Core installs registries and looks up capabilities by data.</p>
+  <ul>
+    <li><strong>Mechanism:</strong> <code>PipelexPlugin</code> + <code>PluginRegistrar</code> + <code>build_registrar()</code>. Built-ins and <code>pipelex.plugins</code> entry points use the same path.</li>
+    <li><strong>New since the first overview:</strong> plugin API v2, lazy HTTP error mappers, env-aware plugin configs, <code>plugins.boot_orchestrator</code>, <code>orchestration_mode</code> + <code>DeliveryMode</code>, and <code>BundleValidatorRegistry</code>.</li>
+    <li><strong>Status:</strong> core is current on <code>refactor/Plugins-4</code>. Temporal is a private <code>pipelex-temporal</code> git+ssh dist. The public base is orchestrator-agnostic; deployment-flavor wiring and release pin flips remain.</li>
+  </ul>
+</div>
+
+<div class="chips">
+  <span class="chip"><b>core</b> pipelex @ <code>refactor/Plugins-4</code> · pushed ✓</span>
+  <span class="chip"><b>plugin API</b> <code>2</code> · HTTP mappers + validators</span>
+  <span class="chip">all gates <b class="status-ok">green</b></span>
+  <span class="chip">deployment flavors <b class="status-wait">pending</b></span>
+  <span class="chip"><b>pipelex-temporal</b> = private (git+ssh, not PyPI)</span>
+</div>
+
+<!-- ============================================================ -->
+<h2>1 · The problem we set out to kill</h2>
+<p>Pipelex core used to <em>hard-code</em> every optional integration behind a <code>match</code> statement. Adding a backend meant editing core; an optional SDK could be imported at the wrong time; and Temporal — a heavy, optional dependency — was woven through the core runtime. The coupling lived in a handful of <strong>seams</strong>:</p>
+
+<figure>
+<svg viewBox="0 0 900 330" width="100%" role="img" aria-label="Before and after architecture">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#8a98a8"/>
+    </marker>
+    <marker id="arrG" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#3fb950"/>
+    </marker>
+  </defs>
+  <!-- BEFORE -->
+  <text x="210" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#ff7b72">BEFORE — core hard-codes each integration</text>
+  <rect x="150" y="48" width="120" height="46" rx="8" fill="#2d1416" stroke="#ff7b72" stroke-width="1.5"/>
+  <text x="210" y="69" text-anchor="middle" font-size="13" font-weight="700" fill="#e6edf3">Pipelex core</text>
+  <text x="210" y="85" text-anchor="middle" font-size="11" fill="#ff7b72">match sdk / mode</text>
+  <g font-size="11.5" fill="#cdd6df">
+    <rect x="40"  y="150" width="90" height="34" rx="6" fill="#161b22" stroke="#5a4048"/><text x="85"  y="171" text-anchor="middle">anthropic</text>
+    <rect x="145" y="150" width="90" height="34" rx="6" fill="#161b22" stroke="#5a4048"/><text x="190" y="171" text-anchor="middle">openai</text>
+    <rect x="250" y="150" width="90" height="34" rx="6" fill="#161b22" stroke="#5a4048"/><text x="295" y="171" text-anchor="middle">mistral</text>
+    <rect x="120" y="210" width="110" height="34" rx="6" fill="#161b22" stroke="#5a4048"/><text x="175" y="231" text-anchor="middle">temporalio</text>
+  </g>
+  <g stroke="#8a98a8" stroke-width="1.3" marker-end="url(#arr)" fill="none">
+    <path d="M180,94 L95,150"/><path d="M205,94 L195,150"/><path d="M235,94 L300,150"/><path d="M205,94 L185,210"/>
+  </g>
+  <!-- divider -->
+  <line x1="450" y1="40" x2="450" y2="300" stroke="#283039" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <!-- AFTER -->
+  <text x="690" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#3fb950">AFTER — plugins register; core names none</text>
+  <rect x="630" y="48" width="120" height="46" rx="8" fill="#102a17" stroke="#3fb950" stroke-width="1.5"/>
+  <text x="690" y="69" text-anchor="middle" font-size="13" font-weight="700" fill="#e6edf3">Pipelex core</text>
+  <text x="690" y="85" text-anchor="middle" font-size="11" fill="#3fb950">lookup()</text>
+  <rect x="600" y="135" width="180" height="40" rx="8" fill="#16203a" stroke="#7c9bff" stroke-width="1.5"/>
+  <text x="690" y="160" text-anchor="middle" font-size="12.5" font-weight="700" fill="#7c9bff">Hub registries</text>
+  <path d="M690,94 L690,135" stroke="#3fb950" stroke-width="1.4" marker-end="url(#arrG)" fill="none"/>
+  <g font-size="11.5" fill="#cdd6df">
+    <rect x="520" y="232" width="96" height="34" rx="6" fill="#161b22" stroke="#2f5a3a"/><text x="568" y="253" text-anchor="middle">anthropic</text>
+    <rect x="626" y="232" width="96" height="34" rx="6" fill="#161b22" stroke="#2f5a3a"/><text x="674" y="253" text-anchor="middle">openai</text>
+    <rect x="732" y="232" width="130" height="34" rx="6" fill="#161b22" stroke="#2f5a3a"/><text x="797" y="253" text-anchor="middle">pipelex-temporal</text>
+  </g>
+  <g stroke="#3fb950" stroke-width="1.3" marker-end="url(#arrG)" fill="none">
+    <path d="M568,232 L660,175"/><path d="M674,232 L688,175"/><path d="M797,232 L720,175"/>
+  </g>
+  <text x="690" y="296" text-anchor="middle" font-size="11" fill="#9aa7b4">register(registrar) — at discovery</text>
+</svg>
+<figcaption>The inversion in one picture: the <code>match</code> fan-out becomes a registry that plugins populate.</figcaption>
+</figure>
+
+<table class="seam-table">
+  <thead><tr><th>Seam (where core named an integration)</th><th>File(s)</th><th>How it's resolved now</th></tr></thead>
+  <tbody>
+    <tr><td>Inference dispatch — 4 families (LLM, image-gen, extract, search)</td><td><code>cogt/{llm,img_gen,extract,search}/*_worker_factory.py</code></td><td><code>InferenceBackendRegistry.lookup(family, sdk)</code></td></tr>
+    <tr><td>Model listing (the <code>show models</code> path)</td><td><code>cogt/model_backends/model_lists.py</code></td><td><code>ModelListerRegistry.get_optional(sdk)</code></td></tr>
+    <tr><td>Orchestrator dispatch (Direct / Temporal / Mistral)</td><td><code>runtime_bridge/bridge.py</code></td><td><code>OrchestratorRegistry.get_optional(mode)</code> + <code>DeliveryMode</code></td></tr>
+    <tr><td>Bundle validation dispatch (<code>/validate</code>)</td><td><code>pipeline/*</code>, <code>runtime_bridge/*</code></td><td><code>BundleValidatorRegistry.get_optional(mode)</code></td></tr>
+    <tr><td>HTTP transport-fault rendering</td><td>host runtimes such as <code>pipelex-api</code></td><td>plugin-contributed lazy <code>ErrorReport</code> mappers</td></tr>
+    <tr><td>Boot / teardown hub-swap (Temporal runtime)</td><td><code>pipelex.py</code></td><td>hub-slot claims + LIFO teardown callbacks</td></tr>
+    <tr><td>Config schema + plugin config files</td><td><code>configs.py</code>, <code>config_loader.py</code></td><td>Temporal schema relocated to core; plugin TOMLs load through env-aware layering</td></tr>
+    <tr><td>Operational CLI commands</td><td>external plugin packages</td><td>ops commands ship as plugin-owned console scripts, not harvested onto <code>pipelex</code></td></tr>
+  </tbody>
+</table>
+<p class="legend">Every row above used to contain a vendor or <code>temporalio</code> branch. After the refactor, dispatch and boot paths use registries; built-in vendors are named only by their plugin modules/list, typed config, and prose.</p>
+
+<!-- ============================================================ -->
+<h2>2 · The design — one contract, one registrar, one discovery pass</h2>
+<p>A plugin is a tiny object with a <code>register</code> method. Discovery hands it a <strong>registrar</strong> (a menu of "I provide X" methods); the registrar accumulates contributions into registries that get installed on the hub at boot. That's the whole machinery.</p>
+
+<h3>The contract</h3>
+<div class="code"><pre><code><span class="cmt"># pipelex/plugins/contract.py</span>
+PLUGIN_API_VERSION: int = 2
+
+@runtime_checkable
+<span class="kw">class</span> <span class="fn">PipelexPlugin</span>(Protocol):
+    name: str
+    targets_api: int
+    <span class="kw">def</span> <span class="fn">register</span>(self, registrar: "PluginRegistrar") -&gt; None: ...
+    <span class="cmt"># INVARIANT: register is side-effect-free — it may ONLY call registrar</span>
+    <span class="cmt"># menu methods. No hub access, no I/O, no SDK/client construction.</span>
+    <span class="cmt"># Heavy work happens lazily inside worker closures, slot thunks,</span>
+    <span class="cmt"># plugin config loaders, and HTTP-error type providers.</span></code></pre></div>
+
+<h3>The discovery → boot flow</h3>
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant Boot as Pipelex.setup()
+  participant Disc as build_registrar(config)
+  participant Built as BUILTIN_PLUGINS
+  participant EP as entry_points("pipelex.plugins")
+  participant Reg as PluginRegistrar
+  participant Hub as Hub
+  Boot->>Disc: build_registrar(config)
+  Disc->>Built: iterate built-in plugins
+  Built->>Reg: plugin.register(registrar)
+  Disc->>EP: iterate installed dists (e.g. pipelex-temporal)
+  EP->>Reg: plugin.register(registrar)
+  Note over Reg: side-effect-free — menu calls only, imports no SDK
+  Disc-->>Boot: registrar (registries + slot thunks + teardown cbs + mapper providers)
+  Boot->>Hub: set inference / orchestrator / validator / model-lister registries
+  Boot->>Hub: resolve hub slots (explicit param &gt; slot thunk &gt; core default)
+</pre>
+<figcaption>One pure pass builds the registrar; boot installs the result. Because <code>register</code> is side-effect-free, the pass is safely repeatable.</figcaption>
+
+<h3>What the registrar offers</h3>
+<table>
+  <thead><tr><th>Menu method</th><th>Contribution</th></tr></thead>
+  <tbody>
+    <tr><td><code>add_inference_backend(family, sdk, make_worker)</code></td><td>a backend driver, keyed by <code>(family, sdk)</code></td></tr>
+    <tr><td><code>add_orchestrator(mode, orchestrator)</code></td><td>an execution strategy, keyed by open <code>orchestration_mode</code></td></tr>
+    <tr><td><code>add_bundle_validator(mode, validator)</code></td><td>a <code>/validate</code> strategy, keyed by <code>orchestration_mode</code></td></tr>
+    <tr><td><code>add_model_lister(sdk, lister)</code></td><td>an optional model-listing capability</td></tr>
+    <tr><td><code>add_http_error_mapper(exc_type_provider, to_error_report)</code></td><td>a lazy transport-exception → <code>ErrorReport</code> mapping for host runtimes</td></tr>
+    <tr><td><code>claim_content_generator / pipe_router / pipe_run / task_manager(factory)</code></td><td>a hub-slot claim — a <em>deferred thunk</em>, run only if the slot is taken</td></tr>
+    <tr><td><code>add_teardown(callback)</code></td><td>a teardown hook, run LIFO at shutdown</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>3 · The critical changes (minimal diffs)</h2>
+<p>The heart of the work is a set of <code>match</code>-to-registry collapses. Pick a tab:</p>
+
+<div class="tabs" data-group="diffs">
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showTab('diffs',0)">Inference dispatch</button>
+    <button class="tab-btn" onclick="showTab('diffs',1)">Orchestrator dispatch</button>
+    <button class="tab-btn" onclick="showTab('diffs',2)">A driver plugin</button>
+    <button class="tab-btn" onclick="showTab('diffs',3)">Temporal externalized</button>
+  </div>
+
+  <div class="tab-panel active">
+    <p class="small"><code>cogt/llm/llm_worker_factory.py</code> — a ~230-line <code>match plugin.sdk</code> with ten vendor arms collapses to a registry lookup.</p>
+    <div class="code"><pre><code><span class="ctx"> def make_llm_worker(inference_model, *, reporting_delegate=None):</span>
+<span class="del">-    match plugin.sdk:</span>
+<span class="del">-        case "gateway_completions": ...          # ten vendor arms, each one:</span>
+<span class="del">-        case "anthropic" | "bedrock_anthropic":  #   require_sdk(...) + lazy import</span>
+<span class="del">-            client = AnthropicFactory.make_anthropic_client(...)   #   + build client</span>
+<span class="del">-            llm_worker = AnthropicLLMWorker(...)                   #   + build worker</span>
+<span class="del">-        case "mistral": ...   ;  case "google": ...</span>
+<span class="del">-        case _:</span>
+<span class="del">-            raise NotImplementedError(f"{plugin.sdk} is not supported")</span>
+<span class="del">-    return llm_worker</span>
+<span class="add">+    model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)</span>
+<span class="add">+    backend = get_models_manager().get_required_inference_backend(inference_model.backend_name)</span>
+<span class="add">+    make_worker = get_inference_backend_registry().lookup(family=InferenceFamily.LLM, sdk=model_handle.sdk)</span>
+<span class="add">+    worker = make_worker(inference_model=inference_model, backend=backend,</span>
+<span class="add">+                         sdk_clients=get_sdk_client_manager().sdk_client_registry,</span>
+<span class="add">+                         reporting_delegate=reporting_delegate)</span>
+<span class="add">+    return cast("LLMWorkerInternalAbstract", worker)</span></code></pre></div>
+    <p class="small">The same shape was applied to image-gen, extract, and search. A registry miss raises a structured <code>InferenceBackendNotFoundError</code> ("… is its plugin installed and enabled?"), never a <code>None</code> deref.</p>
+  </div>
+
+  <div class="tab-panel">
+    <p class="small"><code>runtime_bridge/bridge.py</code> — the old <code>match execution_mode</code> (with hard <code>temporalio</code> / Mistral imports) became a registry lookup. Since then, the flat mode enum was split into an open <code>orchestration_mode</code> token plus a closed <code>DeliveryMode</code>.</p>
+    <div class="code"><pre><code><span class="del">-        match execution_mode:</span>
+<span class="del">-            case PipelexExecutionMode.DIRECT:</span>
+<span class="del">-                return await _run_direct(...)</span>
+<span class="del">-            case PipelexExecutionMode.TEMPORAL_BLOCKING:</span>
+<span class="del">-                return await _run_temporal_blocking(...)        # imported temporalio</span>
+<span class="del">-            case PipelexExecutionMode.TEMPORAL_FIRE_AND_FORGET:</span>
+<span class="del">-                return await _run_temporal_fire_and_forget(...)</span>
+<span class="del">-            case PipelexExecutionMode.MISTRAL_NATIVE:</span>
+<span class="del">-                return await _run_mistral_native(...)           # imported mistral</span>
+<span class="add">+        orchestrator = get_orchestrator_registry().get_optional(mode=input_payload.orchestration_mode)</span>
+<span class="add">+        if orchestrator is None:</span>
+<span class="add">+            raise MissingOrchestratorError(mode=input_payload.orchestration_mode)</span>
+<span class="add">+        _validate_input(input_payload, orchestrator=orchestrator, delivery_assignment=delivery_assignment)</span>
+<span class="add">+        return await orchestrator.run(pipe_job=pipe_job, delivery_assignment=delivery_assignment,</span>
+<span class="add">+                                      delivery=input_payload.delivery)</span></code></pre></div>
+    <p class="small"><code>MissingOrchestratorError</code> is generic and plugin-decoupled. Fire-and-forget is checked against <code>supports_fire_and_forget</code> before dispatch, so blocking-only modes reject honestly instead of pretending to enqueue.</p>
+  </div>
+
+  <div class="tab-panel">
+    <p class="small"><code>plugins/anthropic/anthropic_plugin.py</code> — a whole backend in one small file. <code>register</code> is trivial and import-light; the closure does the heavy lifting lazily.</p>
+    <div class="code"><pre><code><span class="kw">def</span> <span class="fn">_make_anthropic_worker</span>(*, inference_model, backend, sdk_clients, reporting_delegate):
+    require_sdk(spec="anthropic", extra="anthropic", msg=_ANTHROPIC_MISSING_MSG)
+    <span class="kw">from</span> ...anthropic_factory <span class="kw">import</span> AnthropicFactory   <span class="cmt"># lazy: no SDK at boot</span>
+    <span class="kw">from</span> ...anthropic_llm_worker <span class="kw">import</span> AnthropicLLMWorker
+    model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
+    sdk_instance = sdk_clients.get_or_create(handle=model_handle,
+        build=<span class="kw">lambda</span>: AnthropicFactory.make_anthropic_client(model_handle=model_handle, backend=backend))
+    <span class="kw">return</span> AnthropicLLMWorker(sdk_instance=sdk_instance, ...)
+
+<span class="kw">class</span> <span class="fn">AnthropicPlugin</span>:
+    name = "anthropic"
+    targets_api = PLUGIN_API_VERSION
+    <span class="kw">def</span> <span class="fn">register</span>(self, registrar):
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="anthropic",         make_worker=_make_anthropic_worker)
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="bedrock_anthropic", make_worker=_make_anthropic_worker)
+        registrar.add_model_lister(sdk="anthropic", lister=_list_anthropic_models)</code></pre></div>
+    <p class="small">One plugin can serve several <code>(family, sdk)</code> keys and several families at once (Mistral registers into both LLM and Extract; Linkup into both Extract and Search).</p>
+  </div>
+
+  <div class="tab-panel">
+    <p class="small">Once orchestrators went through the registry, Temporal no longer needed to live in core. It became its own private distribution, discovered by an entry point.</p>
+    <div class="code"><pre><code><span class="cmt"># pipelex (core) — pyproject.toml: the temporal extra is gone</span>
+<span class="ctx"> [project.optional-dependencies]</span>
+<span class="del">-temporal = ["temporalio==1.24.0", "aiohttp&gt;=3.14.0"]</span>
+<span class="ctx"> [tool.pytest.ini_options] markers = [</span>
+<span class="del">-  "temporal: tests that require a Temporal server",</span>
+
+<span class="cmt"># pipelex (core) — plugins/builtins.py: TemporalPlugin removed from the list</span>
+<span class="ctx"> BUILTIN_PLUGINS = [ DirectOrchestratorPlugin(), OpenAIPlugin(), ... ]</span>
+<span class="del">-    TemporalPlugin(),</span>
+<span class="add">+# Temporal is NOT here: it ships as the external pipelex-temporal distribution,</span>
+<span class="add">+# discovered via its pipelex.plugins entry point. Zero config, no core temporalio import.</span></code></pre></div>
+    <div class="code" style="margin-top:10px"><pre><code><span class="cmt"># pipelex-temporal (new dist) — pyproject.toml</span>
+[project]
+name = "pipelex-temporal"
+dependencies = ["pipelex&gt;=0.35.0", "temporalio==1.24.0", "aiohttp&gt;=3.14.0"]
+
+[project.scripts]
+pipelex-temporal = "pipelex_temporal.temporal_cli:app"          <span class="cmt"># worker / setup-namespace</span>
+
+[project.entry-points."pipelex.plugins"]
+temporal = "pipelex_temporal.temporal_plugin:TemporalPlugin"    <span class="cmt"># &lt;- discovery hook</span>
+
+[tool.uv.sources]
+pipelex = { path = "../_plugins", editable = true }             <span class="cmt"># dev cross-pin → pipelex==Y at publish</span></code></pre></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>4 · What ships in core today</h2>
+<p>Core ships a list of built-in plugins. Importing this module imports <strong>no backend SDK</strong> — the SDKs load lazily inside the <code>make_worker</code> closures.</p>
+<div class="code"><pre><code><span class="cmt"># pipelex/plugins/builtins.py</span>
+BUILTIN_PLUGINS: list[PipelexPlugin] = [
+    DirectOrchestratorPlugin(),                                  <span class="cmt"># core orchestrator</span>
+    OpenAIPlugin(), GatewayPlugin(), PortkeyPlugin(), AnthropicPlugin(),
+    MistralPlugin(), BedrockPlugin(), GooglePlugin(), FalPlugin(),
+    HuggingFacePlugin(), BlackboxaiPlugin(), OpenRouterPlugin(),
+    AzureRestPlugin(), DoclingPlugin(), Pypdfium2Plugin(), LinkupPlugin(),
+]
+<span class="cmt"># Naming one of these in plugins.disabled is a config error, not a no-op:</span>
+CORE_UNCONDITIONAL_PLUGIN_NAMES = frozenset({"direct", "openai"})</code></pre></div>
+<p class="small">Between them these built-ins register every <code>(family, sdk)</code> inference backend across the four families. <code>direct</code> owns the in-process orchestration mode and bundle validator; <code>openai</code> is the always-on default driver. Observability: <code class="kbd">pipelex plugins list</code> shows what's discovered, what each registered, and the denylist state.</p>
+
+<!-- ============================================================ -->
+<h2>5 · Temporal as an external plugin</h2>
+<p>Phase 5 lifted <code>pipelex/temporal/</code> into a sibling distribution, <strong>pipelex-temporal</strong> (top-level package <code>pipelex_temporal</code>). It depends <em>on</em> core; core depends on nothing Temporal. Installing the dist contributes the <code>"temporal"</code> orchestration mode, its async delivery capability, its bundle validator, and its optional boot-runtime slot claims — no core change.</p>
+
+<pre class="mermaid">
+graph TB
+  subgraph core["pipelex (core, MIT) — refactor/Plugins-4"]
+    bridge["runtime_bridge dispatch + validate"]
+    orr["OrchestratorRegistry (on hub)"]
+    bridge --> orr
+  end
+  subgraph pt["pipelex-temporal (PRIVATE dist) — main"]
+    tp["TemporalPlugin (entry point: pipelex.plugins)"]
+    cli["console script: pipelex-temporal worker / setup-namespace"]
+  end
+  tp -. "install via git+ssh: entry-point discovery" .-> orr
+  pt -- "depends on" --> core
+  subgraph priv["our private infra — installs pipelex-temporal via git+ssh"]
+    w["pipelex-worker"]
+    hosted["pipelex-api-hosted"]
+  end
+  subgraph pub["public packages (MIT) — drop the temporal coupling"]
+    api["pipelex-api"]
+    mw["pipelex-mistralai-workflows"]
+  end
+  w -. "git+ssh pin" .-> pt
+  hosted -. "git+ssh pin (runner enqueues)" .-> pt
+</pre>
+<figcaption>Core never imports Temporal. The private dist plugs in through the <code>pipelex.plugins</code> entry point. Only <strong>our private infra</strong> installs it (via a <code>git+ssh</code> pin); the <strong>public MIT packages drop temporal</strong> — they can't depend on a private repo.</figcaption>
+
+<details>
+  <summary>The key prerequisite (Step 0b): why the config schema had to move first</summary>
+  <p>Core config (<code>configs.py</code>) imported the Temporal config <em>schema</em>, which lived under <code>pipelex.temporal</code>. You cannot "keep config in core, move <code>temporal/</code> out" while core config imports from <code>temporal/</code>. So the schema (<code>config_temporal.py</code>) and the two exceptions it raises were relocated into core (<code>pipelex/system/configuration/{config_temporal,exceptions}.py</code>), re-based on <code>PipelexError</code>. After this, <strong>the last hard <code>pipelex.temporal</code> import in core was gone</strong> — and the move became pure packaging. The <code>RetryPolicy</code> field aliases to <code>Any</code> at runtime so the schema validates without importing <code>temporalio</code>.</p>
+  <p class="small">A latent bug surfaced and was fixed along the way: a <code>(ValueError, PipelexError)</code> MRO meant <code>ValueError.__init__</code> won and <code>.message</code> was never set. Bases were reordered to <code>(PipelexError, ValueError)</code>, with a regression test sweeping every <code>PipelexError</code> subclass.</p>
+</details>
+
+<details>
+  <summary>"Option A": why operational commands are a console script, not a plugin contribution</summary>
+  <p>An earlier design harvested plugin-contributed CLI commands by running discovery while building the <code>pipelex</code> CLI. A review found this brittle: one broken or colliding external plugin (or an unreadable user config) could brick <em>every</em> command — including the <code>--help</code>/<code>doctor</code>/<code>plugins</code> recovery commands. <strong>We removed the surface instead of hardening it.</strong> Temporal's <code>worker</code> and <code>setup-namespace</code> now ship as a standalone <code>pipelex-temporal</code> console script (<code>[project.scripts]</code>), so <code>pipelex --help</code> no longer loads config or scans entry points, and a third party can't shadow a core command.</p>
+</details>
+
+<!-- ============================================================ -->
+<h2>6 · The invariants that hold every phase</h2>
+<div class="callout good"><strong>Import-light boot.</strong> Booting with built-ins registered imports no optional SDK (<code>anthropic</code>, <code>mistralai</code>, <code>boto3</code>, <code>fal_client</code>, …) and no <code>temporalio</code>. Enforced by a subprocess test with a <code>sys.meta_path</code> finder that <em>raises</em> on those modules — boot must not trip it.</div>
+<div class="callout info"><strong>Side-effect-free <code>register</code>.</strong> A plugin's <code>register</code> may only call registrar menu methods — no hub access, no I/O, no client construction. This is what makes discovery a pure, repeatable function.</div>
+<div class="callout warn"><strong>Fail loud.</strong> Duplicate <code>(family, sdk)</code> / duplicate mode / a double-claimed slot / an API-version mismatch / a broken entry point each raise a named, contextual error. A missing backend says "install X" — it never dereferences <code>None</code>.</div>
+
+<h3>Presence vs activation (so you don't add a flag that shouldn't exist)</h3>
+<table>
+  <thead><tr><th>Question</th><th>Answer</th></tr></thead>
+  <tbody>
+    <tr><td>Is a plugin <em>present</em>?</td><td>It's in <code>BUILTIN_PLUGINS</code> or an installed dist exposes the <code>pipelex.plugins</code> entry point. Zero config.</td></tr>
+    <tr><td>When does an inference backend <em>activate</em>?</td><td>By data — a model names its <code>sdk</code>; the registry resolves it.</td></tr>
+    <tr><td>When does an orchestrator <em>activate</em>?</td><td>Per call — the request's open <code>orchestration_mode</code> selects the plugin; the endpoint-selected <code>DeliveryMode</code> says whether the caller waits.</td></tr>
+    <tr><td>When does the Temporal <em>runtime</em> boot?</td><td>Only when <code>plugins.boot_orchestrator = "temporal"</code> — a per-process "boot as a Temporal worker" gate, not a generic on/off toggle.</td></tr>
+    <tr><td>Can I turn a plugin off?</td><td>A narrow <code>plugins.disabled</code> denylist (can't disable a core-unconditional plugin). There is deliberately no redundant allowlist.</td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>7 · Phase history</h2>
+<p>The original plugin-system phases landed as checkpoint commits on <code>refactor/Plugins-3</code>. <code>refactor/Plugins-4</code> then added the consumer-facing seams needed for an orchestrator-agnostic API base and deployment flavors.</p>
+<table>
+  <thead><tr><th>Phase</th><th>What it did</th><th>Checkpoint commit</th></tr></thead>
+  <tbody>
+    <tr><td><b>0</b> · Rename</td><td>Freed the word "plugin": <code>Plugin→ModelHandle</code>, <code>PluginManager→SdkClientManager</code>, …</td><td><code>7213a90c0</code></td></tr>
+    <tr><td><b>1</b> · Seam + LLM</td><td>Contract, registrar, discovery, registries; LLM family migrated (contract proven on a real family)</td><td><code>42e9f7797</code></td></tr>
+    <tr><td><b>2</b> · Inference families</td><td>Image-gen / extract / search migrated; all four families go through the registry</td><td><code>d62628f0b</code>, <code>94fa908df</code></td></tr>
+    <tr><td><b>3</b> · Orchestrators</td><td>Bridge <code>match</code> + four boot blocks + teardown → registry &amp; hub-slot thunks</td><td><code>5f61db323</code></td></tr>
+    <tr><td>· Option A</td><td>Dropped the CLI-harvest seam; ops commands → <code>pipelex-temporal</code> console script</td><td><code>989c9beed</code></td></tr>
+    <tr><td><b>4</b> · Model listing</td><td>The 5th seam: <code>model_lists.py match</code> → <code>ModelListerRegistry</code></td><td><code>6a0796548</code>, <code>e4e021c2b</code></td></tr>
+    <tr><td><b>5</b> · Step 0b</td><td>Relocated the Temporal config schema into core (the move's prerequisite)</td><td><code>7d64eb6ac</code></td></tr>
+    <tr><td><b>5</b> · Cut-over</td><td>Externalized <code>pipelex/temporal/</code> → the <code>pipelex-temporal</code> dist</td><td><code>a8382d1a1</code>, <code>27da150a5</code></td></tr>
+    <tr><td><b>5</b> · Finalize</td><td>Removed dead Temporal dev-tooling from core (skills + Makefile targets → relocated)</td><td><code>e410ae971</code></td></tr>
+    <tr><td><b>Plugins-4 A</b></td><td>Added env-aware plugin-config loading and the HTTP error mapper seam; bumped <code>PLUGIN_API_VERSION</code> to 2</td><td><code>4b5449f88</code>, <code>75196e2e3</code></td></tr>
+    <tr><td><b>Boot gate</b></td><td>Moved Temporal runtime activation from <code>temporal.is_enabled</code> to <code>plugins.boot_orchestrator</code></td><td><code>eaa671d10</code></td></tr>
+    <tr><td><b>Mode split</b></td><td>Split flat <code>PipelexExecutionMode</code> into open <code>orchestration_mode</code> plus closed <code>DeliveryMode</code></td><td><code>bd4e52827</code></td></tr>
+    <tr><td><b>Validate</b></td><td>Added per-call <code>BundleValidatorRegistry</code> dispatch for orchestrator-aware <code>/validate</code></td><td><code>bbe44c929</code></td></tr>
+  </tbody>
+</table>
+
+<!-- ============================================================ -->
+<h2>8 · Where we stand</h2>
+<div class="callout good"><strong>Core foundation current.</strong> In this repo, built-in inference plugins, direct orchestration, model listing, HTTP mapper contributions, bundle validators, slot claims, and plugin discovery are wired through the registrar. The public core still imports no Temporal SDK at boot.</div>
+
+<table>
+  <thead><tr><th>Repo</th><th>Branch · tip</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>pipelex (core)</td><td><code>refactor/Plugins-4</code> · <code>221a2c611</code></td><td class="status-ok">pushed — plugin API v2, mode/delivery split, bundle validator seam</td></tr>
+    <tr><td>pipelex-temporal <span class="small">(private)</span></td><td><code>feature/Orchestrator-dispatched-validate</code></td><td class="status-ok">adopts the v2 seams: env-aware config, lazy Temporal error mapper, Temporal validator</td></tr>
+    <tr><td>pipelex-api <span class="small">(public base)</span></td><td><code>refactor/orchestrator-agnostic-base</code> + follow-ons</td><td class="status-ok">Temporal dependency removed; consumes mapper and dispatch seams; follow-on execute/start work stacked</td></tr>
+    <tr><td>pipelex-api-hosted <span class="small">(private flavor)</span></td><td>—</td><td class="status-wait">build Temporal flavor image: install <code>pipelex-temporal</code> via git+ssh and bake <code>pipelex_{env}.toml</code> + <code>temporal_{env}.toml</code></td></tr>
+    <tr><td>pipelex-worker <span class="small">(private)</span></td><td>—</td><td class="status-wait">flip pin from <code>pipelex[temporal]</code> to <code>pipelex</code> + <code>pipelex-temporal</code>; CLI becomes <code>pipelex-temporal worker</code></td></tr>
+    <tr><td>pipelex-mistralai-workflows <span class="small">(public)</span></td><td>feature branch</td><td class="status-ok">migrated to the open <code>orchestration_mode</code> / <code>DeliveryMode</code> surface in its plugin work</td></tr>
+  </tbody>
+</table>
+
+<h3>What's left — deployment flavors and release pins</h3>
+<p class="small"><code>pipelex-temporal</code> is <strong>private / not open-source</strong>, so it is <strong>not published to PyPI</strong>. It travels by a pinned <code>git+ssh</code> reference — exactly how this workspace already pins <code>pipelex-shared</code> (<code>… @ git+ssh://git@github.com/Pipelex/infra-python-tools.git@&lt;ref&gt;</code>).</p>
+<ol>
+  <li>Build the private Temporal API flavor: base <code>pipelex-api</code> image + one <code>pipelex-temporal</code> git+ssh install + env config child images.</li>
+  <li>Move Temporal connection settings into plugin-owned <code>temporal_{env}.toml</code>; the main <code>pipelex_{env}.toml</code> keeps only core/base settings such as <code>[plugins] boot_orchestrator = "temporal"</code>.</li>
+  <li>Flip <code>pipelex-worker</code> to the external plugin in the same release window as the public core/API pins.</li>
+  <li>Run consumer suites against the exact public version + private plugin ref pair before deploying hosted Temporal.</li>
+</ol>
+<p class="callout warn"><strong>Known boundary:</strong> the plugin system now supports both private and public orchestrator plugins, but the release/install channel is still per plugin. Private Temporal rides git+ssh; public Mistral rides PyPI once published. Do not add a central allowlist or a generic "enable plugin" flag to bridge that packaging difference.</p>
+
+<!-- ============================================================ -->
+<h2>9 · Links</h2>
+<ul>
+  <li><strong>pipelex (core):</strong> <a href="https://github.com/Pipelex/pipelex">github.com/Pipelex/pipelex</a> · branch <a href="https://github.com/Pipelex/pipelex/tree/refactor/Plugins-4">refactor/Plugins-4</a></li>
+  <li><strong>pipelex-temporal:</strong> <a href="https://github.com/Pipelex/pipelex-temporal">github.com/Pipelex/pipelex-temporal</a> <span class="small">(private — git+ssh install)</span></li>
+  <li><strong>Deployment consumers:</strong> <a href="https://github.com/Pipelex/pipelex-worker">pipelex-worker</a> <span class="small">(private)</span> · <a href="https://github.com/Pipelex/pipelex-api-hosted">pipelex-api-hosted</a> <span class="small">(private Temporal flavor)</span> · <a href="https://github.com/Pipelex/pipelex-api">pipelex-api</a> <span class="small">(public base)</span> · <a href="https://github.com/Pipelex/pipelex-mistralai-workflows">pipelex-mistralai-workflows</a> <span class="small">(public plugin)</span></li>
+</ul>
+
+<hr>
+<p class="small">Updated for co-developer review · core <code>refactor/Plugins-4</code> @ <code>221a2c611</code>. Diagrams render with Mermaid (loaded from CDN when this file is opened in a browser).</p>
+
+</div>
+
+<script>
+function showTab(group, idx){
+  document.querySelectorAll('.tabs[data-group="'+group+'"] .tab-btn').forEach(function(b,i){b.classList.toggle('active', i===idx);});
+  document.querySelectorAll('.tabs[data-group="'+group+'"] .tab-panel').forEach(function(p,i){p.classList.toggle('active', i===idx);});
+}
+</script>
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+</script>
+</body>
+</html>

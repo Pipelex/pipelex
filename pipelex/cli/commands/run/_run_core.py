@@ -359,7 +359,7 @@ def execute_run(
     library_dir: list[str] | None,
     costs: bool | None = None,
     telemetry_command_label: str = COMMAND,
-    temporal: bool | None = None,
+    orchestrator: str | None = None,
     dynamic_output_concept_ref: str | None = None,
     save_csv: str | None = None,
 ) -> None:
@@ -367,7 +367,7 @@ def execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir, temporal_enabled=temporal)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir, boot_orchestrator=orchestrator)
 
     try:
         with get_telemetry_manager().telemetry_context():

@@ -262,7 +262,7 @@ class TestDeliveryExecutor:
     async def test_generate_result_files_with_pydantic_instances_in_raw(self, mocker: MockerFixture) -> None:
         """working_memory_raw can contain hydrated Pydantic instances after Temporal transit.
 
-        When `dump_for_temporal()` runs in a child workflow, it embeds `__class__` metadata
+        When `dump_for_transport()` runs in a child workflow, it embeds `__class__` metadata
         on ListContent items so the parent can reconstruct them. Kajson's Temporal data
         converter then eagerly rehydrates those dicts back into BaseModel instances on the
         activity worker that runs delivery — even though the typed slot is `dict[str, Any]`.

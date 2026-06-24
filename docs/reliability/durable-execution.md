@@ -14,14 +14,14 @@ Stay on direct execution while you are developing, prototyping, or running short
 Move to a [durable backend](../distributed-execution/index.md) when you need:
 
 - **Crash survival** — a long pipeline resumes exactly where it left off after a worker restart.
-- **Retry under failure** — each LLM call, extraction, or image generation retries independently, with per-activity timeouts and a retry policy keyed off the [error category](failure-classification.md). (This per-leaf retry is the Temporal model, where each leaf maps to one host activity. On Mistral Workflows in `direct` mode the whole pipe runs inside a single host activity, so it retries as a unit; per-leaf retry there needs `mistral_native` mode.)
+- **Retry under failure** — each LLM call, extraction, or image generation retries independently, with per-step timeouts and a retry policy keyed off the [error category](failure-classification.md). (With per-leaf retry, each leaf retries on its own; depending on the backend, a pipe may instead retry as a single unit.)
 - **Large durable batches** — running a pipe over thousands of items, durably and rate-limited.
 - **Horizontal scale** — fan work out across multiple worker machines.
 
-The same `.mthds` methods run on every path without changing a line — which durable backend runs them is a deployment choice, not a code change. The [Pipelex on Temporal](../distributed-execution/temporal/index.md) backend is switched on with `[temporal] is_enabled = true`, which dispatches the work through your Temporal cluster. A second, managed backend (Mistral Workflows) is coming soon: that flag will not apply to it — pipes run inside Workflows activities via the runtime bridge.
+The same `.mthds` methods run on every path without changing a line — which durable backend runs them is a deployment choice, not a code change. [Distributed execution](../distributed-execution/index.md) is delivered through the Pipelex platform, on a Temporal-backed engine or a Mistral Workflows integration.
 
 !!! note "Durable backend"
-    Durable execution (Tier 2) runs on Temporal: your own Temporal cluster ([Pipelex on Temporal](../distributed-execution/temporal/index.md)). A managed option — Mistral's Workflows control plane, also built on Temporal — is coming soon; the resilience model described here will apply to it too, the difference being who operates the control plane.
+    Durable execution (Tier 2) runs on a durable backend — [Temporal-backed execution or a Mistral Workflows integration](../distributed-execution/index.md) — delivered through the Pipelex platform. The resilience model described here applies the same way whichever backend runs your work.
 
 !!! tip "The error you see is the same on both paths"
     A pipe that fails on a Temporal worker reaches your CLI or HTTP adapter with the *same* classification — category, retryable flag, model, provider, suggested action — as the identical failure run locally. Switching to a durable backend changes the resilience, not the error contract.

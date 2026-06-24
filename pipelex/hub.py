@@ -31,7 +31,7 @@ from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
@@ -49,6 +49,10 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+    from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+    from pipelex.plugins.model_lister_registry import ModelListerRegistry
+    from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
@@ -71,7 +75,11 @@ class PipelexHub:
         self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
-        self._plugin_manager: PluginManager | None = None
+        self._sdk_client_manager: SdkClientManager | None = None
+        self._inference_backend_registry: InferenceBackendRegistry | None = None
+        self._model_lister_registry: ModelListerRegistry | None = None
+        self._orchestrator_registry: OrchestratorRegistry | None = None
+        self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -175,8 +183,20 @@ class PipelexHub:
     def set_models_manager(self, models_manager: ModelManagerAbstract):
         self._models_manager = models_manager
 
-    def set_plugin_manager(self, plugin_manager: PluginManager):
-        self._plugin_manager = plugin_manager
+    def set_sdk_client_manager(self, sdk_client_manager: SdkClientManager):
+        self._sdk_client_manager = sdk_client_manager
+
+    def set_inference_backend_registry(self, inference_backend_registry: "InferenceBackendRegistry"):
+        self._inference_backend_registry = inference_backend_registry
+
+    def set_model_lister_registry(self, model_lister_registry: "ModelListerRegistry"):
+        self._model_lister_registry = model_lister_registry
+
+    def set_orchestrator_registry(self, orchestrator_registry: "OrchestratorRegistry"):
+        self._orchestrator_registry = orchestrator_registry
+
+    def set_bundle_validator_registry(self, bundle_validator_registry: "BundleValidatorRegistry"):
+        self._bundle_validator_registry = bundle_validator_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -286,11 +306,35 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._models_manager
 
-    def get_plugin_manager(self) -> PluginManager:
-        if self._plugin_manager is None:
-            msg = "PluginManager2 is not initialized"
+    def get_sdk_client_manager(self) -> SdkClientManager:
+        if self._sdk_client_manager is None:
+            msg = "SdkClientManager is not initialized"
             raise RuntimeError(msg)
-        return self._plugin_manager
+        return self._sdk_client_manager
+
+    def get_inference_backend_registry(self) -> "InferenceBackendRegistry":
+        if self._inference_backend_registry is None:
+            msg = "InferenceBackendRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._inference_backend_registry
+
+    def get_model_lister_registry(self) -> "ModelListerRegistry":
+        if self._model_lister_registry is None:
+            msg = "ModelListerRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._model_lister_registry
+
+    def get_orchestrator_registry(self) -> "OrchestratorRegistry":
+        if self._orchestrator_registry is None:
+            msg = "OrchestratorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._orchestrator_registry
+
+    def get_bundle_validator_registry(self) -> "BundleValidatorRegistry":
+        if self._bundle_validator_registry is None:
+            msg = "BundleValidatorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._bundle_validator_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -444,8 +488,24 @@ def get_model_deck() -> ModelDeck:
     return get_models_manager().get_model_deck()
 
 
-def get_plugin_manager() -> PluginManager:
-    return get_pipelex_hub().get_plugin_manager()
+def get_sdk_client_manager() -> SdkClientManager:
+    return get_pipelex_hub().get_sdk_client_manager()
+
+
+def get_inference_backend_registry() -> "InferenceBackendRegistry":
+    return get_pipelex_hub().get_inference_backend_registry()
+
+
+def get_model_lister_registry() -> "ModelListerRegistry":
+    return get_pipelex_hub().get_model_lister_registry()
+
+
+def get_orchestrator_registry() -> "OrchestratorRegistry":
+    return get_pipelex_hub().get_orchestrator_registry()
+
+
+def get_bundle_validator_registry() -> "BundleValidatorRegistry":
+    return get_pipelex_hub().get_bundle_validator_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

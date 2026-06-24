@@ -212,8 +212,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         if (not self.llm_prompt_spec.templating_style) and (
             inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM)
         ):
-            # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
-            # TODO: improve this by making it possible to get the inference model for external LLM Plugins
+            # Note: the case where we don't get an inference model corresponds to the use of an external LLM plugin
+            # TODO: improve this by making it possible to get the inference model for external LLM plugins
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
             self.llm_prompt_spec.templating_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,

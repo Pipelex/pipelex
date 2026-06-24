@@ -469,8 +469,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """Serialize the working memory as a dictionary."""
         return self.model_dump(serialize_as_any=True)
 
-    def dump_for_temporal(self) -> dict[str, Any]:
-        """Serialize for Temporal transit with explicit ListContent representation.
+    def dump_for_transport(self) -> dict[str, Any]:
+        """Serialize for cross-process transport with explicit ListContent representation.
 
         Like smart_dump(), but serializes ListContent as a plain list instead of
         ``{"items": [...]}``.  This removes the ambiguity at hydration time: a

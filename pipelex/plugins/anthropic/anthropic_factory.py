@@ -15,7 +15,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicFactoryError
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 from pipelex.types import StrEnum
@@ -36,14 +36,14 @@ class AnthropicSdkVariant(StrEnum):
 class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
-        plugin: Plugin,
+        model_handle: ModelHandle,
         *,
         backend: InferenceBackend,
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
         try:
-            sdk_variant = AnthropicSdkVariant(plugin.sdk)
+            sdk_variant = AnthropicSdkVariant(model_handle.sdk)
         except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
+            msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
             raise AnthropicFactoryError(msg) from exc
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config

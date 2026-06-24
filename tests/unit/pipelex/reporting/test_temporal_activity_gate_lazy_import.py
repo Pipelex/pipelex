@@ -2,7 +2,7 @@
 
 ``_is_in_temporal_activity`` must detect the activity context WITHOUT importing temporalio:
 a module-level import would put the entire temporalio extra (Rust bridge, protobuf, ~130ms)
-on every pipelex boot's critical path wherever ``pipelex[temporal]`` is installed — including
+on every pipelex boot's critical path wherever ``pipelex-temporal`` is installed — including
 processes that never touch Temporal (CLI validate runs, direct-mode servers, the hosted
 runner image). The gate sniffs ``sys.modules`` instead: a process that never imported
 ``temporalio.activity`` cannot be inside a Temporal activity, because the activity context is

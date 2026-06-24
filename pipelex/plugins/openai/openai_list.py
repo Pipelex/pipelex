@@ -7,8 +7,8 @@ from rich import box
 from rich.table import Table
 
 from pipelex.hub import get_console
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
-from pipelex.plugins.plugin_sdk_registry import Plugin
 
 if TYPE_CHECKING:
     from openai.types import Model
@@ -25,9 +25,9 @@ async def list_openai_models(
     any_listed: bool,
 ) -> None:
     """List OpenAI models."""
-    plugin = Plugin(sdk=sdk, backend=backend_name)
+    model_handle = ModelHandle(sdk=sdk, backend=backend_name)
     openai_models = await openai_list_available_models(
-        plugin=plugin,
+        model_handle=model_handle,
         backend=backend,
     )
 

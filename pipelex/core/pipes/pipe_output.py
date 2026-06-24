@@ -14,7 +14,6 @@ from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_types import AnyTokensUsage
 
@@ -31,29 +30,6 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     # usage_assembly_error mirrors graph_assembly_error.
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
-
-    def prepare_for_temporal(self, library_crate: LibraryCrate | None = None) -> "PipeOutput":
-        """Dehydrate WorkingMemory to raw dict for Temporal transit.
-
-        Returns a copy with working_memory serialized to a plain dict
-        (no dynamic class metadata), leaving the original unchanged.
-        The receiving side must call hydrate_working_memory() to reconstruct
-        the typed WorkingMemory after dynamic classes are registered.
-
-        Symmetric with `PipeJob.prepare_for_temporal()`: when `library_crate`
-        is None, dehydration is a no-op — there are no dynamic concept classes
-        to round-trip, so the typed WorkingMemory can travel as-is.
-        """
-        if library_crate is None:
-            return self
-        if not self.working_memory.root:
-            return self
-        return self.model_copy(
-            update={
-                "working_memory_raw": self.working_memory.dump_for_temporal(),
-                "working_memory": WorkingMemory(),
-            }
-        )
 
     @property
     def main_stuff(self) -> Stuff:

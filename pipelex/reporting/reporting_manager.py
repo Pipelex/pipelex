@@ -28,7 +28,7 @@ def _is_in_temporal_activity() -> bool:
     imported in this process, no activity context can exist — the context is set by temporalio's
     own machinery, which requires the module to be imported. Importing it here would put the
     entire temporalio extra (Rust bridge, protobuf) on every boot's critical path wherever the
-    ``pipelex[temporal]`` extra is installed, even for processes that never touch Temporal.
+    ``pipelex-temporal`` plugin is installed, even for processes that never touch Temporal.
     Worker processes are unaffected: by the time any activity runs, ``temporalio.activity`` is
     necessarily in ``sys.modules``.
     """
