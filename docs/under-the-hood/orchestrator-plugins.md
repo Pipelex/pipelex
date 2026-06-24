@@ -17,7 +17,7 @@ An **orchestrator** is what knows how to run a pipe under one token. Core names 
 ## The seam in one view
 
 ```
-run_pipe_via_bridge(input_payload)            # pipelex/runtime_bridge/bridge.py
+run_pipe_via_bridge(input_payload)            # pipelex_transport.bridge — closed host-runtime library
   → build the PipeJob (boundary decode + library scope + trace_context)
   → orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
   → if orchestrator is None: raise MissingOrchestratorError(mode)   # generic, names no orchestrator
@@ -25,6 +25,9 @@ run_pipe_via_bridge(input_payload)            # pipelex/runtime_bridge/bridge.py
 ```
 
 The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
+
+!!! note "Open seam, closed host-side entry"
+    The host-side entry — `run_pipe_via_bridge` / `build_pipe_job_from_input` and the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — lives in the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime (Temporal, Mistral, Airflow, your own) is a Pipelex commercial capability, not an open extension point. What stays **open** is the seam a third-party orchestrator extends: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
 
 ---
 
@@ -128,14 +131,17 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 | Area | Modules / symbols |
 |---|---|
-| Bridge entry + boundary | `pipelex.runtime_bridge.bridge` (`run_pipe_via_bridge`, `build_pipe_job_from_input`, `serialize_pipe_output`), `pipelex.runtime_bridge.serialization` (`serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
+| Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
 | Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
-| Host-runtime primitives | `pipelex.runtime_bridge.primitives.*` (`delivery`, `hydration`, `pipe_classification`, `submitter_hydration`, `trace_flush`) |
+| Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by `pipelex-transport`) |
 | Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`) |
 | Execution protocols | `PipeRouterProtocol`, `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |
-| Payload / core types | `PipeJob`, `PipeOutput`, `DeliveryAssignment`, `WorkingMemory` (+ factory), `JobMetadata`, `LibraryCrate` |
+| Payload / core types | `PipeJob`, `PipeOutput`, `DeliveryAssignment`, `WorkingMemory` (+ factory, `dump_for_transport`), `JobMetadata`, `LibraryCrate` |
 | Library + hub scoping | `set_current_library` / `get_current_library`, `scoped_pipe_router`, `get_class_registry` (per-call library hydration via `library_crate_dump`) |
 | Tracing / graph hooks | `trace_events`, `graph_tracer_manager`, `tracing_assembly` (per-step trace/usage events across the boundary) |
+
+!!! warning "Not in the open SPI — the closed `pipelex-transport` layer"
+    The host-side bridge entry (`run_pipe_via_bridge`, `build_pipe_job_from_input`), the cross-process dispatch primitives (`delivery`, `pipe_classification`, `submitter_hydration`, `trace_flush`, `scoped_library`, `pipe_run_arg`), and the transport prepare helpers (`prepare_job_for_transport`, `prepare_output_for_transport`) were extracted out of open core into the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime is a Pipelex commercial capability — Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) compile against `pipelex-transport`; a third-party out-of-tree orchestrator compiles against the **open** rows above only.
 
 ---
 

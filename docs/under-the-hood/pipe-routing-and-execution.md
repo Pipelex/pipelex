@@ -19,7 +19,7 @@ Pipelex runs pipes either **direct** (single-process) or **distributed** on a ho
 ---
 
 !!! note "The runtime bridge"
-    Both distributed paths go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the in-development Mistral Workflows host package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
+    Both distributed paths reach pipe execution through the framework-agnostic runtime bridge. The open `pipelex/runtime_bridge/` keeps the boot, serialization, mode/delivery, and worker-side hydration (`primitives/hydration.py`) pieces; the cross-process **dispatch** primitives — classifying controller pipes as child workflows and leaf operators as activities (`pipe_classification`), flushing trace events (`trace_flush`), and delivering results (`delivery`) — were extracted into the closed `pipelex-transport` library, which both commercial host-runtime plugins import. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 
@@ -49,7 +49,7 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 | `output_name` | `str \| None` | Override for the output variable name |
 | `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |
 
-`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For Temporal dispatch, `prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
+`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, `prepare_job_for_transport(pipe_job)` (in the closed `pipelex-transport` library) moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
 ---
 
@@ -83,7 +83,7 @@ These dynamically-generated classes become the `content` type of `Stuff` objects
 
 ## Direct Execution
 
-In direct execution, everything runs in a single Python process. This is the default mode when Temporal is not enabled.
+In direct execution, everything runs in a single Python process. This is the default mode when no orchestrator plugin is booted.
 
 ### Flow
 
@@ -109,13 +109,15 @@ PipeRouter.run(pipe_job)
 
 ### Router Selection
 
-The router is selected during `Pipelex.setup()`:
+The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROUTER` slot. A boot-orchestrator plugin (e.g. the closed `pipelex-temporal` plugin) claims that slot in its `register()` when `plugins.boot_orchestrator` names it; otherwise the default in-process router is used:
 
 ```python
-if get_config().temporal.is_enabled:
-    effective_pipe_router = make_tprl_pipe_router_top()   # Distributed
-else:
-    effective_pipe_router = PipeRouter(observer=...)       # Direct
+# A boot-orchestrator plugin swaps in its distributed router when
+# plugins.boot_orchestrator == its own name; otherwise this default runs.
+effective_pipe_router = self._resolve_hub_slot(
+    slot=HubSlot.PIPE_ROUTER,
+    default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process
+)
 ```
 
 ### How PipeRouter Works
@@ -186,7 +188,7 @@ sequenceDiagram
     S->>S: Create PipeJob (crate attached)
 
     Note over S: PipeRouterTop.run()
-    S->>S: prepare_for_temporal()<br/>(WM → working_memory_raw)
+    S->>S: prepare_job_for_transport()<br/>(WM → working_memory_raw)
     S->>T: Submit WfPipeRouter(PipeJob)
     T->>W: Dispatch workflow
 
@@ -225,7 +227,7 @@ Custom Temporal payload converter that uses Kajson for serializing/deserializing
 
 **Worker CLI** (`pipelex/temporal/worker_cli.py`)
 
-Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
+Entry point for the worker process. Calls `Pipelex.make(boot_orchestrator="temporal")` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
 
 ### Content Generation Activities
 
@@ -269,8 +271,8 @@ The submitter builds a `LibraryCrate` — a serializable snapshot of all pipes a
 
 Deferred hydration applies to both **PipeJob inputs** and **PipeOutput return values**. In both cases, `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object, avoiding deserialization failures when dynamic concept classes aren't registered in the receiving process's class registry.
 
-- **Input**: `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
-- **Output**: `PipeOutput.prepare_for_temporal()` does the same before returning from a child workflow. The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
+- **Input**: `prepare_job_for_transport(pipe_job)` (in the closed `pipelex-transport` library) moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
+- **Output**: `prepare_output_for_transport(pipe_output, library_crate=library_crate)` does the same before returning from a child workflow (a no-op when no crate is present). The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
 
 ### Per-Workflow ClassRegistry and Library Scoping
 
@@ -296,7 +298,7 @@ flowchart TB
         S1 --> S2 --> S3 --> S4 --> S5 --> S6
     end
 
-    S6 --> Decision{temporal.is_enabled?}
+    S6 --> Decision{boot_orchestrator set?}
 
     subgraph Direct["Direct Execution"]
         D1["PipeRouter._run_pipe_job()"]
@@ -309,7 +311,7 @@ flowchart TB
     end
 
     subgraph Distributed["Distributed Execution (Temporal)"]
-        T1["PipeRouterTop: prepare_for_temporal()"]
+        T1["PipeRouterTop: prepare_job_for_transport()"]
         T2["Kajson serialize PipeJob + crate"]
         T3["Temporal Server"]
         T4["Worker: Kajson deserialize"]
@@ -346,7 +348,7 @@ flowchart TB
 | StructureGenerator | `pipelex/core/concepts/structure_generation/generator.py` |
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
-| Deferred hydration utility | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Deferred hydration utility (open core) | `pipelex/runtime_bridge/primitives/hydration.py` |
 | Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |

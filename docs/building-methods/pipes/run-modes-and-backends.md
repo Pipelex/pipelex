@@ -22,7 +22,10 @@ Pipelex separates **what the inference leaves do** (the run mode) from **where t
 | Backend | Trigger | What runs where |
 |---|---|---|
 | **Direct** (default) | — | Everything in your process |
-| **Temporal** | `--temporal`, or config `[temporal] is_enabled = true` | Controllers as child workflows, inference leaves as activities on workers |
+| **Temporal** | `--orchestrator temporal`, or config `plugins.boot_orchestrator = "temporal"` | Controllers as child workflows, inference leaves as activities on workers |
+
+!!! info "Durable backends are a commercial capability"
+    The Temporal backend is part of Pipelex's [durable & distributed execution offer](https://pipelex.com/products#durable-execution) — the [Temporal backend](https://pipelex.com/products#temporal) is delivered through the Pipelex platform. The `--orchestrator <name>` flag (and its `plugins.boot_orchestrator` config equivalent) boots the process under the named orchestrator plugin; omit it for in-process execution.
 
 The run mode rides across the wire with every inference job, so the backend never changes *what* a leaf does — only *where* it does it. In particular, when you run a **pipeline** in dry mode on Temporal, the real inference activities are still dispatched and mock **inside** them on the worker. That's by design: it lets you test the entire distribution machinery — dispatch, scheduling, serialization, task-queue routing, cross-worker graph tracing — with zero AI spend and no credentials.
 
@@ -45,10 +48,10 @@ pipelex run bundle my_bundle.mthds
 pipelex run bundle my_bundle.mthds --dry-run --mock-inputs
 
 # Live + Temporal
-pipelex run bundle my_bundle.mthds --temporal
+pipelex run bundle my_bundle.mthds --orchestrator temporal
 
 # Dry run + Temporal — dispatches real activities, mocks inside them
-pipelex run bundle my_bundle.mthds --temporal --dry-run --mock-inputs
+pipelex run bundle my_bundle.mthds --orchestrator temporal --dry-run --mock-inputs
 ```
 
 From Python, the same knobs live on the runner — the backend comes from config:
@@ -68,10 +71,10 @@ response = await runner.execute_pipeline()
 
 `pipelex validate` (see the [validate commands](../../tools/cli/validate.md)) combines static validation with a dry run of every pipe. It relates to the matrix in two specific ways:
 
-- **The CLI sweep always runs in-process**, even when Temporal is enabled. The `--temporal` flag on `pipelex validate` exists precisely to verify that: it flips the boot config so you can confirm a validation sweep does not dispatch anything under a Temporal-enabled setup.
+- **The CLI sweep always runs in-process**, even when Temporal is enabled. The `--orchestrator temporal` flag on `pipelex validate` exists precisely to verify that: it boots validation under the orchestrator plugin so you can confirm a validation sweep does not dispatch anything under a Temporal-enabled setup.
 - **The runner API's `/validate` route ships the sweep to a worker — as one activity**: with Temporal enabled, it offloads the *whole* sweep as a single activity (`act_dry_validate`, wrapped in the `WfDryValidate` workflow). Inside that activity, the pipe router and the content generator are scoped to their in-process variants, so nothing nested is dispatched: every dry run in the sweep behaves exactly like the dry × direct cell of the matrix, just hosted on a worker instead of your machine. The per-pipe statuses plus the execution graph come back in one round-trip. See [Temporal integration](../../under-the-hood/temporal-integration.md) for the mechanics.
 
-This is not a contradiction of "the run mode never changes the backend" — it's the same leaf-mock foundation with a different *backend choice* for the nested work. A `--temporal --dry-run` pipeline run picks the Temporal backend all the way down, fanning out for real to test the distribution machinery. A Temporal validation sweep picks the Temporal backend for exactly one hop (get the sweep onto a worker) and the in-process backend for everything inside, because its goal is a cheap interactive answer, not distribution testing. Two deliberate opposites built from the same parts.
+This is not a contradiction of "the run mode never changes the backend" — it's the same leaf-mock foundation with a different *backend choice* for the nested work. A `--orchestrator temporal --dry-run` pipeline run picks the Temporal backend all the way down, fanning out for real to test the distribution machinery. A Temporal validation sweep picks the Temporal backend for exactly one hop (get the sweep onto a worker) and the in-process backend for everything inside, because its goal is a cheap interactive answer, not distribution testing. Two deliberate opposites built from the same parts.
 
 ## Forced Dry Mode
 
