@@ -1,6 +1,6 @@
 # `UsageRegistry` leak fix + distributed cost reporting
 
-Cost reporting was reworked from a leaky per-run, in-process `UsageRegistry` buffer into an **event-sourced artifact that rides back on `PipeOutput`**. The success-path registry leak is gone by removal; a multi-worker (Temporal) run now aggregates usage from every worker into a single end-of-run cost report. A default-on `--costs` switch decouples cost collection from `--graph` over a shared event-log transport, and a cheap deterministic mock validates the distributed path (originally `--mock-inference`; since the unified dry run it is the internal `--dry-run --mock-usage` trigger — see `../dry-run-refactor/plan-unified-dry-run.md`).
+Cost reporting was reworked from a leaky per-run, in-process `UsageRegistry` buffer into an **event-sourced artifact that rides back on `PipeOutput`**. The success-path registry leak is gone by removal; a multi-worker (Temporal) run now aggregates usage from every worker into a single end-of-run cost report. A default-on `--costs` switch decouples cost collection from `--graph` over a shared event-log transport, and a cheap deterministic mock validates the distributed path (originally `--mock-inference`; since the unified dry run it is the internal `--dry-run --mock-usage` trigger — see `../../dry-run-refactor/plan-unified-dry-run.md`).
 
 Shipped in **PR #967** on `fix/For-API-update`, with the companion rename **#968** (`GraphContext → TraceContext`, `is_generate_costs → is_generate_usage`).
 
@@ -24,5 +24,5 @@ Shipped in **PR #967** on `fix/For-API-update`, with the companion rename **#968
 
 The cost-reporting half mirrors graph-spec assembly, documented in the distributed-execution feature:
 
-- [`../distributed-execution/tracing-cost-reporting.md`](../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting (T2 cross-worker cost-report assembly = **FIXED** by this work).
-- [`../distributed-execution/README.md`](../distributed-execution/README.md) — the priority plan (P0.1 `--mock-inference` and P1 cost-report assembly both **shipped** here).
+- [`../../distributed-execution/tracing-cost-reporting.md`](../../distributed-execution/tracing-cost-reporting.md) — as-built tracing & cost reporting (T2 cross-worker cost-report assembly = **FIXED** by this work).
+- [`../../distributed-execution/README.md`](../../distributed-execution/README.md) — the priority plan (P0.1 `--mock-inference` and P1 cost-report assembly both **shipped** here).

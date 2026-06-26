@@ -27,15 +27,15 @@ class ReportingProtocol(Protocol):
 
 class ReportingNoOp(ReportingProtocol):
     @override
-    def report_inference_job(self, inference_job: InferenceJobAbstract):
+    def report_inference_job(self, inference_job: InferenceJobAbstract) -> None:
         pass
 
     @override
-    def setup(self):
+    def setup(self) -> None:
         pass
 
     @override
-    def teardown(self):
+    def teardown(self) -> None:
         pass
 
     @override

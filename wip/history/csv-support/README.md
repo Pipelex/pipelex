@@ -15,7 +15,7 @@ A CSV (or, behind a not-yet-built seam, an Excel `.xlsx`) file maps to a `ListCo
 
 The headline acceptance test is a full round trip: `people.csv` → `PipeBatch` → `PipeSequence`(`PipeLLM` + `PipeCompose`) → `summaries.csv`, green in dry mode via both the in-process runner and a real CLI subprocess.
 
-User-facing docs: [`docs/building-methods/pipes/csv-input-and-output.md`](../../docs/building-methods/pipes/csv-input-and-output.md) + `--save-csv` in [`docs/tools/cli/run.md`](../../docs/tools/cli/run.md); CHANGELOG `[Unreleased]`.
+User-facing docs: [`docs/building-methods/pipes/csv-input-and-output.md`](../../../docs/building-methods/pipes/csv-input-and-output.md) + `--save-csv` in [`docs/tools/cli/run.md`](../../../docs/tools/cli/run.md); CHANGELOG `[Unreleased]`.
 
 ---
 

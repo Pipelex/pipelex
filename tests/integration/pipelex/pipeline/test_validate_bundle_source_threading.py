@@ -37,8 +37,8 @@ description = "A customer"
 """
 
 # An unclosed table header is a TOML *syntax* error: it fails in the interpreter before any
-# blueprint dict exists, so the ``PipelexInterpreterError`` carries only a message — no
-# categorized error data and (crucially) no chance to seed the threaded ``source``.
+# blueprint dict exists, so the interpreter must attach the threaded source directly to the
+# structured error item.
 _MALFORMED_TOML_MTHDS = """
 domain = "testapp"
 [concept.Customer
@@ -85,19 +85,16 @@ class TestValidateBundleSourceThreading:
         assert seeded_items, "no validation_errors item carried the threaded source"
         assert any(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in seeded_items)
 
-    async def test_parse_level_failure_yields_a_sourceless_residual_item(
+    async def test_parse_level_failure_carries_threaded_source(
         self,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """A TOML-syntax error still surfaces a non-empty ``validation_errors`` — the invariant is total.
+        """A TOML-syntax error surfaces a blueprint-validation item with the threaded source.
 
-        Parse-level failures (TOML syntax, an empty blueprint, a bundle elaborator) are raised by
-        the interpreter with only a message — no per-error data, and (since they fail before the
-        blueprint dict is seeded) no threaded ``source``. The shared builder's last-resort residual
-        still emits one ``blueprint_validation`` item, so an invalid verdict never rides a bare
-        message with an empty ``validation_errors[]``. Being parse-level, the residual carries no
-        ``source`` — even though one was threaded in — which this contrasts against the categorized
-        cases above.
+        Parse-level failures happen before a ``PipelexBundleBlueprint`` exists, so they cannot read
+        ``blueprint.source``. The interpreter must attach the caller-supplied logical source directly
+        to the structured blueprint-validation item; otherwise API/MCP clients receive an error
+        message they cannot map back to the submitted file.
         """
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
@@ -105,7 +102,7 @@ class TestValidateBundleSourceThreading:
         report = exc_info.value.to_error_report()
         assert report.validation_errors, "a parse-level failure must still carry a non-empty validation_errors[]"
         assert all(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in report.validation_errors)
-        assert all(item.source is None for item in report.validation_errors)
+        assert [item.source for item in report.validation_errors] == ["broken.mthds"]
 
     async def test_length_mismatch_is_a_host_contract_error(
         self,

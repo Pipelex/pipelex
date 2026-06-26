@@ -1,44 +1,43 @@
-# `wip/` — Work in Progress
+# `wip/` - Work in Progress
 
-This folder holds the **active** planning, design, and current-state docs for the Pipelex runtime — the things that are started or about to start. Finished plans and design history live in the private workspace (`docs/history/`, `docs/plans/`), not here. If a doc describes how the code got to where it is rather than where it is or is going, it does not belong in `wip/`.
+This folder holds active planning, design, and current-state docs for Pipelex runtime work. Finished plans, point-in-time PR recaps, and old audit artifacts are collected under [`history/`](history/).
 
-## How this is organized
+Start with [`executive.md`](executive.md) for priorities. Then open the track README for the area you are picking up.
 
-- **Track folders** group a multi-doc concern. Each has its own `README.md` that maps the track and states what's open. Open the README first.
-- **Standalone docs** are single-topic designs that have no siblings — they live loose at the root with self-describing names (no folder needed).
-- There is **no consolidated cross-cutting backlog** — deferred items and follow-ups live with their feature, in the relevant track or standalone doc's own "open / deferred" section. Follow-ups to features that already shipped live with that feature's record in the private workspace (`docs/history/`, `docs/plans/`), not here.
+## Active Tracks
 
-## Tracks
+- [`plugins/`](plugins/) - real plugin architecture for orchestrators and inference backends. This is the major architecture track: entry-point discovery, registries, orchestrator dispatch, Temporal extraction, version gating, and cutover follow-ups.
+- [`distributed-execution/`](distributed-execution/) - Temporal/distributed execution productionization. P0/P1 tracing and cost reporting shipped; open work is P0.2 follow-ons, local cross-package crates, remote dependency fetch, nondeterminism decisions, and MISTRAL_NATIVE downstream reconciliation.
+- [`dry-run-refactor/`](dry-run-refactor/) - unified dry-run and validation execution. Part A shipped, Part B/unified dry run is implemented, and Part C needs release/API merge and hardening decisions.
+- [`error-handling/`](error-handling/) - current-state reference and open tail for structured errors: webhook signing, metadata long tail, delivery-path request ids, and Temporal fail-safe review backlog.
+- [`runtime-bridge/`](runtime-bridge/) - runtime bridge review/deferred follow-ups. Most PR review items are resolved; active value is in remaining deferred hardening and testing gaps.
+- [`concurrency/`](concurrency/) - direct-mode batching/backpressure design: fan-out scheduling, rate limiting, and batch partial failure.
+- [`graph/`](graph/) - graph/validation graph improvements: source-map enrichment and explicit graph target selection.
+- [`observer-and-telemetry/`](observer-and-telemetry/) - telemetry/identifier visibility notes, especially hosted privacy around structural ids.
+- [`recursivity/`](recursivity/) - only low-priority additive multi-file polish remains active; completed recursivity records are in history.
 
-- **[distributed-execution/](distributed-execution/)** — running MTHDS methods as Temporal workflows across separate worker processes. Its [README](distributed-execution/README.md) is the priority-ordered plan; the folder also holds the tracing/cost-reporting as-built reference, the crate-packaging phases (6a/6b) and crate-first vision, the implemented Temporal IDs/naming design, the deferred Temporal-exception and schema-reconstruction hardening proposals, the `/temporal-e2e-validate` skill validation status, and the [mistral-workflows/](distributed-execution/mistral-workflows/) sub-track (landing the MISTRAL_NATIVE plugin onto `dev`). **This is the active headline track.**
-- **[error-handling/](error-handling/)** — the current-state reference for error handling across Pipelex, track-organized (metadata model, worker classification, extract/classify/render, retry, CLI delivery, Temporal integration, testing). Mostly landed; its [README](error-handling/README.md) lists what's still open.
-- **[concurrency/](concurrency/)** — direct-mode batching / backpressure design. The retry-jitter quick win shipped; the remaining design work is split into fan-out scheduling, rate limiting, and batch partial-failure docs. Status: design scoping.
-- **[csv-support/](csv-support/)** — reading `.csv` files into typed `ListContent` and writing flat list outputs back out via `--save-csv`. Its [README](csv-support/README.md) is the feature + reviewer reference (codec, core input hook, CLI output hook, the I/O contract, locked decisions); the folder also holds the design rationale and the deferred review/security follow-ups. Landed in #955.
-- **[runtime-bridge/](runtime-bridge/)** — review-triage and deferred-items record for the framework-agnostic `pipelex/runtime_bridge/` extraction (`feature/Runtime-bridge-extraction`, PR #969). Its [README](runtime-bridge/README.md) is the full triage of the SWE-agent review comments. The mechanical fixes and the design-fork resolutions (DIRECT-mode router scoping, the `graph_context`→`trace_context` contract, trace-flush false-positive) have all landed; what remains are the genuinely-deferred items, each with its own doc — notably the half-built-singleton boot race.
-- **[keyword-only-arguments/](keyword-only-arguments/)** — the keyword-only-arguments refactor on `refactor/Function-calling-4`: every non-subject parameter across `pipelex/` is keyword-only, enforced by the `check-keyword-only` AST guard (in `agent-check` + CI) and a `PostToolUse` hook. Its [README](keyword-only-arguments/README.md) maps the track; the folder also holds the co-developer [HTML explainer](keyword-only-arguments/keyword-only-arguments.html), the resolved positional-subject-suspects record, the cross-repo downstream-breakage log, and the raw `audit/` artifacts. Landed on the branch; the one open item is the at-release pin swap for the four consumer repos.
-- **[mistralai-2x-bump/](mistralai-2x-bump/)** — the mistralai 2.x SDK bump, rebranched onto post-#969 `dev` after `feature/Mistral-workflows-merge-4` was retired. Its [README](mistralai-2x-bump/README.md) is the cross-repo master: branch state, a verification checklist, and the un-gate procedure. **Status: done + green on two local branches, parked and not pushed — gated from publish on the upstream `instructor` mistralai-2.x PyPI release.**
+## Active Standalone Docs
 
-## Standalone docs
+- [`webhook-signing.md`](webhook-signing.md) - HMAC body-signing rollout for completion webhooks.
+- [`init-yes-mode-handoff.md`](init-yes-mode-handoff.md) - non-interactive `pipelex init --yes` for downstream CI.
+- [`structured-logging.md`](structured-logging.md) - structured log fields and contextvars.
+- [`runtime-code-fixes.md`](runtime-code-fixes.md) - verified runtime fixes to pick up.
+- [`structured-validation-errors-deferred-findings.md`](structured-validation-errors-deferred-findings.md) - contained follow-ups on structured validation errors.
+- [`validate-parse-level-source-attribution.md`](validate-parse-level-source-attribution.md) - source attribution for malformed TOML in multi-file validation.
+- [`blueprint-elaboration-directives.md`](blueprint-elaboration-directives.md) - future elaboration directive system.
+- [`stuffs-as-nodespec.md`](stuffs-as-nodespec.md) - future graph model rework for stuff nodes.
+- [`doctor-output-ansi-under-force-color.md`](doctor-output-ansi-under-force-color.md) - optional plain diagnostic output decision.
+- [`pathlib-refactor.workflow.js`](pathlib-refactor.workflow.js) - runnable path-refactor workflow.
 
-- **[signature-based-validation.md](signature-based-validation/signature-based-validation.md)** — `PipeSignature` contract-only pipes plus strict/lenient (`--allow-signatures`) validation, on `feature/Validate-with-signatures-3`. Landed (Phases 1–7.3, tests green); current-state reference + reviewer verification map. The one open item is the Phase 7.4 cross-repo schema merge-gate (retire the branch-local MTHDS schema rule once `vscode-pipelex` ships the bundled schema).
-- **[webhook-signing.md](webhook-signing.md)** — security track: HMAC body-signing for the completion-callback webhook, with a 3-step cross-repo rollout. The last open piece of the error-handling API-readiness companion work. Plan ready, not started.
-- **[runtime-code-fixes.md](runtime-code-fixes.md)** — verified `pipelex/` runtime fixes to pick up.
-- **[structured-logging.md](structured-logging.md)** — kickoff briefing for replacing string-interpolated log context with structured logging + contextvars. Kicked off, not started; sequenced after the error-handling stack merges.
-- **[stuffs-as-nodespec.md](stuffs-as-nodespec.md)** — future graph-model rework to make stuffs first-class `NodeSpec` instances. A starter, not a worked plan.
-- **[blueprint-elaboration-directives.md](blueprint-elaboration-directives.md)** — extending the build-time blueprint-elaboration system: first-class synthetic-pipe handling, a directive plugin registry, and supporting tooling.
-- **[doctor-output-ansi-under-force-color.md](doctor-output-ansi-under-force-color.md)** — deferred decision: `pipelex doctor` emits ANSI when captured under `FORCE_COLOR` (an env artifact, not a pipelex defect — it's plain when piped without it). Records the evidence and the one optional follow-up (a `--plain`/`--no-color` flag for diagnostics). Low priority. Surfaced by pipelex-worker PR #23.
-- **[structured-validation-errors-deferred-findings.md](structured-validation-errors-deferred-findings.md)** — lower-severity code-review follow-ups on the structured wiring/concept/type `validation_errors[]` work (`feature/Validate-api-render-format`): the missing-`type` (`union_tag_not_found`) categorization gap, dependency-validation fail-fast vs. concept-ref accumulation, qualified same-domain `concept_code`, the source-less `unresolved_pipe_dependency` item, a duplicate-message cleanup, and the `concept_code`-meaning trade-off baked in by the concept-owned fix. All low priority; each a contained pickup.
-- **[pathlib-refactor.workflow.js](pathlib-refactor.workflow.js)** — a runnable multi-agent workflow that refactors filesystem path handling to `pathlib.Path` across `pipelex/` (intended for the `refactor/Paths` branch). Tooling, not a doc.
+## History
 
-## Suggested priorities
+[`history/`](history/) now holds shipped or reference-only material moved out of the active surface:
 
-A pickup order grounded in each doc's own status — adjust to current signals.
-
-1. **[runtime-code-fixes.md](runtime-code-fixes.md)** — smallest and already verified. The `request_id`-on-delivery-failure fix is a quick win; the cross-worker cost-report assembly wiring is the one genuine functional gap (it is also **P1** of the distributed-execution track).
-2. **[distributed-execution/](distributed-execution/)** — the active headline track. Take P1 (cross-worker cost report assembly) first, then the crate phases P2 (local cross-package deps) → P3 (remote deps).
-3. **[webhook-signing.md](webhook-signing.md)** — security-reviewed plan, ready to execute; closes the last open error-handling-companion item. Cross-repo, so coordinate the rollout.
-4. **error-handling long tail** — the metadata-model followups and the `request_id` correlation on delivery error paths in [error-handling/](error-handling/). Mostly landed; these are the remainder.
-5. **[concurrency/](concurrency/)** — pick up when batch-at-scale becomes a priority. Fan-out scheduling and batch partial-failure are coupled (take together); rate limiting is independent.
-6. **[runtime-bridge/](runtime-bridge/)** — tracks PR #969 (in review). The mechanical fixes and design-fork resolutions have landed; the remaining deferred items (notably the half-built-singleton boot-race hardening) can wait for a human decision.
-7. **Deferred / larger / future** — [structured-logging.md](structured-logging.md) (after error-handling merges), [pathlib-refactor.workflow.js](pathlib-refactor.workflow.js) (run when ready), [stuffs-as-nodespec.md](stuffs-as-nodespec.md), the deferred Temporal-exception and schema-reconstruction proposals in [distributed-execution/](distributed-execution/), and [blueprint-elaboration-directives.md](blueprint-elaboration-directives.md). Take individually as needs and signals dictate.
-8. **[mistralai-2x-bump/](mistralai-2x-bump/)** — not a pickup item: the code is done and green, parked on two local branches and blocked on an external dependency (`instructor` shipping mistralai-2.x to PyPI). Revisit only to un-gate when that lands — its README has the procedure.
+- CSV support
+- keyword-only arguments
+- signature-based validation
+- cost-reporting registry work
+- completed test-grind notes
+- completed recursivity handoffs
+- old `archive/` records
+- point-in-time HTML recaps

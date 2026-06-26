@@ -62,7 +62,7 @@ The design deferred these to plan time; resolved here, taking the design's propo
 - [x] `docs/building-methods/pipes/run-modes-and-backends.md`: matrix collapses to one mode axis × two backends; mock inference disappears as a user-facing concept.
 - [x] Purge `--mock-inference` from `docs/features/validation-dry-run.md`, `docs/under-the-hood/dry-run-mock-generation.md`, `docs/building-methods/pipes/executing-pipelines.md`; error pages already regenerated in Phase 3.
 - [x] CHANGELOG `[Unreleased]`: breaking — `--mock-inference` removed; `CogtRunParams.is_mock_inference` → internal `is_mock_usage` DRY sub-flag.
-- [x] wip docs: this plan's checkboxes updated; `wip/registry/deferred-followups.md` "fate of is_mock_inference" item closed; `README.md` updated.
+- [x] wip docs: this plan's checkboxes updated; `wip/history/registry/deferred-followups.md` "fate of is_mock_inference" item closed; `README.md` updated.
 
 ### Phase 7 — Final verification
 
