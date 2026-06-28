@@ -1,8 +1,9 @@
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.bundle_elaborator import BundleElaborator
 from pipelex.core.interpreter.exceptions import BundleElaboratorError, PipelexInterpreterError
@@ -10,9 +11,6 @@ from pipelex.core.interpreter.validation_error_categorizer import PIPELEX_BUNDLE
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-
-if TYPE_CHECKING:
-    from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 
 
 class PipelexInterpreter(BaseModel):
@@ -56,7 +54,16 @@ class PipelexInterpreter(BaseModel):
                 raise PipelexInterpreterError(msg)
         except TomlError as exc:
             msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {exc.message}"
-            raise PipelexInterpreterError(msg) from exc
+            source = str(bundle_path) if bundle_path is not None else mthds_source
+            raise PipelexInterpreterError(
+                msg,
+                validation_errors=[
+                    PipelexBundleBlueprintValidationErrorData(
+                        source=source,
+                        message=msg,
+                    )
+                ],
+            ) from exc
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"

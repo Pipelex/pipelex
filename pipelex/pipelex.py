@@ -56,7 +56,7 @@ from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_manager import ReportingManager
-from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import PipelexConfig
@@ -412,10 +412,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- Libraries & Registries -------------------------------------------------------------
 
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
+        self.reporting_delegate = reporting_delegate or ReportingManager()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
 
