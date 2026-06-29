@@ -17,7 +17,7 @@ The original Step 6 plan called for a `TracingActivityInboundInterceptor` to set
   - `DynamoDBEventLog` — cloud backend (`pipelex/tracing/dynamodb_event_log.py`), schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Available behind `pip install "pipelex[dynamodb]"`.
   - `BufferingEventLog` — in-memory buffer used **inside** Temporal workflow code (`pipelex/tracing/buffering_event_log.py`). Synchronous I/O is forbidden in workflow context, so workflows buffer here and flush via an activity.
   - `InMemoryEventLog` — for tests.
-  - Backend chosen at runtime via `make_event_log(tracing_config)` in `pipelex/tracing/event_log_factory.py` (`TracingBackend.NDJSON | DYNAMODB | TEMPORAL_DYNAMODB`).
+  - Backend chosen at runtime via `make_event_log(tracing_config)` in `pipelex/tracing/event_log_factory.py` (`TracingBackend.NDJSON | DYNAMODB`).
 - **Workflow → activity flush, not interceptor.** `WfPipeRouter.run()` (`pipelex/temporal/tprl_pipe/wf_pipe_router.py`) wires a `BufferingEventLog` into the per-workflow `GraphTracerManager` and into the `ReportingManager` via `set_event_log(context_key=run_id, ...)` — all per-run worker-local state is keyed by `workflow.info().run_id` (replay-stable, unique per run; workflow ids are reused across retry/reset/resubmission). After pipe execution, buffered events are drained and persisted by `act_flush_trace_events` (`pipelex/temporal/tprl_pipe/act_flush_trace_events.py`), which runs the synchronous boto3 / file writes off the workflow thread. Replay determinism (audit finding H1): the flush schedule is a pure function of the payload — gated on `trace_context` presence AND (`emit_graph_events` or DRY run mode), so costs-only LIVE runs (whose buffer is deterministically empty) skip the round-trip while every potentially-non-empty case schedules it (the activity no-ops on an empty list) — and only workflow-thread emissions (inline tracer graph events, dry-run inline usage) land in the buffer — `ReportingManager` routes activity-side usage emissions to the per-process fallback even when the activity is co-located with the workflow worker, so the buffer content and the command stream are pure functions of payload + history.
 - **Per-context keying** — `ReportingManager` holds a dict of `_event_log_contexts` keyed by `graph_context.lookup_key`, so concurrent workflows don't trample each other.
 - **Direct mode unchanged** — `pipeline_run_setup.py:282` calls the same `set_event_log` path, so the same `EventLogProtocol` machinery runs in-process for non-Temporal execution.
@@ -91,7 +91,7 @@ Items related to the event log and graph tracing system that are explicitly out 
 
 | Item | Status | Context |
 |---|---|---|
-| DynamoDB backend | **Shipped** | `pipelex/tracing/dynamodb_event_log.py` (+ `TEMPORAL_DYNAMODB` variant). Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
+| DynamoDB backend | **Shipped** | `pipelex/tracing/dynamodb_event_log.py`. Schema-compatible with `pipelex-api-infra`'s `TraceEventDynamoDBAdapter`. Selected via `[pipelex.tracing] backend = "dynamodb"`. |
 | SQLite backend | **Not planned** — NDJSON + DynamoDB cover the matrix | Not built. Re-evaluate only if a use case appears that NDJSON can't serve and DynamoDB is overkill. |
 
 ### Event log protocol extensions

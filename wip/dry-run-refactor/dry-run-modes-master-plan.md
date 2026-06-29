@@ -19,7 +19,7 @@ Both are the **same `run_mode=DRY`** run; they differ only in **backend** (where
 | | Controllers (nested sub-pipes) | Cogt leaf (LLM/extract/img-gen) | Graph tracing | Result |
 |---|---|---|---|---|
 | **Mode 1 — in-memory activity** | forced **in-process** via `scoped_pipe_router` | forced **inline** via `scoped_content_generator` → mocks in-process | `scoped_event_log(InMemoryEventLog())` → in memory | one activity, zero nested dispatch, zero external I/O |
-| **Mode 2 — full distribution** | hub default = **Temporal router** → child workflows | hub default = **`ContentGeneratorInWorkflow`** → dispatches `act_llm_gen_*`, mocks **inside** the activity | hub default = `temporal_dynamodb` (cross-worker assembly) | real distributed path, no AI spend |
+| **Mode 2 — full distribution** | hub default = **Temporal router** → child workflows | hub default = **`ContentGeneratorInWorkflow`** → dispatches `act_llm_gen_*`, mocks **inside** the activity | hub default = DynamoDB (cross-worker assembly) | real distributed path, no AI spend |
 
 The **only divergence is which content generator / router the run uses** — and both are selected by **per-call ContextVar overrides** (coroutine-local, restore-on-exit), so concurrent runs of different modes on one worker never cross-contaminate. Mode 1 *sets* the overrides; Mode 2 *leaves the hub defaults*. They are additive, not exclusive.
 

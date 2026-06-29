@@ -43,7 +43,7 @@ The key property: the rich Temporal schema (the one with the `temporalio` import
 - `configs.py:14` import of `Temporal` + `configs.py:257` `temporal: Temporal` field → removed.
 - `pipelex.py:206-207` — the only core code reading `config.temporal` (the override) → rewired to `boot_orchestrator`.
 - `--temporal/--no-temporal` flags threaded through: `cli/cli_factory.py`, `cli/commands/validate/{pipe,bundle,method}_cmd.py` + `_validate_core.py`, `cli/commands/run/bundle_cmd.py`, `pipelex.py` setup signatures.
-- `[temporal]` TOML blocks in `pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `.pipelex/pipelex_override.toml`, **and** the kit templates under `pipelex/kit/configs/` (they seed `~/.pipelex`; `make check-config-sync` enforces `.pipelex ↔ kit` parity, so both sides move together). `tracing_config.temporal_dynamodb` is the separate tracing axis and **stays**.
+- `[temporal]` TOML blocks in `pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `.pipelex/pipelex_override.toml`, **and** the kit templates under `pipelex/kit/configs/` (they seed `~/.pipelex`; `make check-config-sync` enforces `.pipelex ↔ kit` parity, so both sides move together). The tracing event-log backend config is a separate axis, untouched by this pass.
 - `config_temporal.py` (the 760-line schema) + the two exceptions it owns (`TemporalConfigError`, `WorkerTaskQueueUnknownError` in `pipelex/system/configuration/exceptions.py`) → moved to `pipelex-temporal`. `pipelex-temporal` already consumes the schema from core (its `temporal_connect`/`temporal_tasks`/`task_manager`/`temporal_task_manager`/`temporal_manager`/`namespace_check` import `pipelex.system.configuration.config_temporal`), so those imports become local.
 
 ## Plan (phased, cross-repo)
@@ -63,7 +63,7 @@ The key property: the rich Temporal schema (the one with the `temporalio` import
 - `PluginsConfig` += `boot_orchestrator: str | None = None`.
 - Remove `temporal: Temporal` field + the `config_temporal` import from `configs.py`.
 - Delete core `config_temporal.py` + the two exceptions from `pipelex/system/configuration/exceptions.py`.
-- Remove every `[temporal]` block from core TOMLs (base + `.pipelex/*` + kit configs); keep `tracing_config.temporal_dynamodb`. Run `make check-config-sync`.
+- Remove every `[temporal]` block from core TOMLs (base + `.pipelex/*` + kit configs); leave the tracing config untouched. Run `make check-config-sync`.
 - Rewire CLI: `--temporal/--no-temporal` → `--orchestrator`; `temporal_enabled` → `boot_orchestrator` through `cli_factory` + `Pipelex.setup()`; the `pipelex.py` override site sets `config.plugins.boot_orchestrator`.
 - Update the Temporal plugin `register` gate → `registrar.config.plugins.boot_orchestrator == self.name`; boot thunks + orchestrators self-load the rich config via the Phase-1 loader.
 - Regenerate error pages (`make gep`) — the two relocated exceptions leave core's error catalog.
@@ -83,7 +83,7 @@ The key property: the rich Temporal schema (the one with the `temporalio` import
 
 ## Deferred (out of scope, follow-ups)
 
-- **Tracing naming axis:** `TracingBackend.TEMPORAL_DYNAMODB`, `TemporalDynamoDBTracingConfig`, `tracing_config.temporal_dynamodb` are string/naming couplings (no `temporalio` import, don't break the build). Whether a fully-externalized Temporal should still have core's tracing system name a `temporal_dynamodb` backend is a separate question — leave for later.
+- **Tracing naming axis (since resolved):** core's tracing system used to expose a Temporal-named event-log backend variant. It has since been removed — `TracingBackend` is now just `NDJSON | DYNAMODB`, and no Temporal-named tracing config remains in core.
 - **Exact `--orchestrator` vocabulary** for force-in-process (`direct` vs `none`) — settled: the flag takes any plugin name; `--orchestrator temporal` boots Temporal, omitting it (or any non-boot-orchestrator name) runs in-process. No sentinel keyword is reserved.
 - **Whether other (inference) plugin config should also leave `PipelexConfig`** — user explicitly scoped this pass to Temporal only.
 
@@ -105,7 +105,7 @@ The key property: the rich Temporal schema (the one with the `temporalio` import
 - `PluginsConfig += boot_orchestrator: str | None = None` (generic gate; absent from `pipelex.toml`, set programmatically).
 - Deleted `pipelex/system/configuration/config_temporal.py` **and** `pipelex/system/configuration/exceptions.py` (its only importer was `config_temporal`); removed `temporal: Temporal` from `PipelexConfig`.
 - CLI: `--temporal/--no-temporal` (`bool|None`) → `--orchestrator` (`str|None`); `temporal_enabled` → `boot_orchestrator` through `cli_factory` → `Pipelex.make`/`setup`; the `pipelex.py` override sets `config.plugins.boot_orchestrator`.
-- Removed every `[temporal]` block from `pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `.pipelex/pipelex_override.toml`, `pipelex/kit/configs/pipelex.toml`; `tracing_config.temporal_dynamodb` stays. `make check-config-sync` green.
+- Removed every `[temporal]` block from `pipelex/pipelex.toml`, `.pipelex/pipelex.toml`, `.pipelex/pipelex_override.toml`, `pipelex/kit/configs/pipelex.toml`; left the tracing config untouched. `make check-config-sync` green.
 - `make gep` regenerated: removed the 2 relocated core exceptions **and** 9 pre-existing stale `pipelex-temporal` flow-error pages (left over from the Phase-5 externalization) — core's error catalog now names no Temporal error.
 
 ### Deviations from the written plan (deliberate)
@@ -119,7 +119,7 @@ The config loader also merges the **global** `~/.pipelex/pipelex.toml`, which wa
 
 ### Headline invariant — verified
 
-Core has **no** `from temporalio... import` anywhere and **no** `temporal` config field. Remaining `temporal` mentions are all out of scope: the intentional `sys.modules.get("temporalio.activity")` *sniff* in `reporting_manager` (a string lookup that explicitly avoids importing — the crash-free-without-temporalio pattern), the execution-mode enum's `requires_pipelex_temporal` mode vocabulary, prose comments/docstrings, and the deferred `temporal_dynamodb` tracing axis. None is a type-check coupling.
+Core has **no** `from temporalio... import` anywhere and **no** `temporal` config field. Remaining `temporal` mentions are all out of scope: the intentional `sys.modules.get("temporalio.activity")` *sniff* in `reporting_manager` (a string lookup that explicitly avoids importing — the crash-free-without-temporalio pattern), the execution-mode enum's `requires_pipelex_temporal` mode vocabulary, and prose comments/docstrings. None is a type-check coupling.
 
 ### Gates (all green)
 
