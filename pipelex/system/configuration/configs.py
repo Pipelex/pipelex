@@ -144,7 +144,7 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_usage: bool
     graph_config: GraphConfig
 
-    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # Bounded fan-out concurrency for PipeBatch (the in-process backpressure pillar, short of a durable execution backend).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 

@@ -79,20 +79,9 @@ TYPER_DECORATOR_ATTRS = frozenset({"command", "callback"})
 #: pytest's ``fixture`` is written both as ``@pytest.fixture`` and as bare ``@fixture`` (``from pytest import fixture``).
 #: Jinja2's ``pass_context`` / ``pass_environment`` / ``pass_eval_context`` mark a filter/test/global whose
 #: wrapped callable is invoked POSITIONALLY by the Jinja2 engine (``{{ x|filter(arg) }}``), so its arguments
-#: cannot be made keyword-only — same framework-entrypoint category as Typer/Temporal/pytest. Written bare
+#: cannot be made keyword-only — same framework-entrypoint category as Typer/pytest. Written bare
 #: (``@pass_context``, ``from jinja2 import pass_context``) or attributed (``@jinja2.pass_context``).
 BARE_FRAMEWORK_DECORATOR_NAMES = frozenset({"fixture", "pass_context", "pass_environment", "pass_eval_context"})
-
-#: Temporal handler decorators matched on their trailing two attribute segments.
-TEMPORAL_DECORATOR_TAILS = frozenset(
-    {
-        ("activity", "defn"),
-        ("workflow", "run"),
-        ("workflow", "signal"),
-        ("workflow", "query"),
-        ("workflow", "update"),
-    }
-)
 
 #: Typer parameter-annotation metadata callables that mark a call-style CLI entrypoint.
 TYPER_ANNOTATION_ATTRS = frozenset({"Argument", "Option"})
@@ -134,19 +123,6 @@ class Violation(NamedTuple):
 # --------------------------------------------------------------------------------------
 
 
-def _attribute_tail(node: ast.expr) -> tuple[str, ...]:
-    """Return the trailing attribute segments of a dotted expression (e.g. ``a.b.c`` -> ``(a, b, c)``)."""
-    segments: list[str] = []
-    current: ast.expr = node
-    while isinstance(current, ast.Attribute):
-        segments.append(current.attr)
-        current = current.value
-    if isinstance(current, ast.Name):
-        segments.append(current.id)
-    segments.reverse()
-    return tuple(segments)
-
-
 def _decorator_matches_carveout(decorator: ast.expr) -> bool:
     """Whether a single decorator expression matches any framework / pydantic carve-out."""
     target: ast.expr = decorator.func if isinstance(decorator, ast.Call) else decorator
@@ -169,14 +145,11 @@ def _decorator_matches_carveout(decorator: ast.expr) -> bool:
     if isinstance(target, ast.Attribute):
         if target.attr in TYPER_DECORATOR_ATTRS:
             return True
-        tail = _attribute_tail(target)
-        if len(tail) >= 2 and tail[-2:] in TEMPORAL_DECORATOR_TAILS:
-            return True
     return False
 
 
 def _has_carveout_decorator(node: ast.FunctionDef | ast.AsyncFunctionDef) -> bool:
-    """Scan the WHOLE decorator stack for a carve-out match (e.g. @activity.defn above @convert_pipelex_errors)."""
+    """Scan the WHOLE decorator stack for a carve-out match (a framework decorator may sit above a custom one)."""
     return any(_decorator_matches_carveout(decorator) for decorator in node.decorator_list)
 
 
