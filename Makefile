@@ -703,10 +703,10 @@ agent-test: env
 # Debug variant of agent-test for when the suite hangs or fails opaquely.
 # Use this instead of agent-test when:
 #   - a prior `make agent-test` hung (or got killed) without a verdict
-#   - failures are integration-temporal with worker crashes / "node down" noise
+#   - failures show xdist worker crashes / "node down" noise
 #   - you need to see what's actually happening during the run
 # Differences vs agent-test:
-#   - pkill stale `pytest` + `temporal-sdk-python` processes first (zombies from
+#   - pkill stale `pytest` processes first (zombies from
 #     prior hung runs compound contention and cause more hangs)
 #   - outer wall-clock `timeout` so fixture-teardown hangs and xdist
 #     worker-replace loops can't run forever (`pytest --timeout` is per-test only)
@@ -724,9 +724,8 @@ agent-test-debug: env
 		echo "  The outer wall-clock cap is the whole point of this target — install before using."; \
 		exit 1; \
 	fi
-	@echo "• Cleaning stale pytest + temporal-sdk-python processes..."
+	@echo "• Cleaning stale pytest processes..."
 	@pkill -9 -f "pytest" 2>/dev/null || true
-	@pkill -9 -f "temporal-sdk-python" 2>/dev/null || true
 	@sleep 1
 	@echo "• Running with outer timeout=$(DEBUG_TIMEOUT)s, log: $(DEBUG_LOG)"
 	@echo "  Live progress: tail -f $(DEBUG_LOG)"
@@ -749,7 +748,7 @@ agent-test-debug: env
 		echo "  Full log: $(DEBUG_LOG)"; \
 		echo "  Tip: grep failures by error class name, not formatted message —"; \
 		echo "       grep -B 2 -A 10 'YourErrorClass' $(DEBUG_LOG)"; \
-		echo "  If failures are integration-temporal with worker crashes, re-run that"; \
+		echo "  If failures show xdist worker crashes ('node down'), re-run that"; \
 		echo "  slice serially: .venv/bin/pytest --timeout=60 -q tests/integration/.../"; \
 		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
 	else \
