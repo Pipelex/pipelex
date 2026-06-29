@@ -353,7 +353,7 @@ class _Collector(ast.NodeVisitor):
         self._in_class_body: tuple[bool, ...] = ()
 
     @override
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # ast visitor naming
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._class_stack = (*self._class_stack, node.name)
         self._in_class_body = (*self._in_class_body, True)
         self.generic_visit(node)
@@ -384,11 +384,11 @@ class _Collector(ast.NodeVisitor):
         self._in_class_body = self._in_class_body[:-1]
 
     @override
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # ast visitor naming
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._visit_function(node)
 
     @override
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # ast visitor naming
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._visit_function(node)
 
 

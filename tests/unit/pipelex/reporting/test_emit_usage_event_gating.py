@@ -176,3 +176,39 @@ class TestEmitUsageEventGating:
         assert isinstance(emitted_event, UsageReportEvent)
         assert emitted_event.pipeline_run_id == "run_fastpath"
         assert emitted_event.writer_id == "fastpath_writer"
+
+    def test_isolated_execution_routes_off_the_registered_fast_path(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Isolated sub-execution (probe True): a usage emission must NOT take the registered fast path.
+
+        Even with a registered context and costs on, an emission from inside an isolated sub-execution
+        (a Temporal activity) routes to the per-process fallback instead of the workflow's registered
+        buffer — the buffer must stay a pure function of inline execution for replay determinism (audit
+        H1). Asserts the registered context is skipped AND the event lands in the per-process log.
+        """
+        ActivityEventLogCache.reset_for_tests()
+        _enable_ndjson_tracing(mocker, tmp_path)
+        mocker.patch("pipelex.reporting.reporting_manager.is_in_isolated_execution", return_value=True)
+
+        manager = ReportingManager()
+        manager.setup()
+        trace_context = _make_trace_context("run_isolated", emit_usage_events=True, emit_graph_events=True)
+
+        event_log_spy = mocker.MagicMock()
+        event_log_spy.writer_id = "registered_writer"
+        event_log_spy.next_sequence.return_value = 0
+        manager.set_event_log(
+            context_key=trace_context.lookup_key,
+            event_log=event_log_spy,
+            workflow_id="wf_run_isolated",
+            pipeline_run_id="run_isolated",
+        )
+
+        manager.report_inference_job(_make_llm_job("run_isolated", trace_context=trace_context))
+
+        # Registered fast path skipped; the event lands in the per-process fallback (writer act_*).
+        event_log_spy.emit.assert_not_called()
+        reader = NdjsonEventLog(traces_dir=str(tmp_path))
+        usage_events = [evt for evt in reader.read_events("run_isolated") if isinstance(evt, UsageReportEvent)]
+        assert len(usage_events) == 1
+        assert usage_events[0].writer_id.startswith("act_")
+        ActivityEventLogCache.reset_for_tests()
