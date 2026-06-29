@@ -1,13 +1,13 @@
 ---
 title: "Error Model"
-description: "How Pipelex classifies, carries, and reports errors — the ErrorReport schema, inference error categories, error domains, the layer model, worker classification, and the Temporal error bridge."
+description: "How Pipelex classifies, carries, and reports errors — the ErrorReport schema, inference error categories, error domains, the layer model, worker classification, and how classification survives a distributed worker boundary."
 ---
 
 # Error Model
 
-In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, the Temporal retry engine, and the HTTP adapter picking a status code.
+In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, a distributed worker's retry engine, and the HTTP adapter picking a status code.
 
-This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it crosses the Temporal boundary.
+This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it survives serialization across a distributed worker boundary.
 
 ---
 
@@ -22,7 +22,7 @@ Three rules hold across the codebase, and everything else builds on them.
 **No broad catches in business logic.** `except Exception` is allowed only at CLI entry points and async task roots. Ruff rule `BLE001` enforces this — an unexpected exception crashes loudly instead of being silently swallowed.
 
 !!! info "Why classify, instead of just propagating the exception?"
-    A raw `openai.RateLimitError` tells a Python `except` clause what to catch, but it does not tell the Temporal retry engine whether to retry, the HTTP adapter which status to emit, or an agent whether the failure is the user's fault. Classification turns an exception into a decision input that every consumer can act on uniformly.
+    A raw `openai.RateLimitError` tells a Python `except` clause what to catch, but it does not tell a distributed worker's retry engine whether to retry, the HTTP adapter which status to emit, or an agent whether the failure is the user's fault. Classification turns an exception into a decision input that every consumer can act on uniformly.
 
 ---
 
@@ -93,7 +93,7 @@ report.http_status       # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
-    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy. `recover_error_report()` catches the `ValidationError` and synthesizes an `UnrecoverableWorkflowFailureError` fallback (carrying the recovered message plus an `[error report failed schema validation]` marker) so failure-webhook delivery stays intact; the workflow still fails afterwards, keeping the contract bug visible. Any other caller of `from_dict()` should treat the validation failure as a bug to fix.
+    `from_dict()` rejects unknown keys, so it is the strict inverse of `to_dict()`. A report dict that crosses a serialization boundary and fails validation on the way back is an internal contract bug — the writer and the reader share the schema within one deploy. A cross-boundary recovery helper that rebuilds a report (e.g. a distributed-worker bridge) is expected to catch that `ValidationError` and synthesize a fallback report so failure-webhook delivery stays intact while keeping the contract bug visible; any other caller of `from_dict()` should treat the validation failure as a bug to fix.
 
 ---
 
@@ -197,7 +197,7 @@ class ProviderErrorMetadata(BaseModel):
 ```
 
 !!! warning "`body` is excluded from serialization"
-    The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, Temporal details.
+    The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, and any serialized worker payload.
 
 `UserAction` pairs a discrete `UserActionKind` (`WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`) with a free-form `detail` string — so the CLI can render consistent guidance while keeping provider-specific text.
 
@@ -242,53 +242,21 @@ A wrapper keeps its own `error_type` and `message` but inherits every classifica
 
 ---
 
-## The Temporal Error Bridge
+## Crossing a Distributed Worker Boundary
 
-When a pipe runs on a Temporal worker, the error must survive serialization across the **activity → workflow → submitter** boundary. Temporal's default failure converter would wrap a raw `PipelexError` without packing the `ErrorReport` or deriving the retry decision. The bridge closes that gap.
+The error model is built to survive serialization. Because `ErrorReport` round-trips through `to_dict()` / `from_dict()`, a failure that happens on a remote worker can reach the submitting process with its full classification intact — not just a message string.
 
-### Activity Side — `convert_pipelex_errors`
+The runtime itself stays transport-agnostic: the machinery that carries an error across a worker boundary ships in the **host-runtime plugin** for each distributed backend, not in core. A backend plugin is responsible for three things.
 
-A decorator applied beneath `@activity.defn` on every in-scope activity converts a `PipelexError` into a `TemporalError`.
+**Packing.** Convert a `PipelexError` into the transport's failure type and stash `to_error_report().to_dict()` in its details payload, so worker and submitter code keep the full classification rather than a bare message. The same step derives the transport's retry decision from `InferenceErrorCategory.is_retryable`.
 
-```python
-@activity.defn
-@convert_pipelex_errors
-async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    return await llm_gen_text(llm_assignment=llm_assignment)
-```
+**Recovering.** On the submitter side, walk the returned failure, pull the packed dict, and rebuild the `ErrorReport`. Recovery is **total**: when no report dict is found — a non-Pipelex exception, a worker crash, a timeout — the plugin synthesizes a fallback report so the recovery path always has structured classification to surface.
 
-`TemporalError.from_message_exception()` does two things:
+**A fail-safe floor.** Ensure a domain error that escapes the conversion path fails the unit of work *terminally* rather than hanging. In a durable-execution system the default for an unconverted exception is often the most dangerous behavior available (retry forever), so "convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
 
-- **Derives `non_retryable`** from `InferenceErrorCategory.is_retryable` for category-carrying errors. (The configured `non_retryable_error_types` class-name list is the fallback for category-less exceptions.)
-- **Packs the report** — `to_error_report().to_dict()` goes into `ApplicationError.details`, so workflow code keeps the full classification, not just a message string.
+**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging.
 
-### Submitter Side — `recover_error_report`
-
-Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`. It is **total** — callers in the error-recovery path always get a structured report.
-
-```python
-def recover_error_report(exc: BaseException) -> ErrorReport:
-    report_dict = _find_error_report_dict(exc)
-    if report_dict is not None:
-        return ErrorReport.from_dict(report_dict)
-    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
-```
-
-When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is also synthesized into the same `UnrecoverableWorkflowFailureError` fallback — carrying the recovered message plus an `[error report failed schema validation]` marker — so the failure webhook still fires; the workflow still fails afterwards, keeping the contract bug visible.
-
-The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
-
-### Workflow-Level Fail-Safe Floor
-
-The activity bridge converts every error that crosses an *activity* boundary. But a `PipelexError` raised **inline in workflow code** — an operator that runs its leaf inline instead of dispatching it as an activity, or an inline setup error — is neither an `ActivityError` nor an `ApplicationError`. Temporal's default for an unhandled exception in workflow code that is *not* a recognized failure type is to treat it as a **workflow-task failure** and retry the task indefinitely (bounded only by the workflow execution timeout). That is the single worst outcome a durable-execution system can produce: invisible, resource-consuming, and surfaced only after ~the timeout as a generic timeout error rather than the real cause. The fail-safe floor closes that hole on two levels:
-
-- **Workflow-level catch-all (rich path).** `WfPipeRouter.run()` and `WfPipeRun.run()` each end their boundary handling with an `except PipelexError` clause. `WfPipeRouter` converts a genuine inline error to a terminal `TemporalError` via `from_message_exception` (same conversion the activity bridge does — the structured report rides in `ApplicationError.details`). `WfPipeRun` routes it through its deferred-delivery path so the FAILED webhook still fires, then chains a details-carrying `TemporalError` so the classification also survives to the submitter. The catch-all only converts *genuine* inline errors: an escaping `PipelexError` that already carries a Temporal failure in its `__cause__` chain (e.g. a nested child-dispatch that already wrapped a sub-pipe failure as `WorkflowExecutionError`) is already terminal and recoverable, so it propagates untouched rather than being flattened to a generic report.
-
-- **Worker-level floor (belt-and-suspenders).** The worker registers `workflow_failure_exception_types=[WorkflowExecutionError, PipelexError]`. Any domain error that slips past the catch-alls still fails the workflow **terminally** instead of hanging — degrading to a synthesized `UnrecoverableWorkflowFailureError` report (message preserved, classification floored) rather than a silent retry loop. The scope is deliberately `PipelexError`, not `Exception`: genuinely transient Temporal/infra errors and deterministic-replay glitches are not domain errors, and workflow-task retry is the *correct* behavior for them — so they keep Temporal's default.
-
-The rule of thumb: in a durable-execution system the default for "unexpected exception in business logic inside a workflow" is the most dangerous behavior available (retry forever), so "we convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
-
-**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes inline fails loud and bounded instead of hanging.
+See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boundary these converters span; the per-backend converters themselves live in the host-runtime plugins.
 
 ---
 
@@ -331,7 +299,7 @@ A downstream FastAPI exception handler calls `ErrorReport.http_status` and is a 
 
 ### Inputs and Outputs
 
-**Inputs.** `to_error_report()` takes a live `PipelexError`. `recover_error_report()` takes any `BaseException` and walks its `__cause__` chain. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift.
+**Inputs.** `to_error_report()` takes a live `PipelexError`. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift. (A distributed-worker bridge adds a cross-boundary recovery helper that walks a returned failure's `__cause__` chain and rebuilds the report; it lives in the host-runtime plugin, not core.)
 
 **Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(...)` — code 1 by default, or the validate surface's 0/1/2 policy (see [Validate exit-code policy](#validate-exit-code-policy-0-1-2)).
 
@@ -354,8 +322,8 @@ flowchart TB
     REPORT --> AGENT["Agent CLI<br/>JSON / Markdown"]
     REPORT --> HTTP["HTTP adapters<br/>.http_status"]
 
-    W -.->|"@convert_pipelex_errors"| TEMP["Temporal bridge<br/>TemporalError → ApplicationError.details"]
-    TEMP -.->|"recover_error_report()"| REPORT
+    W -.->|"pack on worker"| TEMP["Distributed worker bridge (plugin)<br/>report packed into transport details"]
+    TEMP -.->|"recover on submitter"| REPORT
 
     classDef src fill:#fff3e0,stroke:#e65100,color:#000
     classDef cls fill:#e8eaf6,stroke:#3949ab,color:#000
@@ -417,7 +385,6 @@ report.error_category                   # "transient" / "capacity" / ...
 
 # Round-trip across a boundary
 ErrorReport.from_dict(payload)           # strict inverse of to_dict()
-recover_error_report(temporal_failure)   # walk __cause__ for an ApplicationError
 
 # Retry decision
 InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
@@ -436,9 +403,6 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
-| `pipelex_temporal/tprl/temporal_error.py` *(in the closed `pipelex-temporal` plugin)* | `TemporalError`, `from_message_exception`, `recover_error_report` |
-| `pipelex_temporal/tprl/activity_error_boundary.py` *(plugin)* | `convert_pipelex_errors` decorator |
-| `pipelex_temporal/tprl/workflow_caller.py` *(plugin)* | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
 
@@ -454,8 +418,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment |
-| Failure on a Temporal worker | `ErrorReport` recovered from `ApplicationError.details` — same classification as local |
-| Worker exception with no `ErrorReport` | Synthesized `UnrecoverableWorkflowFailureError` report — `error_domain = RUNTIME` |
+| Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
+| Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
 
 ---
 

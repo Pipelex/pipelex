@@ -70,7 +70,7 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing Config (event log for distributed tracing across Temporal workers)
+# Tracing Config (event log for distributed tracing across workers)
 ####################################################################################################
 
 [pipelex.tracing_config]

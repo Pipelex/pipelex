@@ -38,7 +38,6 @@ CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {"teleme
 GIT_IGNORED_CONFIG_DIRS: frozenset[str] = frozenset(
     {
         "storage",
-        "temporal-payload-store",
         "traces",
     }
 )
