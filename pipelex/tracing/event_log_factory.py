@@ -29,12 +29,3 @@ def make_event_log(tracing_config: TracingConfig, *, writer_id: str = "primary")
                 region=tracing_config.dynamodb.region,
                 writer_id=writer_id,
             )
-        case TracingBackend.TEMPORAL_DYNAMODB:
-            if tracing_config.temporal_dynamodb is None:
-                msg = "temporal_dynamodb config is required when backend is 'temporal_dynamodb'"
-                raise PipelexConfigError(msg)
-            return DynamoDBEventLog(
-                table_name=tracing_config.temporal_dynamodb.table_name,
-                region=tracing_config.temporal_dynamodb.region,
-                writer_id=writer_id,
-            )
