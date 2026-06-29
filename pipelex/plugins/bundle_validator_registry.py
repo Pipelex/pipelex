@@ -2,10 +2,9 @@
 
 A bundle validator produces a validation verdict for one orchestration mode, the way an
 orchestrator runs a pipe for one mode. The seam is generic across orchestrators: the
-core ``direct`` plugin contributes the in-process validator (``"direct"``), the external
-``pipelex-temporal`` plugin contributes the worker-dispatched validator (under
-``"temporal"``), and a Mistral validator can slot in later — none of which core or a
-host runtime names.
+core ``direct`` plugin contributes the in-process validator (``"direct"``), and an
+external orchestrator plugin can contribute a worker-dispatched validator under its own
+mode token — which core never names.
 
 Verdict-as-value (not raise): ``validate_bundles`` *returns* the verdict — the valid
 report (a ``ValidationReport``) or the invalid ``ErrorReport`` (carrying
@@ -49,13 +48,13 @@ class BundleValidatorProtocol(Protocol):
     """How ``/validate`` produces a verdict under one orchestration mode.
 
     A validator plugin registers one of these per ``orchestration_mode`` token it serves
-    (``"direct"`` in core; ``"temporal"`` from ``pipelex-temporal``;
-    ``"mistralai-workflows"`` later). The API resolves the mode and dispatches through the
-    ``BundleValidatorRegistry`` instead of branching on a backend. Validation is inherently
-    blocking, so there is no ``delivery`` axis here (unlike ``OrchestratorProtocol.run``).
+    (``"direct"`` in core; external orchestrator plugins register their own tokens). The
+    API resolves the mode and dispatches through the ``BundleValidatorRegistry`` instead
+    of branching on a backend. Validation is inherently blocking, so there is no
+    ``delivery`` axis here (unlike ``OrchestratorProtocol.run``).
 
     ``library_dirs`` is host context the in-process arm needs to load the method library;
-    a dispatched arm (Temporal) ignores it — its worker loads its own library.
+    a worker-dispatched arm ignores it — its worker loads its own library.
     """
 
     async def validate_bundles(

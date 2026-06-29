@@ -205,30 +205,6 @@ class TestCheckKeywordOnly:
         )
         assert violations == []
 
-    def test_carveout_temporal_activity_defn_in_stack_skipped(self) -> None:
-        """@activity.defn anywhere in the decorator stack is skipped (scan whole stack)."""
-        violations = _violate(
-            """
-            @activity.defn
-            @convert_pipelex_errors
-            def act_render(job, context, options):
-                ...
-            """
-        )
-        assert violations == []
-
-    def test_carveout_workflow_run_skipped(self) -> None:
-        """@workflow.run is skipped."""
-        violations = _violate(
-            """
-            class MyWorkflow:
-                @workflow.run
-                async def run(self, request, options):
-                    ...
-            """
-        )
-        assert violations == []
-
     def test_carveout_pytest_fixture_skipped(self) -> None:
         """@pytest.fixture is skipped."""
         violations = _violate(

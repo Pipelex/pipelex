@@ -62,6 +62,7 @@ class HubSlot(StrEnum):
     PIPE_ROUTER = "pipe_router"
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
+    ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
 
 
 class PluginOrigin(StrEnum):
@@ -221,6 +222,9 @@ class PluginRegistrar:
 
     def claim_task_manager(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.TASK_MANAGER, factory=factory)
+
+    def claim_isolated_execution_probe(self, factory: Callable[[], Any]) -> None:
+        self._claim(slot=HubSlot.ISOLATED_EXECUTION_PROBE, factory=factory)
 
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)

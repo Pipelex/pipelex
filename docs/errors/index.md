@@ -20,5 +20,5 @@ the error came from:
 - [Inference & providers](inference-and-providers.md) — Inference (Cogt), Provider plugins.
 - [Platform & tooling](platform-and-tooling.md) — Base & root errors, Tools, Kit, System & configuration, CLI.
 
-See [Error Model](../under-the-hood/error-model.md) for the underlying contract,
-classification rules, and the cross-boundary Temporal bridge.
+See [Error Model](../under-the-hood/error-model.md) for the underlying contract
+and classification rules.

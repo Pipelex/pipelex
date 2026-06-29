@@ -6,11 +6,13 @@ class AsyncExecutionNotEnabledError(PipelexError):
     """Raised when a route that depends on asynchronous execution is hit on a
     deployment that does not have an async execution backend enabled.
 
-    Backend-neutral on purpose: the same condition can be produced today by a
-    Temporal-backed runner finding ``[temporal] is_enabled = false`` and will be
-    produced by other async backends (e.g. Mistral Workflows) as support lands.
-    The class name, title, and detail therefore talk about *async execution* as
-    a capability of the deployment, not about any specific backend brand.
+    Backend-neutral on purpose, and it lives in core precisely because it is the
+    shared contract between the runner API — which maps it to an HTTP status (501)
+    — and any async-execution backend plugin that raises it: the Temporal plugin
+    today, other async backends (e.g. Mistral Workflows) as support lands. Core
+    itself never raises it. The class name, title, and detail therefore talk about
+    *async execution* as a capability of the deployment, not about any specific
+    backend brand.
 
     ``error_domain = CONFIG`` because the caller's request is well-formed; what
     is missing is server-side configuration. The pipelex-api layer maps this
@@ -31,9 +33,11 @@ class AsyncExecutionNotEnabledError(PipelexError):
 
     @classmethod
     def with_default_message(cls) -> "AsyncExecutionNotEnabledError":
-        """Construct with the canonical backend-neutral message used by the
-        facade-level dispatch guard (``with_conditional_worker``) and the
-        lower-level ``WorkflowExecutor.temporal_client()`` boundary.
+        """Construct with the canonical backend-neutral message.
+
+        Raised by an async-execution backend plugin at its dispatch /
+        client-acquisition boundary (e.g. the Temporal plugin) to refuse a request
+        that needs async execution when no such backend is enabled.
         """
         return cls(cls.DEFAULT_MESSAGE)
 

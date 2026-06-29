@@ -404,7 +404,6 @@ _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     # Execution & runtime
     ("pipe_run", "execution-and-runtime", "Pipe execution"),
     ("pipeline", "execution-and-runtime", "Pipeline execution"),
-    ("temporal", "execution-and-runtime", "Temporal execution"),
     ("runtime_bridge", "execution-and-runtime", "Runtime bridge"),
     ("graph", "execution-and-runtime", "Graph"),
     ("tracing", "execution-and-runtime", "Tracing"),
@@ -539,8 +538,8 @@ def render_index_page(by_subsystem: dict[str, list[type[PipelexError]]]) -> str:
     lines.extend(
         [
             "",
-            "See [Error Model](../under-the-hood/error-model.md) for the underlying contract,",
-            "classification rules, and the cross-boundary Temporal bridge.",
+            "See [Error Model](../under-the-hood/error-model.md) for the underlying contract",
+            "and classification rules.",
             "",
         ]
     )

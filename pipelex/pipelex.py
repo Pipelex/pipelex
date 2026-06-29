@@ -456,6 +456,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if task_manager_factory is not None:
             task_manager_factory()
 
+        # --- Isolated-execution probe ----------------------------------------------------------
+        # Claimed only by a boot-orchestrator plugin whose runtime has a replay/activity split (e.g. a
+        # Temporal worker): the thunk resolves the ambient predicate that reports whether the current
+        # call runs inside an isolated sub-execution (an activity). ReportingManager consults it to
+        # route an activity-side usage emission to the per-process log instead of the workflow's
+        # registered buffer (audit H1). Unclaimed (any in-process boot), the fresh hub's default
+        # reports "never isolated", so no wiring is needed here.
+        isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
+        if isolated_execution_probe_factory is not None:
+            self.pipelex_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
+
         # --- Pipe Router -----------------------------------------------------------------------
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
 

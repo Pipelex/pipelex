@@ -38,7 +38,7 @@ _PRE_REQUEST_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
     httpx.PoolTimeout,
 )
 # The OpenAI / Anthropic SDKs honor Retry-After only up to ~60s, then fall back to backoff; match
-# that boundary — a longer wait is the Temporal line, not something to chase in direct mode.
+# that boundary — a longer wait is the durable-execution track's job, not something to chase in direct mode.
 _MAX_RETRY_AFTER_SECONDS: float = 60.0
 
 # Full-jitter exponential backoff: each wait is drawn from uniform(0, exponential_bound) so

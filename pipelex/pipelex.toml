@@ -341,7 +341,7 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing config (event log for distributed tracing across Temporal workers)
+# Tracing config (event log for distributed tracing across workers)
 ####################################################################################################
 
 [pipelex.tracing_config]
@@ -352,10 +352,6 @@ backend = "ndjson"
 traces_dir = ".pipelex/traces"
 
 [pipelex.tracing_config.dynamodb]
-table_name = ""
-region = ""
-
-[pipelex.tracing_config.temporal_dynamodb]
 table_name = ""
 region = ""
 
