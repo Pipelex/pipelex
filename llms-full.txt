@@ -1880,7 +1880,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Distributed Execution](distributed-execution.md)**
 
-    Run methods as durable workflows on Temporal with your own workers, with a managed Mistral Workflows backend coming soon. Per-activity routing, named runtime profiles, and dashboard observability on the Temporal backend.
+    Run the same methods as durable workflows on a Temporal or Mistral Workflows backend, [delivered through the Pipelex platform](https://pipelex.com/products#durable-execution). Per-activity routing, named runtime profiles, and dashboard observability.
 
 -   **[Telemetry & Observability](telemetry.md)**
 
@@ -2524,7 +2524,7 @@ List specific pipe codes in `pipelex.dry_run_config.allowed_to_fail_pipes` so dr
 
 For configuration details, see [Dry Run Configuration](../configuration/config-pipeline-validation/dry-run-config.md).
 
-Dry run is one of two run modes (live, dry run), each of which works in-process or distributed on Temporal — see [Run Modes & Backends](../building-methods/pipes/run-modes-and-backends.md) for the full matrix.
+Dry run is one of two run modes (live, dry run), each of which works in-process or distributed on a durable backend — see [Run Modes & Backends](../building-methods/pipes/run-modes-and-backends.md) for the full matrix.
 
 
 ## Telemetry & Observability
@@ -2660,7 +2660,6 @@ Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environmen
 - **[Telemetry](../configuration/config-practical/telemetry-config.md)** — Observability settings
 - **[Reporting](../configuration/config-practical/reporting-config.md)** — Cost tracking and reports
 - **[Dry Run](../configuration/config-pipeline-validation/dry-run-config.md)** — Mock generation settings
-- **[Features](../configuration/config-advanced/feature-config.md)** — Feature flags
 
 For full configuration reference, see [Configuration](../configuration/index.md).
 
@@ -5577,7 +5576,10 @@ Pipelex separates **what the inference leaves do** (the run mode) from **where t
 | Backend | Trigger | What runs where |
 |---|---|---|
 | **Direct** (default) | — | Everything in your process |
-| **Temporal** | `--temporal`, or config `[temporal] is_enabled = true` | Controllers as child workflows, inference leaves as activities on workers |
+| **Temporal** | `--orchestrator temporal`, or config `plugins.boot_orchestrator = "temporal"` | Controllers as child workflows, inference leaves as activities on workers |
+
+!!! info "Durable backends are a commercial capability"
+    The Temporal backend is part of Pipelex's [durable & distributed execution offer](https://pipelex.com/products#durable-execution) — the [Temporal backend](https://pipelex.com/products#temporal) is delivered through the Pipelex platform. The `--orchestrator <name>` flag (and its `plugins.boot_orchestrator` config equivalent) boots the process under the named orchestrator plugin; omit it for in-process execution.
 
 The run mode rides across the wire with every inference job, so the backend never changes *what* a leaf does — only *where* it does it. In particular, when you run a **pipeline** in dry mode on Temporal, the real inference activities are still dispatched and mock **inside** them on the worker. That's by design: it lets you test the entire distribution machinery — dispatch, scheduling, serialization, task-queue routing, cross-worker graph tracing — with zero AI spend and no credentials.
 
@@ -5600,10 +5602,10 @@ pipelex run bundle my_bundle.mthds
 pipelex run bundle my_bundle.mthds --dry-run --mock-inputs
 
 # Live + Temporal
-pipelex run bundle my_bundle.mthds --temporal
+pipelex run bundle my_bundle.mthds --orchestrator temporal
 
 # Dry run + Temporal — dispatches real activities, mocks inside them
-pipelex run bundle my_bundle.mthds --temporal --dry-run --mock-inputs
+pipelex run bundle my_bundle.mthds --orchestrator temporal --dry-run --mock-inputs
 ```
 
 From Python, the same knobs live on the runner — the backend comes from config:
@@ -5623,10 +5625,10 @@ response = await runner.execute_pipeline()
 
 `pipelex validate` (see the [validate commands](../../tools/cli/validate.md)) combines static validation with a dry run of every pipe. It relates to the matrix in two specific ways:
 
-- **The CLI sweep always runs in-process**, even when Temporal is enabled. The `--temporal` flag on `pipelex validate` exists precisely to verify that: it flips the boot config so you can confirm a validation sweep does not dispatch anything under a Temporal-enabled setup.
-- **The runner API's `/validate` route ships the sweep to a worker — as one activity**: with Temporal enabled, it offloads the *whole* sweep as a single activity (`act_dry_validate`, wrapped in the `WfDryValidate` workflow). Inside that activity, the pipe router and the content generator are scoped to their in-process variants, so nothing nested is dispatched: every dry run in the sweep behaves exactly like the dry × direct cell of the matrix, just hosted on a worker instead of your machine. The per-pipe statuses plus the execution graph come back in one round-trip. See [Temporal integration](../../under-the-hood/temporal-integration.md) for the mechanics.
+- **The CLI sweep always runs in-process**, even when Temporal is enabled. The `--orchestrator temporal` flag on `pipelex validate` exists precisely to verify that: it boots validation under the orchestrator plugin so you can confirm a validation sweep does not dispatch anything under a Temporal-enabled setup.
+- **The runner API's `/validate` route ships the sweep to a worker — as one activity**: with Temporal enabled, it offloads the *whole* sweep as a single activity (`act_dry_validate`, wrapped in the `WfDryValidate` workflow). Inside that activity, the pipe router and the content generator are scoped to their in-process variants, so nothing nested is dispatched: every dry run in the sweep behaves exactly like the dry × direct cell of the matrix, just hosted on a worker instead of your machine. The per-pipe statuses plus the execution graph come back in one round-trip. See [Runtime Bridge & Transport](../../under-the-hood/runtime-bridge-and-transport.md) for how a job crosses the worker boundary.
 
-This is not a contradiction of "the run mode never changes the backend" — it's the same leaf-mock foundation with a different *backend choice* for the nested work. A `--temporal --dry-run` pipeline run picks the Temporal backend all the way down, fanning out for real to test the distribution machinery. A Temporal validation sweep picks the Temporal backend for exactly one hop (get the sweep onto a worker) and the in-process backend for everything inside, because its goal is a cheap interactive answer, not distribution testing. Two deliberate opposites built from the same parts.
+This is not a contradiction of "the run mode never changes the backend" — it's the same leaf-mock foundation with a different *backend choice* for the nested work. A `--orchestrator temporal --dry-run` pipeline run picks the Temporal backend all the way down, fanning out for real to test the distribution machinery. A Temporal validation sweep picks the Temporal backend for exactly one hop (get the sweep onto a worker) and the in-process backend for everything inside, because its goal is a cheap interactive answer, not distribution testing. Two deliberate opposites built from the same parts.
 
 ## Forced Dry Mode
 
@@ -13129,57 +13131,6 @@ pipelex show pipe YOUR_PIPE_CODE
 - [Packages](../../building-methods/packages.md) - Organizing methods into packages
 
 
-## Feature
-
-# Feature Configuration
-
-The `FeatureConfig` class controls which features are enabled in Pipelex.
-
-## Configuration Options
-
-```python
-class FeatureConfig(ConfigModel):
-    is_reporting_enabled: bool
-```
-
-### Fields
-
-- `is_reporting_enabled`: When true, enables the reporting system
-
-## Impact on Dependency Injection
-
-The feature flags directly affect which implementation is used for certain components:
-
-| Feature Flag | When True | When False |
-|--------------|-----------|------------|
-| `is_reporting_enabled` | `ReportingManager` | `ReportingNoOp` |
-
-## Feature Details
-
-### Reporting
-
-```toml
-is_reporting_enabled = true
-```
-
-- Controls whether reporting functionality is enabled
-- When enabled, generates the cost report of the pipelex execution (LLM costs, OCR costs, etc...)
-- Default: `true`
-
-## Example Configuration
-
-```toml
-[pipelex.feature_config]
-# Enable reporting for cost monitoring
-is_reporting_enabled = true
-```
-
-## Related Documentation
-
-- [Cost Tracking](../../features/cost-tracking.md) - Track and monitor AI usage costs
-- [Reporting Config](../config-practical/reporting-config.md) - Detailed reporting configuration options
-
-
 ## plxt (Formatter & Linter)
 
 # plxt (Formatter & Linter)
@@ -13649,15 +13600,6 @@ hub.set_reporting_delegate(MyReportingDelegate())
 # ... and so on for other components
 ```
 
-## NoOp Implementations
-
-Some components have "NoOp" (No Operation) implementations that are used when the feature is disabled:
-
-- `ReportingNoOp`: Used when reporting is disabled
-- `ActivityManagerNoOp`: Used when activity tracking is disabled
-
-These NoOp implementations implement the same protocol but do nothing, allowing the system to function without the specific feature.
-
 ## Protocol Compliance
 
 All custom implementations MUST:
@@ -13668,14 +13610,6 @@ All custom implementations MUST:
 4. Handle errors appropriately
 5. Clean up resources when needed
 
-## Feature Flags
-
-Some components are controlled by feature flags in the configuration:
-
-- `is_reporting_enabled`: Controls Reporting system
-
-When a feature is disabled, the corresponding NoOp implementation is used automatically.
-
 ## Available Injectable Components
 
 Pipelex supports injection of the following components:
@@ -13683,7 +13617,8 @@ Pipelex supports injection of the following components:
 **Reporting Delegate** (`ReportingManager`)
 
 - Protocol: `ReportingProtocol`
-- Default: `ReportingManager` or `ReportingNoOp` if disabled
+- Default: `ReportingManager`
+- No-op option: inject `ReportingNoOp` to disable reporting explicitly
 - [Details](reporting-delegate-injection.md)
 
 **Secrets Provider** (`EnvSecretsProvider`)
@@ -13987,15 +13922,16 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
-- **Distributed Content Generation** - How dynamic classes and large payloads cross Temporal boundaries
+- **Runtime Bridge & Transport** - The backend-neutral seam that carries a pipe run across process boundaries — boundary DTOs, LibraryCrate propagation, deferred hydration, and per-call isolation
+- **Content Generation Across Boundaries** - How dynamic classes and large payloads cross a worker boundary
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
 !!! info "Not Required for Using Pipelex"
     You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
-!!! tip "Looking for Temporal deployment and operations?"
-    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
+!!! tip "Looking for distributed execution?"
+    For running Pipelex methods as durable, distributed workflows, see the user-facing [Distributed Execution](../distributed-execution/index.md) overview. The pages below cover the runtime mechanics that make distributed execution work under the hood.
 
 ---
 
@@ -14012,8 +13948,8 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
 - [:material-alert-circle-outline: Error Model](./error-model.md){ .md-button }
-- [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
-- [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
+- [:material-transit-connection-variant: Runtime Bridge & Transport](./runtime-bridge-and-transport.md){ .md-button }
+- [:material-swap-horizontal: Content Generation Across Boundaries](./distributed-content-generation.md){ .md-button }
 
 
 
@@ -17210,7 +17146,7 @@ This ensures the fix targets the same directory where the issue was found — if
 
 # Pipe Routing & Execution
 
-Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime today is your own Temporal workers ([Pipelex on Temporal](../distributed-execution/temporal/index.md)); a managed Mistral Workflows backend (also built on Temporal) is coming soon. Both reach pipe execution through the same framework-agnostic runtime bridge.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime is a durable backend — Temporal-backed execution or a Mistral Workflows integration — delivered through the Pipelex platform (see [Distributed Execution](../distributed-execution/index.md)). Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -17224,7 +17160,7 @@ Pipelex runs pipes either **direct** (single-process) or **distributed** on a ho
 ---
 
 !!! note "The runtime bridge"
-    Both distributed paths go through the framework-agnostic runtime bridge (`pipelex/runtime_bridge/`). Its `primitives/` layer is shared by `pipelex.temporal` and the in-development Mistral Workflows host package: it classifies controller pipes as child workflows and leaf operators as activities (`pipe_classification.py`), hydrates working memory, flushes trace events, and delivers results in a host-neutral way. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
+    Both distributed paths reach pipe execution through the framework-agnostic runtime bridge. The open `pipelex/runtime_bridge/` keeps the boot, serialization, mode/delivery, and worker-side hydration (`primitives/hydration.py`) pieces; the cross-process **dispatch** primitives — classifying controller pipes as child workflows and leaf operators as activities (`pipe_classification`), flushing trace events (`trace_flush`), and delivering results (`delivery`) — were extracted into the closed `pipelex-transport` library, which both commercial host-runtime plugins import. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 
@@ -17233,7 +17169,7 @@ Pipelex runs pipes either **direct** (single-process) or **distributed** on a ho
 Every pipe execution — regardless of mode — follows the same pattern:
 
 1. **Setup**: `pipeline_run_setup()` loads the library, resolves the pipe, initializes working memory, and creates a `PipeJob`
-2. **Route**: A router (`PipeRouter` or `PipeRouterTop`) receives the PipeJob and dispatches it
+2. **Route**: A router (`PipeRouter` for direct mode, or the booted orchestrator's distributed router) receives the PipeJob and dispatches it
 3. **Execute**: The pipe's `run_pipe()` method runs, potentially resolving and executing child pipes
 
 The `PipeJob` is the universal unit of execution. It carries everything needed to run a single pipe.
@@ -17254,7 +17190,7 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 | `output_name` | `str \| None` | Override for the output variable name |
 | `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |
 
-`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For Temporal dispatch, `prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
+`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, a transport-prep step in the closed `pipelex-transport` library moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
 ---
 
@@ -17288,7 +17224,7 @@ These dynamically-generated classes become the `content` type of `Stuff` objects
 
 ## Direct Execution
 
-In direct execution, everything runs in a single Python process. This is the default mode when Temporal is not enabled.
+In direct execution, everything runs in a single Python process. This is the default mode when no orchestrator plugin is booted.
 
 ### Flow
 
@@ -17314,13 +17250,15 @@ PipeRouter.run(pipe_job)
 
 ### Router Selection
 
-The router is selected during `Pipelex.setup()`:
+The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROUTER` slot. A boot-orchestrator plugin (e.g. the closed `pipelex-temporal` plugin) claims that slot in its `register()` when `plugins.boot_orchestrator` names it; otherwise the default in-process router is used:
 
 ```python
-if get_config().temporal.is_enabled:
-    effective_pipe_router = make_tprl_pipe_router_top()   # Distributed
-else:
-    effective_pipe_router = PipeRouter(observer=...)       # Direct
+# A boot-orchestrator plugin swaps in its distributed router when
+# plugins.boot_orchestrator == its own name; otherwise this default runs.
+effective_pipe_router = self._resolve_hub_slot(
+    slot=HubSlot.PIPE_ROUTER,
+    default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process
+)
 ```
 
 ### How PipeRouter Works
@@ -17360,22 +17298,21 @@ All controllers follow the same pattern:
 
 ### Auto-Switching Router
 
-The hub (`get_pipe_router()`) automatically returns the correct router based on context:
+The hub (`get_pipe_router()`) returns the router for whichever orchestrator the process is booted under:
 
-- **Direct execution**: Returns `PipeRouter` — child pipes run in-process
-- **Distributed execution, outside workflow** (submitter side): Returns `PipeRouterTop` — submits a top-level Temporal workflow
-- **Distributed execution, inside workflow** (worker side): Returns `PipeRouterChild` — creates a Temporal child workflow via `execute_child_workflow()`
+- **Direct execution**: the in-process `PipeRouter` — child pipes run in the same process.
+- **Distributed execution**: the booted host-runtime orchestrator's router, which has claimed the hub's `PIPE_ROUTER` slot. That router auto-detects whether it is dispatching from the **submitter** (start a top-level workflow) or from **inside a running workflow** (start a child workflow). Pipelex's Temporal backend realizes this as `TemporalPipeRouter`, which picks `execute_workflow` vs `execute_child_workflow` accordingly.
 
-This means each child pipe in a controller gets its own Temporal workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the Temporal UI.
+This means each child pipe in a controller gets its own workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the host runtime's UI.
 
 !!! note "Library Dependency"
-    Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current workflow via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each `WfPipeRouter` loads the crate from the `PipeJob` into a per-workflow `Library` instance. Controllers call `get_required_pipe()` inside Temporal workflow code — accessing per-workflow state via ContextVar. The Temporal sandbox is disabled (`--is-not-sandboxed`) because library loading is a side effect incompatible with replay semantics.
+    Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current run via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each worker-side job loads the crate from the `PipeJob` into a per-run `Library` instance before resolving child pipes. (Temporal-specific detail: the backend disables the Temporal sandbox via `--no-sandbox` because library loading is a side effect incompatible with replay semantics.) See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for how the crate and working memory cross the boundary.
 
 ---
 
 ## Distributed Execution
 
-In distributed execution, the PipeJob is serialized and sent to a Temporal worker for execution.
+In distributed execution, the PipeJob is serialized and sent to a host-runtime worker for execution. The concrete dispatch shape below is illustrated with Pipelex's [Temporal backend](https://pipelex.com/products#temporal); the boundary mechanics (LibraryCrate, deferred hydration, per-call isolation) are backend-neutral and documented in [Runtime Bridge & Transport](./runtime-bridge-and-transport.md).
 
 ### Flow
 
@@ -17390,8 +17327,8 @@ sequenceDiagram
     S->>S: Resolve pipe, build LibraryCrate
     S->>S: Create PipeJob (crate attached)
 
-    Note over S: PipeRouterTop.run()
-    S->>S: prepare_for_temporal()<br/>(WM → working_memory_raw)
+    Note over S: TemporalPipeRouter.run() (submitter side)
+    S->>S: transport prep (closed)<br/>(WM → working_memory_raw)
     S->>T: Submit WfPipeRouter(PipeJob)
     T->>W: Dispatch workflow
 
@@ -17414,76 +17351,36 @@ sequenceDiagram
     S->>S: Hydrate PipeOutput<br/>(working_memory_raw → WM)
 ```
 
-### Key Components
+### Key components (the backend's role)
 
-**PipeRouterTop** (`pipelex/temporal/tprl_pipe/pipe_router_top.py`)
+A host-runtime orchestrator supplies the pieces that turn this generic shape into real workflows. The contract each implements is open core; the concrete classes are backend-specific. In Pipelex's Temporal backend:
 
-Implements `PipeRouterProtocol` like `PipeRouter`, but dispatches via Temporal instead of direct execution. Uses `WorkflowExecutor` to submit `WfPipeRouter` workflows.
+- a **router** implementing `PipeRouterProtocol` (`TemporalPipeRouter`) that dispatches via Temporal instead of running in-process;
+- a **worker-side job** (a Temporal workflow) that receives a deserialized `PipeJob`, loads the crate, hydrates working memory, and calls `pipe.run_pipe()` — exactly like the direct router;
+- a **data converter** that uses Kajson to (de)serialize Pydantic models with subclass types preserved — critical because `PipeJob.pipe` is a `PipeAbstract` subclass and `WorkingMemory` holds `Stuff` objects with concept-specific content classes;
+- a **worker entry point** that calls `Pipelex.make(boot_orchestrator="temporal")` and starts the worker with its registered workflows and activities (shipped as the `pipelex-temporal worker` console command).
 
-**WfPipeRouter** (`pipelex/temporal/tprl_pipe/wf_pipe_router.py`)
+The concrete modules live in the closed `pipelex-temporal` plugin (`pipelex_temporal/...`), documented in that repo. The open contracts they satisfy — `PipeRouterProtocol`, the boundary DTOs, serialization — are listed in the [Orchestrator SPI](./orchestrator-plugins.md#the-orchestrator-spi).
 
-The Temporal workflow that runs on the worker. Receives a deserialized `PipeJob` and calls `pipe.run_pipe()` — exactly like the direct router.
+### Content generation activities
 
-**Kajson Data Converter** (`pipelex/temporal/temporal_data_converter.py`)
-
-Custom Temporal payload converter that uses Kajson for serializing/deserializing Pydantic models. Preserves subclass types during transport, which is critical because `PipeJob.pipe` is a `PipeAbstract` subclass and `WorkingMemory` contains `Stuff` objects with concept-specific content classes.
-
-**Worker CLI** (`pipelex/temporal/worker_cli.py`)
-
-Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
-
-### Content Generation Activities
-
-Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch dedicated Temporal activities for their actual work. Activities are invoked directly from inside `WfPipeRouter` via `ContentGeneratorInWorkflow` (`pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`), which calls `workflow.execute_activity(act_*, ...)` — there is no intermediate child workflow per content-generation call.
-
-| Activity | Purpose |
-|----------|---------|
-| `act_llm_gen_text` | LLM text generation |
-| `act_llm_gen_object` | LLM structured output (single object) |
-| `act_llm_gen_object_list` | LLM structured output (list) |
-| `act_jinja2_gen_text` | Jinja2 template rendering |
-| `act_extract_gen_extract_pages` | Document extraction (OCR) |
-| `act_render_page_views` | PDF page rendering (page-views) |
-| `act_img_gen_images` | Image generation |
-
-All content-generation activities resolve dispatch via `worker_config.resolve_dispatch(...)`, so task-queue routing can be configured per activity (and, where applicable, per handle) through `[temporal.worker_config.activity_queues]`. If no routing is configured, activities fall back to the workflow's own task queue.
-
-### Worker Environment
-
-The `@with_conditional_worker` decorator on `PipeRouterTop._run_pipe_job()` supports two environments:
-
-- **EXTERNAL** (production) — assumes a worker is already running, submits the workflow directly
-- **INTERNAL** (testing) — spins up an embedded worker for the duration of the execution
+Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch their actual leaf work as host-runtime activities, invoked from inside the worker-side job via the runtime's in-workflow content generator — no intermediate child workflow per content-generation call. A backend can route those activities to different task queues per activity (and, where applicable, per handle); in the Temporal backend that routing is configured under the plugin's own `[worker_config.activity_queues]` config (in the plugin's `temporal.toml`, not core config), falling back to the job's own task queue when unset. The concrete activity set and queue-routing reference live in the `pipelex-temporal` plugin's docs; see also [Content Generation Across Boundaries](./distributed-content-generation.md) for the backend-neutral serialization mechanism.
 
 !!! note "Future Improvement: Per-Pipe Routing"
-    Router selection is currently global and binary: either all pipes go through Temporal, or none do. A simple `PipeCompose` (microseconds of Jinja2 rendering) gets the same Temporal overhead as a `PipeLLM` (minutes of API call time). Per-pipe or per-type routing decisions could improve efficiency.
+    Router selection is currently global and binary: either all pipes go through the distributed backend, or none do. A simple `PipeCompose` (microseconds of Jinja2 rendering) gets the same dispatch overhead as a `PipeLLM` (minutes of API call time). Per-pipe or per-type routing decisions could improve efficiency.
 
 ---
 
-## LibraryCrate, Deferred Hydration, and Per-Workflow Isolation
+## Crossing the boundary: crate, hydration, isolation
 
-Distributed execution introduces three mechanisms that don't exist in direct mode. These solve the fundamental challenge: the worker is a separate process that doesn't share the submitter's library, class registry, or working memory state.
+Distributed execution introduces three mechanisms that don't exist in direct mode, because the worker is a separate process that shares none of the submitter's library, class registry, or working-memory state. They are backend-neutral; for the full walkthrough see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md). In short:
 
-For a detailed walkthrough of these mechanisms, see [Temporal Integration](./temporal-integration.md).
+- **LibraryCrate propagation** — the submitter attaches a serializable snapshot of all pipes and concepts to the `PipeJob`; every worker-side job loads it (idempotently, by fingerprint) so `get_required_pipe()` resolves at every level.
+- **Deferred hydration** — `WorkingMemory` crosses as a raw JSON dict (`working_memory_raw`) on both `PipeJob` inputs and `PipeOutput` return values, avoiding deserialization failures when a receiving process hasn't registered the bundle's dynamic concept classes. The transport-prep helpers live in the closed `pipelex-transport` library; the raw field and the hydration helper stay in open core.
+- **Per-call isolation** — each job gets its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library`, scoped via `ContextVar`, so concurrent jobs with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
 
-### LibraryCrate Propagation
-
-The submitter builds a `LibraryCrate` — a serializable snapshot of all pipes and concepts — and attaches it to the `PipeJob`. Each `WfPipeRouter` on the worker loads the crate into a per-workflow scoped library, making all pipes resolvable via `get_required_pipe()`.
-
-### Deferred Hydration (Input and Output)
-
-Deferred hydration applies to both **PipeJob inputs** and **PipeOutput return values**. In both cases, `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object, avoiding deserialization failures when dynamic concept classes aren't registered in the receiving process's class registry.
-
-- **Input**: `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
-- **Output**: `PipeOutput.prepare_for_temporal()` does the same before returning from a child workflow. The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
-
-### Per-Workflow ClassRegistry and Library Scoping
-
-Each workflow creates its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library` instance, both scoped via `ContextVar`. This ensures concurrent workflows with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
-
-### Known Limitation: StuffArtefact Serialization in Dry-Run
-
-PipeCondition and PipeCompose dispatch the `act_jinja2_gen_text` activity (via `ContentGeneratorInWorkflow.make_templated_text`) to render their expression / construct templates. The activity serializes working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal activities to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating activities. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
+!!! warning "Known backend limitation: StuffArtefact in dry-run"
+    On a host runtime whose data converter serializes working memory for internal templating activities (Temporal's `act_jinja2_gen_text`, dispatched by PipeCondition and PipeCompose), dry-run mode can fail: working memory then holds `StuffArtefact` debug objects that are not JSON-serializable. PipeSequence and PipeParallel are unaffected — they dispatch child pipes without internal templating activities. This is a backend-specific concern; see the `pipelex-temporal` plugin docs for details and fix direction.
 
 ---
 
@@ -17501,7 +17398,7 @@ flowchart TB
         S1 --> S2 --> S3 --> S4 --> S5 --> S6
     end
 
-    S6 --> Decision{temporal.is_enabled?}
+    S6 --> Decision{boot_orchestrator set?}
 
     subgraph Direct["Direct Execution"]
         D1["PipeRouter._run_pipe_job()"]
@@ -17513,12 +17410,12 @@ flowchart TB
         D3 --> D4
     end
 
-    subgraph Distributed["Distributed Execution (Temporal)"]
-        T1["PipeRouterTop: prepare_for_temporal()"]
+    subgraph Distributed["Distributed Execution (Temporal example)"]
+        T1["Submitter router: transport prep (closed)"]
         T2["Kajson serialize PipeJob + crate"]
-        T3["Temporal Server"]
+        T3["Host runtime (Temporal Server)"]
         T4["Worker: Kajson deserialize"]
-        T5["WfPipeRouter: load crate, hydrate WM"]
+        T5["Worker job: load crate, hydrate WM"]
         T6["pipe.run_pipe()"]
         T1 --> T2 --> T3 --> T4 --> T5 --> T6
     end
@@ -17540,18 +17437,13 @@ flowchart TB
 | Pipeline setup | `pipelex/pipeline/pipeline_run_setup.py` |
 | PipeRouter (direct) | `pipelex/pipe_run/pipe_router.py` |
 | PipeRouterProtocol | `pipelex/pipe_run/pipe_router_protocol.py` |
-| PipeRouterTop (distributed, outside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
-| PipeRouterChild (distributed, inside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
-| Auto-switch utility | `pipelex/temporal/temporal_workflow_utils.py` |
-| WfPipeRouter workflow | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
-| Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
-| Worker CLI | `pipelex/temporal/worker_cli.py` |
+| Distributed router / worker job / data converter / worker CLI | backend-specific — in the host-runtime plugin (e.g. `pipelex_temporal/...`), not open core |
 | Library manager | `pipelex/libraries/library_manager.py` |
 | ConceptFactory | `pipelex/core/concepts/concept_factory.py` |
 | StructureGenerator | `pipelex/core/concepts/structure_generation/generator.py` |
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
-| Deferred hydration utility | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Deferred hydration utility (open core) | `pipelex/runtime_bridge/primitives/hydration.py` |
 | Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |
@@ -17560,13 +17452,435 @@ flowchart TB
 | Router selection | `pipelex/pipelex.py` (in `Pipelex.setup()`) |
 
 
+## Inference Backend Plugins
+
+# Inference Backend Plugins
+
+Every model call in Pipelex — an LLM completion, an image generation, a document extraction, a web search — is served by an **inference worker**. Which worker handles a given model is decided entirely by data: a model's `sdk` field selects a backend, and a **backend plugin** is what teaches Pipelex how to build the worker for that `sdk`.
+
+Core names no backend by import or by string. The built-in drivers (OpenAI, Gateway, Anthropic, Mistral, Bedrock, Google, FAL, HuggingFace, Docling, …) are plugins too — they ride the exact same seam an out-of-tree plugin would. This page documents that seam, the **Inference SPI** a plugin compiles against, and how to write one.
+
+---
+
+## The seam in one view
+
+```
+boot (Pipelex.setup)
+  └─ build_registrar(config)            # pure, import-light
+       ├─ for each plugin in BUILTIN_PLUGINS
+       └─ for each installed "pipelex.plugins" entry point
+            └─ plugin.register(registrar)        # side-effect-free
+                 └─ registrar.add_inference_backend(family=…, sdk=…, make_worker=…)
+  └─ InferenceBackendRegistry(registrar.inference_backends)   # stored on the hub
+
+run time (e.g. LLMWorkerFactory.make_llm_worker)
+  └─ model_handle = ModelHandle.make_for_inference_model(...)
+  └─ make_worker = get_inference_backend_registry().lookup(family=LLM, sdk=model_handle.sdk)
+  └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
+```
+
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `NotImplementedError` ("… Is its plugin installed?").
+
+---
+
+## The contract: `PipelexPlugin`
+
+A plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` protocol:
+
+```python
+class PipelexPlugin(Protocol):
+    name: str            # unique, lowercase identifier (e.g. "openai")
+    targets_api: int     # must equal PLUGIN_API_VERSION
+    def register(self, registrar: PluginRegistrar) -> None: ...
+```
+
+`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again at CLI-build to harvest plugin-contributed commands).
+
+`targets_api` is checked against `PLUGIN_API_VERSION`. A mismatch fails loud with `PluginApiVersionMismatchError` — a single coarse integer gate, not semver-range matching.
+
+---
+
+## Registering an inference backend
+
+A backend plugin's `register` calls one menu method per `(family, sdk)` it serves:
+
+```python
+registrar.add_inference_backend(
+    family=InferenceFamily.LLM,         # LLM | IMG_GEN | EXTRACT | SEARCH
+    sdk="acme",                          # the model's `sdk` string
+    make_worker=_make_acme_worker,       # a MakeWorkerFn (a plain callable)
+)
+```
+
+A registry key is `(family, sdk)`. The same `sdk` string may appear in two families (e.g. `google` serves both `LLM` and `IMG_GEN`); they are distinct keys. A duplicate `(family, sdk)` fails loud with `DuplicateInferenceBackendError` naming **both** contributing plugins.
+
+One plugin may register across several families from a single `register` — the built-in `gateway` plugin serves all four, `mistral` serves `LLM` + `EXTRACT`, `linkup` serves `EXTRACT` + `SEARCH`. This is the cross-family-vendor coordination point: one plugin, many backends.
+
+---
+
+## `MakeWorkerFn` — the locked call shape
+
+A backend is a typed **callable**, not a one-method object. Its signature is the contract:
+
+```python
+def _make_acme_worker(
+    *,
+    inference_model: InferenceModelSpec,
+    backend: InferenceBackend,
+    sdk_clients: SdkClientRegistry,
+    reporting_delegate: ReportingProtocol | None,
+) -> InferenceWorkerAbstract:
+    ...
+```
+
+The factory always passes all four keyword arguments. A stateless backend simply ignores the ones it doesn't need (`# noqa: ARG001` on the unused parameter — see the built-in `pypdfium2` and `azure_rest` plugins).
+
+Two invariants shape what goes *inside* the closure:
+
+- **Import-light.** The plugin module must import no backend SDK at module load. Do the SDK import **inside** the closure (`# noqa: PLC0415`), so merely discovering the plugin never pulls a heavy/optional dependency. Booting Pipelex with the built-ins registered imports none of `anthropic`, `mistralai`, `google.genai`, `boto3`, `fal_client`, `huggingface_hub`, `docling`, `linkup`, … — enforced by a subprocess import-blocker guard.
+- **Fail at use, not at boot.** Guard an optional dependency with `require_sdk(...)` *inside* the closure. A missing extra then raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) only when the backend is actually used.
+
+Client memoization goes through `sdk_clients.get_or_create(handle=…, build=lambda: …)` — the registry caches one SDK client per `ModelHandle`, so repeated worker construction reuses the connection.
+
+---
+
+## Listing models — an optional capability
+
+Alongside its worker factory, a backend plugin **may** register a model lister — the callable behind `pipelex show models <backend>`. It is optional: a backend that cannot enumerate its models simply never calls `add_model_lister`, and the listing command reports that SDK as unsupported-for-listing. The contract grows by one *optional* method, so progressive disclosure is preserved.
+
+```python
+registrar.add_model_lister(sdk="acme", lister=_list_acme_models)
+```
+
+A `ListModelsFn` mirrors `MakeWorkerFn` — import-light to reference, lazy inside. It is always `async` (the listing loop awaits it) and is keyed by `sdk` alone (listing is per-SDK, not per-`(family, sdk)`):
+
+```python
+async def _list_acme_models(
+    *,
+    sdk: str,
+    backend_name: str,
+    backend: InferenceBackend,
+    flat: bool,
+    any_listed: bool,
+) -> None:
+    from my_pkg.acme_list import list_acme_models  # noqa: PLC0415
+
+    await list_acme_models(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+```
+
+The same import-light / fail-at-use rules apply: a missing optional extra must raise `MissingDependencyError` only when the backend is actually listed — use the `require_sdk(...)` helper, or an equivalent `find_spec` guard inside the function the lister delegates to (the built-in listers do the latter, reusing the guard already in their `list_*_models` functions). If a registered lister's client variant cannot enumerate models at runtime (e.g. a Bedrock-backed Anthropic client), raise `ModelListingUnsupportedError(sdk=…)`: the loop treats that as the same soft "unsupported for listing" outcome as a missing lister — never a hard failure. A duplicate `sdk` lister fails loud with `DuplicateModelListerError` naming both plugins.
+
+---
+
+## Authoring a backend plugin (minimal example)
+
+A complete LLM backend plugin for a hypothetical `acme` SDK:
+
+```python
+# acme_plugin.py
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.contract import PLUGIN_API_VERSION
+from pipelex.plugins.inference_backend_registry import InferenceFamily, require_sdk
+from pipelex.plugins.model_handle import ModelHandle
+from pipelex.plugins.registrar import PluginRegistrar
+from pipelex.plugins.sdk_client_registry import SdkClientRegistry
+from pipelex.reporting.reporting_protocol import ReportingProtocol
+
+_ACME_MISSING_MSG = "The acme SDK is required in order to use Acme models."
+
+
+def _make_acme_worker(
+    *,
+    inference_model: InferenceModelSpec,
+    backend: InferenceBackend,
+    sdk_clients: SdkClientRegistry,
+    reporting_delegate: ReportingProtocol | None,
+) -> InferenceWorkerAbstract:
+    require_sdk(spec="acme", extra="acme", msg=_ACME_MISSING_MSG)
+
+    from acme import AcmeClient  # noqa: PLC0415
+
+    from my_pkg.acme_llm_worker import AcmeLLMWorker  # noqa: PLC0415
+
+    model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
+    sdk_instance = sdk_clients.get_or_create(
+        handle=model_handle,
+        build=lambda: AcmeClient(api_key=backend.api_key),
+    )
+    return AcmeLLMWorker(
+        sdk_instance=sdk_instance,
+        inference_model=inference_model,
+        reporting_delegate=reporting_delegate,
+    )
+
+
+class AcmePlugin:
+    name = "acme"
+    targets_api = PLUGIN_API_VERSION
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="acme", make_worker=_make_acme_worker)
+```
+
+### Shipping it as an out-of-tree plugin
+
+Declare an entry point in the `pipelex.plugins` group; discovery finds it automatically once the distribution is installed (no central enable-list — *presence* is the source of truth):
+
+```toml
+# pyproject.toml of your plugin package
+[project.entry-points."pipelex.plugins"]
+acme = "my_pkg.acme_plugin:AcmePlugin"
+```
+
+The entry point may resolve to a plugin instance or a zero-argument factory. A broken entry point is isolated and reported as `BrokenPluginError`, never a silent skip.
+
+### Disabling a discovered plugin
+
+`build_registrar` skips (and logs) any plugin whose `name` appears in the core-owned `plugins.disabled` denylist:
+
+```toml
+# .pipelex/pipelex.toml
+[plugins]
+disabled = ["acme"]
+```
+
+For external entry points the denylist is matched against the **entry-point name** *before* the plugin is loaded, so a broken or dependency-missing installed plugin can still be disabled to recover startup (it would otherwise raise `BrokenPluginError` at load). A working external plugin that sets a `name` different from its entry-point name is denylistable by **either** name.
+
+Disabling a core-unconditional plugin (`openai`) is a configuration error, not a no-op — it raises `CoreUnconditionalPluginDisabledError`. There is intentionally **no** allowlist: a plugin's presence (built-in or installed entry point) is what enables it.
+
+Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
+
+---
+
+## The Inference SPI
+
+What an out-of-tree backend plugin imports *is* the contract. The published surface:
+
+| Symbol | Module | Role |
+|--------|--------|------|
+| `PipelexPlugin`, `PLUGIN_API_VERSION` | `pipelex.plugins.contract` | the plugin protocol + version gate |
+| `PluginRegistrar` | `pipelex.plugins.registrar` | the accumulator `register` writes into |
+| `InferenceFamily`, `MakeWorkerFn`, `require_sdk` | `pipelex.plugins.inference_backend_registry` | family enum, callable type, dependency guard |
+| `ListModelsFn` | `pipelex.plugins.model_lister_registry` | the optional model-listing callable type |
+| `ModelListingUnsupportedError` | `pipelex.cogt.exceptions` | soft signal a lister raises when its client variant cannot list |
+| `ModelHandle` | `pipelex.plugins.model_handle` | the backend selector derived from a model spec |
+| `SdkClientRegistry` | `pipelex.plugins.sdk_client_registry` | per-handle client memoization |
+| `InferenceModelSpec` | `pipelex.cogt.model_backends.model_spec` | the resolved model record |
+| `InferenceBackend` | `pipelex.cogt.model_backends.backend` | the backend config record (api key, extras) |
+| `InferenceWorkerAbstract` and the `{LLM,ImgGen,Extract,Search}WorkerAbstract` subclasses | `pipelex.cogt.…` | the worker contracts a plugin returns |
+| `MissingDependencyError` | `pipelex.exceptions` | raised by `require_sdk` |
+
+The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_VERSION` — not an `__init__.py` re-export shim (the repo bans re-exports; import by full path). Anything a plugin needs to import outside this surface is a design gap to resolve, not an accident to live with.
+
+---
+
+## Fail-loud guarantees
+
+| Condition | Error |
+|-----------|-------|
+| `targets_api` ≠ `PLUGIN_API_VERSION` | `PluginApiVersionMismatchError` |
+| duplicate `(family, sdk)` | `DuplicateInferenceBackendError` (names both plugins) |
+| duplicate `sdk` model lister | `DuplicateModelListerError` (names both plugins) |
+| `name` in `plugins.disabled` but core-unconditional | `CoreUnconditionalPluginDisabledError` |
+| entry point raises while loading/registering | `BrokenPluginError` |
+| lookup for an unregistered `(family, sdk)` | `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?") |
+| optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
+
+---
+
+## Related
+
+- [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
+- [Error Model](error-model.md) — how these errors render and dereference
+- [Architecture Overview](architecture-overview.md)
+
+
+## Orchestrator Plugins
+
+# Orchestrator Plugins
+
+A pipe a host runtime invokes through the runtime bridge runs along **two orthogonal axes**:
+
+- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by `pipelex-temporal`, [`"mistral-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by `pipelex-mistralai-workflows`. Neither is built into the open-source `pipelex` core: both ship as external, closed-source host-runtime backends, distributed privately rather than on PyPI as part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
+- **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`), set by the endpoint and passed as a parameter to `run`, never received from a caller. An orchestrator honors it per its nature; `supports_fire_and_forget` advertises whether it can do genuine async.
+
+An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `run` — `"direct"` is contributed by a core plugin, `"temporal"` by the Temporal plugin, `"mistral-workflows"` by the external `pipelex-mistralai-workflows` plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
+
+---
+
+## The seam in one view
+
+```
+<host-side bridge entry>(input_payload)       # closed pipelex-transport library
+  → build the PipeJob (boundary decode + library scope + trace_context)
+  → orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
+  → if orchestrator is None: raise MissingOrchestratorError(mode)   # generic, names no orchestrator
+  → return await orchestrator.run(pipe_job=..., delivery_assignment=..., delivery=...)
+```
+
+The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
+
+!!! note "Open seam, closed host-side entry"
+    The host-side entry — the bridge entry point and `PipeJob` builder, plus the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — lives in the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime (Temporal, Mistral, Airflow, your own) is a Pipelex [commercial capability](https://pipelex.com/products#durable-execution), not an open extension point. What stays **open** is the seam a third-party orchestrator extends: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
+
+---
+
+## The orchestrator contract
+
+An orchestrator satisfies `OrchestratorProtocol` (`pipelex/plugins/orchestrator_registry.py`):
+
+```python
+class OrchestratorProtocol(Protocol):
+    supports_fire_and_forget: bool
+
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None, delivery: DeliveryMode) -> PipelexPipeRunOutput: ...
+```
+
+`run` honors the endpoint-chosen `delivery` per the orchestrator's nature (in-process always blocks; a distributed orchestrator awaits completion for `BLOCKING` and returns a workflow id for `FIRE_AND_FORGET`). `supports_fire_and_forget` is the capability a runner reads *before* dispatch — `/start` rejects honestly (4xx) when the resolved mode cannot do genuine async, instead of silently running blocking and acking.
+
+A plugin contributes one per token it serves by calling the registrar menu in its `register`, passing the token as a raw string (no enum, no cast):
+
+```python
+registrar.add_orchestrator(mode="temporal", orchestrator=TemporalOrchestrator())
+```
+
+Constructing the orchestrator instance must be **import-light** — it must not import the host-runtime SDK (`temporalio`, …) at module scope or in its `__init__`. The heavy import happens lazily inside `run` (and a friendly `MissingOrchestratorError` is raised there if the mode's extra is absent), so discovering and registering the plugin never pulls the SDK. This is what keeps boot import-light even on a process that will never use the mode.
+
+### A missing orchestrator is a generic, plugin-decoupled error
+
+A token with no registered orchestrator (its plugin is not installed) raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message names the token but **no orchestrator** — *"No orchestrator is registered for orchestration mode '{mode}'; is its plugin installed?"* — so core stays fully decoupled from its plugins (it never spells out `pipelex-temporal` / `pipelex-mistralai-workflows`). The one special case is the core `"direct"` token: its orchestrator is always present, so a miss there reports a boot/discovery fault. The message survives STRICT error disclosure.
+
+---
+
+## HTTP error mappers: rendering an orchestrator's transport faults
+
+An orchestrator's *runtime* (a Temporal client, a Mistral workflow runner) raises SDK-specific transport faults — a server unreachable, a workflow timeout — that a host runtime serving HTTP must turn into a proper error response, not a catch-all 500. But core names no web framework and the SDK lives only in the plugin, so the host (`pipelex-api`) cannot itself know how to classify `temporalio.TemporalError`.
+
+The plugin bridges that gap by contributing a **framework-agnostic mapper** — a function from one exception type to a structured `ErrorReport` (`pipelex/base_exceptions.py`):
+
+```python
+registrar.add_http_error_mapper(
+    exc_type_provider=lambda: TemporalError,      # SDK imported only when a host resolves the mappers, never at register
+    to_error_report=lambda exc: ErrorReport(...), # classified transient / RUNTIME
+)
+```
+
+The exc type is supplied as a **provider thunk**, not the bare class, on purpose: naming `temporalio.TemporalError` requires importing `temporalio` (the whole SDK), so a bare `exc_type=` would force that import at `register` — breaking the import-light invariant for a plugin that hard-depends on a heavy SDK. The provider defers the import to read time (a host runtime's app construction), where the plugin — and therefore its SDK — is by definition installed.
+
+The contract is deliberately split so no layer overreaches:
+
+- **The plugin** owns *classification* — which exception, transient or not, which error domain. It stays import-light: `register` only records the provider + closure; the SDK import happens when the provider runs at read time (and the `to_error_report` closure when the mapper is first invoked), never at registration.
+- **Core** owns *transport* — `registrar.get_http_error_mappers()` runs every provider, builds the `{exc_type: mapper}` dict, and is fail-loud on a duplicate *resolved* exception type (naming both plugins). `ErrorReport` is a core type, so the seam carries **no** web-framework import.
+- **The host runtime** owns *presentation* — at app construction it iterates the resolved mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the `ErrorReport` through its own RFC 7807 + `DisclosureMode` path. FastAPI / Starlette stays only in the host; core and the plugin import neither.
+
+This is what lets the public `pipelex-api` base be orchestrator-agnostic and still render a Temporal (or Mistral) transport fault correctly: install the flavor's plugin and its mapper rides in; install none and there is simply nothing to wrap. The capability is optional, so it grew the plugin contract by one method → `PLUGIN_API_VERSION` is now **2**.
+
+---
+
+## Boot-orchestrator plugins: claiming the runtime
+
+Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when the core-owned boot gate names it. `plugins.boot_orchestrator == self.name` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on". The gate is a backend-agnostic name-match — core names no orchestrator, and `register` reads no config file (the rich orchestrator config self-loads inside the thunks):
+
+Not every orchestrator goes this far. A per-call-only plugin — `pipelex-mistralai-workflows` is the minimal example — contributes just its `"mistral-workflows"` orchestrator and claims **no** hub slots: its router is installed per workflow invocation by the workflow body itself, so there is no process-global boot slot to claim and it never participates in the boot gate below. The boot-orchestrator machinery in this section applies only to a plugin that boots the process as its runtime (today, `pipelex-temporal`).
+
+```python
+if registrar.config.plugins.boot_orchestrator == self.name:
+    registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
+    registrar.claim_task_manager(_setup_temporal_task_manager)
+    registrar.claim_pipe_router(_make_temporal_pipe_router)
+    registrar.claim_pipe_run(_make_temporal_pipe_run)
+    registrar.add_teardown(_teardown_temporal)
+```
+
+Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed instance. The thunk runs only at the boot apply-point, so `register` itself imports no `temporalio` — even on a worker. This is the deferred-thunk rule that keeps the import-light invariant intact at boot.
+
+Because the gate is a name-match, `plugins.boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without `pipelex-temporal` installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token(s) it serves are separate namespaces that *may* differ, even where a shipped plugin keeps them identical (`pipelex-temporal` is named `temporal` and serves `temporal`). The error names no specific plugin, keeping core decoupled.
+
+### Injection precedence
+
+At each ordered hub slot, `Pipelex.setup` resolves in this precedence:
+
+1. an explicit `setup()` parameter (test/host injection) — always wins;
+2. a plugin slot-claim thunk;
+3. the core default.
+
+A slot claim must never silently override an explicit injection. Teardown runs the plugin-registered teardown callbacks **LIFO**, before core teardown, so a worker's in-flight runtime resources release first.
+
+---
+
+## Operational commands ship as console scripts
+
+The plugin seam does **not** contribute commands to the host `pipelex` CLI. An operational command — a worker daemon, a one-time namespace bootstrap — is a daemon/utility, not a way a pipe *runs*, so a plugin that needs one ships its own `[project.scripts]` console script, which pip materializes into a standalone executable. Nothing is harvested onto `pipelex` at import time, so a broken or colliding plugin can never brick `pipelex --help` / `doctor` / `init`.
+
+The `pipelex-temporal` plugin follows this rule: its `worker` and `setup-namespace` commands ship as the `pipelex-temporal` console script (`pipelex-temporal worker`, `pipelex-temporal setup-namespace`), declared in the plugin distribution's `pyproject.toml`:
+
+```toml
+[project.scripts]
+pipelex-temporal = "pipelex_temporal.temporal_cli:app"
+```
+
+Because the script is declared by the `pipelex-temporal` distribution itself, it travels with that dist — nothing in core to harvest or move.
+
+---
+
+## The Orchestrator SPI
+
+What an out-of-tree orchestrator imports *is* a contract. The SPI is a documented, versioned set of modules and symbols (gated by `PLUGIN_API_VERSION` in `pipelex/plugins/contract.py`) — not an `__init__.py` re-export shim. It is sized to what a real orchestrator (`pipelex-mistralai-workflows`) actually imports, not guessed. Anything an orchestrator needs that is *outside* this surface is a design bug — promote it into the SPI or remove the need.
+
+| Area | Modules / symbols |
+|---|---|
+| Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
+| Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
+| Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by `pipelex-transport`) |
+| Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`) |
+| Execution protocols | `PipeRouterProtocol`, `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |
+| Payload / core types | `PipeJob`, `PipeOutput`, `DeliveryAssignment`, `WorkingMemory` (+ factory, `dump_for_transport`), `JobMetadata`, `LibraryCrate` |
+| Library + hub scoping | `set_current_library` / `get_current_library`, `scoped_pipe_router`, `get_class_registry` (per-call library hydration via `library_crate_dump`) |
+| Tracing / graph hooks | `trace_events`, `graph_tracer_manager`, `tracing_assembly` (per-step trace/usage events across the boundary) |
+
+!!! warning "Not in the open SPI — the closed `pipelex-transport` layer"
+    The host-side bridge entry point, the cross-process dispatch primitives (boundary delivery, pipe classification, submitter-side hydration, trace flush, scoped-library, and the submit-arg envelope), and the transport-prep helpers were extracted out of open core into the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime is a Pipelex commercial capability — Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) compile against `pipelex-transport`; a third-party out-of-tree orchestrator compiles against the **open** rows above only.
+
+---
+
+## Worked example: the `pipelex-temporal` plugin
+
+`pipelex_temporal/temporal_plugin.py` (in the external `pipelex-temporal` distribution) is the reference orchestrator plugin. Its `register`:
+
+- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`). It advertises `supports_fire_and_forget = True`, and its `run` branches on the endpoint-chosen `delivery`: `BLOCKING` awaits completion and reports `make_workflow_id(...)`; `FIRE_AND_FORGET` calls `.start(...)` and returns an `is_completed=False` output carrying the workflow id;
+- **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
+
+The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) carries both delivery bodies behind one exhaustive `match delivery`, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
+
+The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's `BUILTIN_PLUGINS` (`pipelex/plugins/builtins.py`) holds only the always-shipped inference and `direct` plugins and explicitly excludes Temporal; installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
+
+---
+
+## Authoring an out-of-tree orchestrator plugin
+
+A third-party host-runtime plugin is a distribution that:
+
+1. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_orchestrator(mode=..., orchestrator=...)` for the mode(s) it serves — import-light;
+2. compiles its orchestrator against the Orchestrator SPI above (and nothing outside it);
+3. advertises itself under the `pipelex.plugins` entry-point group:
+
+```toml
+[project.entry-points."pipelex.plugins"]
+my_runtime = "my_package.my_plugin:MyRuntimePlugin"
+```
+
+Installing the distribution makes the mode available; uninstalling removes it. No core change, no central registration list. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+
+
 ## Error Model
 
 # Error Model
 
-In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, the Temporal retry engine, and the HTTP adapter picking a status code.
+In Pipelex, an error is **data**, not a control-flow accident. Every failure is classified once — at the layer that knows the most about it — and that classification travels intact to every consumer: the human reading a Rich panel, the agent parsing JSON, a distributed worker's retry engine, and the HTTP adapter picking a status code.
 
-This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it crosses the Temporal boundary.
+This page covers the contract that makes that possible: the `ErrorReport` schema, the classification enums, how inference workers classify SDK exceptions, how classification survives every wrapping layer, and how it survives serialization across a distributed worker boundary.
 
 ---
 
@@ -17581,7 +17895,7 @@ Three rules hold across the codebase, and everything else builds on them.
 **No broad catches in business logic.** `except Exception` is allowed only at CLI entry points and async task roots. Ruff rule `BLE001` enforces this — an unexpected exception crashes loudly instead of being silently swallowed.
 
 !!! info "Why classify, instead of just propagating the exception?"
-    A raw `openai.RateLimitError` tells a Python `except` clause what to catch, but it does not tell the Temporal retry engine whether to retry, the HTTP adapter which status to emit, or an agent whether the failure is the user's fault. Classification turns an exception into a decision input that every consumer can act on uniformly.
+    A raw `openai.RateLimitError` tells a Python `except` clause what to catch, but it does not tell a distributed worker's retry engine whether to retry, the HTTP adapter which status to emit, or an agent whether the failure is the user's fault. Classification turns an exception into a decision input that every consumer can act on uniformly.
 
 ---
 
@@ -17652,7 +17966,7 @@ report.http_status       # 422 / 429 / 500 — for HTTP adapters
 ```
 
 !!! warning "`ErrorReport` is `extra="forbid"`"
-    `from_dict()` rejects unknown keys. `recover_error_report()` calls it directly: a report dict that is found but fails validation is an internal contract bug — the activity bridge and the submitter share the schema within one deploy. `recover_error_report()` catches the `ValidationError` and synthesizes an `UnrecoverableWorkflowFailureError` fallback (carrying the recovered message plus an `[error report failed schema validation]` marker) so failure-webhook delivery stays intact; the workflow still fails afterwards, keeping the contract bug visible. Any other caller of `from_dict()` should treat the validation failure as a bug to fix.
+    `from_dict()` rejects unknown keys, so it is the strict inverse of `to_dict()`. A report dict that crosses a serialization boundary and fails validation on the way back is an internal contract bug — the writer and the reader share the schema within one deploy. A cross-boundary recovery helper that rebuilds a report (e.g. a distributed-worker bridge) is expected to catch that `ValidationError` and synthesize a fallback report so failure-webhook delivery stays intact while keeping the contract bug visible; any other caller of `from_dict()` should treat the validation failure as a bug to fix.
 
 ---
 
@@ -17756,7 +18070,7 @@ class ProviderErrorMetadata(BaseModel):
 ```
 
 !!! warning "`body` is excluded from serialization"
-    The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, Temporal details.
+    The raw provider response `body` can carry account ids, billing details, or credential fragments. It is held in-process but `exclude`d from every serialized form — CLI JSON, agent output, and any serialized worker payload.
 
 `UserAction` pairs a discrete `UserActionKind` (`WAIT_AND_RETRY`, `CHECK_BILLING`, `CHECK_CREDENTIALS`, `CHANGE_INPUT`, `CHANGE_MODEL`, `CONTACT_SUPPORT`, `UNKNOWN`) with a free-form `detail` string — so the CLI can render consistent guidance while keeping provider-specific text.
 
@@ -17801,53 +18115,21 @@ A wrapper keeps its own `error_type` and `message` but inherits every classifica
 
 ---
 
-## The Temporal Error Bridge
+## Crossing a Distributed Worker Boundary
 
-When a pipe runs on a Temporal worker, the error must survive serialization across the **activity → workflow → submitter** boundary. Temporal's default failure converter would wrap a raw `PipelexError` without packing the `ErrorReport` or deriving the retry decision. The bridge closes that gap.
+The error model is built to survive serialization. Because `ErrorReport` round-trips through `to_dict()` / `from_dict()`, a failure that happens on a remote worker can reach the submitting process with its full classification intact — not just a message string.
 
-### Activity Side — `convert_pipelex_errors`
+The runtime itself stays transport-agnostic: the machinery that carries an error across a worker boundary ships in the **host-runtime plugin** for each distributed backend, not in core. A backend plugin is responsible for three things.
 
-A decorator applied beneath `@activity.defn` on every in-scope activity converts a `PipelexError` into a `TemporalError`.
+**Packing.** Convert a `PipelexError` into the transport's failure type and stash `to_error_report().to_dict()` in its details payload, so worker and submitter code keep the full classification rather than a bare message. The same step derives the transport's retry decision from `InferenceErrorCategory.is_retryable`.
 
-```python
-@activity.defn
-@convert_pipelex_errors
-async def act_llm_gen_text(llm_assignment: LLMAssignment) -> str:
-    return await llm_gen_text(llm_assignment=llm_assignment)
-```
+**Recovering.** On the submitter side, walk the returned failure, pull the packed dict, and rebuild the `ErrorReport`. Recovery is **total**: when no report dict is found — a non-Pipelex exception, a worker crash, a timeout — the plugin synthesizes a fallback report so the recovery path always has structured classification to surface.
 
-`TemporalError.from_message_exception()` does two things:
+**A fail-safe floor.** Ensure a domain error that escapes the conversion path fails the unit of work *terminally* rather than hanging. In a durable-execution system the default for an unconverted exception might be to retry forever, so "convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
 
-- **Derives `non_retryable`** from `InferenceErrorCategory.is_retryable` for category-carrying errors. (The configured `non_retryable_error_types` class-name list is the fallback for category-less exceptions.)
-- **Packs the report** — `to_error_report().to_dict()` goes into `ApplicationError.details`, so workflow code keeps the full classification, not just a message string.
+**Net effect:** a pipe failing on a remote worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes conversion fails loud and bounded instead of hanging.
 
-### Submitter Side — `recover_error_report`
-
-Once the failure returns to the process that submitted the workflow, `recover_error_report()` walks the `__cause__` chain for the `ApplicationError`, pulls the details-packed dict, and rebuilds the `ErrorReport`. It is **total** — callers in the error-recovery path always get a structured report.
-
-```python
-def recover_error_report(exc: BaseException) -> ErrorReport:
-    report_dict = _find_error_report_dict(exc)
-    if report_dict is not None:
-        return ErrorReport.from_dict(report_dict)
-    return UnrecoverableWorkflowFailureError(_message_from_exc(exc)).to_error_report()
-```
-
-When no report dict is found in the chain — a non-Pipelex exception, a worker crash, a heartbeat timeout — the function synthesizes an `UnrecoverableWorkflowFailureError` report so the recovery path always has structured classification to surface. A report dict that fails `ErrorReport.from_dict` validation is treated as an internal contract bug (writer and reader share the schema within one deploy) and is also synthesized into the same `UnrecoverableWorkflowFailureError` fallback — carrying the recovered message plus an `[error report failed schema validation]` marker — so the failure webhook still fires; the workflow still fails afterwards, keeping the contract bug visible.
-
-The recovered report is carried on `WorkflowExecutionError(error_report=...)`, whose `to_error_report()` override returns it. Since `WorkflowExecutionError` is a `PipelexError`, `PipelineExecutionError` inherits the classification natively.
-
-### Workflow-Level Fail-Safe Floor
-
-The activity bridge converts every error that crosses an *activity* boundary. But a `PipelexError` raised **inline in workflow code** — an operator that runs its leaf inline instead of dispatching it as an activity, or an inline setup error — is neither an `ActivityError` nor an `ApplicationError`. Temporal's default for an unhandled exception in workflow code that is *not* a recognized failure type is to treat it as a **workflow-task failure** and retry the task indefinitely (bounded only by the workflow execution timeout). That is the single worst outcome a durable-execution system can produce: invisible, resource-consuming, and surfaced only after ~the timeout as a generic timeout error rather than the real cause. The fail-safe floor closes that hole on two levels:
-
-- **Workflow-level catch-all (rich path).** `WfPipeRouter.run()` and `WfPipeRun.run()` each end their boundary handling with an `except PipelexError` clause. `WfPipeRouter` converts a genuine inline error to a terminal `TemporalError` via `from_message_exception` (same conversion the activity bridge does — the structured report rides in `ApplicationError.details`). `WfPipeRun` routes it through its deferred-delivery path so the FAILED webhook still fires, then chains a details-carrying `TemporalError` so the classification also survives to the submitter. The catch-all only converts *genuine* inline errors: an escaping `PipelexError` that already carries a Temporal failure in its `__cause__` chain (e.g. a nested child-dispatch that already wrapped a sub-pipe failure as `WorkflowExecutionError`) is already terminal and recoverable, so it propagates untouched rather than being flattened to a generic report.
-
-- **Worker-level floor (belt-and-suspenders).** The worker registers `workflow_failure_exception_types=[WorkflowExecutionError, PipelexError]`. Any domain error that slips past the catch-alls still fails the workflow **terminally** instead of hanging — degrading to a synthesized `UnrecoverableWorkflowFailureError` report (message preserved, classification floored) rather than a silent retry loop. The scope is deliberately `PipelexError`, not `Exception`: genuinely transient Temporal/infra errors and deterministic-replay glitches are not domain errors, and workflow-task retry is the *correct* behavior for them — so they keep Temporal's default.
-
-The rule of thumb: in a durable-execution system the default for "unexpected exception in business logic inside a workflow" is the most dangerous behavior available (retry forever), so "we convert all the errors we know about" is not enough — the floor must hold for the errors, and the code paths, that nobody enumerated.
-
-**Net effect:** a pipe failing on a Temporal worker reaches the CLI and HTTP adapters with the *same* `error_category` / `retryable` / `model` / `provider` / `user_action` as the identical failure run locally — and a failure that escapes inline fails loud and bounded instead of hanging.
+See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boundary these converters span; the per-backend converters themselves live in the host-runtime plugins.
 
 ---
 
@@ -17890,9 +18172,9 @@ A downstream FastAPI exception handler calls `ErrorReport.http_status` and is a 
 
 ### Inputs and Outputs
 
-**Inputs.** `to_error_report()` takes a live `PipelexError`. `recover_error_report()` takes any `BaseException` and walks its `__cause__` chain. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift.
+**Inputs.** `to_error_report()` takes a live `PipelexError`. `ErrorReport.from_dict()` takes a `to_dict()` payload — strictly, raising `ValidationError` on drift. (A distributed-worker bridge adds a cross-boundary recovery helper that walks a returned failure's `__cause__` chain and rebuilds the report; it lives in the host-runtime plugin, not core.)
 
-**Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(...)` — code 1 by default, or the validate surface's 0/1/2 policy (see [Validate exit-code policy](#validate-exit-code-policy-0--1--2)).
+**Outputs.** `to_error_report()` returns an `ErrorReport`; `to_dict()` returns a `None`-free `dict`. Side effects: telemetry events emitted on pipeline failure at Layer 3; the agent CLI writes to stderr and raises `typer.Exit(...)` — code 1 by default, or the validate surface's 0/1/2 policy (see [Validate exit-code policy](#validate-exit-code-policy-0-1-2)).
 
 ---
 
@@ -17913,8 +18195,8 @@ flowchart TB
     REPORT --> AGENT["Agent CLI<br/>JSON / Markdown"]
     REPORT --> HTTP["HTTP adapters<br/>.http_status"]
 
-    W -.->|"@convert_pipelex_errors"| TEMP["Temporal bridge<br/>TemporalError → ApplicationError.details"]
-    TEMP -.->|"recover_error_report()"| REPORT
+    W -.->|"pack on worker"| TEMP["Distributed worker bridge (plugin)<br/>report packed into transport details"]
+    TEMP -.->|"recover on submitter"| REPORT
 
     classDef src fill:#fff3e0,stroke:#e65100,color:#000
     classDef cls fill:#e8eaf6,stroke:#3949ab,color:#000
@@ -17976,7 +18258,6 @@ report.error_category                   # "transient" / "capacity" / ...
 
 # Round-trip across a boundary
 ErrorReport.from_dict(payload)           # strict inverse of to_dict()
-recover_error_report(temporal_failure)   # walk __cause__ for an ApplicationError
 
 # Retry decision
 InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
@@ -17995,9 +18276,6 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |
-| `pipelex/temporal/tprl/temporal_error.py` | `TemporalError`, `from_message_exception`, `recover_error_report` |
-| `pipelex/temporal/tprl/activity_error_boundary.py` | `convert_pipelex_errors` decorator |
-| `pipelex/temporal/tprl/workflow_caller.py` | `WorkflowExecutor`, `WorkflowExecutionError` recovery |
 | `pipelex/cli/error_handlers.py` | Human CLI Rich panels — `display_error_panel()` |
 | `pipelex/cli/agent_cli/commands/agent_output.py` | Agent CLI JSON / markdown delivery |
 
@@ -18013,323 +18291,198 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | LLM returns schema-mismatched JSON | `instructor` re-asks; if exhausted → `UNKNOWN` |
 | Connection dropped mid-request | `AMBIGUOUS` → non-retryable (outcome unknown) |
 | Wrapper exception (no own category) | Inherits cause's classification via enrichment |
-| Failure on a Temporal worker | `ErrorReport` recovered from `ApplicationError.details` — same classification as local |
-| Worker exception with no `ErrorReport` | Synthesized `UnrecoverableWorkflowFailureError` report — `error_domain = RUNTIME` |
+| Failure on a distributed worker | `ErrorReport` recovered from the transport's serialized details — same classification as local |
+| Worker exception with no `ErrorReport` | Synthesized fallback report — `error_domain = RUNTIME` |
 
 ---
 
 ## Next Steps
 
 - [Pipe Routing & Execution](./pipe-routing-and-execution.md) — the layer model errors rise through
-- [Temporal Integration](./temporal-integration.md) — the activity → workflow boundary the error bridge spans
+- [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) — the process boundary the error bridge spans (the per-backend error converters live in the host-runtime plugins)
 - [Cogt Configuration](../configuration/config-technical/cogt-config.md) — `transport_max_retries` and the Tier 1 retry policy
 - [Agent CLI](../tools/cli/agent-cli.md) — the JSON / markdown error contract
 
 
-## Temporal Integration
+## Runtime Bridge & Transport
 
-# Temporal Integration
+# Runtime Bridge & Transport
 
-This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide instead.
+This page is for contributors working on Pipelex internals. For the capability overview, see the user-facing [Distributed Execution](../distributed-execution/index.md) page instead.
 
-This page covers the Temporal-specific mechanisms that enable distributed pipe execution. For the general pipe routing architecture (shared between direct and distributed modes), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
+Pipelex runs a pipe either **direct** (everything in one Python process) or **distributed** on a host runtime (a separate worker process, potentially on another machine). Both paths reach pipe execution through the same framework-agnostic **runtime bridge**. This page documents that bridge backend-neutrally: the boundary data types, how a library snapshot and working memory cross a process boundary, and how concurrent runs stay isolated. The concrete realizations — Temporal-backed durable execution and the Mistral Workflows integration — are commercial Pipelex platform capabilities; their backend-specific topology lives in their own plugin repos.
 
----
-
-## The Three Challenges
-
-Distributing pipe execution across separate worker processes introduces three challenges that don't exist in direct (single-process) mode:
-
-1. **Pipe resolution** — Controllers call `get_required_pipe()` to resolve child pipes. The worker's library must contain those pipes.
-2. **Dynamic class deserialization** — `.mthds` bundles generate Python classes at runtime (e.g., `RawText` inheriting from `TextContent`). The worker must have those classes registered before deserializing `WorkingMemory`.
-3. **Concurrent isolation** — Multiple workflows running on the same worker may define conflicting class/pipe names. Each workflow needs its own scoped registry and library.
-
-These are solved by three mechanisms: LibraryCrate propagation, deferred hydration, and per-workflow scoping.
+!!! info "A commercial capability rides on this seam"
+    Embedding a Pipelex pipe run into a host runtime — so it executes as durable, distributed workflows — is part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution). This page documents the **open seam** and the **open boundary types**; the cross-process plumbing that drives them lives in the closed `pipelex-transport` library (see [Where open core ends](#where-open-core-ends-and-pipelex-transport-begins) below). For the orchestrator extension point a third-party backend compiles against, see [Orchestrator Plugins](./orchestrator-plugins.md).
 
 ---
 
-## LibraryCrate
+## Direct vs distributed, one bridge
 
-A `LibraryCrate` is a serializable snapshot of the library — two flat dicts of blueprints:
+| Mode | Where pipes run | How the PipeJob travels |
+|------|-----------------|--------------------------|
+| **Direct** | All pipes in the same process. Library, class registry, and pipe resolution are shared in-memory. | Stays in-process; no serialization. |
+| **Distributed** | The PipeJob is serialized and sent to a worker — a separate process. | Crosses the boundary as structured JSON, carrying a serializable library snapshot. |
+
+Both modes share the same pipe definitions, library loading, and controller logic. The only difference is *where* a pipe runs and how its `PipeJob` gets there. Distributing execution across separate processes introduces problems that don't exist in-process — those problems, and their solutions, are this page's subject. For the routing layer that sits above the bridge (how a controller dispatches its child pipes in each mode), see [Pipe Routing & Execution](./pipe-routing-and-execution.md).
+
+---
+
+## The boundary data types
+
+Three open-core Pydantic models are everything that crosses a process boundary.
+
+### PipeJob — the unit of execution
+
+`PipeJob` (`pipelex/pipe_run/pipe_job.py`) carries everything needed to run a single pipe:
+
+| Field | Purpose |
+|-------|---------|
+| `pipe` | The resolved pipe object (concrete operator or controller). |
+| `working_memory` | Runtime data store — typed `Stuff` objects keyed by variable name. |
+| `working_memory_raw` | Raw JSON dict of working memory for deferred hydration (cross-process only). |
+| `pipe_run_params` | Execution config: run mode (LIVE/DRY), output multiplicity, pipe stack for cycle detection. |
+| `job_metadata` | Pipeline run ID, user ID, tracing context. |
+| `library_crate` | Serializable library snapshot for distributed execution. |
+
+### PipeOutput — the result that comes back
+
+`PipeOutput` (`pipelex/core/pipes/pipe_output.py`) carries the run result. Like `PipeJob`, it has both a typed `working_memory` and a `working_memory_raw` dict — the raw field is how a result travels back across a boundary without requiring class resolution at every hop (see [Deferred hydration](#deferred-hydration)).
+
+### LibraryCrate — a serializable library snapshot
+
+A `LibraryCrate` (`pipelex/libraries/library_crate.py`) is a flat, serializable snapshot of the library — the pipes and concepts a worker needs to run the job:
 
 ```python
 class LibraryCrate(BaseModel):
-    concepts: dict[str, ConceptBlueprint | str]  # concept_ref -> blueprint or description
-    pipes: dict[str, PipeBlueprintUnion]          # pipe_ref -> blueprint
-    domains: dict[str, DomainBlueprint]           # domain_code -> domain metadata
+    concepts: dict[str, ConceptBlueprint | str]  # concept ref -> blueprint or description
+    pipes: dict[str, PipeBlueprintUnion]          # pipe ref -> blueprint
+    domains: dict[str, DomainBlueprint]           # domain code -> domain metadata
     source_map: dict[str, str]                    # ref -> source file (error traceability)
     fingerprint: str                              # SHA256 of serialized content
 ```
 
-Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scoring.compute_score`), not in a structural container. `domains` carries per-domain metadata (description, system prompt). `source_map` enables error messages that trace back to origin files. The `fingerprint` enables idempotent loading — if a worker already loaded a crate with the same fingerprint, it skips the reload.
-
-### How it propagates
-
-```mermaid
-sequenceDiagram
-    participant S as Submitter
-    participant W as Worker
-
-    S->>S: Load library, build LibraryCrate
-    S->>W: PipeJob (crate attached)
-
-    Note over W: WfPipeRouter.run()
-    W->>W: load_from_crate(crate)
-    W->>W: pipe.run_pipe()
-
-    Note over W: Controller dispatches child
-    W->>W: PipeRouterChild → child workflow
-    Note over W: Child WfPipeRouter.run()
-    W->>W: load_from_crate(same crate)
-    W->>W: child pipe.run_pipe()
-
-    W->>S: PipeOutput (dehydrated)
-    S->>S: Hydrate PipeOutput
-```
-
-Every child workflow receives the crate through its `PipeJob`. Each `WfPipeRouter` loads the crate into its own scoped library. This ensures every workflow — parent or child, on any worker — can resolve all pipes.
-
-### Visibility
-
-The `LibraryCrate` is a Pydantic model. Temporal serializes it as structured JSON in the workflow input, making it fully visible in the Temporal dashboard — not opaque bytes.
+Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scoring.compute_score`), not in a structural container. `source_map` lets error messages trace back to origin files. The `fingerprint` enables idempotent loading — a worker that already loaded a crate with the same fingerprint skips the reload. The crate is a plain Pydantic model, so a host runtime serializes it as structured JSON in the job input — fully inspectable, not opaque bytes.
 
 ---
 
-## Deferred Hydration
+## The three cross-process challenges
+
+Sending a pipe run to a separate worker process introduces three challenges that single-process execution never faces:
+
+1. **Pipe resolution** — Controllers call `get_required_pipe()` to resolve child pipes. The worker's library must contain those pipes. → solved by **LibraryCrate propagation**.
+2. **Dynamic class deserialization** — `.mthds` bundles generate Python classes at runtime (e.g., `RawText` inheriting from `TextContent`). A receiving process must have those classes registered before it can deserialize `WorkingMemory`. → solved by **deferred hydration**.
+3. **Concurrent isolation** — One worker may run many jobs at once. Two jobs that each define a concept named `Result` with different structures must not share a class registry or library. → solved by **per-call scoping**.
+
+---
+
+## LibraryCrate propagation
+
+The submitter builds a `LibraryCrate` from its loaded library (`pipelex/libraries/library_crate_factory.py`) and attaches it to the `PipeJob`. On the worker, the job's entry point loads the crate into a scoped library, registering the bundle's dynamic concept classes, so `get_required_pipe()` resolves every pipe at every level of nesting. Because a distributed run can fan out into nested jobs (a controller's child pipes), every nested job carries the same crate; loading is idempotent via the fingerprint, so re-receiving a crate already loaded on a worker is a no-op.
+
+---
+
+## Deferred hydration
 
 ### The chicken-and-egg problem
 
-Temporal's data converter deserializes payloads (workflow inputs and return values) using Kajson, which needs dynamic concept classes registered to reconstruct typed `WorkingMemory`. But those classes only get registered when the `LibraryCrate` is loaded inside the workflow. This creates two deserialization gaps:
+A host runtime's data converter deserializes a payload (a job input, a return value) before any bundle code has run — but reconstructing a typed `WorkingMemory` needs the bundle's dynamic concept classes registered, and those only get registered when the `LibraryCrate` is loaded *inside* the job. Two deserialization gaps follow:
 
-1. **Input**: The `PipeJob` workflow input contains `WorkingMemory` with dynamic classes that don't exist yet on the worker.
-2. **Output**: A child workflow's `PipeOutput` return value contains `WorkingMemory` with dynamic classes. The parent's data converter runs in the Temporal SDK's event processing context (outside the workflow coroutine's `ContextVar` scope), so it can't access the parent's per-workflow class registry.
+1. **Input** — the `PipeJob` input contains `WorkingMemory` whose dynamic classes don't exist yet on the worker.
+2. **Output** — a nested job's `PipeOutput` return value contains `WorkingMemory` with dynamic classes, and the parent's data converter typically runs outside the job's scope, so it can't reach the per-job class registry.
 
-### The solution
+### The solution: carry working memory raw
 
-Both `PipeJob` and `PipeOutput` carry a `working_memory_raw` field for deferred hydration:
+Both `PipeJob` and `PipeOutput` carry a `working_memory_raw` field — a plain JSON dict — alongside the typed `working_memory`. The raw dict needs no class resolution to cross a boundary, which decouples transport from class registration.
 
-```python
-class PipeJob(BaseModel):
-    working_memory: WorkingMemory | None = None
-    working_memory_raw: dict[str, Any] | None = None
-    library_crate: LibraryCrate | None = None
+- **Input dehydration** — before dispatch, the working memory is moved into `working_memory_raw` (a plain dict produced by `WorkingMemory.dump_for_transport()`, which stays in open core at `pipelex/core/memory/working_memory.py`). After the worker loads the crate, the job's entry point hydrates the raw dict back to a typed `WorkingMemory`, inside the job's scope.
+- **Output dehydration** — before a nested job returns, its working memory is dehydrated to `working_memory_raw`. The raw dict then flows **end-to-end** — nested job → parent → delivery — without intermediate rehydration, because parents and delivery workers generally have not loaded the crate. Only the **top-level submitter** rehydrates.
 
-class PipeOutput(PipeOutputAbstract[WorkingMemory]):
-    working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
-    working_memory_raw: dict[str, Any] | None = None
-```
+The worker-side hydration helper (`pipelex/runtime_bridge/primitives/hydration.py`) is open core: it iterates the raw dict, uses `StuffContentFactory` to rebuild typed content from the registered classes, and preserves aliases. It also guards against cross-exec class-identity mismatches (`_validate_as_known_class` round-trips items through `model_dump()`): the dynamic classes a worker re-execs from the crate are new Python identities sharing a name with whatever a data converter eagerly rebuilt, and a naive `model_validate` would reject the older instance.
 
-**Input dehydration/hydration cycle:**
+### Boundary-by-boundary (backend-neutral)
 
-- Before dispatch, `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (a plain dict via `dump_for_temporal()`).
-- After the worker loads the crate, `WfPipeRouter` hydrates the raw dict back to typed `WorkingMemory`.
+| Boundary | Direction | What crosses | Hydrate on receive? |
+|----------|-----------|--------------|----------------------|
+| Submitter → top worker job | input | `PipeJob` (`working_memory_raw` + `library_crate`) | Yes — worker loads crate, then hydrates in scope |
+| Parent job → nested job | input | Same `PipeJob` shape (crate re-loaded idempotently) | Yes — in the nested job's own scope |
+| Nested job → parent | output | `PipeOutput` (`working_memory_raw`) | **No** — parent forwards the raw dict |
+| Parent job → delivery | result arg | `PipeOutput` (`working_memory_raw`, no crate) | **No** — delivery renders from raw, best-effort local hydration of the main stuff using only globally registered classes |
+| Top worker job → submitter | output | `PipeOutput` (`working_memory_raw`) | Yes — the submitter rehydrates, opening a fresh scoped library if a crate is available |
 
-**Output dehydration/hydration cycle:**
+Because delivery renders from the raw dict (`pipelex/pipe_run/delivery_executor.py` branches on which field is populated), a delivery worker never needs the crate loaded — which is the precondition for true distributed execution. Dynamic concepts lose typed rendering on the delivery worker (a generic field-walking fallback still produces readable JSON/HTML), but the worker stays crate-free.
 
-- Before returning from a workflow, `WfPipeRouter` calls `PipeOutput.prepare_for_temporal()` to dehydrate `WorkingMemory` to `working_memory_raw`.
-- The raw dict flows **end-to-end**: child workflow → parent `WfPipeRun` → `act_deliver` activity, all without intermediate rehydration. Parents do not own a per-workflow registry that would let them rehydrate the child's output, and the activity worker is typically a different process that has not loaded the crate.
-- Only the **top-level submitter** rehydrates, via `rehydrate_pipe_output_with_crate()` (`pipelex/temporal/tprl_pipe/submitter_hydration.py`). When the submitter has not loaded the bundle locally (e.g., a remote API client that built the `PipeJob` from a serialized `LibraryCrate`), this function opens a fresh per-call scoped Library, loads the crate into a scoped `ClassRegistry` pre-seeded from the global, hydrates inside the scope, then tears down — leaving the submitter's global registry untouched.
-
-The hydration function (`pipelex/temporal/tprl_pipe/hydration.py`) iterates the raw dict, uses `StuffContentFactory` to reconstruct typed content objects using the registered classes, and preserves aliases. It also includes a small but unintuitive guard (`_validate_as_known_class`) that round-trips items through `model_dump()` to defeat cross-exec class-identity mismatches: kajson may eagerly rebuild instances using one class identity, then `load_from_crate` re-execs the source and replaces the registry entry with a new identity (same name, different `id()`), which would otherwise cause Pydantic's `model_validate` to reject the older instance.
-
-### Why output dehydration goes end-to-end
-
-Earlier designs had the parent `WfPipeRun` rehydrate the child's `PipeOutput` before scheduling `act_deliver`, then propagated dynamic classes from the per-workflow registry into the worker's global `KajsonManager` registry so the activity worker could decode the typed payload. This worked on a single worker but broke under distributed Temporal: any worker polling the task queue can pick up the activity, and `ContextVars` / per-worker globals do not cross processes. The current design eliminates that hack — `act_deliver` receives the raw dict directly, never needs class resolution for transport, and the activity worker does not need the crate loaded.
-
-### Activity-side rendering of the raw working memory
-
-`act_deliver` cannot assume dynamic concept classes are registered on its worker. `DeliveryExecutor.generate_result_files()` (`pipelex/pipe_run/delivery_executor.py`) therefore branches on which field is populated:
-
-- **Typed path** (`working_memory` set, in-process / same-worker): existing typed renderers run unchanged.
-- **Raw path** (`working_memory_raw` set, cross-process Temporal): `working_memory.json` is written directly from the raw dict; for the main stuff, `try_local_hydrate_stuff()` attempts a single-Stuff hydration using only globally registered classes (built-in `StuffContent` subclasses are always present). On success, typed renderers produce `main_stuff.{md,html}` and the viewer; on miss (dynamic concept class not registered locally), a generic field-walking fallback renders JSON-in-markdown and `<pre>`-in-HTML so users still get readable output. Misses log a warning so silent regressions on built-in hydration surface.
-
-Tradeoff: dynamic concepts lose typed rendering on the activity worker, but the activity worker no longer needs the crate, which is the precondition for true distributed execution.
-
-### Boundary-by-boundary summary
-
-| Boundary | Direction | What crosses | Hydration on receive? |
-|----------|-----------|--------------|------------------------|
-| Submitter → top `WfPipeRouter` | input | `PipeJob` with `working_memory_raw` + `library_crate` | Yes — worker loads crate, then hydrates inside scope |
-| Parent `WfPipeRouter` → child `WfPipeRouter` | input | Same `PipeJob` shape (crate re-loaded idempotently via fingerprint) | Yes — child worker loads crate, hydrates inside its own scope |
-| Child `WfPipeRouter` → parent `WfPipeRun` | output | `PipeOutput` with `working_memory_raw` | **No** — parent forwards raw dict |
-| Parent `WfPipeRun` → `act_deliver` | activity arg | `PipeOutput` with `working_memory_raw` (no crate) | **No** — activity renders from raw, with best-effort local hydration of the main stuff using only globally registered classes |
-| Top `WfPipeRouter` → submitter | output | `PipeOutput` with `working_memory_raw` | Yes — `rehydrate_pipe_output_with_crate()` opens a fresh scoped Library if a crate is available, otherwise falls back to the global registry |
-
-### Dashboard visibility
-
-`working_memory_raw` is a plain JSON dict — fully readable in the Temporal dashboard without needing class resolution.
+!!! note "Where the transport prep lives"
+    Moving working memory into `working_memory_raw` for a job, dehydrating a result before return, and the submitter-side rehydration are part of the **closed `pipelex-transport`** library — they are the cross-process plumbing. The *raw field itself*, `dump_for_transport`, and the worker-side hydration helper stay **open core**, because they are host-agnostic and are also exercised by the open `pipelex-api` runner.
 
 ---
 
-## Per-Workflow Scoping
+## Per-call scoping
 
-### Why per-workflow isolation matters
+A single worker may process many concurrent jobs. If two jobs define a concept named `Result` with different fields, they must not share a `ClassRegistry` or `Library` — otherwise the second registration overwrites the first and silently corrupts data. Each job therefore creates its own scoped state:
 
-A single Temporal worker may process multiple concurrent workflows. If two workflows define a concept named `Result` with different structures (e.g., `Result(score, label)` vs `Result(value, confidence, is_valid)`), they must not share the same `ClassRegistry` or `Library`. Without isolation, the second workflow's class registration would overwrite the first's, causing silent data corruption.
+1. **ClassRegistry** — a fresh `ClassRegistry` pre-seeded from the global registry (which holds the base classes from `PIPELEXPATH`). The crate's dynamic classes register here, never in the global registry.
+2. **Library** — a fresh `Library` (`library_manager.open_fresh_library()`) with that `ClassRegistry` attached, set as current via a `ContextVar` keyed by the run id. Run-id keying (not job/workflow id) is deliberate: a reused workflow id across retries/resets could otherwise let a closed predecessor's cleanup tear down a live successor's library on the same worker.
+3. **Lookup chain** — `hub.get_class_registry()` reads the `ContextVar`, returns the scoped library's registry, and falls back to the global registry when no library is set (e.g. a data converter running outside the job scope — which is exactly why output uses deferred hydration).
+4. **Cleanup** — `library_manager.teardown(library_id)` drops the library and its registry; the `ContextVar` is reset. No manual GC needed.
 
-### How it works
-
-Each `WfPipeRouter.run()` creates its own scoped state:
-
-1. **ClassRegistry**: A new `ClassRegistry` pre-seeded from the global registry (which has base classes from `PIPELEXPATH`). Dynamic classes from the crate are registered here — not in the global registry.
-
-2. **Library**: A new `Library` instance opened via `library_manager.open_fresh_library()`, with the `ClassRegistry` attached as a `PrivateAttr`. The library is set as the current library via the `_library_id` `ContextVar`. The library id is keyed by the run id (`wf_{run_id}`) — replay-stable but unique per run. Keying by workflow id would collide across runs of a reused workflow id (workflow-level retry policy, Temporal reset, resubmission of the same `pipeline_run_id`): a closed predecessor run's late eviction cleanup could tear down a live successor run's library on the same worker. With run-id keying, a pre-existing library under the id can only be this same run's own leftover (an interrupted execution whose cleanup never ran), so `open_fresh_library` tears it down before opening: reusing it would fingerprint-skip the crate load against the fresh registry — the crate's dynamic classes would never land in it. The stale teardown is best-effort: the manager forgets the entry pop-first, and a raising teardown is logged and never fails the fresh open (worker-local leak state must not decide setup success). The same run-id keying applies to the rest of the per-run worker-local state: the graph tracer key and the report-delegate event-log context key.
-
-3. **ClassRegistry lookup chain**: `hub.get_class_registry()` reads `_library_id` from the `ContextVar`, gets the library's attached `ClassRegistry`. Falls back to the global registry if no library is set.
-
-4. **Cleanup**: `library_manager.teardown(library_id)` deletes the library and its `ClassRegistry`. The `ContextVar` is reset via `clear_current_library()`. No manual GC needed — the `ClassRegistry` is garbage-collected with the `Library`. In the workflow's `finally` block, this worker-local cleanup runs BEFORE the awaited `act_flush_trace_events` activity: the await is a suspension point where an eviction-time `BaseException` can abort the rest of the block, so ordering cleanup first guarantees an eviction can only skip the flush itself, never the teardown.
-
-### Kajson integration
-
-The Temporal data converter passes the active `ClassRegistry` to `kajson.loads()`:
-
-```python
-pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
-```
-
-Inside a workflow coroutine, `get_class_registry()` returns the per-workflow scoped registry (via `_library_id` ContextVar). However, the data converter is also called from the Temporal SDK's event processing context (e.g., when deserializing child workflow return values), where the ContextVar is not set. In that case, it falls back to the global registry. This is why PipeOutput uses deferred hydration — the `working_memory_raw` dict doesn't require class resolution during deserialization.
+The hub's class-registry and library scoping (`pipelex/hub.py`, `pipelex/libraries/library.py`, `pipelex/libraries/library_manager.py`) is open core — the same machinery serves direct execution, the open runner, and any host-runtime plugin.
 
 ---
 
-## Workflow Topology
+## Where open core ends and `pipelex-transport` begins
 
-A single pipe execution can create many Temporal workflows. Each level of nesting dispatches child workflows:
+The boundary types and the host-agnostic helpers are **open** (MIT, in the `pipelex` distribution):
 
-```
-PipeSequence (3 steps)
-  → 1 parent WfPipeRouter
-  → 3 child WfPipeRouters (one per step)
-  Each child step (if PipeLLM):
-    → 1 act_llm_gen_text activity (dispatched directly from WfPipeRouter
-       via ContentGeneratorInWorkflow.make_llm_text)
+| Concern | Open core (`pipelex`) |
+|---|---|
+| Boundary DTOs | `PipeJob`, `PipeOutput`, `LibraryCrate`, `runtime_bridge/payloads.py` |
+| Serialization | `runtime_bridge/serialization.py` |
+| Mode / delivery model | `orchestration_mode`, `DeliveryMode`, the orchestrator registry / SPI |
+| Working-memory raw + dump | `working_memory_raw`, `WorkingMemory.dump_for_transport` |
+| Worker-side hydration | `runtime_bridge/primitives/hydration.py` |
 
-PipeParallel (2 branches, then summary)
-  → 1 parent WfPipeRouter
-  → 3 child WfPipeRouters (2 branches concurrent + 1 summary)
+The cross-process *plumbing* that drives a pipe run across the boundary — the host-side bridge entry point, the transport-prep step, and the dispatch primitives (submitter rehydration, delivery, trace flush, scoped-library, pipe classification, and the submit-arg envelope) — is **closed** (the proprietary `pipelex-transport` library, installed via git+ssh, pinned to an exact core rev). Embedding Pipelex into a host runtime is a commercial capability, not an open extension seam.
 
-PipeBatch (3 items)
-  → 1 parent WfPipeRouter
-  → 1 child WfPipeRouter for the PipeBatch controller
-  → 3 child WfPipeRouters (one per item)
-```
-
-Each `WfPipeRouter` loads the `LibraryCrate` (idempotent via fingerprint), so pipe resolution works at every level.
+A third-party orchestrator compiles against the **open** surface only (the [Orchestrator SPI](./orchestrator-plugins.md#the-orchestrator-spi)); Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) additionally compile against `pipelex-transport`.
 
 ---
 
-## Controller Dispatch Patterns on Temporal
+## Next steps
 
-Each controller type creates a different child workflow pattern:
-
-| Controller | Dispatch pattern | Child workflows |
-|------------|-----------------|----------------|
-| **PipeSequence** | Sequential: each step via `SubPipe.run_pipe()` → `PipeRouterChild` | N children (one per step), executed sequentially |
-| **PipeParallel** | Concurrent: all branches via `SubPipe.run_pipe()` + `asyncio.gather()` | N children (one per branch), executed concurrently |
-| **PipeBatch** | Fan-out: each list item via `SubPipe.run_pipe()` | N children (one per item), executed concurrently |
-| **PipeCondition** | Conditional: evaluates expression, dispatches selected outcome via `SubPipe.run_pipe()` | 1 child (the chosen outcome pipe), plus an internal `act_jinja2_gen_text` activity for expression evaluation |
-
-### Internal templating activities
-
-Some controllers dispatch internal `act_jinja2_gen_text` activities in addition to pipe routing:
-
-- **PipeCondition**: `act_jinja2_gen_text` to evaluate the expression template against working memory
-- **PipeCompose**: `act_jinja2_gen_text` to resolve construct field references (e.g., `{ from = "title_text.text" }`)
-
-Both call `ContentGeneratorInWorkflow.make_templated_text` from inside `WfPipeRouter`, which dispatches the activity directly via `workflow.execute_activity(act_jinja2_gen_text, ...)`. These activities carry working memory contents through the Temporal data converter, which creates a serialization dependency on working memory content types.
-
----
-
-## Validation Dispatch: One In-Process Activity
-
-Pipeline *execution* fans out across workflows and activities as described above — but *validation* deliberately does the opposite. When Temporal is enabled, a `/validate` job (validation sweep + graph-producing dry-run) dispatches as the one-step wrapper workflow `wf_dry_validate`, which runs a single `act_dry_validate` activity and returns everything the canonical validation report needs that must be computed worker-side, in one round-trip: the per-pipe status map, the best-effort `GraphSpec`, the library-wide `pending_signatures`, and the `pipe_io_contracts` IO contracts (built inside the worker's library window — their JSON-Schema rendering resolves bundle-defined structure classes through the loaded library's class registry, so the API side never needs to re-acquire a library).
-
-Inside the activity everything is in-process and in-memory:
-
-- The library is loaded once: the sweep half is `validate_bundle` itself (the same function the direct-mode route calls, so both backends share the categorized `ValidateBundleError` contract), which leaves the library loaded; the graph dry-run (`dry_run_pipe_in_process`) runs against that same library; teardown happens once in the activity's `finally`.
-- ContextVar scopes pin the run in-process: `scoped_pipe_router` (nested controller sub-pipes resolve a local router, not the `TemporalPipeRouter`), `scoped_content_generator` (inference leaves resolve an inline dry generator, not `ContentGeneratorInWorkflow`), and `scoped_event_log` (the graph traces into a shared `InMemoryEventLog` — no NDJSON file, no DynamoDB round-trip; the `GraphSpec` rides back on the activity result). No usage/cost events are emitted.
-- The graph is best-effort: an expected dry-run failure (the run-failure wrappers, or a mock-input mint failure) returns `graph_spec=None` with validation still successful; any other error propagates and fails the activity.
-- Validation failures cross the boundary as structured `ErrorReport`s via the activity error boundary — a `ValidateBundleError` keeps its categorized per-error data (blueprint/factory/pipe/dry-run), so the API can render meaningful diagnostics. Signatures are not a failure: an unsatisfied `PipeSignature` is a runnability fact carried on the report's `pending_signatures` / `is_runnable`, not an error that crosses the boundary.
-
-Submitters call `dispatch_dry_validate` (`pipelex/temporal/tprl_pipe/dry_validate_dispatch.py`) for the whole round-trip. The wrapper workflow exists so the dispatch works on the current `temporalio` SDK; replacing it with a true standalone activity is a deferred optimization.
-
----
-
-## Known Limitation: StuffArtefact Serialization in Dry-Run
-
-In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memory content. When controllers dispatch internal templating activities that carry working memory contents through the Temporal data converter, Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
-
-`StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
-
-**Confirmed affected**:
-
-- **PipeCondition**: expression evaluation dispatches `act_jinja2_gen_text`, which serializes working memory to evaluate the Jinja2 expression. Fails with `StuffArtefact` TypeError.
-- **PipeCompose**: construct field resolution dispatches `act_jinja2_gen_text` similarly.
-
-**Likely affected** (hangs in testing, root cause not fully diagnosed):
-
-- **PipeBatch**: fan-out creates child PipeJobs with copies of working memory. The hang may be caused by `StuffArtefact` in the serialized child PipeJob, or by a different serialization issue in the list content extraction.
-
-**Not affected**:
-
-- **PipeSequence**: no internal templating activities — child pipes are dispatched via `SubPipe.run_pipe()` → `PipeRouterChild`, which creates clean child PipeJobs.
-- **PipeParallel**: same dispatch pattern as PipeSequence — branches go through `SubPipe.run_pipe()` without internal templating activities.
-- **All controllers in live mode**: `StuffArtefact` is only produced in dry-run. Live execution uses real content objects that serialize correctly.
-
-**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip non-serializable objects from working memory before passing to internal templating activities.
-
----
-
-## File Reference
-
-| Component | File |
-|-----------|------|
-| LibraryCrate model | `pipelex/libraries/library_crate.py` |
-| LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
-| PipeJob (crate + raw WM fields) | `pipelex/pipe_run/pipe_job.py` |
-| PipeOutput (raw WM for deferred hydration) | `pipelex/core/pipes/pipe_output.py` |
-| PipeRouterTop (submitter-side dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
-| PipeRouterChild (worker-side child dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
-| WfPipeRouter (workflow entry point) | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
-| Deferred hydration (worker-side) | `pipelex/temporal/tprl_pipe/hydration.py` |
-| Submitter-side rehydration | `pipelex/temporal/tprl_pipe/submitter_hydration.py` |
-| Activity-side delivery rendering (typed/raw dual path) | `pipelex/pipe_run/delivery_executor.py` |
-| WorkingMemory dehydration helper | `pipelex/core/memory/working_memory.py` (`dump_for_temporal`) |
-| Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
-| Hub (ClassRegistry + Library scoping) | `pipelex/hub.py` |
-| Library (PrivateAttr ClassRegistry) | `pipelex/libraries/library.py` |
-| Worker CLI | `pipelex/temporal/worker_cli.py` |
-| Temporal task manager | `pipelex/temporal/temporal_task_manager.py` |
+- [Orchestrator Plugins](./orchestrator-plugins.md) — the orchestration-mode seam, the Orchestrator SPI, and the open/closed boundary in contract terms.
+- [Pipe Routing & Execution](./pipe-routing-and-execution.md) — how PipeJobs are created and routed in direct and distributed modes.
+- [Content Generation Across Boundaries](./distributed-content-generation.md) — how dynamic Pydantic models and large binary payloads cross a worker boundary.
+- [Distributed Execution](../distributed-execution/index.md) — the user-facing capability overview, and the [workflow-orchestration offer](https://pipelex.com/products#durable-execution) (Temporal-backed durable execution, the Mistral Workflows integration).
 
 
-## Distributed Content Generation
+## Content Generation Across Boundaries
 
-# Distributed Content Generation
+# Content Generation Across Boundaries
 
-This page is for contributors working on Pipelex internals. If you're deploying or operating Pipelex on Temporal, see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide instead.
+This page is for contributors working on Pipelex internals. For the capability overview, see the user-facing [Distributed Execution](../distributed-execution/index.md) page instead.
 
-This page covers the serialization mechanisms that enable content generation (LLM structured output, image generation, PDF extraction, web search) to run across Temporal worker processes. For the broader Temporal architecture — LibraryCrate propagation, deferred hydration, per-workflow scoping — see [Temporal Integration](./temporal-integration.md).
+When content generation (LLM structured output, image generation, PDF extraction, web search) runs on a separate worker process, two serialization problems appear that single-process execution never faces. This page covers them backend-neutrally — the mechanisms live in open core and are the same regardless of which host runtime carries the payload. The concrete activity dispatch is a [commercial platform capability](https://pipelex.com/products#durable-execution); each backend (Temporal, Mistral Workflows) realizes it in its own plugin.
 
 !!! note "Every inference leaf goes through the same seam"
-    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction: direct inline (`ContentGenerator`) or as a Temporal activity (`ContentGeneratorInWorkflow`); the backend choice is independent of the run mode — under `run_mode=DRY` the chosen backend still dispatches and the cogt leaf mocks inside it. Web search (`PipeSearch`) joined this seam last — its `act_search_gen_*` activities make search-on-Temporal replay-safe (the result is recorded in workflow history) and let search failures cross the workflow boundary as classified errors. An operator that runs its leaf inline instead would re-execute it on every replay and, on failure, hang the submitter with an unclassified workflow-task error.
+    All inference operators dispatch their leaf call through the swappable `ContentGenerator` abstraction (`pipelex/cogt/content_generation/content_generator.py`): direct inline, or — on a host runtime — wrapped as an activity by the runtime's in-workflow content generator. The backend choice is independent of the run mode: under `run_mode=DRY` the chosen backend still dispatches and the leaf mocks inside it. Wrapping the leaf as a host-runtime activity is what makes it replay-safe (the result is recorded in the run's history) and lets a leaf failure cross the worker boundary as a classified error, instead of re-executing on every replay and hanging the submitter with an unclassified fault.
 
 ---
 
-## The Two Serialization Challenges
-
-Content generation introduces two cross-cutting problems that don't exist in single-process mode:
+## The two serialization challenges
 
 | Challenge | Trigger | Root cause | Solution |
 |-----------|---------|------------|----------|
-| **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | Submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed JSON schema in assignment, reconstruct class on worker, carry source code through Temporal payload metadata |
-| **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`) | Binary data (base64 images, rendered pages) exceeds Temporal's ~2MB payload limit | Activities store binary data to external storage, return lightweight URI references |
+| **Dynamic class propagation** | LLM structured output (`PipeLLM` with object concept) | The submitter creates a Pydantic model at runtime from `.mthds` concept definitions; the worker process has no such class | Embed the JSON schema in the assignment, reconstruct the class on the worker, carry the source code through the transport's payload metadata |
+| **Large payload management** | Image generation (`PipeImgGen`), PDF extraction (`PipeExtract`) | Binary data (base64 images, rendered pages) exceeds a host runtime's payload limit (Temporal's is ~2 MB) | Activities store binary data to external storage, return lightweight URI references |
 
 ---
 
-## Dynamic Class Propagation
+## Dynamic class propagation
 
 ### Schema embedding
 
-When a pipe produces structured output, the caller captures the Pydantic model's JSON schema into the assignment — a serializable Temporal argument that carries everything the worker needs:
+When a pipe produces structured output, the caller captures the Pydantic model's JSON schema into the assignment — a serializable argument that carries everything the worker needs:
 
 ```python
 class ObjectAssignment(BaseModel):
@@ -18349,11 +18502,11 @@ class ObjectAssignment(BaseModel):
         )
 ```
 
-The schema is a plain `dict` — fully serializable, visible in the Temporal dashboard, and self-contained. No class reference crosses the process boundary.
+The schema is a plain `dict` — fully serializable, inspectable on the wire, and self-contained. No class reference crosses the process boundary.
 
 ### Schema-to-model reconstruction
 
-On the worker, `model_class_from_json_schema()` rebuilds a live Pydantic class from the embedded schema:
+On the worker, `model_class_from_json_schema()` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
 
 ```python
 source_code = _generate_source_from_schema(schema)        # datamodel-code-generator
@@ -18366,16 +18519,16 @@ The reconstruction pipeline:
 1. **Generate** — `datamodel-code-generator` converts the JSON schema into Python source code defining a `BaseModel` subclass.
 2. **Execute** — `exec()` compiles the source in an isolated namespace and extracts the named class.
 3. **Cache** — A thread-safe SHA-256 hash cache (with double-check locking) avoids redundant generation for the same schema.
-4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through Temporal payloads.
+4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through the transport.
 
 !!! warning "Class name normalization"
     `datamodel-code-generator` normalizes schema titles to PascalCase (e.g., `dynamic_concept_test__Greeting` becomes `DynamicConceptTestGreeting`). The code tries both the original and normalized names. If neither matches, it raises `ValueError` listing the available classes.
 
-### Source code injection into Temporal payloads
+### Carrying the class source across the boundary
 
-When the activity returns a `BaseModel` whose class has `__kajson_class_source__`, the custom `BaseModelPayloadConverter` injects it into the Temporal payload metadata:
+The reconstructed class's source rides in the transport's **payload metadata**, not in the payload data itself — keeping the JSON payload clean and the reconstruction transparent. A host runtime's data converter injects it on serialize and re-attaches it on deserialize:
 
-**Serialization** (`to_payload`):
+**Serialize:**
 
 ```python
 class_source = getattr(type(value), "__kajson_class_source__", None)
@@ -18383,7 +18536,7 @@ if class_source is not None:
     metadata["kajson_class_source"] = class_source.encode()
 ```
 
-**Deserialization** (`from_payload`):
+**Deserialize:**
 
 ```python
 source_bytes = payload.metadata.get("kajson_class_source")
@@ -18393,105 +18546,71 @@ pydantic_gizmo = kajson.loads(
     class_registry=get_class_registry(),
     class_source_code=class_source_code,
 )
-# Re-attach source so it survives further Temporal hops
-if class_source_code is not None:
-    if isinstance(pydantic_gizmo, BaseModel):
-        type(pydantic_gizmo).__kajson_class_source__ = class_source_code
-    elif isinstance(pydantic_gizmo, list):
-        for item in pydantic_gizmo:
-            if isinstance(item, BaseModel):
-                type(item).__kajson_class_source__ = class_source_code
+# Re-attach source so it survives further hops
+if class_source_code is not None and isinstance(pydantic_gizmo, BaseModel):
+    type(pydantic_gizmo).__kajson_class_source__ = class_source_code
 ```
 
-The source code rides in Temporal metadata (not the payload data itself), keeping the JSON payload clean and the class reconstruction transparent. After `kajson.loads()` reconstructs the object, the converter re-attaches `__kajson_class_source__` to the deserialized class — this ensures the source survives if the object crosses another Temporal boundary (e.g. workflow returning a result to a parent activity that forwards it elsewhere).
+Re-attaching after `kajson.loads()` ensures the source survives if the object crosses another boundary (e.g. a worker returning a result to a parent that forwards it). The `__kajson_class_source__` attachment is open core; the converter that injects it into payload metadata is the host-runtime plugin's (Pipelex's Temporal backend realizes it as `BaseModelPayloadConverter`).
 
 ### The type bridge
 
-The class reconstructed on the worker is a structural match to the original, but it is a different Python class in memory. Standard `isinstance()` checks would fail. The caller bridges this gap with a `model_validate` round-trip:
+The class reconstructed on the worker is a structural match to the original, but a different Python class in memory — so `isinstance()` checks would fail. The caller bridges the gap with a `model_validate` round-trip (`pipelex/cogt/content_generation/content_generator.py`):
 
 ```python
 raw_obj = await llm_gen_object(object_assignment=object_assignment)
 return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 ```
 
-`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class. This restores type safety for downstream code.
-
-### End-to-end flow
-
-```mermaid
-sequenceDiagram
-    participant S as Submitter
-    participant W as Worker Activity
-    participant LLM as LLM Provider
-
-    S->>S: object_class.model_json_schema()
-    S->>W: ObjectAssignment (class_name + schema)
-
-    Note over W: model_class_from_json_schema()
-    W->>W: datamodel-code-generator → source
-    W->>W: exec() → class + __kajson_class_source__
-
-    W->>LLM: gen_object(schema=reconstructed_class)
-    LLM-->>W: structured JSON
-
-    W-->>S: BaseModel result<br/>(metadata: kajson_class_source)
-
-    Note over S: kajson.loads(class_source_code=...)
-    S->>S: model_validate() → original type
-```
+`model_dump(serialize_as_any=True)` produces a plain dict from the reconstructed object, and `model_validate()` rebuilds it as a proper instance of the original class, restoring type safety for downstream code.
 
 ### Structured web search reuses the same mechanism
 
-Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and solves it the same way. `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class via `SchemaToModelFactory` to drive the provider call, and the activity returns the **raw result dict**. The submitter re-validates that dict against the original output class (`output_structure_class.model_validate(result_dict)`) — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary. The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
+Structured web search (`PipeSearch` with a non-text output concept) faces the identical dynamic-class problem and solves it the same way. `SearchObjectAssignment` mirrors `ObjectAssignment` — it ships `output_class_name` + `output_class_schema` alongside the `SearchAssignment`, the activity reconstructs a throwaway class to drive the provider call, and returns the **raw result dict**. The submitter re-validates that dict against the original output class (`output_structure_class.model_validate(result_dict)`) — a pure, deterministic step that keeps the dynamic class on the submitter side and never ships it across the boundary. The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at all: it returns a `SearchResultContent`, a native serializable model.
 
 ---
 
-## Large Payload Management
+## Large payload management
 
 ### The payload size constraint
 
-Temporal payloads have a practical limit around 2MB. A single generated image can exceed this in base64 encoding. PDF extraction produces multiple page images. Sending raw binary through Temporal would either fail with a `DataConverterError` or severely degrade workflow history performance.
+A host runtime's payload has a practical size limit (Temporal's is around 2 MB). A single generated image can exceed it in base64; PDF extraction produces multiple page images. Sending raw binary through the runtime would fail conversion or degrade the run history.
 
 ### The store-then-reference pattern
 
-Activities handle the full binary lifecycle internally — generate, store, return a lightweight reference:
+Activities handle the full binary lifecycle internally — generate, store, return a lightweight reference. The storing is open-core: `GeneratedContentFactory` (`pipelex/cogt/content_generation/generated_content_factory.py`) uploads binary data via the configured `StorageProviderAbstract` (S3, local filesystem, …) and returns `ImageContent` or `PageContent` — Pydantic models carrying URIs, MIME types, and metadata, but never raw bytes. A host runtime's activity simply wraps that helper:
 
 ```python
-@activity.defn
-async def act_img_gen_images(img_gen_assignment: ImgGenAssignment) -> list[ImageContent]:
-    """Generate images and store them, returning lightweight ImageContent references.
-
-    Large binary data (base64/bytes) is stored within the activity and never crosses
-    the Temporal workflow boundary — only URLs are returned.
-    """
-    storage_provider = get_storage_provider()
-    generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+async def generate_and_store_images(img_gen_assignment):
+    """Large binary (base64/bytes) is stored inside the activity and never
+    crosses the runtime boundary — only URLs come back."""
+    factory = GeneratedContentFactory(storage_provider=get_storage_provider())
     return await img_gen_image_list_and_store(
         img_gen_assignment=img_gen_assignment,
-        generated_content_factory=generated_content_factory,
+        generated_content_factory=factory,
     )
 ```
-
-`GeneratedContentFactory` uploads binary data via the configured `StorageProviderAbstract` (S3, local filesystem, etc.) and returns `ImageContent` or `PageContent` — Pydantic models carrying URIs, MIME types, and metadata, but never raw bytes.
 
 !!! info "What crosses the boundary"
     `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, `size`, `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
-### Content type scenarios
+What gets stored vs. what crosses the boundary, by content type:
 
-| Content type | Activity | What gets stored | What crosses the Temporal boundary |
-|-------------|----------|-----------------|-----------------------------------|
-| Generated image | `act_img_gen_images` | Base64/bytes → S3 via `GeneratedContentFactory` | `list[ImageContent]` with URIs |
-| Extracted pages | `act_extract_gen_extract_pages` | Extracted page images → S3 | `list[PageContent]` with URI references |
-| Rendered page views | `act_render_page_views` | PDF page renders → S3 | `list[ImageContent]` with URIs |
-| LLM text | `act_llm_gen_text` | Nothing stored (text is small) | Plain `str` |
-| LLM object | `act_llm_gen_object` | Nothing stored (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
-| Search sourced answer | `act_search_gen_sourced_answer` | Nothing stored (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
-| Search structured | `act_search_gen_structured` | Nothing stored (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
+| Content type | What gets stored | What crosses the boundary |
+|-------------|-----------------|----------------------------|
+| Generated image | Base64/bytes → storage via `GeneratedContentFactory` | `list[ImageContent]` with URIs |
+| Extracted pages | Extracted page images → storage | `list[PageContent]` with URI references |
+| Rendered page views | PDF page renders → storage | `list[ImageContent]` with URIs |
+| LLM text | Nothing (text is small) | Plain `str` |
+| LLM object | Nothing (JSON is small) | `BaseModel` + `__kajson_class_source__` in metadata |
+| Search sourced answer | Nothing (answer + source refs are small) | `SearchResultContent` (answer + `DocumentContent` sources) |
+| Search structured | Nothing (JSON is small) | Raw `dict`, re-validated against the output class on the submitter |
+
+Each host-runtime plugin dispatches these through its own activities and queue routing; for the Temporal realization (the `act_*` activity set, per-activity task queues), see the `pipelex-temporal` plugin's docs.
 
 ---
 
-## Kajson Class Resolution
+## Kajson class resolution
 
 When `kajson.loads()` receives both a `class_registry` and `class_source_code`, the resolution follows a priority chain:
 
@@ -18509,7 +18628,7 @@ if class_source_code is not None:
 
 Resolution order:
 
-1. **Explicit `class_registry`** — the per-workflow scoped registry (see [Temporal Integration](./temporal-integration.md#per-workflow-scoping))
+1. **Explicit `class_registry`** — the per-call scoped registry (see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md#per-call-scoping))
 2. **Source-derived classes** — from `class_source_code`, filling gaps in the explicit registry
 3. **`sys.modules`** — already-imported classes
 4. **Dynamic import** — last resort, importing the module path from `__module__` metadata
@@ -18529,20 +18648,17 @@ Resolution order:
 | LLM generation functions | `pipelex/cogt/content_generation/llm_generate.py` |
 | Search generation functions | `pipelex/cogt/content_generation/search_generate.py` |
 | Generated content factory (storage) | `pipelex/cogt/content_generation/generated_content_factory.py` |
-| Temporal data converter | `pipelex/temporal/temporal_data_converter.py` |
-| Image generation activity | `pipelex/temporal/tprl_content_generation/act_img_gen_generate.py` |
-| Extract activity | `pipelex/temporal/tprl_content_generation/act_extract_generate.py` |
-| Search activity | `pipelex/temporal/tprl_content_generation/act_search_generate.py` |
-| Page view rendering activity | `pipelex/temporal/tprl_content_generation/act_render_page_views.py` |
 | Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |
 | PageContent model | `pipelex/core/stuffs/page_content.py` |
+
+The host-runtime data converter and the `act_*` activities that carry these payloads are backend-specific and live in their plugin repos, not in open core.
 
 ---
 
 ## Next Steps
 
-- [Temporal Integration](./temporal-integration.md) — LibraryCrate propagation, deferred hydration, per-workflow scoping
+- [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) — boundary DTOs, LibraryCrate propagation, deferred hydration, per-call scoping
 - [Pipe Routing & Execution](./pipe-routing-and-execution.md) — how PipeJobs travel through the system
 - [Architecture Overview](./architecture-overview.md) — the two-layer design and how components fit together
 
@@ -18720,12 +18836,11 @@ Only `field_validator`, `model_validator`, and `model_serializer` are actually u
 
 ### Framework entrypoints
 
-A def is skipped when it is registered with a framework whose calling convention is not ours to dictate. Matching is on the decorator's attribute suffix (the receiver name varies — `app`, `graph_app`, `show_app`, `kit_app`, `build_app`, ...), and on the Temporal and pytest decorators by their attribute/name:
+A def is skipped when it is registered with a framework whose calling convention is not ours to dictate. Matching is on the decorator's attribute suffix (the receiver name varies — `app`, `graph_app`, `show_app`, `kit_app`, `build_app`, ...), and on the pytest decorators by their attribute/name:
 
-- Typer/click commands and callbacks — any decorator that is an attribute access ending in `.command` or `.callback`.
-- Temporal handlers — `activity.defn`, `workflow.run`, and defensively `workflow.signal`, `workflow.query`, `workflow.update` (none of the latter three are used yet, but they are part of the worker entrypoint surface). Note `workflow.defn` decorates classes, not functions, so it is irrelevant. The custom `@convert_pipelex_errors` decorator is stacked directly below `@activity.defn` and is NOT a framework decorator — the guard must scan the WHOLE decorator stack for a framework match, not just the innermost or outermost decorator.
+- Typer/click commands and callbacks — any decorator that is an attribute access ending in `.command` or `.callback`. The guard scans the WHOLE decorator stack for a framework match (a framework decorator may sit above a custom one such as `@convert_pipelex_errors`), not just the innermost or outermost decorator.
 - pytest fixtures — `fixture`, matched on the bare decorator name so both `@pytest.fixture` and bare `@fixture` (`from pytest import fixture`) are covered (the only src-side fixtures live in the shipped `pipelex/test_extras/shared_pytest_plugins.py` plugin module).
-- Jinja2 filters/tests/globals — `pass_context`, `pass_environment`, `pass_eval_context`, matched on the bare decorator name (covers both `@pass_context` from `from jinja2 import pass_context` and the attributed `@jinja2.pass_context`). The Jinja2 engine invokes a filter POSITIONALLY from template syntax — `{{ value | tag("name") }}` calls `tag(context, value, "name")` — so the wrapped callable's arguments cannot be made keyword-only. This is the same framework-entrypoint category as Typer/Temporal/pytest. A multi-argument filter without one of these decorators (rare) is covered by the `# kw-only: ignore` escape hatch; single-argument filters (`escape_script_tag(value)`) are compliant under the single-parameter rule and need nothing.
+- Jinja2 filters/tests/globals — `pass_context`, `pass_environment`, `pass_eval_context`, matched on the bare decorator name (covers both `@pass_context` from `from jinja2 import pass_context` and the attributed `@jinja2.pass_context`). The Jinja2 engine invokes a filter POSITIONALLY from template syntax — `{{ value | tag("name") }}` calls `tag(context, value, "name")` — so the wrapped callable's arguments cannot be made keyword-only. This is the same framework-entrypoint category as Typer/pytest. A multi-argument filter without one of these decorators (rare) is covered by the `# kw-only: ignore` escape hatch; single-argument filters (`escape_script_tag(value)`) are compliant under the single-parameter rule and need nothing.
 
 FastAPI is intentionally absent: there are no route handlers in `pipelex/` source — the FastAPI server lives in the separate `pipelex-api/` repo.
 
