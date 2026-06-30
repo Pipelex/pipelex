@@ -19,7 +19,7 @@
 ### Changed
 
 - **`dry_run_pipeline` return shape:** `dry_run_pipeline` now returns the fully resolved, domain-qualified pipe reference alongside the `GraphSpec`.
-- **Graph viewer assets bumped:** The CDN-pinned `@pipelex/mthds-ui` graph viewer used by the generated ReactFlow HTML is upgraded from `0.6.4` to `0.10.0`, with refreshed Subresource Integrity hashes.
+- **Graph viewer assets bumped:** The CDN-pinned `@pipelex/mthds-ui` graph viewer used by the generated ReactFlow HTML is upgraded from `0.6.4` to `0.11.0`, with refreshed Subresource Integrity hashes. `0.11.0` adds `PipeStructure` to the viewer's recognized pipe types, so graphs containing a `PipeStructure` node (e.g. from the `preliminary_text` structuring path) render instead of showing the GraphSpec validation error screen.
 
 ### Fixed
 
