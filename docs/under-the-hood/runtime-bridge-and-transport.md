@@ -110,7 +110,7 @@ The worker-side hydration helper (`pipelex/runtime_bridge/primitives/hydration.p
 Because delivery renders from the raw dict (`pipelex/pipe_run/delivery_executor.py` branches on which field is populated), a delivery worker never needs the crate loaded — which is the precondition for true distributed execution. Dynamic concepts lose typed rendering on the delivery worker (a generic field-walking fallback still produces readable JSON/HTML), but the worker stays crate-free.
 
 !!! note "Where the transport prep lives"
-    Moving working memory into `working_memory_raw` for a job (`prepare_job_for_transport`), dehydrating a result before return (`prepare_output_for_transport`), and the submitter-side rehydration are part of the **closed `pipelex-transport`** library — they are the cross-process plumbing. The *raw field itself*, `dump_for_transport`, and the worker-side hydration helper stay **open core**, because they are host-agnostic and are also exercised by the open `pipelex-api` runner.
+    Moving working memory into `working_memory_raw` for a job, dehydrating a result before return, and the submitter-side rehydration are part of the **closed `pipelex-transport`** library — they are the cross-process plumbing. The *raw field itself*, `dump_for_transport`, and the worker-side hydration helper stay **open core**, because they are host-agnostic and are also exercised by the open `pipelex-api` runner.
 
 ---
 
@@ -129,20 +129,19 @@ The hub's class-registry and library scoping (`pipelex/hub.py`, `pipelex/librari
 
 ## Where open core ends and `pipelex-transport` begins
 
-The boundary types and the host-agnostic helpers are **open** (MIT, in the `pipelex` distribution). The cross-process *plumbing* that drives a pipe run across the boundary is **closed** (the proprietary `pipelex-transport` library, installed via git+ssh, pinned to an exact core rev). Embedding Pipelex into a host runtime is a commercial capability, so the entry point and dispatch primitives are not an open extension seam.
+The boundary types and the host-agnostic helpers are **open** (MIT, in the `pipelex` distribution):
 
-| Concern | Open core (`pipelex`) | Closed (`pipelex-transport`) |
-|---|---|---|
-| Boundary DTOs | `PipeJob`, `PipeOutput`, `LibraryCrate`, `runtime_bridge/payloads.py` | — |
-| Serialization | `runtime_bridge/serialization.py` | — |
-| Mode / delivery model | `orchestration_mode`, `DeliveryMode`, the orchestrator registry / SPI | — |
-| Working-memory raw + dump | `working_memory_raw`, `WorkingMemory.dump_for_transport` | — |
-| Worker-side hydration | `runtime_bridge/primitives/hydration.py` | — |
-| Bridge entry point | — | `run_pipe_via_bridge`, `build_pipe_job_from_input` |
-| Transport prep | — | `prepare_job_for_transport`, `prepare_output_for_transport` |
-| Submitter rehydration, delivery, trace flush, scoped-library, pipe classification, submit-arg envelope | — | the dispatch primitives |
+| Concern | Open core (`pipelex`) |
+|---|---|
+| Boundary DTOs | `PipeJob`, `PipeOutput`, `LibraryCrate`, `runtime_bridge/payloads.py` |
+| Serialization | `runtime_bridge/serialization.py` |
+| Mode / delivery model | `orchestration_mode`, `DeliveryMode`, the orchestrator registry / SPI |
+| Working-memory raw + dump | `working_memory_raw`, `WorkingMemory.dump_for_transport` |
+| Worker-side hydration | `runtime_bridge/primitives/hydration.py` |
 
-A third-party orchestrator compiles against the **open** rows only (the [Orchestrator SPI](./orchestrator-plugins.md#the-orchestrator-spi)); Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) additionally compile against `pipelex-transport`.
+The cross-process *plumbing* that drives a pipe run across the boundary — the host-side bridge entry point, the transport-prep step, and the dispatch primitives (submitter rehydration, delivery, trace flush, scoped-library, pipe classification, and the submit-arg envelope) — is **closed** (the proprietary `pipelex-transport` library, installed via git+ssh, pinned to an exact core rev). Embedding Pipelex into a host runtime is a commercial capability, not an open extension seam.
+
+A third-party orchestrator compiles against the **open** surface only (the [Orchestrator SPI](./orchestrator-plugins.md#the-orchestrator-spi)); Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) additionally compile against `pipelex-transport`.
 
 ---
 

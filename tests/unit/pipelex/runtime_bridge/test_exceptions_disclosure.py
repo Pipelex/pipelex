@@ -5,7 +5,7 @@ from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 
 
 class TestRuntimeBridgeExceptionDisclosure:
-    @pytest.mark.parametrize("mode", ["temporal", "mistralai-workflows", "acme"])
+    @pytest.mark.parametrize("mode", ["temporal", "mistral-workflows", "acme"])
     def test_generic_plugin_hint_survives_strict_disclosure(self, mode: str) -> None:
         """MissingOrchestratorError carries a caller-actionable, plugin-decoupled hint in its message.
 

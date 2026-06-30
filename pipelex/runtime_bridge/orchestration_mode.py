@@ -3,7 +3,7 @@
 ``orchestration_mode`` is an **open string token**, not a closed enum. Core owns
 only ``"direct"`` (its single built-in, in-process orchestrator); every other token
 is contributed by the plugin that owns the orchestrator — ``pipelex-temporal`` owns
-``"temporal"``, ``pipelex-mistralai-workflows`` owns ``"mistralai-workflows"``. The
+``"temporal"``, ``pipelex-mistralai-workflows`` owns ``"mistral-workflows"``. The
 orchestrator/validator registries are keyed by this token and validation is a
 registry lookup (*is this mode registered?* → ``MissingOrchestratorError`` on a miss),
 never an enum-membership check.

@@ -49,7 +49,7 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 | `output_name` | `str \| None` | Override for the output variable name |
 | `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |
 
-`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, `prepare_job_for_transport(pipe_job)` (in the closed `pipelex-transport` library) moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
+`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, a transport-prep step in the closed `pipelex-transport` library moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
 ---
 
@@ -187,7 +187,7 @@ sequenceDiagram
     S->>S: Create PipeJob (crate attached)
 
     Note over S: TemporalPipeRouter.run() (submitter side)
-    S->>S: prepare_job_for_transport()<br/>(WM → working_memory_raw)
+    S->>S: transport prep (closed)<br/>(WM → working_memory_raw)
     S->>T: Submit WfPipeRouter(PipeJob)
     T->>W: Dispatch workflow
 
@@ -235,7 +235,7 @@ Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch
 Distributed execution introduces three mechanisms that don't exist in direct mode, because the worker is a separate process that shares none of the submitter's library, class registry, or working-memory state. They are backend-neutral; for the full walkthrough see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md). In short:
 
 - **LibraryCrate propagation** — the submitter attaches a serializable snapshot of all pipes and concepts to the `PipeJob`; every worker-side job loads it (idempotently, by fingerprint) so `get_required_pipe()` resolves at every level.
-- **Deferred hydration** — `WorkingMemory` crosses as a raw JSON dict (`working_memory_raw`) on both `PipeJob` inputs and `PipeOutput` return values, avoiding deserialization failures when a receiving process hasn't registered the bundle's dynamic concept classes. The transport-prep helpers (`prepare_job_for_transport`, `prepare_output_for_transport`) live in the closed `pipelex-transport` library; the raw field and the hydration helper stay in open core.
+- **Deferred hydration** — `WorkingMemory` crosses as a raw JSON dict (`working_memory_raw`) on both `PipeJob` inputs and `PipeOutput` return values, avoiding deserialization failures when a receiving process hasn't registered the bundle's dynamic concept classes. The transport-prep helpers live in the closed `pipelex-transport` library; the raw field and the hydration helper stay in open core.
 - **Per-call isolation** — each job gets its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library`, scoped via `ContextVar`, so concurrent jobs with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
 
 !!! warning "Known backend limitation: StuffArtefact in dry-run"
@@ -270,7 +270,7 @@ flowchart TB
     end
 
     subgraph Distributed["Distributed Execution (Temporal example)"]
-        T1["Submitter router: prepare_job_for_transport()"]
+        T1["Submitter router: transport prep (closed)"]
         T2["Kajson serialize PipeJob + crate"]
         T3["Host runtime (Temporal Server)"]
         T4["Worker: Kajson deserialize"]
