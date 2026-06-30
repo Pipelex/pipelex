@@ -98,6 +98,8 @@ if registrar.config.plugins.boot_orchestrator == self.name:
 
 Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed instance. The thunk runs only at the boot apply-point, so `register` itself imports no `temporalio` — even on a worker. This is the deferred-thunk rule that keeps the import-light invariant intact at boot.
 
+Because the gate is a name-match, `plugins.boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without `pipelex-temporal` installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token it serves can differ (`pipelex-mistralai-workflows` is named `mistral_native` but serves `mistralai-workflows`). The error names no specific plugin, keeping core decoupled.
+
 ### Injection precedence
 
 At each ordered hub slot, `Pipelex.setup` resolves in this precedence:

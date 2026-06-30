@@ -75,6 +75,10 @@ class PluginStatus(StrEnum):
     DISABLED = "disabled"
     BROKEN = "broken"
 
+    @property
+    def is_registered(self) -> bool:
+        return self is PluginStatus.REGISTERED
+
 
 class PluginDiscovery(BaseModel):
     """Observability record of one discovered plugin and what it contributed.
@@ -233,6 +237,17 @@ class PluginRegistrar:
     # ------------------------------------------------------------------ #
     # Read accessors (for host runtimes consuming plugin contributions)
     # ------------------------------------------------------------------ #
+
+    @property
+    def registered_plugin_names(self) -> set[str]:
+        """Names of plugins that discovered and registered successfully.
+
+        The authoritative namespace the ``plugins.boot_orchestrator`` gate matches against: a
+        boot-orchestrator plugin claims its hub slots iff ``boot_orchestrator == its own name``.
+        Disabled/broken discoveries are excluded — they never run ``register`` and so never claim a
+        slot, making them invalid boot-orchestrator targets.
+        """
+        return {discovery.name for discovery in self.discoveries if discovery.status.is_registered}
 
     def get_http_error_mappers(self) -> dict[type[Exception], HttpErrorMapperFn]:
         """Resolve every contributed exc-type provider into a ``{exc_type: mapper}`` dict.

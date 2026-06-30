@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
+- **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), mirroring `teardown`. Previously a failed boot could poison a subsequent boot in the same process — surfacing as a "LogConfig is already set" error or a stale, half-populated class registry.
+
 ## [v0.36.0] - 2026-06-30
 
 ### Highlights
