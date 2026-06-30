@@ -91,30 +91,6 @@
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
 
-## Temporal Integration Test Options
-
-   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
-
-   - `--temporal-server`: Which Temporal server to use
-     - `none` (default): in-process test server — no external dependencies, used in CI
-     - `time-skipping`: in-process server with deterministic time control
-     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
-
-   ```bash
-   # CI default: in-process server
-   .venv/bin/pytest tests/integration/pipelex/temporal/
-
-   # Dev with local Temporal server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server local
-
-   # Dev with cloud/testing server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server testing
-   ```
-
----
-
 ## Prerequisites for running command lines: use virtual environment
 
    **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST use the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.

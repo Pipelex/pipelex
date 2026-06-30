@@ -19,15 +19,16 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
-- **Distributed Content Generation** - How dynamic classes and large payloads cross Temporal boundaries
+- **Runtime Bridge & Transport** - The backend-neutral seam that carries a pipe run across process boundaries — boundary DTOs, LibraryCrate propagation, deferred hydration, and per-call isolation
+- **Content Generation Across Boundaries** - How dynamic classes and large payloads cross a worker boundary
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
 !!! info "Not Required for Using Pipelex"
     You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
-!!! tip "Looking for Temporal deployment and operations?"
-    For running Pipelex on Temporal — cluster setup, workers, task-queue routing, and dashboard observability — see the user-facing [Distributed Execution with Temporal](../distributed-execution/temporal/index.md) guide. The pages below cover the runtime mechanics that make distributed execution work under the hood.
+!!! tip "Looking for distributed execution?"
+    For running Pipelex methods as durable, distributed workflows, see the user-facing [Distributed Execution](../distributed-execution/index.md) overview. The pages below cover the runtime mechanics that make distributed execution work under the hood.
 
 ---
 
@@ -44,6 +45,6 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
 - [:material-alert-circle-outline: Error Model](./error-model.md){ .md-button }
-- [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
-- [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
+- [:material-transit-connection-variant: Runtime Bridge & Transport](./runtime-bridge-and-transport.md){ .md-button }
+- [:material-swap-horizontal: Content Generation Across Boundaries](./distributed-content-generation.md){ .md-button }
 

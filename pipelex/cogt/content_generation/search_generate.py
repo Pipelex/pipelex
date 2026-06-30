@@ -19,7 +19,7 @@ from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.hub import get_model_deck
+from pipelex.hub import get_model_deck, get_report_delegate
 
 
 def _make_search_worker(search_assignment: SearchAssignment) -> SearchWorkerAbstract:
@@ -28,7 +28,7 @@ def _make_search_worker(search_assignment: SearchAssignment) -> SearchWorkerAbst
         model_handle=search_assignment.search_setting.model,
         model_type=ModelType.SEARCH,
     )
-    return SearchWorkerFactory.make_search_worker(inference_model=inference_model)
+    return SearchWorkerFactory.make_search_worker(inference_model=inference_model, reporting_delegate=get_report_delegate())
 
 
 def _make_search_job(search_assignment: SearchAssignment) -> SearchJob:

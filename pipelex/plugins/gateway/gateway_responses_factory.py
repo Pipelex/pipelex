@@ -18,22 +18,22 @@ if TYPE_CHECKING:
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-    from pipelex.plugins.plugin_sdk_registry import Plugin
+    from pipelex.plugins.model_handle import ModelHandle
 
 
 class GatewayResponsesFactory(OpenAIResponsesFactory):
     @classmethod
     def make_portkey_openai_client_for_responses(
         cls,
-        plugin: Plugin,
+        model_handle: ModelHandle,
         *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
         endpoint = GatewayFactory.get_endpoint(backend=backend)
         api_key = GatewayFactory.get_api_key(backend=backend)
-        if not GatewayOpenAISdkVariant.is_responses(plugin.sdk):
-            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
+        if not GatewayOpenAISdkVariant.is_responses(model_handle.sdk):
+            msg = f"ModelHandle '{model_handle}' is not supported by '{cls.__name__}'"
             raise GatewayFactoryError(msg)
 
         return openai.AsyncOpenAI(

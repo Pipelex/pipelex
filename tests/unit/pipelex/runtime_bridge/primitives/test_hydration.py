@@ -52,7 +52,7 @@ class TestHydrateWorkingMemory:
         working_memory = WorkingMemory()
         working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello, world!")
 
-        raw = working_memory.dump_for_temporal()
+        raw = working_memory.dump_for_transport()
         hydrated = hydrate_working_memory(raw)
 
         assert "greeting" in hydrated.root
@@ -64,7 +64,7 @@ class TestHydrateWorkingMemory:
     def test_hydrate_empty(self) -> None:
         """An empty WorkingMemory raw dict hydrates to empty WorkingMemory."""
         working_memory = WorkingMemory()
-        raw = working_memory.dump_for_temporal()
+        raw = working_memory.dump_for_transport()
 
         hydrated = hydrate_working_memory(raw)
 
@@ -77,14 +77,14 @@ class TestHydrateWorkingMemory:
         working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
         working_memory.aliases["main_stuff"] = "greeting"
 
-        raw = working_memory.dump_for_temporal()
+        raw = working_memory.dump_for_transport()
         hydrated = hydrate_working_memory(raw)
 
         assert hydrated.aliases == {"main_stuff": "greeting"}
         assert "greeting" in hydrated.root
 
     def test_hydrate_list_content_round_trip(self) -> None:
-        """ListContent survives dump_for_temporal/hydrate round-trip as a plain list."""
+        """ListContent survives dump_for_transport/hydrate round-trip as a plain list."""
         working_memory = WorkingMemory()
         list_stuff = Stuff(
             stuff_code="test",
@@ -100,7 +100,7 @@ class TestHydrateWorkingMemory:
         )
         working_memory.root["colors"] = list_stuff
 
-        raw = working_memory.dump_for_temporal()
+        raw = working_memory.dump_for_transport()
 
         # Verify the Temporal format uses a plain list, not {"items": [...]}
         assert isinstance(raw["root"]["colors"]["content"], list)
@@ -127,8 +127,8 @@ class TestHydrateWorkingMemory:
         assert list_content.items[1].text == "red"
         assert list_content.items[2].text == "green"
 
-    def test_dump_for_temporal_list_items_carry_pipelex_markers_only(self) -> None:
-        """dump_for_temporal must emit pipelex-private type markers, never kajson's __class__/__module__.
+    def test_dump_for_transport_list_items_carry_pipelex_markers_only(self) -> None:
+        """dump_for_transport must emit pipelex-private type markers, never kajson's __class__/__module__.
 
         This is the structural guard against the cross-process decode bug: if these
         items carried __class__ keys, kajson's universal decoder would try to bind
@@ -144,7 +144,7 @@ class TestHydrateWorkingMemory:
         )
         working_memory.root["items"] = list_stuff
 
-        raw = working_memory.dump_for_temporal()
+        raw = working_memory.dump_for_transport()
 
         serialized_items = cast("list[dict[str, Any]]", raw["root"]["items"]["content"])
         assert isinstance(serialized_items, list)

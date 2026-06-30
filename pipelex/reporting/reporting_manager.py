@@ -1,4 +1,3 @@
-import sys
 from datetime import datetime, timezone
 from typing import NamedTuple, cast
 
@@ -13,30 +12,13 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
 from pipelex.graph.trace_context import TraceContext
+from pipelex.hub import is_in_isolated_execution
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
-
-
-def _is_in_temporal_activity() -> bool:
-    """True when the current call stack runs inside a Temporal activity.
-
-    ``sys.modules`` sniff instead of importing temporalio: if ``temporalio.activity`` was never
-    imported in this process, no activity context can exist — the context is set by temporalio's
-    own machinery, which requires the module to be imported. Importing it here would put the
-    entire temporalio extra (Rust bridge, protobuf) on every boot's critical path wherever the
-    ``pipelex[temporal]`` extra is installed, even for processes that never touch Temporal.
-    Worker processes are unaffected: by the time any activity runs, ``temporalio.activity`` is
-    necessarily in ``sys.modules``.
-    """
-    activity_module = sys.modules.get("temporalio.activity")
-    if activity_module is None:
-        return False
-    return cast("bool", activity_module.in_activity())
-
 
 # DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
 # ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
@@ -183,18 +165,19 @@ class ReportingManager(ReportingProtocol):
         lookup_key (workflow-thread or direct mode), emit through the cached
         per-context event log.
 
-        Activity path: an emission coming from inside a Temporal activity NEVER
-        takes the fast path, even when the activity runs co-located with the
-        workflow worker. The registered context there is the workflow's
-        in-sandbox BufferingEventLog, and activities do not re-execute on
-        replay — a cross-thread write into that buffer makes the workflow's
-        buffer content depend on whether activities actually ran, breaking
-        replay determinism (audit finding H1). Activities must behave
-        identically whether co-located or remote: per-process fallback.
+        Isolated-execution path: an emission from inside an isolated sub-execution
+        (reported by the boot orchestrator's ``is_in_isolated_execution`` probe — a
+        Temporal activity, even when co-located with the workflow worker) NEVER takes
+        the fast path. The registered context there is the workflow's in-sandbox
+        BufferingEventLog, and an isolated sub-execution does not re-execute on replay —
+        a cross-thread write into that buffer makes the workflow's buffer content depend
+        on whether the sub-execution actually ran, breaking replay determinism (audit
+        finding H1). Such emissions must behave identically whether co-located or remote:
+        per-process fallback.
 
         Fallback: when context lookup misses (runner process — set_event_log
-        was never called here) or the emission comes from an activity, emit
-        through the per-process activity event log so the event still lands in
+        was never called here) or the emission comes from an isolated sub-execution,
+        emit through the per-process activity event log so the event still lands in
         the same backend partition as the rest of the run. See
         _emit_usage_event_runner_fallback for details.
         """
@@ -213,7 +196,7 @@ class ReportingManager(ReportingProtocol):
         if not trace_context.emit_usage_events:
             return
 
-        if not _is_in_temporal_activity():
+        if not is_in_isolated_execution():
             context = self._event_log_contexts.get(trace_context.lookup_key)
             if context is not None:
                 self._emit_via_registered_context(context, trace_context=trace_context, tokens_usage=tokens_usage)

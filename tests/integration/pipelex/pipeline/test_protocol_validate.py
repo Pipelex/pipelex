@@ -159,6 +159,51 @@ class TestProtocolValidate:
         finally:
             clear_current_library()
 
+    async def test_explicit_graph_target_without_main_pipe_produces_graph(self, load_empty_library: Callable[[], str]) -> None:
+        """Protocol validate can graph an explicit target even when the bundle has no main_pipe."""
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_COMPLETE_MTHDS], extra={"graph_pipe_code": "summarize"})
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.graph_spec is not None
+            traced_pipe_codes = {node.pipe_code for node in report.graph_spec.nodes if node.pipe_code}
+            assert traced_pipe_codes == {"summarize"}
+        finally:
+            clear_current_library()
+
+    async def test_explicit_graph_target_overrides_main_pipe(self, load_empty_library: Callable[[], str]) -> None:
+        """Protocol validate graphs the explicit target rather than the declared main_pipe."""
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(mthds_contents=[_MAIN_PIPE_MTHDS], extra={"graph_pipe_code": "summarize"})
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.graph_spec is not None
+            traced_pipe_codes = {node.pipe_code for node in report.graph_spec.nodes if node.pipe_code}
+            assert traced_pipe_codes == {"summarize"}
+            assert "outline_then_summarize" not in traced_pipe_codes
+        finally:
+            clear_current_library()
+
+    async def test_unknown_explicit_graph_target_degrades_to_no_graph(self, load_empty_library: Callable[[], str]) -> None:
+        """Unknown graph targets stay best-effort: validation succeeds with graph_spec=None."""
+        load_empty_library()
+        try:
+            runner = PipelexMTHDSProtocol()
+            report = await runner.validate(
+                mthds_contents=[_MAIN_PIPE_MTHDS],
+                extra={"graph_pipe_code": "protocol_validate_graph.does_not_exist"},
+            )
+
+            assert isinstance(report, PipelexValidationReport)
+            assert report.graph_spec is None
+            assert report.is_runnable is True
+        finally:
+            clear_current_library()
+
     async def test_graph_failure_mid_window_degrades_and_lifecycle_holds(
         self,
         load_empty_library: Callable[[], str],

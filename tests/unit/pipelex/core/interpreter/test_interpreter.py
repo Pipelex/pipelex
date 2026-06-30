@@ -2,6 +2,7 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from tests.unit.pipelex.core.test_data import InterpreterTestCases
 
@@ -22,3 +23,17 @@ class TestPipelexInterpreter:
         log.verbose(f"Testing invalid MTHDS content: {test_name}")
         with pytest.raises(expected_exception):
             PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=invalid_mthds_content)
+
+    def test_toml_syntax_error_carries_mthds_source(self):
+        """Parse-level errors must still expose the caller-supplied logical source."""
+        with pytest.raises(PipelexInterpreterError) as exc_info:
+            PipelexInterpreter.make_pipelex_bundle_blueprint(
+                mthds_content='domain = "broken" trailing',
+                mthds_source="broken.mthds",
+            )
+
+        err = exc_info.value
+        assert err.validation_errors is not None
+        assert len(err.validation_errors) == 1
+        assert err.validation_errors[0].source == "broken.mthds"
+        assert "TOML syntax error" in err.validation_errors[0].message

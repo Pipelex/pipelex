@@ -36,24 +36,10 @@ own page. Classes are grouped by subsystem.
 - [`PipelineManagerNotFoundError`](pipeline-manager-not-found-error.md) — Pipeline manager not found
 - [`ValidateBundleError`](validate-bundle-error.md) — Validate bundle
 
-## Temporal execution
-
-- [`ContentGenerationError`](content-generation-error.md) — Content generation
-- [`SearchAttributeRegistrationError`](search-attribute-registration-error.md) — Search attribute registration
-- [`TemporalConfigError`](temporal-config-error.md) — Temporal config
-- [`TemporalFlowError`](temporal-flow-error.md) — Temporal flow
-- [`TemporalServerError`](temporal-server-error.md) — Temporal server
-- [`UnrecoverableWorkflowFailureError`](unrecoverable-workflow-failure-error.md) — Unrecoverable workflow failure
-- [`WorkerProfileConfigError`](worker-profile-config-error.md) — Worker profile config
-- [`WorkerScopeConfigError`](worker-scope-config-error.md) — Worker scope config
-- [`WorkerTaskQueueUnknownError`](worker-task-queue-unknown-error.md) — Worker task queue unknown
-- [`WorkflowExecutionError`](workflow-execution-error.md) — Workflow execution
-- [`WorkflowInputError`](workflow-input-error.md) — Workflow input
-
 ## Runtime bridge
 
-- [`MissingMistralWorkflowsPluginError`](missing-mistral-workflows-plugin-error.md) — Missing mistral workflows plugin
-- [`MissingPipelexTemporalExtraError`](missing-pipelex-temporal-extra-error.md) — Missing pipelex temporal extra
+- [`MissingBundleValidatorError`](missing-bundle-validator-error.md) — Missing bundle validator
+- [`MissingOrchestratorError`](missing-orchestrator-error.md) — Missing orchestrator
 - [`PipelexBridgeDispatchError`](pipelex-bridge-dispatch-error.md) — Pipelex bridge dispatch
 - [`PipelexRuntimeBridgeError`](pipelex-runtime-bridge-error.md) — Pipelex runtime bridge
 

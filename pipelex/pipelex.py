@@ -1,7 +1,8 @@
 import types
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -47,9 +48,16 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.exceptions import UnknownBootOrchestratorError
+from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.model_lister_registry import ModelListerRegistry
+from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+from pipelex.plugins.registrar import HubSlot, PluginRegistrar
+from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_manager import ReportingManager
-from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import PipelexConfig
@@ -92,6 +100,8 @@ if TYPE_CHECKING:
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 
+_HubSlotImplT = TypeVar("_HubSlotImplT")
+
 
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
@@ -125,9 +135,12 @@ class Pipelex(metaclass=MetaSingleton):
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
         self.func_registry: FuncRegistry | None = None
+        # plugins — the registrar is built in setup() (build_registrar); held for the slot-claim /
+        # CLI-command / teardown apply-points. Declared here so teardown() can guard on it.
+        self._plugin_registrar: PluginRegistrar | None = None
         # cogt
-        self.plugin_manager = PluginManager()
-        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
+        self.sdk_client_manager = SdkClientManager()
+        self.pipelex_hub.set_sdk_client_manager(self.sdk_client_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
@@ -167,7 +180,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         *,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -189,13 +202,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # Override temporal.is_enabled if temporal_enabled is explicitly provided
-        if temporal_enabled is not None:
-            config = get_config()
-            updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
-            config.temporal = updated_temporal
-
-        self._temporal_task_manager: object | None = None
+        # Boot this process under the named orchestrator plugin, when explicitly provided.
+        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
+        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
+        if boot_orchestrator is not None:
+            get_config().plugins.boot_orchestrator = boot_orchestrator
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -324,7 +335,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- AI Models and Inference Management ------------------------------------------------
 
-        self.plugin_manager.setup()
+        self.sdk_client_manager.setup()
 
         self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
@@ -372,17 +383,38 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
-        self.pipelex_hub.set_dry_run_forced(not needs_inference)
-        if content_generator is None:
-            if get_config().temporal.is_enabled:
-                from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
-                    ContentGeneratorInWorkflowFactory,
-                )
+        # --- Plugin discovery -----------------------------------------------------------------
+        # Build the plugin registrar from the fully-resolved config (pure and import-light:
+        # registering the built-ins imports no backend SDK). Runs after the gateway/model setup
+        # checks and before the hub setup points below — the family worker factories look their
+        # backends up on the hub registries at run time. The slot-claim thunks, CLI commands and
+        # teardown callbacks the registrar also accumulates are applied at their ordered
+        # apply-points in a later phase (no orchestrator plugin contributes any of them yet).
+        plugin_registrar = build_registrar(config=get_config())
+        self._plugin_registrar = plugin_registrar
+        # Reject an unknown boot orchestrator before falling through to the core defaults. The
+        # requested name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched
+        # against registered plugin names — the same namespace the slot-claim gate uses
+        # (boot_orchestrator == plugin.name). When no plugin of that name registered (not installed,
+        # disabled, or a typo) nothing claims the hub slots, so without this guard the run would
+        # silently execute in-process instead of under the requested runtime.
+        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
+        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+        self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
+        self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
+        self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
 
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow()
-            else:
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+        self.pipelex_hub.set_dry_run_forced(not needs_inference)
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
+        # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
+        # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
+        if content_generator is None:
+            content_generator = self._resolve_hub_slot(
+                slot=HubSlot.CONTENT_GENERATOR,
+                default=lambda: ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=storage_provider)),
+            )
         self.pipelex_hub.set_content_generator(content_generator)
 
         self.inference_manager = inference_manager or InferenceManager()
@@ -390,10 +422,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- Libraries & Registries -------------------------------------------------------------
 
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
+        self.reporting_delegate = reporting_delegate or ReportingManager()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
 
@@ -428,54 +457,65 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
-        # --- Temporal --------------------------------------------------------------------------
+        # --- Task Manager ----------------------------------------------------------------------
+        # The TASK_MANAGER slot is claimed only by a boot-orchestrator plugin running this process as
+        # its runtime (a Temporal worker). The thunk does the full wiring on the plugin's own hub and
+        # is torn down via a registered teardown callback (LIFO) — no core default, no explicit param.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+        task_manager_factory = plugin_registrar.slot_claims.get(HubSlot.TASK_MANAGER)
+        if task_manager_factory is not None:
+            task_manager_factory()
 
-            temporal_task_manager = TemporalTaskManager()
-            temporal_hub.set_task_manager(temporal_task_manager)
-            temporal_task_manager.complement_catalog(
-                extra_catalog=Tasks.TASK_PACKS,
-                extra_workflows=[],
-                extra_activities=[],
-            )
-            temporal_task_manager.setup()
-            self._temporal_task_manager = temporal_task_manager
+        # --- Isolated-execution probe ----------------------------------------------------------
+        # Claimed only by a boot-orchestrator plugin whose runtime has a replay/activity split (e.g. a
+        # Temporal worker): the thunk resolves the ambient predicate that reports whether the current
+        # call runs inside an isolated sub-execution (an activity). ReportingManager consults it to
+        # route an activity-side usage emission to the per-process log instead of the workflow's
+        # registered buffer (audit H1). Unclaimed (any in-process boot), the fresh hub's default
+        # reports "never isolated", so no wiring is needed here.
+        isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
+        if isolated_execution_probe_factory is not None:
+            self.pipelex_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
 
         # --- Pipe Router -----------------------------------------------------------------------
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
 
         if pipe_router:
             self.pipelex_hub.set_pipe_router(pipe_router)
-        elif get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_router(make_temporal_pipe_router())
         else:
-            self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
+            self.pipelex_hub.set_pipe_router(self._resolve_hub_slot(slot=HubSlot.PIPE_ROUTER, default=lambda: PipeRouter(observer=multi_observer)))
 
         # --- Pipe Run --------------------------------------------------------------------------
+        # No explicit param for pipe_run: plugin slot-claim thunk > core default.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_run(make_temporal_pipe_run())
-        else:
-            self.pipelex_hub.set_pipe_run(PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        self.pipelex_hub.set_pipe_run(
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        )
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
-    def teardown(self):
-        # temporal
-        if self._temporal_task_manager is not None:
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+    def _resolve_hub_slot(self, *, slot: HubSlot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT:
+        """Resolve a process-global hub slot: a plugin's claimed thunk if present, else the core default.
 
-            if isinstance(self._temporal_task_manager, TemporalTaskManager):
-                self._temporal_task_manager.teardown()
-            temporal_hub.reset()
+        Call sites apply explicit-injection precedence first (an explicit ``setup()`` param wins),
+        so this only arbitrates plugin-claim vs core-default. The claim is a thunk invoked here at the
+        boot apply-point — never during ``register`` — so a non-worker boot constructs no plugin impl.
+        The return type follows the core ``default`` (the claimed thunk is typed ``Any`` and adopts it).
+        """
+        if self._plugin_registrar is not None:
+            factory = self._plugin_registrar.slot_claims.get(slot)
+            if factory is not None:
+                return cast("_HubSlotImplT", factory())
+        return default()
+
+    def teardown(self):
+        # Plugin-contributed teardown callbacks (LIFO) — e.g. a Temporal worker tears down its task
+        # manager + resets its hub. Names no integration: the callbacks were registered by whichever
+        # boot-orchestrator plugin claimed the runtime, and run before core teardown so a worker's
+        # in-flight Temporal resources release first.
+        if self._plugin_registrar is not None:
+            for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
+                teardown_callback()
 
         # pipelex
         self.pipeline_manager.teardown()
@@ -486,7 +526,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager.teardown()
         if self.reporting_delegate:
             self.reporting_delegate.teardown()
-        self.plugin_manager.teardown()
+        self.sdk_client_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
@@ -514,7 +554,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         *,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -547,8 +587,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 deck validation. Useful for commands like validate/show that don't call inference
                 APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
                 not constrain work this process executes as a Temporal worker.
-            temporal_enabled: When provided, overrides the temporal.is_enabled config value.
-                True forces Temporal workflow execution, False forces direct execution.
+            boot_orchestrator: When provided, boots this process under the orchestrator plugin
+                of this name (e.g. "temporal" to run pipes through the Temporal worker runtime).
+                Any other value (or None) leaves execution in-process. Core names no orchestrator;
+                the matching plugin gates on its own name.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate
                 commands that need gateway-provided model specs without enabling full inference.
@@ -588,7 +630,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
-                temporal_enabled=temporal_enabled,
+                boot_orchestrator=boot_orchestrator,
                 needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
@@ -608,6 +650,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if needs_inference:
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
+            # A failed boot must release the process-global singletons it acquired, not just the
+            # singleton registration — otherwise they leak and poison the next boot in the same
+            # process. setup() establishes these progressively (logging + hub config in __init__, the
+            # KajsonManager class registry, the template registries) and may mutate config (e.g.
+            # plugins.boot_orchestrator); failing partway skips teardown(), the normal release point.
+            # We release the same process-global state teardown() does, but via its class-level entry
+            # points so it is safe on a half-built instance (full teardown() would touch managers a
+            # partial setup never assigned). Without this the next boot raises "LogConfig is already
+            # set" and serves a stale, half-populated class registry (the KajsonManager singleton
+            # ignores a fresh registry once created).
+            pipelex_instance.pipelex_hub.reset_config()
+            KajsonManager.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
             # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]

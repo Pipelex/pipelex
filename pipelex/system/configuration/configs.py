@@ -11,7 +11,6 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.temporal.config_temporal import Temporal
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.storage.storage_config import StorageConfig
@@ -86,10 +85,6 @@ class PromptingConfig(ConfigModel):
         return None
 
 
-class FeatureConfig(ConfigModel):
-    is_reporting_enabled: bool
-
-
 class ReportingConfig(ConfigModel):
     is_log_costs_to_console: bool
     is_generate_cost_report_file_enabled: bool
@@ -102,7 +97,6 @@ class ReportingConfig(ConfigModel):
 class TracingBackend(StrEnum):
     NDJSON = "ndjson"
     DYNAMODB = "dynamodb"
-    TEMPORAL_DYNAMODB = "temporal_dynamodb"
 
 
 class NdjsonTracingConfig(ConfigModel):
@@ -114,17 +108,11 @@ class DynamoDBTracingConfig(ConfigModel):
     region: str
 
 
-class TemporalDynamoDBTracingConfig(ConfigModel):
-    table_name: str
-    region: str
-
-
 class TracingConfig(ConfigModel):
     is_enabled: bool
     backend: TracingBackend = Field(strict=False)
     ndjson: NdjsonTracingConfig | None = None
     dynamodb: DynamoDBTracingConfig | None = None
-    temporal_dynamodb: TemporalDynamoDBTracingConfig | None = None
 
 
 class ObserverConfig(ConfigModel):
@@ -156,7 +144,7 @@ class PipelineExecutionConfig(ConfigModel):
     is_generate_usage: bool
     graph_config: GraphConfig
 
-    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # Bounded fan-out concurrency for PipeBatch (the in-process backpressure pillar, short of a durable execution backend).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
@@ -210,7 +198,6 @@ class PipelineExecutionConfig(ConfigModel):
 
 class Pipelex(ConfigModel):
     storage_config: StorageConfig
-    feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 
@@ -244,9 +231,24 @@ class MigrationConfig(ConfigModel):
         return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
+class PluginsConfig(ConfigModel):
+    # Names of discovered plugins to skip at startup (a denylist; discovery is the
+    # source of truth for presence). Denylisting a plugin core requires
+    # unconditionally is a startup error. There is intentionally no allowlist.
+    disabled: list[str]
+
+    # Boot *this process* under the orchestrator plugin of this name. A boot-orchestrator
+    # plugin (e.g. the Temporal plugin) claims the process-global hub slots in its
+    # ``register`` iff ``plugins.boot_orchestrator == <its own name>``; any other value
+    # (or ``None``) leaves execution in-process. Core names no orchestrator — the gate is
+    # a plain name match, set programmatically (CLI ``--orchestrator`` / ``Pipelex.setup``),
+    # not from ``pipelex.toml``. Optional, so it stays absent from the TOML defaults.
+    boot_orchestrator: str | None = None
+
+
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
-    temporal: Temporal
     pipelex: Pipelex
+    plugins: PluginsConfig
     migration: MigrationConfig

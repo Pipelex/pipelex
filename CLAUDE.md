@@ -93,30 +93,6 @@
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
 
-### Temporal Integration Test Options
-
-   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
-
-   - `--temporal-server`: Which Temporal server to use
-     - `none` (default): in-process test server — no external dependencies, used in CI
-     - `time-skipping`: in-process server with deterministic time control
-     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
-
-   ```bash
-   # CI default: in-process server
-   .venv/bin/pytest tests/integration/pipelex/temporal/
-
-   # Dev with local Temporal server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server local
-
-   # Dev with cloud/testing server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server testing
-   ```
-
----
-
 ### Prerequisites for running command lines: use virtual environment
 
    **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST use the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
@@ -186,7 +162,7 @@ Non-subject function parameters across `pipelex/` source must be **keyword-only*
 - `def f(subject, *, opt1, opt2): ...` — the first non-`self`/`cls` parameter (the subject) may stay positional; everything after it must be keyword-only. Making the subject keyword-only too (`def f(*, a, b)`) is always allowed and often preferable.
 - A lone subject (`def render(node)`) is compliant; a second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is a violation.
 
-The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation. Carve-outs (dunders, pydantic validators/serializers, Typer/Temporal/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net.
+The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation. Carve-outs (dunders, pydantic validators/serializers, Typer/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net.
 
 The full specification — the two exceptions, the carve-out list, the symmetric-tuple allowlist, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
 

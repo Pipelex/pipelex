@@ -30,20 +30,3 @@ class PipeJob(BaseModel):
             msg = "WorkingMemory is in raw form and has not been hydrated yet"
             raise PipeJobError(msg)
         return WorkingMemory()
-
-    def prepare_for_temporal(self) -> "PipeJob":
-        """Return a PipeJob ready for Temporal dispatch, with WorkingMemory serialized to raw dict.
-
-        Returns a copy when mutation is needed, leaving the original unchanged.
-        Returns self when no transformation is required.
-        """
-        if self.library_crate is None:
-            return self
-        if self.working_memory is not None:
-            return self.model_copy(
-                update={
-                    "working_memory_raw": self.working_memory.dump_for_temporal(),
-                    "working_memory": None,
-                }
-            )
-        return self

@@ -1,28 +1,34 @@
 ---
 title: "Distributed Execution"
-description: "Run Pipelex methods as durable workflows on Temporal with your own Pipelex Temporal workers. A second, managed backend (Mistral Workflows) is coming soon."
+description: "Run Pipelex methods as durable, horizontally-scaled workflows — crash survival, automatic per-step retries, and operational visibility, delivered through the Pipelex platform."
 ---
 
 # Distributed Execution
 
-Pipelex methods run in-process by default — you call `pipelex run pipe ...` or invoke a pipe from Python and everything happens in one process. When you need durability, retries that survive failure, and horizontal scale, you run the same methods as **durable workflows** on Temporal.
+Pipelex methods run in-process by default — you call a pipe and everything happens in one process. When you move to production and need work that survives crashes, retries every step under failure, and scales across machines, the **same methods** run as durable workflows. No rewrite: the methods you build locally are the methods that run distributed.
 
-## Pipelex on Temporal
+## What it gives you
 
-**[Pipelex on Temporal](temporal/index.md)** runs Pipelex's own Temporal workers against a Temporal cluster you operate (self-hosted or Temporal Cloud) — you own the control plane. Python 3.10+, installed with `pipelex[temporal]`. Generally available.
+- **Crash survival** — a long-running pipeline resumes exactly where it left off after a restart or worker crash, instead of starting over.
+- **Per-step retries** — every LLM call, image generation, and document extraction retries on its own, with its own timeout and retry policy, so one flaky provider call doesn't sink the whole run.
+- **Horizontal scale** — fan work out across many workers, and route different workloads — a provider, a model, OCR — to their own pools so they scale and fail independently.
+- **Operational visibility** — every run is durable and observable: see what's running, what each step is doing, and replay history when you need it.
 
-The same `.mthds` methods run distributed without rewriting. Pipelex's runtime bridge classifies controller pipes as child workflows and leaf operators (LLM calls, image generation, document extraction) as activities — so durability, retries, and observability attach at the right granularity.
+## How it works
 
-## Where to go next
+You don't change your methods. Under the hood, Pipelex maps each method onto a durable execution graph — controller pipes become workflows, and each leaf operation (the actual AI calls) becomes an independently-retried unit of work. Pipelex handles the AI; the orchestration layer handles durability, retries, scheduling, and visibility. Which durable backend runs your methods is a deployment choice, not a code change.
 
-- **[Overview](temporal/index.md)** — what it is, when you'd want it, the big picture, quick start.
-- **[Cluster Setup](cluster-setup.md)** — search attributes and `pipelex setup-temporal-namespace`.
-- **[Worker Deployment](workers.md)** — `pipelex worker`, scopes, runtime profiles, multi-worker topologies.
-- **[Task-Queue Routing](task-routing.md)** — per-activity routing, queue options, per-handle overrides.
-- **[Workflow Observability](observability.md)** — workflow ids, summary fields, search-attribute filtering.
+## Backends
 
-For the failure-handling model that motivates durable execution, see [Retries & Resilience](../reliability/retries-and-resilience.md).
+Distributed execution is delivered through the Pipelex platform, on top of proven orchestration engines:
 
-## Coming soon: a managed backend
+- **[Temporal-backed execution](https://pipelex.com/products#temporal)** — run your methods as durable workflows on a Temporal control plane, with per-step retries and full replay history.
+- **[Mistral Workflows](https://pipelex.com/products#mistral-workflows)** — run your pipes inside Mistral's managed Workflows orchestration, so there's no control plane for you to operate.
 
-A second distributed-execution backend — running Pipelex pipes inside **Mistral Workflows**, Mistral's managed orchestration control plane (itself built on Temporal) — is in active development. It runs the same `.mthds` methods through the same runtime bridge, with no cluster for you to operate. Documentation and install instructions will land here once it ships.
+Both run the identical `.mthds` methods through the same Pipelex runtime, so the durability model and the [error contract](../reliability/failure-classification.md) are the same whichever one executes your work.
+
+## Get started
+
+Distributed and durable execution is part of the Pipelex platform rather than something you wire up yourself. To run your methods durably at scale — or to talk through which backend fits your deployment — see **[Pipelex products](https://pipelex.com/products#durable-execution)**.
+
+For the failure-handling model that durable execution builds on, see [Retries & Resilience](../reliability/retries-and-resilience.md).

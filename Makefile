@@ -24,6 +24,7 @@ VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
+HEARTBEAT_INTERVAL ?= 20
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -43,6 +44,29 @@ define PRINT_TITLE
     $(eval PADDED_TITLE := $(FULL_TITLE)$(PADDING))
     @echo ""
     @echo "$(PADDED_TITLE)"
+endef
+
+define WAIT_WITH_HEARTBEAT
+	start_time=$$(date +%s); \
+	$(1) & \
+	cmd_pid=$$!; \
+	( while kill -0 "$$cmd_pid" 2>/dev/null; do \
+		sleep $(HEARTBEAT_INTERVAL); \
+		if kill -0 "$$cmd_pid" 2>/dev/null; then \
+			elapsed=$$(( $$(date +%s) - $$start_time )); \
+			echo "• $(2) still running ($${elapsed}s elapsed)"; \
+		fi; \
+	done ) & \
+	heartbeat_pid=$$!; \
+	wait "$$cmd_pid"; \
+	exit_code=$$?; \
+	kill "$$heartbeat_pid" 2>/dev/null || true; \
+	wait "$$heartbeat_pid" 2>/dev/null || true
+endef
+
+define RUN_WITH_HEARTBEAT
+	@$(call WAIT_WITH_HEARTBEAT,$(1),$(2)); \
+	exit $$exit_code
 endef
 
 define HELP
@@ -124,8 +148,6 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-temporal            - Run temporal tests (SRV=local|testing MODE=live REG=isolated)
-make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
@@ -147,17 +169,6 @@ make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
 make view-graph               - Start server and open ReactFlow graph in browser
-
-make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
-make ts                       - Shorthand -> temporal-server
-make temporal-stop            - Kill the local Temporal dev server (port 7233)
-make tstop                    - Shorthand -> temporal-stop
-make temporal-worker          - Start a Temporal worker (separate process)
-make tw                       - Shorthand -> temporal-worker
-make temporal-run             - Run a pipe through Temporal (real LLM calls)
-make trun                     - Shorthand -> temporal-run
-make temporal-run-dry         - Run a pipe through Temporal (dry run, no LLM)
-make trund                    - Shorthand -> temporal-run-dry
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -185,7 +196,7 @@ export HELP
     rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
+	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test agent-test-debug atd \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
@@ -197,8 +208,6 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	temporal-server ts temporal-stop tstop temporal-worker tw temporal-worker-router twr temporal-worker-runner twn \
-	temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
 
 all help:
@@ -667,42 +676,6 @@ test-img-gen: env
 tg: test-img-gen
 	@echo "> done: tg = test-img-gen"
 
-SRV ?=
-MODE ?=
-REG ?=
-TEMPORAL_PYTEST_MARKERS := $(if $(filter live,$(MODE)),"temporal","temporal and (dry_runnable or not inference)")
-TEMPORAL_TESTS_DIR := tests/integration/pipelex/temporal/
-
-test-temporal: env
-	$(call PRINT_TITLE,"Unit testing Temporal")
-	@if [ -n "$(TEST)" ]; then \
-		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
-			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s --lf \
-				$(if $(SRV),--temporal-server $(SRV),) \
-				$(if $(REG),--class-registry $(REG),) \
-				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-				$(TEMPORAL_TESTS_DIR); \
-		else \
-			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s -k "$(TEST)" \
-				$(if $(SRV),--temporal-server $(SRV),) \
-				$(if $(REG),--class-registry $(REG),) \
-				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-				$(TEMPORAL_TESTS_DIR); \
-		fi; \
-	else \
-		$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s \
-			$(if $(SRV),--temporal-server $(SRV),) \
-			$(if $(REG),--class-registry $(REG),) \
-			$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-			$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-			$(TEMPORAL_TESTS_DIR); \
-	fi
-
-ttm: test-temporal
-	@echo "> done: ttm = test-temporal"
-
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
@@ -721,8 +694,7 @@ ta: test-pipelex-api
 agent-test: env
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
-	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
-	exit_code=$$?; \
+	$(call WAIT_WITH_HEARTBEAT,$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1,agent-test); \
 	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
@@ -731,10 +703,10 @@ agent-test: env
 # Debug variant of agent-test for when the suite hangs or fails opaquely.
 # Use this instead of agent-test when:
 #   - a prior `make agent-test` hung (or got killed) without a verdict
-#   - failures are integration-temporal with worker crashes / "node down" noise
+#   - failures show xdist worker crashes / "node down" noise
 #   - you need to see what's actually happening during the run
 # Differences vs agent-test:
-#   - pkill stale `pytest` + `temporal-sdk-python` processes first (zombies from
+#   - pkill stale `pytest` processes first (zombies from
 #     prior hung runs compound contention and cause more hangs)
 #   - outer wall-clock `timeout` so fixture-teardown hangs and xdist
 #     worker-replace loops can't run forever (`pytest --timeout` is per-test only)
@@ -752,9 +724,8 @@ agent-test-debug: env
 		echo "  The outer wall-clock cap is the whole point of this target — install before using."; \
 		exit 1; \
 	fi
-	@echo "• Cleaning stale pytest + temporal-sdk-python processes..."
+	@echo "• Cleaning stale pytest processes..."
 	@pkill -9 -f "pytest" 2>/dev/null || true
-	@pkill -9 -f "temporal-sdk-python" 2>/dev/null || true
 	@sleep 1
 	@echo "• Running with outer timeout=$(DEBUG_TIMEOUT)s, log: $(DEBUG_LOG)"
 	@echo "  Live progress: tail -f $(DEBUG_LOG)"
@@ -777,7 +748,7 @@ agent-test-debug: env
 		echo "  Full log: $(DEBUG_LOG)"; \
 		echo "  Tip: grep failures by error class name, not formatted message —"; \
 		echo "       grep -B 2 -A 10 'YourErrorClass' $(DEBUG_LOG)"; \
-		echo "  If failures are integration-temporal with worker crashes, re-run that"; \
+		echo "  If failures show xdist worker crashes ('node down'), re-run that"; \
 		echo "  slice serially: .venv/bin/pytest --timeout=60 -q tests/integration/.../"; \
 		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
 	else \
@@ -880,15 +851,18 @@ lint: ruff-lint plxt-lint
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+	@echo "$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml,pyright)
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	@echo "$(VENV_MYPY) --config-file pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_MYPY) --config-file pyproject.toml,mypy)
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
+	@echo "$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests,pylint)
 
 
 ##########################################################################################
@@ -1084,67 +1058,6 @@ sg: serve-graph
 
 vg: view-graph
 	@echo "> done: vg = view-graph"
-
-temporal-server:
-	$(call PRINT_TITLE,"Starting local Temporal dev server")
-	@if ! command -v temporal >/dev/null 2>&1; then \
-		echo "Error: 'temporal' CLI not found. Install it with: brew install temporal"; \
-		exit 1; \
-	fi
-	@echo "• Temporal Web UI will be available at http://localhost:8233"
-	@echo "• Temporal gRPC service at localhost:7233"
-	@echo "• Press Ctrl+C to stop"
-	temporal server start-dev
-
-ts: temporal-server
-
-temporal-stop:
-	$(call PRINT_TITLE,"Stopping local Temporal dev server")
-	@PID=$$(lsof -tiTCP:7233 -sTCP:LISTEN 2>/dev/null); \
-	if [ -z "$$PID" ]; then \
-		echo "• No process found on port 7233"; \
-	else \
-		kill $$PID && echo "• Killed Temporal server (PID $$PID)"; \
-	fi
-
-tstop: temporal-stop
-
-TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds
-TEMPORAL_PIPE ?= simple_text_sequence
-TEMPORAL_LIB ?=
-
-TEMPORAL_SCOPE ?=
-
-temporal-worker: env
-	$(call PRINT_TITLE,"Starting Temporal worker$(if $(TEMPORAL_SCOPE), (scope: $(TEMPORAL_SCOPE)),)")
-	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed \
-		$(if $(TEMPORAL_SCOPE),--scope $(TEMPORAL_SCOPE),)
-
-tw: temporal-worker
-
-temporal-worker-router: env
-	$(MAKE) temporal-worker TEMPORAL_SCOPE=router
-
-twr: temporal-worker-router
-
-temporal-worker-runner: env
-	$(MAKE) temporal-worker TEMPORAL_SCOPE=runner
-
-twn: temporal-worker-runner
-
-temporal-run: env
-	$(call PRINT_TITLE,"Running pipe through Temporal")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo --graph \
-		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
-
-trun: temporal-run
-
-temporal-run-dry: env
-	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo --graph \
-		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
-
-trund: temporal-run-dry
 
 ##########################################################################################
 ### GRAPH UI ASSET SYNC (from mthds-ui)

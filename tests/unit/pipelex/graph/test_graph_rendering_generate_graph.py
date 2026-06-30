@@ -163,3 +163,20 @@ class TestGenerateGraphForBundle:
         assert result["graph_output_dir"] == str(tmp_path)
         assert result["pipe_code"] == "pipe_code"
         assert result["direction"] == expected_direction
+
+    async def test_pipe_code_override_passed_to_dry_run(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """An explicit graph target should be passed to the pipeline dry-run helper."""
+        mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+
+        await generate_graph_for_bundle(
+            bundle_path=mocks["bundle_path"],
+            graph_format=GraphFormat.REACTFLOW,
+            pipe_code="other_pipe",
+        )
+
+        mocks["mock_dry_run"].assert_awaited_once()
+        assert mocks["mock_dry_run"].call_args.kwargs["pipe_code"] == "other_pipe"

@@ -1,11 +1,12 @@
-"""Routing tests for ImgGenWorkerFactory: each plugin SDK string must build the right image
+"""Routing tests for ImgGenWorkerFactory: each SDK string must build the right image
 generation worker with the right SDK client, completions factory, and reporting delegate,
-while caching the SDK instance in the plugin SDK registry.
+while caching the SDK instance in the SDK client registry.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -17,13 +18,37 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.exceptions import MissingDependencyError
 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
+from pipelex.plugins.builtins import BUILTIN_PLUGINS
+from pipelex.plugins.exceptions import InferenceBackendNotFoundError
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
+from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
-from pipelex.plugins.plugin_sdk_registry import Plugin, PluginSdkRegistry
+from pipelex.plugins.registrar import PluginRegistrar
+from pipelex.plugins.sdk_client_registry import SdkClientRegistry
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
+
+    from pipelex.system.configuration.configs import PipelexConfig
+
+
+def build_builtin_inference_backend_registry() -> InferenceBackendRegistry:
+    """Register the built-in driver plugins into a fresh registrar and snapshot the backends.
+
+    This is exactly what boot does, so the routing tests below exercise the real
+    plugin closures through the real registry lookup.
+    """
+    # No builtin's register() reads config: Temporal — the only plugin that did, via
+    # ``temporal.is_enabled`` — now ships as the external pipelex-temporal dist. A bare
+    # stub config suffices.
+    stub_config = cast("PipelexConfig", SimpleNamespace())
+    registrar = PluginRegistrar(config=stub_config)
+    for plugin in BUILTIN_PLUGINS:
+        plugin.register(registrar)
+    return InferenceBackendRegistry(registrar.inference_backends)
+
 
 FACTORY_MODULE = "pipelex.cogt.img_gen.img_gen_worker_factory"
 
@@ -72,21 +97,22 @@ def make_backend(name: str = "test_backend") -> InferenceBackend:
 def patch_hub_getters(
     mocker: MockerFixture,
     backend: InferenceBackend,
-) -> PluginSdkRegistry:
+) -> SdkClientRegistry:
     """Patch hub getters at the worker-factory namespace; return the fresh SDK registry."""
-    registry = PluginSdkRegistry()
+    registry = SdkClientRegistry()
     models_manager = mocker.MagicMock()
     models_manager.get_required_inference_backend.return_value = backend
     mocker.patch(f"{FACTORY_MODULE}.get_models_manager", return_value=models_manager)
-    plugin_manager = mocker.MagicMock()
-    plugin_manager.plugin_sdk_registry = registry
-    mocker.patch(f"{FACTORY_MODULE}.get_plugin_manager", return_value=plugin_manager)
+    sdk_client_manager = mocker.MagicMock()
+    sdk_client_manager.sdk_client_registry = registry
+    mocker.patch(f"{FACTORY_MODULE}.get_sdk_client_manager", return_value=sdk_client_manager)
+    mocker.patch(f"{FACTORY_MODULE}.get_inference_backend_registry", return_value=build_builtin_inference_backend_registry())
     return registry
 
 
 class TestImgGenWorkerFactory:
     @pytest.mark.parametrize(
-        ("sdk", "client_target", "worker_target", "factory_cls", "http_flag", "passes_plugin"),
+        ("sdk", "client_target", "worker_target", "factory_cls", "http_flag", "passes_model_handle"),
         [
             pytest.param("gateway_img_gen", GATEWAY_CLIENT, GATEWAY_WORKER, None, None, False, id="gateway_img_gen"),
             pytest.param("openai_img_gen", OPENAI_CLIENT, OPENAI_WORKER, None, None, True, id="openai_img_gen"),
@@ -112,7 +138,7 @@ class TestImgGenWorkerFactory:
         worker_target: str,
         factory_cls: type | None,
         http_flag: bool | None,
-        passes_plugin: bool,
+        passes_model_handle: bool,
     ) -> None:
         """Each SDK string routes to its image generation worker with the SDK client wired in."""
         backend = make_backend()
@@ -128,8 +154,8 @@ class TestImgGenWorkerFactory:
         client_factory_mock.assert_called_once()
         client_kwargs = client_factory_mock.call_args.kwargs
         assert client_kwargs["backend"] is backend
-        if passes_plugin:
-            assert client_kwargs["plugin"] == Plugin(sdk=sdk, backend="test_backend", variant=None)
+        if passes_model_handle:
+            assert client_kwargs["model_handle"] == ModelHandle(sdk=sdk, backend="test_backend", variant=None)
 
         worker_cls_mock.assert_called_once()
         worker_kwargs = worker_cls_mock.call_args.kwargs
@@ -205,7 +231,7 @@ class TestImgGenWorkerFactory:
         worker = ImgGenWorkerFactory.make_img_gen_worker(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         worker_cls_mock.assert_called_once_with(
-            plugin=Plugin(sdk="azure_rest_img_gen", backend="test_backend", variant=None),
+            model_handle=ModelHandle(sdk="azure_rest_img_gen", backend="test_backend", variant=None),
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
         )
@@ -217,9 +243,9 @@ class TestImgGenWorkerFactory:
         backend = make_backend()
         registry = patch_hub_getters(mocker, backend=backend)
         inference_model = make_img_gen_model_spec(sdk="gateway_img_gen")
-        plugin = Plugin.make_for_inference_model(inference_model=inference_model)
+        model_handle = ModelHandle.make_for_inference_model(inference_model=inference_model)
         cached_client = mocker.MagicMock(name="cached_client")
-        registry.set_sdk_instance(plugin=plugin, sdk_instance=cached_client)
+        registry.set(model_handle=model_handle, sdk_instance=cached_client)
         client_factory_mock = mocker.patch(GATEWAY_CLIENT)
         worker_cls_mock = mocker.patch(GATEWAY_WORKER)
 
@@ -234,6 +260,7 @@ class TestImgGenWorkerFactory:
         [
             pytest.param("fal", "fal", id="fal"),
             pytest.param("google", "google", id="google"),
+            pytest.param("huggingface_img_gen", "huggingface", id="huggingface_img_gen"),
         ],
     )
     def test_missing_dependency_raises(self, mocker: MockerFixture, sdk: str, expected_extra: str) -> None:
@@ -249,14 +276,15 @@ class TestImgGenWorkerFactory:
         assert exc_info.value.extra_name == expected_extra
         assert f"pipelex[{expected_extra}]" in str(exc_info.value)
 
-    def test_unknown_sdk_raises_not_implemented(self, mocker: MockerFixture) -> None:
-        """An unrecognized SDK string raises NotImplementedError naming the plugin."""
+    def test_unknown_sdk_raises_backend_not_found(self, mocker: MockerFixture) -> None:
+        """An unrecognized SDK string raises a structured InferenceBackendNotFoundError naming the SDK (a registry miss)."""
         backend = make_backend()
         patch_hub_getters(mocker, backend=backend)
         inference_model = make_img_gen_model_spec(sdk="definitely_not_an_sdk")
 
-        with pytest.raises(NotImplementedError) as exc_info:
+        with pytest.raises(InferenceBackendNotFoundError) as exc_info:
             ImgGenWorkerFactory.make_img_gen_worker(inference_model=inference_model)
 
+        assert exc_info.value.sdk == "definitely_not_an_sdk"
         assert "definitely_not_an_sdk" in str(exc_info.value)
-        assert "not supported for image generation" in str(exc_info.value)
+        assert "Is its plugin installed and enabled?" in str(exc_info.value)
