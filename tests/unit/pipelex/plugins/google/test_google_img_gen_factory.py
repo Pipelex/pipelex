@@ -268,3 +268,68 @@ class TestGoogleImgGenFactory:
                 exact_size=ImageSize(width=2048, height=512),
                 model_name="nano-banana-pro",
             )
+
+    @pytest.mark.parametrize(
+        ("taxonomy", "aspect_ratio", "tier", "expected"),
+        [
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, AspectRatio.SQUARE, SizeTier.TWO_K, ("1:1", "2K", 2048, 2048)),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, AspectRatio.LANDSCAPE_16_9, SizeTier.FOUR_K, ("16:9", "4K", 5504, 3072)),
+            (AspectRatioTaxonomy.GEMINI_2_5, AspectRatio.SQUARE, SizeTier.ONE_K, ("1:1", "1K", 1024, 1024)),
+        ],
+    )
+    def test_resolve_image_config_from_tier(
+        self,
+        taxonomy: AspectRatioTaxonomy,
+        aspect_ratio: AspectRatio,
+        tier: SizeTier,
+        expected: tuple[GoogleAspectRatioType, GoogleImageSize, int, int],
+    ) -> None:
+        """A tier resolves to Google's `image_size` token plus the matching grid dimensions."""
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            taxonomy,
+            aspect_ratio=aspect_ratio,
+            size=tier,
+            model_name="some-gemini-model",
+        )
+        assert resolved == expected
+
+    def test_resolve_image_config_unset_size_omits_wire_param(self) -> None:
+        """No size set -> `image_size` stays None (param omitted on the wire), dims come from the 1K grid."""
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            AspectRatioTaxonomy.GEMINI_3_FLASH,
+            aspect_ratio=AspectRatio.SQUARE,
+            size=None,
+            model_name="nano-banana-2",
+        )
+        assert resolved.aspect_ratio == "1:1"
+        assert resolved.image_size is None
+        assert (resolved.width, resolved.height) == (1024, 1024)
+
+    def test_resolve_image_config_from_exact_size(self) -> None:
+        """An exact size resolves through the grid derivation, ignoring the aspect_ratio argument."""
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            AspectRatioTaxonomy.GEMINI_3_FLASH,
+            aspect_ratio=AspectRatio.SQUARE,
+            size=ImageSize(width=2752, height=1536),
+            model_name="nano-banana-2",
+        )
+        assert resolved == ("16:9", "2K", 2752, 1536)
+
+    def test_resolve_image_config_rejects_tier_beyond_taxonomy(self) -> None:
+        """A tier outside the taxonomy's grids is a validation error, not a silent downgrade."""
+        with pytest.raises(ImgGenParameterError, match="does not support image size"):
+            GoogleImgGenFactory.resolve_image_config(
+                AspectRatioTaxonomy.GEMINI_2_5,
+                aspect_ratio=AspectRatio.SQUARE,
+                size=SizeTier.TWO_K,
+                model_name="nano-banana",
+            )
+
+    def test_resolve_image_config_rejects_half_k(self) -> None:
+        with pytest.raises(ImgGenParameterError, match=r"0\.5k"):
+            GoogleImgGenFactory.resolve_image_config(
+                AspectRatioTaxonomy.GEMINI_3_FLASH,
+                aspect_ratio=AspectRatio.SQUARE,
+                size=SizeTier.HALF_K,
+                model_name="nano-banana-2",
+            )

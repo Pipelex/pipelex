@@ -127,7 +127,7 @@ class OpenAIImgGenFactory:
             case SizeTier.FOUR_K:
                 scaled_size = ImageSize(width=width * 4, height=height * 4)
         try:
-            cls.validate_gpt_image_2_size(model_name=model_name, size=scaled_size)
+            cls.validate_gpt_image_2_size(model_name=model_name, size=scaled_size, is_tier_derived=True)
         except ImgGenParameterError as exc:
             msg = (
                 f"Size tier '{tier}' is not satisfiable by OpenAI image model '{model_name}': the derived size "
@@ -137,7 +137,7 @@ class OpenAIImgGenFactory:
         return scaled_size
 
     @classmethod
-    def validate_gpt_image_2_size(cls, *, model_name: str, size: ImageSize) -> None:
+    def validate_gpt_image_2_size(cls, *, model_name: str, size: ImageSize, is_tier_derived: bool = False) -> None:
         size_string = cls._size_to_string(size)
         width = size.width
         height = size.height
@@ -170,7 +170,12 @@ class OpenAIImgGenFactory:
             raise ImgGenParameterError(msg)
 
         if total_pixels > cls.GPT_IMAGE_2_RELIABILITY_PIXELS:
-            log.warning(f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.")
+            msg = f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary."
+            if is_tier_derived:
+                # A tier is a portable request, not a hand-picked size: note it quietly.
+                log.verbose(msg)
+            else:
+                log.warning(msg)
 
     @classmethod
     def moderation_for_openai_image(cls, is_moderated: bool | None) -> OpenAIImageModerationType:

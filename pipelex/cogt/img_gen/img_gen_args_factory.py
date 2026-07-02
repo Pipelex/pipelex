@@ -387,23 +387,13 @@ class ImgGenArgsFactory:
                 # The Google native worker and the gateway build their own `image_config`
                 # from the job params; this path validates the (aspect_ratio, size) pair
                 # against the taxonomy's published grids and exposes the ratio literal.
-                ratio_literal: str
-                if isinstance(size, ImageSize):
-                    ratio_literal, _ = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
-                        aspect_ratio_taxonomy,
-                        exact_size=size,
-                        model_name=model_name,
-                    )
-                else:
-                    google_image_size = GoogleImgGenFactory.image_size_for_tier(size) if size is not None else "1K"
-                    GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                        aspect_ratio_taxonomy,
-                        aspect_ratio=aspect_ratio,
-                        size=google_image_size,
-                        model_name=model_name,
-                    )
-                    ratio_literal = GoogleImgGenFactory.aspect_ratio_literal(aspect_ratio)
-                return {"aspect_ratio": ratio_literal}
+                resolved = GoogleImgGenFactory.resolve_image_config(
+                    aspect_ratio_taxonomy,
+                    aspect_ratio=aspect_ratio,
+                    size=size,
+                    model_name=model_name,
+                )
+                return {"aspect_ratio": resolved.aspect_ratio}
             case AspectRatioTaxonomy.QWEN_IMAGE:
                 width: int
                 height: int

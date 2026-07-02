@@ -10,7 +10,9 @@ from portkey_ai import (
 
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
+from pipelex.cogt.img_gen.img_gen_job_components import SizeTier
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
@@ -22,6 +24,7 @@ from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:
+    from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobParams
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -61,6 +64,28 @@ class GatewayFactory:
         )
 
     @classmethod
+    def _make_gemini_image_config(cls, inference_model: InferenceModelSpec, *, job_params: ImgGenJobParams) -> dict[str, str]:
+        """Build the gemini `image_config` extra-body block, honoring the portable size.
+
+        A tier maps straight to Google's `image_size` token. An exact size needs the
+        model's taxonomy rules to derive its (ratio, size) grid cell. An unset size omits
+        `image_size` entirely so the provider applies its own default (the 1K class).
+        """
+        size = job_params.size
+        if isinstance(size, ImageSize):
+            taxonomy = GoogleImgGenFactory.img_gen_taxonomy(inference_model)
+            ratio_literal, google_size = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+                taxonomy,
+                exact_size=size,
+                model_name=inference_model.name,
+            )
+            return {"aspect_ratio": ratio_literal, "image_size": google_size}
+        image_config: dict[str, str] = {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
+        if isinstance(size, SizeTier):
+            image_config["image_size"] = GoogleImgGenFactory.image_size_for_tier(size)
+        return image_config
+
+    @classmethod
     def make_extras(
         cls, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
@@ -92,11 +117,7 @@ class GatewayFactory:
             # Mistral models really want non-null seed
             extra_body["seed"] = random.randint(0, 1000000)
         elif isinstance(inference_job, ImgGenJob) and inference_model.model_id.startswith("gemini"):
-            aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(inference_job.job_params.aspect_ratio)
-            extra_body["image_config"] = {
-                "aspect_ratio": aspect_ratio_str,
-                # "image_size": "2K",
-            }
+            extra_body["image_config"] = cls._make_gemini_image_config(inference_model, job_params=inference_job.job_params)
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
         if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation

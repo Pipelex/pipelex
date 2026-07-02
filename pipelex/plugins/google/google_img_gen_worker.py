@@ -8,11 +8,10 @@ from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
@@ -82,22 +81,6 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # Best-effort cleanup boundary: teardown must never fail, whatever client/event-loop close throws.
             log.debug(f"Error during Google async client teardown: {exc}")
 
-    def _img_gen_taxonomy(self) -> AspectRatioTaxonomy:
-        """Resolve the model's geometry taxonomy from its deck rules."""
-        rules = self.inference_model.rules or {}
-        taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
-        if taxonomy_value is None:
-            msg = (
-                f"Google image model '{self.inference_model.name}' has no 'aspect_ratio' rules configured; "
-                f"set rules.aspect_ratio to a Gemini taxonomy (e.g. 'gemini_3_flash')"
-            )
-            raise ImgGenParameterError(msg)
-        try:
-            return AspectRatioTaxonomy(taxonomy_value)
-        except ValueError as exc:
-            msg = f"Google image model '{self.inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}'"
-            raise ImgGenParameterError(msg) from exc
-
     @override
     async def _gen_image(
         self,
@@ -105,17 +88,17 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         """Generate a single image using Google Gemini Image API."""
         prompt_text = img_gen_job.img_gen_prompt.positive_text
-        aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(img_gen_job.job_params.aspect_ratio)
-        width, height = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-            self._img_gen_taxonomy(),
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            GoogleImgGenFactory.img_gen_taxonomy(self.inference_model),
             aspect_ratio=img_gen_job.job_params.aspect_ratio,
-            size="1K",
+            size=img_gen_job.job_params.size,
             model_name=self.inference_model.name,
         )
 
-        # Build image config for aspect ratio
+        # Build image config for aspect ratio and size (image_size None = provider default)
         image_config = genai_types.ImageConfig(
-            aspect_ratio=aspect_ratio_str,
+            aspect_ratio=resolved.aspect_ratio,
+            image_size=resolved.image_size,
         )
 
         # Build generation config with image output
@@ -210,7 +193,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     )
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
-                    size=ImageSize(width=width, height=height),
+                    size=ImageSize(width=resolved.width, height=resolved.height),
                     mime_type=mime_type,
                 )
 

@@ -1,18 +1,32 @@
 import math
 import operator
 from collections.abc import Mapping
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, NamedTuple
 
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
-from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
+from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 GoogleAspectRatioType = Literal["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"]
 
 GoogleImageSize = Literal["1K", "2K", "4K"]
 
 AspectRatioToDimensions = dict[GoogleAspectRatioType, tuple[int, int]]
+
+
+class ResolvedGoogleImageConfig(NamedTuple):
+    """Wire-ready Google `image_config` values plus the grid dimensions they map to.
+
+    An `image_size` of None means the parameter must be omitted on the wire so the
+    provider applies its own default (the 1K class) — never send a made-up value.
+    """
+
+    aspect_ratio: GoogleAspectRatioType
+    image_size: GoogleImageSize | None
+    width: int
+    height: int
 
 
 class GoogleImgGenFactory:
@@ -101,6 +115,61 @@ class GoogleImgGenFactory:
     GEMINI_3_PRO_ASPECT_RATIOS: ClassVar[frozenset[GoogleAspectRatioType]] = frozenset(
         ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"]
     )
+
+    @classmethod
+    def img_gen_taxonomy(cls, inference_model: InferenceModelSpec) -> AspectRatioTaxonomy:
+        """Resolve the model's geometry taxonomy from its deck rules.
+
+        Raises:
+            ImgGenParameterError: If the model has no `aspect_ratio` rules configured
+                or the configured taxonomy value is unknown.
+        """
+        rules = inference_model.rules or {}
+        taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
+        if taxonomy_value is None:
+            msg = (
+                f"Google image model '{inference_model.name}' has no 'aspect_ratio' rules configured; "
+                f"set rules.aspect_ratio to a Gemini taxonomy (e.g. 'gemini_3_flash')"
+            )
+            raise ImgGenParameterError(msg)
+        try:
+            return AspectRatioTaxonomy(taxonomy_value)
+        except ValueError as exc:
+            msg = f"Google image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}'"
+            raise ImgGenParameterError(msg) from exc
+
+    @classmethod
+    def resolve_image_config(
+        cls,
+        taxonomy: AspectRatioTaxonomy,
+        *,
+        aspect_ratio: AspectRatio,
+        size: SizeTier | ImageSize | None,
+        model_name: str,
+    ) -> ResolvedGoogleImageConfig:
+        """Resolve the wire-ready (aspect_ratio, image_size) pair and its grid dimensions.
+
+        An exact size derives its grid cell from the taxonomy's grids and ignores the
+        `aspect_ratio` argument (the two are mutually exclusive upstream). A tier maps to
+        Google's `image_size` token, validated against the grids. When no size is set,
+        `image_size` is None (omit the param; provider default is the 1K class) and the
+        dimensions come from the 1K grid.
+
+        Raises:
+            ImgGenParameterError: If the (aspect_ratio, size) request has no cell in the
+                taxonomy's grids.
+        """
+        if isinstance(size, ImageSize):
+            ratio_literal, google_size = cls.derive_ratio_and_size_from_exact_size(taxonomy, exact_size=size, model_name=model_name)
+            return ResolvedGoogleImageConfig(aspect_ratio=ratio_literal, image_size=google_size, width=size.width, height=size.height)
+        image_size = cls.image_size_for_tier(size) if size is not None else None
+        width, height = cls.dimensions_for_aspect_ratio_and_size(
+            taxonomy,
+            aspect_ratio=aspect_ratio,
+            size=image_size or "1K",
+            model_name=model_name,
+        )
+        return ResolvedGoogleImageConfig(aspect_ratio=cls.aspect_ratio_literal(aspect_ratio), image_size=image_size, width=width, height=height)
 
     @classmethod
     def aspect_ratio_literal(cls, aspect_ratio: AspectRatio) -> GoogleAspectRatioType:
