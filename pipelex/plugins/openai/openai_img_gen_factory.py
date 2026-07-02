@@ -76,7 +76,15 @@ class OpenAIImgGenFactory:
         size: ImageSize | None,
     ) -> tuple[str, int, int]:
         if size is None:
-            width, height = cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE[aspect_ratio]
+            dimensions = cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE.get(aspect_ratio)
+            if dimensions is None:
+                supported_aspect_ratios = ", ".join(supported_ratio.value for supported_ratio in cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE)
+                msg = (
+                    f"Aspect ratio '{aspect_ratio}' is not supported by OpenAI image model '{model_name}'. "
+                    f"Supported aspect ratios are: {supported_aspect_ratios}"
+                )
+                raise ImgGenParameterError(msg)
+            width, height = dimensions
             size = ImageSize(width=width, height=height)
         cls.validate_gpt_image_2_size(model_name=model_name, size=size)
         return cls._size_to_string(size), size.width, size.height

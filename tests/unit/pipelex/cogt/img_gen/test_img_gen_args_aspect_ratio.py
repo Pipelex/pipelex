@@ -39,6 +39,10 @@ class TestImgGenArgsAspectRatio:
         [
             AspectRatio.LANDSCAPE_3_2,
             AspectRatio.PORTRAIT_2_3,
+            AspectRatio.LANDSCAPE_4_1,
+            AspectRatio.LANDSCAPE_8_1,
+            AspectRatio.PORTRAIT_1_4,
+            AspectRatio.PORTRAIT_1_8,
         ],
     )
     def test_flux_rejects_unsupported_ratios(self, aspect_ratio: AspectRatio) -> None:
@@ -83,6 +87,10 @@ class TestImgGenArgsAspectRatio:
         [
             AspectRatio.LANDSCAPE_3_2,
             AspectRatio.PORTRAIT_2_3,
+            AspectRatio.LANDSCAPE_4_1,
+            AspectRatio.LANDSCAPE_8_1,
+            AspectRatio.PORTRAIT_1_4,
+            AspectRatio.PORTRAIT_1_8,
         ],
     )
     def test_flux_11_ultra_rejects_unsupported_ratios(self, aspect_ratio: AspectRatio) -> None:
@@ -137,6 +145,10 @@ class TestImgGenArgsAspectRatio:
         [
             AspectRatio.LANDSCAPE_21_9,
             AspectRatio.PORTRAIT_9_21,
+            AspectRatio.LANDSCAPE_4_1,
+            AspectRatio.LANDSCAPE_8_1,
+            AspectRatio.PORTRAIT_1_4,
+            AspectRatio.PORTRAIT_1_8,
         ],
     )
     def test_qwen_image_rejects_unsupported_ratios(self, aspect_ratio: AspectRatio) -> None:

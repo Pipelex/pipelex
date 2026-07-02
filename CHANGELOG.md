@@ -5,6 +5,7 @@
 ### Added
 
 - **Gemini image-to-image (img2img) support:** The Google img-gen worker now forwards input images to the Gemini API as inline parts alongside the text prompt, enabling image editing and multi-image composition with the Nano Banana models. `nano-banana-2` (`gemini-3.1-flash-image-preview`) accepts image inputs and is supported by the dimensions factory (same 1K/2K/4K resolution grid as Nano Banana Pro, per Google's published tables); added `nano-banana-2-lite` (`gemini-3.1-flash-lite-image`, 1K only) to the Google backend.
+- **Banner aspect ratios (`landscape_4_1`, `landscape_8_1`, `portrait_1_4`, `portrait_1_8`):** New `AspectRatio` values for the extreme banner/strip formats introduced by the Gemini 3.1 image models, supported by `nano-banana-2` and `nano-banana-2-lite` with Google's published pixel grids. All other image-gen backends reject them with a clean parameter error. The Google dimension tables were restructured by model generation (Gemini 2.5 grid vs Gemini 3 grid) with per-model capability gating, so unsupported ratio/size combinations raise `ImgGenParameterError` instead of crashing.
 
 ### Fixed
 

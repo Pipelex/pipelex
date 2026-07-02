@@ -304,7 +304,14 @@ class ImgGenArgsFactory:
                         value = "portrait_16_9"
                     case AspectRatio.PORTRAIT_9_21:
                         value = "portrait_21_9"
-                    case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                    case (
+                        AspectRatio.LANDSCAPE_3_2
+                        | AspectRatio.PORTRAIT_2_3
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.FLUX_11_ULTRA:
@@ -324,7 +331,14 @@ class ImgGenArgsFactory:
                         value = "9:16"
                     case AspectRatio.PORTRAIT_9_21:
                         value = "9:21"
-                    case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                    case (
+                        AspectRatio.LANDSCAPE_3_2
+                        | AspectRatio.PORTRAIT_2_3
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.GPT_IMAGE_LEGACY:
@@ -367,7 +381,14 @@ class ImgGenArgsFactory:
                     case AspectRatio.PORTRAIT_2_3:
                         width, height = 1056, 1584
                         aspect_ratio_string = "2:3"
-                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
+                    case (
+                        AspectRatio.LANDSCAPE_21_9
+                        | AspectRatio.PORTRAIT_9_21
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by HuggingFace image generation model"
                         raise ImgGenParameterError(msg)
                 return {"width": width, "height": height, "aspect_ratio": aspect_ratio_string}

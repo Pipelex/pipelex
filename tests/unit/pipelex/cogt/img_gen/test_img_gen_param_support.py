@@ -114,6 +114,26 @@ class TestImgGenParamSupport:
         assert check == SupportCheck(is_supported=True, reason=None)
 
     @pytest.mark.parametrize(
+        "aspect_ratio",
+        [
+            AspectRatio.LANDSCAPE_4_1,
+            AspectRatio.LANDSCAPE_8_1,
+            AspectRatio.PORTRAIT_1_4,
+            AspectRatio.PORTRAIT_1_8,
+        ],
+    )
+    def test_check_aspect_ratio_gpt_image_2_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_gpt_image_2_rules(),
+            aspect_ratio=aspect_ratio,
+            size=None,
+            model_name="gpt-image-2",
+        )
+        assert check.is_supported is False
+        assert check.reason is not None
+        assert "gpt-image-2" in check.reason
+
+    @pytest.mark.parametrize(
         ("background", "expected_supported"),
         [
             (Background.OPAQUE, True),
