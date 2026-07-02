@@ -78,6 +78,9 @@ is_sync_mode = false
 aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9, landscape_4_1, landscape_8_1,
                          # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21, portrait_1_4, portrait_1_8
 background = "auto"     # Options: transparent, opaque, auto
+# size is optional and has no default key: when unset, nothing is sent to the provider and its
+# default size applies. Set it to a size tier ("1k", "2k", "4k") or an exact size like "2048x1152"
+# to apply a default size to every PipeImgGen that doesn't set its own.
 quality = "low"        # Options: low, medium, high
 # nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
 guidance_scale = 3.5    # Controls adherence to prompt
@@ -95,6 +98,7 @@ Image generation jobs support these parameters:
 - **Dimensions**:
 
     - `aspect_ratio`: Predefined ratios for image dimensions
+    - `size` (optional): Portable size intent — a size tier (`"1k"`, `"2k"`, `"4k"`) or an exact pixel size like `"2048x1152"`. Unset means the provider's default size. See [PipeImgGen — Image size and portability](../../building-methods/pipes/pipe-operators/PipeImgGen.md#image-size-and-portability)
     - `background`: Background handling mode
 
 - **Quality Control**:

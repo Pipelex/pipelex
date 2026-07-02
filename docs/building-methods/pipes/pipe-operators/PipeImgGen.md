@@ -76,10 +76,43 @@ Image generation presets are defined in your model deck configuration and can in
 | `prompt`                | string          | The image generation prompt. Can be a static string or reference input variables using `$` prefix (e.g., `"$description"` or `"A sketch of: $subject"`). | Yes      |
 | `negative_prompt`       | string          | Optional negative prompt when supported by the selected model or provider.                                                    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image. Valid values: `"square"`, `"landscape_4_3"`, `"landscape_3_2"`, `"landscape_16_9"`, `"landscape_21_9"`, `"landscape_4_1"`, `"landscape_8_1"`, `"portrait_3_4"`, `"portrait_2_3"`, `"portrait_9_16"`, `"portrait_9_21"`, `"portrait_1_4"`, `"portrait_1_8"`. The banner ratios (`landscape_4_1`, `landscape_8_1`, `portrait_1_4`, `portrait_1_8`) are only supported by Gemini 3.1 image models.                                                              | No       |
+| `size`                  | string          | Portable size intent: either a **size tier** (`"1k"`, `"2k"`, `"4k"`) or an **exact pixel size** like `"2048x1152"`. A tier composes with `aspect_ratio`; an exact size implies its own ratio, so setting both an exact `size` and `aspect_ratio` is a validation error. When unset, the model's provider default applies. See [Image size and portability](#image-size-and-portability). | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
 | `background`            | string          | Optional background setting when supported by the selected provider.                                                          | No       |
 | `output_format`         | string          | Optional output image format when supported by the selected provider.                                                         | No       |
 | `is_raw`                | boolean         | Request a raw generation mode when supported by the selected provider.                                                        | No       |
+
+### Image size and portability
+
+The `size` parameter carries a size intent that stays portable when you switch the pipe's `model` between providers. It accepts two forms:
+
+- **A size tier** (`"1k"`, `"2k"`, `"4k"`): "produce this pixel class at my chosen `aspect_ratio`". A tier promises a pixel *class*, not identical dimensions across providers — `size = "2k"` at 16:9 yields 2752×1536 on `nano-banana-2` (Google's published grid) and 3072×1728 on `gpt-image-2` (computed from OpenAI's constraints). Both are 2K-class images; that is the abstraction. The `"0.5k"` tier token is reserved and currently rejected by every model.
+- **An exact pixel size** (`"2048x1152"`): "produce exactly these pixels". Deterministic everywhere it runs. Because an exact size implies its own ratio, combining it with `aspect_ratio` is a blueprint validation error. On tier-grid models (Gemini), an exact size runs only if it exactly matches a cell of the model's published grid — a near-miss is a validation error suggesting the nearest valid cells, never a silent snap.
+
+When `size` is unset, nothing is sent to the provider and its default applies (typically the 1K class) — Pipelex never silently upgrades your resolution.
+
+Per-model support:
+
+| Model | Size tiers | Exact size |
+| --- | --- | --- |
+| `nano-banana` (Gemini 2.5 Flash Image) | `1k` | matching grid cells only |
+| `nano-banana-pro` (Gemini 3 Pro Image) | `1k`, `2k`, `4k` | matching grid cells only |
+| `nano-banana-2` (Gemini 3.1 Flash Image) | `1k`, `2k`, `4k` (all ratios incl. banners) | matching grid cells only |
+| `nano-banana-2-lite` (Gemini 3.1 Flash Lite) | `1k` | matching grid cells only |
+| `gpt-image-2` | `1k`, `2k` | arbitrary within OpenAI's constraints (multiples of 16, ≤ 3:1 ratio, 0.65–8.29 MP) |
+| `gpt-image-1` / `-1-mini` / `-1.5` (legacy) | `1k` | the fixed OpenAI sizes only |
+| Flux / Flux 1.1 Ultra / SDXL / Qwen | `1k` (no-op) | not supported |
+
+An unsatisfiable request is a **hard validation error**, never a warn-and-ignore: it fails at blueprint-load time when the pipe's `model` resolves to a concrete model with rules, or at runtime before any API call when the choice is a preset or alias resolved later. Worked examples of switching `model` on an otherwise unchanged pipe:
+
+- `nano-banana-2` + `aspect_ratio = "landscape_16_9"` + `size = "2k"` → switch to `gpt-image-2`: runs, 2K-class dimensions. Switch to `flux-pro/v1.1`: validation error (Flux cannot produce the 2K class).
+- `gpt-image-2` + `size = "2048x2048"` → switch to `nano-banana-2`: runs (exact grid hit: square at 2K). With `size = "2000x2000"` instead: validation error suggesting `2048x2048`.
+- SDXL + `size = "1k"` → runs on every model (worst case as a no-op).
+- `nano-banana-2` + `size = "4k"` → switch to `gpt-image-2`: validation error (4K exceeds its pixel cap) — an honest refusal, not a silent downgrade.
+
+!!! note "Cost"
+
+    Size tiers change the bill: providers charge proportionally more for larger outputs (Google's output tokens scale with the tier, OpenAI's prices scale with the size), so `2k` and `4k` generations cost several times a `1k` generation. Leaving `size` unset keeps the model at its provider-default size and cost.
 
 ### Example: Generating a single image from a static prompt
 

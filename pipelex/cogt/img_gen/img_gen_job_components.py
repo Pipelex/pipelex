@@ -62,7 +62,14 @@ def parse_img_gen_size(value: Any) -> Any:
     raise ValueError(msg)
 
 
-ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]
+# JSON-schema-facing input shape: in .mthds files an exact size is written as a "WxH" string,
+# so the schema must accept the pattern string alongside the tier enum and the ImageSize table.
+_ExactSizeStr: TypeAlias = Annotated[str, Field(pattern=rf"^{_EXACT_SIZE_PATTERN.pattern}$")]
+
+ImgGenSize: TypeAlias = Annotated[
+    SizeTier | ImageSize,
+    BeforeValidator(parse_img_gen_size, json_schema_input_type=SizeTier | _ExactSizeStr | ImageSize),
+]
 
 
 class Quality(StrEnum):
