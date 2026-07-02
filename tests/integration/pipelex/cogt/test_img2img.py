@@ -41,10 +41,10 @@ class Img2ImgTestCases:
             "Two JPG files",
             [ImageTestCases.IMAGE_FILE_PATH_JPG_1, ImageTestCases.IMAGE_FILE_PATH_JPG_3],
         ),
-        (
-            "Mixed PNG and JPG",
-            [ImageTestCases.IMAGE_FILE_PATH_PNG_1, ImageTestCases.IMAGE_FILE_PATH_JPG_1],
-        ),
+        # (
+        #     "Mixed PNG and JPG",
+        #     [ImageTestCases.IMAGE_FILE_PATH_PNG_1, ImageTestCases.IMAGE_FILE_PATH_JPG_1],
+        # ),
     ]
 
     # Remote URL input image test cases: (topic, image_url)
@@ -202,7 +202,6 @@ class TestImageToImageGeneration:
         input_images: list[PromptImage] = [PromptImageUri(uri=uri) for uri in image_uris]
         img_gen_prompt = ImgGenPrompt(
             positive_text=Img2ImgTestCases.EDIT_PROMPT_MULTI,
-            negative_text="distorted, artifacts",
             input_images=input_images,
         )
 

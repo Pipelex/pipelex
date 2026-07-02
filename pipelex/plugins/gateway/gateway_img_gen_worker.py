@@ -1,12 +1,18 @@
 from __future__ import annotations
 
-import asyncio
 import base64
 import io
+import json
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from PIL import Image
-from portkey_ai import AsyncPortkey, Portkey
+from portkey_ai import AsyncPortkey
+
+# The vendored openai package is the one AsyncPortkey.openai_client is built from, so the
+# exceptions it raises are the vendored classes (not the real `openai` package's) — there is
+# no public re-export of them in portkey_ai.
+from portkey_ai._vendor import openai as portkey_vendored_openai  # noqa: PLC2701
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
@@ -24,6 +30,7 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.tools.misc.exceptions import FileTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -82,15 +89,16 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             raise ImgGenParameterError(msg)
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
+        # Given that different backends and different models can be used with this worker, we must interpret the response,
+        # so we build a plain dict from it in both branches and detect its shape below.
+        response_dict: dict[str, Any]
         try:
             # TODO: add portkey tracing headers when enabled
             if image_files is not None:
                 # OpenAI/Azure's Images API splits generation and editing across two REST routes, and
                 # only /images/edits accepts the 'image' parameter (/images/generations rejects it with
                 # a 400 "Unknown parameter"). The args factory maps input images to httpx-style file
-                # tuples under "image"; they must travel as a multipart body, with every remaining
-                # scalar arg as a (None, value) file part alongside the image(s), since httpx drops
-                # any JSON body entirely once 'files' is set (see httpx's encode_request).
+                # tuples under "image"; they must travel as a multipart body.
                 edits_endpoint_path = endpoint_path.replace("/images/generations", "/images/edits", 1)
                 if edits_endpoint_path == endpoint_path:
                     msg = f"Could not derive an /images/edits route from endpoint path '{endpoint_path}'"
@@ -100,26 +108,66 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 # but multiple images must each go under 'image[]' — repeated bare 'image' parts
                 # are collapsed to one by the server, silently dropping the others.
                 image_field_name = "image[]" if len(image_files) > 1 else "image"
-                multipart_fields: list[tuple[str, Any]] = [(image_field_name, image_file) for image_file in image_files]
-                multipart_fields.extend((key, (None, str(value))) for key, value in args_dict.items())
-                # portkey_ai's AsyncAPIClient._build_request() never forwards 'files' to httpx (confirmed
-                # against portkey_ai 2.3.0 and the current portkey-python-sdk main branch: the sync
-                # APIClient._build_request() passes files=options.files, the async one omits it entirely),
-                # so an async .post(..., files=...) silently sends an empty body. Route this one call
-                # through a throwaway sync Portkey client (same credentials) off the event loop instead.
-                sync_portkey_client = Portkey(
-                    base_url=str(self.portkey_client.base_url),  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
-                    api_key=self.portkey_client.api_key,
-                    debug=self.portkey_client.debug,
+                multipart_files: list[tuple[str, Any]] = [(image_field_name, image_file) for image_file in image_files]
+                # TODO: PR the one-line fix upstream to portkey-python-sdk — AsyncAPIClient._build_request()
+                # omits files=options.files (the sync APIClient passes it), so AsyncPortkey.post(files=...)
+                # silently sends an empty body (verified on portkey-ai 2.3.0 through 2.3.2 and current main).
+                # Once the fix ships, restore the plain Portkey call
+                # `self.portkey_client.with_options(config=config_id).post(url=edits_endpoint_path, files=...)`;
+                # commit 2d4ae4ecb71116e942c0adf2e6516de4b42f0614 holds the state of things and analysis.
+                # Until then, route the edit through the vendored AsyncOpenAI client that AsyncPortkey already
+                # carries: same base_url, Portkey auth headers baked in as default_headers, shared connection
+                # pool — and its multipart serializer renders every scalar arg passed as `body` into a form
+                # field (bools lowercased, arrays bracketed) once Content-Type is multipart/form-data.
+                http_response = await self.portkey_client.openai_client.post(
+                    edits_endpoint_path,
+                    cast_to=httpx.Response,
+                    body=args_dict,
+                    files=multipart_files,
+                    options={
+                        "headers": {
+                            PortkeyHeaderKey.CONFIG: config_id,
+                            "Content-Type": "multipart/form-data",
+                        },
+                    },
                 )
-                edit_post = sync_portkey_client.with_options(config=config_id).post  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                response = await asyncio.to_thread(edit_post, url=edits_endpoint_path, files=multipart_fields)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+                # A 2xx with a non-JSON body (e.g. an intermediary's HTML error page) must surface as a
+                # categorized ImgGenGenerationError, not a raw JSONDecodeError — the latter escapes the
+                # Temporal PipelexError bridge and gets retried, duplicating a billable generation.
+                try:
+                    response_dict = http_response.json()
+                except json.JSONDecodeError as exc:
+                    msg = f"Gateway returned a non-JSON body for model '{self.inference_model.name}'"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CONTACT_SUPPORT,
+                            detail="The Gateway returned a malformed response — retry, and report this if it persists",
+                        ),
+                        provider_metadata=None,
+                    ) from exc
             else:
                 response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                     url=endpoint_path,
                     **args_dict,
                 )
-        except portkey_exceptions.APIError as exc:
+                if response is None:
+                    msg = f"Could not get a response for model '{self.inference_model.name}' via Portkey"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CONTACT_SUPPORT,
+                            detail="The Gateway returned no response — retry, and report this if it persists",
+                        ),
+                        provider_metadata=None,
+                    )
+                if not isinstance(response, GenericResponse):
+                    msg = "Response is not of type GenericResponse"
+                    raise TypeError(msg)
+                response_dict = response.model_dump(serialize_as_any=True)
+        except (portkey_exceptions.APIError, portkey_vendored_openai.APIError) as exc:
             metadata = extract_gateway_metadata(exc)
             classification = classify_inference_error(metadata)
             raise render_inference_error(
@@ -129,26 +177,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             ) from exc
-
-        if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.name}' via Portkey"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="The Gateway returned no response — retry, and report this if it persists",
-                ),
-                provider_metadata=None,
-            )
-
-        if not isinstance(response, GenericResponse):
-            msg = "Response is not of type GenericResponse"
-            raise TypeError(msg)
-
-        # Given that different backends and different models can be used with this worker, we must interpret the response,
-        # so we do it according to the shape we detect
-        response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
