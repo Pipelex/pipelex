@@ -55,22 +55,27 @@ Checkpoint 1 review triage (context-free Sonnet `/code-review` on `19ce81eeb`):
 
 Static validation story complete: Google models get deck rules, tiers and exact sizes are checked at blueprint-load/runtime-pre-call, exact-grid matching works. **No wire changes in this phase.**
 
-- [ ] **Tests first**: per-taxonomy support matrices in `tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py` — which (aspect_ratio × tier) pairs pass/fail per taxonomy value, incl. `1k` as universal no-op, `2k`/`4k` rejections on incapable models, `0.5k` rejected everywhere for now
-- [ ] **Tests first**: exact-grid hit/miss tests — `"2048x2048"` on a gemini-3 grid → derives (1:1, 2K); `"2000x2000"` → error naming nearest cells
-- [ ] **Tests first**: static blueprint-validation tests for Google models (the previously-skipped gap) + the four portability worked examples from the design's "acceptance bar" section as test cases
-- [ ] New `AspectRatioTaxonomy` values in `pipelex/cogt/img_gen/img_gen_model_rules.py`: `gemini_2_5` (1K only, standard ratios), `gemini_3_pro` (1K/2K/4K, standard ratios), `gemini_3_flash` (1K/2K/4K now — 0.5k deferred, all ratios), `gemini_3_flash_lite` (1K only, all ratios); docstring states the topic governs ratio **and** size jointly (topic keeps its `aspect_ratio` name — no rename)
-- [ ] `pipelex/kit/configs/inference/backends/google.toml`: `rules` blocks on Google image models (`aspect_ratio = "gemini_3_flash"` etc.); check whether kit configs need a sync step (see `/add-model` skill conventions) and run it if so
-- [ ] `GoogleImgGenFactory` (`pipelex/plugins/google/google_img_gen_factory.py`) re-keyed by taxonomy instead of matching on model names; **kill the `GoogleImageGenModel` name enum** (model handles are deck config, not code constants); dimension grids stay in the factory as the single source of truth for dims
-- [ ] Exact-grid match: given exact WxH on a tier-grid model, search the model's grids for an equal cell → derive (ratio, tier) and proceed as if the user had written them; on miss → `ImgGenParameterError` suggesting nearest valid cells (same or adjacent ratio, closest area); never silently snap
-- [ ] `ImgGenParamSupport` (`pipelex/cogt/img_gen/img_gen_param_support.py`): `check_aspect_ratio` covers (aspect_ratio, size) jointly incl. tier values; `check_blueprint_params` now receives the explicitly-set `size` (today it passes `size=None`); `check_job_params` picks it from params as before; keep the unknown-taxonomy abstain policy
-- [ ] Tier satisfiability for non-Google taxonomies wired into the same check: gpt-image-2 accepts `1k`/`2k`, rejects `0.5k`/`4k`; legacy gpt-image accepts `1k` only; Flux/SDXL/Qwen accept `1k` as no-op, reject the rest; exact size on no-exact-size models → validation error with the "use aspect_ratio, optionally size = '1k'" message
-- [ ] Verify: `make agent-check`, targeted unit tests, `make tb` (deck TOML changed)
+- [x] **Tests first**: per-taxonomy support matrices in `tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py` — which (aspect_ratio × tier) pairs pass/fail per taxonomy value, incl. `1k` as universal no-op, `2k`/`4k` rejections on incapable models, `0.5k` rejected everywhere for now
+- [x] **Tests first**: exact-grid hit/miss tests — `"2048x2048"` on a gemini-3 grid → derives (1:1, 2K); `"2000x2000"` → error naming nearest cells
+- [x] **Tests first**: static blueprint-validation tests for Google models (the previously-skipped gap) + the four portability worked examples from the design's "acceptance bar" section as test cases
+- [x] New `AspectRatioTaxonomy` values in `pipelex/cogt/img_gen/img_gen_model_rules.py`: `gemini_2_5` (1K only, standard ratios), `gemini_3_pro` (1K/2K/4K, standard ratios), `gemini_3_flash` (1K/2K/4K now — 0.5k deferred, all ratios), `gemini_3_flash_lite` (1K only, all ratios); docstring states the topic governs ratio **and** size jointly (topic keeps its `aspect_ratio` name — no rename)
+- [x] `pipelex/kit/configs/inference/backends/google.toml`: `rules` blocks on Google image models (`aspect_ratio = "gemini_3_flash"` etc.); source of truth is `.pipelex/inference/backends/google.toml`, synced via `make ukc` + `make ccs` (both run, in sync)
+- [x] `GoogleImgGenFactory` (`pipelex/plugins/google/google_img_gen_factory.py`) re-keyed by taxonomy instead of matching on model names; **`GoogleImageGenModel` name enum killed** (model handles are deck config, not code constants); dimension grids stay in the factory as the single source of truth for dims
+- [x] Exact-grid match: `derive_ratio_and_size_from_exact_size` searches the taxonomy's grids for an equal cell → derives (ratio, tier); on miss → `ImgGenParameterError` suggesting the nearest valid cells (closest ratio, then closest area); never silently snaps
+- [x] `ImgGenParamSupport`: `check_aspect_ratio` covers (aspect_ratio, size) jointly incl. tier values; `check_blueprint_params` now receives the explicitly-set `size`; `check_job_params` picks it from params as before; unknown-taxonomy abstain policy kept
+- [x] Tier satisfiability for non-Google taxonomies wired into the same check: gpt-image-2 accepts `1k`/`2k`, rejects `0.5k`/`4k`; legacy gpt-image accepts `1k` only; Flux/SDXL/Qwen accept `1k` as no-op, reject the rest; exact size on no-exact-size models → validation error
+- [x] Verify: `make agent-check`, targeted unit tests, `make tb` (deck TOML changed), full `tests/unit/` suite green
 
 ### CHECKPOINT 2 — validation story complete (design's explicit checkpoint)
 
 Natural handoff point: everything static is done and green; Phase 3 opens the worker/API-call area. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings. Also run the broader unit suite here (`.venv/bin/pytest -x -q tests/unit/`) since taxonomy/deck changes have wide reach.
 
-- [ ] Checkpoint 2 done (commit SHA recorded below, review findings triaged)
+- [x] Checkpoint 2 done (commit SHA recorded below, review findings triaged)
+
+Checkpoint 2 review triage (context-free Sonnet `/code-review` on `ec0aa7ce7`): **no correctness bugs found**; the reviewer confirmed the hardcoded worker `size="1K"` and the gateway's commented-out `image_size` are the planned Phase 3 gap, not regressions. Two low-severity notes, both addressed in follow-up commit `a8e56bfe5`:
+
+- `grids_for_taxonomy` returned the class-level grid dict directly (latent mutation footgun) → return type is now a read-only `Mapping`, with the shared-tables contract stated in the docstring.
+- The SQUARE stand-in in `check_blueprint_params` relied on an unstated invariant (every taxonomy supports SQUARE; tier verdicts are ratio-uniform) → now guarded by `test_square_stand_in_invariant`, parametrized over every taxonomy, which fails first if a future taxonomy breaks either half.
 
 ## Phase 3 — wire
 
@@ -116,10 +121,10 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: Phase 0 + Phase 1 done and committed; Checkpoint 1 complete (review fanned out, findings triaged, fixes committed). Next: Phase 2 (rules & validation), starting with its tests-first items.
+- **Status**: Phases 0–2 done and committed; Checkpoint 2 complete (review fanned out, findings triaged, follow-ups committed). Next: Phase 3 (wire), starting with its tests-first items. NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits.
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
 - **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
-- **Phase 2 commit**: —
+- **Phase 2 commit**: `ec0aa7ce7`; Checkpoint 2 review follow-ups: `a8e56bfe5`
 - **Phase 3 commit**: —
 - **Phase 4 commit**: —
 - **Decisions taken during implementation**:
@@ -127,4 +132,11 @@ Full checkpoint protocol one last time: full suite green → commit → update t
   - Exact-size parsing accepts only positive `WxH` (regex `([1-9]\d*)x([1-9]\d*)`, lowercase `x`, no spaces); everything else raises "expected a size tier (…) or an exact size like '2048x1152'".
   - Interim guard: `ImgGenArgsFactory.make_args_from_aspect_ratio` raises `ImgGenParameterError` for any `SizeTier` ("not yet supported") so a tier can never silently reach the wire between Phase 1 and Phases 2–3; `check_aspect_ratio` was widened to the union. Phases 2–3 replace this guard with real per-taxonomy logic.
   - `mthds_schema.json` regen deliberately deferred to Phase 4 (the schema unit tests don't gate on drift — verified).
+  - Phase 2 necessarily implements the gpt-image-2 tier→scaled-size computation (`OpenAIImgGenFactory._gpt_image_2_size_for_tier`): the capability check reuses `ImgGenArgsFactory` as the single source of truth, so "gpt-image-2 accepts 1k/2k" can only be checked by actually deriving and validating the scaled size. Phase 3's OpenAI item reduces to the reliability-warning demotion + payload assertions.
+  - No global early guard for `0.5k`: each taxonomy rejects it with its honest reason (Gemini: unverified wire token via `image_size_for_tier`; gpt-image-2: below the 0.65 MP floor via the scaled-size validator; Flux/SDXL/Qwen/legacy: only-'1k' message).
+  - `check_blueprint_params` checks a set `size` even when `aspect_ratio` is None, using `AspectRatio.SQUARE` as a neutral stand-in — the size verdict is ratio-independent (exact sizes ignore the ratio everywhere; tier satisfiability is uniform across each model's supported ratios). The deferred deck-default ratio itself still gets checked at runtime.
+  - `GoogleImgGenWorker` resolves its taxonomy from `inference_model.rules` (new `_img_gen_taxonomy()`, clear `ImgGenParameterError` if rules/topic missing or unknown); the wire still hardcodes `size="1K"` until Phase 3.
+  - Gemini taxonomy cases in `make_args_from_aspect_ratio` validate (ratio, size) against the grids and return `{"aspect_ratio": <literal>}` — the Google native worker and gateway build their own `image_config`, so nothing consumes these args yet (Phase 3 threads `image_size`).
+  - Pre-existing drift fixed by `make ukc`: kit `google.toml` had `nano-banana-2-lite` `inputs = ["text"]` while the `.pipelex` source (of-truth) said `["text", "images"]` since the img2img commit `38c716b56` — kit now matches the source (lite accepts image inputs).
+  - Gateway remote config (`pipelex-back-office/pipelex_back_office/remote_config/gateway_models.toml`, per Louis) also got the four `rules` blocks: gateway gemini img-gen models run through `OpenAICompletionsImgGenWorker` (sdk `gateway_completions`) which never reads rules on the wire, and older pipelex releases abstain on the unknown taxonomy — so the addition is validation-only and version-safe. **Louis uploads it** so it becomes live remotely.
 - **Open questions**: —
