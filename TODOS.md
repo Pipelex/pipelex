@@ -48,7 +48,7 @@ The new `size` surface is the foundation everything else builds on; catch shape/
 
 Checkpoint 1 review triage (context-free Sonnet `/code-review` on `19ce81eeb`):
 
-- **Fixed** (follow-up commit `81d937a44`): exact `ImageSize` was silently dropped on the Flux / Flux-1.1-Ultra / Qwen taxonomies — now a hard `ImgGenParameterError` ("does not support exact image sizes"), with a parametrized test. Also deduplicated the tier-token error text into `SizeTier.quoted_tokens()` and removed the spec `size` description's reference to `aspect_ratio` (the spec surface has no such field).
+- **Fixed** (follow-up commit `18b1364c5`): exact `ImageSize` was silently dropped on the Flux / Flux-1.1-Ultra / Qwen taxonomies — now a hard `ImgGenParameterError` ("does not support exact image sizes"), with a parametrized test. Also deduplicated the tier-token error text into `SizeTier.quoted_tokens()` and removed the spec `size` description's reference to `aspect_ratio` (the spec surface has no such field).
 - **Known, deferred by plan**: `check_blueprint_params` not yet receiving `size` (no static validation of `size` at blueprint load) — that is exactly the Phase 2 item "`check_blueprint_params` now receives the explicitly-set `size`"; not fixed early.
 
 ## Phase 2 — rules & validation
@@ -118,7 +118,7 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 - **Status**: Phase 0 + Phase 1 done and committed; Checkpoint 1 complete (review fanned out, findings triaged, fixes committed). Next: Phase 2 (rules & validation), starting with its tests-first items.
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
-- **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `81d937a44`
+- **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
 - **Phase 2 commit**: —
 - **Phase 3 commit**: —
 - **Phase 4 commit**: —
