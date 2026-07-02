@@ -81,13 +81,13 @@ Checkpoint 2 review triage (context-free Sonnet `/code-review` on `ec0aa7ce7`): 
 
 Providers actually receive the size intent.
 
-- [ ] **Tests first**: worker/gateway payload assertions (extend `tests/unit/pipelex/plugins/google/test_google_img_gen_factory.py` and gateway factory tests) — tier → `image_size` token (`"1k"` → `"1K"`), **param omitted entirely when `size` unset** (never silently upgrade; provider default = 1K); args-factory tests for OpenAI tier-derived sizes
-- [ ] Google worker (`pipelex/plugins/google/google_img_gen_worker.py`): send `image_config.image_size` from the tier, stop hardcoding `"1K"`; computed grid dims keep stamping `GeneratedImageRawDetails.size` metadata, now tier-aware
-- [ ] Gateway (`pipelex/plugins/gateway/gateway_factory.py` `make_extras`): thread the same `image_size` into `extra_body["image_config"]` for gemini-routed jobs (replaces the commented-out placeholder)
-- [ ] `ImgGenArgsFactory` (`pipelex/cogt/img_gen/img_gen_args_factory.py`) handles the union on OpenAI paths: tier → scale the existing `GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE` table (`2k` = ×2 per edge, `0.5k` = ×½, `4k` = ×4) → run through existing `validate_gpt_image_2_size`; exact size → existing pass-through unchanged
-- [ ] Reliability-boundary warning: demote to `log.verbose` when the size is tier-derived; keep the loud warning for user-supplied exact sizes
-- [ ] Legacy gpt-image path: tier `1k` → the existing fixed size for the chosen ratio; nothing else changes
-- [ ] Verify: `make agent-check`, targeted tests (`tests/unit/pipelex/cogt/img_gen/`, `tests/unit/pipelex/plugins/`)
+- [x] **Tests first**: worker/gateway payload assertions (extend `tests/unit/pipelex/plugins/google/test_google_img_gen_factory.py` and gateway factory tests) — tier → `image_size` token (`"1k"` → `"1K"`), **param omitted entirely when `size` unset** (never silently upgrade; provider default = 1K); args-factory tests for OpenAI tier-derived sizes
+- [x] Google worker (`pipelex/plugins/google/google_img_gen_worker.py`): send `image_config.image_size` from the tier, stop hardcoding `"1K"`; computed grid dims keep stamping `GeneratedImageRawDetails.size` metadata, now tier-aware
+- [x] Gateway (`pipelex/plugins/gateway/gateway_factory.py` `make_extras`): thread the same `image_size` into `extra_body["image_config"]` for gemini-routed jobs (replaces the commented-out placeholder)
+- [x] `ImgGenArgsFactory` (`pipelex/cogt/img_gen/img_gen_args_factory.py`) handles the union on OpenAI paths: tier → scale the existing `GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE` table (`2k` = ×2 per edge, `0.5k` = ×½, `4k` = ×4) → run through existing `validate_gpt_image_2_size`; exact size → existing pass-through unchanged (implemented in Phase 2; payload tests added here)
+- [x] Reliability-boundary warning: demote to `log.verbose` when the size is tier-derived; keep the loud warning for user-supplied exact sizes
+- [x] Legacy gpt-image path: tier `1k` → the existing fixed size for the chosen ratio; nothing else changes (implemented in Phase 2; payload tests added here)
+- [x] Verify: `make agent-check`, targeted tests (`tests/unit/pipelex/cogt/img_gen/`, `tests/unit/pipelex/plugins/`)
 
 ### CHECKPOINT 3 — wire complete
 
@@ -121,11 +121,11 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: Phases 0–2 done and committed; Checkpoint 2 complete (review fanned out, findings triaged, follow-ups committed). Next: Phase 3 (wire), starting with its tests-first items. NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits.
+- **Status**: Phases 0–3 done and committed; Checkpoint 3 in progress (Phase 3 committed, review fan-out pending triage). Next after Checkpoint 3: Phase 4 (docs, e2e, release readiness). NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits.
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
 - **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
 - **Phase 2 commit**: `ec0aa7ce7`; Checkpoint 2 review follow-ups: `a8e56bfe5`
-- **Phase 3 commit**: —
+- **Phase 3 commit**: `1e4642b6f`
 - **Phase 4 commit**: —
 - **Decisions taken during implementation**:
   - The shared annotated union is `ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]` in `img_gen_job_components.py`; fields declare `ImgGenSize | None`.

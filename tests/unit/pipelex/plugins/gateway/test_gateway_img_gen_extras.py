@@ -84,14 +84,30 @@ class TestGatewayImgGenExtras:
         with pytest.raises(ImgGenParameterError, match="rules"):
             GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
 
-    def test_tier_without_rules_still_maps_directly(self, mocker: MockerFixture) -> None:
-        """A tier needs no grid derivation, so it maps to the wire token even without rules."""
+    def test_tier_without_rules_raises(self, mocker: MockerFixture) -> None:
+        """A tier cannot be validated without taxonomy rules — clear error, never a silent forward."""
         model = _make_model(mocker, rules=None)
         job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.SQUARE, size=SizeTier.FOUR_K)
 
+        with pytest.raises(ImgGenParameterError, match="rules"):
+            GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
+
+    def test_tier_beyond_taxonomy_raises(self, mocker: MockerFixture) -> None:
+        """A tier the model's taxonomy cannot produce is rejected client-side, same as the native worker."""
+        model = _make_model(mocker, rules={ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GEMINI_2_5})
+        job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.SQUARE, size=SizeTier.TWO_K)
+
+        with pytest.raises(ImgGenParameterError, match="does not support image size"):
+            GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
+
+    def test_unset_size_without_rules_keeps_ratio_only_mapping(self, mocker: MockerFixture) -> None:
+        """With no size requested and no rules to validate against, the plain ratio mapping is kept."""
+        model = _make_model(mocker, rules=None)
+        job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.PORTRAIT_9_16, size=None)
+
         _, extra_body = GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
 
-        assert extra_body == {"image_config": {"aspect_ratio": "1:1", "image_size": "4K"}}
+        assert extra_body == {"image_config": {"aspect_ratio": "9:16"}}
 
     def test_non_gemini_img_gen_job_gets_no_image_config(self, mocker: MockerFixture) -> None:
         """Only gemini-routed img-gen jobs get an `image_config` block."""

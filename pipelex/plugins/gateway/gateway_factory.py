@@ -10,9 +10,8 @@ from portkey_ai import (
 
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
-from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import SizeTier
+from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
@@ -67,22 +66,24 @@ class GatewayFactory:
     def _make_gemini_image_config(cls, inference_model: InferenceModelSpec, *, job_params: ImgGenJobParams) -> dict[str, str]:
         """Build the gemini `image_config` extra-body block, honoring the portable size.
 
-        A tier maps straight to Google's `image_size` token. An exact size needs the
-        model's taxonomy rules to derive its (ratio, size) grid cell. An unset size omits
-        `image_size` entirely so the provider applies its own default (the 1K class).
+        Any requested size (tier or exact) resolves through the model's taxonomy rules and
+        their published grids — same validation as the native Google worker, never a silent
+        forward of an unsupported size. An unset size omits `image_size` entirely so the
+        provider applies its own default (the 1K class); when the model has no taxonomy
+        rules, that no-size case keeps the plain ratio-only mapping.
         """
-        size = job_params.size
-        if isinstance(size, ImageSize):
-            taxonomy = GoogleImgGenFactory.img_gen_taxonomy(inference_model)
-            ratio_literal, google_size = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
-                taxonomy,
-                exact_size=size,
-                model_name=inference_model.name,
-            )
-            return {"aspect_ratio": ratio_literal, "image_size": google_size}
-        image_config: dict[str, str] = {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
-        if isinstance(size, SizeTier):
-            image_config["image_size"] = GoogleImgGenFactory.image_size_for_tier(size)
+        rules = inference_model.rules or {}
+        if job_params.size is None and ImgGenArgTopic.ASPECT_RATIO not in rules:
+            return {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            GoogleImgGenFactory.img_gen_taxonomy(inference_model),
+            aspect_ratio=job_params.aspect_ratio,
+            size=job_params.size,
+            model_name=inference_model.name,
+        )
+        image_config: dict[str, str] = {"aspect_ratio": resolved.aspect_ratio}
+        if resolved.image_size is not None:
+            image_config["image_size"] = resolved.image_size
         return image_config
 
     @classmethod
