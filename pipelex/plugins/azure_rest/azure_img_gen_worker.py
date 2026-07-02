@@ -6,7 +6,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
+from pipelex.cogt.img_gen.img_gen_args_factory import ImageFileTuple, ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
@@ -124,25 +124,44 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         # Get deployment name (model_id from the inference model)
         deployment = self.inference_model.model_id
 
-        # Build the API URL
+        # Build the API URL. Azure's Images API splits generation and editing across two REST
+        # routes, and only /images/edits accepts the 'image' parameter (/images/generations
+        # rejects it with a 400 "Unknown parameter"). The args factory maps input images to
+        # httpx-style file tuples under "image".
         base_path = f"openai/deployments/{deployment}/images"
         params = f"?api-version={self.api_version}"
-        generation_url = f"{self.endpoint}/{base_path}/generations{params}"
+        image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
+        route = "edits" if image_files is not None else "generations"
+        image_url = f"{self.endpoint}/{base_path}/{route}{params}"
 
         # Tier 1 transport retry: this is a genuinely SDK-less path (raw httpx, no retrying SDK
         # in between), so it gets the transport-retry floor explicitly, from the same config
         # budget as the SDK-backed workers.
         async def _post_image_request() -> httpx.Response:
             async with httpx.AsyncClient() as client:
-                http_response = await client.post(
-                    generation_url,
-                    headers={
-                        "Api-Key": self.api_key,
-                        "Content-Type": "application/json",
-                    },
-                    json=args_dict,
-                    timeout=600.0,
-                )
+                if image_files is not None:
+                    # OpenAI's multipart convention for /images/edits (matching the openai SDK's
+                    # extract_files serialization): a single input image is the bare 'image' field,
+                    # but multiple images must each go under 'image[]' — repeated bare 'image' parts
+                    # are collapsed to one by the server, silently dropping the others.
+                    image_field_name = "image[]" if len(image_files) > 1 else "image"
+                    http_response = await client.post(
+                        image_url,
+                        headers={"Api-Key": self.api_key},
+                        data={key: str(value) for key, value in args_dict.items()},
+                        files=[(image_field_name, image_file) for image_file in image_files],
+                        timeout=600.0,
+                    )
+                else:
+                    http_response = await client.post(
+                        image_url,
+                        headers={
+                            "Api-Key": self.api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json=args_dict,
+                        timeout=600.0,
+                    )
                 http_response.raise_for_status()
                 return http_response
 

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 from typing import TYPE_CHECKING, Any
 
 from PIL import Image
-from portkey_ai import AsyncPortkey
+from portkey_ai import AsyncPortkey, Portkey
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
@@ -14,7 +15,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
+from pipelex.cogt.img_gen.img_gen_args_factory import ImageFileTuple, ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
@@ -75,14 +76,49 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             model_name=self.inference_model.name,
         )
 
-        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path") or f"/{self.inference_model.model_id}"
+        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path")
+        if not endpoint_path:
+            msg = f"Model '{self.inference_model.name}' does not have an endpoint_path configured but it's required for this model/sdk."
+            raise ImgGenParameterError(msg)
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+        image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
         try:
             # TODO: add portkey tracing headers when enabled
-            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                url=endpoint_path,
-                **args_dict,
-            )
+            if image_files is not None:
+                # OpenAI/Azure's Images API splits generation and editing across two REST routes, and
+                # only /images/edits accepts the 'image' parameter (/images/generations rejects it with
+                # a 400 "Unknown parameter"). The args factory maps input images to httpx-style file
+                # tuples under "image"; they must travel as a multipart body, with every remaining
+                # scalar arg as a (None, value) file part alongside the image(s), since httpx drops
+                # any JSON body entirely once 'files' is set (see httpx's encode_request).
+                edits_endpoint_path = endpoint_path.replace("/images/generations", "/images/edits", 1)
+                if edits_endpoint_path == endpoint_path:
+                    msg = f"Could not derive an /images/edits route from endpoint path '{endpoint_path}'"
+                    raise ImgGenParameterError(msg)
+                # OpenAI's multipart convention for /images/edits (matching the openai SDK's
+                # extract_files serialization): a single input image is the bare 'image' field,
+                # but multiple images must each go under 'image[]' — repeated bare 'image' parts
+                # are collapsed to one by the server, silently dropping the others.
+                image_field_name = "image[]" if len(image_files) > 1 else "image"
+                multipart_fields: list[tuple[str, Any]] = [(image_field_name, image_file) for image_file in image_files]
+                multipart_fields.extend((key, (None, str(value))) for key, value in args_dict.items())
+                # portkey_ai's AsyncAPIClient._build_request() never forwards 'files' to httpx (confirmed
+                # against portkey_ai 2.3.0 and the current portkey-python-sdk main branch: the sync
+                # APIClient._build_request() passes files=options.files, the async one omits it entirely),
+                # so an async .post(..., files=...) silently sends an empty body. Route this one call
+                # through a throwaway sync Portkey client (same credentials) off the event loop instead.
+                sync_portkey_client = Portkey(
+                    base_url=str(self.portkey_client.base_url),  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
+                    api_key=self.portkey_client.api_key,
+                    debug=self.portkey_client.debug,
+                )
+                edit_post = sync_portkey_client.with_options(config=config_id).post  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                response = await asyncio.to_thread(edit_post, url=edits_endpoint_path, files=multipart_fields)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+            else:
+                response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    url=endpoint_path,
+                    **args_dict,
+                )
         except portkey_exceptions.APIError as exc:
             metadata = extract_gateway_metadata(exc)
             classification = classify_inference_error(metadata)
@@ -95,7 +131,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             ) from exc
 
         if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
+            msg = f"Could not get a response for model '{self.inference_model.name}' via Portkey"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,
@@ -213,7 +249,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     )
                 first_base64 = first_image.get("b64_json")
                 if not isinstance(first_base64, str):
-                    msg = f"No base64 image data in first image from model '{self.inference_model.model_id}'"
+                    msg = f"No base64 image data in first image from model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.CONTENT,
@@ -237,7 +273,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     with Image.open(io.BytesIO(image_bytes)) as pil_img:
                         width, height = pil_img.size
                 except (ValueError, OSError, FileTypeError) as exc:
-                    msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.model_id}'"
+                    msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.UNKNOWN,
@@ -262,7 +298,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
-                    msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
+                    msg = f"No base64 image data received from model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.CONTENT,
@@ -341,7 +377,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 )
                 generated_images.append(generated_image)
         else:
-            msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
+            msg = f"Unexpected response from model '{self.inference_model.name}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,

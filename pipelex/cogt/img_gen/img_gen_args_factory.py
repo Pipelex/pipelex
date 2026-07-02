@@ -7,7 +7,8 @@ The factory uses the model's rules (a mapping of topics to taxonomies) to determ
 how each parameter should be formatted for the specific provider's API.
 """
 
-from typing import Any
+import base64
+from typing import Any, TypeAlias
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
@@ -36,6 +37,9 @@ from pipelex.config import get_config
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
+
+ImageFileTuple: TypeAlias = tuple[str, bytes, str]
+"""httpx-style multipart file part: (filename, content_bytes, mime_type)."""
 
 
 class ImgGenArgsFactory:
@@ -546,22 +550,24 @@ class ImgGenArgsFactory:
 
         match input_images_taxonomy:
             case InputImagesTaxonomy.GPT_IMAGE:
-                # OpenAI /images/edits format: "image" accepts array of base64 data URLs
-                # Max 16 images, each < 50MB, png/webp/jpg
-                # Format: data:image/png;base64,{base64_data}
+                # The GPT Image "image" argument is only valid on the OpenAI/Azure /images/edits
+                # route, which (unlike /images/generations) takes a multipart/form-data body, so
+                # each image is produced here as an httpx-style (filename, bytes, mime_type) file
+                # tuple. Max 16 images, each < 50MB, png/webp/jpg.
                 prepped_images = await prep_prompt_images(prompt_images=input_images, is_http_url_enabled=False)
-                image_data_urls: list[str] = []
-                for prepped in prepped_images:
+                image_files: list[ImageFileTuple] = []
+                for index, prepped in enumerate(prepped_images):
                     if isinstance(prepped, PreparedFileBase64):
-                        image_data_urls.append(prepped.as_data_url())
+                        image_bytes = base64.b64decode(prepped.base64_data)
+                        image_files.append((f"image_{index}.{prepped.file_type.extension}", image_bytes, prepped.mime_type))
                     elif isinstance(prepped, PreparedFileHttpUrl):
-                        # GPT Image API requires base64 data URLs, not HTTP URLs
-                        msg = "GPT Image API requires base64 data URLs, but got HTTP URL"
+                        # GPT Image API requires the image bytes as a file part, not an HTTP URL
+                        msg = "GPT Image API requires image file data, but got HTTP URL"
                         raise ImgGenParameterError(msg)
                     else:
                         msg = f"Unexpected PreparedFile type for GPT Image API: {type(prepped).__name__}"
                         raise ImgGenParameterError(msg)
-                return {"image": image_data_urls}
+                return {"image": image_files}
 
             case InputImagesTaxonomy.BFL_FLUX_2:
                 # BFL Flux 2 Pro format: input_image (1st), input_image_2 through input_image_8

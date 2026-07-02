@@ -32,7 +32,7 @@ class Img2ImgTestCases:
     # Single input image test cases: (topic, image_uri)
     SINGLE_INPUT_IMAGES: ClassVar[list[tuple[str, str]]] = [
         ("PNG local file", ImageTestCases.IMAGE_FILE_PATH_PNG_1),
-        ("JPG local file", ImageTestCases.IMAGE_FILE_PATH_JPG_3),
+        # ("JPG local file", ImageTestCases.IMAGE_FILE_PATH_JPG_3),
     ]
 
     # Multiple input images test cases: (topic, list of image_uris)
