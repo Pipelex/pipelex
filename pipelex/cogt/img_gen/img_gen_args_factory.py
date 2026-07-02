@@ -16,7 +16,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
@@ -276,14 +276,17 @@ class ImgGenArgsFactory:
         aspect_ratio_taxonomy: AspectRatioTaxonomy,
         *,
         aspect_ratio: AspectRatio,
-        size: ImageSize | None,
+        size: SizeTier | ImageSize | None,
         model_name: str,
     ) -> dict[str, Any]:
         """Map aspect ratio to provider-specific parameter name and value format.
 
         Raises:
-            ImgGenParameterError: If the aspect ratio is not supported by the target model
+            ImgGenParameterError: If the aspect ratio or size is not supported by the target model
         """
+        if isinstance(size, SizeTier):
+            msg = f"Size tier '{size}' is not yet supported for image generation model '{model_name}'"
+            raise ImgGenParameterError(msg)
         key: str
         value: Any
         match aspect_ratio_taxonomy:

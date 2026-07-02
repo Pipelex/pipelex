@@ -22,7 +22,7 @@ from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, InputFidelity
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, InputFidelity, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
@@ -61,7 +61,7 @@ class ImgGenParamSupport:
         *,
         rules: ImgGenModelRules,
         aspect_ratio: AspectRatio,
-        size: ImageSize | None,
+        size: SizeTier | ImageSize | None,
         model_name: str,
     ) -> SupportCheck:
         taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)

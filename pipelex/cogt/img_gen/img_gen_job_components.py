@@ -1,6 +1,7 @@
-from typing import Literal
+import re
+from typing import Annotated, Any, Literal, TypeAlias
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
@@ -23,6 +24,41 @@ class AspectRatio(StrEnum):
     PORTRAIT_9_21 = "portrait_9_21"
     PORTRAIT_1_4 = "portrait_1_4"
     PORTRAIT_1_8 = "portrait_1_8"
+
+
+class SizeTier(StrEnum):
+    """Portable image size classes.
+
+    A tier promises a pixel class at the pipe's chosen aspect ratio, not identical
+    pixel dimensions across providers: each provider maps the tier to its own grid
+    or computed dimensions.
+    """
+
+    HALF_K = "0.5k"
+    ONE_K = "1k"
+    TWO_K = "2k"
+    FOUR_K = "4k"
+
+
+_EXACT_SIZE_PATTERN = re.compile(r"([1-9]\d*)x([1-9]\d*)")
+
+
+def parse_img_gen_size(value: Any) -> Any:
+    """Parse a string into a SizeTier token or an exact ImageSize; pass other values through."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return SizeTier(value)
+    except ValueError:
+        pass
+    if exact_match := _EXACT_SIZE_PATTERN.fullmatch(value):
+        return ImageSize(width=int(exact_match.group(1)), height=int(exact_match.group(2)))
+    tier_tokens = ", ".join(f"'{tier}'" for tier in SizeTier)
+    msg = f"Invalid image size '{value}': expected a size tier ({tier_tokens}) or an exact size like '2048x1152'"
+    raise ValueError(msg)
+
+
+ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]
 
 
 class Quality(StrEnum):
@@ -52,7 +88,7 @@ class Background(StrEnum):
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
-    size: ImageSize | None = None
+    size: ImgGenSize | None = None
     background: Background = Field(strict=False)
     quality: Quality | None = Field(default=None, strict=False)
     input_fidelity: InputFidelity | None = Field(default=None, strict=False)
@@ -82,6 +118,7 @@ class ImgGenJobParams(BaseModel):
 
 class ImgGenJobParamsDefaults(ConfigModel):
     aspect_ratio: AspectRatio = Field(strict=False)
+    size: ImgGenSize | None = None
     background: Background = Field(strict=False)
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
@@ -102,6 +139,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             output_format = ImageFormat.PNG
         return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
+            size=self.size,
             background=self.background,
             quality=self.quality,
             nb_steps=self.nb_steps,

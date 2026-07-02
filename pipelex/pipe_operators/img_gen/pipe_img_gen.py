@@ -4,7 +4,7 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -45,6 +45,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
+    size: ImgGenSize | None = None
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
@@ -197,6 +198,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Build ImgGenJobParams from ImgGenSetting + one-time settings
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
+            size=self.size or img_gen_param_defaults.size,
             background=self.background or img_gen_param_defaults.background,
             quality=img_gen_setting.quality,
             nb_steps=img_gen_setting.nb_steps,
