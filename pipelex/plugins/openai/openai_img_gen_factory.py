@@ -142,10 +142,6 @@ class OpenAIImgGenFactory:
         width = size.width
         height = size.height
 
-        if width <= 0 or height <= 0:
-            msg = f"Size '{size_string}' is invalid for OpenAI image model '{model_name}': width and height must be positive"
-            raise ImgGenParameterError(msg)
-
         if width % cls.GPT_IMAGE_2_EDGE_MULTIPLE != 0 or height % cls.GPT_IMAGE_2_EDGE_MULTIPLE != 0:
             msg = f"Size '{size_string}' is invalid for OpenAI image model '{model_name}': width and height must be multiples of 16"
             raise ImgGenParameterError(msg)

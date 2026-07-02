@@ -1,6 +1,6 @@
 # Portable image size for image generation — implementation plan
 
-Implements the design in [`wip/img-gen-size-portable-design.md`](wip/img-gen-size-portable-design.md). The design decisions are **settled** (with Louis, 2026-07-02) — do not re-litigate them; if implementation reveals a genuine conflict with the design, stop and surface it instead of silently deviating.
+Implements the design in [`wip/img-gen-size/design.md`](wip/img-gen-size/design.md). The design decisions are **settled** (with Louis, 2026-07-02) — do not re-litigate them; if implementation reveals a genuine conflict with the design, stop and surface it instead of silently deviating.
 
 **Branch**: `feature/Img2Img-with-gpt-image`.
 

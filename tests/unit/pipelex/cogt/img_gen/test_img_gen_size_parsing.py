@@ -54,6 +54,20 @@ class TestImgGenSizeParsing:
         with pytest.raises(ValidationError, match="expected a size tier"):
             ImgGenJobParams.model_validate({"aspect_ratio": "square", "background": "auto", "size": size_input})
 
+    @pytest.mark.parametrize(
+        "size_table",
+        [
+            {"width": 0, "height": 768},
+            {"width": 1024, "height": 0},
+            {"width": -1024, "height": 768},
+            {"width": 1024, "height": -768},
+        ],
+    )
+    def test_non_positive_exact_size_table_rejected(self, size_table: dict[str, int]):
+        """The table wire form bypasses the 'WxH' string regex, so ImageSize itself must reject non-positive dims."""
+        with pytest.raises(ValidationError, match="greater than 0"):
+            ImgGenJobParams.model_validate({"aspect_ratio": "square", "background": "auto", "size": size_table})
+
     def test_native_values_pass_through(self):
         """SizeTier and ImageSize instances (and None) are accepted as-is."""
         tier_params = ImgGenJobParams(aspect_ratio=AspectRatio.SQUARE, background=Background.AUTO, size=SizeTier.TWO_K)

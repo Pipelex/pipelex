@@ -11,7 +11,6 @@ from portkey_ai import (
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
@@ -69,14 +68,19 @@ class GatewayFactory:
         Any requested size (tier or exact) resolves through the model's taxonomy rules and
         their published grids — same validation as the native Google worker, never a silent
         forward of an unsupported size. An unset size omits `image_size` entirely so the
-        provider applies its own default (the 1K class); when the model has no taxonomy
-        rules, that no-size case keeps the plain ratio-only mapping.
+        provider applies its own default (the 1K class); when the model has no usable taxonomy
+        (rules missing, or a remotely-fetched spec carrying a taxonomy string that predates
+        this factory), that no-size case abstains like the support checks and keeps the plain
+        ratio-only mapping.
         """
-        rules = inference_model.rules or {}
-        if job_params.size is None and ImgGenArgTopic.ASPECT_RATIO not in rules:
-            return {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
+        if job_params.size is None:
+            taxonomy = GoogleImgGenFactory.optional_img_gen_taxonomy(inference_model)
+            if taxonomy is None:
+                return {"aspect_ratio": GoogleImgGenFactory.aspect_ratio_literal(job_params.aspect_ratio)}
+        else:
+            taxonomy = GoogleImgGenFactory.img_gen_taxonomy(inference_model)
         resolved = GoogleImgGenFactory.resolve_image_config(
-            GoogleImgGenFactory.img_gen_taxonomy(inference_model),
+            taxonomy,
             aspect_ratio=job_params.aspect_ratio,
             size=job_params.size,
             model_name=inference_model.name,

@@ -89,7 +89,7 @@ The `size` parameter carries a size intent that stays portable when you switch t
 - **A size tier** (`"1k"`, `"2k"`, `"4k"`): "produce this pixel class at my chosen `aspect_ratio`". A tier promises a pixel *class*, not identical dimensions across providers — `size = "2k"` at 16:9 yields 2752×1536 on `nano-banana-2` (Google's published grid) and 3072×1728 on `gpt-image-2` (computed from OpenAI's constraints). Both are 2K-class images; that is the abstraction. The `"0.5k"` tier token is reserved and currently rejected by every model.
 - **An exact pixel size** (`"2048x1152"`): "produce exactly these pixels". Deterministic everywhere it runs. Because an exact size implies its own ratio, combining it with `aspect_ratio` is a blueprint validation error. On tier-grid models (Gemini), an exact size runs only if it exactly matches a cell of the model's published grid — a near-miss is a validation error suggesting the nearest valid cells, never a silent snap.
 
-When `size` is unset, nothing is sent to the provider and its default applies (typically the 1K class) — Pipelex never silently upgrades your resolution.
+When `size` is unset, no size intent is sent: Gemini-routed jobs omit the `image_size` parameter entirely, and OpenAI models fall back to their fixed 1K-class preset for the chosen aspect ratio. Either way you stay at the provider's default resolution and cost — Pipelex never silently upgrades.
 
 Per-model support:
 

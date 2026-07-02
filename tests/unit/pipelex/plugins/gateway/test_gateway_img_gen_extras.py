@@ -109,6 +109,25 @@ class TestGatewayImgGenExtras:
 
         assert extra_body == {"image_config": {"aspect_ratio": "9:16"}}
 
+    def test_unset_size_with_unknown_taxonomy_keeps_ratio_only_mapping(self, mocker: MockerFixture) -> None:
+        """A remotely-fetched spec may carry a taxonomy string that predates this factory: with no size
+        requested, the wire path must abstain (like the support checks) and keep the plain ratio mapping.
+        """
+        model = _make_model(mocker, rules={ImgGenArgTopic.ASPECT_RATIO: "legacy_gateway_taxonomy"})
+        job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.PORTRAIT_9_16, size=None)
+
+        _, extra_body = GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
+
+        assert extra_body == {"image_config": {"aspect_ratio": "9:16"}}
+
+    def test_sized_request_with_unknown_taxonomy_raises(self, mocker: MockerFixture) -> None:
+        """A size cannot be validated against an unknown taxonomy — clear error, never a silent forward."""
+        model = _make_model(mocker, rules={ImgGenArgTopic.ASPECT_RATIO: "legacy_gateway_taxonomy"})
+        job = _make_img_gen_job(mocker, aspect_ratio=AspectRatio.SQUARE, size=SizeTier.TWO_K)
+
+        with pytest.raises(ImgGenParameterError, match="unknown aspect_ratio taxonomy"):
+            GatewayFactory.make_extras(model, inference_job=job, output_desc="Image")
+
     def test_non_gemini_img_gen_job_gets_no_image_config(self, mocker: MockerFixture) -> None:
         """Only gemini-routed img-gen jobs get an `image_config` block."""
         model = _make_model(mocker, model_id="gpt-image-1", rules=None)
