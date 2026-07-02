@@ -1,0 +1,121 @@
+# Portable image size for image generation — implementation plan
+
+Implements the design in [`wip/img-gen-size-portable-design.md`](wip/img-gen-size-portable-design.md). The design decisions are **settled** (with Louis, 2026-07-02) — do not re-litigate them; if implementation reveals a genuine conflict with the design, stop and surface it instead of silently deviating.
+
+**Branch**: `feature/Img2Img-with-gpt-image`.
+
+## Working conventions for this plan
+
+- **TDD**: write the failing tests first, then implement (red → green), per phase.
+- **One commit per phase.** Record each phase's commit SHA in the "State for cold start" section below, so each review fan-out gets a precise diff pointer.
+- **Verification commands**: `make agent-check` after code changes; targeted tests via `.venv/bin/pytest -x -q <path>` during development; `make tb` whenever a config model or `pipelex.toml` structure changes; full `make agent-test` at the final checkpoint (and at any checkpoint if the phase touched shared surfaces).
+- **Keyword-only args**: any new function in `pipelex/` source must follow the keyword-only convention (bare `*` after the subject) — `make agent-check` hard-blocks violations.
+- **Checkpoint protocol** (mandatory at every CHECKPOINT below — the agent must stop and do all of this before starting the next phase):
+  1. **Verify**: run the phase's verification commands; everything green before proceeding.
+  2. **Commit** the phase's work.
+  3. **Update this file**: tick the boxes, record the commit SHA, note decisions taken, open questions, and anything a cold-start session needs in "State for cold start".
+  4. **Fan out a code review**: spawn a **Sonnet-5** sub-agent with **no inherited context** to run the `/code-review` skill. Hand it *only* a pointer to the changes (the phase's commit SHA / `git diff <sha>^..<sha>`, or `git diff <base>..HEAD` for multi-commit spans) — never this plan, the design doc, the rationale, or your own conclusions. Target: clean solid software, not over-engineering.
+  5. **Triage the review findings**: apply clear correctness/simplification fixes (amend or follow-up commit); findings that are design tradeoffs (not silent bugs) go to a deferred-items doc under `wip/img-gen-size/` instead of being reflexively "fixed".
+  6. It must be safe to end the session at any checkpoint — the "State for cold start" section is the handoff.
+
+## Phase 0 — baseline
+
+The working tree starts with the prior aspect-ratio work **staged but uncommitted** (img-gen aspect-ratio files + the design doc). That work is authorized prior work — commit it as-is first so the size work diffs cleanly.
+
+- [ ] Commit the currently staged changes as their own commit (aspect-ratio follow-up + design doc); record the SHA below as `BASE`
+- [ ] Confirm green baseline: `make agent-check` + `.venv/bin/pytest -x -q tests/unit/pipelex/cogt/img_gen/ tests/unit/pipelex/plugins/ tests/unit/pipelex/pipe_operators/pipe_img_gen/` + `make tb`
+- [ ] If the baseline is not green, fix or surface to the user before writing any size code
+
+## Phase 1 — types & surface
+
+New `size` field end to end on the params/blueprint/spec surface, no behavior on the wire yet.
+
+- [ ] **Tests first**: parsing unit tests in `tests/unit/pipelex/cogt/img_gen/` — tier tokens (`"0.5k"`/`"1k"`/`"2k"`/`"4k"`), exact `"WxH"` → `ImageSize`, garbage strings → clear `ValueError`; serialization round-trip for both union arms (StrEnum as str, `ImageSize` as dict)
+- [ ] **Tests first**: blueprint validator tests in `tests/unit/pipelex/pipe_operators/pipe_img_gen/test_pipe_img_gen_blueprint.py` — tier composes with `aspect_ratio`; exact size + `aspect_ratio` set together → validation error; each alone OK
+- [ ] `SizeTier` StrEnum in `pipelex/cogt/img_gen/img_gen_job_components.py` next to `AspectRatio`: `HALF_K = "0.5k"`, `ONE_K = "1k"`, `TWO_K = "2k"`, `FOUR_K = "4k"`
+- [ ] `ImgGenJobParams.size` becomes `SizeTier | ImageSize | None` via an annotated union with a `BeforeValidator` that parses strings (tier token → `SizeTier`, `"<int>x<int>"` → `ImageSize`, else `ValueError`); reuse the same annotated type for all three surfaces
+- [ ] `PipeImgGenBlueprint.size` (`pipelex/pipe_operators/img_gen/pipe_img_gen_blueprint.py`) + `PipeImgGenSpec.size` (`pipelex/builder/pipe/pipe_img_gen_spec.py`) use the same union; blueprint gains the `size`-vs-`aspect_ratio` exclusivity validator (spec's `to_blueprint()` threads it through)
+- [ ] `PipeImgGen` (`pipelex/pipe_operators/img_gen/pipe_img_gen.py`) threads `self.size or img_gen_param_defaults.size` into `ImgGenJobParams` like the other one-time settings
+- [ ] `ImgGenJobParamsDefaults` gains optional `size` — class default `None` (the Optional exception to the no-class-defaults config rule); **no key added** to `pipelex/pipelex.toml` or `.pipelex/pipelex.toml` (`None` = provider default)
+- [ ] Explicit non-goal, do not add: `size` on `ImgGenSetting` (deck presets) — geometry is pipe intent, not model preset
+- [ ] Verify: `make agent-check`, targeted tests, `make tb` (config model changed)
+
+### CHECKPOINT 1 — surface in place
+
+The new `size` surface is the foundation everything else builds on; catch shape/over-engineering problems now, before Phase 2 builds on the union type. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings.
+
+- [ ] Checkpoint 1 done (commit SHA recorded below, review findings triaged)
+
+## Phase 2 — rules & validation
+
+Static validation story complete: Google models get deck rules, tiers and exact sizes are checked at blueprint-load/runtime-pre-call, exact-grid matching works. **No wire changes in this phase.**
+
+- [ ] **Tests first**: per-taxonomy support matrices in `tests/unit/pipelex/cogt/img_gen/test_img_gen_param_support.py` — which (aspect_ratio × tier) pairs pass/fail per taxonomy value, incl. `1k` as universal no-op, `2k`/`4k` rejections on incapable models, `0.5k` rejected everywhere for now
+- [ ] **Tests first**: exact-grid hit/miss tests — `"2048x2048"` on a gemini-3 grid → derives (1:1, 2K); `"2000x2000"` → error naming nearest cells
+- [ ] **Tests first**: static blueprint-validation tests for Google models (the previously-skipped gap) + the four portability worked examples from the design's "acceptance bar" section as test cases
+- [ ] New `AspectRatioTaxonomy` values in `pipelex/cogt/img_gen/img_gen_model_rules.py`: `gemini_2_5` (1K only, standard ratios), `gemini_3_pro` (1K/2K/4K, standard ratios), `gemini_3_flash` (1K/2K/4K now — 0.5k deferred, all ratios), `gemini_3_flash_lite` (1K only, all ratios); docstring states the topic governs ratio **and** size jointly (topic keeps its `aspect_ratio` name — no rename)
+- [ ] `pipelex/kit/configs/inference/backends/google.toml`: `rules` blocks on Google image models (`aspect_ratio = "gemini_3_flash"` etc.); check whether kit configs need a sync step (see `/add-model` skill conventions) and run it if so
+- [ ] `GoogleImgGenFactory` (`pipelex/plugins/google/google_img_gen_factory.py`) re-keyed by taxonomy instead of matching on model names; **kill the `GoogleImageGenModel` name enum** (model handles are deck config, not code constants); dimension grids stay in the factory as the single source of truth for dims
+- [ ] Exact-grid match: given exact WxH on a tier-grid model, search the model's grids for an equal cell → derive (ratio, tier) and proceed as if the user had written them; on miss → `ImgGenParameterError` suggesting nearest valid cells (same or adjacent ratio, closest area); never silently snap
+- [ ] `ImgGenParamSupport` (`pipelex/cogt/img_gen/img_gen_param_support.py`): `check_aspect_ratio` covers (aspect_ratio, size) jointly incl. tier values; `check_blueprint_params` now receives the explicitly-set `size` (today it passes `size=None`); `check_job_params` picks it from params as before; keep the unknown-taxonomy abstain policy
+- [ ] Tier satisfiability for non-Google taxonomies wired into the same check: gpt-image-2 accepts `1k`/`2k`, rejects `0.5k`/`4k`; legacy gpt-image accepts `1k` only; Flux/SDXL/Qwen accept `1k` as no-op, reject the rest; exact size on no-exact-size models → validation error with the "use aspect_ratio, optionally size = '1k'" message
+- [ ] Verify: `make agent-check`, targeted unit tests, `make tb` (deck TOML changed)
+
+### CHECKPOINT 2 — validation story complete (design's explicit checkpoint)
+
+Natural handoff point: everything static is done and green; Phase 3 opens the worker/API-call area. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings. Also run the broader unit suite here (`.venv/bin/pytest -x -q tests/unit/`) since taxonomy/deck changes have wide reach.
+
+- [ ] Checkpoint 2 done (commit SHA recorded below, review findings triaged)
+
+## Phase 3 — wire
+
+Providers actually receive the size intent.
+
+- [ ] **Tests first**: worker/gateway payload assertions (extend `tests/unit/pipelex/plugins/google/test_google_img_gen_factory.py` and gateway factory tests) — tier → `image_size` token (`"1k"` → `"1K"`), **param omitted entirely when `size` unset** (never silently upgrade; provider default = 1K); args-factory tests for OpenAI tier-derived sizes
+- [ ] Google worker (`pipelex/plugins/google/google_img_gen_worker.py`): send `image_config.image_size` from the tier, stop hardcoding `"1K"`; computed grid dims keep stamping `GeneratedImageRawDetails.size` metadata, now tier-aware
+- [ ] Gateway (`pipelex/plugins/gateway/gateway_factory.py` `make_extras`): thread the same `image_size` into `extra_body["image_config"]` for gemini-routed jobs (replaces the commented-out placeholder)
+- [ ] `ImgGenArgsFactory` (`pipelex/cogt/img_gen/img_gen_args_factory.py`) handles the union on OpenAI paths: tier → scale the existing `GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE` table (`2k` = ×2 per edge, `0.5k` = ×½, `4k` = ×4) → run through existing `validate_gpt_image_2_size`; exact size → existing pass-through unchanged
+- [ ] Reliability-boundary warning: demote to `log.verbose` when the size is tier-derived; keep the loud warning for user-supplied exact sizes
+- [ ] Legacy gpt-image path: tier `1k` → the existing fixed size for the chosen ratio; nothing else changes
+- [ ] Verify: `make agent-check`, targeted tests (`tests/unit/pipelex/cogt/img_gen/`, `tests/unit/pipelex/plugins/`)
+
+### CHECKPOINT 3 — wire complete
+
+The provider-facing change surface is done; Phase 4 is docs/e2e/release, a different concern. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings.
+
+- [ ] Checkpoint 3 done (commit SHA recorded below, review findings triaged)
+
+## Phase 4 — docs, e2e & release readiness
+
+- [ ] `docs/building-methods/pipes/pipe-operators/PipeImgGen.md`: `size` in the param table; portability section with the design's worked examples; cost note (2k/4k cost proportionally more; unset = provider default cost) — Material for MkDocs conventions, blank line before lists, no hard wraps
+- [ ] `docs/configuration/config-technical/cogt-config.md`: document the optional `size` default in `ImgGenJobParamsDefaults`
+- [ ] MTHDS JSON Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` (blueprint field changed — schema should expose enum-or-pattern for `size`)
+- [ ] `CHANGELOG.md` entry under `[Unreleased]` (breaking changes marked "breaking"; no mention of `wip/` docs)
+- [ ] E2E smoke (cost-gated test profile, see `/test-model` skill conventions): one 2K generation on `nano-banana-2` and one on `gpt-image-2` in `tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/`
+- [ ] Retire the superseded WIP note if still present anywhere; move any deferred-review-findings doc into `wip/img-gen-size/`
+- [ ] Full gates: `make agent-check` + `make agent-test` + `make tb`
+
+### CHECKPOINT 4 — final gate
+
+Full checkpoint protocol one last time: full suite green → commit → update this file (final state, remaining follow-ups) → fan out `/code-review` (Sonnet-5, context-free, pointer = `git diff <BASE>..HEAD` for the whole feature) → triage findings. Then hand back to the user for merge/release decisions.
+
+- [ ] Checkpoint 4 done (feature-complete, full suite green, final review triaged)
+
+## Out of scope (explicit follow-ups, do not implement here)
+
+- `0.5k` wire-token verification against Gemini 3.1 Flash (empirical test of `"512"` / `"0.5K"`), then enabling it in the `gemini_3_flash` taxonomy + adding the published 512px grid to the factory. Until then `0.5k` is a validation error on every model.
+- Adding 4:5/5:4 to the `AspectRatio` enum (published in Gemini grids) — separate decision.
+- `size` on `ImgGenSetting` deck presets — only if a real need materializes.
+
+## State for cold start
+
+> Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
+
+- **Status**: plan written, no implementation started. Working tree holds the prior aspect-ratio work staged-but-uncommitted (Phase 0 commits it).
+- **`BASE` commit (Phase 0)**: _not yet committed_
+- **Phase 1 commit**: —
+- **Phase 2 commit**: —
+- **Phase 3 commit**: —
+- **Phase 4 commit**: —
+- **Decisions taken during implementation**: —
+- **Open questions**: —
