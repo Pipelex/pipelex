@@ -34,6 +34,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
@@ -279,20 +280,32 @@ class ImgGenArgsFactory:
         size: SizeTier | ImageSize | None,
         model_name: str,
     ) -> dict[str, Any]:
-        """Map aspect ratio to provider-specific parameter name and value format.
+        """Map aspect ratio and size to provider-specific parameter name and value format.
 
         Raises:
             ImgGenParameterError: If the aspect ratio or size is not supported by the target model
         """
-        if isinstance(size, SizeTier):
-            msg = f"Size tier '{size}' is not yet supported for image generation model '{model_name}'"
-            raise ImgGenParameterError(msg)
         match aspect_ratio_taxonomy:
             case AspectRatioTaxonomy.FLUX | AspectRatioTaxonomy.FLUX_11_ULTRA | AspectRatioTaxonomy.QWEN_IMAGE:
-                if size is not None:
+                if isinstance(size, ImageSize):
                     msg = f"Model '{model_name}' does not support exact image sizes; use aspect_ratio to control the geometry"
                     raise ImgGenParameterError(msg)
-            case AspectRatioTaxonomy.GPT_IMAGE_LEGACY | AspectRatioTaxonomy.GPT_IMAGE_2:
+                if isinstance(size, SizeTier):
+                    match size:
+                        case SizeTier.ONE_K:
+                            # These models natively produce 1K-class images: '1k' is a portable no-op.
+                            pass
+                        case SizeTier.HALF_K | SizeTier.TWO_K | SizeTier.FOUR_K:
+                            msg = f"Model '{model_name}' cannot produce images at size tier '{size}'; supported tier: '1k'"
+                            raise ImgGenParameterError(msg)
+            case (
+                AspectRatioTaxonomy.GPT_IMAGE_LEGACY
+                | AspectRatioTaxonomy.GPT_IMAGE_2
+                | AspectRatioTaxonomy.GEMINI_2_5
+                | AspectRatioTaxonomy.GEMINI_3_PRO
+                | AspectRatioTaxonomy.GEMINI_3_FLASH
+                | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
+            ):
                 pass
         key: str
         value: Any
@@ -365,6 +378,32 @@ class ImgGenArgsFactory:
                     aspect_ratio=aspect_ratio,
                     size=size,
                 )[0]
+            case (
+                AspectRatioTaxonomy.GEMINI_2_5
+                | AspectRatioTaxonomy.GEMINI_3_PRO
+                | AspectRatioTaxonomy.GEMINI_3_FLASH
+                | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
+            ):
+                # The Google native worker and the gateway build their own `image_config`
+                # from the job params; this path validates the (aspect_ratio, size) pair
+                # against the taxonomy's published grids and exposes the ratio literal.
+                ratio_literal: str
+                if isinstance(size, ImageSize):
+                    ratio_literal, _ = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+                        aspect_ratio_taxonomy,
+                        exact_size=size,
+                        model_name=model_name,
+                    )
+                else:
+                    google_image_size = GoogleImgGenFactory.image_size_for_tier(size) if size is not None else "1K"
+                    GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+                        aspect_ratio_taxonomy,
+                        aspect_ratio=aspect_ratio,
+                        size=google_image_size,
+                        model_name=model_name,
+                    )
+                    ratio_literal = GoogleImgGenFactory.aspect_ratio_literal(aspect_ratio)
+                return {"aspect_ratio": ratio_literal}
             case AspectRatioTaxonomy.QWEN_IMAGE:
                 width: int
                 height: int

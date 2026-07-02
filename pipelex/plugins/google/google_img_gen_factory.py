@@ -1,8 +1,11 @@
+import math
+import operator
 from typing import ClassVar, Literal
 
 from pipelex.cogt.exceptions import ImgGenParameterError
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
-from pipelex.types import StrEnum
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
+from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
 
 GoogleAspectRatioType = Literal["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"]
 
@@ -11,23 +14,17 @@ GoogleImageSize = Literal["1K", "2K", "4K"]
 AspectRatioToDimensions = dict[GoogleAspectRatioType, tuple[int, int]]
 
 
-class GoogleImageGenModel(StrEnum):
-    NANO_BANANA = "nano-banana"
-    NANO_BANANA_PRO = "nano-banana-pro"
-    NANO_BANANA_2 = "nano-banana-2"
-    NANO_BANANA_2_LITE = "nano-banana-2-lite"
-
-
 class GoogleImgGenFactory:
     """Factory class for Google image generation parameter mappings.
 
-    Dimension tables mirror the resolution grids Google publishes per model generation;
-    which sizes and aspect ratios each model accepts is gated in
-    `dimensions_for_aspect_ratio_and_size`.
+    Dimension tables mirror the resolution grids Google publishes per model generation.
+    Which sizes and aspect ratios each model accepts is keyed by its deck-rules
+    `AspectRatioTaxonomy` value (gemini_2_5 / gemini_3_pro / gemini_3_flash /
+    gemini_3_flash_lite) — model handles are deck config, not code constants.
     Reference: https://ai.google.dev/gemini-api/docs/image-generation
     """
 
-    # Gemini 2.5 generation grid — used by nano-banana (gemini-2.5-flash-image).
+    # Gemini 2.5 generation grid — used by the gemini_2_5 taxonomy (nano-banana).
     # 1K only, standard ratios only.
     ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K: ClassVar[AspectRatioToDimensions] = {
         "1:1": (1024, 1024),
@@ -42,9 +39,9 @@ class GoogleImgGenFactory:
         "21:9": (1536, 672),
     }
 
-    # Gemini 3 generation grid — shared by nano-banana-pro (1K/2K/4K, standard ratios only,
-    # gated by GEMINI_3_PRO_ASPECT_RATIOS), nano-banana-2 (1K/2K/4K, all ratios) and
-    # nano-banana-2-lite (1K only, all ratios). Rows follow Google's published table order.
+    # Gemini 3 generation grid — shared by gemini_3_pro (1K/2K/4K, standard ratios only,
+    # gated by GEMINI_3_PRO_ASPECT_RATIOS), gemini_3_flash (1K/2K/4K, all ratios) and
+    # gemini_3_flash_lite (1K only, all ratios). Rows follow Google's published table order.
     ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_1K: ClassVar[AspectRatioToDimensions] = {
         "1:1": (1024, 1024),
         "1:4": (512, 2048),
@@ -137,31 +134,99 @@ class GoogleImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def dimensions_for_aspect_ratio_and_size(cls, model: str, *, aspect_ratio: AspectRatio, size: GoogleImageSize) -> tuple[int, int]:
-        """Get pixel dimensions (width, height) for the given aspect ratio and size, gated per model."""
-        aspect_ratio_str = cls.aspect_ratio_literal(aspect_ratio)
-        match model:
-            case GoogleImageGenModel.NANO_BANANA:
-                if size != "1K":
-                    msg = f"Model '{model}' only supports 1K size"
-                    raise ImgGenParameterError(msg)
-                dimensions = cls.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K.get(aspect_ratio_str)
-                if dimensions is None:
-                    msg = f"Aspect ratio '{aspect_ratio}' is not supported by model '{model}'"
-                    raise ImgGenParameterError(msg)
-                return dimensions
-            case GoogleImageGenModel.NANO_BANANA_PRO:
-                if aspect_ratio_str not in cls.GEMINI_3_PRO_ASPECT_RATIOS:
-                    msg = f"Aspect ratio '{aspect_ratio}' is not supported by model '{model}'"
-                    raise ImgGenParameterError(msg)
-                return cls.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3[size][aspect_ratio_str]
-            case GoogleImageGenModel.NANO_BANANA_2:
-                return cls.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3[size][aspect_ratio_str]
-            case GoogleImageGenModel.NANO_BANANA_2_LITE:
-                if size != "1K":
-                    msg = f"Model '{model}' only supports 1K size"
-                    raise ImgGenParameterError(msg)
-                return cls.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_1K[aspect_ratio_str]
-            case _:
-                msg = f"Model '{model}' is not supported by Google Gemini Image Gen"
+    def image_size_for_tier(cls, tier: SizeTier) -> GoogleImageSize:
+        """Map a portable size tier to Google's `image_size` wire token."""
+        match tier:
+            case SizeTier.ONE_K:
+                return "1K"
+            case SizeTier.TWO_K:
+                return "2K"
+            case SizeTier.FOUR_K:
+                return "4K"
+            case SizeTier.HALF_K:
+                msg = f"Size tier '{tier}' is not supported by Google Gemini Image models yet (no verified wire token)"
                 raise ImgGenParameterError(msg)
+
+    @classmethod
+    def grids_for_taxonomy(cls, taxonomy: AspectRatioTaxonomy, *, model_name: str) -> dict[GoogleImageSize, AspectRatioToDimensions]:
+        """The (size -> ratio -> dimensions) cells a Google taxonomy accepts, ratio-filtered."""
+        match taxonomy:
+            case AspectRatioTaxonomy.GEMINI_2_5:
+                return {"1K": cls.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K}
+            case AspectRatioTaxonomy.GEMINI_3_PRO:
+                return {
+                    size: {ratio: dims for ratio, dims in grid.items() if ratio in cls.GEMINI_3_PRO_ASPECT_RATIOS}
+                    for size, grid in cls.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3.items()
+                }
+            case AspectRatioTaxonomy.GEMINI_3_FLASH:
+                return cls.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3
+            case AspectRatioTaxonomy.GEMINI_3_FLASH_LITE:
+                return {"1K": cls.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_3_1K}
+            case (
+                AspectRatioTaxonomy.FLUX
+                | AspectRatioTaxonomy.FLUX_11_ULTRA
+                | AspectRatioTaxonomy.GPT_IMAGE_LEGACY
+                | AspectRatioTaxonomy.GPT_IMAGE_2
+                | AspectRatioTaxonomy.QWEN_IMAGE
+            ):
+                msg = f"Taxonomy '{taxonomy}' configured for model '{model_name}' is not a Google Gemini image generation taxonomy"
+                raise ImgGenParameterError(msg)
+
+    @classmethod
+    def dimensions_for_aspect_ratio_and_size(
+        cls,
+        taxonomy: AspectRatioTaxonomy,
+        *,
+        aspect_ratio: AspectRatio,
+        size: GoogleImageSize,
+        model_name: str,
+    ) -> tuple[int, int]:
+        """Get pixel dimensions (width, height) for the given aspect ratio and size, gated per taxonomy."""
+        aspect_ratio_str = cls.aspect_ratio_literal(aspect_ratio)
+        grids = cls.grids_for_taxonomy(taxonomy, model_name=model_name)
+        grid = grids.get(size)
+        if grid is None:
+            supported_sizes = ", ".join(grids)
+            msg = f"Model '{model_name}' does not support image size '{size}'; supported: {supported_sizes}"
+            raise ImgGenParameterError(msg)
+        dimensions = grid.get(aspect_ratio_str)
+        if dimensions is None:
+            msg = f"Aspect ratio '{aspect_ratio}' is not supported by model '{model_name}'"
+            raise ImgGenParameterError(msg)
+        return dimensions
+
+    @classmethod
+    def derive_ratio_and_size_from_exact_size(
+        cls,
+        taxonomy: AspectRatioTaxonomy,
+        *,
+        exact_size: ImageSize,
+        model_name: str,
+    ) -> tuple[GoogleAspectRatioType, GoogleImageSize]:
+        """Exact-grid match: derive the (ratio, size) pair whose grid cell equals the exact WxH.
+
+        Raises:
+            ImgGenParameterError: If no cell matches — the message names the nearest valid
+                cells (closest ratio, then closest area). Never silently snaps.
+        """
+        grids = cls.grids_for_taxonomy(taxonomy, model_name=model_name)
+        for google_size, grid in grids.items():
+            for ratio_str, dimensions in grid.items():
+                if dimensions == (exact_size.width, exact_size.height):
+                    return ratio_str, google_size
+
+        requested_area = exact_size.width * exact_size.height
+        requested_ratio = exact_size.width / exact_size.height
+        candidates: list[tuple[float, int, str, str]] = []
+        for google_size, grid in grids.items():
+            for ratio_str, (width, height) in grid.items():
+                ratio_distance = abs(math.log((width / height) / requested_ratio))
+                area_distance = abs(width * height - requested_area)
+                candidates.append((ratio_distance, area_distance, f"{width}x{height}", f"{ratio_str} @ {google_size}"))
+        candidates.sort(key=operator.itemgetter(0, 1))
+        suggestions = ", ".join(f"{dims_str} ({cell_desc})" for _, _, dims_str, cell_desc in candidates[:3])
+        msg = (
+            f"Exact size '{exact_size.width}x{exact_size.height}' does not match any cell of the resolution grid "
+            f"of model '{model_name}'; nearest valid sizes: {suggestions}"
+        )
+        raise ImgGenParameterError(msg)

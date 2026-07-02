@@ -204,6 +204,7 @@ class ImgGenParamSupport:
         *,
         rules: ImgGenModelRules,
         aspect_ratio: AspectRatio | None,
+        size: SizeTier | ImageSize | None,
         background: Background | None,
         output_format: ImageFormat | None,
         model_name: str,
@@ -214,8 +215,17 @@ class ImgGenParamSupport:
         actual value is unknown at blueprint load time.
         """
         reasons: list[str] = []
-        if aspect_ratio is not None:
-            check = cls.check_aspect_ratio(rules=rules, aspect_ratio=aspect_ratio, size=None, model_name=model_name)
+        if aspect_ratio is not None or size is not None:
+            # When only `size` is set, the ratio context does not change the verdict:
+            # exact sizes ignore the ratio on every taxonomy, and tier satisfiability is
+            # uniform across each model's supported ratios — SQUARE is a neutral stand-in.
+            # The deferred deck-default ratio itself is still checked at runtime.
+            check = cls.check_aspect_ratio(
+                rules=rules,
+                aspect_ratio=aspect_ratio or AspectRatio.SQUARE,
+                size=size,
+                model_name=model_name,
+            )
             if not check.is_supported and check.reason is not None:
                 reasons.append(check.reason)
         if background is not None:

@@ -10,6 +10,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import (
     Background,
     ImgGenJobParams,
     InputFidelity,
+    SizeTier,
 )
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
@@ -68,6 +69,11 @@ def _make_sdxl_rules() -> ImgGenModelRules:
         ImgGenArgTopic.NUM_IMAGES: NumImagesTaxonomy.FAL,
         ImgGenArgTopic.OUTPUT_FORMAT: OutputFormatTaxonomy.SDXL,
     }
+
+
+def _make_aspect_ratio_rules(taxonomy: AspectRatioTaxonomy) -> ImgGenModelRules:
+    """Minimal rules dict carrying only the aspect_ratio topic — enough for geometry checks."""
+    return {ImgGenArgTopic.ASPECT_RATIO: taxonomy}
 
 
 class TestImgGenParamSupport:
@@ -281,6 +287,7 @@ class TestImgGenParamSupport:
         reasons = ImgGenParamSupport.check_blueprint_params(
             rules=_make_legacy_openai_rules(),
             aspect_ratio=None,
+            size=None,
             background=None,
             output_format=None,
             model_name="gpt-image-1",
@@ -291,6 +298,7 @@ class TestImgGenParamSupport:
         reasons = ImgGenParamSupport.check_blueprint_params(
             rules=_make_legacy_openai_rules(),
             aspect_ratio=AspectRatio.LANDSCAPE_4_3,
+            size=None,
             background=None,
             output_format=None,
             model_name="gpt-image-1",
@@ -319,3 +327,198 @@ class TestImgGenParamSupport:
             model_name="any-model",
         )
         assert check.is_supported is True
+
+    @pytest.mark.parametrize(
+        "taxonomy",
+        [
+            AspectRatioTaxonomy.FLUX,
+            AspectRatioTaxonomy.FLUX_11_ULTRA,
+            AspectRatioTaxonomy.QWEN_IMAGE,
+            AspectRatioTaxonomy.GPT_IMAGE_LEGACY,
+            AspectRatioTaxonomy.GPT_IMAGE_2,
+            AspectRatioTaxonomy.GEMINI_2_5,
+            AspectRatioTaxonomy.GEMINI_3_PRO,
+            AspectRatioTaxonomy.GEMINI_3_FLASH,
+            AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
+        ],
+    )
+    def test_tier_1k_is_satisfiable_everywhere(self, taxonomy: AspectRatioTaxonomy) -> None:
+        """The '1k' tier is a portable no-op: every model natively produces a 1K-class image."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(taxonomy),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=SizeTier.ONE_K,
+            model_name="model-under-test",
+        )
+        assert check == SupportCheck(is_supported=True, reason=None)
+
+    @pytest.mark.parametrize(
+        ("taxonomy", "expected_supported"),
+        [
+            (AspectRatioTaxonomy.FLUX, False),
+            (AspectRatioTaxonomy.FLUX_11_ULTRA, False),
+            (AspectRatioTaxonomy.QWEN_IMAGE, False),
+            (AspectRatioTaxonomy.GPT_IMAGE_LEGACY, False),
+            (AspectRatioTaxonomy.GPT_IMAGE_2, True),
+            (AspectRatioTaxonomy.GEMINI_2_5, False),
+            (AspectRatioTaxonomy.GEMINI_3_PRO, True),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, True),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH_LITE, False),
+        ],
+    )
+    def test_tier_2k_support_matrix(self, taxonomy: AspectRatioTaxonomy, expected_supported: bool) -> None:
+        """'2k' is satisfiable only on gpt-image-2 and the Gemini 3 (non-lite) generations."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(taxonomy),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=SizeTier.TWO_K,
+            model_name="model-under-test",
+        )
+        assert check.is_supported is expected_supported
+        if not expected_supported:
+            assert check.reason is not None
+
+    @pytest.mark.parametrize(
+        ("taxonomy", "expected_supported"),
+        [
+            (AspectRatioTaxonomy.FLUX, False),
+            (AspectRatioTaxonomy.FLUX_11_ULTRA, False),
+            (AspectRatioTaxonomy.QWEN_IMAGE, False),
+            (AspectRatioTaxonomy.GPT_IMAGE_LEGACY, False),
+            (AspectRatioTaxonomy.GPT_IMAGE_2, False),
+            (AspectRatioTaxonomy.GEMINI_2_5, False),
+            (AspectRatioTaxonomy.GEMINI_3_PRO, True),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, True),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH_LITE, False),
+        ],
+    )
+    def test_tier_4k_support_matrix(self, taxonomy: AspectRatioTaxonomy, expected_supported: bool) -> None:
+        """'4k' is Gemini-3-only: gpt-image-2 caps out below 4K (honest refusal, no silent downgrade)."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(taxonomy),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=SizeTier.FOUR_K,
+            model_name="model-under-test",
+        )
+        assert check.is_supported is expected_supported
+        if not expected_supported:
+            assert check.reason is not None
+
+    @pytest.mark.parametrize(
+        "taxonomy",
+        [
+            AspectRatioTaxonomy.FLUX,
+            AspectRatioTaxonomy.FLUX_11_ULTRA,
+            AspectRatioTaxonomy.QWEN_IMAGE,
+            AspectRatioTaxonomy.GPT_IMAGE_LEGACY,
+            AspectRatioTaxonomy.GPT_IMAGE_2,
+            AspectRatioTaxonomy.GEMINI_2_5,
+            AspectRatioTaxonomy.GEMINI_3_PRO,
+            AspectRatioTaxonomy.GEMINI_3_FLASH,
+            AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
+        ],
+    )
+    def test_tier_half_k_rejected_everywhere(self, taxonomy: AspectRatioTaxonomy) -> None:
+        """'0.5k' is a validation error on every model until the Gemini wire token is verified."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(taxonomy),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=SizeTier.HALF_K,
+            model_name="model-under-test",
+        )
+        assert check.is_supported is False
+        assert check.reason is not None
+
+    def test_gemini_3_pro_rejects_banner_ratio_even_at_1k(self) -> None:
+        """Tier support does not override ratio gating: Pro has no banner ratios."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.GEMINI_3_PRO),
+            aspect_ratio=AspectRatio.LANDSCAPE_4_1,
+            size=SizeTier.ONE_K,
+            model_name="nano-banana-pro",
+        )
+        assert check.is_supported is False
+
+    def test_gemini_3_flash_supports_banner_ratio_at_2k(self) -> None:
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.GEMINI_3_FLASH),
+            aspect_ratio=AspectRatio.LANDSCAPE_4_1,
+            size=SizeTier.TWO_K,
+            model_name="nano-banana-2",
+        )
+        assert check == SupportCheck(is_supported=True, reason=None)
+
+    def test_exact_size_grid_hit_on_gemini_3_flash(self) -> None:
+        """Worked example: a gpt-image-2 bundle with size '2048x2048' runs on nano-banana-2 (1:1 @ 2K)."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.GEMINI_3_FLASH),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=ImageSize(width=2048, height=2048),
+            model_name="nano-banana-2",
+        )
+        assert check == SupportCheck(is_supported=True, reason=None)
+
+    def test_exact_size_grid_miss_on_gemini_3_flash_names_nearest_cells(self) -> None:
+        """Worked example: '2000x2000' errors suggesting the nearest grid cell, never silently snaps."""
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.GEMINI_3_FLASH),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=ImageSize(width=2000, height=2000),
+            model_name="nano-banana-2",
+        )
+        assert check.is_supported is False
+        assert check.reason is not None
+        assert "2048x2048" in check.reason
+
+    def test_exact_size_rejected_on_preset_only_taxonomy(self) -> None:
+        check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.FLUX),
+            aspect_ratio=AspectRatio.SQUARE,
+            size=ImageSize(width=2048, height=2048),
+            model_name="flux-dev",
+        )
+        assert check.is_supported is False
+        assert check.reason is not None
+        assert "exact image sizes" in check.reason
+
+    def test_worked_example_16_9_at_2k_portability(self) -> None:
+        """Design acceptance bar: 16:9 + '2k' runs on gemini_3_flash and gpt_image_2, fails on flux."""
+        for taxonomy in [AspectRatioTaxonomy.GEMINI_3_FLASH, AspectRatioTaxonomy.GPT_IMAGE_2]:
+            check = ImgGenParamSupport.check_aspect_ratio(
+                rules=_make_aspect_ratio_rules(taxonomy),
+                aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+                size=SizeTier.TWO_K,
+                model_name="model-under-test",
+            )
+            assert check.is_supported is True, taxonomy
+        flux_check = ImgGenParamSupport.check_aspect_ratio(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.FLUX),
+            aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+            size=SizeTier.TWO_K,
+            model_name="flux-pro",
+        )
+        assert flux_check.is_supported is False
+
+    def test_check_blueprint_params_checks_explicit_size_without_aspect_ratio(self) -> None:
+        """An explicitly-set size is checked even when aspect_ratio defers to the deck default."""
+        reasons = ImgGenParamSupport.check_blueprint_params(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.FLUX),
+            aspect_ratio=None,
+            size=SizeTier.TWO_K,
+            background=None,
+            output_format=None,
+            model_name="flux-dev",
+        )
+        assert len(reasons) == 1
+        assert "flux-dev" in reasons[0]
+
+    def test_check_blueprint_params_joint_aspect_ratio_and_tier(self) -> None:
+        reasons = ImgGenParamSupport.check_blueprint_params(
+            rules=_make_aspect_ratio_rules(AspectRatioTaxonomy.GEMINI_3_FLASH),
+            aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+            size=SizeTier.TWO_K,
+            background=None,
+            output_format=None,
+            model_name="nano-banana-2",
+        )
+        assert reasons == []

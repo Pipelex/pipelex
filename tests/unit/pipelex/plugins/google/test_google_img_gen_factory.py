@@ -1,10 +1,11 @@
 import pytest
 
 from pipelex.cogt.exceptions import ImgGenParameterError
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
+from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
 from pipelex.plugins.google.google_img_gen_factory import (
     GoogleAspectRatioType,
-    GoogleImageGenModel,
     GoogleImageSize,
     GoogleImgGenFactory,
 )
@@ -14,6 +15,13 @@ BANNER_ASPECT_RATIOS = [
     AspectRatio.LANDSCAPE_8_1,
     AspectRatio.PORTRAIT_1_4,
     AspectRatio.PORTRAIT_1_8,
+]
+
+GOOGLE_TAXONOMIES = [
+    AspectRatioTaxonomy.GEMINI_2_5,
+    AspectRatioTaxonomy.GEMINI_3_PRO,
+    AspectRatioTaxonomy.GEMINI_3_FLASH,
+    AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
 ]
 
 
@@ -46,6 +54,23 @@ class TestGoogleImgGenFactory:
         assert set(GoogleImgGenFactory.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K) == GoogleImgGenFactory.GEMINI_3_PRO_ASPECT_RATIOS
 
     @pytest.mark.parametrize(
+        ("tier", "expected_image_size"),
+        [
+            (SizeTier.ONE_K, "1K"),
+            (SizeTier.TWO_K, "2K"),
+            (SizeTier.FOUR_K, "4K"),
+        ],
+    )
+    def test_image_size_for_tier(self, tier: SizeTier, expected_image_size: GoogleImageSize) -> None:
+        """Portable size tiers map to Google's wire tokens."""
+        assert GoogleImgGenFactory.image_size_for_tier(tier) == expected_image_size
+
+    def test_image_size_for_tier_rejects_half_k(self) -> None:
+        """The 0.5k wire token is unverified — rejected until Google opens it."""
+        with pytest.raises(ImgGenParameterError, match=r"0\.5k"):
+            GoogleImgGenFactory.image_size_for_tier(SizeTier.HALF_K)
+
+    @pytest.mark.parametrize(
         ("aspect_ratio", "size", "expected_dimensions"),
         [
             (AspectRatio.LANDSCAPE_4_1, "1K", (2048, 512)),
@@ -64,28 +89,30 @@ class TestGoogleImgGenFactory:
             (AspectRatio.LANDSCAPE_16_9, "4K", (5504, 3072)),
         ],
     )
-    def test_nano_banana_2_dimensions(
+    def test_gemini_3_flash_dimensions(
         self,
         aspect_ratio: AspectRatio,
         size: GoogleImageSize,
         expected_dimensions: tuple[int, int],
     ) -> None:
-        """nano-banana-2 supports the full Gemini 3 grid, banners included, at every size."""
+        """gemini_3_flash supports the full Gemini 3 grid, banners included, at every size."""
         dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-            GoogleImageGenModel.NANO_BANANA_2,
+            AspectRatioTaxonomy.GEMINI_3_FLASH,
             aspect_ratio=aspect_ratio,
             size=size,
+            model_name="nano-banana-2",
         )
         assert dimensions == expected_dimensions
 
     @pytest.mark.parametrize("aspect_ratio", BANNER_ASPECT_RATIOS)
-    def test_nano_banana_pro_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
-        """Gemini 3 Pro publishes no banner ratios, so nano-banana-pro rejects them cleanly."""
+    def test_gemini_3_pro_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
+        """Gemini 3 Pro publishes no banner ratios, so its taxonomy rejects them cleanly."""
         with pytest.raises(ImgGenParameterError, match="not supported by model"):
             GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                GoogleImageGenModel.NANO_BANANA_PRO,
+                AspectRatioTaxonomy.GEMINI_3_PRO,
                 aspect_ratio=aspect_ratio,
                 size="1K",
+                model_name="nano-banana-pro",
             )
 
     @pytest.mark.parametrize(
@@ -96,47 +123,51 @@ class TestGoogleImgGenFactory:
             (AspectRatio.LANDSCAPE_21_9, "1K", (1584, 672)),
         ],
     )
-    def test_nano_banana_pro_standard_ratios_still_work(
+    def test_gemini_3_pro_standard_ratios_work_at_every_size(
         self,
         aspect_ratio: AspectRatio,
         size: GoogleImageSize,
         expected_dimensions: tuple[int, int],
     ) -> None:
-        """nano-banana-pro keeps its standard-ratio coverage at every size after the grid restructure."""
         dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-            GoogleImageGenModel.NANO_BANANA_PRO,
+            AspectRatioTaxonomy.GEMINI_3_PRO,
             aspect_ratio=aspect_ratio,
             size=size,
+            model_name="nano-banana-pro",
         )
         assert dimensions == expected_dimensions
 
     @pytest.mark.parametrize("aspect_ratio", BANNER_ASPECT_RATIOS)
-    def test_nano_banana_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
-        """The Gemini 2.5 grid has no banner ratios, so nano-banana rejects them cleanly."""
+    def test_gemini_2_5_rejects_banner_ratios(self, aspect_ratio: AspectRatio) -> None:
+        """The Gemini 2.5 grid has no banner ratios."""
         with pytest.raises(ImgGenParameterError, match="not supported by model"):
             GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                GoogleImageGenModel.NANO_BANANA,
+                AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=aspect_ratio,
                 size="1K",
-            )
-
-    def test_nano_banana_rejects_non_1k_size(self) -> None:
-        """nano-banana only supports the 1K size."""
-        with pytest.raises(ImgGenParameterError, match="only supports 1K"):
-            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                GoogleImageGenModel.NANO_BANANA,
-                aspect_ratio=AspectRatio.SQUARE,
-                size="2K",
+                model_name="nano-banana",
             )
 
     @pytest.mark.parametrize("size", ["2K", "4K"])
-    def test_nano_banana_2_lite_rejects_non_1k_sizes(self, size: GoogleImageSize) -> None:
-        """nano-banana-2-lite only supports the 1K size."""
-        with pytest.raises(ImgGenParameterError, match="only supports 1K"):
+    def test_gemini_2_5_rejects_non_1k_sizes(self, size: GoogleImageSize) -> None:
+        """gemini_2_5 only offers the 1K size."""
+        with pytest.raises(ImgGenParameterError, match="does not support image size"):
             GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                GoogleImageGenModel.NANO_BANANA_2_LITE,
+                AspectRatioTaxonomy.GEMINI_2_5,
                 aspect_ratio=AspectRatio.SQUARE,
                 size=size,
+                model_name="nano-banana",
+            )
+
+    @pytest.mark.parametrize("size", ["2K", "4K"])
+    def test_gemini_3_flash_lite_rejects_non_1k_sizes(self, size: GoogleImageSize) -> None:
+        """gemini_3_flash_lite only offers the 1K size."""
+        with pytest.raises(ImgGenParameterError, match="does not support image size"):
+            GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+                AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
+                aspect_ratio=AspectRatio.SQUARE,
+                size=size,
+                model_name="nano-banana-2-lite",
             )
 
     @pytest.mark.parametrize(
@@ -147,30 +178,93 @@ class TestGoogleImgGenFactory:
             (AspectRatio.SQUARE, (1024, 1024)),
         ],
     )
-    def test_nano_banana_2_lite_full_ratio_set_at_1k(self, aspect_ratio: AspectRatio, expected_dimensions: tuple[int, int]) -> None:
-        """nano-banana-2-lite supports the full Gemini 3 ratio set, banners included, at 1K."""
+    def test_gemini_3_flash_lite_full_ratio_set_at_1k(self, aspect_ratio: AspectRatio, expected_dimensions: tuple[int, int]) -> None:
+        """gemini_3_flash_lite supports the full Gemini 3 ratio set, banners included, at 1K."""
         dimensions = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-            GoogleImageGenModel.NANO_BANANA_2_LITE,
+            AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
             aspect_ratio=aspect_ratio,
             size="1K",
+            model_name="nano-banana-2-lite",
         )
         assert dimensions == expected_dimensions
 
-    @pytest.mark.parametrize("model", list(GoogleImageGenModel))
-    def test_portrait_9_21_rejected_for_every_model(self, model: GoogleImageGenModel) -> None:
-        """9:21 is rejected before any per-model gating."""
+    @pytest.mark.parametrize("taxonomy", GOOGLE_TAXONOMIES)
+    def test_portrait_9_21_rejected_for_every_taxonomy(self, taxonomy: AspectRatioTaxonomy) -> None:
+        """9:21 is rejected before any per-taxonomy gating."""
         with pytest.raises(ImgGenParameterError, match="not supported by Google Gemini Image models"):
             GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                model,
+                taxonomy,
                 aspect_ratio=AspectRatio.PORTRAIT_9_21,
                 size="1K",
+                model_name="some-gemini-model",
             )
 
-    def test_unknown_model_rejected(self) -> None:
-        """A model handle outside the Google image-gen roster is rejected."""
-        with pytest.raises(ImgGenParameterError, match="not supported by Google Gemini Image Gen"):
+    def test_non_google_taxonomy_rejected(self) -> None:
+        """A non-Gemini taxonomy value has no Google resolution grids."""
+        with pytest.raises(ImgGenParameterError, match="not a Google Gemini image generation taxonomy"):
             GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-                "imagen-42",
+                AspectRatioTaxonomy.FLUX,
                 aspect_ratio=AspectRatio.SQUARE,
                 size="1K",
+                model_name="flux-dev",
+            )
+
+    @pytest.mark.parametrize(
+        ("taxonomy", "exact_size", "expected_ratio", "expected_image_size"),
+        [
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, ImageSize(width=2048, height=2048), "1:1", "2K"),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, ImageSize(width=2752, height=1536), "16:9", "2K"),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, ImageSize(width=5504, height=3072), "16:9", "4K"),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH, ImageSize(width=512, height=2048), "1:4", "1K"),
+            (AspectRatioTaxonomy.GEMINI_3_PRO, ImageSize(width=2048, height=2048), "1:1", "2K"),
+            (AspectRatioTaxonomy.GEMINI_2_5, ImageSize(width=1024, height=1024), "1:1", "1K"),
+            (AspectRatioTaxonomy.GEMINI_3_FLASH_LITE, ImageSize(width=1024, height=1024), "1:1", "1K"),
+        ],
+    )
+    def test_exact_grid_hit_derives_ratio_and_size(
+        self,
+        taxonomy: AspectRatioTaxonomy,
+        exact_size: ImageSize,
+        expected_ratio: GoogleAspectRatioType,
+        expected_image_size: GoogleImageSize,
+    ) -> None:
+        """An exact WxH equal to a grid cell derives the (ratio, size) pair."""
+        derived = GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+            taxonomy,
+            exact_size=exact_size,
+            model_name="some-gemini-model",
+        )
+        assert derived == (expected_ratio, expected_image_size)
+
+    def test_exact_grid_miss_suggests_nearest_cells(self) -> None:
+        """A near-miss errors out naming the nearest valid cells — never silently snaps."""
+        with pytest.raises(ImgGenParameterError) as exc_info:
+            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+                AspectRatioTaxonomy.GEMINI_3_FLASH,
+                exact_size=ImageSize(width=2000, height=2000),
+                model_name="nano-banana-2",
+            )
+        error_message = str(exc_info.value)
+        assert "2000x2000" in error_message
+        assert "2048x2048" in error_message
+        assert "1:1" in error_message
+
+    def test_exact_grid_respects_taxonomy_size_gating(self) -> None:
+        """A 2K cell of the Gemini 3 grid is not a hit on a 1K-only taxonomy."""
+        with pytest.raises(ImgGenParameterError) as exc_info:
+            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+                AspectRatioTaxonomy.GEMINI_3_FLASH_LITE,
+                exact_size=ImageSize(width=2048, height=2048),
+                model_name="nano-banana-2-lite",
+            )
+        error_message = str(exc_info.value)
+        assert "1024x1024" in error_message
+
+    def test_exact_grid_respects_taxonomy_ratio_gating(self) -> None:
+        """A banner cell of the Gemini 3 grid is not a hit on the Pro taxonomy (no banners)."""
+        with pytest.raises(ImgGenParameterError):
+            GoogleImgGenFactory.derive_ratio_and_size_from_exact_size(
+                AspectRatioTaxonomy.GEMINI_3_PRO,
+                exact_size=ImageSize(width=2048, height=512),
+                model_name="nano-banana-pro",
             )

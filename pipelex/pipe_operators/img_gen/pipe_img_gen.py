@@ -92,6 +92,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         unsupported = ImgGenParamSupport.check_blueprint_params(
             rules=spec.rules,
             aspect_ratio=self.aspect_ratio,
+            size=self.size,
             background=self.background,
             output_format=self.output_format,
             model_name=img_gen_setting.model,
