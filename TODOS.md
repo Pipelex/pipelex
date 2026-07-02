@@ -102,13 +102,13 @@ Checkpoint 3 review triage (context-free Sonnet `/code-review` on `1e4642b6f`):
 
 ## Phase 4 — docs, e2e & release readiness
 
-- [ ] `docs/building-methods/pipes/pipe-operators/PipeImgGen.md`: `size` in the param table; portability section with the design's worked examples; cost note (2k/4k cost proportionally more; unset = provider default cost) — Material for MkDocs conventions, blank line before lists, no hard wraps
-- [ ] `docs/configuration/config-technical/cogt-config.md`: document the optional `size` default in `ImgGenJobParamsDefaults`
-- [ ] MTHDS JSON Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` (blueprint field changed — schema should expose enum-or-pattern for `size`)
-- [ ] `CHANGELOG.md` entry under `[Unreleased]` (breaking changes marked "breaking"; no mention of `wip/` docs)
-- [ ] E2E smoke (cost-gated test profile, see `/test-model` skill conventions): one 2K generation on `nano-banana-2` and one on `gpt-image-2` in `tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/`
-- [ ] Retire the superseded WIP note if still present anywhere; move any deferred-review-findings doc into `wip/img-gen-size/`
-- [ ] Full gates: `make agent-check` + `make agent-test` + `make tb`
+- [x] `docs/building-methods/pipes/pipe-operators/PipeImgGen.md`: `size` in the param table; portability section with the design's worked examples; cost note (2k/4k cost proportionally more; unset = provider default cost) — Material for MkDocs conventions, blank line before lists, no hard wraps
+- [x] `docs/configuration/config-technical/cogt-config.md`: document the optional `size` default in `ImgGenJobParamsDefaults`
+- [x] MTHDS JSON Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` (blueprint field changed — schema should expose enum-or-pattern for `size`)
+- [x] `CHANGELOG.md` entry under `[Unreleased]` (breaking changes marked "breaking"; no mention of `wip/` docs)
+- [x] E2E smoke (cost-gated test profile, see `/test-model` skill conventions): one 2K generation on `nano-banana-2` and one on `gpt-image-2` in `tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen/`
+- [x] Retire the superseded WIP note if still present anywhere; move any deferred-review-findings doc into `wip/img-gen-size/` — **no-op**: `wip/gemini-img-gen-size-tier-follow-up.md` never existed on this branch (folded into the design doc before it was written), and every checkpoint review finding was fixed in a follow-up commit, so there is no deferred-findings doc to move
+- [x] Full gates: `make agent-check` + `make agent-test` + `make tb`
 
 ### CHECKPOINT 4 — final gate
 
@@ -126,12 +126,12 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: Phases 0–3 done and committed; Checkpoint 3 complete (review fanned out, findings triaged, fix committed). Next: Phase 4 (docs, e2e & release readiness). NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits. Also note the gateway now *requires* `rules.aspect_ratio` on gemini-routed models whenever a `size` is requested — the remote config upload matters for that path.
+- **Status**: Phases 0–4 done and committed; Checkpoint 4 in progress (final feature-wide review fan-out + triage). The gateway remote config with the `rules` blocks is **live**: the Phase 4 live e2e smoke ran 2K generations through the `all_pipelex_gateway` routing profile and both passed with exact expected pixels (nano-banana-2 2752×1536, gpt-image-2 3072×1728).
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
 - **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
 - **Phase 2 commit**: `ec0aa7ce7`; Checkpoint 2 review follow-ups: `a8e56bfe5`
 - **Phase 3 commit**: `1e4642b6f`; Checkpoint 3 review fix: `94ded54f0`
-- **Phase 4 commit**: —
+- **Phase 4 commit**: `d6593bc8b`
 - **Decisions taken during implementation**:
   - The shared annotated union is `ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]` in `img_gen_job_components.py`; fields declare `ImgGenSize | None`.
   - Exact-size parsing accepts only positive `WxH` (regex `([1-9]\d*)x([1-9]\d*)`, lowercase `x`, no spaces); everything else raises "expected a size tier (…) or an exact size like '2048x1152'".
@@ -143,5 +143,8 @@ Full checkpoint protocol one last time: full suite green → commit → update t
   - `GoogleImgGenWorker` resolves its taxonomy from `inference_model.rules` (new `_img_gen_taxonomy()`, clear `ImgGenParameterError` if rules/topic missing or unknown); the wire still hardcodes `size="1K"` until Phase 3.
   - Gemini taxonomy cases in `make_args_from_aspect_ratio` validate (ratio, size) against the grids and return `{"aspect_ratio": <literal>}` — the Google native worker and gateway build their own `image_config`, so nothing consumes these args yet (Phase 3 threads `image_size`).
   - Pre-existing drift fixed by `make ukc`: kit `google.toml` had `nano-banana-2-lite` `inputs = ["text"]` while the `.pipelex` source (of-truth) said `["text", "images"]` since the img2img commit `38c716b56` — kit now matches the source (lite accepts image inputs).
-  - Gateway remote config (`pipelex-back-office/pipelex_back_office/remote_config/gateway_models.toml`, per Louis) also got the four `rules` blocks: older pipelex releases abstain on the unknown taxonomy, so the addition is version-safe. **Louis uploads it** so it becomes live remotely. Since Checkpoint 3 the rules are load-bearing on the gateway wire path: `GatewayFactory._make_gemini_image_config` resolves any requested `size` through the taxonomy grids and raises if `rules.aspect_ratio` is missing (only the no-size case falls back to the ratio-only mapping).
+  - Gateway remote config (`pipelex-back-office/pipelex_back_office/remote_config/gateway_models.toml`, per Louis) also got the four `rules` blocks: older pipelex releases abstain on the unknown taxonomy, so the addition is version-safe. **Confirmed live** by the Phase 4 e2e smoke (2K through the gateway on both models). Since Checkpoint 3 the rules are load-bearing on the gateway wire path: `GatewayFactory._make_gemini_image_config` resolves any requested `size` through the taxonomy grids and raises if `rules.aspect_ratio` is missing (only the no-size case falls back to the ratio-only mapping).
+  - Phase 4: the MTHDS JSON Schema exposes `size` as tier-enum | `^WxH$`-pattern string | ImageSize table via pydantic's `json_schema_input_type` on the `ImgGenSize` `BeforeValidator` (schema tests in `test_mthds_schema.py`); the pattern is derived from `_EXACT_SIZE_PATTERN` so the two can't drift.
+  - Phase 4: plxt's bundled MTHDS schema (from the released pipeline: pipelex → mthds.ai → vscode-pipelex → pipelex-tools) predates `size`, which made `plxt lint` (and CI's `merge-check-plxt-lint`) reject any `.mthds` using it. Fixed structurally: `.pipelex/plxt.toml` now points the `.mthds`/`.plx` rule at the locally generated `derived/mthds_schema.json` (this repo is the language's source of truth), and the `plxt-lint`/`merge-check-plxt-lint` make targets regenerate it first. Caveat: taplo resolves the relative schema path against the CLI's CWD (repo root for make/CI/hooks — correct) and against the LSP workspace root in editors — an editor rooted at the multi-repo workspace parent won't resolve it (falls back to a noisy schema-load error). A config-file-relative resolution fix would belong in `vscode-pipelex` (taplo-common `Options::prepare`).
+  - Phase 4: the live 2K e2e asserts actual decoded pixel dimensions (PIL) rather than metadata — this is the assertion that would have caught the historical hardcoded-1K bug.
 - **Open questions**: —
