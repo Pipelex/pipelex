@@ -522,3 +522,42 @@ class TestImgGenParamSupport:
             model_name="nano-banana-2",
         )
         assert reasons == []
+
+    @pytest.mark.parametrize("taxonomy", list(AspectRatioTaxonomy))
+    def test_square_stand_in_invariant(self, taxonomy: AspectRatioTaxonomy) -> None:
+        """Guards the invariant check_blueprint_params leans on when only `size` is set.
+
+        Using SQUARE as the stand-in ratio is only sound if (a) every taxonomy supports
+        SQUARE, and (b) a tier's verdict is uniform across all ratios the taxonomy
+        supports. A future taxonomy that drops 1:1 or gates tiers per-ratio would make
+        the stand-in verdict silently wrong — this test fails first.
+        """
+        rules = _make_aspect_ratio_rules(taxonomy)
+        square_check = ImgGenParamSupport.check_aspect_ratio(
+            rules=rules,
+            aspect_ratio=AspectRatio.SQUARE,
+            size=None,
+            model_name="model-under-test",
+        )
+        assert square_check.is_supported is True, f"taxonomy '{taxonomy}' must support SQUARE"
+
+        supported_ratios = [
+            ratio
+            for ratio in AspectRatio
+            if ImgGenParamSupport.check_aspect_ratio(rules=rules, aspect_ratio=ratio, size=None, model_name="model-under-test").is_supported
+        ]
+        for tier in SizeTier:
+            square_verdict = ImgGenParamSupport.check_aspect_ratio(
+                rules=rules,
+                aspect_ratio=AspectRatio.SQUARE,
+                size=tier,
+                model_name="model-under-test",
+            ).is_supported
+            for ratio in supported_ratios:
+                ratio_verdict = ImgGenParamSupport.check_aspect_ratio(
+                    rules=rules,
+                    aspect_ratio=ratio,
+                    size=tier,
+                    model_name="model-under-test",
+                ).is_supported
+                assert ratio_verdict is square_verdict, f"tier '{tier}' verdict differs between SQUARE and '{ratio}' on '{taxonomy}'"

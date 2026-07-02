@@ -1,5 +1,6 @@
 import math
 import operator
+from collections.abc import Mapping
 from typing import ClassVar, Literal
 
 from pipelex.cogt.exceptions import ImgGenParameterError
@@ -148,8 +149,11 @@ class GoogleImgGenFactory:
                 raise ImgGenParameterError(msg)
 
     @classmethod
-    def grids_for_taxonomy(cls, taxonomy: AspectRatioTaxonomy, *, model_name: str) -> dict[GoogleImageSize, AspectRatioToDimensions]:
-        """The (size -> ratio -> dimensions) cells a Google taxonomy accepts, ratio-filtered."""
+    def grids_for_taxonomy(cls, taxonomy: AspectRatioTaxonomy, *, model_name: str) -> Mapping[GoogleImageSize, AspectRatioToDimensions]:
+        """The (size -> ratio -> dimensions) cells a Google taxonomy accepts, ratio-filtered.
+
+        The returned mapping shares the class-level grid tables — read-only by contract.
+        """
         match taxonomy:
             case AspectRatioTaxonomy.GEMINI_2_5:
                 return {"1K": cls.ASPECT_RATIO_TO_DIMENSIONS_GEMINI_2_5_1K}
