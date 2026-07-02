@@ -107,11 +107,21 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # seed=img_gen_job.job_params.seed,
         )
 
+        # Build contents: the text prompt, plus input images for image-to-image editing
+        contents: genai_types.ContentListUnion
+        if input_images := img_gen_job.img_gen_prompt.input_images:
+            image_tasks = [GoogleFactory.prepare_image_part(prompt_image) for prompt_image in input_images]
+            image_parts = await asyncio.gather(*image_tasks)
+            parts = [genai_types.Part.from_text(text=prompt_text), *image_parts]
+            contents = genai_types.Content(parts=parts, role="user")
+        else:
+            contents = prompt_text
+
         # Generate content using async client
         try:
             response = await self.genai_async_client.models.generate_content(
                 model=self.inference_model.model_id,
-                contents=prompt_text,
+                contents=contents,
                 config=generation_config,
             )
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:

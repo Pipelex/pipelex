@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Gemini image-to-image (img2img) support:** The Google img-gen worker now forwards input images to the Gemini API as inline parts alongside the text prompt, enabling image editing and multi-image composition with the Nano Banana models. `nano-banana-2` (`gemini-3.1-flash-image-preview`) accepts image inputs and is supported by the dimensions factory (same 1K/2K/4K resolution grid as Nano Banana Pro, per Google's published tables); added `nano-banana-2-lite` (`gemini-3.1-flash-lite-image`, 1K only) to the Google backend.
+
 ### Fixed
 
 - **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.

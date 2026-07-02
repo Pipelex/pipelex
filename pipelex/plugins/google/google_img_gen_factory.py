@@ -14,6 +14,8 @@ AspectRatioToDimensions = dict[GoogleAspectRatioType, tuple[int, int]]
 class GoogleImageGenModel(StrEnum):
     NANO_BANANA = "nano-banana"
     NANO_BANANA_PRO = "nano-banana-pro"
+    NANO_BANANA_2 = "nano-banana-2"
+    NANO_BANANA_2_LITE = "nano-banana-2-lite"
 
 
 class GoogleImgGenFactory:
@@ -34,7 +36,9 @@ class GoogleImgGenFactory:
         "21:9": (1536, 672),
     }
 
-    # Resolution mappings for Gemini 3.0 Pro Image (Nano Banana Pro) - supports 1K, 2K, 4K
+    # Resolution mappings for Gemini 3.0 Pro Image (Nano Banana Pro) - supports 1K, 2K, 4K.
+    # Gemini 3.1 Flash Image (Nano Banana 2) publishes identical 1K/2K/4K dimensions, and
+    # Gemini 3.1 Flash Lite Image (Nano Banana 2 Lite) the same 1K dimensions (1K only).
     # Reference: https://ai.google.dev/gemini-api/docs/image-generation
     ASPECT_RATIO_TO_DIMENSIONS_NANO_BANANA_PRO_1K: ClassVar[AspectRatioToDimensions] = {
         "1:1": (1024, 1024),
@@ -112,7 +116,12 @@ class GoogleImgGenFactory:
                     msg = f"Model '{model}' only supports 1K size"
                     raise ImgGenParameterError(msg)
                 return cls.ASPECT_RATIO_TO_DIMENSIONS_NANO_BANANA_1K[aspect_ratio_str]
-            case GoogleImageGenModel.NANO_BANANA_PRO:
+            case GoogleImageGenModel.NANO_BANANA_2_LITE:
+                if size != "1K":
+                    msg = f"Model '{model}' only supports 1K size"
+                    raise ImgGenParameterError(msg)
+                return cls.ASPECT_RATIO_TO_DIMENSIONS_NANO_BANANA_PRO_1K[aspect_ratio_str]
+            case GoogleImageGenModel.NANO_BANANA_PRO | GoogleImageGenModel.NANO_BANANA_2:
                 return cls.SIZE_TO_ASPECT_RATIO_TO_DIMENSIONS_NANO_BANANA_PRO[size][aspect_ratio_str]
             case _:
                 msg = f"Model '{model}' is not supported by Google Gemini Image Gen"
