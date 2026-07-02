@@ -93,7 +93,12 @@ Providers actually receive the size intent.
 
 The provider-facing change surface is done; Phase 4 is docs/e2e/release, a different concern. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings.
 
-- [ ] Checkpoint 3 done (commit SHA recorded below, review findings triaged)
+- [x] Checkpoint 3 done (commit SHA recorded below, review findings triaged)
+
+Checkpoint 3 review triage (context-free Sonnet `/code-review` on `1e4642b6f`):
+
+- **Fixed** (follow-up commit `94ded54f0`): the gateway's gemini `image_config` tier branch mapped the tier token directly without taxonomy/grid validation — an unsupported tier (e.g. `2k` on the 1K-only `gemini_2_5` `nano-banana`) was silently forwarded to the provider while the native worker rejects the identical request client-side, and the reviewer traced the dispatch chain to confirm no upstream backstop catches it (blueprint-time validation skips deck aliases; `check_job_params` has no production caller). Any requested size (tier or exact) now resolves through `GoogleImgGenFactory.resolve_image_config` like every other call site — which also absorbed the reviewer's low-severity note that `_make_gemini_image_config` partially re-implemented the resolver. The gap-locking test `test_tier_without_rules_still_maps_directly` was replaced by `test_tier_without_rules_raises` + `test_tier_beyond_taxonomy_raises`; the no-size/no-rules case keeps the pre-existing ratio-only mapping (covered by its own test).
+- Reviewer confirmed the rest clean: the hardcoded-`"1K"` worker bug is genuinely fixed, the `is_tier_derived` warning demotion is threaded correctly at all call sites, and the new tests assert real values.
 
 ## Phase 4 — docs, e2e & release readiness
 
@@ -121,11 +126,11 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: Phases 0–3 done and committed; Checkpoint 3 in progress (Phase 3 committed, review fan-out pending triage). Next after Checkpoint 3: Phase 4 (docs, e2e, release readiness). NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits.
+- **Status**: Phases 0–3 done and committed; Checkpoint 3 complete (review fanned out, findings triaged, fix committed). Next: Phase 4 (docs, e2e & release readiness). NOTE: the gateway remote config edit (see decisions below) is in `pipelex-back-office` working tree — Louis uploads it; not part of this repo's commits. Also note the gateway now *requires* `rules.aspect_ratio` on gemini-routed models whenever a `size` is requested — the remote config upload matters for that path.
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
 - **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
 - **Phase 2 commit**: `ec0aa7ce7`; Checkpoint 2 review follow-ups: `a8e56bfe5`
-- **Phase 3 commit**: `1e4642b6f`
+- **Phase 3 commit**: `1e4642b6f`; Checkpoint 3 review fix: `94ded54f0`
 - **Phase 4 commit**: —
 - **Decisions taken during implementation**:
   - The shared annotated union is `ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]` in `img_gen_job_components.py`; fields declare `ImgGenSize | None`.
@@ -138,5 +143,5 @@ Full checkpoint protocol one last time: full suite green → commit → update t
   - `GoogleImgGenWorker` resolves its taxonomy from `inference_model.rules` (new `_img_gen_taxonomy()`, clear `ImgGenParameterError` if rules/topic missing or unknown); the wire still hardcodes `size="1K"` until Phase 3.
   - Gemini taxonomy cases in `make_args_from_aspect_ratio` validate (ratio, size) against the grids and return `{"aspect_ratio": <literal>}` — the Google native worker and gateway build their own `image_config`, so nothing consumes these args yet (Phase 3 threads `image_size`).
   - Pre-existing drift fixed by `make ukc`: kit `google.toml` had `nano-banana-2-lite` `inputs = ["text"]` while the `.pipelex` source (of-truth) said `["text", "images"]` since the img2img commit `38c716b56` — kit now matches the source (lite accepts image inputs).
-  - Gateway remote config (`pipelex-back-office/pipelex_back_office/remote_config/gateway_models.toml`, per Louis) also got the four `rules` blocks: gateway gemini img-gen models run through `OpenAICompletionsImgGenWorker` (sdk `gateway_completions`) which never reads rules on the wire, and older pipelex releases abstain on the unknown taxonomy — so the addition is validation-only and version-safe. **Louis uploads it** so it becomes live remotely.
+  - Gateway remote config (`pipelex-back-office/pipelex_back_office/remote_config/gateway_models.toml`, per Louis) also got the four `rules` blocks: older pipelex releases abstain on the unknown taxonomy, so the addition is version-safe. **Louis uploads it** so it becomes live remotely. Since Checkpoint 3 the rules are load-bearing on the gateway wire path: `GatewayFactory._make_gemini_image_config` resolves any requested `size` through the taxonomy grids and raises if `rules.aspect_ratio` is missing (only the no-size case falls back to the ratio-only mapping).
 - **Open questions**: —
