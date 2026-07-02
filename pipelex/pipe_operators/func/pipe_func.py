@@ -6,6 +6,7 @@ from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -43,6 +44,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     @field_validator("function_name", mode="before")
     @classmethod
     def validate_function_name(cls, function_name: str) -> str:
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the customer's function is not registered in this process (its
+            # source only travels on the crate), so the registry lookup + return-type inspection
+            # cannot run here. The sandbox registers the real function and validates it for real
+            # when it loads. Accept the declared name verbatim.
+            return function_name
         function = func_registry.get_function(function_name)
         if not function:
             # Check if this function was found but is ineligible (e.g., missing return type)
@@ -77,6 +84,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     def validate_output_with_library(self):
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the function is not in this process, so its return type cannot be
+            # inspected to cross-check against the output concept's structure class. The sandbox does
+            # this check for real at registration time. Skip the whole library-output validation here.
+            return
         function = func_registry.get_required_function(self.function_name)
         return_type: type[StuffContent] | None = get_type_hints(function).get("return")
         if return_type is None:

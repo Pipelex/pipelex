@@ -283,6 +283,16 @@ gemini = { tag_style = "xml" }
 pipe_stack_limit = 20
 
 ####################################################################################################
+# PipeFunc config
+####################################################################################################
+
+[pipelex.pipe_func_config]
+# Sandbox-hosted PipeFunc execution. False = local/direct: customer functions are imported and run
+# in this process (unchanged behavior). True = hosted runner/worker: customer PipeFunc code is
+# carried as source text and executed only inside an isolated sandbox, never imported here.
+is_sandbox_hosted = false
+
+####################################################################################################
 # Pipeline execution config
 ####################################################################################################
 

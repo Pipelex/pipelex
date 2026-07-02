@@ -32,8 +32,18 @@ class LibraryCrate(BaseModel):
     source_map: dict[str, str] = Field(default_factory=dict)
     """concept_ref or pipe_ref -> source file path (for error reporting)"""
 
+    python_sources: dict[str, str] = Field(default_factory=dict)
+    """relpath (within the library dir) -> Python source text, captured WITHOUT importing.
+
+    Carries the customer's PipeFunc and structure-class .py source alongside the method so it can
+    travel to a sandbox and be registered + executed there. Populated only in sandbox-hosted load
+    mode; empty for local/direct loads. Deliberately EXCLUDED from the fingerprint (see
+    compute_fingerprint_from_content): the fingerprint represents library structure for dedupe, and
+    folding source into it would break the structural-idempotency contract in load_from_crate.
+    """
+
     fingerprint: str = ""
-    """SHA-256 hex digest of the serialized concepts + pipes content."""
+    """SHA-256 hex digest of the serialized concepts + pipes content (source is intentionally excluded)."""
 
     @staticmethod
     def compute_fingerprint_from_content(

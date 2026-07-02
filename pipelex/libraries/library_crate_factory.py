@@ -33,6 +33,8 @@ class LibraryCrateFactory:
     def make_from_blueprints(
         cls,
         blueprints: list[PipelexBundleBlueprint],
+        *,
+        python_sources: dict[str, str] | None = None,
     ) -> LibraryCrate:
         """Build a LibraryCrate from parsed bundle blueprints.
 
@@ -47,6 +49,9 @@ class LibraryCrateFactory:
 
         Args:
             blueprints: List of parsed MTHDS bundle blueprints
+            python_sources: Optional relpath -> Python source text captured (without importing) in
+                sandbox-hosted load mode. Attached verbatim to the crate; intentionally NOT folded
+                into the fingerprint (the fingerprint represents library structure for dedupe).
 
         Returns:
             A LibraryCrate with all content merged and fingerprinted
@@ -143,6 +148,7 @@ class LibraryCrateFactory:
             pipes=pipes,
             domains=domains,
             source_map=source_map,
+            python_sources=python_sources or {},
             fingerprint=fingerprint,
         )
 

@@ -15,6 +15,7 @@ from typing_extensions import override
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
 from pipelex.cli.installed_methods import find_method_by_full_address
+from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -102,6 +103,11 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
+        # library_id -> {relpath: source}. Customer Python source captured (without importing) in
+        # sandbox-hosted load mode, threaded into get_crate() so the crate can carry it to a sandbox.
+        # Empty in local/direct mode. Per-library side-state because get_crate() rebuilds from
+        # blueprints only and cannot see the original .py text otherwise.
+        self._library_sources: dict[str, dict[str, str]] = {}
 
     ############################################################
     # Manager lifecycle
@@ -139,6 +145,7 @@ class LibraryManager(LibraryManagerAbstract):
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
+            self._library_sources.pop(library_id, None)
         return True
 
     @override
@@ -160,6 +167,7 @@ class LibraryManager(LibraryManagerAbstract):
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
+        self._library_sources = {}
         with ExitStack() as teardown_stack:
             for library in libraries:
                 teardown_stack.callback(library.teardown)
@@ -261,7 +269,10 @@ class LibraryManager(LibraryManagerAbstract):
         accumulated = self._blueprints.get(library_id)
         if not accumulated:
             return None
-        crate = LibraryCrateFactory.make_from_blueprints(blueprints=accumulated)
+        crate = LibraryCrateFactory.make_from_blueprints(
+            blueprints=accumulated,
+            python_sources=self._library_sources.get(library_id),
+        )
         self._crate_cache[library_id] = crate
         return crate
 
@@ -309,18 +320,29 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Import modules and register in global registries
         # Import from user directories
+        is_sandbox_hosted = is_pipe_func_sandbox_hosted()
         for library_dir in all_dirs:
-            # Only import files that contain StructuredContent subclasses (uses AST pre-check)
+            # Only import files that contain StructuredContent subclasses (uses AST pre-check).
+            # Kept in hosted mode too: concepts declared as `structure = "ClassName"` resolve that
+            # class from the registry at load time, so the structure classes must be present. These
+            # are pydantic data classes, not the arbitrary PipeFunc bodies the hosted invariant guards.
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=library_dir,
                 base_class_names=[StructuredContent.__name__],
                 force_include_dirs=[Path(builder_pkg.__file__).parent],
             )
-            # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
-            FuncRegistryUtils.register_funcs_in_folder(
-                folder_path=library_dir,
-                force_include_dirs=[Path(builder_pkg.__file__).parent],
-            )
+            if is_sandbox_hosted:
+                # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
+                # process. Capture every .py as source text (no import) so it can travel to the
+                # sandbox, where it is registered and executed instead. Accumulate across dirs.
+                self._library_sources.setdefault(library_id, {}).update(FuncRegistryUtils.read_py_sources(folder_path=library_dir))
+            else:
+                # Local/direct mode (unchanged): import files that contain @pipe_func decorated
+                # functions (uses AST pre-check) and register them in the process-global func_registry.
+                FuncRegistryUtils.register_funcs_in_folder(
+                    folder_path=library_dir,
+                    force_include_dirs=[Path(builder_pkg.__file__).parent],
+                )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
         num_registered = ClassRegistryUtils.auto_register_all_subclasses(

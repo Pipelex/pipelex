@@ -469,6 +469,10 @@ def get_required_config() -> ConfigRoot:
     return get_pipelex_hub().get_required_config()
 
 
+def get_optional_config() -> ConfigRoot | None:
+    return get_pipelex_hub().get_optional_config()
+
+
 def get_secrets_provider() -> SecretsProviderAbstract:
     return get_pipelex_hub().get_required_secrets_provider()
 

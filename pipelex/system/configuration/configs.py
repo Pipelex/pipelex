@@ -59,6 +59,17 @@ class PipeRunConfig(ConfigModel):
     pipe_stack_limit: int
 
 
+class PipeFuncConfig(ConfigModel):
+    # When true, this process treats PipeFunc as sandbox-hosted: it carries the customer's PipeFunc
+    # code without ever importing or executing it. Library loading captures the customer .py source
+    # as text (onto the crate) instead of registering it in the func_registry, and the PipeFunc
+    # validators skip the func_registry lookup + return-type checks — the real function is registered
+    # and validated inside the sandbox, not here. Local/direct execution leaves this false, which is
+    # byte-identical to the pre-existing behavior. This is a hosted-deploy flag, not a client
+    # preference, so it is intentionally absent from the .pipelex/ override file.
+    is_sandbox_hosted: bool
+
+
 class DryRunConfig(ConfigModel):
     text_gen_truncate_length: int
     nb_list_items: int
@@ -206,6 +217,7 @@ class Pipelex(ConfigModel):
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
+    pipe_func_config: PipeFuncConfig
     pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
     tracing_config: TracingConfig
