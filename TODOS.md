@@ -114,7 +114,15 @@ Checkpoint 3 review triage (context-free Sonnet `/code-review` on `1e4642b6f`):
 
 Full checkpoint protocol one last time: full suite green → commit → update this file (final state, remaining follow-ups) → fan out `/code-review` (Sonnet-5, context-free, pointer = `git diff <BASE>..HEAD` for the whole feature) → triage findings. Then hand back to the user for merge/release decisions.
 
-- [ ] Checkpoint 4 done (feature-complete, full suite green, final review triaged)
+- [x] Checkpoint 4 done (feature-complete, full suite green, final review triaged)
+
+Checkpoint 4 review triage (context-free Sonnet `/code-review` on `17f478e7b..HEAD`, five independent passes — CLAUDE.md compliance, bug scan, git-history regression, docs/schema/test drift, comment-invariant audit; compliance/history/comment audits came back clean). All fixes in follow-up commit `d6e5d81b5`:
+
+- **Fixed — non-positive exact size crashed the Google grid derivation**: the `size = { width = 0, ... }` table wire form bypassed the `WxH` string regex and reached `derive_ratio_and_size_from_exact_size` as a raw `ZeroDivisionError`. `ImageSize` now enforces `Field(gt=0)` on both dims (the honest type invariant — schema regen picks it up as Draft-4 `minimum`+`exclusiveMinimum`); the now-dead OpenAI positivity guard was removed.
+- **Fixed — exact-size deck default silently defeated an explicit pipe `aspect_ratio`**: the `self.size or img_gen_param_defaults.size` merge could pair a config-default exact size with a pipe's explicit ratio, and factories ignore the ratio when size is exact. New `resolve_default_size` (unit-tested pure function): an exact-size default only applies to pipes that don't set their own `aspect_ratio` (specificity semantics); a tier default composes with any ratio. Documented in cogt-config.md.
+- **Fixed — gateway hard-failed size-unset jobs on unknown taxonomy strings**: `_make_gemini_image_config` raised for a remotely-fetched spec whose `rules.aspect_ratio` predates the taxonomy enum, contradicting the support layer's documented abstain policy. New `GoogleImgGenFactory.optional_img_gen_taxonomy` (None on missing/unknown) lets the no-size case keep the ratio-only mapping; sized requests still hard-fail with the honest message.
+- **Fixed (polish)**: spec `size` description marks `'0.5k'` reserved; the docs/changelog claim "nothing is sent when size unset" is now scoped honestly (Gemini omits `image_size`; OpenAI always sends its fixed 1K-class preset).
+- **Deferred** to `wip/img-gen-size/deferred-review-findings.md`: gateway no-rules error message is deck-config-speak a gateway user can't action; static-arm validation silently skips when routing can't resolve rules (by design); size⊕aspect_ratio exclusivity invisible to the JSON schema (model_validator); `quoted_tokens()` still lists `'0.5k'` in parse errors.
 
 ## Out of scope (explicit follow-ups, do not implement here)
 
@@ -126,12 +134,12 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: Phases 0–4 done and committed; Checkpoint 4 in progress (final feature-wide review fan-out + triage). The gateway remote config with the `rules` blocks is **live**: the Phase 4 live e2e smoke ran 2K generations through the `all_pipelex_gateway` routing profile and both passed with exact expected pixels (nano-banana-2 2752×1536, gpt-image-2 3072×1728).
+- **Status**: **FEATURE COMPLETE.** Phases 0–4 done and committed; Checkpoint 4 done (feature-wide review triaged, fixes committed, deferred items in `wip/img-gen-size/`). All gates green after the review fixes: `make agent-check`, `make tb`, full `make agent-test`, `make docs-check`. Remaining decisions are the user's: merge/release (release ordering note: the published mthds.ai schema and the plxt/pipelex-tools bundled schema need the regenerated `size`-aware schema before downstream repos lint `.mthds` files using `size`; this repo lints against its own generated schema since `d6593bc8b`). The gateway remote config with the `rules` blocks is **live**: the Phase 4 live e2e smoke ran 2K generations through the `all_pipelex_gateway` routing profile and both passed with exact expected pixels (nano-banana-2 2752×1536, gpt-image-2 3072×1728). The design doc moved to `wip/img-gen-size/design.md`.
 - **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
 - **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `18b1364c5`
 - **Phase 2 commit**: `ec0aa7ce7`; Checkpoint 2 review follow-ups: `a8e56bfe5`
 - **Phase 3 commit**: `1e4642b6f`; Checkpoint 3 review fix: `94ded54f0`
-- **Phase 4 commit**: `d6593bc8b`
+- **Phase 4 commit**: `d6593bc8b`; Checkpoint 4 review fixes: `d6e5d81b5`
 - **Decisions taken during implementation**:
   - The shared annotated union is `ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]` in `img_gen_job_components.py`; fields declare `ImgGenSize | None`.
   - Exact-size parsing accepts only positive `WxH` (regex `([1-9]\d*)x([1-9]\d*)`, lowercase `x`, no spaces); everything else raises "expected a size tier (…) or an exact size like '2048x1152'".
