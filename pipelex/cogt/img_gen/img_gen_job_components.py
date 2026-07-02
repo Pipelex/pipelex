@@ -39,6 +39,11 @@ class SizeTier(StrEnum):
     TWO_K = "2k"
     FOUR_K = "4k"
 
+    @classmethod
+    def quoted_tokens(cls) -> str:
+        """Comma-separated quoted tier tokens, for error messages."""
+        return ", ".join(f"'{tier}'" for tier in cls)
+
 
 _EXACT_SIZE_PATTERN = re.compile(r"([1-9]\d*)x([1-9]\d*)")
 
@@ -53,8 +58,7 @@ def parse_img_gen_size(value: Any) -> Any:
         pass
     if exact_match := _EXACT_SIZE_PATTERN.fullmatch(value):
         return ImageSize(width=int(exact_match.group(1)), height=int(exact_match.group(2)))
-    tier_tokens = ", ".join(f"'{tier}'" for tier in SizeTier)
-    msg = f"Invalid image size '{value}': expected a size tier ({tier_tokens}) or an exact size like '2048x1152'"
+    msg = f"Invalid image size '{value}': expected a size tier ({SizeTier.quoted_tokens()}) or an exact size like '2048x1152'"
     raise ValueError(msg)
 
 

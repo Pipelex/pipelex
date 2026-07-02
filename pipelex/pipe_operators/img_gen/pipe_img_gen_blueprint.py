@@ -37,11 +37,10 @@ class PipeImgGenBlueprint(PipeBlueprint):
     @model_validator(mode="after")
     def validate_size_vs_aspect_ratio(self) -> Self:
         if isinstance(self.size, ImageSize) and self.aspect_ratio is not None:
-            tier_tokens = ", ".join(f"'{tier}'" for tier in SizeTier)
             msg = (
                 f"PipeImgGen cannot set both an exact size ('{self.size.width}x{self.size.height}') and aspect_ratio "
                 f"('{self.aspect_ratio}'): an exact size implies the aspect ratio. "
-                f"Remove aspect_ratio, or use a size tier ({tier_tokens}) instead of an exact size."
+                f"Remove aspect_ratio, or use a size tier ({SizeTier.quoted_tokens()}) instead of an exact size."
             )
             raise ValueError(msg)
         return self

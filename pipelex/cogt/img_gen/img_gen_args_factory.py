@@ -287,6 +287,13 @@ class ImgGenArgsFactory:
         if isinstance(size, SizeTier):
             msg = f"Size tier '{size}' is not yet supported for image generation model '{model_name}'"
             raise ImgGenParameterError(msg)
+        match aspect_ratio_taxonomy:
+            case AspectRatioTaxonomy.FLUX | AspectRatioTaxonomy.FLUX_11_ULTRA | AspectRatioTaxonomy.QWEN_IMAGE:
+                if size is not None:
+                    msg = f"Model '{model_name}' does not support exact image sizes; use aspect_ratio to control the geometry"
+                    raise ImgGenParameterError(msg)
+            case AspectRatioTaxonomy.GPT_IMAGE_LEGACY | AspectRatioTaxonomy.GPT_IMAGE_2:
+                pass
         key: str
         value: Any
         match aspect_ratio_taxonomy:

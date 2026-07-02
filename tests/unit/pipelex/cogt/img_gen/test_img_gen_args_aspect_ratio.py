@@ -5,12 +5,31 @@ from __future__ import annotations
 import pytest
 
 from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy
 
 
 class TestImgGenArgsAspectRatio:
+    @pytest.mark.parametrize(
+        "aspect_ratio_taxonomy",
+        [
+            AspectRatioTaxonomy.FLUX,
+            AspectRatioTaxonomy.FLUX_11_ULTRA,
+            AspectRatioTaxonomy.QWEN_IMAGE,
+        ],
+    )
+    def test_exact_size_rejected_on_preset_only_taxonomies(self, aspect_ratio_taxonomy: AspectRatioTaxonomy) -> None:
+        """Taxonomies with no exact-size wire parameter must reject an exact size instead of silently dropping it."""
+        with pytest.raises(ImgGenParameterError, match="does not support exact image sizes"):
+            ImgGenArgsFactory.make_args_from_aspect_ratio(
+                aspect_ratio_taxonomy=aspect_ratio_taxonomy,
+                aspect_ratio=AspectRatio.SQUARE,
+                size=ImageSize(width=2048, height=1152),
+                model_name="preset-only-model",
+            )
+
     @pytest.mark.parametrize(
         ("aspect_ratio", "expected_image_size"),
         [

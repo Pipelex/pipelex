@@ -35,8 +35,8 @@ class PipeImgGenSpec(PipeSpec):
     size: ImgGenSize | None = Field(
         default=None,
         description=(
-            "Image size intent: a portable tier ('0.5k', '1k', '2k', '4k') or exact pixels like '2048x1152'. "
-            "An exact size implies the aspect ratio and cannot be combined with aspect_ratio. Omit to use the provider default."
+            "Image size intent: a portable tier ('0.5k', '1k', '2k', '4k') or exact pixels like '2048x1152' "
+            "(an exact size implies the aspect ratio). Omit to use the provider default."
         ),
     )
 

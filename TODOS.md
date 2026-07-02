@@ -22,29 +22,34 @@ Implements the design in [`wip/img-gen-size-portable-design.md`](wip/img-gen-siz
 
 The working tree starts with the prior aspect-ratio work **staged but uncommitted** (img-gen aspect-ratio files + the design doc). That work is authorized prior work — commit it as-is first so the size work diffs cleanly.
 
-- [ ] Commit the currently staged changes as their own commit (aspect-ratio follow-up + design doc); record the SHA below as `BASE`
-- [ ] Confirm green baseline: `make agent-check` + `.venv/bin/pytest -x -q tests/unit/pipelex/cogt/img_gen/ tests/unit/pipelex/plugins/ tests/unit/pipelex/pipe_operators/pipe_img_gen/` + `make tb`
-- [ ] If the baseline is not green, fix or surface to the user before writing any size code
+- [x] Commit the currently staged changes as their own commit (aspect-ratio follow-up + design doc); record the SHA below as `BASE`
+- [x] Confirm green baseline: `make agent-check` + `.venv/bin/pytest -x -q tests/unit/pipelex/cogt/img_gen/ tests/unit/pipelex/plugins/ tests/unit/pipelex/pipe_operators/pipe_img_gen/` + `make tb`
+- [x] If the baseline is not green, fix or surface to the user before writing any size code
 
 ## Phase 1 — types & surface
 
 New `size` field end to end on the params/blueprint/spec surface, no behavior on the wire yet.
 
-- [ ] **Tests first**: parsing unit tests in `tests/unit/pipelex/cogt/img_gen/` — tier tokens (`"0.5k"`/`"1k"`/`"2k"`/`"4k"`), exact `"WxH"` → `ImageSize`, garbage strings → clear `ValueError`; serialization round-trip for both union arms (StrEnum as str, `ImageSize` as dict)
-- [ ] **Tests first**: blueprint validator tests in `tests/unit/pipelex/pipe_operators/pipe_img_gen/test_pipe_img_gen_blueprint.py` — tier composes with `aspect_ratio`; exact size + `aspect_ratio` set together → validation error; each alone OK
-- [ ] `SizeTier` StrEnum in `pipelex/cogt/img_gen/img_gen_job_components.py` next to `AspectRatio`: `HALF_K = "0.5k"`, `ONE_K = "1k"`, `TWO_K = "2k"`, `FOUR_K = "4k"`
-- [ ] `ImgGenJobParams.size` becomes `SizeTier | ImageSize | None` via an annotated union with a `BeforeValidator` that parses strings (tier token → `SizeTier`, `"<int>x<int>"` → `ImageSize`, else `ValueError`); reuse the same annotated type for all three surfaces
-- [ ] `PipeImgGenBlueprint.size` (`pipelex/pipe_operators/img_gen/pipe_img_gen_blueprint.py`) + `PipeImgGenSpec.size` (`pipelex/builder/pipe/pipe_img_gen_spec.py`) use the same union; blueprint gains the `size`-vs-`aspect_ratio` exclusivity validator (spec's `to_blueprint()` threads it through)
-- [ ] `PipeImgGen` (`pipelex/pipe_operators/img_gen/pipe_img_gen.py`) threads `self.size or img_gen_param_defaults.size` into `ImgGenJobParams` like the other one-time settings
-- [ ] `ImgGenJobParamsDefaults` gains optional `size` — class default `None` (the Optional exception to the no-class-defaults config rule); **no key added** to `pipelex/pipelex.toml` or `.pipelex/pipelex.toml` (`None` = provider default)
-- [ ] Explicit non-goal, do not add: `size` on `ImgGenSetting` (deck presets) — geometry is pipe intent, not model preset
-- [ ] Verify: `make agent-check`, targeted tests, `make tb` (config model changed)
+- [x] **Tests first**: parsing unit tests in `tests/unit/pipelex/cogt/img_gen/` — tier tokens (`"0.5k"`/`"1k"`/`"2k"`/`"4k"`), exact `"WxH"` → `ImageSize`, garbage strings → clear `ValueError`; serialization round-trip for both union arms (StrEnum as str, `ImageSize` as dict)
+- [x] **Tests first**: blueprint validator tests in `tests/unit/pipelex/pipe_operators/pipe_img_gen/test_pipe_img_gen_blueprint.py` — tier composes with `aspect_ratio`; exact size + `aspect_ratio` set together → validation error; each alone OK
+- [x] `SizeTier` StrEnum in `pipelex/cogt/img_gen/img_gen_job_components.py` next to `AspectRatio`: `HALF_K = "0.5k"`, `ONE_K = "1k"`, `TWO_K = "2k"`, `FOUR_K = "4k"`
+- [x] `ImgGenJobParams.size` becomes `SizeTier | ImageSize | None` via an annotated union with a `BeforeValidator` that parses strings (tier token → `SizeTier`, `"<int>x<int>"` → `ImageSize`, else `ValueError`); reuse the same annotated type for all three surfaces
+- [x] `PipeImgGenBlueprint.size` (`pipelex/pipe_operators/img_gen/pipe_img_gen_blueprint.py`) + `PipeImgGenSpec.size` (`pipelex/builder/pipe/pipe_img_gen_spec.py`) use the same union; blueprint gains the `size`-vs-`aspect_ratio` exclusivity validator (spec's `to_blueprint()` threads it through)
+- [x] `PipeImgGen` (`pipelex/pipe_operators/img_gen/pipe_img_gen.py`) threads `self.size or img_gen_param_defaults.size` into `ImgGenJobParams` like the other one-time settings
+- [x] `ImgGenJobParamsDefaults` gains optional `size` — class default `None` (the Optional exception to the no-class-defaults config rule); **no key added** to `pipelex/pipelex.toml` or `.pipelex/pipelex.toml` (`None` = provider default)
+- [x] Explicit non-goal, do not add: `size` on `ImgGenSetting` (deck presets) — geometry is pipe intent, not model preset
+- [x] Verify: `make agent-check`, targeted tests, `make tb` (config model changed)
 
 ### CHECKPOINT 1 — surface in place
 
 The new `size` surface is the foundation everything else builds on; catch shape/over-engineering problems now, before Phase 2 builds on the union type. Full checkpoint protocol: verify → commit → update this file → fan out `/code-review` (Sonnet-5, context-free, pointer = this phase's commit SHA) → triage findings.
 
-- [ ] Checkpoint 1 done (commit SHA recorded below, review findings triaged)
+- [x] Checkpoint 1 done (commit SHA recorded below, review findings triaged)
+
+Checkpoint 1 review triage (context-free Sonnet `/code-review` on `19ce81eeb`):
+
+- **Fixed** (follow-up commit `81d937a44`): exact `ImageSize` was silently dropped on the Flux / Flux-1.1-Ultra / Qwen taxonomies — now a hard `ImgGenParameterError` ("does not support exact image sizes"), with a parametrized test. Also deduplicated the tier-token error text into `SizeTier.quoted_tokens()` and removed the spec `size` description's reference to `aspect_ratio` (the spec surface has no such field).
+- **Known, deferred by plan**: `check_blueprint_params` not yet receiving `size` (no static validation of `size` at blueprint load) — that is exactly the Phase 2 item "`check_blueprint_params` now receives the explicitly-set `size`"; not fixed early.
 
 ## Phase 2 — rules & validation
 
@@ -111,11 +116,15 @@ Full checkpoint protocol one last time: full suite green → commit → update t
 
 > Update this section at every checkpoint. A fresh session should be able to resume from this section + the design doc alone.
 
-- **Status**: plan written, no implementation started. Working tree holds the prior aspect-ratio work staged-but-uncommitted (Phase 0 commits it).
-- **`BASE` commit (Phase 0)**: _not yet committed_
-- **Phase 1 commit**: —
+- **Status**: Phase 0 + Phase 1 done and committed; Checkpoint 1 complete (review fanned out, findings triaged, fixes committed). Next: Phase 2 (rules & validation), starting with its tests-first items.
+- **`BASE` commit (Phase 0)**: `17f478e7b` (plan + design doc; the aspect-ratio code itself was already committed as `d42084e91` before this plan started — nothing else was staged)
+- **Phase 1 commit**: `19ce81eeb`; Checkpoint 1 review fixes: `81d937a44`
 - **Phase 2 commit**: —
 - **Phase 3 commit**: —
 - **Phase 4 commit**: —
-- **Decisions taken during implementation**: —
+- **Decisions taken during implementation**:
+  - The shared annotated union is `ImgGenSize: TypeAlias = Annotated[SizeTier | ImageSize, BeforeValidator(parse_img_gen_size)]` in `img_gen_job_components.py`; fields declare `ImgGenSize | None`.
+  - Exact-size parsing accepts only positive `WxH` (regex `([1-9]\d*)x([1-9]\d*)`, lowercase `x`, no spaces); everything else raises "expected a size tier (…) or an exact size like '2048x1152'".
+  - Interim guard: `ImgGenArgsFactory.make_args_from_aspect_ratio` raises `ImgGenParameterError` for any `SizeTier` ("not yet supported") so a tier can never silently reach the wire between Phase 1 and Phases 2–3; `check_aspect_ratio` was widened to the union. Phases 2–3 replace this guard with real per-taxonomy logic.
+  - `mthds_schema.json` regen deliberately deferred to Phase 4 (the schema unit tests don't gate on drift — verified).
 - **Open questions**: —
