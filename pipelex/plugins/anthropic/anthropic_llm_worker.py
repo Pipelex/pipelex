@@ -29,7 +29,7 @@ from pipelex.cogt.llm.llm_utils import (
     dump_kwargs,
     dump_response_from_structured_gen,
 )
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -57,7 +57,7 @@ class _ThinkingParams:
     suppress_temperature: bool
 
 
-class AnthropicLLMWorker(LLMWorkerInternalAbstract):
+class AnthropicLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -65,7 +65,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        LLMWorkerInternalAbstract.__init__(
+        LLMWorkerAbstract.__init__(
             self,
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,

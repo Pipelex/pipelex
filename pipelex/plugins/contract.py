@@ -25,7 +25,7 @@ class PipelexPlugin(Protocol):
     **Invariant — ``register`` is side-effect-free.** It may *only* call
     registrar menu methods: no hub access, no I/O, no SDK/client construction.
     This is what makes ``build_registrar`` safe to run more than once (it runs at
-    CLI-build to harvest commands *and* again at boot). Anything heavy — importing
+    boot *and* again in the ``pipelex plugins list`` diagnostic command). Anything heavy — importing
     a backend SDK, constructing a client, importing ``temporalio`` — happens lazily
     inside the ``make_worker`` closures and the hub-slot-claim thunks, never in
     ``register`` itself.

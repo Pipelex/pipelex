@@ -1,190 +1,113 @@
-# TODOS — Required main stuff (PipeParallel always combines)
+# Cookbook "hello plugin" → real inference-backend plugin (Option B)
 
-**Branch:** `feature/Required-main-stuff` · **Design:** `wip/required-main-stuff.md` (full) · `wip/required-main-stuff-brief.html` (brief)
+Status: **CHECKPOINT B CLEARED — TRACK COMPLETE (2026-07-03).** Phases 0–4 done and ALL COMMITTED. Pipelex (`feature/More-plugins`): `2f9b7e1d9` (optional_routes fix), `dee230f46` (LLM worker fold, breaking), plus the docs+tracker commit carrying this file. Cookbook (`dev`): `ecb231c` (the whole example; root `pyproject.toml`/`uv.lock` editable pin deliberately left uncommitted — flip to `pipelex==X.Y.Z` at release, see caveat below). Only remaining action = release ordering (step 3 below). This tracker is retired.
 
-**Scope:** implement the design **excluding §9 (companion track — `/execute` vs `/start`→delivery result-shape unification)**, which is designed and tackled separately. Everything else is in scope: always-combine `PipeParallel`, delete `combined_output`, new `native.Composite` concept, static branch-name validation, invariant enforcement across in-repo surfaces, then the gated cross-repo sweep.
+## NEXT SESSION — start here
 
-## The rule being implemented
+1. **Commit slicing first** (user to approve slices). This worktree (`_plugins`, branch `feature/More-plugins`) holds four separable concerns — do NOT mix them:
+   - `optional_routes` factory fix: `pipelex/cogt/model_routing/routing_profile_factory.py` + `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` + its CHANGELOG "Fixed" entry.
+   - LLM worker fold (breaking): `llm_worker_abstract.py` (folded), `llm_worker_internal_abstract.py` (deleted), `llm_utils.py` + `llm_generate.py` (dump gating moved), `inference_manager{,_protocol}.py` (legacy setter removed), 6 re-parented workers under `pipelex/plugins/`, reworked tests (`test_worker_error_enrichment`, `test_external_plugin`, `test_llm_gen_text`, `test_setup_inference_workers`, factory/manager types) + the two CHANGELOG "Changed" entries.
+   - Orchestrator-plugins docs from a PRIOR session (unrelated to this track — `docs/under-the-hood/orchestrator-plugins.md` etc.).
+   - `TODOS.md` (this tracker).
+   Cookbook side = one coherent commit (example package, `.pipelex/inference/` config, `.mthds`, README×2, CHANGELOG, `test_bundles.py`, mypy exclude) — but the `[tool.uv.sources]` editable pin in `pyproject.toml`/`uv.lock` must NOT ship (see editable-pin caveat below).
+2. **Phase 4 — docs rewrite** (checkboxes below). Also re-check `docs/under-the-hood/inference-backend-plugins.md`'s worker section against the folded base (constructor now takes `inference_model`; no lifecycle gotchas left to document).
+3. **Release ordering**: pipelex release > 0.36.0 (breaking changelog) → flip cookbook pin to `pipelex==X.Y.Z` → cookbook release. Before the pipelex release, grep `pipelex-temporal` + `pipelex-mistralai-workflows` for LLM worker subclasses / `set_llm_worker_from_external_plugin` (expected: none — both are orchestrator-only).
 
-> A pipe run always delivers a main stuff. Consequently, a pipeline always delivers a main stuff.
+All gates were green at session end (2026-07-03): pipelex `make agent-check` + `make tb` + FULL `make agent-test`; cookbook `make agent-check` + `make agent-test` + hello-plugin real run end-to-end.
 
-Enforced at the one non-stamping leaf: `PipeParallel` always combines its branch outputs into its declared `output` concept and stamps that as main stuff. `combined_output` is deleted (breaking, no back-compat per house policy). `native.Composite` is the untyped combination vehicle.
+## Goal
 
-## Working conventions for this track
+Replace the legacy cookbook example `pipelex-cookbook/examples/c_advanced/using_inference_plugins/` with a genuine entry-point plugin that demonstrates the real plugin system. Today that example is a single `.mthds` file whose `model` field references the handle `llm_plugin_example_using_openai` — a name **defined nowhere** (not in the cookbook's `.pipelex/inference/`, not in the core kit). "Plugin" in its name is pre-plugin-system vocabulary meaning "custom model config entry"; the example has only ever run as DRY RUN (see `pipelex-cookbook/.pipelex/traces/`). Decision taken with the user (2026-07-03): **Option B** — make it an actual `pipelex.plugins` entry-point plugin, not a config-only reframe.
 
-- **TDD:** write the red tests first for each behavioral change, then implement to green.
-- **Gates:** `make agent-check` after code changes; targeted pytest during development (`.venv/bin/pytest -x -q <path>`); full `make agent-test` before each checkpoint.
-- **Commits:** one commit per phase, landed at its checkpoint, so each review sub-agent gets a clean SHA range.
-- **Checkpoint protocol (MANDATORY STOP):** at each checkpoint the agent must stop forward progress and, in order:
-  1. **Verify** — run the phase's full gates (`make agent-check` + `make agent-test`) and confirm the phase's acceptance criteria below.
-  2. **Update this file** — check off done items, record decisions taken, deviations from the design, and current code state in the "Checkpoint log" section, so a brand-new session can cold-start from this file alone. Update `wip/required-main-stuff.md` status line too.
-  3. **Fan out review** — spawn a **Sonnet-5 sub-agent with NO inherited context** to run the `/code-review` skill on the phase's changes. Hand it *only* a pointer to the changes (the phase's commit SHA range, e.g. `git diff <base>..HEAD`, or the working-tree diff) — never the plan, the design doc, the rationale, or your own conclusions. Target: clean solid software, not over-engineering.
-  4. **Triage findings** — fix real defects before proceeding; findings that are design tradeoffs (not silent bugs) go to a deferred-items doc under `wip/required-main-stuff/`, not reflexively applied.
+## Background: the plugin system (cold-start summary)
 
-## Phase 1 — Runtime + language surface (this repo)
+The pipelex repo (this worktree, `_plugins`) has a discovery-based plugin system. Everything below is verified against the current tree:
 
-### 1a. Red tests first
+- **Contract** (`pipelex/plugins/contract.py`): a plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` protocol — `name: str`, `targets_api: int` (must equal `PLUGIN_API_VERSION`, currently **2**), and `register(self, registrar) -> None`. `register` is **side-effect-free**: it may only call registrar menu methods — no I/O, no SDK import, no client construction. Heavy work goes inside the `make_worker` closures.
+- **Discovery** (`pipelex/plugins/discovery.py`): `build_registrar` iterates `BUILTIN_PLUGINS` then external entry points in group **`pipelex.plugins`**. An entry point may resolve to a plugin instance or a zero-arg factory returning one. Denylist via `plugins.disabled` config; fail-loud on duplicates/version mismatch/broken plugin.
+- **Inference seam** (`pipelex/plugins/inference_backend_registry.py`): `registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="<token>", make_worker=...)`. A model's `sdk` field selects the backend factory; worker factories hold no match over SDK strings. `MakeWorkerFn` is called as `make_worker(*, inference_model: InferenceModelSpec, backend: InferenceBackend, sdk_clients: SdkClientRegistry, reporting_delegate: ReportingProtocol | None) -> InferenceWorkerAbstract`. Use `require_sdk(...)` inside `make_worker` for optional-dependency guards.
+- **Minimal LLM worker**: subclass `LLMWorkerAbstract` (`pipelex/cogt/llm/llm_worker_abstract.py`); since the fold (see follow-up below) the abstract surface is just `_gen_text` + `_gen_object` — the base takes `inference_model` in `__init__`, owns the job lifecycle, and derives capability flags from the spec.
+- **Optional companion**: `registrar.add_model_lister(sdk="<token>", lister=...)` — powers `pipelex show models`.
+- **Reference implementations**: smallest builtin = `pipelex/plugins/blackboxai/blackboxai_plugin.py` (one `add_inference_backend`, lazy imports inside `_make_..._worker`). External entry-point precedents = `pipelex-temporal` (`pipelex_temporal/temporal_plugin.py`) and `pipelex-mistralai-workflows`.
+- **Canonical authoring doc**: `docs/under-the-hood/inference-backend-plugins.md` (the "acme" walkthrough — the cookbook example should be its living counterpart).
+- **Verification command**: `pipelex plugins list` prints every discovered plugin (origin builtin/external, status, API version, contributions).
 
-- [x] Regression test for the **stale-stamp bug**: a `PipeSequence` ending in an `add_each`-only `PipeParallel` must deliver the combined composite as main stuff, not the previous step's output (today it silently delivers step N-1's stuff).
-- [x] **Terminal-parallel delivers main stuff**: an `add_each`-only parallel as top-level `main_pipe` with memory from `make_from_pipeline_inputs` (the API path) completes with a stamped main stuff (today `main_stuff_name` is `None` and `PipeOutput.main_stuff` raises).
-- [x] **Static validation accept/reject cases**: `output = "Composite"` accepted; structured concept with fields matching branch `result` names accepted (required fields ⊆ result names, result names ⊆ declared fields); native non-composite (`Text`, `Image`, …), `Dynamic`, `Anything`, and multiplicity suffixes (`Foo[]`, `Foo[N]`) rejected at bundle/library validation time.
-- [x] **`CompositeContent` round-trips**: `smart_dump`, kajson transport round-trip (`dump_for_transport` → rehydrate), `rendered_markdown` / `rendered_html` with named sub-contents surfaced as top-level fields (no wrapper key).
-- [x] **Dry-run parity**: dry run of a parallel stamps the same combined main stuff shape as live run.
+Model config layer (how a `.mthds` `model` handle reaches the plugin): the cookbook's `.pipelex/inference/backends.toml` declares backends keyed by name (`[hello]`, `enabled`, `api_key`...); per-backend model files `backends/<name>.toml` declare model sections with `[defaults]` carrying `sdk = "<token>"` — the section header is the model handle referenced from `.mthds`. The `add-model` skill (in this repo's `.claude/skills/`) documents the full add-a-model procedure including routing profiles.
 
-### 1b. `native.Composite` concept
+## Decisions
 
-- [x] Add `COMPOSITE = "Composite"` to `NativeConceptCode` in `pipelex/core/concepts/native/concept_native.py`.
-- [x] New `CompositeContent(StuffContent)` in `pipelex/core/stuffs/composite_content.py` — pydantic `extra="allow"` so branch names are top-level serialized fields; full content surface (`smart_dump`, kajson round-trip, `rendered_markdown`/`rendered_html`).
-- [x] Register in the class registry + concept factory wherever native concepts are wired.
+- **D1 — worker shape**: a deterministic, zero-key "hello" echo worker (returns a canned/derived completion) so the example runs everywhere with no credentials; the rewritten docs page points to `inference-backend-plugins.md` for wrapping a real SDK. Rationale: cookbook examples must be runnable; the seam being demonstrated is discovery/registration, not OpenAI usage. (Override here if we'd rather wrap the OpenAI SDK.)
+- **D2 — package location**: the plugin package lives inside the example dir, e.g. `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with its own `pyproject.toml`, installed with `uv pip install -e` (cookbook already uses uv). It is NOT a dependency of the cookbook's root `pyproject.toml` — installing it is the demonstrated step.
+- **D3 — naming**: retire the dangling handle `llm_plugin_example_using_openai`. New names: plugin `hello-inference` (entry-point name `hello_inference`), sdk token `hello`, backend `[hello]`, model handle e.g. `hello-1`. No `pipelex_` prefix anywhere user-facing that belongs to the example.
 
-### 1c. Always-combine runtime
+## Phases
 
-- [x] `pipelex/pipe_controllers/parallel/pipe_parallel.py`: unconditional combine in `_live_run_controller_pipe` **and** `_dry_run_controller_pipe` via a shared helper (an existing TODO already asks for this); combination concept taken from `self.output`; `set_new_main_stuff` always called; parallel-combine graph edges always registered.
-- [x] Investigate `final_stuff_code` while in this file (the parallel currently clears it with a copy-pasted `PipeBatch` log line): confirm what it drives (graph/trace identity) — final wiring decision is a Phase 2 item, but capture findings now.
+### Phase 0 — Recon in the cookbook repo
 
-### 1d. Delete `combined_output` across the language surface
+- [x] Verify how a custom backend + model file wires end-to-end in the cookbook's current `.pipelex/` layout: add a scratch `[hello]` backend + `backends/hello.toml` model with `sdk = "hello"` and confirm the failure mode is `InferenceBackendNotFoundError` for `(llm, hello)` (proves config resolves and the missing piece is exactly the plugin). **DONE** — exact friendly message confirmed: "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?".
+- [x] Confirm whether routing profiles (`.pipelex/inference/routing_profiles.toml`) need an entry for a directly-referenced model handle, or whether `model = { model = "hello-1" }` in `.mthds` bypasses routing. **ANSWERED: routing is NOT bypassed.** `ModelManager.build_deck` routes every known model through the active profile; a DEFAULT match whose backend lacks the model spec **silently drops the model from the deck** (only the `internal` backend is tried as fallback). So the example needs an exact route. We use `optional_routes = { "hello-1" = "hello" }` in the active `all_pipelex_gateway` profile — optional routes only apply when the target backend is enabled, so the entry is inert if `[hello]` is disabled. **This surfaced a real core bug (fixed here, see below).**
+- [x] ~~Check the cookbook's pinned `pipelex` version supports the plugin system~~ — resolved 2026-07-03: the cookbook now sources `pipelex` **editable from this worktree** (`pipelex-cookbook/pyproject.toml` `[tool.uv.sources] pipelex = { path = "../_plugins", editable = true }`), so it runs against this tree's tip. Any pipelex-side change needed for the example is made HERE and is live in the cookbook immediately.
 
-- [x] `pipelex/pipe_controllers/parallel/pipe_parallel_blueprint.py`: delete field + the one-of-two (`add_each_output`/`combined_output`) validator.
-- [x] `pipelex/pipe_controllers/parallel/pipe_parallel_factory.py`: stop resolving the combined concept separately.
-- [x] `pipelex/builder/pipe/pipe_parallel_spec.py`: delete field + validators; simplify `to_blueprint()`; update pretty-render.
-- [x] `pipelex/builder/operations/pipe_ops.py` + `pipelex/cli/agent_cli/commands/pipe_cmd.py`: remove `combined_output` display/handling code.
-- [x] `pipelex/core/bundles/pipelex_bundle_blueprint.py`: drop the `combined_output` concept-ref collection; **add the new static structure-compatibility check** (design §3).
+### Phase 1 — The plugin package (in `pipelex-cookbook`) — DONE
 
-### 1e. Fixtures, schema, docs
+- [x] Create `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with `pyproject.toml`: distribution name `hello-inference-plugin`, entry point `hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"` (module path deviates from the plan's `hello_inference_plugin:...` — no-re-exports rule forbids defining the class in `__init__.py`; layout mirrors the builtins' `<name>_plugin.py`), dependency on `pipelex`, hatchling build, `py.typed` marker (needed by the cookbook's mypy).
+- [x] Implement `HelloInferencePlugin` in `hello_inference_plugin/hello_plugin.py`: `name = "hello_inference"`, `targets_api = PLUGIN_API_VERSION`, side-effect-free `register`, worker import deferred into the `_make_hello_llm_worker` closure.
+- [x] Implement `HelloLLMWorker(LLMWorkerAbstract)` in `hello_llm_worker.py`: deterministic `_gen_text` (canned haiku + word-count token usage), `_gen_object` raises `LLMCapabilityError`; capability flags come from the model spec via the base class. (An earlier gotcha — workers had to call `llm_job.llm_job_before_start` themselves or reporting crashed on a `None` duration — was eliminated by folding `LLMWorkerInternalAbstract` into `LLMWorkerAbstract` in core, see below.)
+- [x] Bonus TAKEN: `registrar.add_model_lister(sdk="hello", lister=...)` in `hello_list.py` — reads the models from the backend config (no remote API), lights up `pipelex show models hello`.
 
-- [x] Migrate test fixtures and data: `tests/integration/pipelex/pipes/controller/pipe_parallel/pipe_parallel_1.mthds`, `tests/e2e/pipelex/pipes/pipe_controller/pipe_parallel/parallel_graph_*.mthds`, `tests/unit/pipelex/pipe_controllers/parallel/{data.py,test_pipe_parallel_blueprint.py}`, `tests/unit/pipelex/builder/pipe/pipe_controller/pipe_parallel/test_data.py`, `tests/unit/pipelex/builder/operations/test_pipe_spec_to_toml.py`, `tests/unit/pipelex/graph/test_mermaidflow.py`, `tests/integration/pipelex/pipeline/test_bundle_validator.py`, `tests/integration/pipelex/cli/test_agent_validate_pipe_in_bundle.py`, `tests/integration/pipelex/pipes/controller/pipe_parallel/test_pipe_parallel_validation.py` (and any others `grep -rln combined_output` surfaces).
-- [x] Regenerate the MTHDS JSON Schema: `.venv/bin/pipelex-dev generate-mthds-schema`.
-- [x] Rewrite `docs/building-methods/pipes/pipe-controllers/PipeParallel.md` to the new semantics — current reality only, no historical narrative.
-- [x] Changelog entry under `[Unreleased]`, marked breaking (delete `combined_output`; `output` is the combination concept; new `native.Composite`).
-- [x] Gates: `make agent-check` green, targeted parallel/builder/graph tests green, full `make agent-test` green.
+### Phase 2 — Config + method files (in `pipelex-cookbook`) — DONE
 
-### ⛔ CHECKPOINT 1 — MANDATORY STOP
+- [x] `[hello]` backend added to `.pipelex/inference/backends.toml` (enabled, no key), `backends/hello.toml` declares `hello-1` with `sdk = "hello"`, and `optional_routes = { "hello-1" = "hello" }` added to the active `all_pipelex_gateway` profile in `routing_profiles.toml`.
+- [x] `hello_plugin.mthds` references `hello-1`; dangling handle `llm_plugin_example_using_openai` retired.
 
-Acceptance: parallel always combines (live + dry), `combined_output` fully gone from source and fixtures, `native.Composite` round-trips, static validation catches bad `output` declarations at `/validate` time, all gates green.
+### Phase 3 — End-to-end verification (in `pipelex-cookbook`) — DONE
 
-- [x] Verify acceptance criteria + full gates (`make agent-check` + full `make agent-test` green).
-- [x] Commit Phase 1 — `757146324` on top of `1b26b3fae`.
-- [x] Update this file (checkpoint log below) + design doc status for cold start.
-- [x] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 1 diff (pointer only).
-- [x] Triage findings: review found NO correctness bugs; duplicated native-concept match extracted to `NativeConceptCode.is_composite` (fixed); double-parse finding deferred → `wip/required-main-stuff/deferred-phase-1-review.md`.
+- [x] `uv pip install -e examples/c_advanced/using_inference_plugins/hello_inference_plugin` (left installed in the cookbook venv).
+- [x] `pipelex plugins list` shows `hello_inference | external | registered | 2 | inference backend llm:hello + model lister hello`.
+- [x] Dry run AND real run green — real run outputs the deterministic haiku, zero keys. `pipelex show models hello` lists `hello-1`.
+- [x] Negative check: after uninstall, run fails with the friendly "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?" — and the DRY RUN still passes without the plugin (worker creation is lazy), so cookbook CI needs nothing installed.
+- [x] Housekeeping: example README written (install → discover → run → failure mode → docs link); cookbook CHANGELOG `[Unreleased]` entry; root README bullet under "Advanced Methods"; `tests/e2e/test_bundles.py` stale special-cases removed (`NEEDS_OPENAI_KEY` and `GHA_DISABLED` both emptied — the example no longer needs a key nor a GHA skip); cookbook `pyproject.toml` mypy `exclude` gains the nested plugin dir (module-name clash: resolve as the installed package, not via `examples/` traversal).
+- Gates: cookbook `make agent-check` + `make agent-test` green; all `tests/e2e/test_bundles.py` dry-run cases pass (hello_plugin auto-discovered, no special-casing). Pipelex-side `make agent-check` green + targeted cogt tests pass.
 
-## Phase 2 — Enforce the invariant across in-repo surfaces
+**CHECKPOINT A — CLEARED 2026-07-03.** Working end-to-end in the cookbook. NOT committed yet in either repo (user to arbitrate commit slicing; this worktree also has unrelated uncommitted orchestrator-plugins docs).
 
-Once every pipe stamps, "a completed run has a main stuff" is guaranteed; tighten the defensive branches from optional to direct.
+#### Follow-up DONE (in this worktree): LLM worker family symmetry (fold `LLMWorkerInternalAbstract` → `LLMWorkerAbstract`)
 
-- [x] Graph tracer output-spec branch in `pipelex/core/pipes/pipe_abstract.py` — remove the defensive branch and its apologetic comment ("main_stuff may not exist for pipes like PipeParallel…").
-- [x] Delivery executor `pipelex/pipe_run/delivery_executor.py`: always write the `main_stuff.*` artifact files for completed runs (kills the "empty envelope" failure mode).
-- [x] CLI run cores: `pipelex/cli/commands/run/_run_core.py` + `pipelex/cli/agent_cli/commands/run/_run_core.py` — drop the "no main output produced" branches for live runs.
-- [x] OTel telemetry attribute extraction: `pipelex/system/telemetry/otel_factory.py`.
-- [x] Wire models go non-optional (`main_stuff_name: str`): `pipelex/runtime_bridge/payloads.py`, `pipelex/runtime_bridge/serialization.py` (`resolve_main_stuff_root_key`), `pipelex/pipeline/pipeline_response.py` (`PipelexRunResultExecute`), `pipelex/cli/agent_cli/commands/run/_run_core_api.py`. Temporal payload history is not a concern — never shipped to prod.
-- [x] Audit every remaining `get_optional_main_stuff` call site: `WorkingMemory.get_optional_main_stuff` itself **stays** (pre-run/empty memory legitimately has none); each post-run boundary call site is either tightened or justified in the checkpoint log.
-- [x] Resolve the **`final_stuff_code`** open question (design §7) using the Phase 1c findings: presumably honor it on the combined stuff like operators do.
-- [x] Gates: `make agent-check` + full `make agent-test` green.
+Decided with the user right after Checkpoint A: `LLMWorkerInternalAbstract` was a remnant of the pre-plugin-system "fake plugin" era, and the base `LLMWorkerAbstract` had a hole in its template method (external workers had to call `llm_job_before_start` themselves or reporting crashed). Fixed structurally, matching the other three families:
 
-### ⛔ CHECKPOINT 2 — MANDATORY STOP
+- `LLMWorkerAbstract.__init__` now takes `inference_model`; the base owns the lifecycle (`llm_job_before_start`, spec-driven capability checks, constraints, spec-based OTel names). `LLMWorkerInternalAbstract` deleted; all builtin LLM workers re-parented.
+- Legacy `set_llm_worker_from_external_plugin` (manager + protocol) removed — pre-plugin-system path registering spec-less worker classes by handle; its test reworked to drive an out-of-tree `LLMWorkerAbstract` subclass with a real spec.
+- Import-cycle lesson (user cares): `pipelex/hub.py` imports the worker ABCs at module level, and `pipelex.config.get_config` imports the hub — so **nothing in hub's import closure may import `pipelex.config` at module level**. The dump gating that caused this moved to the `llm_generate` funnel; `dump_prompt`/`dump_response_from_text_gen` in `llm_utils` are config-gated internally (llm_utils left hub's closure when the ABC dropped it). NO lazy imports. Pre-existing deeper inversion flagged, not fixed: `config.py → hub` and `configs.py → aws_config.py → hub` mean the config layer sits ON TOP of the hub — a future refactor could move the config singleton below the hub and dissolve this class of cycle for good.
+- Cookbook side: `HelloLLMWorker` shrank to `_gen_text` + `_gen_object` only (the teaching outcome we wanted); breaking changelog entries added in pipelex CHANGELOG `[Unreleased]`.
 
-Acceptance: no defensive main-stuff branch left for completed live runs; wire `main_stuff_name` non-optional; call-site audit documented; all gates green. Cross-repo work starts fresh from here — this checkpoint's TODOS update is the cold-start context for that session.
+#### Core bug found & fixed during Phase 0 (in this worktree)
 
-- [x] Verify acceptance criteria + full gates.
-- [x] Commit Phase 2 — `3c3cf4570` on top of `9acbd7a86`.
-- [x] Update this file (checkpoint log: final call-site audit results, `final_stuff_code` decision) + design doc status.
-- [x] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 2 diff (pointer only).
-- [x] Triage findings: ONE confirmed bug (reproduced by the reviewer) — `PipeCondition`'s `continue` outcome doesn't stamp a main stuff, so the tightened tracer epilogue crashed with a raw `WorkingMemoryStuffNotFoundError` whenever a condition continued with no pre-existing main stuff under active tracing. FIXED at the semantic site (see Checkpoint 2 log "Review triage"). All other tightened surfaces judged internally consistent by the review; no simplification findings.
+`RoutingProfileFactory.make_routing_profile` (`pipelex/cogt/model_routing/routing_profile_factory.py`) parsed + validated `optional_routes` from `routing_profiles.toml` but never passed it to the built `RoutingProfile` — TOML optional routes silently did nothing (nothing in the tree used them; zero test coverage). Fixed (one-line pass-through), new test module `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` (factory pass-through + enabled/disabled gating), CHANGELOG `[Unreleased]` entry added. **Consequence for the cookbook:** its `[Unreleased]` note says the example requires `pipelex` > 0.36.0 — the cookbook-side release must wait for (or pin past) the pipelex release carrying this fix. Related pre-existing wart spotted, NOT fixed: `RoutingProfile.get_backend_match_for_model` mutates `self.routes` in place when merging optional routes (`possible_routes = self.routes` without copy) — harmless today (idempotent merge), flag if it ever bites.
 
-## Phase 3 — Cross-repo sweep (GATED)
+### Phase 4 — Docs rewrite (in the pipelex repo, this worktree) — DONE 2026-07-03
 
-**Gate: do not start before Phases 1–2 are merged to `main` and a pipelex version is cut.** Each repo below is its own git repo — commit/PR per its own conventions.
+- [x] Rewrote `docs/cookbook/using-inference-plugins.md`: what a plugin is (entry point + `PipelexPlugin` + registrar), package layout, model-config side (`.pipelex/inference/`, optional route), install + `pipelex plugins list` + run walkthrough, failure mode, links to `under-the-hood/inference-backend-plugins.md`. Stale `.pipelex/pipelex.toml` claim gone; GitHub badge now points at the example dir. Also updated the stale blurb in `docs/cookbook/index.md`.
+- [x] Audited `docs/features/llm-integration.md` — contains no plugin terminology at all (nothing to fix); the stale "plugins" mention was the cookbook page's own link text, now rewritten. Workspace-wide grep: no other legacy "plugin = config entry" language in docs (remaining "plugin" hits are the unrelated Claude Code skills plugin page).
+- [x] Re-checked `docs/under-the-hood/inference-backend-plugins.md` worker section against the folded base: acme example already passes `inference_model` to the worker, no lifecycle gotchas documented — one stale bit found & fixed: lookup-miss error is `InferenceBackendNotFoundError`, not `NotImplementedError` (the doc's own fail-loud table already had it right).
+- [x] `make docs-check` (strict mkdocs build) green.
+- [x] Changelog entry under `[Unreleased]` (brief docs entry under "Changed").
 
-- [ ] `mthds/` — spec: `mthds-format.md`, `pipes-controllers.md`, `validation-rules.md`, `namespace-resolution.md`, `cross-package-references.md`, `docs/mthds_schema.json` — remove `combined_output`, define always-combine + `native.Composite`.
-- [ ] `vscode-pipelex/` — pinned `mthds_schema.json` in taplo-common; `plxt` lint/format accepts the new shape and rejects `combined_output`.
-- [ ] `conformance/` — `tests/pipelex/test_validate_subcommands.py` fixture updates; keep spec ↔ test links green (`make check-spec-links`).
-- [ ] `mthds-plugins/` — skills references: `mthds-reference.md`, `build-phases.md`, `recursive-cheat-sheet.md`, `mthds-run/SKILL.md` across plugin variants.
-- [ ] `pipelex-app/` — `src/types/core/pipes/pipe_controllers/pipe-parallel.ts`.
-- [ ] `mthds-ui/` — `src/graph/types.ts`: `combined_output_concept` exec-data key (kept as-is in Phase 1 for compat; decide rename here per design §7) + graph-spec data fixtures.
-- [ ] `cocode/` — migrate `ai_instruction_update.mthds`, `swe_docs.mthds`.
-- [ ] `pipelex-website/` — `docs/mthds-doc.md`.
-- [ ] Demo/workshop repos — `illustration_generator/bundle.mthds` copies.
-- [ ] SDKs (`pipelex-sdk-js/`, `mthds-python/`) + `pipelex-starter-python/` — tighten `main_stuff` handling for completed runs; check `PipeOutputAbstract` (mthds-python) for encoded main-stuff optionality (design §7). Full `find_main_content` cleanup also needs the companion track — do only the invariant-side tightening here.
-- [ ] `pipelex-temporal/` (private) — adapt to the split orchestrator SPI: move the `FIRE_AND_FORGET` arm out of `match delivery` into `start(...)` returning `PipelexPipeDispatchAck`; `run(...)` keeps only the blocking arm (no `delivery` param, no `is_completed`). Same check for `pipelex-mistralai-workflows/` if it registers an orchestrator.
-- [ ] `pipelex-api/` — `/execute` calls `orchestrator.run(...)` without `delivery`; `/start` calls `orchestrator.start(...)` and reads the ack's `workflow_id` (today it reads `run_output.workflow_id` off a degenerate `PipelexPipeRunOutput`).
+**CHECKPOINT B (final)** — Phase 4 work all done; **only the commits remain** (user to approve the slices from "NEXT SESSION" step 1, plus these Phase 4 docs edits which ride with the tracker/docs concern or their own docs slice). Once committed in both repos, note the commit SHAs here and retire/archive this tracker. Release ordering reminder (step 3 above) still applies before shipping either side.
 
-### ⛔ CHECKPOINT 3 — MANDATORY STOP
+## Cross-repo map
 
-Acceptance: every consumer repo aligned with the released pipelex version; conformance + spec-links green; no repo still references `combined_output`.
+| Repo | Work |
+|---|---|
+| `pipelex-cookbook` | plugin package, backend/model config, `.mthds`, run verification (Phases 0–3) |
+| `pipelex` (this worktree `_plugins`) | docs page rewrite + terminology audit (Phase 4), plus any core change the example surfaces |
 
-- [ ] Verify per-repo test suites / checks.
-- [ ] Update this file; close out or fold residual items into follow-up trackers.
-- [ ] Fan out context-free Sonnet-5 `/code-review` sub-agents per changed repo (pointer only — the repo's diff/SHA range).
-- [ ] Triage findings; then close this track (companion track remains open, separate design).
+**Editable-pin caveat**: the cookbook's `[tool.uv.sources]` editable pin on `../_plugins` is a local dev convenience (set by the user 2026-07-03) and must NOT ship: before merging/releasing the cookbook side, flip back to a PyPI `pipelex==X.Y.Z` pin carrying whatever core changes this work needed (same playbook as the pipelex-api editable-pin precedent — editable local paths break CI). If the example needs no core change, the flip-back is to the current release.
 
-## Open questions (from design §7 — resolve during implementation)
+## Gotchas for a cold start
 
-- [x] `final_stuff_code`: RESOLVED in Phase 2 — the parallel honors it on the combined stuff (see Checkpoint 2 log).
-- [ ] Graph `execution_data` key `combined_output_concept`: keep name in Phase 1 for `mthds-ui` compat; rename decision in Phase 3 (`mthds-ui` row).
-- [ ] `add_each_output` naming: recommendation is **keep** (pure churn otherwise); revisit only if MTHDS spec editors want it (Phase 3, `mthds/` row).
-- [ ] `PipeOutputAbstract` (mthds-python): check for encoded optionality (Phase 3, SDKs row).
-
-## Checkpoint log
-
-*(Filled in at each checkpoint — decisions taken, deviations from design, current code state, audit results. This section is the cold-start context for a fresh session.)*
-
-### Checkpoint 1 — reached (Phase 1 complete)
-
-**Code state:** Phase 1 fully implemented on `feature/Required-main-stuff`; one commit carries the whole phase (see git log). `make agent-check` green; full `make agent-test` green.
-
-**What landed:**
-
-- `native.Composite`: `NativeConceptCode.COMPOSITE` + `CompositeContent(StuffContent)` (`pipelex/core/stuffs/composite_content.py`, pydantic `extra="allow"`), wired into `ConceptFactory.make_native_concept`, `NativeConceptCode.structure_class`, and `CoreRegistryModels.STUFF`. Custom `rendered_markdown`/`rendered_html` iterate the named components; a `components` property exposes `model_extra`.
-- Always-combine runtime: `PipeParallel._run_branches_and_combine` is the shared live/dry helper (resolves the old TODO); combine concept comes from `self.output`; `set_new_main_stuff` and PARALLEL_COMBINE graph edges are unconditional. `combined_output` field deleted from runtime model, blueprint, factory, spec, pipe_ops/pipe_cmd display, and bundle-blueprint concept-ref collection.
-- Static validation, two layers: (1) parse-time in `PipeParallelBlueprint.validate_output` — rejects multiplicity suffixes and native non-`Composite`/`Dynamic`/`Anything` outputs; mirrored on the runtime model in `PipeParallel.validate_output_static` for direct constructions; (2) library-time in `PipeParallel.validate_output_with_library` — structure-compatibility check (required fields ⊆ result names; result names ⊆ declared fields; `CompositeContent` subclasses skip). Both feed `/validate` (bundle parse + `Library.validate...` → `pipe.validate_with_libraries()`).
-
-**Decisions / deviations from the plan:**
-
-- The TODOS 1d line said to put the structure-compatibility check in `pipelex_bundle_blueprint.py`; it lives on `PipeParallel.validate_output_with_library` instead, because the concept's structure class (registered Python class, generated class, refines chain) is only resolvable against the loaded library — the bundle blueprint cannot see class-backed structures. Design §3 says "bundle/library validation time", which this satisfies.
-- kajson round-trip needed a `__json_encode__` hook on `CompositeContent`: pydantic stores extras outside `__dict__`, so kajson's default `__dict__` fallback silently dropped every component. The hook hands kajson the live components so nested contents keep their class metadata (`# noqa: PLW3201` — kajson protocol name).
-- A description-only concept as a parallel output is rejected by the field-compat check naturally (its generated structure class is TextContent-derived, requiring `text`), with a message suggesting `Composite` — test pins this.
-- Graph `execution_data` key `combined_output_concept` kept (now always set = declared output concept ref) for `mthds-ui` compat, per design §7; rename decision deferred to Phase 3.
-- `tests/e2e/.../cv_job_match.mthds` had two parallels with now-invalid outputs (`Page[]`, `Text`) — migrated to `Composite` (was not on the plan's fixture list).
-- Mermaidflow unit test's IOSpec name `combined_output` renamed `combined_result` (terminology hygiene only — it was never the field).
-
-**`final_stuff_code` findings (1c investigation, wiring decision = Phase 2):**
-
-- Producer: only `PipeBatch` sets it — a pre-allocated per-branch stuff code (`branch_output_item_code`) so the batch's aggregated `ListContent` item identity matches the branch's final output stuff in the graph.
-- Consumers: `PipeLLM` and `PipeStructure` pass it as `code=` to `StuffFactory.make_stuff` for their output stuff. Other operators do not honor it (pre-existing gap worth noting in Phase 2).
-- `PipeSequence` threads it to the last step only (clears for earlier steps); `PipeBatch` and `PipeParallel` clear it on entry.
-- Implication: a `PipeParallel` as a `PipeBatch` branch drops the requested code, so the batch item's graph identity doesn't match the parallel's combined stuff. Now that the parallel always stamps, Phase 2 should honor `final_stuff_code` on the combined stuff (pass `code=` through `combine_stuffs` → `make_stuff`). A `TODO(Phase 2)` marks the spot in `_live_run_controller_pipe`.
-
-**New/updated tests:** `tests/unit/pipelex/core/stuffs/test_composite_content.py` (round-trips incl. transport dump→hydrate), `tests/unit/pipelex/pipe_controllers/parallel/` (blueprint accept/reject + data.py), `tests/integration/.../pipe_parallel/test_pipe_parallel_always_combines.py` (+ fixture `parallel_always_combine.mthds`; stale-stamp regression + terminal-parallel main stuff; dry parity via `pipe_run_mode` parametrization), `tests/integration/.../pipe_parallel/test_pipe_parallel_output_validation.py` (library-level accept/reject via `acquire_library`). e2e graph expectations updated: the add_each-only graph now expects `parallel_combine: 2` edges.
-
-### Checkpoint 2 — reached (Phase 2 complete)
-
-**Code state:** Phase 2 fully implemented on `feature/Required-main-stuff`; commit `3c3cf4570` on top of `9acbd7a86`. `make agent-check` green; full `make agent-test` green (all tests passing). TDD followed: red tests written and confirmed failing before each behavioral change.
-
-**What landed (invariant enforcement, per-surface):**
-
-- **Graph tracer epilogue** (`pipe_abstract.py` `_run_pipe_traced` success path): `get_main_stuff()` direct read; `output_spec` built unconditionally; the `main_stuff is not None` gate on `output_concept_data` removed. The apologetic comment is gone.
-- **Delivery executor** (`generate_result_files`): typed path reads `get_main_stuff()` (raises `WorkingMemoryStuffNotFoundError` when absent); raw path raises `PipeJobError` when the raw dump lacks a main stuff. The `try_local_hydrate_stuff` → raw-render fallback is unchanged (it's about local class availability, not missing main stuff). A missing main stuff surfaces as `StorageDeliveryError` at the `_store_results` boundary — the same handling path as any storage failure, so the caller's failure-webhook behavior is unchanged.
-- **CLI run cores:** human core pretty-prints/saves/CSV-exports via `main_stuff` directly (the "--save-csv: no main stuff produced" exit branch is deleted); agent core builds `main_stuff_json` + `compact_result` unconditionally; agent API-runner core raises `PipeExecutionError` when a completed response has no main stuff under the announced key (the `main_stuff_name`-extension *name* fallback to `MAIN_STUFF_NAME` is kept — that's protocol-extension handling, not invariant softening).
-- **OTel** (`make_output_json`): direct read; the `"{}"` fallback is gone (called on the success path only).
-- **Wire models:** `PipelexPipeRunOutput.main_stuff_name: str` (required) and `PipelexRunResultExecute.main_stuff_name: str`. `resolve_main_stuff_root_key` returns `str` and raises `PipeJobError` on a memory with no main stuff; `PipelexRunResultExecute.from_pipe_output` now uses it (previously `aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME)` — which could announce a key that wasn't actually in `root`).
-- **`PipeOutput.optional_main_stuff` DELETED** (breaking, in changelog). Workspace grep: only external consumer is `pipelex-demo-vibe` examples → Phase 3 sweep list.
-
-**`final_stuff_code` resolution (design §7):** the parallel now honors it on the combined stuff. Implementation: `_run_branches_and_combine` captures `pipe_run_params.final_stuff_code` and clears it *before* branch fan-out (branches deep-copy the params, so they must not inherit the parent's requested code), then passes it as the new `code=` param on `StuffFactory.combine_stuffs` → `make_stuff`. Live/dry parity for free (shared helper). Pinned by `test_pipe_parallel_final_stuff_code.py` (combined stuff carries the code; branch outputs don't). **Noted, not addressed (pre-existing gaps, out of scope):** only `PipeLLM`/`PipeStructure` honor `final_stuff_code` among operators; `PipeBatch` still clears it on entry rather than stamping its aggregate list with it.
-
-**Call-site audit (final state):** `grep get_optional_main_stuff` across `pipelex/` + `tests/` → the definition in `working_memory.py` (kept: pre-run/empty memory legitimately has none; public API for SDK-side pre-run checks) plus ONE justified in-source caller added by the review triage: `PipeCondition`'s pre-delivery checks (a mid-run "is there something to pass through / did anything get delivered" probe — legitimately optional at that point, converted into a loud `PipeRunError` when absent). Every post-run boundary call site was tightened.
-
-**Review triage (Checkpoint 2):** The context-free review found and reproduced one real bug: the Phase 1 premise "every pipe stamps" was FALSE for `PipeCondition`'s `continue` outcome (live path returned the memory untouched) and for the dry run of an all-special-outcomes condition — so the tightened tracer epilogue (which fires on EVERY pipe node) crashed with a raw `WorkingMemoryStuffNotFoundError` on any continue-with-no-prior-main-stuff under tracing. Resolution (design-consistent, not a defensive revert): `continue` IS pass-through delivery — the delivered main stuff is the one already in memory; with nothing to pass through the pipe now raises a clear actionable `PipeRunError` at the semantic site ("map the outcome to a pipe, or place this condition after a producing step"), in both live and dry paths. Pinned by `tests/integration/.../pipe_condition/test_pipe_condition_continue_delivery.py` (pass-through identity + both fail-loud cases; run params constructed directly so keyless forced-DRY coercion can't swap the exercised path). Suite gap noted by the reviewer (nothing drove continue-with-no-main-stuff under tracing) is now covered. The reviewer confirmed the parallel `final_stuff_code` capture/clear mirrors `PipeBatch`'s existing pattern, and `combine_stuffs(code=)` has no empty-string/double-stamp edge. Related known-shaky area: `test_pipe_condition_continue_output_type.py` stays xfail (separate pre-existing bug, batch-over-continue aggregation semantics — untouched by this fix since batch branches always have a main stuff stamped).
-
-**Test changes:** new `tests/integration/.../pipe_parallel/test_pipe_parallel_final_stuff_code.py`; `test_output_serialization.py` extended (aliased/direct root-key resolution + missing-main-stuff raises); `test_input_models.py` pins `main_stuff_name` required; `test_delivery_executor.py` mocks now carry a real main stuff + two new missing-main-stuff raise tests + `main_stuff.*` files asserted stored; `test_run_core_execution.py` obsolete `test_save_csv_no_main_stuff_exits` deleted; `test_run_pipe_tracer_metadata.py` + `test_run_cost_report.py` mock outputs made invariant-compliant; `test_mock_usage_direct.py` tightened.
-
-**Cross-repo consequences flagged for Phase 3:** `main_stuff_name` is now required on the `/execute` response extension and `PipelexPipeRunOutput` — the closed `pipelex-transport` library and any consumer parsing these payloads must be checked; `pipelex-demo-vibe` uses the deleted `optional_main_stuff`.
-
-### Between checkpoints — PR opened toward the Phase 3 gate
-
-- Merged `origin/dev` into the branch (`fc96c1d96`; only conflict = both sides' `[Unreleased]` changelog sections, combined into unified Added/Changed/Fixed). Post-merge `make agent-check` green; full `make agent-test` re-run on the merged tree.
-- PR **#1014** opened against `dev`. Phase 3 stays gated until the PR is merged and a pipelex version is cut.
-- **Review round 1 (codex bot, CONFIRMED REAL):** requiring `main_stuff_name` on `PipelexPipeRunOutput` broke the fire-and-forget arm — `pipelex-temporal`'s `FIRE_AND_FORGET` branch constructs the payload with `main_stuff_name=None, is_completed=False` (its only not-completed constructor anywhere). Resolution chosen by the user (NOT the "make it optional again" convenient fix, which would re-spread null-guards): **split the delivery axis into the type system.** `OrchestratorProtocol` now has `run(...) -> PipelexPipeRunOutput` (blocking, completed, `main_stuff_name` stays required) and `start(...) -> PipelexPipeDispatchAck` (new ids-only ack model: `pipeline_run_id` + `workflow_id`); the `delivery` param is gone from the SPI (`DeliveryMode` stays as wire-input vocab picking the method); `PipelexPipeRunOutput.is_completed` DELETED — nothing anywhere read it. DIRECT implements `start` by raising `PipelexBridgeDispatchError` (unreachable behind the `supports_fire_and_forget` gate). Docs (`orchestrator-plugins.md`) + changelog updated; new Phase 3 rows added for `pipelex-temporal` and `pipelex-api`.
-- **Review round 2 (`4ee873fe4`, pushed):** all remaining bot threads (codex ×2, greptile ×1, cubic ×5) confirmed real, fixed, replied and resolved in-thread — 0 unresolved threads on the PR. (1) `PipeParallelSpec.add_each_output` defaults to `false` like the blueprint (always-combine specs can omit it). (2) `validate_output_with_library` now also checks branch output **types** against structured field content classes — compatibility is conceptual (branch structure class IS the field class or a subclass; refinement passes since refining concepts generate inheriting classes — user's explicit call), matching exactly what pydantic accepts in `combine_stuffs`; conservative skips: non-content-class annotations (primitive fields from `.mthds` structures), list-producing branches. Gotcha pinned in-code: the `type: Literal[...]` field shadows the builtin in the class body, so the method signature needs `builtins.type[StuffContent]`. (3) **Greptile P1 (real):** `dump_for_transport()` lost Composite component types (plain dicts after hydration; the existing round-trip test only compared `smart_dump()`, hence the miss) — components are now marker-stamped (`__pipelex_class__`/`__pipelex_module__`, ListContent components as plain lists of stamped item dicts, mirroring the top-level convention) and `hydrate_content` rebuilds typed components; regression tests assert component *types* incl. a ListContent component. (4) HTML value rendering deduped into shared `pipelex/core/stuffs/html_rendering.render_value_html()` used by `StructuredContent` + `CompositeContent`. (5) wip §4 reworded implemented-not-proposal. Changelog + `PipeParallel.md` doc updated; `make agent-check` + full `make agent-test` green.
-- **Review round 3 (`/review` sweep, own critical pass + testing/maintainability/adversarial sub-agents):** scope CLEAN, no bug bots missed on the shipped path. **Applied in-PR:** `DirectOrchestrator.start()` raise-path test (`tests/unit/pipelex/runtime_bridge/test_direct_orchestrator.py` — `supports_fire_and_forget is False` + `start()` raises `PipelexBridgeDispatchError`); gates green. **Deferred to `wip/required-main-stuff/deferred-review-round-3.md`** (per user, keep PR frozen — none reachable in prod): **F1** nested-`CompositeContent` transport is decode-asymmetric (inner composite components decay to raw dicts and leak `__pipelex_*` markers on the Temporal round-trip — real silent corruption but Temporal not shipped; fix before hosted-Temporal rollout: recurse in `_hydrate_list_item` for CompositeContent subclasses + nested test); **F2** `ConceptValueError` (bare `ValueError`, not `PipelexError`) from `get_structure_class()` in `validate_output_with_library` escapes the validate sweep's catches → whole-bundle abort vs per-pipe FAILURE (low reach; fix: re-raise as `PipeValidationError`); **M1** `rendered_html` table-wrapper + empty-literal still copy-pasted across Composite/Structured (extract `render_named_values_table`). Minor noted: `combined_output_concept` key rename stays a Phase-3 mthds-ui-coordinated item; unguarded `get_required_pipe` consistency nit; `from_pipe_output` non-COMPLETED latent; duplicate-result-name stays a runtime guard.
-
-### Checkpoint 3 — not reached
+- `register` must stay side-effect-free and import-light; anything heavy goes inside `make_worker`. Discovery runs `build_registrar` at boot AND in `pipelex plugins list`.
+- `targets_api` must equal `PLUGIN_API_VERSION` (2) or discovery fails loud with `PluginApiVersionMismatchError`.
+- The keyword-only-arguments convention is enforced on `pipelex/` source only, but the example package should follow it anyway — it's teaching material.
+- Worker subclass signatures must match `LLMWorkerAbstract` exactly (use `@override`); the reporting/telemetry plumbing is inherited, don't reimplement it.
+- Don't edit `docs/errors/` pages by hand (generated); nothing here should need new error classes anyway.
+- Stale-terminology precedent: on 2026-07-03 we already fixed "CLI-build command harvest" leftovers in `contract.py`, `discovery.py`, and `inference-backend-plugins.md` — same spirit applies to any old "LLM plugin" config-speak found during Phase 4.
