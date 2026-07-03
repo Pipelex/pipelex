@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Routing-profile `optional_routes` were silently dropped:** `RoutingProfileFactory.make_routing_profile` parsed and validated the `optional_routes` table from `routing_profiles.toml` but never passed it to the built `RoutingProfile`, so optional routes declared in config had no effect — models relying on one fell through to the profile's default backend and could silently vanish from the model deck. The factory now carries `optional_routes` through, with unit coverage for the pass-through and for the enabled/disabled-backend gating.
+
 - **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
 - **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), mirroring `teardown`. Previously a failed boot could poison a subsequent boot in the same process — surfacing as a "LogConfig is already set" error or a stale, half-populated class registry.
 
