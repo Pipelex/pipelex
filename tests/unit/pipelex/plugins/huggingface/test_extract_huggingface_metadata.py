@@ -7,17 +7,19 @@ Distills an ``HfHubHTTPError`` / ``InferenceTimeoutError`` into a
 
 from __future__ import annotations
 
-import requests
+import httpx
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
 from pipelex.cogt.inference.error_classification import extract_huggingface_metadata
 
 
 def _make_hf_http_error(status_code: int, headers: dict[str, str] | None = None, body_text: str = "") -> HfHubHTTPError:
-    response = requests.Response()
-    response.status_code = status_code
-    response.headers.update(headers or {})
-    response._content = body_text.encode("utf-8") if body_text else b""  # noqa: SLF001
+    response = httpx.Response(
+        status_code=status_code,
+        headers=headers,
+        text=body_text,
+        request=httpx.Request("POST", "https://router.huggingface.co/test"),
+    )
     return HfHubHTTPError(message=f"HTTP {status_code}", response=response)
 
 

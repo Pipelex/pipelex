@@ -11,6 +11,7 @@
 
 ### Changed
 
+- **Security: `transformers` bumped past CVE-2026-4372 (GHSA-29pf-2h5f-8g72):** The lockfile no longer resolves the vulnerable `transformers < 5.3.0` (a high-severity RCE through malicious model `config.json` files, pulled in transitively by the `docling` extra). To unblock the upgrade, the `huggingface` extra now requires `huggingface_hub>=1.5.0,<2.0.0` (breaking: was `>=0.23,<1.0.0`) — the hub 1.x line is requests→httpx based, but the surfaces Pipelex uses (`AsyncInferenceClient`, `HfHubHTTPError`, `InferenceTimeoutError`, provider literals) are unchanged.
 - **Repo lint validates `.mthds` files against the locally generated MTHDS schema:** `plxt lint` in this repo now uses `derived/mthds_schema.json` (regenerated automatically by the lint make targets) instead of the released schema bundled with plxt, so language-surface additions like `size` are lintable here before they propagate to a plxt release.
 
 ### Fixed

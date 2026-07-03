@@ -662,10 +662,10 @@ def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
 def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
     """Distill a HuggingFace ``HfHubHTTPError`` / ``InferenceTimeoutError`` into a ``ProviderErrorMetadata``.
 
-    HuggingFace wraps a ``requests.Response`` (not ``httpx.Response``); the
-    ``request_id`` is mirrored onto ``exc.request_id`` by ``HfHubHTTPError.__init__``
-    (sourced from headers like ``X-Request-Id`` / ``X-Amzn-Trace-Id`` / ``X-Amz-Cf-Id``).
-    Network-level failures (``InferenceTimeoutError``, raw ``requests`` exceptions)
+    HuggingFace (hub 1.x) wraps an ``httpx.Response``; the ``request_id`` is
+    mirrored onto ``exc.request_id`` by ``HfHubHTTPError.__init__`` (sourced from
+    headers like ``X-Request-Id`` / ``X-Amzn-Trace-Id`` / ``X-Amz-Cf-Id``).
+    Network-level failures (``InferenceTimeoutError``, raw ``httpx`` exceptions)
     carry no response metadata; every status field comes back as ``None``.
     """
     response = getattr(exc, "response", None)
