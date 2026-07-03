@@ -16,6 +16,7 @@ from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_on
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_app
 from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
@@ -41,6 +42,7 @@ class PipelexDevCLI(TyperGroup):
             "check-mthds-schema",
             "check-rules",
             "check-urls",
+            "drift",
             "generate-error-pages",
             "generate-mthds-schema",
             "kit",
@@ -74,6 +76,7 @@ app = typer.Typer(
     cls=PipelexDevCLI,
 )
 
+app.add_typer(drift_app, name="drift", help="Drift contracts: deterministic review obligations between code, docs, and tests")
 app.add_typer(kit_app, name="kit", help="Manage agent rules for the Pipelex repository")
 
 
