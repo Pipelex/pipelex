@@ -89,8 +89,8 @@ class TestImgGenArgsInputImages:
         assert "input_image_9" not in result
 
     @pytest.mark.asyncio
-    async def test_gpt_image_collects_base64_data_urls(self, mocker: MockerFixture) -> None:
-        """GPT Image returns all prepped images as a list of base64 data URLs under the `image` key."""
+    async def test_gpt_image_builds_multipart_file_tuples(self, mocker: MockerFixture) -> None:
+        """GPT Image returns all prepped images as httpx-style (filename, bytes, mime_type) file tuples under the `image` key."""
         input_images = make_input_images(2)
         prepped_files: list[PreparedFile] = [
             make_prepped_base64("Zmlyc3Q="),
@@ -109,8 +109,8 @@ class TestImgGenArgsInputImages:
 
         assert result == {
             "image": [
-                "data:image/png;base64,Zmlyc3Q=",
-                "data:image/png;base64,c2Vjb25k",
+                ("image_0.png", b"first", "image/png"),
+                ("image_1.png", b"second", "image/png"),
             ],
         }
         prep_mock.assert_awaited_once_with(prompt_images=input_images, is_http_url_enabled=False)
@@ -132,7 +132,7 @@ class TestImgGenArgsInputImages:
                 input_images=input_images,
             )
 
-        assert "requires base64 data URLs" in str(exc_info.value)
+        assert "requires image file data" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_none_taxonomy_with_images_raises(self) -> None:

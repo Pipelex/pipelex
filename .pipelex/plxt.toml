@@ -99,6 +99,13 @@ include = ["**/*.toml"]
 # Which files this rule applies to (relative globs).
 include = ["**/*.mthds", "**/*.plx"]
 
+# This repo is the source of truth for the MTHDS language: validate .mthds files
+# against the locally generated schema, not the released one bundled with plxt
+# (which lags behind whenever a language surface changes here).
+# Generate it with: .venv/bin/pipelex-dev generate-mthds-schema
+[rule.schema]
+path = "derived/mthds_schema.json"
+
 # Per-rule formatting overrides — all at defaults so you can tweak them
 # independently of .toml files.
 [rule.formatting]

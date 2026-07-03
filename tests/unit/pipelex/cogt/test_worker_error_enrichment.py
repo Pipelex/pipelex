@@ -140,6 +140,7 @@ def _make_inference_model(backend_name: str = WORKER_PROVIDER) -> SimpleNamespac
         max_prompt_images=None,
         listed_constraints=[],
         valued_constraints={},
+        is_img2img_supported=True,
     )
 
 
