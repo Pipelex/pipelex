@@ -5,7 +5,7 @@ from openai import Omit, omit
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, InputFidelity
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, InputFidelity, SizeTier
 
 OpenAIImageLegacySizeType = Literal["1024x1024", "1536x1024", "1024x1536"]
 OpenAIImageModerationType = Literal["low", "auto"] | Omit
@@ -46,8 +46,16 @@ class OpenAIImgGenFactory:
         *,
         model_name: str,
         aspect_ratio: AspectRatio,
-        size: ImageSize | None,
+        size: SizeTier | ImageSize | None,
     ) -> tuple[OpenAIImageLegacySizeType, int, int]:
+        if isinstance(size, SizeTier):
+            match size:
+                case SizeTier.ONE_K:
+                    # The fixed legacy grid IS the 1K class: fall through to the aspect-ratio lookup.
+                    size = None
+                case SizeTier.HALF_K | SizeTier.TWO_K | SizeTier.FOUR_K:
+                    msg = f"Size tier '{size}' is not supported by OpenAI image model '{model_name}'; this model only offers the '1k' class"
+                    raise ImgGenParameterError(msg)
         if size is not None:
             size_string = cls._size_to_string(size)
             if legacy_size := cls.LEGACY_SIZE_TO_DIMENSIONS.get(size_string):
@@ -73,23 +81,66 @@ class OpenAIImgGenFactory:
         *,
         model_name: str,
         aspect_ratio: AspectRatio,
-        size: ImageSize | None,
+        size: SizeTier | ImageSize | None,
     ) -> tuple[str, int, int]:
-        if size is None:
-            width, height = cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE[aspect_ratio]
-            size = ImageSize(width=width, height=height)
-        cls.validate_gpt_image_2_size(model_name=model_name, size=size)
-        return cls._size_to_string(size), size.width, size.height
+        exact_size: ImageSize
+        if isinstance(size, SizeTier):
+            exact_size = cls._gpt_image_2_size_for_tier(model_name=model_name, aspect_ratio=aspect_ratio, tier=size)
+        elif size is None:
+            width, height = cls._gpt_image_2_preset_dimensions(model_name=model_name, aspect_ratio=aspect_ratio)
+            exact_size = ImageSize(width=width, height=height)
+            cls.validate_gpt_image_2_size(model_name=model_name, size=exact_size)
+        else:
+            exact_size = size
+            cls.validate_gpt_image_2_size(model_name=model_name, size=exact_size)
+        return cls._size_to_string(exact_size), exact_size.width, exact_size.height
 
     @classmethod
-    def validate_gpt_image_2_size(cls, *, model_name: str, size: ImageSize) -> None:
+    def _gpt_image_2_preset_dimensions(cls, *, model_name: str, aspect_ratio: AspectRatio) -> tuple[int, int]:
+        dimensions = cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE.get(aspect_ratio)
+        if dimensions is None:
+            supported_aspect_ratios = ", ".join(supported_ratio.value for supported_ratio in cls.GPT_IMAGE_2_ASPECT_RATIO_TO_SIZE)
+            msg = (
+                f"Aspect ratio '{aspect_ratio}' is not supported by OpenAI image model '{model_name}'. "
+                f"Supported aspect ratios are: {supported_aspect_ratios}"
+            )
+            raise ImgGenParameterError(msg)
+        return dimensions
+
+    @classmethod
+    def _gpt_image_2_size_for_tier(cls, *, model_name: str, aspect_ratio: AspectRatio, tier: SizeTier) -> ImageSize:
+        """Derive an exact size from a portable tier by scaling the 1K preset per edge.
+
+        The scaled size runs through the same validator as user-supplied exact sizes,
+        which is what makes '4k' (over the caps) and '0.5k' (under the pixel floor)
+        honest validation errors rather than silent downgrades.
+        """
+        width, height = cls._gpt_image_2_preset_dimensions(model_name=model_name, aspect_ratio=aspect_ratio)
+        scaled_size: ImageSize
+        match tier:
+            case SizeTier.HALF_K:
+                scaled_size = ImageSize(width=width // 2, height=height // 2)
+            case SizeTier.ONE_K:
+                scaled_size = ImageSize(width=width, height=height)
+            case SizeTier.TWO_K:
+                scaled_size = ImageSize(width=width * 2, height=height * 2)
+            case SizeTier.FOUR_K:
+                scaled_size = ImageSize(width=width * 4, height=height * 4)
+        try:
+            cls.validate_gpt_image_2_size(model_name=model_name, size=scaled_size, is_tier_derived=True)
+        except ImgGenParameterError as exc:
+            msg = (
+                f"Size tier '{tier}' is not satisfiable by OpenAI image model '{model_name}': the derived size "
+                f"{scaled_size.width}x{scaled_size.height} is out of the model's range; use '1k'/'2k' or an exact size"
+            )
+            raise ImgGenParameterError(msg) from exc
+        return scaled_size
+
+    @classmethod
+    def validate_gpt_image_2_size(cls, *, model_name: str, size: ImageSize, is_tier_derived: bool = False) -> None:
         size_string = cls._size_to_string(size)
         width = size.width
         height = size.height
-
-        if width <= 0 or height <= 0:
-            msg = f"Size '{size_string}' is invalid for OpenAI image model '{model_name}': width and height must be positive"
-            raise ImgGenParameterError(msg)
 
         if width % cls.GPT_IMAGE_2_EDGE_MULTIPLE != 0 or height % cls.GPT_IMAGE_2_EDGE_MULTIPLE != 0:
             msg = f"Size '{size_string}' is invalid for OpenAI image model '{model_name}': width and height must be multiples of 16"
@@ -115,7 +166,12 @@ class OpenAIImgGenFactory:
             raise ImgGenParameterError(msg)
 
         if total_pixels > cls.GPT_IMAGE_2_RELIABILITY_PIXELS:
-            log.warning(f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary.")
+            msg = f"Size '{size_string}' is valid for OpenAI image model '{model_name}', but it is above the 2560x1440 reliability boundary."
+            if is_tier_derived:
+                # A tier is a portable request, not a hand-picked size: note it quietly.
+                log.verbose(msg)
+            else:
+                log.warning(msg)
 
     @classmethod
     def moderation_for_openai_image(cls, is_moderated: bool | None) -> OpenAIImageModerationType:

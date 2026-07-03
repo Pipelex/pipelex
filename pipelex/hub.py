@@ -755,7 +755,7 @@ def set_pipe_router(pipe_router: "PipeRouterProtocol") -> None:
     """Override the active pipe router for the current async context.
 
     Used by host runtimes that want controllers to dispatch sub-pipes
-    through their own router (e.g. Mistral-native mode swaps in a router
+    through their own router (e.g. Mistral Workflows mode swaps in a router
     that turns sub-pipe calls into child workflows / activities). The
     override is contextvar-scoped, so concurrent runs on the same hub
     don't leak into each other. Pass ``None`` via

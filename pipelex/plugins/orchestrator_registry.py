@@ -15,7 +15,7 @@ class OrchestratorProtocol(Protocol):
 
     An orchestrator plugin registers one of these per ``orchestration_mode`` token it
     serves (``"direct"`` in core; ``"temporal"`` from ``pipelex-temporal``,
-    ``"mistralai-workflows"`` from ``pipelex-mistralai-workflows``). The runtime bridge
+    ``"mistral-workflows"`` from ``pipelex-mistralai-workflows``). The runtime bridge
     dispatches by token through the ``OrchestratorRegistry`` instead of branching on a
     ``match``.
 

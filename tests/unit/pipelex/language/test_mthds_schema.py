@@ -230,6 +230,22 @@ class TestMthdsSchemaGeneration:
         errors = sorted(validator.iter_errors(table), key=str)
         assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
 
+    @pytest.mark.parametrize(
+        ("size_value", "should_validate"),
+        [
+            pytest.param("1k", True, id="tier-token"),
+            pytest.param("2048x1152", True, id="exact-size-string"),
+            pytest.param({"width": 2048, "height": 1152}, True, id="exact-size-table"),
+            pytest.param("banana", False, id="garbage-string"),
+            pytest.param("0x100", False, id="zero-width"),
+        ],
+    )
+    def test_pipe_img_gen_size_field_schema(self, schema: dict[str, Any], size_value: Any, should_validate: bool) -> None:
+        """The `size` field must accept tier tokens and exact `WxH` strings, as written in .mthds files."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeImgGen"), "size": size_value}
+        assert validator.is_valid(table) is should_validate, f"size={size_value!r} should {'' if should_validate else 'not '}validate"
+
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
         """Guard: the test's per-kind table map covers exactly the pipe kinds in the schema.
 

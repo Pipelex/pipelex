@@ -7,17 +7,17 @@ description: "How Pipelex dispatches a pipe run by orchestration mode through th
 
 A pipe a host runtime invokes through the runtime bridge runs along **two orthogonal axes**:
 
-- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by `pipelex-temporal`, [`"mistralai-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by `pipelex-mistralai-workflows`. Both are commercial host-runtime backends, part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
+- **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by `pipelex-temporal`, [`"mistral-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by `pipelex-mistralai-workflows`. Neither is built into the open-source `pipelex` core: both ship as external, closed-source host-runtime backends, distributed privately rather than on PyPI as part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
 - **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`), set by the endpoint and passed as a parameter to `run`, never received from a caller. An orchestrator honors it per its nature; `supports_fire_and_forget` advertises whether it can do genuine async.
 
-An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `run` — `"direct"` is contributed by a core plugin, `"temporal"` by the Temporal plugin, `"mistralai-workflows"` by the external `pipelex-mistralai-workflows` plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
+An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `run` — `"direct"` is contributed by a core plugin, `"temporal"` by the Temporal plugin, `"mistral-workflows"` by the external `pipelex-mistralai-workflows` plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
 
 ---
 
 ## The seam in one view
 
 ```
-run_pipe_via_bridge(input_payload)            # pipelex_transport.bridge — closed host-runtime library
+<host-side bridge entry>(input_payload)       # closed pipelex-transport library
   → build the PipeJob (boundary decode + library scope + trace_context)
   → orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
   → if orchestrator is None: raise MissingOrchestratorError(mode)   # generic, names no orchestrator
@@ -27,7 +27,7 @@ run_pipe_via_bridge(input_payload)            # pipelex_transport.bridge — clo
 The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
 
 !!! note "Open seam, closed host-side entry"
-    The host-side entry — `run_pipe_via_bridge` / `build_pipe_job_from_input` and the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — lives in the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime (Temporal, Mistral, Airflow, your own) is a Pipelex [commercial capability](https://pipelex.com/products#durable-execution), not an open extension point. What stays **open** is the seam a third-party orchestrator extends: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
+    The host-side entry — the bridge entry point and `PipeJob` builder, plus the dispatch primitives that decode the boundary payload, scope the per-call library, and deliver results — lives in the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime (Temporal, Mistral, Airflow, your own) is a Pipelex [commercial capability](https://pipelex.com/products#durable-execution), not an open extension point. What stays **open** is the seam a third-party orchestrator extends: the orchestrator registry, `OrchestratorProtocol`, and the `pipelex.runtime_bridge` modules listed in [The Orchestrator SPI](#the-orchestrator-spi) below.
 
 ---
 
@@ -87,6 +87,8 @@ This is what lets the public `pipelex-api` base be orchestrator-agnostic and sti
 
 Some orchestrators don't just serve a per-call mode — they reconfigure the whole process to run *as* that runtime (a Temporal worker). Such a plugin **claims process-global hub slots**, but only when the core-owned boot gate names it. `plugins.boot_orchestrator == self.name` means "boot this process as a Temporal-default runtime", not "the Temporal plugin is on". The gate is a backend-agnostic name-match — core names no orchestrator, and `register` reads no config file (the rich orchestrator config self-loads inside the thunks):
 
+Not every orchestrator goes this far. A per-call-only plugin — `pipelex-mistralai-workflows` is the minimal example — contributes just its `"mistral-workflows"` orchestrator and claims **no** hub slots: its router is installed per workflow invocation by the workflow body itself, so there is no process-global boot slot to claim and it never participates in the boot gate below. The boot-orchestrator machinery in this section applies only to a plugin that boots the process as its runtime (today, `pipelex-temporal`).
+
 ```python
 if registrar.config.plugins.boot_orchestrator == self.name:
     registrar.claim_content_generator(_make_temporal_content_generator)   # a thunk, not an instance
@@ -97,6 +99,8 @@ if registrar.config.plugins.boot_orchestrator == self.name:
 ```
 
 Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed instance. The thunk runs only at the boot apply-point, so `register` itself imports no `temporalio` — even on a worker. This is the deferred-thunk rule that keeps the import-light invariant intact at boot.
+
+Because the gate is a name-match, `plugins.boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without `pipelex-temporal` installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token(s) it serves are separate namespaces that *may* differ, even where a shipped plugin keeps them identical (`pipelex-temporal` is named `temporal` and serves `temporal`). The error names no specific plugin, keeping core decoupled.
 
 ### Injection precedence
 
@@ -141,7 +145,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 | Tracing / graph hooks | `trace_events`, `graph_tracer_manager`, `tracing_assembly` (per-step trace/usage events across the boundary) |
 
 !!! warning "Not in the open SPI — the closed `pipelex-transport` layer"
-    The host-side bridge entry (`run_pipe_via_bridge`, `build_pipe_job_from_input`), the cross-process dispatch primitives (`delivery`, `pipe_classification`, `submitter_hydration`, `trace_flush`, `scoped_library`, `pipe_run_arg`), and the transport prepare helpers (`prepare_job_for_transport`, `prepare_output_for_transport`) were extracted out of open core into the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime is a Pipelex commercial capability — Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) compile against `pipelex-transport`; a third-party out-of-tree orchestrator compiles against the **open** rows above only.
+    The host-side bridge entry point, the cross-process dispatch primitives (boundary delivery, pipe classification, submitter-side hydration, trace flush, scoped-library, and the submit-arg envelope), and the transport-prep helpers were extracted out of open core into the **closed `pipelex-transport` library**. Embedding Pipelex into a host runtime is a Pipelex commercial capability — Pipelex's own host-runtime plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) compile against `pipelex-transport`; a third-party out-of-tree orchestrator compiles against the **open** rows above only.
 
 ---
 

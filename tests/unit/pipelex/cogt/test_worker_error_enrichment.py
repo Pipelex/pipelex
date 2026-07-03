@@ -138,7 +138,7 @@ def _make_extract_job(mocker: MockerFixture) -> Any:
 
 def _make_inference_model() -> SimpleNamespace:
     """Stub inference model exposing the fields the workers read."""
-    return SimpleNamespace(name=WORKER_MODEL, backend_name=WORKER_PROVIDER, tag="stub-tag", desc="stub-desc")
+    return SimpleNamespace(name=WORKER_MODEL, backend_name=WORKER_PROVIDER, tag="stub-tag", desc="stub-desc", is_img2img_supported=True)
 
 
 @pytest.mark.asyncio(loop_scope="class")
