@@ -2,6 +2,8 @@
 
 Status: design proposal, no code written. Branch `feature/Optionals`. This document gathers the design space for adding optionality (`?`) to concept refs, presents each decision with options and consequences, and marks a recommendation for each. Decisions are numbered D1–D10 and summarized at the end.
 
+Decision status (2026-07-03, Louis): **all open questions resolved** — D3 implicit lifting, D4 `?` forbidden on plurals, `continue` = "declared output absent" (§14), naming (`!` = force marker, `?` pronounced "optional"), and D6 lints via a general `warnings` array on the validation report (bundled into the same protocol bump as the `optional` flag). The design is ready for implementation planning.
+
 ## 1. The problem
 
 MTHDS can express *how many* values flow through a slot (`contracts.PenaltyClause[]`) but not *whether* a value flows at all. Every declared input is unconditionally required and every declared output is unconditionally produced. Real methods constantly need "maybe there is no value", and today authors work around it in four ways, all bad:
@@ -94,6 +96,8 @@ Consequences: the change concentrates in the multiplicity parser (`variable_mult
 
 An alternative considered and rejected: expressing optionality as an expanded input table (`penalty = { concept = "PenaltyClause", optional = true }`) instead of a suffix. It avoids grammar changes but breaks symmetry with `[]`, is far more verbose, requires inventing an expanded input form that doesn't exist today, and gives outputs no way to be optional at all. The suffix is the design the user asked for and the right one; the expanded form can arrive later for defaults (D10) without conflict.
 
+Naming (DECIDED 2026-07-03): `?` is the **optional marker**, pronounced "optional" (consistent with the `@?` sigil); `!` is the **force marker** (Swift-familiar). These are the terms the spec, docs, error messages, and skills use.
+
 ## 6. D2 — What absence *is* at runtime
 
 Options:
@@ -116,6 +120,8 @@ The recommended model is a trichotomy on the input marker:
 | `v = "X!"` (forced) | Allowed; taint terminates here | Pipe would run, but absence raises a typed error carrying the provenance chain | `x!` |
 
 And the safety theorem validation enforces: **every absence source must reach an explicit sink** (`?` input, `!` input, or a `?` on the enclosing method's declared output). If taint reaches a non-optional method output or otherwise escapes unhandled, validation fails with a dedicated error naming the source, the path, and the three ways to fix it.
+
+**DECIDED 2026-07-03: implicit lifting approved** — chosen for user-friendliness. Consequence: the mitigations listed below (liftable-pipe visibility in the validation report, skipped-node rendering in the graph, run-report skip reasons) are commitments of phase 1, not optional extras.
 
 Why implicit lifting for plain inputs (rather than Swift's "consuming an optional without unwrapping is a compile error"):
 
@@ -140,7 +146,7 @@ Should `X[]?` exist? The distinction it would encode is "the list step was skipp
 - **A. Forbid `?` on plural refs; absence of a plural normalizes to the empty list (recommended).** `[]` already has a perfectly good "nothing": empty. When a pipe with plural output is skipped by lifting, the runtime writes an **empty ListContent** (plus an absence-flavored note in the ledger for observability) rather than an absent slot. Taint stops there: downstream batch over it runs zero branches (already today's clean behavior), downstream prompts see an empty list.
 - **B. Allow `X[]?` as a distinct state.** Two kinds of nothing for every plural slot; every consumer must consider both; PipeBatch needs an absent-vs-empty policy; templates need to distinguish undefined from empty. High complexity, and the "skipped vs empty" signal is preserved anyway in the ledger and the graph without needing a type-level distinction.
 
-Recommendation A, firmly. It yields a pleasing symmetry: `?` is the absence story for singulars, `[]`-emptiness is the absence story for plurals, and the two never stack. Corollary: `!` on plural inputs is also forbidden (there is nothing to force).
+**DECIDED 2026-07-03: option A** — `?` forbidden on plurals; the empty list does the job. It yields a pleasing symmetry: `?` is the absence story for singulars, `[]`-emptiness is the absence story for plurals, and the two never stack. Corollary: `!` on plural inputs is also forbidden (there is nothing to force).
 
 Bonus primitive that falls out: **PipeBatch whose inner pipe has optional output performs compaction** — absent branch results are dropped, so the batch output is `X[]` containing only found items (Swift's `compactMap`). The existing `build_or_skip`-inside-batch test pattern (condition routing rejects to `continue`) is exactly this, done by hand today; optionals make it typed. Whether compaction ships in phase 1 or 2 is a scoping call — the semantics should be fixed now.
 
@@ -170,7 +176,7 @@ New error types flow automatically through the existing machinery (`build_valida
 Two sub-decisions:
 
 - **Dry-run modeling.** v1: keep the dry run all-present (mock every input, including optional ones) and rely on the static taint pass for the absent arm. Alternative: dual-arm dry run (a second pass with all optionals absent) — better coverage of skip paths and template guards, but doubles dry-run cost and requires the skip machinery to run under DRY. Recommend static-only in v1, dual-arm as a follow-up if the static pass proves insufficient.
-- **Advisory channel.** Some findings are lints, not errors: `!` on a guaranteed slot, `?` output on a pipe that can never produce absence, a liftable-pipe inventory. The validation report is binary today; the only advisory precedent is `pending_signatures`/`is_runnable`. Options: (a) mirror that pattern with a dedicated `optionality_notes` list; (b) add a general `warnings` array to the report (protocol change, conformance impact, but the right long-term shape); (c) stay silent on lints in v1. Recommend (b) if we're touching the protocol anyway for the `optional` flag on IO contracts (D8) — one protocol bump instead of two — otherwise (c).
+- **Advisory channel.** Some findings are lints, not errors: `!` on a guaranteed slot, `?` output on a pipe that can never produce absence. The validation report is binary today; the only advisory precedent is `pending_signatures`/`is_runnable`. Options: (a) mirror that pattern with a dedicated `optionality_notes` list; (b) add a general `warnings` array to the report (protocol change, conformance impact, but the right long-term shape); (c) stay silent on lints in v1. **DECIDED 2026-07-03: option (b)** — a general `warnings` array (same item shape as errors, never flips `is_valid`), bundled into the same protocol bump that adds the `optional` flag to IO contracts, so one bump covers both. Note the split with the *factual* liftable-pipe inventory ("pipe X may be skipped when Y is absent"), which is dataflow information, not a lint — it ships as structured data on the valid report (beside `pipe_io_contracts`), per the D3 implicit-lifting commitment.
 
 ## 11. D7 — Prompts and templates: what the author sees
 
@@ -212,7 +218,7 @@ Success-path observability matters equally: the run report enumerates recorded a
 
 ## 14. Interactions with in-flight work
 
-- **Required-main-stuff invariant** (`feature/Required-main-stuff`, PR #1014): that track enforces "main stuff always exists" and makes `PipeCondition` `continue` pass-through-or-error. Optionals deliberately create runs whose final output is absent. Reconciliation: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant becomes "main stuff is always *resolved*: a value or a recorded absence". Also, `continue`'s two possible semantics ("pass previous main stuff through" vs "declared output is absent") must be picked consciously: under optionals the coherent reading is **declared output absent, memory otherwise unchanged**. This needs a joint decision with that track before either merges semantics that contradict the other.
+- **Required-main-stuff invariant** (`feature/Required-main-stuff`, PR #1014): that track enforces "main stuff always exists" and makes `PipeCondition` `continue` pass-through-or-error. Optionals deliberately create runs whose final output is absent. Reconciliation: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant becomes "main stuff is always *resolved*: a value or a recorded absence". Also, `continue`'s two possible semantics ("pass previous main stuff through" vs "declared output is absent") must be picked consciously: under optionals the coherent reading is **declared output absent, memory otherwise unchanged**. **DECIDED 2026-07-03: `continue` = declared output absent.** This decision must be propagated to the Required-main-stuff track before either merges semantics that contradict the other.
 - **`@?` required-variable detection** (D7) — the fix lands as part of this feature.
 - **Pre-existing wart to fix while in the area:** structure-field shorthand strings default to `required=True` while the expanded `ConceptStructureBlueprint` defaults `required=False` — opposite defaults for the same concept. Unrelated to slot optionality but adjacent enough to confuse; fix or at least document deliberately.
 - **Not in scope:** structure-field `?` sugar (e.g. `concept_ref = "X?"` meaning `required=false`). It would create two spellings for one thing and blur the slot-vs-field distinction §3 works hard to establish. Revisit only if field/slot unification ever becomes a goal.
@@ -258,16 +264,18 @@ Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the
 | D3 | Consumption | Trichotomy `X` (lift/skip) / `X?` (absorb) / `X!` (force); every absence source must reach an explicit sink |
 | D4 | Plurals | `?` forbidden on plurals; skipped plural output normalizes to empty list |
 | D5 | Producers | `?` output allowed anywhere; `continue`-reachable conditions MUST declare it; LLM maybe-wrapper (phase 2); boundaries explicit, internals inferred |
-| D6 | Validation | Static taint pass, new `PipeValidationErrorType`s; dry run stays all-present in v1; add a general `warnings` channel if the protocol is bumped anyway |
+| D6 | Validation | Static taint pass, new `PipeValidationErrorType`s; dry run stays all-present in v1; general `warnings` array on the validation report (decided) |
 | D7 | Templates | Absent = undefined (loud on deep use) + static guard-lint; `@?` finally means optional |
 | D8 | Wire | `optional` on IO contracts; absence records in run results; absent main output = success, not error |
 | D9 | Errors | `OptionalValueAbsentError` with provenance chain; RFC 7807 + error pages via existing machinery |
 | D10 | Deferred | `on_error = "absent"` (`try?`), coalescing (`??`), presence sugar — phase 2/3, semantics sketched now |
 
-## 19. Open questions for Louis
+Decided 2026-07-03 (Louis): D3 (implicit lifting), D4 (forbid `?` on plurals), the `continue`-absent semantics (§14), naming (`!` force marker, `?` "optional"), and D6 lints via a general `warnings` array. All open questions resolved; ready for implementation planning.
 
-1. **Implicit lifting (D3)** is the biggest taste call: are you comfortable with plain-`X` pipes auto-skipping when fed absence (bracketed by explicit `?` markers at entry and sink, surfaced in validation and the graph), or do you want mid-chain consumption to require an explicit mark at every step, Swift-compile-error style?
-2. **Skip vs empty for plurals (D4):** confirm that "skipped step with plural output → empty list, taint stops" matches your intuition, since it deliberately erases the skipped-vs-found-nothing distinction at the type level (the ledger keeps it for observability).
-3. **`continue` semantics (§14):** under optionals, `continue` = "declared output absent" rather than "pass previous main stuff through". Needs a joint call with the Required-main-stuff track.
-4. **Warnings channel (D6):** worth the protocol/conformance bump now, or defer lints entirely?
-5. **Naming:** the spec needs a name for the `!` marker — "force marker" (Swift-familiar) vs "required assertion". And is `?` pronounced "optional" in MTHDS docs, matching `@?`?
+## 19. Open questions — resolutions (2026-07-03)
+
+1. **Implicit lifting (D3): APPROVED** — implicit, for user-friendliness. Mitigations (validation-report liftable-pipe inventory, graph skipped-node rendering, run-report skip reasons) are phase-1 commitments.
+2. **Skip vs empty for plurals (D4): APPROVED** — `?` forbidden on plurals; the empty list does the job.
+3. **`continue` semantics (§14): APPROVED** — `continue` = "declared output absent". To be propagated to the Required-main-stuff track.
+4. **Warnings channel (D6): APPROVED** — general `warnings` array on the validation report, bundled into the same protocol bump as the `optional` flag on IO contracts. The distinction that sharpened the question stands in the design: *factual dataflow info* (liftable-pipe inventory) ships as structured data on the valid report; *lints* (useless `!`, over-claimed `?`) go in `warnings`.
+5. **Naming: APPROVED** — `!` = "force marker"; `?` pronounced "optional".
