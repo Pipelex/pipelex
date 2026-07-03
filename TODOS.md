@@ -4,8 +4,15 @@ Implements [wip/drift-contracts-design.md](wip/drift-contracts-design.md). Read 
 
 ## Cold-start context (update at every checkpoint)
 
-- **Status:** Not started. Plan written, no code yet.
+- **Status:** Phase 1 COMPLETE, CHECKPOINT 1 CLEARED — engine landed in `fc190e8a0`, review-triage fixes in the follow-up commit (all Phase 1 boxes ticked below; `make agent-check` + `make agent-test` + `--help` smokes green). The no-context Sonnet `/code-review` fan-out surfaced two real defects, both fixed: (1) unescaped `contract_id` in the check output could crash Rich on a markup-metacharacter orphan-ack filename; (2) the rot detector missed contracts whose triggers are fully shadowed by excludes → new `EMPTY_EFFECTIVE_TRIGGERS` issue kind (manifest rot; suppressed when dead trigger globs already explain the emptiness). Nothing deferred — no findings were design tradeoffs. Next = Phase 2 (Make/CI wiring, seed contracts, docs).
 - **Branch / worktree:** `docs/Update` in the `_docs` worktree (the design doc landed here in `122ffd6f3`). Treat `_docs` as the repo root.
+- **Phase 1 as-built notes** (deviations/additions a fresh session must know):
+    - `.drift/` (the ack state dir) is **always excluded from trigger matching** (`DRIFT_STATE_PREFIX` in `core.py`): if a trigger glob could match ack files, every ack would invalidate its own digest once the ack file is staged — an unfixable open-contract loop. Small addition beyond the design; documented in the code.
+    - The check also validates ack-contract-field ↔ filename-stem equality and orphan acks, per the plan's hardening list.
+    - `drift ack` warns (does not fail) on matched trigger files that are unstaged-modified or untracked — the faster-feedback nicety from the failure-modes table.
+    - New `DriftError` classes (under `drift/exceptions.py`, base `PipelexCLIError`) required regenerating `docs/errors/` pages (`make gep`) — included in the commit.
+    - Test-capture gotcha: the hub console binds stdout at creation, so command tests patch `drift_cmd.get_console` with a recording `Console(width=200, record=True, color_system=None)` (house pattern from `test_doctor_display_report.py`) — `capsys`/`capfd` are unreliable for it. `plan` output goes through `typer.echo`, so plan tests use `capfd`.
+    - The reusable `git_repo` fixture lives in `tests/unit/pipelex/cli/dev/conftest.py` (GitRepo helper class: write/add/commit/git).
 - **Key repo facts** (verified against the tree — three claims from the first draft were WRONG and are corrected here):
     - Dev CLI commands live in `pipelex/cli/dev_cli/commands/`, registered in `pipelex/cli/dev_cli/_dev_cli.py`. The `kit` sub-app (`app.add_typer(kit_app, name="kit")`, `_dev_cli.py:77`) is the one command-group precedent — `drift` follows it. House style is two-layer: a Typer wrapper in `_dev_cli.py` delegating to a keyword-only `*_cmd()` in the module; the CI-gate idiom (`check_config_sync_cmd.py`) prints a rich panel then `sys.exit(1)`.
     - Dev CLI unit tests live under `tests/unit/pipelex/cli/dev/`. **CORRECTION: no git-temp-repo fixture exists**, and there is **no `check-config-sync` test to copy** — existing check tests use inline source snippets (`find_violations_in_source`), not temp repos. A reusable `git_repo` conftest fixture is net-new (see Phase 1 test notes). With the pure-core/adapter split most tests stay pure-Python; only the adapter needs the fixture.
@@ -50,42 +57,42 @@ Everything in `pipelex/cli/dev_cli/commands/drift/` (a genuine package — the p
 
 ### 1a. Skeleton and models
 
-- [ ] Create the `drift/` package with the four modules above (merge only if two stay trivially small; do not add speculative ones).
-- [ ] Manifest models per the design: `version`, `[contracts.<id>]` with `description`, `triggers`, `exclude` (defaults to `[]`), `review`, `verify_commands` (defaults to `[]`). Read `drift.toml` from the git toplevel via `toml_utils.load_toml_with_tomlkit`; schema-invalid manifest is a hard error with an actionable message. **Validate contract IDs** against a safe charset (`[a-z0-9-]+`) since they become filenames AND TOML table keys.
-- [ ] Ack model per the design: `contract`, `digest`, `reviewed_by`, `reviewed_at`, `rationale`, `[trigger_files]` path→OID map. One file per contract at `.drift/acks/<contract-id>.toml`; read with `toml_utils.load_toml_with_tomlkit`, write with `toml_utils.save_toml_to_path` via a temp file + atomic `os.replace` (concurrency-safe).
+- [x] Create the `drift/` package with the four modules above (merge only if two stay trivially small; do not add speculative ones).
+- [x] Manifest models per the design: `version`, `[contracts.<id>]` with `description`, `triggers`, `exclude` (defaults to `[]`), `review`, `verify_commands` (defaults to `[]`). Read `drift.toml` from the git toplevel via `toml_utils.load_toml_with_tomlkit`; schema-invalid manifest is a hard error with an actionable message. **Validate contract IDs** against a safe charset (`[a-z0-9-]+`) since they become filenames AND TOML table keys.
+- [x] Ack model per the design: `contract`, `digest`, `reviewed_by`, `reviewed_at`, `rationale`, `[trigger_files]` path→OID map. One file per contract at `.drift/acks/<contract-id>.toml`; read with `toml_utils.load_toml_with_tomlkit`, write with `toml_utils.save_toml_to_path` via a temp file + atomic `os.replace` (concurrency-safe).
 
 ### 1b. Digest engine (Decision 1 + 2)
 
-- [ ] File matching (pure `core.py`): triggers/exclude globs evaluated against the injected `git ls-files` set (tracked files). Pin the semantics: directory review target (`docs/tools/cli/`) resolves iff ≥1 tracked file lives under it; trailing slashes normalized; matching is case-sensitive per POSIX; symlinks are not followed.
-- [ ] Content hashing (`git_adapter.py`): staged blob OIDs via **one** `git ls-files -s <matched-paths>` call — matching and hashing share the index source. NOT `git hash-object`, NOT working-tree bytes. No ARG_MAX exposure (pathspecs), filter-normalized.
-- [ ] Contract digest (pure `core.py`): `sha256` over a **canonical JSON** document — the normalized pydantic contract (sorted keys, sorted glob lists) plus the sorted `(path, oid)` pairs as nested JSON. Deterministic across runs, `drift.toml` reformatting, comment edits, and glob reordering.
-- [ ] Tests: **pure-core** (no git) — digest stability across runs; digest stability across manifest reformatting/comments; **glob-list REORDER → SAME digest** (the executable proof of Decision 2); contract-definition change → digest change; defaulted-vs-explicit-empty `exclude` → SAME digest. **Adapter** (git_repo fixture) — trigger edit/add/delete/rename → OID/digest change; a staged edit is reflected, an unstaged edit is NOT (index semantics); `git ls-files -s` output parsed correctly.
-- [ ] Build the reusable `git_repo` pytest fixture (`git init` + commit in `tmp_path`) in a dev-CLI `conftest.py` — net-new, foundational for every adapter/command test.
+- [x] File matching (pure `core.py`): triggers/exclude globs evaluated against the injected `git ls-files` set (tracked files). Pin the semantics: directory review target (`docs/tools/cli/`) resolves iff ≥1 tracked file lives under it; trailing slashes normalized; matching is case-sensitive per POSIX; symlinks are not followed.
+- [x] Content hashing (`git_adapter.py`): staged blob OIDs via **one** `git ls-files -s <matched-paths>` call — matching and hashing share the index source. NOT `git hash-object`, NOT working-tree bytes. No ARG_MAX exposure (pathspecs), filter-normalized.
+- [x] Contract digest (pure `core.py`): `sha256` over a **canonical JSON** document — the normalized pydantic contract (sorted keys, sorted glob lists) plus the sorted `(path, oid)` pairs as nested JSON. Deterministic across runs, `drift.toml` reformatting, comment edits, and glob reordering.
+- [x] Tests: **pure-core** (no git) — digest stability across runs; digest stability across manifest reformatting/comments; **glob-list REORDER → SAME digest** (the executable proof of Decision 2); contract-definition change → digest change; defaulted-vs-explicit-empty `exclude` → SAME digest. **Adapter** (git_repo fixture) — trigger edit/add/delete/rename → OID/digest change; a staged edit is reflected, an unstaged edit is NOT (index semantics); `git ls-files -s` output parsed correctly.
+- [x] Build the reusable `git_repo` pytest fixture (`git init` + commit in `tmp_path`) in a dev-CLI `conftest.py` — net-new, foundational for every adapter/command test.
 
 ### 1c. `drift check` (the pure gate)
 
-- [ ] Validates: manifest parses and is schema-valid; contract IDs are unique and charset-valid; every trigger glob matches ≥1 tracked file (dead glob = hard error); **every review target resolves the same way (a review glob/path matching zero tracked files is an equally hard error — rot symmetry)**; every contract has an ack; **every ack file maps to a manifest contract (orphan ack = hard error) and its `contract` field equals its filename stem**; every ack digest equals the recomputed digest. Git plumbing only (`ls-files`) — **no `verify_commands` execution** (correct the design's "no subprocesses" wording: it shells to git, just never runs verify).
-- [ ] Failure output: per open contract, an actionable block in the style of the existing check targets, ending with "run `make drift-plan`". A dead-glob/missing-target failure additionally says "edit `drift.toml` first" (a mid-rename glob can go temporarily dead on the very PR that should fix it). Exit non-zero on any failure via `sys.exit(1)` (Typer layer idiom).
-- [ ] Tests: each validation failure class (bad manifest, invalid/duplicate ID, dead trigger glob, zero-match review target, missing ack, orphan ack, `contract`≠filename, digest mismatch after staged edit), the all-green pass, and the failure message ends with "run `make drift-plan`".
+- [x] Validates: manifest parses and is schema-valid; contract IDs are unique and charset-valid; every trigger glob matches ≥1 tracked file (dead glob = hard error); **every review target resolves the same way (a review glob/path matching zero tracked files is an equally hard error — rot symmetry)**; every contract has an ack; **every ack file maps to a manifest contract (orphan ack = hard error) and its `contract` field equals its filename stem**; every ack digest equals the recomputed digest. Git plumbing only (`ls-files`) — **no `verify_commands` execution** (correct the design's "no subprocesses" wording: it shells to git, just never runs verify).
+- [x] Failure output: per open contract, an actionable block in the style of the existing check targets, ending with "run `make drift-plan`". A dead-glob/missing-target failure additionally says "edit `drift.toml` first" (a mid-rename glob can go temporarily dead on the very PR that should fix it). Exit non-zero on any failure via `sys.exit(1)` (Typer layer idiom).
+- [x] Tests: each validation failure class (bad manifest, invalid/duplicate ID, dead trigger glob, zero-match review target, missing ack, orphan ack, `contract`≠filename, digest mismatch after staged edit), the all-green pass, and the failure message ends with "run `make drift-plan`".
 
 ### 1d. `drift plan [CONTRACT]`
 
-- [ ] Lists open contracts; Markdown by default (per the workspace surface-output conventions — the consumer is an agent). For each open contract: description, per-file added/removed/modified trigger changes (diff of stored `[trigger_files]` map vs current index — no git-diff machinery), review targets, verify commands, previous ack's reviewer/date/rationale, and the exact `make drift-ack ...` invocation to fulfill.
-- [ ] With a `CONTRACT` argument: the full packet for that contract only. Unknown contract id = hard error.
-- [ ] Tests: added/removed/modified reporting correctness; previous-rationale surfacing; fulfilled contracts excluded from output; **the emitted `make drift-ack CONTRACT=… RATIONALE="…"` string is exact and copy-pasteable** (agents run it verbatim).
+- [x] Lists open contracts; Markdown by default (per the workspace surface-output conventions — the consumer is an agent). For each open contract: description, per-file added/removed/modified trigger changes (diff of stored `[trigger_files]` map vs current index — no git-diff machinery), review targets, verify commands, previous ack's reviewer/date/rationale, and the exact `make drift-ack ...` invocation to fulfill.
+- [x] With a `CONTRACT` argument: the full packet for that contract only. Unknown contract id = hard error.
+- [x] Tests: added/removed/modified reporting correctness; previous-rationale surfacing; fulfilled contracts excluded from output; **the emitted `make drift-ack CONTRACT=… RATIONALE="…"` string is exact and copy-pasteable** (agents run it verbatim).
 
 ### 1e. `drift ack CONTRACT --rationale "…"`
 
-- [ ] `--rationale` required; `reviewed_by` defaults from `git config user.name`, `--by` overrides. **If `git config user.name` is unset AND no `--by`: hard error with an actionable message** ("set git config user.name or pass --by") — never write an empty/placeholder reviewer. `reviewed_at` UTC ISO timestamp (audit-only, no validity semantics).
-- [ ] Runs the contract's `verify_commands` first (Decision 4 — each `shlex`-split, `shell=False`, cwd=repo root, env inherited, stop at first failure, captured output shown on abort); any failure aborts the ack without writing. **No `--skip-verify` flag** (design decision; an audited-skip variant is a deferred item, see Deferred). 
-- [ ] Recomputes the digest from the **index** at ack time and writes the ack file. Clean tree NOT required, but **trigger files must be staged** (`git add`) to be covered — document this in the failure/help text. Optionally warn when a matched trigger file is untracked or unstaged-modified so the author knows coverage will lag until staged.
-- [ ] Tests: ack round-trip (stage → ack → check green); ack-then-edit invalidation (ack → edit+stage trigger → check fails); verify-command failure aborts without writing; missing rationale rejected; `reviewed_by` resolution trio (git-config default / `--by` override / unset+no-`--by` → error); unknown CONTRACT id → hard error; ack permitted with an otherwise-dirty tree.
+- [x] `--rationale` required; `reviewed_by` defaults from `git config user.name`, `--by` overrides. **If `git config user.name` is unset AND no `--by`: hard error with an actionable message** ("set git config user.name or pass --by") — never write an empty/placeholder reviewer. `reviewed_at` UTC ISO timestamp (audit-only, no validity semantics).
+- [x] Runs the contract's `verify_commands` first (Decision 4 — each `shlex`-split, `shell=False`, cwd=repo root, env inherited, stop at first failure, captured output shown on abort); any failure aborts the ack without writing. **No `--skip-verify` flag** (design decision; an audited-skip variant is a deferred item, see Deferred). 
+- [x] Recomputes the digest from the **index** at ack time and writes the ack file. Clean tree NOT required, but **trigger files must be staged** (`git add`) to be covered — document this in the failure/help text. Optionally warn when a matched trigger file is untracked or unstaged-modified so the author knows coverage will lag until staged.
+- [x] Tests: ack round-trip (stage → ack → check green); ack-then-edit invalidation (ack → edit+stage trigger → check fails); verify-command failure aborts without writing; missing rationale rejected; `reviewed_by` resolution trio (git-config default / `--by` override / unset+no-`--by` → error); unknown CONTRACT id → hard error; ack permitted with an otherwise-dirty tree.
 
 ### 1f. CLI registration and gates
 
-- [ ] Register the `drift` Typer sub-app in `_dev_cli.py` following the `kit` pattern; `--help` smoke works for all three commands.
-- [ ] `make agent-check` green (includes keyword-only guard).
-- [ ] `make agent-test` green.
+- [x] Register the `drift` Typer sub-app in `_dev_cli.py` following the `kit` pattern; `--help` smoke works for all three commands.
+- [x] `make agent-check` green (includes keyword-only guard).
+- [x] `make agent-test` green.
 
 ### CHECKPOINT 1 — STOP (engine done, nothing wired)
 
@@ -189,15 +196,15 @@ Added by the `/plan-eng-review` (2026-07-03), deferred not dropped:
 
 Synthesized from this review's findings. Each derives from a specific decision/finding above.
 
-- [ ] **T1 (P1)** — engine — digest source = index OIDs via a single `git ls-files -s` (Decision 1); drop `git hash-object`/working-tree. Verify: adapter test — staged edit reflected, unstaged not.
-- [ ] **T2 (P1)** — core — canonical-JSON digest over normalized pydantic contract + sorted `(path, oid)` (Decision 2). Verify: glob-reorder → SAME digest; reformat → SAME digest.
-- [ ] **T3 (P1)** — package — pure `core.py` + thin `git_adapter.py` + `models.py` + `drift_cmd.py` (Decision 3); build the reusable `git_repo` conftest fixture. Verify: core tests run with no git.
-- [ ] **T4 (P2)** — models — contract-ID charset validation, `toml_utils` I/O, atomic ack write (temp + `os.replace`). Verify: invalid ID rejected; ack round-trip.
-- [ ] **T5 (P2)** — `check` — add validations: review zero-match hard error (symmetry), orphan-ack, `ack.contract`==filename, unique IDs; failure text says "edit drift.toml first" on dead glob. Verify: one test per failure class.
-- [ ] **T6 (P2)** — `ack` — verify_commands `shlex`+`shell=False`, cwd=root, env-inherit, fail-fast, output-on-abort (Decision 4); `reviewed_by` unset+no-`--by` → error; document git-add-before-ack. Verify: reviewed_by trio; verify-fail aborts without write.
+- [x] **T1 (P1)** — engine — digest source = index OIDs via a single `git ls-files -s` (Decision 1); drop `git hash-object`/working-tree. Verify: adapter test — staged edit reflected, unstaged not.
+- [x] **T2 (P1)** — core — canonical-JSON digest over normalized pydantic contract + sorted `(path, oid)` (Decision 2). Verify: glob-reorder → SAME digest; reformat → SAME digest.
+- [x] **T3 (P1)** — package — pure `core.py` + thin `git_adapter.py` + `models.py` + `drift_cmd.py` (Decision 3); build the reusable `git_repo` conftest fixture. Verify: core tests run with no git.
+- [x] **T4 (P2)** — models — contract-ID charset validation, `toml_utils` I/O, atomic ack write (temp + `os.replace`). Verify: invalid ID rejected; ack round-trip.
+- [x] **T5 (P2)** — `check` — add validations: review zero-match hard error (symmetry), orphan-ack, `ack.contract`==filename, unique IDs; failure text says "edit drift.toml first" on dead glob. Verify: one test per failure class.
+- [x] **T6 (P2)** — `ack` — verify_commands `shlex`+`shell=False`, cwd=root, env-inherit, fail-fast, output-on-abort (Decision 4); `reviewed_by` unset+no-`--by` → error; document git-add-before-ack. Verify: reviewed_by trio; verify-fail aborts without write.
 - [ ] **T7 (P2)** — CI — new `lint-drift` job, OUT of `lint-all` `needs` (advisory) (Decision 5). Verify: job runs, merges not blocked.
 - [ ] **T8 (P3)** — docs — correct the merge-conflict framing (rely on post-merge digest mismatch, not the conflict) in `docs/contribute/drift-contracts.md` AND `wip/drift-contracts-design.md`. Verify: mkdocs strict build green.
-- [ ] **T9 (P2)** — git adapter — failure-path tests: missing binary, non-zero exit, timeout. Verify: each raises an actionable error.
+- [x] **T9 (P2)** — git adapter — failure-path tests: missing binary, non-zero exit, timeout. Verify: each raises an actionable error.
 
 ## GSTACK REVIEW REPORT
 

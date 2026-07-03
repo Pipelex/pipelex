@@ -164,6 +164,7 @@ class DriftIssueKind(StrEnum):
 
     DEAD_TRIGGER_PATTERN = "dead_trigger_pattern"
     DEAD_REVIEW_TARGET = "dead_review_target"
+    EMPTY_EFFECTIVE_TRIGGERS = "empty_effective_triggers"
     MISSING_ACK = "missing_ack"
     ORPHAN_ACK = "orphan_ack"
     ACK_CONTRACT_MISMATCH = "ack_contract_mismatch"
@@ -173,7 +174,7 @@ class DriftIssueKind(StrEnum):
     def is_manifest_rot(self) -> bool:
         """Rot issues are fixed by editing drift.toml, not by re-acking."""
         match self:
-            case DriftIssueKind.DEAD_TRIGGER_PATTERN | DriftIssueKind.DEAD_REVIEW_TARGET:
+            case DriftIssueKind.DEAD_TRIGGER_PATTERN | DriftIssueKind.DEAD_REVIEW_TARGET | DriftIssueKind.EMPTY_EFFECTIVE_TRIGGERS:
                 return True
             case DriftIssueKind.MISSING_ACK | DriftIssueKind.ORPHAN_ACK | DriftIssueKind.ACK_CONTRACT_MISMATCH | DriftIssueKind.DIGEST_MISMATCH:
                 return False
@@ -193,10 +194,15 @@ def find_issues(manifest: DriftManifest, *, staged_oids: Mapping[str, str], acks
     issues: list[DriftIssue] = []
     tracked_files = [path for path in staged_oids if not path.startswith(DRIFT_STATE_PREFIX)]
     for contract_id, contract in manifest.contracts.items():
-        for pattern in find_dead_patterns(tracked_files, patterns=contract.triggers):
+        dead_triggers = find_dead_patterns(tracked_files, patterns=contract.triggers)
+        for pattern in dead_triggers:
             issues.append(DriftIssue(kind=DriftIssueKind.DEAD_TRIGGER_PATTERN, contract_id=contract_id, detail=pattern))
         for pattern in find_dead_patterns(tracked_files, patterns=contract.review):
             issues.append(DriftIssue(kind=DriftIssueKind.DEAD_REVIEW_TARGET, contract_id=contract_id, detail=pattern))
+        # A contract whose excludes swallow every trigger match has an empty effective set: it can
+        # never go stale, so it is manifest rot. Skip when dead trigger globs already explain it.
+        if not dead_triggers and not match_files(tracked_files, patterns=contract.triggers, exclude=contract.exclude):
+            issues.append(DriftIssue(kind=DriftIssueKind.EMPTY_EFFECTIVE_TRIGGERS, contract_id=contract_id))
         ack = acks.get(contract_id)
         if ack is None:
             issues.append(DriftIssue(kind=DriftIssueKind.MISSING_ACK, contract_id=contract_id))

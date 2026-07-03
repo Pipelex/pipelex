@@ -147,6 +147,53 @@ review = ["docs/missing.md"]
             drift_check_cmd(repo_root=git_repo.root)
         assert "does not match its filename stem" in drift_console.export_text()
 
+    def test_orphan_ack_with_markup_metacharacters_reports_cleanly(self, git_repo: GitRepo, drift_console: Console) -> None:
+        """An orphan ack whose filename stem contains Rich markup must be reported, not crash the check."""
+        _seed_repo(git_repo)
+        _ack_contract(git_repo.root, contract_id="demo-docs")
+        weird_ack = ack_file_path(git_repo.root, contract_id="[red]stray")
+        weird_ack.write_text(ack_file_path(git_repo.root, contract_id="demo-docs").read_text())
+        with pytest.raises(SystemExit):
+            drift_check_cmd(repo_root=git_repo.root)
+        assert "no matching contract" in drift_console.export_text()
+
+    def test_triggers_fully_shadowed_by_exclude_is_manifest_rot(self, git_repo: GitRepo, drift_console: Console) -> None:
+        """A contract whose excludes swallow every trigger match can never go stale — flag it as rot."""
+        manifest = """
+version = 1
+
+[contracts.demo-docs]
+description = "Demo docs must track demo source."
+triggers = ["src/**/*.py"]
+exclude = ["src/**"]
+review = ["docs/demo.md"]
+"""
+        _seed_repo(git_repo, manifest=manifest)
+        _ack_contract(git_repo.root, contract_id="demo-docs")
+        with pytest.raises(SystemExit):
+            drift_check_cmd(repo_root=git_repo.root)
+        output = drift_console.export_text()
+        assert "fully excluded" in output
+        assert "edit drift.toml first" in output
+
+    def test_dead_trigger_does_not_double_report_empty_effective_set(self, git_repo: GitRepo, drift_console: Console) -> None:
+        """When the emptiness is caused by dead trigger globs, only the dead-pattern issue is reported."""
+        manifest = """
+version = 1
+
+[contracts.demo-docs]
+description = "Demo docs must track demo source."
+triggers = ["nonexistent/**"]
+review = ["docs/demo.md"]
+"""
+        _seed_repo(git_repo, manifest=manifest)
+        _ack_contract(git_repo.root, contract_id="demo-docs")
+        with pytest.raises(SystemExit):
+            drift_check_cmd(repo_root=git_repo.root)
+        output = drift_console.export_text()
+        assert "matches no tracked file" in output
+        assert "fully excluded" not in output
+
     def test_schema_invalid_manifest_is_hard_error(self, git_repo: GitRepo) -> None:
         _seed_repo(git_repo, manifest="version = 1\n\n[contracts.demo-docs]\ntriggers = []\n")
         with pytest.raises(DriftManifestError):

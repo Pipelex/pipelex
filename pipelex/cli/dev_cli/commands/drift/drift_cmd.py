@@ -65,6 +65,8 @@ def _issue_message(issue: DriftIssue) -> str:
             return f"trigger pattern '{issue.detail}' matches no tracked file"
         case DriftIssueKind.DEAD_REVIEW_TARGET:
             return f"review target '{issue.detail}' matches no tracked file"
+        case DriftIssueKind.EMPTY_EFFECTIVE_TRIGGERS:
+            return "triggers are fully excluded — no tracked file is effectively covered"
         case DriftIssueKind.MISSING_ACK:
             return "no ack recorded — initial review required"
         case DriftIssueKind.ORPHAN_ACK:
@@ -97,7 +99,7 @@ def drift_check_cmd(*, quiet: bool = False, repo_root: Path | None = None) -> No
     console.print("[bold red]✗ Drift check: FAILED[/bold red]")
     console.print()
     for issue in issues:
-        console.print(f"  [red]✗[/red] [cyan]{issue.contract_id}[/cyan]: {escape(_issue_message(issue))}")
+        console.print(f"  [red]✗[/red] [cyan]{escape(issue.contract_id)}[/cyan]: {escape(_issue_message(issue))}")
     console.print()
     if any(issue.kind.is_manifest_rot for issue in issues):
         console.print("  Dead patterns are manifest rot: edit drift.toml first.")
