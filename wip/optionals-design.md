@@ -4,6 +4,8 @@ Status: design proposal, no code written. Branch `feature/Optionals`. This docum
 
 Decision status (2026-07-03, Louis): **all open questions resolved** — D3 implicit lifting, D4 `?` forbidden on plurals, `continue` = "declared output absent" (§14), naming (`!` = force marker, `?` pronounced "optional"), and D6 lints via a general `warnings` array on the validation report (bundled into the same protocol bump as the `optional` flag). The design is ready for implementation planning.
 
+Post-merge addendum (2026-07-03, after merging dev with the Required-main-stuff PR #1014): §14 rewritten against the merged reality, and a new decision **D11** added (absent branch results in PipeParallel's always-combine — signed off by Louis). The implementation plan lives in `wip/optionals-plan.md`.
+
 ## 1. The problem
 
 MTHDS can express *how many* values flow through a slot (`contracts.PenaltyClause[]`) but not *whether* a value flows at all. Every declared input is unconditionally required and every declared output is unconditionally produced. Real methods constantly need "maybe there is no value", and today authors work around it in four ways, all bad:
@@ -216,9 +218,20 @@ Compare with today's equivalent (`Stuff 'penalty_clause' not found in working me
 
 Success-path observability matters equally: the run report enumerates recorded absences and skipped pipes even when the run succeeds, so "my report doesn't mention penalties" is answerable without debugging.
 
-## 14. Interactions with in-flight work
+## 14. Interactions with merged and in-flight work
 
-- **Required-main-stuff invariant** (`feature/Required-main-stuff`, PR #1014): that track enforces "main stuff always exists" and makes `PipeCondition` `continue` pass-through-or-error. Optionals deliberately create runs whose final output is absent. Reconciliation: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant becomes "main stuff is always *resolved*: a value or a recorded absence". Also, `continue`'s two possible semantics ("pass previous main stuff through" vs "declared output is absent") must be picked consciously: under optionals the coherent reading is **declared output absent, memory otherwise unchanged**. **DECIDED 2026-07-03: `continue` = declared output absent.** This decision must be propagated to the Required-main-stuff track before either merges semantics that contradict the other.
+- **Required-main-stuff invariant — now MERGED** (PR #1014, squashed to dev and merged into this branch 2026-07-03): the invariant "a pipe run always delivers a main stuff" is enforced and test-pinned at every post-run boundary. The reconciliation stands as designed: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant generalizes to "main stuff is always *resolved*: a value or a recorded absence". Concrete consequences of the merge, now facts rather than coordination items:
+  - **`continue` landed with the opposite semantics.** Dev ships `continue` = pass-through-or-error (deliver the current main stuff; `PipeRunError` if there is none, live and dry-run alike), pinned by `test_pipe_condition_continue_delivery.py` including run-id stamping. The optionals decision (**`continue` = declared output absent, memory otherwise unchanged**, DECIDED 2026-07-03) *replaces* that landed behavior in phase 1: the runtime records an absence for the declared output instead of passing through or raising, the pinned tests are rewritten (not extended), and the dry-run all-special-outcomes guard becomes "legal iff the output is declared `?` → record absence". The landed runtime error becomes unreachable for validated bundles once `continue`-reachable ⇒ `?` output is statically enforced (D6's `OPTIONAL_OUTPUT_REQUIRED`).
+  - **Migration note — the pass-through capability disappears.** "If the value is already fine, `continue` and deliver it as-is" works on dev today. Under optionals the condition's output is absent instead; the previous value remains in memory under its own name, so downstream consumes it explicitly (`?` input + `@?` guard) — the ergonomic replacement is coalescing (`??`, D10/phase 2), which this strengthens the case for pulling forward. The phase-1 docs and changelog must state the migration idiom explicitly (breaking).
+  - **The tightened boundaries are the phase-1 absence-arm checklist.** These sites now read the main stuff directly and raise when it is missing; each must learn the "resolved as absent" arm: the graph-tracer epilogue in `pipe_abstract.py` (`get_main_stuff()` direct), the delivery executor (typed and raw-transport arms both raise), the CLI run cores (bare, agent, agent-API), `otel_factory.py`, and `resolve_main_stuff_root_key` in `runtime_bridge/serialization.py` (raises `PipeJobError`).
+  - **Wire constraint: `main_stuff_name` stays required.** `PipelexPipeRunOutput` and `PipelexRunResultExecute` now require `main_stuff_name: str` (fire-and-forget is a separate `PipelexPipeDispatchAck`). Do not re-optionalize it — that would undo #1014 and re-spread null guards. D8's shape: `main_stuff_name` keeps naming the declared output slot; the run result's absence records mark that slot absent; consumers branch on the structured absence record (presentation-vs-contract, as with `/validate`'s `is_valid`).
+  - **No resurrection of `PipeOutput.optional_main_stuff`** (deleted in #1014). The new accessor is tri-state *resolved* (Stuff | AbsenceRecord) — never `None` for a completed run.
+  - **Prose sweep:** the invariant wording ("a pipe run always delivers a main stuff") now lives in docstrings and error messages across several files; phase 1 rewrites it to "always resolves its declared output: a value or a recorded absence".
+- **D11 — Absent branch results in PipeParallel's always-combine (new decision, post-#1014). DECIDED 2026-07-03 (Louis): absorption requires an optional attribute.** #1014 makes `PipeParallel` unconditionally combine its branch results into the declared `output` concept (`combined_output` deleted; untyped vehicle = `native.Composite`; static field/result-name/type compatibility checks in `validate_output_with_library`). Under optionals a branch may resolve absent (its pipe lifted, or a `?` output produced absence), so the combine needs a policy:
+  - **Structured output:** a structure field with `required = false` **absorbs** the absent branch as field-level `None` — slot absence converts to field-level null (§3's first kind of nothing) at the combine boundary, and taint terminates there. A **required** field fed by a maybe-absent branch is a **static validation error** (extends #1014's `validate_output_with_library` checks; part of the D6 taint pass), naming the branch, the field, and the two fixes (make the field optional, or sink the absence upstream).
+  - **`Composite` output:** absent components are **omitted** from the composite, with a ledger note for observability (compaction-flavored, mirroring D4's story for plurals). The component-wise transport encoding already tolerates omitted components, so no wire change.
+  - Tainting the whole parallel output on any absent branch was rejected: it discards exactly the partial results fan-out exists to collect.
+  - Whole-parallel lifting (the parallel's own *input* absent) is plain D3 and needs no new rule.
 - **`@?` required-variable detection** (D7) — the fix lands as part of this feature.
 - **Pre-existing wart to fix while in the area:** structure-field shorthand strings default to `required=True` while the expanded `ConceptStructureBlueprint` defaults `required=False` — opposite defaults for the same concept. Unrelated to slot optionality but adjacent enough to confuse; fix or at least document deliberately.
 - **Not in scope:** structure-field `?` sugar (e.g. `concept_ref = "X?"` meaning `required=false`). It would create two spellings for one thing and blur the slot-vs-field distinction §3 works hard to establish. Revisit only if field/slot unification ever becomes a goal.
@@ -233,6 +246,8 @@ Success-path observability matters equally: the run report enumerates recorded a
 
 Inside `pipelex/` (the bulk): grammar (`variable_multiplicity.py` + the input-factory regex + the `[`-splitter in `concepts/helpers.py`), `StuffSpec`/`NamedStuffSpec` gain the presence field, `InputStuffSpecs.required_names` splits required/declared, the three runtime miss-gates (`validate_before_run`, `SubPipe`, PipeCondition's branch check) learn the trichotomy, `PipeSequence.needed_inputs`/`generated_outputs` gain the taint dimension, WorkingMemory gains the absence ledger, PipeLLM gains the maybe-wrapper, mock seeding and the dry-run sweep learn optional slots, validation gains the new error types + template guard-lint, `contract_match` canonicalization compares markers, builder specs mirror blueprint validation, error classes + generated error pages, graph tracer `skipped` state, and docs.
 
+Added by the #1014 merge (see §14): PipeCondition's `continue` arms (live + dry) and their pinned tests, PipeParallel's unconditional combine + its static compatibility validation (D11), and the tightened post-run boundary sites that must learn the resolved-as-absent arm — `pipe_abstract.py` tracer epilogue, `delivery_executor.py` (typed + raw), the CLI run cores, `otel_factory.py`, `resolve_main_stuff_root_key`/`payloads.py`/`pipeline_response.py`.
+
 Cross-repo (from the workspace survey):
 
 | Repo | Surfaces | Size |
@@ -246,7 +261,7 @@ Cross-repo (from the workspace survey):
 | `pipelex-api/` | Pass-through; new absence fields in run results, docs | S |
 | JSON schemas | Regenerate only — `inputs`/`output` are unconstrained strings, already `?`-permissive | S |
 
-Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the same change as the pipelex surface they verify; the mthds spec, tooling, and UI repos can follow the runtime release.
+Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the same change as the pipelex surface they verify; the mthds spec, tooling, and UI repos can follow the runtime release. The Required-main-stuff Phase 3 cross-repo sweep (release-gated: `combined_output` removal + `Composite` in the spec/schema/skills) touches the same mthds spec pages — land it before the optionals cross-repo wave to avoid colliding edits.
 
 ## 17. Phasing
 
@@ -269,8 +284,9 @@ Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the
 | D8 | Wire | `optional` on IO contracts; absence records in run results; absent main output = success, not error |
 | D9 | Errors | `OptionalValueAbsentError` with provenance chain; RFC 7807 + error pages via existing machinery |
 | D10 | Deferred | `on_error = "absent"` (`try?`), coalescing (`??`), presence sugar — phase 2/3, semantics sketched now |
+| D11 | Parallel combine | Absent branch → optional structure field absorbs as field-`None` / `Composite` omits the component + ledger note; required field fed maybe-absent = static error (decided) |
 
-Decided 2026-07-03 (Louis): D3 (implicit lifting), D4 (forbid `?` on plurals), the `continue`-absent semantics (§14), naming (`!` force marker, `?` "optional"), and D6 lints via a general `warnings` array. All open questions resolved; ready for implementation planning.
+Decided 2026-07-03 (Louis): D3 (implicit lifting), D4 (forbid `?` on plurals), the `continue`-absent semantics (§14), naming (`!` force marker, `?` "optional"), D6 lints via a general `warnings` array, and D11 (parallel combine absorbs absence only through optional attributes). All open questions resolved; ready for implementation planning.
 
 ## 19. Open questions — resolutions (2026-07-03)
 
