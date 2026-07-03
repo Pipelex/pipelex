@@ -2,8 +2,10 @@
 #
 # A contract says: when these trigger files change, these review targets must be
 # re-examined against the change, and the examination must be recorded with
-# `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates CI on it.
-# See docs/contribute/drift-contracts.md for the full workflow.
+# `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates the local
+# `make check` aggregate and runs as an advisory CI job (to be promoted to a
+# required check — see TODOS.md). See docs/contribute/drift-contracts.md for the
+# full workflow.
 #
 # Keep this manifest small: every contract here must earn its friction. Anything
 # mechanizable (regenerate-and-diff, referential integrity) belongs in a derived
@@ -13,8 +15,15 @@ version = 1
 
 [contracts.config-docs]
 description = "User-facing configuration docs must track the config model and the shipped defaults."
+# The config model tree is rooted in system/configuration/ but several documented
+# submodels are defined in their own packages — they trigger too.
 triggers = [
   "pipelex/system/configuration/**/*.py",
+  "pipelex/system/telemetry/telemetry_config.py",
+  "pipelex/cogt/config_cogt.py",
+  "pipelex/cogt/img_gen/img_gen_job_components.py",
+  "pipelex/tools/aws/aws_config.py",
+  "pipelex/tools/log/log_config.py",
   "pipelex/pipelex.toml",
 ]
 review = [

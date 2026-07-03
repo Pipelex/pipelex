@@ -1,6 +1,6 @@
 # Drift Contracts
 
-Drift contracts turn the "keep docs in sync with code" policy from advisory prose into a deterministic, CI-gated obligation. A **drift contract** declares: *when these trigger files change, these review targets must be re-examined against the change, and the examination must be recorded.* The tool cannot judge whether a doc is still correct — that takes a human or an agent — but it can prove, deterministically, that someone looked at this exact content and said so on the record.
+Drift contracts turn the "keep docs in sync with code" policy from advisory prose into a deterministic, mechanically-checked obligation. A **drift contract** declares: *when these trigger files change, these review targets must be re-examined against the change, and the examination must be recorded.* The tool cannot judge whether a doc is still correct — that takes a human or an agent — but it can prove, deterministically, that someone looked at this exact content and said so on the record.
 
 ## The three synchronization tiers
 
@@ -20,7 +20,7 @@ Three pieces:
 
 - **`drift.toml`** (repo root, human-authored) declares the contracts: `triggers` (globs over tracked files), optional `exclude`, `review` targets, and optional `verify_commands`.
 - **`.drift/acks/<contract-id>.toml`** (tool-written, committed) records the last fulfilled review: a content digest, the reviewer, a timestamp, a rationale, and the per-file trigger snapshot.
-- **`pipelex-dev drift plan|check|ack`** computes obligations, gates CI, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make check` aggregate and CI), `make drift-ack CONTRACT=… RATIONALE="…"`.
+- **`pipelex-dev drift plan|check|ack`** computes obligations, checks them, and records acks. Make wrappers: `make drift-plan`, `make drift-check` (in the `make check` aggregate; in CI it currently runs as an **advisory** job that is visible on the PR but does not block merges — it will be promoted to a required check), `make drift-ack CONTRACT=… RATIONALE="…"`.
 
 The validity rule is a single equality, with no base ref, no git diff, and no timestamps:
 

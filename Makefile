@@ -358,7 +358,7 @@ dc: drift-check
 
 drift-ack: env
 	$(call PRINT_TITLE,"Recording drift ack")
-	@if [ -z "$(CONTRACT)" ]; then \
+	@if [ -z "$(CONTRACT)" ] || [ -z "$(RATIONALE)" ]; then \
 		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
 		exit 1; \
 	fi

@@ -1,10 +1,12 @@
 contract = "config-docs"
-digest = "sha256:9a94eab61a93f71e002588c68bbd58d1a5cce1f26f4e20b1f1548d869fa1d948"
+digest = "sha256:f80483d1aa9779613488628c83facb28e7e8bb9a1fc87bbe4b4db771ffc93ce9"
 reviewed_by = "Claude (Fable 5)"
-reviewed_at = "2026-07-03T20:00:48Z"
-rationale = "Initial review: checked every documented setting/section/default in docs/configuration/ against configs.py, config_model.py, config_loader.py and pipelex.toml. Fixed staleness: removed the dead [cogt.inference_manager_config] section and the invalid output_format key under img_gen_param_defaults (both would crash config load under extra=forbid), corrected is_structure_prompt_enabled/guidance_scale/nb_steps defaults, added the 0.5k size tier, closed an unclosed code fence, rewrote index.md's override layering (global ~/.pipelex layer, overrides live inside .pipelex/, temporary_override, init --local), fixed error-class names and overrides.toml->x_custom_*.toml in inference-backend-config.md, bundle_uri(s)/mthds_content(s) plural rename in library-config.md, refreshed alias examples to the current kit deck. make tb green."
+reviewed_at = "2026-07-03T20:22:36Z"
+rationale = "Broadened triggers to the documented config submodel sources (config_cogt.py, img_gen_job_components.py, aws_config.py, log_config.py, telemetry_config.py) per code-review finding: Optional-field additions there previously reopened nothing. The same initial review already verified cogt/aws/logging/telemetry docs against exactly these files; no further doc changes needed. make tb green."
 
 [trigger_files]
+"pipelex/cogt/config_cogt.py" = "blob:fca7b96f9147122b6b8300471cac637b05fed1ee"
+"pipelex/cogt/img_gen/img_gen_job_components.py" = "blob:580e7e5f44a22e318fb4c18fdf29a9dc1dda6280"
 "pipelex/pipelex.toml" = "blob:ddb1c75f920f25d56ba6ec8b24497034633480b8"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:12cf96754989b59ffced39521e3fe11606058d8f"
@@ -12,3 +14,6 @@ rationale = "Initial review: checked every documented setting/section/default in
 "pipelex/system/configuration/config_model.py" = "blob:0056a1767720bdf44eb1dae3b557e17606626924"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
 "pipelex/system/configuration/configs.py" = "blob:a4cd638271294d47dc5601027ee924fdd1098039"
+"pipelex/system/telemetry/telemetry_config.py" = "blob:af9290b428c0ef7307d67475b8bd78e1ce2bd282"
+"pipelex/tools/aws/aws_config.py" = "blob:cf7df86e26b8b2f69880b87f6c8ffab6947d0762"
+"pipelex/tools/log/log_config.py" = "blob:68a62955d6a7a0934171411268aaf00e081ee85a"

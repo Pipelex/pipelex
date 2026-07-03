@@ -92,7 +92,7 @@ Notes on the schema:
 
 ## Ack state format
 
-One file per contract under `.drift/acks/`, committed. Per-contract files keep unrelated PRs from conflicting on a shared state file; a conflict on the *same* contract is meaningful (see above).
+One file per contract under `.drift/acks/`, committed. Per-contract files keep unrelated PRs from conflicting on a shared state file; two branches re-acking the *same* contract may conflict, and either way the post-merge digest recompute is what catches an unreviewed combination (see above).
 
 ```toml
 contract = "config-docs"
@@ -156,7 +156,7 @@ Requires `--rationale`. Runs the contract's `verify_commands` first; any failure
 
 ## Decisions, mapped to the brief's open questions
 
-- **Review state inside the manifest or separate?** Separate. The manifest is human-authored and low-churn; acks are tool-written and change with every fulfilled review. One file per contract to keep merge conflicts scoped and meaningful.
+- **Review state inside the manifest or separate?** Separate. The manifest is human-authored and low-churn; acks are tool-written and change with every fulfilled review. One file per contract to keep any merge conflict scoped to the contract it concerns (the real merge safety net being the post-merge digest recompute).
 - **Acks in repo, CI artifacts, or PR metadata?** In repo. Anything outside the tree breaks the local-equals-CI property and hides the audit trail from the PR diff.
 - **Review identity for agents?** A plain string. Git already attributes the commit; `reviewed_by` is context, not authentication. Agents should pass something resolvable (e.g. model name or session URL).
 - **Should ack require a clean tree?** No. Agents ack mid-flow before committing; digest mismatch after later edits is caught by `check`.
