@@ -4,7 +4,8 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -34,6 +35,18 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 
+def resolve_default_size(explicit_aspect_ratio: AspectRatio | None, *, default_size: ImgGenSize | None) -> ImgGenSize | None:
+    """Resolve the config-level size default applicable to a pipe, honoring exact-size/aspect-ratio exclusivity.
+
+    An exact size implies its own aspect ratio (the blueprint forbids setting both on a pipe), so an
+    exact-size deck default does not apply to a pipe that explicitly sets `aspect_ratio` — the more
+    specific pipe field wins. A tier default composes with any ratio and always applies.
+    """
+    if explicit_aspect_ratio is not None and isinstance(default_size, ImageSize):
+        return None
+    return default_size
+
+
 class PipeImgGenOutput(PipeOutput):
     pass
 
@@ -45,6 +58,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
+    size: ImgGenSize | None = None
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
@@ -91,6 +105,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         unsupported = ImgGenParamSupport.check_blueprint_params(
             rules=spec.rules,
             aspect_ratio=self.aspect_ratio,
+            size=self.size,
             background=self.background,
             output_format=self.output_format,
             model_name=img_gen_setting.model,
@@ -197,6 +212,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Build ImgGenJobParams from ImgGenSetting + one-time settings
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
+            size=self.size or resolve_default_size(self.aspect_ratio, default_size=img_gen_param_defaults.size),
             background=self.background or img_gen_param_defaults.background,
             quality=img_gen_setting.quality,
             nb_steps=img_gen_setting.nb_steps,

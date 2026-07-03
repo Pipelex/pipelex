@@ -7,7 +7,8 @@ The factory uses the model's rules (a mapping of topics to taxonomies) to determ
 how each parameter should be formatted for the specific provider's API.
 """
 
-from typing import Any
+import base64
+from typing import Any, TypeAlias
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
@@ -15,7 +16,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
@@ -33,9 +34,13 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
+
+ImageFileTuple: TypeAlias = tuple[str, bytes, str]
+"""httpx-style multipart file part: (filename, content_bytes, mime_type)."""
 
 
 class ImgGenArgsFactory:
@@ -272,14 +277,36 @@ class ImgGenArgsFactory:
         aspect_ratio_taxonomy: AspectRatioTaxonomy,
         *,
         aspect_ratio: AspectRatio,
-        size: ImageSize | None,
+        size: SizeTier | ImageSize | None,
         model_name: str,
     ) -> dict[str, Any]:
-        """Map aspect ratio to provider-specific parameter name and value format.
+        """Map aspect ratio and size to provider-specific parameter name and value format.
 
         Raises:
-            ImgGenParameterError: If the aspect ratio is not supported by the target model
+            ImgGenParameterError: If the aspect ratio or size is not supported by the target model
         """
+        match aspect_ratio_taxonomy:
+            case AspectRatioTaxonomy.FLUX | AspectRatioTaxonomy.FLUX_11_ULTRA | AspectRatioTaxonomy.QWEN_IMAGE:
+                if isinstance(size, ImageSize):
+                    msg = f"Model '{model_name}' does not support exact image sizes; use aspect_ratio to control the geometry"
+                    raise ImgGenParameterError(msg)
+                if isinstance(size, SizeTier):
+                    match size:
+                        case SizeTier.ONE_K:
+                            # These models natively produce 1K-class images: '1k' is a portable no-op.
+                            pass
+                        case SizeTier.HALF_K | SizeTier.TWO_K | SizeTier.FOUR_K:
+                            msg = f"Model '{model_name}' cannot produce images at size tier '{size}'; supported tier: '1k'"
+                            raise ImgGenParameterError(msg)
+            case (
+                AspectRatioTaxonomy.GPT_IMAGE_LEGACY
+                | AspectRatioTaxonomy.GPT_IMAGE_2
+                | AspectRatioTaxonomy.GEMINI_2_5
+                | AspectRatioTaxonomy.GEMINI_3_PRO
+                | AspectRatioTaxonomy.GEMINI_3_FLASH
+                | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
+            ):
+                pass
         key: str
         value: Any
         match aspect_ratio_taxonomy:
@@ -300,7 +327,14 @@ class ImgGenArgsFactory:
                         value = "portrait_16_9"
                     case AspectRatio.PORTRAIT_9_21:
                         value = "portrait_21_9"
-                    case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                    case (
+                        AspectRatio.LANDSCAPE_3_2
+                        | AspectRatio.PORTRAIT_2_3
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.FLUX_11_ULTRA:
@@ -320,7 +354,14 @@ class ImgGenArgsFactory:
                         value = "9:16"
                     case AspectRatio.PORTRAIT_9_21:
                         value = "9:21"
-                    case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
+                    case (
+                        AspectRatio.LANDSCAPE_3_2
+                        | AspectRatio.PORTRAIT_2_3
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.GPT_IMAGE_LEGACY:
@@ -337,6 +378,22 @@ class ImgGenArgsFactory:
                     aspect_ratio=aspect_ratio,
                     size=size,
                 )[0]
+            case (
+                AspectRatioTaxonomy.GEMINI_2_5
+                | AspectRatioTaxonomy.GEMINI_3_PRO
+                | AspectRatioTaxonomy.GEMINI_3_FLASH
+                | AspectRatioTaxonomy.GEMINI_3_FLASH_LITE
+            ):
+                # The Google native worker and the gateway build their own `image_config`
+                # from the job params; this path validates the (aspect_ratio, size) pair
+                # against the taxonomy's published grids and exposes the ratio literal.
+                resolved = GoogleImgGenFactory.resolve_image_config(
+                    aspect_ratio_taxonomy,
+                    aspect_ratio=aspect_ratio,
+                    size=size,
+                    model_name=model_name,
+                )
+                return {"aspect_ratio": resolved.aspect_ratio}
             case AspectRatioTaxonomy.QWEN_IMAGE:
                 width: int
                 height: int
@@ -363,7 +420,14 @@ class ImgGenArgsFactory:
                     case AspectRatio.PORTRAIT_2_3:
                         width, height = 1056, 1584
                         aspect_ratio_string = "2:3"
-                    case AspectRatio.LANDSCAPE_21_9 | AspectRatio.PORTRAIT_9_21:
+                    case (
+                        AspectRatio.LANDSCAPE_21_9
+                        | AspectRatio.PORTRAIT_9_21
+                        | AspectRatio.LANDSCAPE_4_1
+                        | AspectRatio.LANDSCAPE_8_1
+                        | AspectRatio.PORTRAIT_1_4
+                        | AspectRatio.PORTRAIT_1_8
+                    ):
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by HuggingFace image generation model"
                         raise ImgGenParameterError(msg)
                 return {"width": width, "height": height, "aspect_ratio": aspect_ratio_string}
@@ -546,22 +610,24 @@ class ImgGenArgsFactory:
 
         match input_images_taxonomy:
             case InputImagesTaxonomy.GPT_IMAGE:
-                # OpenAI /images/edits format: "image" accepts array of base64 data URLs
-                # Max 16 images, each < 50MB, png/webp/jpg
-                # Format: data:image/png;base64,{base64_data}
+                # The GPT Image "image" argument is only valid on the OpenAI/Azure /images/edits
+                # route, which (unlike /images/generations) takes a multipart/form-data body, so
+                # each image is produced here as an httpx-style (filename, bytes, mime_type) file
+                # tuple. Max 16 images, each < 50MB, png/webp/jpg.
                 prepped_images = await prep_prompt_images(prompt_images=input_images, is_http_url_enabled=False)
-                image_data_urls: list[str] = []
-                for prepped in prepped_images:
+                image_files: list[ImageFileTuple] = []
+                for index, prepped in enumerate(prepped_images):
                     if isinstance(prepped, PreparedFileBase64):
-                        image_data_urls.append(prepped.as_data_url())
+                        image_bytes = base64.b64decode(prepped.base64_data)
+                        image_files.append((f"image_{index}.{prepped.file_type.extension}", image_bytes, prepped.mime_type))
                     elif isinstance(prepped, PreparedFileHttpUrl):
-                        # GPT Image API requires base64 data URLs, not HTTP URLs
-                        msg = "GPT Image API requires base64 data URLs, but got HTTP URL"
+                        # GPT Image API requires the image bytes as a file part, not an HTTP URL
+                        msg = "GPT Image API requires image file data, but got HTTP URL"
                         raise ImgGenParameterError(msg)
                     else:
                         msg = f"Unexpected PreparedFile type for GPT Image API: {type(prepped).__name__}"
                         raise ImgGenParameterError(msg)
-                return {"image": image_data_urls}
+                return {"image": image_files}
 
             case InputImagesTaxonomy.BFL_FLUX_2:
                 # BFL Flux 2 Pro format: input_image (1st), input_image_2 through input_image_8

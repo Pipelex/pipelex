@@ -2673,7 +2673,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.6.0"
+version = "0.7.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
@@ -2684,9 +2684,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/51/d4/64263f35f42dcc0a74bb348e6511e923fe32f99d851955f04673f1cb5d68/mthds-0.6.0.tar.gz", hash = "sha256:8608599345f90b1a6f4a475cc73dc050d9dfd69c4b9245d814b8733fd923dd5b", size = 131133, upload-time = "2026-06-30T12:50:51.744Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/fe/52bf1818f41b71658f24ee78dfe24730c04c1066e8b434f39fe23823cbb4/mthds-0.7.0.tar.gz", hash = "sha256:35e8c9d5f4b27e86fec02245f72bc2eb9c849790d39a8ffe6dcb001e7fe7d4cb", size = 136385, upload-time = "2026-07-02T20:17:58.875Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/58/f3/4b30d61dbd6b5699954da41908353524b07c388376a0bb164e75196bd6c0/mthds-0.6.0-py3-none-any.whl", hash = "sha256:8faf7ba78e672da7c3693a07872bfd654fcdcff43d0e085a9d340d9920beb2f3", size = 57703, upload-time = "2026-06-30T12:50:50.57Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/9f/f12c6de8a2ed9938a5914559639921ded8275f42b8c43ac1af35fe7a488f/mthds-0.7.0-py3-none-any.whl", hash = "sha256:4e371b73ba259899f5ba0b460809d00f176ac44ad773073a3ebb6c10ee207866", size = 57898, upload-time = "2026-07-02T20:17:57.525Z" },
 ]
 
 [[package]]
@@ -3856,7 +3856,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.6.0" },
+    { name = "mthds", specifier = ">=0.7.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
