@@ -101,8 +101,21 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         )
 
     def record_absence(self, record: AbsenceRecord) -> None:
-        """Record that the slot named by the record holds no value (keyed by variable name)."""
+        """Write a ledger NOTE: the record is keyed by variable name, any value under that name
+        is left in place (and wins in `resolve_stuff`). This is the observability-note arm (e.g.
+        the D4 plural empty-list note); an absence that RESOLVES a slot goes through
+        `record_resolved_absence` instead.
+        """
         self.absences[record.variable_name] = record
+
+    def record_resolved_absence(self, record: AbsenceRecord) -> None:
+        """Record an absence as the slot's RESOLUTION: a stale value (or alias) under the same
+        name is removed so it cannot outrank the fresh absence — the mirror of `set_stuff`'s
+        value-supersedes-record invariant.
+        """
+        self.remove_stuff(name=record.variable_name)
+        self.remove_alias(alias=record.variable_name)
+        self.record_absence(record)
 
     def get_optional_absence(self, name: str) -> AbsenceRecord | None:
         return self.absences.get(name)
@@ -110,13 +123,13 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def record_new_main_absence(self, record: AbsenceRecord) -> None:
         """Record a pipe-output absence as the resolved main result.
 
-        Marks both the named slot and the main-stuff position, and removes any stale main stuff
-        so a previous value cannot masquerade as this pipe's output. The previous value stays in
-        memory under its own name — memory is otherwise unchanged.
+        Marks both the named slot and the main-stuff position, and removes any stale value under
+        either name so a previous output cannot masquerade as this pipe's. Other names stay
+        untouched — memory is otherwise unchanged.
         """
         self.remove_main_stuff()
         self.remove_alias_to_main_stuff()
-        self.record_absence(record)
+        self.record_resolved_absence(record)
         self.absences[MAIN_STUFF_NAME] = record
 
     def resolve_stuff(self, name: str) -> Stuff | AbsenceRecord:

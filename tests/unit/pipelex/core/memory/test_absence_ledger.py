@@ -111,6 +111,42 @@ class TestAbsenceLedger:
         assert working_memory.get_optional_absence("assessment") is not None
         assert working_memory.get_optional_absence(MAIN_STUFF_NAME) is None
 
+    def test_record_resolved_absence_supersedes_stale_value_under_same_name(self):
+        """A resolution absence clears a stale value (and alias) under the same name — the mirror
+        of set_stuff's value-supersedes-record — so old data cannot outrank the fresh absence.
+        """
+        working_memory = WorkingMemory()
+        working_memory.set_stuff(name="draft", stuff=_make_text_stuff("draft", text="old draft"))
+        record = _make_record("draft")
+        working_memory.record_resolved_absence(record)
+
+        assert working_memory.get_optional_stuff("draft") is None
+        assert working_memory.resolve_stuff("draft") == record
+
+    def test_record_new_main_absence_supersedes_stale_value_under_output_name(self):
+        """When a pipe's output name collides with an earlier value, recording the output absence
+        supersedes the stale value under that name too, not just the main-stuff position.
+        """
+        working_memory = WorkingMemory()
+        working_memory.set_new_main_stuff(_make_text_stuff("draft", text="old draft"), name="draft")
+        record = _make_record("draft")
+        working_memory.record_new_main_absence(record)
+
+        assert working_memory.get_optional_stuff("draft") is None
+        assert working_memory.resolve_stuff("draft") == record
+        assert isinstance(working_memory.resolve_main_stuff(), AbsenceRecord)
+
+    def test_record_absence_is_a_note_beside_a_value(self):
+        """The plain record_absence stays a ledger NOTE: a value under the same name is kept and
+        wins in resolve_stuff (the D4 plural empty-list note depends on this).
+        """
+        working_memory = WorkingMemory()
+        working_memory.set_stuff(name="items", stuff=_make_text_stuff("items"))
+        working_memory.record_absence(_make_record("items"))
+
+        assert working_memory.get_optional_stuff("items") is not None
+        assert isinstance(working_memory.resolve_stuff("items"), Stuff)
+
     def test_provenance_chain_walks_to_origin(self):
         """provenance_chain() lists the record then its upstream chain; origin is the first absence."""
         origin = _make_record("penalty_clause")

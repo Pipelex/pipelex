@@ -322,7 +322,8 @@ class PipeParallel(PipeController):
                     if branch_resolved.variable_name == sub_pipe_output_name
                     else branch_resolved.model_copy(update={"variable_name": sub_pipe_output_name})
                 )
-                working_memory.record_absence(branch_record)
+                # Resolution, not a note: a stale value under the result name must not outrank it.
+                working_memory.record_resolved_absence(branch_record)
                 log.verbose(f"PipeParallel '{self.code}': branch result '{sub_pipe_output_name}' is absent, omitted from the combine")
                 continue
             output_stuff = branch_resolved

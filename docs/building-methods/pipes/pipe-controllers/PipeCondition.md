@@ -152,7 +152,7 @@ An absent output propagates like any recorded absence:
 - A downstream pipe declaring the input **optional** (`?`) runs and handles both arms.
 - A downstream pipe declaring the input **forced** (`!`) fails with a typed error carrying the full provenance chain.
 - Inside a `PipeBatch`, an absent branch result is dropped from the aggregated list (compaction): batching a "keep or skip" condition over items yields a list of only the kept results.
-- Inside a `PipeParallel`, an absent branch result is omitted from the combined output (a non-required structured field absorbs it as `null`).
+- Inside a `PipeParallel`, an absent branch result is omitted from the combined output (a non-required structured field absorbs it as its default — `null` unless the field declares another default).
 
 !!! warning "Breaking change: `continue` no longer passes the previous output through"
     `continue` used to deliver the current main stuff by passing it through. It now resolves the condition's output as **absent** instead. The previous value is not lost — it stays in the working memory under its own name, so a downstream pipe consumes it explicitly by that name (declared `?` when it may be absent). If you need "use the new value if produced, otherwise the previous one", that coalescing idiom is planned as a follow-up; today, model it with an explicit downstream pipe that declares both inputs.
