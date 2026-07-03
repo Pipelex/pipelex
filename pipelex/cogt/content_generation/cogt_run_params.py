@@ -1,10 +1,12 @@
 """Cogt-tier slice of the run params (D-plan Part B).
 
 ``CogtRunParams`` carries the execution-mode contract down to the cogt leaf. The
-facts (``run_mode``, ``is_mock_usage``) are owned by ``PipeRunParams`` as direct
-fields; its derived ``cogt_run_params`` property mints this carrier on demand, so
-there is exactly one stored copy. Single writer of the facts:
-``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job``).
+facts (``run_mode``, ``is_mock_usage``, ``inference_profile_ref``) are owned by
+``PipeRunParams`` as direct fields; its derived ``cogt_run_params`` property mints
+this carrier on demand, so there is exactly one stored copy. Single writer of the
+mode facts: ``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job``);
+``inference_profile_ref`` is written once at submission — the same factory kwarg,
+or a ``model_copy(update=...)`` stamp at an orchestrator seam.
 
 Route to the leaf: operators slice ``pipe_run_params.cogt_run_params`` off and pass
 it into the content-generator protocol methods; generators stamp it as a field on
@@ -21,6 +23,7 @@ cogt-relevant flags.
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from pipelex.pipe_run.inference_profile_ref import InferenceProfileRef
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.types import Self
 
@@ -63,6 +66,13 @@ class CogtRunParams(BaseModel):
     # Default False keeps dry runs zero-token with the report suppressed. Single writer:
     # ``PipeRunParamsFactory.make_run_params`` (fed by ``prepare_pipe_job``).
     is_mock_usage: bool = False
+
+    # Selection of an externally-stored inference configuration for this run (BYOK). None means
+    # the executing process's boot configuration applies — the unchanged default. Core never
+    # resolves the ref; it rides every assignment so a distributed worker can verify it against
+    # its own boot identity and attribute usage to it. Optional-with-default so payloads from
+    # older writers still validate under `extra="forbid"`.
+    inference_profile_ref: InferenceProfileRef | None = None
 
     @model_validator(mode="after")
     def validate_mock_usage_requires_dry(self) -> Self:

@@ -44,7 +44,7 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 | `pipe` | `PipeAbstract` | The resolved pipe object (concrete operator or controller) |
 | `working_memory` | `WorkingMemory \| None` | Runtime data store — typed `Stuff` objects keyed by variable name |
 | `working_memory_raw` | `dict \| None` | Raw JSON dict of WorkingMemory for deferred hydration (Temporal only) |
-| `pipe_run_params` | `PipeRunParams` | Execution config: run mode (LIVE/DRY), output multiplicity, pipe stack for cycle detection |
+| `pipe_run_params` | `PipeRunParams` | Execution config: run mode (LIVE/DRY), output multiplicity, pipe stack for cycle detection, optional inference-profile ref (selection of an externally-stored inference configuration — carried, never resolved, by core) |
 | `job_metadata` | `JobMetadata` | Pipeline run ID, user ID, OTel tracing context, graph tracing context |
 | `output_name` | `str \| None` | Override for the output variable name |
 | `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |

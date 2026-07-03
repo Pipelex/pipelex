@@ -8,6 +8,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams, check_mock_usage_requires_dry
 from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF_NAME
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
+from pipelex.pipe_run.inference_profile_ref import InferenceProfileRef  # noqa: TC001 — pydantic resolves the field annotation at runtime
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode  # noqa: TC001 — pydantic resolves the field annotation at runtime
 from pipelex.pipeline.exceptions import PipeStackOverflowError
 from pipelex.types import Self, StrEnum
@@ -158,6 +159,13 @@ class PipeRunParams(BaseModel):
     # frozen for the same reason as `run_mode`.
     is_mock_usage: bool = Field(default=False, frozen=True)
 
+    # Selection of an externally-stored inference configuration for this run (BYOK). None means
+    # the executing process's boot configuration applies — the unchanged default. Core stores and
+    # transports the ref but never resolves it. `frozen=True`: the selection is written once at
+    # submission (factory kwarg, or a `model_copy(update=...)` stamp at an orchestrator seam) and
+    # must not drift mid-run; sub-pipe copies inherit it through `model_copy`.
+    inference_profile_ref: InferenceProfileRef | None = Field(default=None, frozen=True)
+
     final_stuff_code: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
     dynamic_output_concept_ref: str | None = None
@@ -177,11 +185,15 @@ class PipeRunParams(BaseModel):
     def cogt_run_params(self) -> CogtRunParams:
         """Mint the cogt-tier slice of these params — what generators stamp on every assignment.
 
-        Derived (not stored) from the run-mode fields above, so there is exactly one copy of the
-        facts; the carrier exists because the cogt layer must stay pipe-agnostic and the assignment
+        Derived (not stored) from the fields above, so there is exactly one copy of the facts;
+        the carrier exists because the cogt layer must stay pipe-agnostic and the assignment
         payloads cross the Temporal activity boundary.
         """
-        return CogtRunParams(run_mode=self.run_mode, is_mock_usage=self.is_mock_usage)
+        return CogtRunParams(
+            run_mode=self.run_mode,
+            is_mock_usage=self.is_mock_usage,
+            inference_profile_ref=self.inference_profile_ref,
+        )
 
     @property
     def pipe_stack_str(self) -> str:

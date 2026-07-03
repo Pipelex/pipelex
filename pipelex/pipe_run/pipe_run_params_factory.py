@@ -5,6 +5,7 @@ from pipelex.cogt.content_generation.cogt_run_params import check_mock_usage_req
 from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.hub import is_dry_run_forced
+from pipelex.pipe_run.inference_profile_ref import InferenceProfileRef
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 
@@ -21,6 +22,7 @@ class PipeRunParamsFactory:
         dynamic_output_concept_ref: str | None = None,
         batch_params: BatchParams | None = None,
         params: dict[str, Any] | None = None,
+        inference_profile_ref: InferenceProfileRef | None = None,
     ) -> PipeRunParams:
         """Single writer of ``run_mode`` and ``is_mock_usage`` — direct fields on ``PipeRunParams``.
 
@@ -48,4 +50,5 @@ class PipeRunParamsFactory:
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             batch_params=batch_params,
             params=params or {},
+            inference_profile_ref=inference_profile_ref,
         )
