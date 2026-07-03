@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Dry-run mock lists shrink from 3 to 2 items:** When a pipe input is declared as a list without a fixed size, the dry-run mock now fabricates 2 items instead of 3. Cuts dry-run work on list inputs without changing correctness.
+
 ### Fixed
 
 - **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
