@@ -25,3 +25,14 @@ The default-binding invariant (always points at an enabled profile) is enforced 
 ## 6. `list_profiles` pagination
 
 `list_profiles` is single-page (byte-identical to `list_methods`) — silently truncates past one 1MB query page. Not plausible at expected profile counts per org; revisit only if profiles grow large payloads (deck overlays with many custom model specs could).
+
+## 7. Encryption-context IAM condition on the KMS grants (Checkpoint 4 review)
+
+Captured from the Checkpoint 4 review of `pipelex-api-infra@feature/inference-profiles` (`c28d211`). The platform's `kms:GenerateDataKey` grant (`api_inference_profiles_kms_policy`, `iam.tf`) is scoped to the CMK ARN but carries no encryption-context condition. The `{org_id, profile_id}` context that binds each blob to its item is enforced only by app code (`kms_envelope.encrypt_credentials` requires the `encryption_context` kwarg), not by IAM. Adding a condition would make it enforceable defense-in-depth.
+
+Deliberately deferred, for two reasons:
+
+- **Not a security leak on the encrypt side.** A missing/wrong context only produces ciphertext that later fails to decrypt (fail-closed) — the confused-deputy risk lives on the *decrypt* side, which is already handled two ways: the envelope pins `KeyId` on decrypt (Checkpoint 2), and the Phase 2d worker-fleet `kms:Decrypt` grant is already specced as "encryption-context-conditioned."
+- **The reviewer's suggested form is imprecise.** `"ForAllValues:StringEquals": {"kms:EncryptionContextKeys": ["org_id","profile_id"]}` only *restricts* the context to a subset of those keys — it's vacuously true for an empty context, so it does NOT require the keys to be present. Actually requiring both keys needs a presence check (`"Null": {"kms:EncryptionContext:org_id": "false", "kms:EncryptionContext:profile_id": "false"}`), optionally combined with the `ForAllValues` restriction to forbid extra keys.
+
+Do it once, correctly, for both grants when the Phase 2d decrypt grant lands — encrypt and decrypt conditions designed together — rather than bolting an imprecise condition onto the encrypt grant now. Owner: Phase 2d infra.
