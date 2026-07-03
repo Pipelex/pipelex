@@ -60,6 +60,26 @@ class TestExtractHuggingFaceMetadata:
         assert metadata.provider_error_code is None
         assert isinstance(metadata.body, str)
 
+    def test_unread_streaming_response_body_is_tolerated(self) -> None:
+        """An unread streaming ``httpx.Response`` (hub 1.x async streaming error) must not crash the reader.
+
+        Accessing ``.text`` on such a response raises ``httpx.ResponseNotRead``; the
+        best-effort reader must swallow it and still return status/header metadata.
+        """
+        response = httpx.Response(
+            status_code=503,
+            headers={"x-request-id": "hf-req-stream", "retry-after": "7"},
+            content=iter([b'{"error": "overloaded"}']),
+            request=httpx.Request("POST", "https://router.huggingface.co/test"),
+        )
+        exc = HfHubHTTPError(message="HTTP 503", response=response)
+        metadata = extract_huggingface_metadata(exc)
+        assert metadata.status_code == 503
+        assert metadata.request_id == "hf-req-stream"
+        assert metadata.retry_after_seconds == 7.0
+        assert metadata.body is None
+        assert metadata.provider_error_code is None
+
     def test_inference_timeout_has_no_status(self) -> None:
         exc = InferenceTimeoutError("timed out")
         metadata = extract_huggingface_metadata(exc)

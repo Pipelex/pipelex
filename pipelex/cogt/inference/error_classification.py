@@ -493,7 +493,13 @@ def _parse_response_text_body(response: Any) -> tuple[Any | None, str | None]:
     """
     if response is None:
         return None, None
-    raw_text = getattr(response, "text", None)
+    try:
+        raw_text = getattr(response, "text", None)
+    except httpx.StreamError:
+        # An httpx.Response whose body was never buffered (e.g. hub 1.x async
+        # streaming errors) raises ResponseNotRead/StreamConsumed on ``.text``,
+        # and the body cannot be recovered synchronously — treat as "no text".
+        return None, None
     if not isinstance(raw_text, str) or not raw_text:
         return None, None
     try:
