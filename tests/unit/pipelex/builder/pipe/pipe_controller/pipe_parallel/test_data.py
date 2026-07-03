@@ -31,16 +31,15 @@ class PipeParallelTestCases:
                 SubPipeBlueprint(pipe="validate_data", result="validation"),
             ],
             add_each_output=True,
-            combined_output=None,
             source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITH_EACH_OUTPUT",  # noqa: E501
         ),
     )
 
-    PARALLEL_WITH_COMBINED = (
-        "parallel_with_combined",
+    PARALLEL_WITHOUT_EACH_OUTPUT = (
+        "parallel_without_each_output",
         PipeParallelSpec(
             pipe_code="combined_parallel",
-            description="Parallel with combined output",
+            description="Parallel combining into its declared output only",
             inputs={"input": "Input"},
             output="CombinedResult",
             branches=[
@@ -48,10 +47,9 @@ class PipeParallelTestCases:
                 SubPipeSpec(pipe_code="pipe2", result="result2"),
             ],
             add_each_output=False,
-            combined_output="MergedData",
         ),
         PipeParallelBlueprint(
-            description="Parallel with combined output",
+            description="Parallel combining into its declared output only",
             inputs={"input": "Input"},
             output="CombinedResult",
             branches=[
@@ -59,41 +57,37 @@ class PipeParallelTestCases:
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],
             add_each_output=False,
-            combined_output="MergedData",
-            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITH_COMBINED",  # noqa: E501
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITHOUT_EACH_OUTPUT",  # noqa: E501
         ),
     )
 
-    PARALLEL_WITH_BOTH_EACH_OUTPUT_AND_COMBINED = (
-        "parallel_with_both_each_output_and_combined",
+    PARALLEL_OMITTING_ADD_EACH_OUTPUT = (
+        "parallel_omitting_add_each_output",
         PipeParallelSpec(
-            pipe_code="combined_parallel",
-            description="Parallel with combined output",
+            pipe_code="plain_combined_parallel",
+            description="Always-combine parallel omitting add_each_output entirely",
             inputs={"input": "Input"},
             output="CombinedResult",
             branches=[
                 SubPipeSpec(pipe_code="pipe1", result="result1"),
                 SubPipeSpec(pipe_code="pipe2", result="result2"),
             ],
-            add_each_output=True,
-            combined_output="MergedData",
         ),
         PipeParallelBlueprint(
-            description="Parallel with combined output",
+            description="Always-combine parallel omitting add_each_output entirely",
             inputs={"input": "Input"},
             output="CombinedResult",
             branches=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],
-            add_each_output=True,
-            combined_output="MergedData",
-            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_WITH_BOTH_EACH_OUTPUT_AND_COMBINED",  # noqa: E501
+            add_each_output=False,
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_OMITTING_ADD_EACH_OUTPUT",  # noqa: E501
         ),
     )
 
     TEST_CASES: ClassVar[list[tuple[str, PipeParallelSpec, PipeParallelBlueprint]]] = [
         PARALLEL_WITH_EACH_OUTPUT,
-        PARALLEL_WITH_COMBINED,
-        PARALLEL_WITH_BOTH_EACH_OUTPUT_AND_COMBINED,
+        PARALLEL_WITHOUT_EACH_OUTPUT,
+        PARALLEL_OMITTING_ADD_EACH_OUTPUT,
     ]

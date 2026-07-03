@@ -1,0 +1,468 @@
+<title>Required main stuff — design brief</title>
+<style>
+  :root {
+    --ground: #FBFCFC;
+    --panel: #F1F5F6;
+    --panel-deep: #E7EEF0;
+    --ink: #1A2B32;
+    --muted: #5B6E75;
+    --line: #D8E0E3;
+    --accent: #0E7490;
+    --danger: #B3422F;
+    --danger-soft: #F6E9E5;
+    --good: #2F7D4F;
+    --good-soft: #E6F1EA;
+    --code-bg: #EEF3F4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #10181C;
+      --panel: #182228;
+      --panel-deep: #1E2B33;
+      --ink: #E8EDEF;
+      --muted: #8FA3AB;
+      --line: #2A3840;
+      --accent: #3FB2D2;
+      --danger: #E07856;
+      --danger-soft: #33211C;
+      --good: #5CB884;
+      --good-soft: #1B2E24;
+      --code-bg: #16212A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #10181C;
+    --panel: #182228;
+    --panel-deep: #1E2B33;
+    --ink: #E8EDEF;
+    --muted: #8FA3AB;
+    --line: #2A3840;
+    --accent: #3FB2D2;
+    --danger: #E07856;
+    --danger-soft: #33211C;
+    --good: #5CB884;
+    --good-soft: #1B2E24;
+    --code-bg: #16212A;
+  }
+  :root[data-theme="light"] {
+    --ground: #FBFCFC;
+    --panel: #F1F5F6;
+    --panel-deep: #E7EEF0;
+    --ink: #1A2B32;
+    --muted: #5B6E75;
+    --line: #D8E0E3;
+    --accent: #0E7490;
+    --danger: #B3422F;
+    --danger-soft: #F6E9E5;
+    --good: #2F7D4F;
+    --good-soft: #E6F1EA;
+    --code-bg: #EEF3F4;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font: 400 16px/1.62 -apple-system, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 46rem; margin: 0 auto; padding: 0 1.25rem; }
+  .wrap-wide { max-width: 56rem; margin: 0 auto; padding: 0 1.25rem; }
+
+  header.masthead { padding: 3rem 0 1.75rem; }
+  .kicker {
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: clamp(1.7rem, 4.5vw, 2.15rem);
+    line-height: 1.18;
+    font-weight: 750;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.6rem;
+    text-wrap: balance;
+  }
+  .standfirst { color: var(--muted); font-size: 1.05rem; margin: 0; max-width: 42rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem; margin-top: 1.1rem; font-size: 0.8125rem; color: var(--muted); }
+  .meta code { font-size: 0.78rem; }
+
+  .tldr {
+    background: var(--panel);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 1.6rem 0 1.7rem;
+    margin: 1.25rem 0 0;
+  }
+  .tldr .label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.9rem;
+  }
+  .tldr ul { margin: 0; padding: 0 0 0 1.1rem; display: grid; gap: 0.65rem; }
+  .tldr li { padding-left: 0.2rem; }
+  .tldr li::marker { color: var(--accent); }
+  .tldr b { font-weight: 650; }
+
+  main { padding: 0.5rem 0 3rem; }
+  section { margin-top: 2.9rem; }
+  h2 {
+    font-size: 1.28rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+    margin: 0.3rem 0 0.9rem;
+    text-wrap: balance;
+  }
+  .sec-kicker {
+    font-size: 0.6875rem;
+    font-weight: 650;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0;
+  }
+  p { margin: 0 0 1rem; }
+  .note { color: var(--muted); font-size: 0.875rem; }
+
+  code, pre {
+    font-family: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+    font-size: 0.845rem;
+  }
+  code { background: var(--code-bg); border-radius: 4px; padding: 0.1em 0.35em; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    line-height: 1.55;
+    margin: 0;
+  }
+  pre code { background: none; padding: 0; }
+  .del { color: var(--danger); }
+  .add { color: var(--good); }
+  .dim { color: var(--muted); }
+
+  figure { margin: 1.4rem 0; }
+  .fig-frame {
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--panel);
+    padding: 0.75rem;
+    overflow-x: auto;
+  }
+  .fig-frame svg { display: block; min-width: 720px; width: 100%; height: auto; }
+  figcaption { font-size: 0.8125rem; color: var(--muted); margin-top: 0.55rem; line-height: 1.5; }
+
+  table.modes { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin: 1.2rem 0; }
+  .modes-scroll { overflow-x: auto; }
+  table.modes th, table.modes td { text-align: left; padding: 0.55rem 0.9rem 0.55rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.modes th { font-size: 0.6875rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  table.modes td:first-child { font-weight: 650; white-space: nowrap; }
+  .pill {
+    display: inline-block; font-size: 0.72rem; font-weight: 650; letter-spacing: 0.02em;
+    padding: 0.1rem 0.5rem; border-radius: 999px; white-space: nowrap;
+  }
+  .pill-danger { color: var(--danger); background: var(--danger-soft); }
+  .pill-good { color: var(--good); background: var(--good-soft); }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.2rem 0; }
+  .duo h3 { font-size: 0.6875rem; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 0.5rem; }
+  @media (max-width: 720px) { .duo { grid-template-columns: 1fr; } }
+
+  ol.phases { margin: 1rem 0 0; padding-left: 1.2rem; display: grid; gap: 0.6rem; }
+  ol.phases li::marker { color: var(--accent); font-weight: 650; }
+  ol.phases b { font-weight: 650; }
+
+  footer { border-top: 1px solid var(--line); padding: 1.4rem 0 3rem; font-size: 0.875rem; color: var(--muted); }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+  /* SVG diagram tokens */
+  .sv-box { fill: var(--ground); stroke: var(--line); stroke-width: 1.2; rx: 6; }
+  .sv-slot { fill: var(--ground); stroke: var(--line); stroke-width: 1.2; rx: 5; }
+  .sv-slot-good { fill: var(--good-soft); stroke: var(--good); stroke-width: 1.3; rx: 5; }
+  .sv-lane { fill: var(--panel-deep); stroke: none; rx: 8; }
+  .sv-t { fill: var(--ink); font-size: 13px; font-weight: 650; }
+  .sv-ts { fill: var(--muted); font-size: 11.5px; font-weight: 400; }
+  .sv-mono { fill: var(--ink); font-size: 11.5px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .sv-mono-dim { fill: var(--muted); font-size: 11px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+  .sv-good-t { fill: var(--good); font-size: 11.5px; font-weight: 650; }
+  .sv-danger-t { fill: var(--danger); font-size: 11.5px; font-weight: 650; }
+  .sv-flow { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+  .sv-flow-danger { stroke: var(--danger); stroke-width: 1.6; fill: none; stroke-dasharray: 5 4; }
+  .sv-flow-good { stroke: var(--good); stroke-width: 1.8; fill: none; }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <p class="kicker">Pipelex runtime · design note</p>
+    <h1>A pipeline must always deliver its main output</h1>
+    <p class="standfirst">Why reading a pipeline's result is uglier than it should be, the rule we adopted to fix it, and the API shape divergence we're tracking separately.</p>
+    <div class="meta">
+      <span>Branch <code>feature/Required-main-stuff</code></span>
+      <span>Full design: <code>wip/required-main-stuff.md</code></span>
+    </div>
+  </div>
+</header>
+
+<div class="tldr">
+  <div class="wrap">
+    <p class="label">TL;DR</p>
+    <ul>
+      <li><b>Problem.</b> A pipeline doesn't always deliver a <code>main_stuff</code>. One construct — <code>PipeParallel</code> with only <code>add_each_output</code> — never stamps it, so callers get a <em>stale</em> value, <em>nothing at all</em>, or (hosted) an <em>empty result envelope</em>. Every consumer pays with defensive code.</li>
+      <li><b>Decision.</b> Every pipe run now delivers a main stuff. <code>PipeParallel</code> <b>always combines</b> its branch outputs into its declared <code>output</code> concept. The redundant <code>combined_output</code> field is <b>deleted</b>, and a new <code>native.Composite</code> concept covers the "just give me the named results" case.</li>
+      <li><b>Payoff.</b> <code>main_stuff</code> stops being optional across the runtime, the wire, and the SDKs — a stale-output bug disappears and a pile of defensive branches gets deleted.</li>
+      <li><b>Side track.</b> The two execution surfaces return the same data in <b>different shapes</b>: blocking <code>POST /v1/execute</code> nests everything under <code>pipe_output</code> (working memory in its transport encoding, main stuff reached via the <code>main_stuff_name</code> pointer), while <code>POST /v1/start</code> → delivery relays flat artifacts via <code>GET /v1/runs/{id}/results</code> — <code>main_stuff</code> (content pre-extracted), <code>graph_spec</code>, and <code>working_memory</code> too, as a clean render. Same information, two encodings — every client normalizes. Unifying them is a companion track, designed separately.</li>
+    </ul>
+  </div>
+</div>
+
+<main>
+  <div class="wrap">
+
+    <section>
+      <p class="sec-kicker">The symptom</p>
+      <h2>Reading a result takes a page of guesswork</h2>
+      <p>Our own starter project needs a normalizer just to get a pipeline's output. It checks whether <code>main_stuff</code> exists, falls back to walking the serialized working memory, and picks "the first entry whose content is a dict" — a heuristic, in code we hand to every new user:</p>
+      <pre><code><span class="dim"># pipelex-starter-python/my_project/run_output.py (abridged)</span>
+def find_main_content(results: RunResults) -> dict[str, Any] <span class="del">| None</span>:
+    if isinstance(results.main_stuff, dict):      <span class="dim"># /start → delivery shape…</span>
+        return results.main_stuff
+    working_memory = results.pipe_output.get("working_memory")  <span class="dim"># …or /execute blocking shape</span>
+    for entry in working_memory["root"].values(): <span class="dim"># heuristic: first dict wins</span>
+        ...</code></pre>
+      <p>Two distinct flaws feed this: <b><code>main_stuff</code> is optional</b>, and <b>the two execution paths return different shapes</b>. This note covers the fix for the first and the plan for the second.</p>
+    </section>
+
+    <section>
+      <p class="sec-kicker">Root cause</p>
+      <h2>One pipe doesn't stamp the main stuff</h2>
+      <p>Every operator (<code>PipeLLM</code>, <code>PipeExtract</code>, <code>PipeCompose</code>, …) stamps its result as the working memory's <code>main_stuff</code>. So do <code>PipeBatch</code> and <code>PipeCondition</code>. The single exception: <b><code>PipeParallel</code> without <code>combined_output</code></b>. It drops each branch result into memory by name and leaves the <code>main_stuff</code> pointer untouched — and the language explicitly allows that as a pipeline's last step.</p>
+    </section>
+  </div>
+
+  <div class="wrap-wide">
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 860 315" role="img" aria-label="Before: a sequence ending in PipeParallel leaves the main_stuff pointer on the previous step's output">
+          <defs>
+            <marker id="arrA" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker>
+            <marker id="arrAd" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--danger)"/></marker>
+          </defs>
+          <text x="20" y="26" class="sv-t">Before — PipeSequence ending in a PipeParallel (add_each_output only)</text>
+
+          <rect x="20" y="44" width="215" height="62" class="sv-box" rx="6"/>
+          <text x="36" y="70" class="sv-t">1 · PipeLLM extract_info</text>
+          <text x="36" y="90" class="sv-good-t">stamps main_stuff ✓</text>
+
+          <line x1="235" y1="75" x2="285" y2="75" class="sv-flow" marker-end="url(#arrA)"/>
+
+          <rect x="288" y="44" width="252" height="62" class="sv-box" rx="6"/>
+          <text x="304" y="70" class="sv-t">2 · PipeParallel (last step)</text>
+          <text x="304" y="90" class="sv-danger-t">never stamps ✗</text>
+
+          <path d="M 380 106 C 380 140, 380 150, 462 172" class="sv-flow" marker-end="url(#arrA)"/>
+          <path d="M 470 106 C 470 140, 545 145, 630 172" class="sv-flow" marker-end="url(#arrA)"/>
+          <text x="500" y="140" class="sv-ts">branch results added by name</text>
+
+          <rect x="20" y="176" width="820" height="86" class="sv-lane" rx="8"/>
+          <text x="36" y="200" class="sv-ts">working memory after the run</text>
+
+          <rect x="36" y="210" width="130" height="38" class="sv-slot" rx="5"/>
+          <text x="50" y="234" class="sv-mono">input_text</text>
+          <rect x="182" y="210" width="130" height="38" class="sv-slot" rx="5"/>
+          <text x="196" y="234" class="sv-mono">info</text>
+          <rect x="328" y="210" width="200" height="38" class="sv-slot" rx="5"/>
+          <text x="342" y="234" class="sv-mono">short_summary</text>
+          <rect x="544" y="210" width="200" height="38" class="sv-slot" rx="5"/>
+          <text x="558" y="234" class="sv-mono">detailed_summary</text>
+
+          <path d="M 120 292 C 170 292, 210 280, 240 254" class="sv-flow-danger" marker-end="url(#arrAd)"/>
+          <text x="20" y="298" class="sv-mono">main_stuff</text>
+          <text x="260" y="298" class="sv-danger-t">stale — still points at step 1's output</text>
+        </svg>
+      </div>
+      <figcaption>The caller asks for <code>main_stuff</code> and silently receives step 1's output. When the parallel is the whole pipeline (API input path), the pointer doesn't exist at all.</figcaption>
+    </figure>
+  </div>
+
+  <div class="wrap">
+    <div class="modes-scroll">
+      <table class="modes">
+        <thead><tr><th>Failure mode</th><th>When it happens</th><th>What the caller sees</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="pill pill-danger">Stale</span></td>
+            <td>The parallel ends a <code>PipeSequence</code> — the shared memory keeps the previous step's stamp</td>
+            <td>The <em>wrong</em> output, silently</td>
+          </tr>
+          <tr>
+            <td><span class="pill pill-danger">Missing</span></td>
+            <td>The parallel <em>is</em> the main pipe, inputs came through the API path (no input alias)</td>
+            <td><code>main_stuff_name = null</code>; typed accessors raise</td>
+          </tr>
+          <tr>
+            <td><span class="pill pill-danger">Empty envelope</span></td>
+            <td>The <code>/start</code> → delivery path — delivery always writes <code>working_memory.json</code>, but the <code>main_stuff.*</code> artifacts are only written when a stamp exists</td>
+            <td>A "successful" run with <code>main_stuff: null</code> — clients dig through the raw memory dump</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <section>
+      <p class="sec-kicker">Decision</p>
+      <h2>PipeParallel always combines — and <code>combined_output</code> dies</h2>
+      <p>The rule: <b>a pipe run always delivers a main stuff</b>. We enforce it at the one leaf that breaks it — <code>PipeParallel</code> now always combines its branch results into its declared <code>output</code> concept and stamps that as main stuff. Sequences, conditions, and nesting then deliver the invariant for free, and the stale pointer is always overwritten.</p>
+      <p>This also kills a redundant field. Today a combining parallel declares the same concept twice (<code>output</code> <em>and</em> <code>combined_output</code>), while a non-combining one declares an <code>output</code> that is a lie — it never produces it. After the change, <code>output</code> is the single, truthful declaration:</p>
+    </section>
+
+    <div class="duo">
+      <div>
+        <h3>Before — output is a lie</h3>
+        <pre><code>[pipe.parallel_summarize]
+type = "PipeParallel"
+inputs = { input_text = "Text" }
+<span class="del">output = "Text"   # never produced</span>
+add_each_output = true
+branches = [
+  { pipe = "sum_short", result = "short_summary" },
+  { pipe = "sum_long",  result = "detailed_summary" },
+]</code></pre>
+      </div>
+      <div>
+        <h3>After — combines into what it declares</h3>
+        <pre><code>[pipe.parallel_summarize]
+type = "PipeParallel"
+inputs = { input_text = "Text" }
+<span class="add">output = "Composite"  # named combination</span>
+add_each_output = true
+branches = [
+  { pipe = "sum_short", result = "short_summary" },
+  { pipe = "sum_long",  result = "detailed_summary" },
+]</code></pre>
+      </div>
+    </div>
+
+    <p>Declare a bespoke structured concept and the combination is fully typed (today's <code>combined_output</code> behavior, minus the duplicate line). Don't want to declare one? The new <b><code>native.Composite</code></b> concept holds the branch results under their names — the "dict of results" experience — while staying a first-class stuff that renders, serializes, and travels like any other. And a new <b>static validation</b> checks branch names against the declared structure at authoring time, so today's runtime combine error becomes a <code>/validate</code> error.</p>
+  </div>
+
+  <div class="wrap-wide">
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 860 300" role="img" aria-label="After: PipeParallel combines branch outputs into its declared concept and stamps it as main_stuff">
+          <defs>
+            <marker id="arrB" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker>
+            <marker id="arrBg" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--good)"/></marker>
+          </defs>
+          <text x="20" y="26" class="sv-t">After — the same pipeline under the new rule</text>
+
+          <rect x="288" y="44" width="252" height="62" class="sv-box" rx="6"/>
+          <text x="304" y="70" class="sv-t">2 · PipeParallel (last step)</text>
+          <text x="304" y="90" class="sv-good-t">always combines ✓</text>
+
+          <path d="M 350 106 C 330 135, 300 145, 250 168" class="sv-flow" marker-end="url(#arrB)"/>
+          <path d="M 420 106 C 420 135, 420 145, 420 168" class="sv-flow" marker-end="url(#arrB)"/>
+          <path d="M 490 106 C 510 135, 570 140, 640 166" class="sv-flow-good" marker-end="url(#arrBg)"/>
+          <text x="530" y="136" class="sv-good-t">combine into declared output</text>
+
+          <rect x="20" y="172" width="820" height="86" class="sv-lane" rx="8"/>
+          <text x="36" y="196" class="sv-ts">working memory after the run</text>
+
+          <rect x="36" y="206" width="170" height="38" class="sv-slot" rx="5"/>
+          <text x="50" y="230" class="sv-mono">short_summary</text>
+          <rect x="222" y="206" width="190" height="38" class="sv-slot" rx="5"/>
+          <text x="236" y="230" class="sv-mono">detailed_summary</text>
+          <rect x="428" y="206" width="396" height="38" class="sv-slot-good" rx="5"/>
+          <text x="442" y="230" class="sv-mono">Composite { short_summary, detailed_summary }</text>
+
+          <path d="M 120 288 C 200 290, 340 280, 425 240" class="sv-flow-good" marker-end="url(#arrBg)"/>
+          <text x="20" y="294" class="sv-mono">main_stuff</text>
+          <text x="440" y="292" class="sv-good-t">always stamped, always the last step's result</text>
+        </svg>
+      </div>
+      <figcaption>Symmetry worth remembering: <code>PipeBatch</code> aggregates homogeneous results into a <em>list</em>; <code>PipeParallel</code> now aggregates heterogeneous results into a <em>named composite</em>.</figcaption>
+    </figure>
+  </div>
+
+  <div class="wrap">
+    <section>
+      <p class="sec-kicker">Side track</p>
+      <h2><code>/execute</code> and <code>/start</code> → delivery speak different shapes</h2>
+      <p>The second flaw behind the ugly starter code: the two execution surfaces carry the <em>same information</em> in structurally different results. <b><code>POST /v1/execute</code></b> blocks until the run completes and responds with the runner's native envelope: everything nested under <code>pipe_output</code>, the working memory in its cross-process <em>transport</em> encoding (type-metadata keys, lists flattened — built for rehydration, not reading), and the main stuff not extracted — you follow the <code>main_stuff_name</code> pointer into <code>root</code> and unwrap <code>.content</code> yourself.</p>
+      <p><b><code>POST /v1/start</code></b> returns immediately; the run then goes through <b>delivery</b>, which writes a folder of result artifacts to storage — <code>working_memory.json</code>, <code>main_stuff.{json,md,html}</code>, <code>main_stuff_viewer.html</code>, <code>graphspec.json</code>, mermaid/reactflow views — and <code>GET /v1/runs/{id}/results</code> relays three of them as flat fields: <code>main_stuff</code> (the output content, pre-extracted), <code>graph_spec</code>, and <code>working_memory</code> (a clean render). So it's not that one path lacks the memory — <em>both carry it</em>. What differs is the envelope, the main-stuff addressing, and the memory encoding — and the SDK only names a subset (<code>working_memory</code> rides along as an unnamed extra field). Every client normalizes.</p>
+    </section>
+  </div>
+
+  <div class="wrap-wide">
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 860 250" role="img" aria-label="Blocking /execute and /start with delivery return different result shapes, normalized in client code">
+          <defs>
+            <marker id="arrC" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--muted)"/></marker>
+          </defs>
+
+          <rect x="20" y="30" width="110" height="150" class="sv-box" rx="6"/>
+          <text x="45" y="100" class="sv-t">Client</text>
+          <text x="41" y="118" class="sv-ts">app / SDK</text>
+
+          <line x1="130" y1="70" x2="185" y2="70" class="sv-flow" marker-end="url(#arrC)"/>
+          <rect x="188" y="44" width="250" height="52" class="sv-box" rx="6"/>
+          <text x="204" y="66" class="sv-t">Blocking execution</text>
+          <text x="204" y="84" class="sv-mono-dim">POST /v1/execute</text>
+
+          <line x1="438" y1="70" x2="490" y2="70" class="sv-flow" marker-end="url(#arrC)"/>
+          <rect x="493" y="44" width="240" height="52" class="sv-slot" rx="5"/>
+          <text x="507" y="66" class="sv-mono">{ pipe_output: {working_memory},</text>
+          <text x="507" y="84" class="sv-mono">  main_stuff_name }</text>
+          <text x="507" y="112" class="sv-ts">transport encoding · main stuff via pointer</text>
+
+          <line x1="130" y1="145" x2="185" y2="145" class="sv-flow" marker-end="url(#arrC)"/>
+          <rect x="188" y="119" width="250" height="52" class="sv-box" rx="6"/>
+          <text x="204" y="141" class="sv-t">Start → delivery</text>
+          <text x="204" y="159" class="sv-mono-dim">POST /v1/start → GET …/results</text>
+
+          <line x1="438" y1="145" x2="490" y2="145" class="sv-flow" marker-end="url(#arrC)"/>
+          <rect x="493" y="119" width="240" height="52" class="sv-slot" rx="5"/>
+          <text x="507" y="141" class="sv-mono">{ main_stuff, graph_spec,</text>
+          <text x="507" y="159" class="sv-mono">  working_memory }</text>
+          <text x="507" y="187" class="sv-ts">flat artifacts · main stuff pre-extracted</text>
+
+          <path d="M 733 70 C 780 75, 790 95, 795 105" class="sv-flow" marker-end="url(#arrC)"/>
+          <path d="M 733 145 C 780 140, 790 122, 795 112" class="sv-flow" marker-end="url(#arrC)"/>
+          <text x="620" y="215" class="sv-danger-t">same data, two shapes →</text>
+          <text x="620" y="233" class="sv-danger-t">every client normalizes</text>
+        </svg>
+      </div>
+      <figcaption>Companion track — not part of this refactor: converge on one result shape so SDK consumers read <code>main_stuff</code> the same way on both paths. Designed separately, after the invariant lands (it belongs to <code>pipelex-api</code> / <code>pipelex-platform</code> / SDK repos).</figcaption>
+    </figure>
+  </div>
+
+  <div class="wrap">
+    <section>
+      <p class="sec-kicker">Rollout</p>
+      <h2>Three phases, breaking by design</h2>
+      <p>No backward compatibility, per house policy — <code>combined_output</code> disappears and existing <code>.mthds</code> files migrate (mechanically: delete the redundant line, or make the declared <code>output</code> truthful).</p>
+      <ol class="phases">
+        <li><b>Runtime + language surface</b> (pipelex repo): always-combine, delete the field, add <code>native.Composite</code> and the static branch-name check, migrate fixtures, regenerate the MTHDS schema.</li>
+        <li><b>Enforce the invariant</b>: tighten the defensive <code>optional_main_stuff</code> branches (delivery, graph tracer, CLI, telemetry) and make <code>main_stuff_name</code> non-optional on the wire models.</li>
+        <li><b>Cross-repo sweep</b> (gated on a pipelex release): MTHDS spec + JSON schema, <code>plxt</code> pinned schema, conformance, plugin skills, app/UI TypeScript types, cocode pipelines, docs sites, SDKs + starter.</li>
+      </ol>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Full design with file-level inventory, rejected alternatives, and open questions: <code>wip/required-main-stuff.md</code> on <code>feature/Required-main-stuff</code>.
+  </div>
+</footer>

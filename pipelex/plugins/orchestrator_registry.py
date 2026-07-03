@@ -1,12 +1,11 @@
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from pipelex.runtime_bridge.delivery_mode import DeliveryMode
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 
 if TYPE_CHECKING:
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
+    from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
 
 
 @runtime_checkable
@@ -19,14 +18,19 @@ class OrchestratorProtocol(Protocol):
     dispatches by token through the ``OrchestratorRegistry`` instead of branching on a
     ``match``.
 
-    ``run`` takes the endpoint-chosen ``delivery`` (the wait-semantics axis) and honors
-    it per the orchestrator's nature: an in-process orchestrator always blocks; a
-    distributed one awaits completion for ``BLOCKING`` and returns a workflow id for
-    ``FIRE_AND_FORGET``.
+    The wait-semantics axis (``DeliveryMode`` on the wire input) is expressed here as
+    which method the endpoint calls, so each return type is truthful on its own:
+
+    - ``run`` is the BLOCKING arm — it awaits completion and returns the completed-run
+      ``PipelexPipeRunOutput`` (which therefore always carries a main stuff).
+    - ``start`` is the FIRE_AND_FORGET arm — it genuinely enqueues the job and returns
+      a ``PipelexPipeDispatchAck`` (ids only; nothing has run yet).
 
     ``supports_fire_and_forget`` is the capability the runner reads *before* dispatch:
     ``/start`` rejects (honestly, with a 4xx) when the resolved mode's orchestrator
-    cannot do genuine async, rather than silently running blocking and acking.
+    cannot do genuine async, rather than silently running blocking and acking. An
+    orchestrator with ``supports_fire_and_forget = False`` implements ``start`` by
+    raising — the gate keeps it unreachable.
     """
 
     supports_fire_and_forget: bool
@@ -36,8 +40,14 @@ class OrchestratorProtocol(Protocol):
         *,
         pipe_job: "PipeJob",
         delivery_assignment: "DeliveryAssignment | None",
-        delivery: DeliveryMode,
     ) -> "PipelexPipeRunOutput": ...
+
+    async def start(
+        self,
+        *,
+        pipe_job: "PipeJob",
+        delivery_assignment: "DeliveryAssignment | None",
+    ) -> "PipelexPipeDispatchAck": ...
 
 
 class OrchestratorRegistry:

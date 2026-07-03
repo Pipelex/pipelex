@@ -118,6 +118,7 @@ class StuffFactory:
         *,
         concept: Concept,
         name: str | None = None,
+        code: str | None = None,
     ) -> Stuff:
         """Combine a dictionary of stuffs into a single stuff."""
         the_subclass = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
@@ -130,6 +131,7 @@ class StuffFactory:
             concept=concept,
             content=the_stuff_content,
             name=name,
+            code=code,
         )
 
     @classmethod

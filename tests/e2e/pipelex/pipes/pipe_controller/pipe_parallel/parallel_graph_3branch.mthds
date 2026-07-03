@@ -34,7 +34,6 @@ description = "Analyze tone, length, and style in parallel with combined output"
 inputs = { input_text = "Text" }
 output = "Pg3CombinedResult"
 add_each_output = true
-combined_output = "Pg3CombinedResult"
 branches = [
   { pipe = "pg3_analyze_tone", result = "tone_result" },
   { pipe = "pg3_analyze_length", result = "length_result" },

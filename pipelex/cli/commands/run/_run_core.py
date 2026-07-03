@@ -199,9 +199,9 @@ async def _execute_run(
         raise typer.Exit(1) from exc
 
     # Pretty print main_stuff unless disabled or in dry run mode
-    if not no_pretty_print and not dry_run and (main_stuff := pipe_output.optional_main_stuff):
+    if not no_pretty_print and not dry_run:
         title = f"Final output of pipe [red]{pipe_code}[/red]"
-        main_stuff.pretty_print_stuff(title=title)
+        pipe_output.main_stuff.pretty_print_stuff(title=title)
 
     # Determine if we need an output directory
     output_path: Path | None = None
@@ -235,31 +235,30 @@ async def _execute_run(
     # Save main_stuff files if enabled
     saved_main_stuff_formats: list[str] = []
     if save_main_stuff and output_path:
-        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-        if main_stuff:
-            main_stuff_json = await main_stuff.content.rendered_json_async()
-            main_stuff_json_path = output_path / "main_stuff.json"
-            main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
-            log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
-            saved_main_stuff_formats.append("json")
+        main_stuff = pipe_output.working_memory.get_main_stuff()
+        main_stuff_json = await main_stuff.content.rendered_json_async()
+        main_stuff_json_path = output_path / "main_stuff.json"
+        main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
+        log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
+        saved_main_stuff_formats.append("json")
 
-            main_stuff_md = await main_stuff.content.rendered_markdown_async()
-            main_stuff_md_path = output_path / "main_stuff.md"
-            main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
-            log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
-            saved_main_stuff_formats.append("md")
+        main_stuff_md = await main_stuff.content.rendered_markdown_async()
+        main_stuff_md_path = output_path / "main_stuff.md"
+        main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
+        log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
+        saved_main_stuff_formats.append("md")
 
-            main_stuff_html = await main_stuff.content.rendered_html_async()
-            main_stuff_html_path = output_path / "main_stuff.html"
-            main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
-            log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
-            saved_main_stuff_formats.append("html")
+        main_stuff_html = await main_stuff.content.rendered_html_async()
+        main_stuff_html_path = output_path / "main_stuff.html"
+        main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
+        log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
+        saved_main_stuff_formats.append("html")
 
-            main_stuff_viewer = await render_stuff_viewer(main_stuff)
-            main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
-            main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
-            log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
-            saved_main_stuff_formats.append("html_viewer")
+        main_stuff_viewer = await render_stuff_viewer(main_stuff)
+        main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
+        main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
+        log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
+        saved_main_stuff_formats.append("html_viewer")
 
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
@@ -277,10 +276,7 @@ async def _execute_run(
     # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
     if save_csv is not None:
         # The path string and its suffix were already validated up front (fail-fast, before the run).
-        csv_main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-        if csv_main_stuff is None:
-            typer.secho("Failed to --save-csv: the pipeline produced no main stuff to write.", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1)
+        csv_main_stuff = pipe_output.working_memory.get_main_stuff()
         csv_content = csv_main_stuff.content
         if not isinstance(csv_content, ListContent):
             typer.secho(
