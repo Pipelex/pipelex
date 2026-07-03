@@ -1,5 +1,6 @@
 """E2E tests for PipeImgGen operator including text-to-image and img2img."""
 
+import io
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -10,6 +11,7 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from tests.cases import ImageTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen"]
@@ -117,8 +119,13 @@ class TestPipeImgGen:
             image_content = pipe_output.main_stuff_as(content_type=ImageContent)
             assert image_content.public_url is not None
             pretty_print(image_content.public_url, title=f"Generated Image URL (2K tier - {topic})")
-            image_path = Path(urlparse(image_content.public_url).path)
-            with Image.open(image_path) as generated_image:
+            # The storage provider decides the URL shape: fetch http(s) URLs, read file:// URIs / local paths
+            parsed_url = urlparse(image_content.public_url)
+            if parsed_url.scheme in {"http", "https"}:
+                image_bytes = await fetch_file_from_url_httpx(url=image_content.public_url)
+            else:
+                image_bytes = Path(parsed_url.path).read_bytes()
+            with Image.open(io.BytesIO(image_bytes)) as generated_image:
                 assert generated_image.size == (expected_width, expected_height), (
                     f"{topic}: expected {expected_width}x{expected_height}, got {generated_image.size[0]}x{generated_image.size[1]}"
                 )
