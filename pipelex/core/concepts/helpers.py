@@ -49,18 +49,22 @@ def get_structure_class_name_from_blueprint(
     return concept_code
 
 
-def strip_multiplicity_from_concept_ref_or_code(concept_ref_or_code: str) -> str:
-    """Strip multiplicity from a concept string or code.
+def strip_markers_from_concept_ref_or_code(concept_ref_or_code: str) -> str:
+    """Strip multiplicity and presence markers from a concept string or code.
+
+    Handles the full io-ref suffix grammar: an optional multiplicity suffix ("[]" or "[N]")
+    followed by an optional presence marker ("?" or "!").
 
     Args:
-        concept_ref_or_code: The concept string or code to strip multiplicity from
+        concept_ref_or_code: The concept string or code to strip markers from
 
     Returns:
-        The concept string or code without multiplicity
+        The concept string or code without multiplicity or presence markers
     """
-    if "[" in concept_ref_or_code:
-        return concept_ref_or_code.split("[", maxsplit=1)[0]
-    return concept_ref_or_code
+    stripped = concept_ref_or_code.removesuffix("?").removesuffix("!")
+    if "[" in stripped:
+        return stripped.split("[", maxsplit=1)[0]
+    return stripped
 
 
 def normalize_structure_blueprint(structure_dict: dict[str, str | ConceptStructureBlueprint]) -> dict[str, ConceptStructureBlueprint]:

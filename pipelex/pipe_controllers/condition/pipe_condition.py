@@ -88,6 +88,7 @@ class PipeCondition(PipeController):
                     variable_name=var_name,
                     concept=stuff_spec.concept,
                     multiplicity=stuff_spec.multiplicity,
+                    presence=stuff_spec.presence,
                 )
 
         # Add the inputs needed by all possible target pipes
@@ -97,7 +98,9 @@ class PipeCondition(PipeController):
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
 
             for input_name, stuff_spec in pipe_needed_inputs.items:
-                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                needed_inputs.add_stuff_spec(
+                    variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                )
 
         return needed_inputs
 

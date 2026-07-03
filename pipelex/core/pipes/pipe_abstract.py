@@ -293,7 +293,7 @@ class PipeAbstract(ABC, BaseModel):
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
+            if input_name not in the_needed_inputs.declared_names:
                 msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
                 raise PipeValidationError(
                     message=msg,
@@ -505,7 +505,7 @@ class PipeAbstract(ABC, BaseModel):
 
                 # Capture input specs from working memory for data flow tracking
                 input_specs: list[IOSpec] = []
-                for var_name in self.needed_inputs().required_names:
+                for var_name in self.needed_inputs().declared_names:
                     stuff = working_memory.get_optional_stuff(var_name)
                     if stuff is not None:
                         # E1: gate the expensive payload serialization on emit_graph_events too — in
@@ -820,7 +820,7 @@ class PipeAbstract(ABC, BaseModel):
                 span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
 
             # Capture full input content for Langfuse
-            needed_input_names = set(self.needed_inputs().required_names)
+            needed_input_names = set(self.needed_inputs().declared_names)
             inputs_json = OtelFactory.make_inputs_json(
                 working_memory=working_memory,
                 needed_input_names=needed_input_names,

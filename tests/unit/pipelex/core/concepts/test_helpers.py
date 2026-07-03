@@ -1,15 +1,15 @@
 import pytest
 
-from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_ref_or_code
+from pipelex.core.concepts.helpers import strip_markers_from_concept_ref_or_code
 
 
-class TestStripMultiplicityFromConceptStringOrCode:
-    """Test the strip_multiplicity_from_concept_ref_or_code function."""
+class TestStripMarkersFromConceptStringOrCode:
+    """Test the strip_markers_from_concept_ref_or_code function."""
 
     @pytest.mark.parametrize(
         ("input_string", "expected_output"),
         [
-            # No multiplicity (PascalCase concepts)
+            # No markers (PascalCase concepts)
             ("ConceptCode", "ConceptCode"),
             ("MyConceptCode", "MyConceptCode"),
             ("ComplexConceptName", "ComplexConceptName"),
@@ -43,17 +43,26 @@ class TestStripMultiplicityFromConceptStringOrCode:
             ("some_domain.MyConceptCode[42]", "some_domain.MyConceptCode"),
             ("another_domain.SomeOtherConcept[]", "another_domain.SomeOtherConcept"),
             ("complex_domain_name.ComplexConceptName[123]", "complex_domain_name.ComplexConceptName"),
+            # Presence markers
+            ("ConceptCode?", "ConceptCode"),
+            ("ConceptCode!", "ConceptCode"),
+            ("my_domain.ConceptCode?", "my_domain.ConceptCode"),
+            ("my_domain.ConceptCode!", "my_domain.ConceptCode"),
+            # Multiplicity and presence combined (multiplicity then presence)
+            ("ConceptCode[]?", "ConceptCode"),
+            ("ConceptCode[3]!", "ConceptCode"),
+            ("my_domain.ConceptCode[]?", "my_domain.ConceptCode"),
         ],
     )
-    def test_strip_multiplicity(self, input_string: str, expected_output: str):
-        """Test stripping multiplicity from concept strings with various formats.
+    def test_strip_markers(self, input_string: str, expected_output: str):
+        """Test stripping multiplicity and presence markers from concept strings.
 
         This tests:
-        - Concepts without multiplicity (should return unchanged)
+        - Concepts without markers (should return unchanged)
         - Concepts with empty multiplicity []
-        - Concepts with single-digit multiplicity [1-9]
-        - Concepts with multi-digit multiplicity [10-999]
-        - Concepts with large multiplicity [1000+]
+        - Concepts with numeric multiplicity [N]
+        - Concepts with presence markers ? and !
+        - Concepts with both multiplicity and presence markers
         """
-        result = strip_multiplicity_from_concept_ref_or_code(input_string)
+        result = strip_markers_from_concept_ref_or_code(input_string)
         assert result == expected_output

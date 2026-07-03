@@ -52,4 +52,4 @@ class StuffSpecFactory:
             ),
         )
 
-        return StuffSpec(concept=concept, multiplicity=parse_result.multiplicity)
+        return StuffSpec(concept=concept, multiplicity=parse_result.multiplicity, presence=parse_result.presence)
