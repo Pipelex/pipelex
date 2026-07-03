@@ -72,9 +72,11 @@ class BundleValidatorProtocol(Protocol):
         mthds_contents: list[str],
         mthds_sources: list[str] | None,
         allow_signatures: bool,
-        library_dirs: Sequence[Path] | None,
+        library_dirs: "Sequence[Path] | None",
     ) -> BundleValidationVerdict: ...
 ```
+
+The `library_dirs` annotation is a quoted forward reference because `Sequence` and `Path` are imported under `TYPE_CHECKING` in `bundle_validator_registry.py`; a plugin that imports them at module scope can use the unquoted form.
 
 Two contract points distinguish it from `OrchestratorProtocol.run`:
 
