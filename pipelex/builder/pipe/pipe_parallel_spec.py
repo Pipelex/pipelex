@@ -33,7 +33,7 @@ class PipeParallelSpec(PipeSpec):
     type: Literal["PipeParallel"] = "PipeParallel"
     pipe_category: Literal["PipeController"] = "PipeController"
     branches: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
-    add_each_output: bool = Field(description="Whether to also expose each branch output by its result name in memory.")
+    add_each_output: bool = Field(default=False, description="Whether to also expose each branch output by its result name in memory.")
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:

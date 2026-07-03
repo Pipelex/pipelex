@@ -1,9 +1,13 @@
+from typing import cast
+
 from kajson import kajson
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
@@ -59,6 +63,54 @@ class TestCompositeContent:
         hydrated_stuff = hydrated_memory.get_stuff("combo")
         assert isinstance(hydrated_stuff.content, CompositeContent)
         assert hydrated_stuff.content.smart_dump() == composite.smart_dump()
+
+    def test_transport_round_trip_preserves_component_types(self):
+        """Hydrated composite components must be typed StuffContent instances, not plain dicts."""
+        composite = CompositeContent.model_validate(
+            {
+                "tone_result": TextContent(text="cheerful"),
+                "score": NumberContent(number=42),
+            }
+        )
+        concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.COMPOSITE)
+        stuff = StuffFactory.make_stuff(concept=concept, content=composite, name="combo")
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff)
+
+        raw = working_memory.dump_for_transport()
+        hydrated_memory = hydrate_working_memory(raw)
+
+        hydrated_content = hydrated_memory.get_stuff("combo").content
+        assert isinstance(hydrated_content, CompositeContent)
+        components = hydrated_content.components
+        tone_result = components["tone_result"]
+        assert isinstance(tone_result, TextContent)
+        assert tone_result.text == "cheerful"
+        score = components["score"]
+        assert isinstance(score, NumberContent)
+        assert score.number == 42
+
+    def test_transport_round_trip_preserves_list_component(self):
+        """A ListContent component (list-producing branch) must survive transport with typed items."""
+        composite = CompositeContent.model_validate(
+            {
+                "summary": TextContent(text="overall summary"),
+                "highlights": ListContent[TextContent](items=[TextContent(text="first"), TextContent(text="second")]),
+            }
+        )
+        concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.COMPOSITE)
+        stuff = StuffFactory.make_stuff(concept=concept, content=composite, name="combo")
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff)
+
+        raw = working_memory.dump_for_transport()
+        hydrated_memory = hydrate_working_memory(raw)
+
+        hydrated_content = hydrated_memory.get_stuff("combo").content
+        assert isinstance(hydrated_content, CompositeContent)
+        highlights = hydrated_content.components["highlights"]
+        assert isinstance(highlights, ListContent)
+        typed_highlights = cast("ListContent[TextContent]", highlights)
+        assert [type(item) for item in typed_highlights.items] == [TextContent, TextContent]
+        assert [item.text for item in typed_highlights.items] == ["first", "second"]
 
     def test_rendered_markdown_surfaces_named_sub_contents(self):
         composite = CompositeContent.model_validate(

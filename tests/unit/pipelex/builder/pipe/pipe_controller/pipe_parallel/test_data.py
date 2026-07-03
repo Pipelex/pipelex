@@ -61,7 +61,33 @@ class PipeParallelTestCases:
         ),
     )
 
+    PARALLEL_OMITTING_ADD_EACH_OUTPUT = (
+        "parallel_omitting_add_each_output",
+        PipeParallelSpec(
+            pipe_code="plain_combined_parallel",
+            description="Always-combine parallel omitting add_each_output entirely",
+            inputs={"input": "Input"},
+            output="CombinedResult",
+            branches=[
+                SubPipeSpec(pipe_code="pipe1", result="result1"),
+                SubPipeSpec(pipe_code="pipe2", result="result2"),
+            ],
+        ),
+        PipeParallelBlueprint(
+            description="Always-combine parallel omitting add_each_output entirely",
+            inputs={"input": "Input"},
+            output="CombinedResult",
+            branches=[
+                SubPipeBlueprint(pipe="pipe1", result="result1"),
+                SubPipeBlueprint(pipe="pipe2", result="result2"),
+            ],
+            add_each_output=False,
+            source="tests/unit/pipelex/libraries/pipelines/builder/pipe/pipe_controllers/pipe_parallel/test_data.py PipeParallelTestCases.PARALLEL_OMITTING_ADD_EACH_OUTPUT",  # noqa: E501
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, PipeParallelSpec, PipeParallelBlueprint]]] = [
         PARALLEL_WITH_EACH_OUTPUT,
         PARALLEL_WITHOUT_EACH_OUTPUT,
+        PARALLEL_OMITTING_ADD_EACH_OUTPUT,
     ]

@@ -20,7 +20,7 @@ The `PipeParallel` controller executes multiple pipes simultaneously, then combi
 The declared `output` of a `PipeParallel` is the concept the branch results are combined into. It must be one of:
 
 -   **`Composite`** — the native untyped composition: the combined object simply holds each branch result under its `result` name. Use this when you don't want to declare a bespoke concept.
--   **A structured concept** whose fields correspond to the branch `result` names: every required field of the structure must match a branch `result` name, and every `result` name must match a declared field.
+-   **A structured concept** whose fields correspond to the branch `result` names: every required field of the structure must match a branch `result` name, and every `result` name must match a declared field. Branch output *types* are checked too: when a field is typed with a content class, the branch feeding it must produce that concept or one refining it (e.g. a concept that refines `Text` fits a `TextContent` field).
 
 Anything else is rejected at validation time: scalar native concepts (`Text`, `Image`, ...), `Dynamic`, `Anything`, and multiplicity suffixes (`Foo[]`, `Foo[3]`) are all invalid — a parallel combination is a named composite, never a scalar or a list (a list aggregation is [`PipeBatch`](PipeBatch.md)'s shape).
 

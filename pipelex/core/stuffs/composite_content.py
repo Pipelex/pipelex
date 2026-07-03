@@ -1,9 +1,10 @@
 import html as html_module
-from typing import Any, cast
+from typing import Any
 
 from pydantic import ConfigDict
 from typing_extensions import override
 
+from pipelex.core.stuffs.html_rendering import render_value_html
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 
@@ -48,25 +49,8 @@ class CompositeContent(StuffContent):
     def rendered_html(self) -> str:
         rows: list[str] = []
         for component_name, component_value in self.components.items():
-            rendered_value = self._render_component_html(component_value)
+            rendered_value = render_value_html(component_value)
             rows.append(f"<tr><th>{html_module.escape(component_name)}</th><td>{rendered_value}</td></tr>")
         if not rows:
             return "<table><tr><td><em>empty</em></td></tr></table>"
         return f"<table>{''.join(rows)}</table>"
-
-    def _render_component_html(self, value: Any) -> str:
-        match value:
-            case StuffContent():
-                return value.rendered_html()
-            case str():
-                return html_module.escape(value)
-            case dict():
-                dict_value = cast("dict[str, Any]", value)
-                items = [f"<dt>{html_module.escape(str(key))}</dt><dd>{self._render_component_html(val)}</dd>" for key, val in dict_value.items()]
-                return f"<dl>{''.join(items)}</dl>"
-            case list() | tuple():
-                list_value = cast("list[Any]", value)
-                items = [f"<li>{self._render_component_html(item)}</li>" for item in list_value]
-                return f"<ul>{''.join(items)}</ul>"
-            case _:
-                return html_module.escape(str(value))

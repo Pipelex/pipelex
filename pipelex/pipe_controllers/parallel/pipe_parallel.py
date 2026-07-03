@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import field_validator
@@ -14,6 +15,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
@@ -30,7 +32,6 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
     from pipelex.core.stuffs.stuff import Stuff
-    from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
 
 
@@ -189,6 +190,53 @@ class PipeParallel(PipeController):
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=sorted(extraneous_result_names),
             )
+
+        self._validate_branch_output_types(structure_class=structure_class)
+
+    # Note: builtins.type because the `type: Literal["PipeParallel"]` field shadows the
+    # builtin in this class body, where signature annotations are evaluated.
+    def _validate_branch_output_types(self, *, structure_class: builtins.type[StuffContent]) -> None:
+        """Check each branch's output concept against its target field's content class.
+
+        Compatibility is conceptual, not type equality: a branch fits a field when its
+        output concept's structure class IS the field's content class or a subclass of
+        it — refinement is honored structurally because a refining concept's generated
+        class inherits from the refined concept's class (e.g. refines-Text ⇒ subclass
+        of TextContent). This is exactly the relation pydantic accepts when
+        `StuffFactory.combine_stuffs()` validates the combined content at run time, so
+        the check turns that runtime failure into an author-time `/validate` error.
+
+        Conservative by design: fields whose annotation is not a plain StuffContent
+        subclass (primitives from .mthds-generated structures, Optionals, unions) and
+        list-producing branches are skipped rather than guessed at.
+        """
+        for sub_pipe in self.parallel_sub_pipes:
+            if not sub_pipe.output_name or sub_pipe.output_name not in structure_class.model_fields:
+                continue
+            field_annotation = structure_class.model_fields[sub_pipe.output_name].annotation
+            if not isinstance(field_annotation, type) or not issubclass(field_annotation, StuffContent):
+                continue
+            branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            if branch_pipe.output.multiplicity is not None:
+                # A list-producing branch combines as a ListContent, not as the item class.
+                continue
+            branch_structure_class = branch_pipe.output.concept.get_structure_class()
+            if not issubclass(branch_structure_class, field_annotation):
+                msg = (
+                    f"PipeParallel '{self.code}' branch '{sub_pipe.pipe_code}' produces "
+                    f"'{branch_pipe.output.concept.concept_ref}' (structure '{branch_structure_class.__name__}') for result "
+                    f"'{sub_pipe.output_name}', but field '{sub_pipe.output_name}' of output "
+                    f"'{self.output.concept.concept_ref}' expects '{field_annotation.__name__}'. "
+                    "The branch output concept must match the field's content class or refine a concept that does."
+                )
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    provided_concept_code=branch_pipe.output.concept.concept_ref,
+                    variable_names=[sub_pipe.output_name],
+                )
 
     @override
     def pipe_dependencies(self) -> set[str]:
