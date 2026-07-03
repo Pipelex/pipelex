@@ -6,8 +6,9 @@ Working rules: TDD (red tests first per step), `make agent-check` after every co
 
 ## Cold-start context (update at every checkpoint)
 
-- **Status:** not started. Phase-1 base = `6708593e4` (design + plan committed; this tracker not yet committed).
-- **Next action:** prep commit (this tracker), then Step A.
+- **Status:** Step A DONE (Checkpoint A cleared). Commit `ae4ace79e` on `feature/Optionals`. Prep turned out to be already covered: the tracker was committed in `eace1d607`, which is the Step-A review base. Grammar (`?`/`!` after multiplicity suffix), `PresenceMarker` StrEnum, `StuffSpec.presence`, `required_names`/`declared_names` split, `OPTIONAL_MARKER_INVALID` blueprint errors, builder-spec mirror, `contract_match` marker comparison — all landed, zero runtime behavior change, `make agent-check` + full `make agent-test` green.
+- **Next action:** Step B — absence at runtime (ledger + trichotomy + lifting). Red tests first.
+- **Key carriers for Step B:** `PresenceMarker` lives in `pipelex/core/pipes/variable_multiplicity.py` (with `is_optional`/`is_force`/`is_plain` properties); presence flows blueprint → `InputStuffSpecsFactory.make_from_string` / `StuffSpecFactory.make_from_blueprint` → `StuffSpec` → `needed_inputs()` aggregation (operators/controllers pass `presence=stuff_spec.presence` through `add_stuff_spec`). The three runtime miss-gates still consume all-names (`named_stuff_specs` / `declared_names`) — Step B flips them to the trichotomy.
 - **Open questions for Louis:** none blocking. Standing flagged compromise: `continue` pass-through breaks in phase 1 while its ergonomic replacement (`??` coalescing) is phase 2 — restructure only if Louis asks.
 
 ## Checkpoint protocol — MANDATORY STOP at every CHECKPOINT
@@ -23,16 +24,16 @@ At each checkpoint the agent MUST stop forward progress and run this sequence, i
 
 ## Prep
 
-- [ ] Commit this tracker (+ staged old-TODOS deletion). Record the SHA as the Step-A review base in the checkpoint log.
+- [x] Commit this tracker (+ staged old-TODOS deletion). Record the SHA as the Step-A review base in the checkpoint log. *(Turned out already done: the tracker landed in `eace1d607`.)*
 
 ## Step A — grammar and carriers (parse `?` / `!`, no behavior change)
 
-- [ ] Red tests first: parser unit tests for every marker × multiplicity combination; blueprint + spec accept/reject fixtures.
-- [ ] Extend the marker grammar (D1) in `pipelex/core/pipes/variable_multiplicity.py` (+ its inline twin), the looser regex in `input_stuff_specs_factory.py`, and the naive `[`-splitter in `concepts/helpers.py`. Fix the `MUTLIPLICITY_PATTERN` typo while there.
-- [ ] `StuffSpec`/`NamedStuffSpec` gain the presence marker (a `PresenceMarker` StrEnum: plain / optional / force); `InputStuffSpecs.required_names` splits into required vs declared.
-- [ ] Blueprint-parse-time grammar errors (`OPTIONAL_MARKER_INVALID`): `?` on plurals, `!` on outputs or plurals, markers on concept definitions / `refines` / structure-field refs / package refs (D1, D4).
-- [ ] Builder specs mirror the blueprint rules (`to_blueprint()` passes markers through); `contract_match` canonicalization compares presence markers (D5).
-- [ ] **CHECKPOINT A** — markers parse, validate, and round-trip; zero runtime behavior change; run the full checkpoint protocol above.
+- [x] Red tests first: parser unit tests for every marker × multiplicity combination; blueprint + spec accept/reject fixtures.
+- [x] Extend the marker grammar (D1) in `pipelex/core/pipes/variable_multiplicity.py` (+ its inline twin), the looser regex in `input_stuff_specs_factory.py`, and the naive `[`-splitter in `concepts/helpers.py`. Fix the `MUTLIPLICITY_PATTERN` typo while there.
+- [x] `StuffSpec`/`NamedStuffSpec` gain the presence marker (a `PresenceMarker` StrEnum: plain / optional / force); `InputStuffSpecs.required_names` splits into required vs declared.
+- [x] Blueprint-parse-time grammar errors (`OPTIONAL_MARKER_INVALID`): `?` on plurals, `!` on outputs or plurals, markers on concept definitions / `refines` / structure-field refs / package refs (D1, D4).
+- [x] Builder specs mirror the blueprint rules (`to_blueprint()` passes markers through); `contract_match` canonicalization compares presence markers (D5).
+- [x] **CHECKPOINT A** — markers parse, validate, and round-trip; zero runtime behavior change; run the full checkpoint protocol above.
 
 ## Step B — absence at runtime (ledger + trichotomy + lifting)
 
@@ -86,8 +87,8 @@ At each checkpoint the agent MUST stop forward progress and run this sequence, i
 
 | Checkpoint | Commit SHA | Review verdict | Notes |
 |---|---|---|---|
-| Prep | — | n/a | |
-| A | — | | |
+| Prep | `eace1d607` | n/a | Tracker was committed alongside the plan update; serves as the Step-A review base. |
+| A | `ae4ace79e` | Clean — no findings at reporting confidence | Cold Sonnet review of `eace1d607..HEAD`. Two sub-threshold doc-in-code notes applied in the follow-up commit (PipeSpec authoring-surface descriptions teach `?`/`!`; enum comment covers all three trigger cases); third note (factory doesn't re-enforce mutual exclusion) = deliberate layering, see deviations log. |
 | B | — | | |
 | C | — | | |
 | D | — | | |
@@ -97,3 +98,10 @@ At each checkpoint the agent MUST stop forward progress and run this sequence, i
 ## Decisions & deviations log
 
 (fill at checkpoints — anything done differently from `wip/optionals-plan.md`, with why)
+
+- **Step A — parser is combo-permissive; validators own the mutual-exclusion rule.** `parse_concept_with_multiplicity` accepts `X[]?` (multiplicity + marker) and returns both; the D1 v1 rule (markers mutually exclusive with multiplicity) is enforced at the blueprint/spec layer where the input-vs-output context is known, raising the typed `OPTIONAL_MARKER_INVALID`. Rejecting in the parser would have degraded those cases to untyped syntax errors.
+- **Step A — `OPTIONAL_MARKER_INVALID` is a `PipeValidationErrorType` raised as `PipeValidationError` inside blueprint validators**, riding the existing pydantic-unwrap machinery (`extract_wrapped_pipe_validation_error`) exactly like `BATCH_ITEM_NAME_COLLISION`. No categorizer change needed.
+- **Step A — the naive `[`-splitter was renamed** `strip_multiplicity_from_concept_ref_or_code` → `strip_markers_from_concept_ref_or_code` (it now strips presence markers too; the old name would have lied). Internal helper, single caller (`pipe_factory`).
+- **Step A — runtime gates pinned to `declared_names`.** The three `pipe_abstract` enumeration sites + `pipe_extract.required_variables` now use `declared_names` (all inputs), so an input declared `?` is still enforced-present at run time in Step A — exact current behavior preserved; Step B flips the gates to the trichotomy.
+- **Step A — derived batch-list needs stay presence-plain.** In `pipe_parallel`/`pipe_sequence`, the computed list-input specs that override `multiplicity=True` (batch `input_list_name` derivation) do not carry the inner spec's presence (a plural + marker combo is exactly what D4 forbids); all pass-through `add_stuff_spec` sites carry `presence=stuff_spec.presence`.
+- **Step A — two stale fixtures updated**, since a trailing `!` is now legal grammar: `test_pipe_blueprint.py` invalid-syntax cases switched to genuinely malformed specs (`Invalid@Format`, `Invalid@Concept`).

@@ -113,8 +113,9 @@ class PipeValidationErrorType(StrEnum):
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
 
-    # Presence-marker grammar misuse, detected at blueprint parse time: `?` combined with a
-    # multiplicity suffix, or `!` on an output (D1, D4 of the optionals design).
+    # Presence-marker grammar misuse, detected at blueprint parse time: a presence marker
+    # (`?` or `!`) combined with a multiplicity suffix, or `!` on an output (D1, D4 of the
+    # optionals design).
     OPTIONAL_MARKER_INVALID = "optional_marker_invalid"
 
     # Wiring / reference-resolution failures, detected when validating a pipe's contract against the

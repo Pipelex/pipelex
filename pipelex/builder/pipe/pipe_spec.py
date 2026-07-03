@@ -31,10 +31,17 @@ class PipeSpec(StructuredContent):
         - []: variable-length list (e.g., "Text[]")
         - [N]: exactly N items (e.g., "Image[3]" for 3 images)
 
+    Presence Notation:
+        Singular inputs and outputs may carry a presence marker after the concept name:
+        - ?: optional (e.g., "PenaltyClause?" — the slot may legitimately hold no value)
+        - !: force (inputs only, e.g., "PenaltyClause!" — assert the value is present, error if absent)
+        Presence markers never combine with multiplicity brackets: an absent plural is the empty list.
+
     Examples:
         inputs = {"document": "Document", "queries": "Text[]"}  # single document, multiple texts
         output = "Article[]"  # produces a list of articles
         output = "Image[5]"  # produces exactly 5 images
+        output = "PenaltyClause?"  # may produce no value
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -55,17 +62,20 @@ class PipeSpec(StructuredContent):
     description: str = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
         description=(
-            "Input specifications mapping variable names to concept codes with optional multiplicity. "
+            "Input specifications mapping variable names to concept codes with optional multiplicity or presence marker. "
             "Keys: input names in snake_case. "
-            "Values: ConceptCodes in PascalCase with optional brackets. "
-            "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), 'domain.Concept[]' (domain-qualified list)."
+            "Values: ConceptCodes in PascalCase with optional brackets, or a presence marker on singular forms. "
+            "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), "
+            "'domain.Concept[]' (domain-qualified list), 'Clause?' (optional input), 'Clause!' (force: error if absent)."
         ),
         json_schema_extra={"mock_format": MockFormat.DICT_SNAKE_KEY_PASCAL_VALUE},
     )
     output: str = Field(
         description=(
-            "Output concept code in PascalCase with optional multiplicity brackets. "
-            "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images). "
+            "Output concept code in PascalCase with optional multiplicity brackets, or '?' on singular forms "
+            "to declare the pipe may produce no value ('!' is not allowed on outputs). "
+            "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images), "
+            "'PenaltyClause?' (may produce no value). "
             "IMPORTANT: Always use PascalCase for the concept name."
         ),
         json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
