@@ -1,0 +1,44 @@
+from typing import TYPE_CHECKING, cast
+
+import pytest
+
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.runtime_bridge.direct_orchestrator import DirectOrchestrator
+from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
+
+if TYPE_CHECKING:
+    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+
+
+class _StubPipe:
+    """Minimal stand-in — DirectOrchestrator.start() only reads pipe_job.pipe.code for its error message."""
+
+    code = "direct_test_pipe"
+
+
+def _make_pipe_job() -> PipeJob:
+    """Build a PipeJob via model_construct to bypass pipe validation (start() never runs the pipe)."""
+    return PipeJob.model_construct(
+        pipe=cast("PipeAbstract", _StubPipe()),
+        working_memory=None,
+        working_memory_raw=None,
+        pipe_run_params=PipeRunParamsFactory.make_run_params(),
+        job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="test-run"),
+        output_name=None,
+        library_crate=None,
+    )
+
+
+class TestDirectOrchestratorStart:
+    def test_does_not_support_fire_and_forget(self) -> None:
+        """DIRECT is in-process only, so it must advertise no genuine async path."""
+        assert DirectOrchestrator().supports_fire_and_forget is False
+
+    @pytest.mark.asyncio
+    async def test_start_raises_dispatch_error(self) -> None:
+        """start() is unreachable behind the supports_fire_and_forget gate; called directly it must fail loudly, never ack."""
+        orchestrator = DirectOrchestrator()
+        with pytest.raises(PipelexBridgeDispatchError, match="supports_fire_and_forget"):
+            await orchestrator.start(pipe_job=_make_pipe_job(), delivery_assignment=None)
