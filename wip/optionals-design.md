@@ -1,10 +1,6 @@
 # Optionals in the MTHDS conceptual typing system — design choices
 
-Status: design proposal, no code written. Branch `feature/Optionals`. This document gathers the design space for adding optionality (`?`) to concept refs, presents each decision with options and consequences, and marks a recommendation for each. Decisions are numbered D1–D10 and summarized at the end.
-
-Decision status (2026-07-03, Louis): **all open questions resolved** — D3 implicit lifting, D4 `?` forbidden on plurals, `continue` = "declared output absent" (§14), naming (`!` = force marker, `?` pronounced "optional"), and D6 lints via a general `warnings` array on the validation report (bundled into the same protocol bump as the `optional` flag). The design is ready for implementation planning.
-
-Post-merge addendum (2026-07-03, after merging dev with the Required-main-stuff PR #1014): §14 rewritten against the merged reality, and a new decision **D11** added (absent branch results in PipeParallel's always-combine — signed off by Louis). The implementation plan lives in `wip/optionals-plan.md`.
+Status: **design approved — all decisions D1–D11 decided.** Branch `feature/Optionals`; implementation plan in `wip/optionals-plan.md`. This document records the design space for adding optionality (`?`) to concept refs: each decision, the options considered, the chosen option, and its consequences. Decisions are numbered D1–D11 and summarized at the end.
 
 ## 1. The problem
 
@@ -15,13 +11,13 @@ MTHDS can express *how many* values flow through a slot (`contracts.PenaltyClaus
 - **The invisible optional in `PipeCondition`.** An outcome mapped to `continue` returns working memory unchanged and produces *no* output — a de-facto optional that the type system cannot see. Validation runs all branches during dry run and never models the "produced nothing" path, so nothing downstream is checked against it.
 - **The cosmetic `@?`.** The prompt sigil `@?var` (→ `{% if var %}{{ var|tag("var") }}{% endif %}`) says "render only if present", but the variable detection still counts it as a required input, and the runtime gate (`validate_before_run`) still hard-fails when it is missing. The author can express optional *rendering* but not optional *presence*.
 
-And when a value genuinely is missing at run time, the user gets one of: a generic `PipeRunInputsError` (whose message says "Dry run of ..." even on live runs — pre-existing bug, `pipe_abstract.py:349`), a `WorkingMemoryStuffNotFoundError` listing valid keys, or a Jinja `UndefinedError` from deep inside template rendering. None of them can say *why* the value is absent, because absence is not a modeled fact — it's just a missing dict key.
+And when a value genuinely is missing at run time, the user gets one of: a generic `PipeRunInputsError` (whose message says "Dry run of ..." even on live runs — pre-existing bug in `PipeAbstract.validate_before_run`), a `WorkingMemoryStuffNotFoundError` listing valid keys, or a Jinja `UndefinedError` from deep inside template rendering. None of them can say *why* the value is absent, because absence is not a modeled fact — it's just a missing dict key.
 
 Swift's optional model is the guide: declare with `?`, chain with `?`, force with `!`, all checked at compile time so `nil` never surprises you at run time. The translation problem is that MTHDS is declarative and high-level: there is no expression context in which to write `a?.b`, no `if let` statement. The unwrapping constructs must live where MTHDS authors already work — input/output declarations, prompts, and controllers — and the "compile time" is our validation engine.
 
-## 2. Recommended shape at a glance
+## 2. The shape at a glance
 
-Before the decision grind, here is the full recommended design on the running example, so the taste is visible end-to-end:
+Before the decision grind, here is the full design on the running example, so the taste is visible end-to-end:
 
 ```toml
 [pipe.extract_penalty_clause]
@@ -96,15 +92,15 @@ marker   := "[]" | "[" digits "]" | "?" | "!"     # v1: markers are mutually exc
 
 Consequences: the change concentrates in the multiplicity parser (`variable_multiplicity.py` — one regex plus its inline twin), the looser input-factory regex, and the naive `[`-splitter in `concepts/helpers.py` which today would silently pass a `?` through. While touching this file, fix the `MUTLIPLICITY_PATTERN` typo (rename to `MULTIPLICITY_PATTERN`).
 
-An alternative considered and rejected: expressing optionality as an expanded input table (`penalty = { concept = "PenaltyClause", optional = true }`) instead of a suffix. It avoids grammar changes but breaks symmetry with `[]`, is far more verbose, requires inventing an expanded input form that doesn't exist today, and gives outputs no way to be optional at all. The suffix is the design the user asked for and the right one; the expanded form can arrive later for defaults (D10) without conflict.
+An alternative considered and rejected: expressing optionality as an expanded input table (`penalty = { concept = "PenaltyClause", optional = true }`) instead of a suffix. It avoids grammar changes but breaks symmetry with `[]`, is far more verbose, requires inventing an expanded input form that doesn't exist today, and gives outputs no way to be optional at all. The suffix is the right design; the expanded form can arrive later for defaults (D10) without conflict.
 
-Naming (DECIDED 2026-07-03): `?` is the **optional marker**, pronounced "optional" (consistent with the `@?` sigil); `!` is the **force marker** (Swift-familiar). These are the terms the spec, docs, error messages, and skills use.
+Naming: `?` is the **optional marker**, pronounced "optional" (consistent with the `@?` sigil); `!` is the **force marker** (Swift-familiar). These are the terms the spec, docs, error messages, and skills use.
 
 ## 6. D2 — What absence *is* at runtime
 
 Options:
 
-- **A. Absent key + absence ledger (recommended).** Absence stays what it mechanically is today — no Stuff under that name — but becomes a *recorded fact*: working memory gains a small side-table of `AbsenceRecord`s (`variable_name`, `producing_pipe`, `kind` = declared-absent | skipped | not-provided, `reason`, and the upstream record it chains to). A pipe that produces absence writes a record instead of a Stuff. `get_optional_stuff` and the run report can then distinguish "declared absent, here's why" from "never produced — that's a bug".
+- **A. Absent key + absence ledger (chosen).** Absence stays what it mechanically is today — no Stuff under that name — but becomes a *recorded fact*: working memory gains a small side-table of `AbsenceRecord`s (`variable_name`, `producing_pipe`, `kind` = declared-absent | skipped | not-provided, `reason`, and the upstream record it chains to). A pipe that produces absence writes a record instead of a Stuff. `get_optional_stuff` and the run report can then distinguish "declared absent, here's why" from "never produced — that's a bug".
 - **B. Sentinel Stuff (present key, null content).** Make `Stuff.content` nullable or introduce an `AbsentContent`. Rejected: it breaks the strongest invariant in the content model (`Stuff.content` is never None, every accessor assumes it), leaks nulls into templates and the wire, and forces every operator to check for the sentinel. All cost, no benefit over A.
 
 Consequence of A: the wire format for run results needs an explicit representation of absence (D8), because "key missing from the output dict" must now be readable as "absent by design, reason attached" rather than ambiguous. The ledger is also what makes the failure UX (D9) possible — provenance is captured at the moment absence is produced, not reconstructed at failure time.
@@ -113,7 +109,7 @@ Consequence of A: the wire format for run results needs an explicit representati
 
 A slot is **maybe-absent** if it is fed by an optional output, by a liftable (skippable) pipe, or is an optional method input. What may a downstream pipe's input declaration say about such a slot?
 
-The recommended model is a trichotomy on the input marker:
+The model is a trichotomy on the input marker:
 
 | Input form | Static rule when fed maybe-absent | Runtime behavior when actually absent | Swift analog |
 |---|---|---|---|
@@ -123,7 +119,7 @@ The recommended model is a trichotomy on the input marker:
 
 And the safety theorem validation enforces: **every absence source must reach an explicit sink** (`?` input, `!` input, or a `?` on the enclosing method's declared output). If taint reaches a non-optional method output or otherwise escapes unhandled, validation fails with a dedicated error naming the source, the path, and the three ways to fix it.
 
-**DECIDED 2026-07-03: implicit lifting approved** — chosen for user-friendliness. Consequence: the mitigations listed below (liftable-pipe visibility in the validation report, skipped-node rendering in the graph, run-report skip reasons) are commitments of phase 1, not optional extras.
+**Decision: implicit lifting**, for user-friendliness. Consequence: the mitigations listed below (liftable-pipe visibility in the validation report, skipped-node rendering in the graph, run-report skip reasons) are commitments of phase 1, not optional extras.
 
 Why implicit lifting for plain inputs (rather than Swift's "consuming an optional without unwrapping is a compile error"):
 
@@ -139,16 +135,16 @@ Rejected alternatives:
 - **Strict-explicit (Swift-literal).** Plain `X` fed by maybe-absent = validation error; author must write `?`, `!`, or a new chain sigil on every consuming input. Consequence: mid-chain noise, and the "chain sigil" would have to be invented (a third marker meaning "skip me", distinct from `?` which means "run me") — three markers where the trichotomy needs two.
 - **Error-only (no skip at all).** `?` inputs and `!` are the only consumers; feeding maybe-absent into plain `X` is an error. Consequence: every pipe downstream of an extraction must guard its prompt for a value that, when absent, makes the pipe pointless. Authors would immediately ask for skip; PipeCondition + `continue` boilerplate would proliferate.
 
-One more rule: an input may declare `?` even when fed by a guaranteed-present slot (over-tolerance is allowed, exactly as Swift lets you pass a `T` where `T?` is expected). This matters for signature stability — a reusable pipe can declare tolerant inputs without caring what feeds it. `!` on a guaranteed slot is statically useless; recommend allowing it silently in v1 (a future advisory channel can lint it, D6).
+One more rule: an input may declare `?` even when fed by a guaranteed-present slot (over-tolerance is allowed, exactly as Swift lets you pass a `T` where `T?` is expected). This matters for signature stability — a reusable pipe can declare tolerant inputs without caring what feeds it. `!` on a guaranteed slot is statically useless; it stays legal and is flagged through the `warnings` channel (D6).
 
 ## 8. D4 — Optionals and plurals
 
 Should `X[]?` exist? The distinction it would encode is "the list step was skipped" vs "the list step ran and found nothing". Options:
 
-- **A. Forbid `?` on plural refs; absence of a plural normalizes to the empty list (recommended).** `[]` already has a perfectly good "nothing": empty. When a pipe with plural output is skipped by lifting, the runtime writes an **empty ListContent** (plus an absence-flavored note in the ledger for observability) rather than an absent slot. Taint stops there: downstream batch over it runs zero branches (already today's clean behavior), downstream prompts see an empty list.
+- **A. Forbid `?` on plural refs; absence of a plural normalizes to the empty list (chosen).** `[]` already has a perfectly good "nothing": empty. When a pipe with plural output is skipped by lifting, the runtime writes an **empty ListContent** (plus an absence-flavored note in the ledger for observability) rather than an absent slot. Taint stops there: downstream batch over it runs zero branches (already today's clean behavior), downstream prompts see an empty list.
 - **B. Allow `X[]?` as a distinct state.** Two kinds of nothing for every plural slot; every consumer must consider both; PipeBatch needs an absent-vs-empty policy; templates need to distinguish undefined from empty. High complexity, and the "skipped vs empty" signal is preserved anyway in the ledger and the graph without needing a type-level distinction.
 
-**DECIDED 2026-07-03: option A** — `?` forbidden on plurals; the empty list does the job. It yields a pleasing symmetry: `?` is the absence story for singulars, `[]`-emptiness is the absence story for plurals, and the two never stack. Corollary: `!` on plural inputs is also forbidden (there is nothing to force).
+**Decision: option A** — `?` forbidden on plurals; the empty list does the job. It yields a pleasing symmetry: `?` is the absence story for singulars, `[]`-emptiness is the absence story for plurals, and the two never stack. Corollary: `!` on plural inputs is also forbidden (there is nothing to force).
 
 Bonus primitive that falls out: **PipeBatch whose inner pipe has optional output performs compaction** — absent branch results are dropped, so the batch output is `X[]` containing only found items (Swift's `compactMap`). The existing `build_or_skip`-inside-batch test pattern (condition routing rejects to `continue`) is exactly this, done by hand today; optionals make it typed. Whether compaction ships in phase 1 or 2 is a scoping call — the semantics should be fixed now.
 
@@ -177,17 +173,17 @@ New error types flow automatically through the existing machinery (`build_valida
 
 Two sub-decisions:
 
-- **Dry-run modeling.** v1: keep the dry run all-present (mock every input, including optional ones) and rely on the static taint pass for the absent arm. Alternative: dual-arm dry run (a second pass with all optionals absent) — better coverage of skip paths and template guards, but doubles dry-run cost and requires the skip machinery to run under DRY. Recommend static-only in v1, dual-arm as a follow-up if the static pass proves insufficient.
-- **Advisory channel.** Some findings are lints, not errors: `!` on a guaranteed slot, `?` output on a pipe that can never produce absence. The validation report is binary today; the only advisory precedent is `pending_signatures`/`is_runnable`. Options: (a) mirror that pattern with a dedicated `optionality_notes` list; (b) add a general `warnings` array to the report (protocol change, conformance impact, but the right long-term shape); (c) stay silent on lints in v1. **DECIDED 2026-07-03: option (b)** — a general `warnings` array (same item shape as errors, never flips `is_valid`), bundled into the same protocol bump that adds the `optional` flag to IO contracts, so one bump covers both. Note the split with the *factual* liftable-pipe inventory ("pipe X may be skipped when Y is absent"), which is dataflow information, not a lint — it ships as structured data on the valid report (beside `pipe_io_contracts`), per the D3 implicit-lifting commitment.
+- **Dry-run modeling.** v1: keep the dry run all-present (mock every input, including optional ones) and rely on the static taint pass for the absent arm. Alternative: dual-arm dry run (a second pass with all optionals absent) — better coverage of skip paths and template guards, but doubles dry-run cost and requires the skip machinery to run under DRY. Decision: static-only in v1, dual-arm as a follow-up if the static pass proves insufficient.
+- **Advisory channel.** Some findings are lints, not errors: `!` on a guaranteed slot, `?` output on a pipe that can never produce absence. The validation report is binary today; the only advisory precedent is `pending_signatures`/`is_runnable`. Options: (a) mirror that pattern with a dedicated `optionality_notes` list; (b) add a general `warnings` array to the report (protocol change, conformance impact, but the right long-term shape); (c) stay silent on lints in v1. **Decision: option (b)** — a general `warnings` array (same item shape as errors, never flips `is_valid`), bundled into the same protocol bump that adds the `optional` flag to IO contracts, so one bump covers both. Note the split with the *factual* liftable-pipe inventory ("pipe X may be skipped when Y is absent"), which is dataflow information, not a lint — it ships as structured data on the valid report (beside `pipe_io_contracts`), per the D3 implicit-lifting commitment.
 
 ## 11. D7 — Prompts and templates: what the author sees
 
 When an optional input is absent, what does the Jinja context contain? Options:
 
-- **A. Nothing — the variable is undefined (recommended).** `{% if var %}` and `@?var` work (falsy), `{{ var }}` renders empty, and a *deep* unguarded use (`{{ var.amount }}`) raises — loud, which is what we want, but today it surfaces as a raw `Jinja2TemplateRenderError`. Pair with the static guard-lint below so authors rarely meet that error.
+- **A. Nothing — the variable is undefined (chosen).** `{% if var %}` and `@?var` work (falsy), `{{ var }}` renders empty, and a *deep* unguarded use (`{{ var.amount }}`) raises — loud, which is what we want, but today it surfaces as a raw `Jinja2TemplateRenderError`. Pair with the static guard-lint below so authors rarely meet that error.
 - **B. A well-behaved `Absent` object** (falsy, chains safely, renders empty — a ChainableUndefined flavor). Everything renders silently; nothing ever fails. Rejected: silence hides bugs — an unguarded `{{ var.amount }}` producing empty prose *changes the prompt's meaning* without anyone noticing. Swift taste says absence misuse should be loud.
 
-The static companion (this is what makes A safe): validation lints that every template reference to a declared-optional input is **guarded** — reachable only inside `{% if var %}`-style guards or via `@?var`. The AST walk that already extracts required variables (`detect_jinja2_required_variables`) can classify guarded vs unguarded references. Unguarded use of an optional → validation error with a precise fix ("wrap in `{% if assessment %}` or use `@?assessment`").
+The static companion (this is what makes A safe): validation lints that every template reference to a declared-optional input is **guarded** — reachable only inside `{% if var %}`-style guards, inline presence conditionals (`{{ 'present' if var is defined else 'absent' }}` — the §15 idiom, so the lint must recognize `is defined` tests as guards), or via `@?var`. The AST walk that already extracts required variables (`detect_jinja2_required_variables`) can classify guarded vs unguarded references. Unguarded use of an optional → validation error with a precise fix ("wrap in `{% if assessment %}` or use `@?assessment`").
 
 Two existing warts this design must fix in passing:
 
@@ -220,14 +216,14 @@ Success-path observability matters equally: the run report enumerates recorded a
 
 ## 14. Interactions with merged and in-flight work
 
-- **Required-main-stuff invariant — now MERGED** (PR #1014, squashed to dev and merged into this branch 2026-07-03): the invariant "a pipe run always delivers a main stuff" is enforced and test-pinned at every post-run boundary. The reconciliation stands as designed: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant generalizes to "main stuff is always *resolved*: a value or a recorded absence". Concrete consequences of the merge, now facts rather than coordination items:
-  - **`continue` landed with the opposite semantics.** Dev ships `continue` = pass-through-or-error (deliver the current main stuff; `PipeRunError` if there is none, live and dry-run alike), pinned by `test_pipe_condition_continue_delivery.py` including run-id stamping. The optionals decision (**`continue` = declared output absent, memory otherwise unchanged**, DECIDED 2026-07-03) *replaces* that landed behavior in phase 1: the runtime records an absence for the declared output instead of passing through or raising, the pinned tests are rewritten (not extended), and the dry-run all-special-outcomes guard becomes "legal iff the output is declared `?` → record absence". The landed runtime error becomes unreachable for validated bundles once `continue`-reachable ⇒ `?` output is statically enforced (D6's `OPTIONAL_OUTPUT_REQUIRED`).
-  - **Migration note — the pass-through capability disappears.** "If the value is already fine, `continue` and deliver it as-is" works on dev today. Under optionals the condition's output is absent instead; the previous value remains in memory under its own name, so downstream consumes it explicitly (`?` input + `@?` guard) — the ergonomic replacement is coalescing (`??`, D10/phase 2), which this strengthens the case for pulling forward. The phase-1 docs and changelog must state the migration idiom explicitly (breaking).
+- **Required-main-stuff invariant (PR #1014).** The invariant "a pipe run always delivers a main stuff" is enforced and test-pinned at every post-run boundary. Reconciliation: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant generalizes to "main stuff is always *resolved*: a value or a recorded absence". Concrete consequences:
+  - **`continue` semantics change (breaking).** Current behavior: `continue` = pass-through-or-error (deliver the current main stuff; `PipeRunError` if there is none, live and dry-run alike), pinned by `test_pipe_condition_continue_delivery.py` including run-id stamping. Phase 1 replaces it with **`continue` = declared output absent, memory otherwise unchanged**: the runtime records an absence for the declared output instead of passing through or raising, the pinned tests are rewritten (not extended), and the dry-run all-special-outcomes guard becomes "legal iff the output is declared `?` → record absence". The pass-through runtime error becomes unreachable for validated bundles once `continue`-reachable ⇒ `?` output is statically enforced (D6's `OPTIONAL_OUTPUT_REQUIRED`).
+  - **Migration note — the pass-through capability disappears.** "If the value is already fine, `continue` and deliver it as-is" is expressible today. Under optionals the condition's output is absent instead; the previous value remains in memory under its own name, so downstream consumes it explicitly (`?` input + `@?` guard) — the ergonomic replacement is coalescing (`??`, D10/phase 2), which this strengthens the case for pulling forward. The phase-1 docs and changelog must state the migration idiom explicitly (breaking).
   - **The tightened boundaries are the phase-1 absence-arm checklist.** These sites now read the main stuff directly and raise when it is missing; each must learn the "resolved as absent" arm: the graph-tracer epilogue in `pipe_abstract.py` (`get_main_stuff()` direct), the delivery executor (typed and raw-transport arms both raise), the CLI run cores (bare, agent, agent-API), `otel_factory.py`, and `resolve_main_stuff_root_key` in `runtime_bridge/serialization.py` (raises `PipeJobError`).
-  - **Wire constraint: `main_stuff_name` stays required.** `PipelexPipeRunOutput` and `PipelexRunResultExecute` now require `main_stuff_name: str` (fire-and-forget is a separate `PipelexPipeDispatchAck`). Do not re-optionalize it — that would undo #1014 and re-spread null guards. D8's shape: `main_stuff_name` keeps naming the declared output slot; the run result's absence records mark that slot absent; consumers branch on the structured absence record (presentation-vs-contract, as with `/validate`'s `is_valid`).
+  - **Wire constraint: `main_stuff_name` stays required.** `PipelexPipeRunOutput` and `PipelexRunResultExecute` require `main_stuff_name: str` (fire-and-forget is a separate `PipelexPipeDispatchAck`). Do not re-optionalize it — that would undo #1014 and re-spread null guards. D8's shape: `main_stuff_name` keeps naming the declared output slot; the run result's absence records mark that slot absent; consumers branch on the structured absence record (presentation-vs-contract, as with `/validate`'s `is_valid`).
   - **No resurrection of `PipeOutput.optional_main_stuff`** (deleted in #1014). The new accessor is tri-state *resolved* (Stuff | AbsenceRecord) — never `None` for a completed run.
-  - **Prose sweep:** the invariant wording ("a pipe run always delivers a main stuff") now lives in docstrings and error messages across several files; phase 1 rewrites it to "always resolves its declared output: a value or a recorded absence".
-- **D11 — Absent branch results in PipeParallel's always-combine (new decision, post-#1014). DECIDED 2026-07-03 (Louis): absorption requires an optional attribute.** #1014 makes `PipeParallel` unconditionally combine its branch results into the declared `output` concept (`combined_output` deleted; untyped vehicle = `native.Composite`; static field/result-name/type compatibility checks in `validate_output_with_library`). Under optionals a branch may resolve absent (its pipe lifted, or a `?` output produced absence), so the combine needs a policy:
+  - **Prose sweep:** the invariant wording ("a pipe run always delivers a main stuff") lives in docstrings and error messages across several files; phase 1 rewrites it to "always resolves its declared output: a value or a recorded absence".
+- **D11 — Absent branch results in PipeParallel's always-combine. Decision: absorption requires an optional attribute.** Since #1014, `PipeParallel` unconditionally combines its branch results into the declared `output` concept (`combined_output` deleted; untyped vehicle = `native.Composite`; static field/result-name/type compatibility checks in `validate_output_with_library`). Under optionals a branch may resolve absent (its pipe lifted, or a `?` output produced absence), so the combine needs a policy:
   - **Structured output:** a structure field with `required = false` **absorbs** the absent branch as field-level `None` — slot absence converts to field-level null (§3's first kind of nothing) at the combine boundary, and taint terminates there. A **required** field fed by a maybe-absent branch is a **static validation error** (extends #1014's `validate_output_with_library` checks; part of the D6 taint pass), naming the branch, the field, and the two fixes (make the field optional, or sink the absence upstream).
   - **`Composite` output:** absent components are **omitted** from the composite, with a ledger note for observability (compaction-flavored, mirroring D4's story for plurals). The component-wise transport encoding already tolerates omitted components, so no wire change.
   - Tainting the whole parallel output on any absent branch was rejected: it discards exactly the partial results fan-out exists to collect.
@@ -246,7 +242,7 @@ Success-path observability matters equally: the run report enumerates recorded a
 
 Inside `pipelex/` (the bulk): grammar (`variable_multiplicity.py` + the input-factory regex + the `[`-splitter in `concepts/helpers.py`), `StuffSpec`/`NamedStuffSpec` gain the presence field, `InputStuffSpecs.required_names` splits required/declared, the three runtime miss-gates (`validate_before_run`, `SubPipe`, PipeCondition's branch check) learn the trichotomy, `PipeSequence.needed_inputs`/`generated_outputs` gain the taint dimension, WorkingMemory gains the absence ledger, PipeLLM gains the maybe-wrapper, mock seeding and the dry-run sweep learn optional slots, validation gains the new error types + template guard-lint, `contract_match` canonicalization compares markers, builder specs mirror blueprint validation, error classes + generated error pages, graph tracer `skipped` state, and docs.
 
-Added by the #1014 merge (see §14): PipeCondition's `continue` arms (live + dry) and their pinned tests, PipeParallel's unconditional combine + its static compatibility validation (D11), and the tightened post-run boundary sites that must learn the resolved-as-absent arm — `pipe_abstract.py` tracer epilogue, `delivery_executor.py` (typed + raw), the CLI run cores, `otel_factory.py`, `resolve_main_stuff_root_key`/`payloads.py`/`pipeline_response.py`.
+From the #1014 surfaces (§14): PipeCondition's `continue` arms (live + dry) and their pinned tests, PipeParallel's unconditional combine + its static compatibility validation (D11), and the tightened post-run boundary sites that must learn the resolved-as-absent arm — `pipe_abstract.py` tracer epilogue, `delivery_executor.py` (typed + raw), the CLI run cores, `otel_factory.py`, `resolve_main_stuff_root_key`/`payloads.py`/`pipeline_response.py`.
 
 Cross-repo (from the workspace survey):
 
@@ -272,26 +268,16 @@ Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the
 
 ## 18. Decision summary
 
-| # | Decision | Recommendation |
+| # | Decision | Chosen option |
 |---|---|---|
 | D1 | Grammar | `?` suffix on inputs+outputs; `!` inputs only; mutually exclusive with `[]` in v1; never on concept definitions/refines/fields |
 | D2 | Runtime absence | Absent key + provenance ledger; no null Stuff |
 | D3 | Consumption | Trichotomy `X` (lift/skip) / `X?` (absorb) / `X!` (force); every absence source must reach an explicit sink |
 | D4 | Plurals | `?` forbidden on plurals; skipped plural output normalizes to empty list |
 | D5 | Producers | `?` output allowed anywhere; `continue`-reachable conditions MUST declare it; LLM maybe-wrapper (phase 2); boundaries explicit, internals inferred |
-| D6 | Validation | Static taint pass, new `PipeValidationErrorType`s; dry run stays all-present in v1; general `warnings` array on the validation report (decided) |
+| D6 | Validation | Static taint pass, new `PipeValidationErrorType`s; dry run stays all-present in v1; general `warnings` array on the validation report |
 | D7 | Templates | Absent = undefined (loud on deep use) + static guard-lint; `@?` finally means optional |
 | D8 | Wire | `optional` on IO contracts; absence records in run results; absent main output = success, not error |
 | D9 | Errors | `OptionalValueAbsentError` with provenance chain; RFC 7807 + error pages via existing machinery |
 | D10 | Deferred | `on_error = "absent"` (`try?`), coalescing (`??`), presence sugar — phase 2/3, semantics sketched now |
-| D11 | Parallel combine | Absent branch → optional structure field absorbs as field-`None` / `Composite` omits the component + ledger note; required field fed maybe-absent = static error (decided) |
-
-Decided 2026-07-03 (Louis): D3 (implicit lifting), D4 (forbid `?` on plurals), the `continue`-absent semantics (§14), naming (`!` force marker, `?` "optional"), D6 lints via a general `warnings` array, and D11 (parallel combine absorbs absence only through optional attributes). All open questions resolved; ready for implementation planning.
-
-## 19. Open questions — resolutions (2026-07-03)
-
-1. **Implicit lifting (D3): APPROVED** — implicit, for user-friendliness. Mitigations (validation-report liftable-pipe inventory, graph skipped-node rendering, run-report skip reasons) are phase-1 commitments.
-2. **Skip vs empty for plurals (D4): APPROVED** — `?` forbidden on plurals; the empty list does the job.
-3. **`continue` semantics (§14): APPROVED** — `continue` = "declared output absent". To be propagated to the Required-main-stuff track.
-4. **Warnings channel (D6): APPROVED** — general `warnings` array on the validation report, bundled into the same protocol bump as the `optional` flag on IO contracts. The distinction that sharpened the question stands in the design: *factual dataflow info* (liftable-pipe inventory) ships as structured data on the valid report; *lints* (useless `!`, over-claimed `?`) go in `warnings`.
-5. **Naming: APPROVED** — `!` = "force marker"; `?` pronounced "optional".
+| D11 | Parallel combine | Absent branch → optional structure field absorbs as field-`None` / `Composite` omits the component + ledger note; required field fed maybe-absent = static error |
