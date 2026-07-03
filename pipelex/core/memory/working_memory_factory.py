@@ -231,7 +231,6 @@ class WorkingMemoryFactory(BaseModel):
             )
 
         if isinstance(typed_named_stuff_spec.multiplicity, bool):
-            # TODO: make this configurable or use existing config variable
             nb_stuffs = 2
         else:
             nb_stuffs = typed_named_stuff_spec.multiplicity
