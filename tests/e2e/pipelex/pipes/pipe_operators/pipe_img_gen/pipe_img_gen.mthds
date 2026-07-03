@@ -26,6 +26,25 @@ output      = "Image"
 prompt      = "$image_prompt"
 model       = "$gen-image-testing"
 
+# Size-tier smoke pipes (2K class)
+[pipe.generate_image_2k_nano_banana_2_e2e]
+type         = "PipeImgGen"
+description  = "Generate a 2K-class image on nano-banana-2"
+output       = "Image"
+prompt       = "A detailed aerial view of a coastal town at golden hour"
+model        = "nano-banana-2"
+aspect_ratio = "landscape_16_9"
+size         = "2k"
+
+[pipe.generate_image_2k_gpt_image_2_e2e]
+type         = "PipeImgGen"
+description  = "Generate a 2K-class image on gpt-image-2"
+output       = "Image"
+prompt       = "A detailed aerial view of a coastal town at golden hour"
+model        = "gpt-image-2"
+aspect_ratio = "landscape_16_9"
+size         = "2k"
+
 # img2img Pipes
 [pipe.img2img_single_input_e2e]
 type        = "PipeImgGen"
