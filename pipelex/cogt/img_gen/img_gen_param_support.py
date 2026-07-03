@@ -31,6 +31,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     InputFidelityTaxonomy,
     OutputFormatTaxonomy,
 )
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.tools.misc.image_utils import ImageFormat
 
 
@@ -163,38 +164,44 @@ class ImgGenParamSupport:
         return _SUPPORTED
 
     @classmethod
-    def check_input_images_topic(
+    def check_input_images(
         cls,
         *,
-        rules: ImgGenModelRules,
+        inference_model: InferenceModelSpec,
         has_input_images: bool,
     ) -> SupportCheck:
+        """Check img2img capability against the model's declared `inputs`, not its rules.
+
+        The `input_images` rule is an args-factory formatting concern that only exists for
+        providers whose request is built by `ImgGenArgsFactory` (e.g. GPT Image, BFL Flux 2).
+        Workers that build the provider request directly (Google Gemini native, chat-completions
+        image models) carry no such rule; for them — and in truth for every model — the
+        capability declaration is `inputs` containing "images".
+        """
         if not has_input_images:
             return _SUPPORTED
-        if ImgGenArgTopic.INPUT_IMAGES in rules:
+        if inference_model.is_img2img_supported:
             return _SUPPORTED
-        reason = (
-            "Input images were provided but the model does not have 'input_images' rules configured. "
-            "This model may not support image-to-image generation."
-        )
+        reason = f"Model '{inference_model.name}' does not accept image inputs, so image-to-image generation is not supported."
         return SupportCheck(is_supported=False, reason=reason)
 
     @classmethod
     def check_job_params(
         cls,
         *,
-        rules: ImgGenModelRules,
+        inference_model: InferenceModelSpec,
         params: ImgGenJobParams,
-        model_name: str,
         has_input_images: bool = False,
     ) -> list[str]:
         """Run all relevant checks; return list of unsupported reasons (empty if all good)."""
+        rules: ImgGenModelRules = inference_model.rules or {}
+        model_name = inference_model.name
         checks: list[SupportCheck] = [
             cls.check_aspect_ratio(rules=rules, aspect_ratio=params.aspect_ratio, size=params.size, model_name=model_name),
             cls.check_background(rules=rules, background=params.background, model_name=model_name),
             cls.check_output_format(rules=rules, output_format=params.output_format),
             cls.check_input_fidelity(rules=rules, input_fidelity=params.input_fidelity, model_name=model_name),
-            cls.check_input_images_topic(rules=rules, has_input_images=has_input_images),
+            cls.check_input_images(inference_model=inference_model, has_input_images=has_input_images),
         ]
         return [check.reason for check in checks if not check.is_supported and check.reason is not None]
 

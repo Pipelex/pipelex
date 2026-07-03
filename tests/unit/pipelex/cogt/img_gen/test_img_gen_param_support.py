@@ -27,7 +27,28 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SafetyCheckerTaxonomy,
 )
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport, SupportCheck
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.tools.misc.image_utils import ImageFormat
+
+
+def _make_model(*, name: str, rules: ImgGenModelRules, inputs: list[str]) -> InferenceModelSpec:
+    """Synthetic img-gen model spec carrying the given rules and input capabilities."""
+    return InferenceModelSpec(
+        backend_name="test-backend",
+        name=name,
+        sdk="test-sdk",
+        model_type=ModelType.IMG_GEN,
+        model_id=name,
+        inputs=inputs,
+        outputs=["image"],
+        costs={},
+        thinking_mode=ThinkingMode.NONE,
+        max_tokens=None,
+        max_prompt_images=None,
+        rules=rules,
+    )
 
 
 def _make_legacy_openai_rules() -> ImgGenModelRules:
@@ -224,20 +245,22 @@ class TestImgGenParamSupport:
         assert check.reason is not None
         assert "some-model" in check.reason
 
-    def test_check_input_images_topic_present_supports(self) -> None:
-        check = ImgGenParamSupport.check_input_images_topic(rules=_make_legacy_openai_rules(), has_input_images=True)
+    def test_check_input_images_capable_model_supports(self) -> None:
+        """A model declaring "images" in its inputs supports img2img, with or without an input_images rule."""
+        model = _make_model(name="img2img-model", rules={ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY}, inputs=["text", "images"])
+        check = ImgGenParamSupport.check_input_images(inference_model=model, has_input_images=True)
         assert check.is_supported is True
 
-    def test_check_input_images_topic_missing_rejects_when_provided(self) -> None:
-        rules: ImgGenModelRules = {ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY}
-        check = ImgGenParamSupport.check_input_images_topic(rules=rules, has_input_images=True)
+    def test_check_input_images_text_only_model_rejects_when_provided(self) -> None:
+        model = _make_model(name="text-only-model", rules=_make_legacy_openai_rules(), inputs=["text"])
+        check = ImgGenParamSupport.check_input_images(inference_model=model, has_input_images=True)
         assert check.is_supported is False
         assert check.reason is not None
-        assert "input_images" in check.reason
+        assert "text-only-model" in check.reason
 
-    def test_check_input_images_topic_missing_supports_when_none(self) -> None:
-        rules: ImgGenModelRules = {ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY}
-        check = ImgGenParamSupport.check_input_images_topic(rules=rules, has_input_images=False)
+    def test_check_input_images_text_only_model_supports_when_none(self) -> None:
+        model = _make_model(name="text-only-model", rules={ImgGenArgTopic.PROMPT: PromptTaxonomy.POSITIVE_ONLY}, inputs=["text"])
+        check = ImgGenParamSupport.check_input_images(inference_model=model, has_input_images=False)
         assert check.is_supported is True
 
     def test_check_job_params_aggregate_legacy_openai_unsupported_aspect_ratio(self) -> None:
@@ -247,9 +270,8 @@ class TestImgGenParamSupport:
             output_format=ImageFormat.PNG,
         )
         reasons = ImgGenParamSupport.check_job_params(
-            rules=_make_legacy_openai_rules(),
+            inference_model=_make_model(name="gpt-image-1", rules=_make_legacy_openai_rules(), inputs=["text", "images"]),
             params=params,
-            model_name="gpt-image-1",
         )
         assert len(reasons) == 1
         assert "LANDSCAPE_4_3" in reasons[0] or "landscape_4_3" in reasons[0]
@@ -261,9 +283,8 @@ class TestImgGenParamSupport:
             output_format=ImageFormat.PNG,
         )
         reasons = ImgGenParamSupport.check_job_params(
-            rules=_make_gpt_image_2_rules(),
+            inference_model=_make_model(name="gpt-image-2", rules=_make_gpt_image_2_rules(), inputs=["text", "images"]),
             params=params,
-            model_name="gpt-image-2",
         )
         assert reasons == []
 
@@ -276,9 +297,8 @@ class TestImgGenParamSupport:
             output_format=ImageFormat.PNG,
         )
         reasons = ImgGenParamSupport.check_job_params(
-            rules=_make_gpt_image_2_rules(),
+            inference_model=_make_model(name="gpt-image-2", rules=_make_gpt_image_2_rules(), inputs=["text", "images"]),
             params=params,
-            model_name="gpt-image-2",
         )
         assert len(reasons) == 2
 
