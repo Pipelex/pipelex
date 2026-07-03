@@ -177,4 +177,9 @@ Acceptance: every consumer repo aligned with the released pipelex version; confo
 
 **Cross-repo consequences flagged for Phase 3:** `main_stuff_name` is now required on the `/execute` response extension and `PipelexPipeRunOutput` — the closed `pipelex-transport` library and any consumer parsing these payloads must be checked; `pipelex-demo-vibe` uses the deleted `optional_main_stuff`.
 
+### Between checkpoints — PR opened toward the Phase 3 gate
+
+- Merged `origin/dev` into the branch (`fc96c1d96`; only conflict = both sides' `[Unreleased]` changelog sections, combined into unified Added/Changed/Fixed). Post-merge `make agent-check` green; full `make agent-test` re-run on the merged tree.
+- PR opened against `dev` (see branch on GitHub). Phase 3 stays gated until the PR is merged and a pipelex version is cut.
+
 ### Checkpoint 3 — not reached
