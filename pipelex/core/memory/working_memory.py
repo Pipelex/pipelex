@@ -140,6 +140,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def resolve_main_stuff(self) -> Stuff | AbsenceRecord:
         return self.resolve_stuff(name=MAIN_STUFF_NAME)
 
+    def list_missing_names(self, names: set[str]) -> list[str]:
+        """The names (sorted) that hold neither a value nor a recorded absence — genuine misses.
+
+        The shared miss-gate check for controllers: a recorded absence is not a miss (the
+        consuming pipe's own gate applies the trichotomy — skip / run / force).
+        """
+        return [name for name in sorted(names) if self.get_optional_stuff(name=name) is None and self.get_optional_absence(name=name) is None]
+
     def get_stuffs(self, names: set[str]) -> list[Stuff]:
         the_stuffs: list[Stuff] = []
         for name in names:

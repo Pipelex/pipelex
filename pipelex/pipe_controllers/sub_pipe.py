@@ -214,11 +214,7 @@ class SubPipe(BaseModel):
                     required_stuff_names.add(get_root_from_dotted_path(req_var))
             # A recorded absence is not a miss: the sub-pipe's own gate applies the trichotomy
             # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
-            missing_names = [
-                name
-                for name in sorted(required_stuff_names)
-                if working_memory.get_optional_stuff(name) is None and working_memory.get_optional_absence(name) is None
-            ]
+            missing_names = working_memory.list_missing_names(names=required_stuff_names)
             if missing_names:
                 sub_pipe_path = [*sub_pipe_run_params.pipe_stack, self.pipe_code]
                 sub_pipe_path_str = ".".join(sub_pipe_path)

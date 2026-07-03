@@ -274,11 +274,7 @@ class PipeCondition(PipeController):
         required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
         # A recorded absence is not a miss: the chosen pipe's own gate applies the trichotomy
         # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
-        missing_names = [
-            name
-            for name in sorted(required_stuff_names)
-            if working_memory.get_optional_stuff(name) is None and working_memory.get_optional_absence(name) is None
-        ]
+        missing_names = working_memory.list_missing_names(names=required_stuff_names)
         if missing_names:
             pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
             pipe_condition_path_str = ".".join(pipe_condition_path)
