@@ -8,7 +8,7 @@ description: "How Pipelex dispatches a pipe run by orchestration mode through th
 A pipe a host runtime invokes through the runtime bridge runs along **two orthogonal axes**:
 
 - **`orchestration_mode`** — *which* orchestrator runs the pipe. An **open string token**, not a closed enum: core owns only `"direct"` (in-process); every other token is contributed by the plugin that owns its orchestrator — [`"temporal"`](https://pipelex.com/products#temporal) (durable, on a Temporal worker fleet) by `pipelex-temporal`, [`"mistral-workflows"`](https://pipelex.com/products#mistral-workflows) (decomposed into Mistral Workflows primitives) by `pipelex-mistralai-workflows`. Neither is built into the open-source `pipelex` core: both ship as external, closed-source host-runtime backends, distributed privately rather than on PyPI as part of Pipelex's [workflow-orchestration offer](https://pipelex.com/products#durable-execution).
-- **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`), set by the endpoint and passed as a parameter to `run`, never received from a caller. An orchestrator honors it per its nature; `supports_fire_and_forget` advertises whether it can do genuine async.
+- **`delivery`** — *whether the caller waits*. A **closed** core `DeliveryMode` enum (`BLOCKING` / `FIRE_AND_FORGET`) on the wire input, set by the endpoint, never received from a caller. On the SPI it is expressed as *which method* the endpoint calls — `run` (blocking) or `start` (fire-and-forget) — so each return type is truthful on its own; `supports_fire_and_forget` advertises whether an orchestrator can do genuine async.
 
 An **orchestrator** is what knows how to run a pipe under one token. Core names no orchestrator by import or by string. The bridge resolves the orchestrator for the requested token from a registry (keyed by the token `str`) and calls its `run` — `"direct"` is contributed by a core plugin, `"temporal"` by the Temporal plugin, `"mistral-workflows"` by the external `pipelex-mistralai-workflows` plugin. A lookup miss raises a generic `MissingOrchestratorError` that names no orchestrator. This page documents that seam, the **Orchestrator SPI** a host-runtime plugin compiles against, and how the Temporal plugin is wired.
 
@@ -21,7 +21,7 @@ An **orchestrator** is what knows how to run a pipe under one token. Core names 
   → build the PipeJob (boundary decode + library scope + trace_context)
   → orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
   → if orchestrator is None: raise MissingOrchestratorError(mode)   # generic, names no orchestrator
-  → return await orchestrator.run(pipe_job=..., delivery_assignment=..., delivery=...)
+  → return await orchestrator.run(pipe_job=..., delivery_assignment=...)   # or orchestrator.start(...) for FIRE_AND_FORGET
 ```
 
 The registry is built once at boot from whatever the discovered plugins contributed (`build_registrar` → `OrchestratorRegistry` on the hub). There is no `match orchestration_mode:` anywhere in the bridge — the token set is open, so validation is the registry lookup itself; adding a mode's behavior means registering an orchestrator for its token, nothing in core changes.
@@ -39,10 +39,12 @@ An orchestrator satisfies `OrchestratorProtocol` (`pipelex/plugins/orchestrator_
 class OrchestratorProtocol(Protocol):
     supports_fire_and_forget: bool
 
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None, delivery: DeliveryMode) -> PipelexPipeRunOutput: ...
+    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput: ...
+
+    async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck: ...
 ```
 
-`run` honors the endpoint-chosen `delivery` per the orchestrator's nature (in-process always blocks; a distributed orchestrator awaits completion for `BLOCKING` and returns a workflow id for `FIRE_AND_FORGET`). `supports_fire_and_forget` is the capability a runner reads *before* dispatch — `/start` rejects honestly (4xx) when the resolved mode cannot do genuine async, instead of silently running blocking and acking.
+The delivery axis is split into two methods so each return type is truthful on its own. `run` is the BLOCKING arm: it awaits completion and returns the completed-run `PipelexPipeRunOutput` — which always carries a main stuff (`main_stuff_name` is required, no "not finished yet" escape hatch). `start` is the FIRE_AND_FORGET arm: it genuinely enqueues the job and returns a `PipelexPipeDispatchAck` (`pipeline_run_id` + `workflow_id`, nothing more — nothing has run yet). `supports_fire_and_forget` is the capability a runner reads *before* dispatch — `/start` rejects honestly (4xx) when the resolved mode cannot do genuine async, instead of silently running blocking and acking; an orchestrator that cannot (like core's DIRECT) implements `start` by raising, unreachable behind that gate.
 
 A plugin contributes one per token it serves by calling the registrar menu in its `register`, passing the token as a raw string (no enum, no cast):
 
@@ -135,7 +137,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 | Area | Modules / symbols |
 |---|---|
-| Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
+| Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`, `PipelexPipeDispatchAck`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
 | Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
 | Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by `pipelex-transport`) |
 | Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`) |
@@ -153,10 +155,10 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 `pipelex_temporal/temporal_plugin.py` (in the external `pipelex-temporal` distribution) is the reference orchestrator plugin. Its `register`:
 
-- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`). It advertises `supports_fire_and_forget = True`, and its `run` branches on the endpoint-chosen `delivery`: `BLOCKING` awaits completion and reports `make_workflow_id(...)`; `FIRE_AND_FORGET` calls `.start(...)` and returns an `is_completed=False` output carrying the workflow id;
+- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`/`start`). It advertises `supports_fire_and_forget = True`; its `run` awaits completion and reports `make_workflow_id(...)`, its `start` enqueues the workflow and returns a `PipelexPipeDispatchAck` carrying the workflow id;
 - **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
 
-The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) carries both delivery bodies behind one exhaustive `match delivery`, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
+The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) keeps the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking `run` arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 
 The Temporal plugin is **external** — it ships as the `pipelex-temporal` distribution and is discovered through a `pipelex.plugins` entry point in that dist's `pyproject.toml`, not through `BUILTIN_PLUGINS`. Core's `BUILTIN_PLUGINS` (`pipelex/plugins/builtins.py`) holds only the always-shipped inference and `direct` plugins and explicitly excludes Temporal; installing `pipelex-temporal` is all it takes to make the `"temporal"` orchestrator available — zero config, no core import of `temporalio`. Its operational `worker` / `setup-namespace` commands ship as the standalone `pipelex-temporal` console script, so they travel with that dist.
 

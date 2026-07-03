@@ -73,18 +73,13 @@ async def run_pipeline_core(
     )
     pipe_output = response.pipe_output
 
-    main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-    main_stuff_json: dict[str, Any] = {}
-    if main_stuff:
-        main_stuff_json = {
-            "json": await main_stuff.content.rendered_json_async(),
-            "markdown": await main_stuff.content.rendered_markdown_async(),
-            "html": await main_stuff.content.rendered_html_async(),
-        }
-
-    compact_result: dict[str, Any] | None = None
-    if main_stuff:
-        compact_result = json.loads(main_stuff_json["json"])
+    main_stuff = pipe_output.working_memory.get_main_stuff()
+    main_stuff_json: dict[str, Any] = {
+        "json": await main_stuff.content.rendered_json_async(),
+        "markdown": await main_stuff.content.rendered_markdown_async(),
+        "html": await main_stuff.content.rendered_html_async(),
+    }
+    compact_result: dict[str, Any] = json.loads(main_stuff_json["json"])
 
     result = build_run_output(
         with_memory=with_memory,

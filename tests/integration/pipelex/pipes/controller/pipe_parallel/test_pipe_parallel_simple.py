@@ -8,6 +8,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -31,14 +32,13 @@ class TestPipeParallelSimple:
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.COMPOSITE}",
             branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
-            combined_output=None,
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
@@ -61,7 +61,6 @@ class TestPipeParallelSimple:
         assert pipe_parallel.code == "parallel_text_analyzer"
         assert len(pipe_parallel.parallel_sub_pipes) == 3
         assert pipe_parallel.add_each_output is True
-        assert pipe_parallel.combined_output is None
 
         # Verify sub-pipes configuration
         assert pipe_parallel.parallel_sub_pipes[0].pipe_code == "analyze_sentiment"
@@ -90,9 +89,9 @@ class TestPipeParallelSimple:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-        # Verify working memory structure - should have original input + 3 parallel results
+        # Verify working memory structure - original input + 3 parallel results + combined output
         final_working_memory = pipe_output.working_memory
-        assert len(final_working_memory.root) == 4  # original input + 3 parallel outputs
+        assert len(final_working_memory.root) == 5
 
         # Original input should still be there
         original_input = final_working_memory.get_stuff("input_text")
@@ -136,10 +135,11 @@ class TestPipeParallelSimple:
         assert sentiment_result.content.text != keywords_result.content.text
         assert word_count_result.content.text != keywords_result.content.text
 
-        # Verify the main stuff points to the input (since no combined_output is set)
+        # The parallel always combines: the main stuff is the composite of the branch outputs
         final_result = pipe_output.main_stuff
-        assert isinstance(final_result.content, TextContent)
-        assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
+        assert final_result.concept.code == "Composite"
+        assert isinstance(final_result.content, CompositeContent)
+        assert set(final_result.content.components.keys()) == {"sentiment_result", "word_count_result", "keywords_result"}
 
     async def test_parallel_short_text_analysis(
         self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
@@ -150,14 +150,13 @@ class TestPipeParallelSimple:
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline for short text",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.COMPOSITE}",
             branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
             ],
             add_each_output=True,
-            combined_output=None,
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
@@ -186,9 +185,9 @@ class TestPipeParallelSimple:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
 
-        # Verify working memory structure
+        # Verify working memory structure - original input + 3 parallel results + combined output
         final_working_memory = pipe_output.working_memory
-        assert len(final_working_memory.root) == 4  # original input + 3 parallel outputs
+        assert len(final_working_memory.root) == 5
 
         # Original input should still be there
         original_input = final_working_memory.get_stuff("input_text")

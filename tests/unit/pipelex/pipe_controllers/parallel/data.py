@@ -13,7 +13,7 @@ class PipeParallelInputTestCases:
         PipeParallelBlueprint(
             description="Test case: valid_with_add_each_output",
             inputs={"data": "native.Text"},
-            output="native.Text",
+            output="native.Composite",
             branches=[
                 SubPipeBlueprint(pipe="process_a", result="result_a"),
                 SubPipeBlueprint(pipe="process_b", result="result_b"),
@@ -22,32 +22,16 @@ class PipeParallelInputTestCases:
         ),
     )
 
-    VALID_WITH_COMBINED_OUTPUT: ClassVar[tuple[str, PipeParallelBlueprint]] = (
-        "valid_with_combined_output",
+    VALID_WITHOUT_ADD_EACH_OUTPUT: ClassVar[tuple[str, PipeParallelBlueprint]] = (
+        "valid_without_add_each_output",
         PipeParallelBlueprint(
-            description="Test case: valid_with_combined_output",
+            description="Test case: valid_without_add_each_output",
             inputs={"data": "native.Text"},
-            output="native.Text",
+            output="native.Composite",
             branches=[
                 SubPipeBlueprint(pipe="analyze_1", result="analysis_1"),
                 SubPipeBlueprint(pipe="analyze_2", result="analysis_2"),
             ],
-            combined_output="native.Text",
-        ),
-    )
-
-    VALID_WITH_BOTH_OUTPUT_OPTIONS: ClassVar[tuple[str, PipeParallelBlueprint]] = (
-        "valid_with_both_output_options",
-        PipeParallelBlueprint(
-            description="Test case: valid_with_both_output_options",
-            inputs={"data": "native.Text"},
-            output="native.Text",
-            branches=[
-                SubPipeBlueprint(pipe="compute_x", result="x"),
-                SubPipeBlueprint(pipe="compute_y", result="y"),
-            ],
-            add_each_output=True,
-            combined_output="native.Text",
         ),
     )
 
@@ -56,7 +40,7 @@ class PipeParallelInputTestCases:
         PipeParallelBlueprint(
             description="Test case: valid_three_parallels",
             inputs={"input_data": "native.Text"},
-            output="native.Text",
+            output="native.Composite",
             branches=[
                 SubPipeBlueprint(pipe="branch_1", result="result_1"),
                 SubPipeBlueprint(pipe="branch_2", result="result_2"),
@@ -71,41 +55,54 @@ class PipeParallelInputTestCases:
         PipeParallelBlueprint(
             description="Test case: valid_multiple_inputs",
             inputs={"text_data": "native.Text", "image_data": "native.Image"},
-            output="native.Text",
+            output="native.Composite",
             branches=[
                 SubPipeBlueprint(pipe="process_text", result="text_result"),
                 SubPipeBlueprint(pipe="process_image", result="image_result"),
             ],
-            combined_output="native.Text",
         ),
     )
 
     VALID_CASES: ClassVar[list[tuple[str, PipeParallelBlueprint]]] = [
         VALID_WITH_ADD_EACH_OUTPUT,
-        VALID_WITH_COMBINED_OUTPUT,
-        VALID_WITH_BOTH_OUTPUT_OPTIONS,
+        VALID_WITHOUT_ADD_EACH_OUTPUT,
         VALID_THREE_PARALLELS,
         VALID_MULTIPLE_INPUTS,
     ]
 
     # Error test cases: (test_id, blueprint_dict, expected_error_message_fragment)
     # Using dicts instead of blueprints to avoid validation errors during import
-    ERROR_NO_OUTPUT_OPTIONS: ClassVar[tuple[str, dict[str, Any], str]] = (
-        "no_output_options",
+    ERROR_NATIVE_NON_COMPOSITE_OUTPUT: ClassVar[tuple[str, dict[str, Any], str]] = (
+        "native_non_composite_output",
         {
-            "description": "Test case: no_output_options",
+            "description": "Test case: native_non_composite_output",
             "inputs": {"data": "native.Text"},
             "output": "native.Text",
             "branches": [
                 {"pipe": "process_a", "result": "result_a"},
                 {"pipe": "process_b", "result": "result_b"},
             ],
-            "add_each_output": False,
-            "combined_output": None,
+            "add_each_output": True,
         },
-        "requires either add_each_output to be True or combined_output to be set",
+        "must be 'Composite' or a structured concept",
+    )
+
+    ERROR_MULTIPLICITY_OUTPUT: ClassVar[tuple[str, dict[str, Any], str]] = (
+        "multiplicity_output",
+        {
+            "description": "Test case: multiplicity_output",
+            "inputs": {"data": "native.Text"},
+            "output": "native.Composite[]",
+            "branches": [
+                {"pipe": "process_a", "result": "result_a"},
+                {"pipe": "process_b", "result": "result_b"},
+            ],
+            "add_each_output": True,
+        },
+        "must not declare a multiplicity",
     )
 
     ERROR_CASES: ClassVar[list[tuple[str, dict[str, Any], str]]] = [
-        ERROR_NO_OUTPUT_OPTIONS,
+        ERROR_NATIVE_NON_COMPOSITE_OUTPUT,
+        ERROR_MULTIPLICITY_OUTPUT,
     ]

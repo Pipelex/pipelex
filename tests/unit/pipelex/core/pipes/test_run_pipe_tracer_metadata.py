@@ -5,8 +5,11 @@ from typing import Callable
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -34,8 +37,19 @@ class TestRunPipeForwardsTracerMetadata:
             blueprint=blueprint,
         )
 
+        main_stuff = Stuff(
+            stuff_code="main-code",
+            stuff_name="main_stuff",
+            concept=Concept(
+                code="Text",
+                domain_code="native",
+                description="Plain text",
+                structure_class_name="TextContent",
+            ),
+            content=TextContent(text="hello"),
+        )
         expected_output = mocker.MagicMock()
-        expected_output.working_memory.get_optional_main_stuff.return_value = None
+        expected_output.working_memory.get_main_stuff.return_value = main_stuff
         mocker.patch.object(PipeLLM, "_live_run_operator_pipe", mocker.AsyncMock(return_value=expected_output))
         mocker.patch.object(PipeLLM, "validate_before_run", mocker.AsyncMock(return_value=None))
         mocker.patch.object(PipeLLM, "validate_after_run", mocker.AsyncMock(return_value=None))

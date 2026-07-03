@@ -241,11 +241,21 @@ class PipeCondition(PipeController):
             "selected_outcome": str(outcome),
         }
 
-        # Handle continue case
+        # Handle continue case: `continue` delivers the current main stuff by passing it through.
+        # With nothing to pass through, the run would deliver no main stuff — a contract violation
+        # ("a pipe run always delivers a main stuff") failed loudly here, at the semantic site,
+        # instead of crashing downstream (graph tracer, delivery, telemetry).
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-            return PipeOutput(working_memory=working_memory)
+            if working_memory.get_optional_main_stuff() is None:
+                msg = (
+                    f"PipeCondition '{self.code}' resolved to the 'continue' outcome but the working memory has "
+                    "no main stuff to pass through — a pipe run must deliver a main stuff. Map the outcome to a "
+                    "pipe, or place this condition after a step that produces the output to pass through."
+                )
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
@@ -337,4 +347,13 @@ class PipeCondition(PipeController):
             "selected_outcome": "all_outcomes",
         }
         self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-        return PipeOutput(working_memory=working_memory)
+        # Dry-run parity with the live `continue` guard: the mapped pipes just dry-ran into this
+        # memory and stamped their outputs; if none did (all-special-outcomes condition) and no
+        # main stuff pre-existed, the run cannot deliver one — fail loudly at the pipe level.
+        if working_memory.get_optional_main_stuff() is None:
+            msg = (
+                f"Dry run of PipeCondition '{self.code}' delivered no main stuff — with only special outcomes "
+                "mapped and no pre-existing main stuff, the run cannot deliver an output."
+            )
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)

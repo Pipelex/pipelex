@@ -12,6 +12,7 @@ from pipelex.core.memory.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -493,7 +494,6 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                 list_content = cast("ListContent[StuffContent]", content)
                 serialized_items: list[dict[str, Any]] = []
                 for item in list_content.items:
-                    item_dict = item.model_dump(serialize_as_any=True)
                     # Preserve per-item type metadata for the hydration side.
                     # These keys are deliberately in pipelex's private namespace
                     # (NOT kajson's `__class__` / `__module__`) so that kajson's
@@ -501,8 +501,43 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                     # Temporal data-converter boundary — class binding is
                     # pipelex's job, not kajson's, since the dynamic class may
                     # only exist in a per-workflow ClassRegistry.
-                    item_dict["__pipelex_class__"] = type(item).__name__
-                    item_dict["__pipelex_module__"] = type(item).__module__
-                    serialized_items.append(item_dict)
+                    serialized_items.append(_encode_content_with_class_markers(item))
                 raw_root[stuff_name]["content"] = serialized_items
+            elif isinstance(content, CompositeContent) and stuff_name in raw_root:
+                # Composite components are extra="allow" fields: a plain model_dump loses
+                # their classes, so stamp each component with the same pipelex-private
+                # markers as list items. The nesting convention mirrors the top level:
+                # a list value is a ListContent, a dict value is a single StuffContent.
+                raw_root[stuff_name]["content"] = _encode_composite_for_transport(content)
         return raw
+
+
+def _encode_content_with_class_markers(content: StuffContent) -> dict[str, Any]:
+    """Serialize one StuffContent with pipelex-private class markers for hydration."""
+    if isinstance(content, CompositeContent):
+        content_dict = _encode_composite_for_transport(content)
+    else:
+        content_dict = content.model_dump(serialize_as_any=True)
+    content_dict["__pipelex_class__"] = type(content).__name__
+    content_dict["__pipelex_module__"] = type(content).__module__
+    return content_dict
+
+
+def _encode_composite_for_transport(composite: CompositeContent) -> dict[str, Any]:
+    """Serialize a CompositeContent's components, each carrying its class markers.
+
+    A ListContent component is encoded as a plain list of marker-stamped item dicts
+    (same shape rule as the top-level transport format: list ⇒ ListContent, dict ⇒
+    single StuffContent), so the hydration side rebuilds typed contents without
+    heuristics.
+    """
+    encoded: dict[str, Any] = {}
+    for component_name, component_value in composite.components.items():
+        if isinstance(component_value, ListContent):
+            list_component = cast("ListContent[StuffContent]", component_value)
+            encoded[component_name] = [_encode_content_with_class_markers(item) for item in list_component.items]
+        elif isinstance(component_value, StuffContent):
+            encoded[component_name] = _encode_content_with_class_markers(component_value)
+        else:
+            encoded[component_name] = component_value
+    return encoded
