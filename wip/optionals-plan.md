@@ -4,7 +4,7 @@ Branch `feature/Optionals` (worktree `_optionals`). Design: `wip/optionals-desig
 
 Working rules: TDD (red tests first per step), `make agent-check` after every code change, full `make agent-test` at each checkpoint, one commit per checkpoint, no backward compatibility (breaking changes go in the changelog under `[Unreleased]`).
 
-Status: **not started.**
+Live progress tracking (checkboxes, checkpoint log, decisions/deviations) is in `TODOS.md` at the worktree root; this document stays the narrative plan.
 
 ## Step A — grammar and carriers (parse `?` / `!`, no behavior change)
 
@@ -14,7 +14,7 @@ Status: **not started.**
 - Builder specs mirror the blueprint rules (`to_blueprint()` passes markers through); `contract_match` canonicalization compares presence markers (D5).
 - Tests: parser unit tests for every marker × multiplicity combination, blueprint + spec accept/reject fixtures.
 
-**CHECKPOINT A** — markers parse, validate, and round-trip; zero runtime behavior change; all gates green. Update this doc.
+**CHECKPOINT A** — markers parse, validate, and round-trip; zero runtime behavior change; all gates green; run the checkpoint protocol in `TODOS.md`.
 
 ## Step B — absence at runtime (ledger + trichotomy + lifting)
 
@@ -26,7 +26,7 @@ Status: **not started.**
 - Mock seeding / dry-run sweep learn optional slots (dry run stays all-present per D6).
 - Tests: lift-skip chain with provenance, absorb, force-failure UX (assert the message names variable, pipes, and reason), plural normalization, optional method inputs, run-report absence enumeration.
 
-**CHECKPOINT B** — absence exists, propagates, and fails loudly only through `!`; all gates green. Update this doc.
+**CHECKPOINT B** — absence exists, propagates, and fails loudly only through `!`; all gates green; run the checkpoint protocol in `TODOS.md`.
 
 ## Step C — controllers: `continue` replacement + parallel combine (D11)
 
@@ -35,7 +35,7 @@ Status: **not started.**
 - PipeBatch compaction (D4 bonus): inner `?` output → absent branch results dropped from the aggregated list. Ship it here if it falls out of the lifting machinery naturally; otherwise defer to phase 2 with the semantics recorded.
 - Tests: continue-absent (live + dry), parallel with absorbed/omitted/required-absent branches, batch compaction if shipped.
 
-**CHECKPOINT C** — controllers speak absence; the #1014 `continue` tests replaced; all gates green. Update this doc.
+**CHECKPOINT C** — controllers speak absence; the #1014 `continue` tests replaced; all gates green; run the checkpoint protocol in `TODOS.md`.
 
 ## Step D — static validation: the taint pass + template lint
 
@@ -45,7 +45,7 @@ Status: **not started.**
 - Liftable-pipe inventory as structured data on the valid report (D3 phase-1 commitment), beside `pipe_io_contracts`.
 - Tests: taint fixtures (valid + each error type), guard-lint accept/reject, `@?` detection.
 
-**CHECKPOINT D** — validation proves the safety theorem ("every absence source reaches an explicit sink"); all gates green. Update this doc.
+**CHECKPOINT D** — validation proves the safety theorem ("every absence source reaches an explicit sink"); all gates green; run the checkpoint protocol in `TODOS.md`.
 
 ## Step E — wire, boundaries, and graph
 
@@ -56,7 +56,7 @@ Status: **not started.**
 - Sweep the invariant prose to "a pipe run always resolves its declared output: a value or a recorded absence".
 - Tests: end-to-end absent-main-output run over each surface (delivery artifacts, execute response, CLI output, telemetry), graph skipped-state serialization.
 
-**CHECKPOINT E** — an absent result is a first-class success everywhere in-repo; all gates green. Update this doc.
+**CHECKPOINT E** — an absent result is a first-class success everywhere in-repo; all gates green; run the checkpoint protocol in `TODOS.md`.
 
 ## Step F — specs, conformance, docs, release prep
 
