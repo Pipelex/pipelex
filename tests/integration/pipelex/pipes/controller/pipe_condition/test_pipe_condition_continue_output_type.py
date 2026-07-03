@@ -2,7 +2,11 @@
 
 Tests that when batching over VerifiedLinks, the PipeCondition correctly:
 - Creates Constraints for approved links
-- Skips (continues) for rejected links
+- Resolves absent (continue) for rejected links, which the batch compacts away (D4)
+
+Live: the rejected link's branch resolves absent and is dropped from the aggregated list.
+Dry: the dry sweep runs every mapped outcome (the builder pipe), so every item yields a mock
+constraint — the continue arm is modeled statically (Step D), not by the dry run.
 """
 
 from collections.abc import Callable
@@ -28,7 +32,6 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition_co
 
 @pytest.mark.llm
 @pytest.mark.inference
-@pytest.mark.xfail(reason="This test identifies a bug. it should be fixed")
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionContinueOutputType:
@@ -43,10 +46,8 @@ class TestPipeConditionContinueOutputType:
         """Test batching over VerifiedLinks with mixed verdicts.
 
         Given 2 VerifiedLinks:
-        - One approved (should create a Constraint)
-        - One rejected (should be skipped via 'continue')
-
-        The output should be a list with only 1 Constraint (from the approved link).
+        - One approved (creates a Constraint)
+        - One rejected (resolves absent via 'continue' and is compacted away — live only)
         """
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
 
@@ -100,7 +101,11 @@ class TestPipeConditionContinueOutputType:
 
         pretty_print(constraint_list, title="Constraint list")
 
-        # Should have only 1 Constraint (from the approved link)
-        # The rejected link should have been skipped via 'continue'
-        if pipe_run_mode.is_dry:
+        if pipe_run_mode.is_live:
+            # Compaction: only the approved link yields a Constraint; the rejected link's branch
+            # resolved absent and was dropped from the aggregated list.
             assert len(constraint_list.items) == 1, f"Expected 1 constraint, got {len(constraint_list.items)}"
+        else:
+            # The dry sweep runs every mapped outcome for every item, so both items yield a mock
+            # constraint — the continue arm is not selected by expression evaluation in dry mode.
+            assert len(constraint_list.items) == 2, f"Expected 2 mock constraints, got {len(constraint_list.items)}"

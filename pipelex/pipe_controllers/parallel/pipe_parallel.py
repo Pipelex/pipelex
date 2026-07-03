@@ -8,6 +8,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
@@ -282,21 +283,49 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
+        structure_class = self.output.concept.get_structure_class()
+        seen_output_names: set[str] = set()
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}
 
         for output_index, pipe_output in enumerate(pipe_outputs):
-            output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' output name not specified"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            if sub_pipe_output_name in output_stuffs:
+            if sub_pipe_output_name in seen_output_names:
                 # TODO: check that at the blueprint / factory level
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            seen_output_names.add(sub_pipe_output_name)
+            branch_resolved = pipe_output.working_memory.resolve_main_stuff()
+            if isinstance(branch_resolved, AbsenceRecord):
+                # Combine under absence (D11): a required structured field cannot be fed a hole —
+                # typed error (statically unreachable once Step D's taint pass lands). Otherwise the
+                # absent component is omitted from the combine — a non-required structured field
+                # absorbs it as field-level None — and a ledger note keeps observability.
+                if not issubclass(structure_class, CompositeContent):
+                    field_info = structure_class.model_fields.get(sub_pipe_output_name)
+                    if field_info is not None and field_info.is_required():
+                        sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                        msg = (
+                            f"PipeParallel '{self.code}': branch '{sub_pipe_code}' resolved absent "
+                            f"({branch_resolved.reason}), but field '{sub_pipe_output_name}' of output "
+                            f"'{self.output.concept.concept_ref}' is required. Make the field optional "
+                            f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
+                        )
+                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                branch_record = (
+                    branch_resolved
+                    if branch_resolved.variable_name == sub_pipe_output_name
+                    else branch_resolved.model_copy(update={"variable_name": sub_pipe_output_name})
+                )
+                working_memory.record_absence(branch_record)
+                log.verbose(f"PipeParallel '{self.code}': branch result '{sub_pipe_output_name}' is absent, omitted from the combine")
+                continue
+            output_stuff = branch_resolved
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
             output_stuffs[sub_pipe_output_name] = output_stuff

@@ -6,7 +6,8 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
@@ -244,20 +245,18 @@ class PipeCondition(PipeController):
             "selected_outcome": str(outcome),
         }
 
-        # Handle continue case: `continue` delivers the current main stuff by passing it through.
-        # With nothing to pass through, the run would deliver no main stuff — a contract violation
-        # ("a pipe run always delivers a main stuff") failed loudly here, at the semantic site,
-        # instead of crashing downstream (graph tracer, delivery, telemetry).
+        # Handle continue case (design §14, phase 1): `continue` resolves the declared output as
+        # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
+        # main stuff stays under its own name (the migration idiom: consume it explicitly
+        # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-            if working_memory.get_optional_main_stuff() is None:
-                msg = (
-                    f"PipeCondition '{self.code}' resolved to the 'continue' outcome but the working memory has "
-                    "no main stuff to pass through — a pipe run must deliver a main stuff. Map the outcome to a "
-                    "pipe, or place this condition after a step that produces the output to pass through."
-                )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            self._record_declared_absent_output(
+                working_memory=working_memory,
+                output_name=output_name,
+                reason=f"PipeCondition '{self.code}' resolved to 'continue' for evaluated expression '{evaluated_expression}'",
+            )
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
@@ -351,13 +350,24 @@ class PipeCondition(PipeController):
             "selected_outcome": "all_outcomes",
         }
         self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-        # Dry-run parity with the live `continue` guard: the mapped pipes just dry-ran into this
-        # memory and stamped their outputs; if none did (all-special-outcomes condition) and no
-        # main stuff pre-existed, the run cannot deliver one — fail loudly at the pipe level.
-        if working_memory.get_optional_main_stuff() is None:
-            msg = (
-                f"Dry run of PipeCondition '{self.code}' delivered no main stuff — with only special outcomes "
-                "mapped and no pre-existing main stuff, the run cannot deliver an output."
+        # Dry-run parity with the live `continue` arm: with only special outcomes mapped, no pipe
+        # dry-ran into this memory — the only live outcomes would be `continue` (absent) or `fail`,
+        # so the declared output resolves absent, memory otherwise unchanged. (The static rule
+        # "continue-reachable ⇒ `?` output" is Step D's OPTIONAL_OUTPUT_REQUIRED.)
+        if not self.pipe_dependencies():
+            self._record_declared_absent_output(
+                working_memory=working_memory,
+                output_name=output_name,
+                reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+
+    def _record_declared_absent_output(self, *, working_memory: WorkingMemory, output_name: str | None, reason: str) -> None:
+        """Resolve this pipe's declared output as a declared-absent record (the `continue` arm)."""
+        record = AbsenceRecord(
+            variable_name=output_name or MAIN_STUFF_NAME,
+            kind=AbsenceKind.DECLARED_ABSENT,
+            reason=reason,
+            producing_pipe=self.code,
+        )
+        working_memory.record_new_main_absence(record)
