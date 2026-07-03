@@ -126,34 +126,19 @@ class PipeParallel(PipeController):
         output_concept = self.output.concept
         if Concept.is_native_concept(concept=output_concept):
             native_code = NativeConceptCode(output_concept.code)
-            match native_code:
-                case NativeConceptCode.COMPOSITE:
-                    pass
-                case (
-                    NativeConceptCode.DYNAMIC
-                    | NativeConceptCode.TEXT
-                    | NativeConceptCode.IMAGE
-                    | NativeConceptCode.DOCUMENT
-                    | NativeConceptCode.HTML
-                    | NativeConceptCode.TEXT_AND_IMAGES
-                    | NativeConceptCode.NUMBER
-                    | NativeConceptCode.PAGE
-                    | NativeConceptCode.JSON
-                    | NativeConceptCode.SEARCH_RESULT
-                    | NativeConceptCode.ANYTHING
-                ):
-                    msg = (
-                        f"PipeParallel '{self.code}' output '{output_concept.concept_ref}' is invalid: "
-                        "the output of a parallel must be 'Composite' or a structured concept whose fields "
-                        "correspond to the branch result names."
-                    )
-                    raise PipeValidationError(
-                        message=msg,
-                        error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                        domain_code=self.domain_code,
-                        pipe_code=self.code,
-                        provided_concept_code=output_concept.concept_ref,
-                    )
+            if not native_code.is_composite:
+                msg = (
+                    f"PipeParallel '{self.code}' output '{output_concept.concept_ref}' is invalid: "
+                    "the output of a parallel must be 'Composite' or a structured concept whose fields "
+                    "correspond to the branch result names."
+                )
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    provided_concept_code=output_concept.concept_ref,
+                )
 
     @override
     def validate_output_with_library(self):

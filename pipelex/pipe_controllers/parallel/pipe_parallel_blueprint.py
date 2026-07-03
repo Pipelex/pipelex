@@ -40,24 +40,9 @@ class PipeParallelBlueprint(PipeBlueprint):
         concept_ref_or_code = output_parse_result.concept_ref_or_code
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
             native_code = NativeConceptCode(concept_ref_or_code.split(".")[-1])
-            match native_code:
-                case NativeConceptCode.COMPOSITE:
-                    pass
-                case (
-                    NativeConceptCode.DYNAMIC
-                    | NativeConceptCode.TEXT
-                    | NativeConceptCode.IMAGE
-                    | NativeConceptCode.DOCUMENT
-                    | NativeConceptCode.HTML
-                    | NativeConceptCode.TEXT_AND_IMAGES
-                    | NativeConceptCode.NUMBER
-                    | NativeConceptCode.PAGE
-                    | NativeConceptCode.JSON
-                    | NativeConceptCode.SEARCH_RESULT
-                    | NativeConceptCode.ANYTHING
-                ):
-                    msg = (
-                        f"PipeParallel output '{self.output}' is invalid: the output of a parallel must be 'Composite' "
-                        "or a structured concept whose fields correspond to the branch result names."
-                    )
-                    raise ValueError(msg)
+            if not native_code.is_composite:
+                msg = (
+                    f"PipeParallel output '{self.output}' is invalid: the output of a parallel must be 'Composite' "
+                    "or a structured concept whose fields correspond to the branch result names."
+                )
+                raise ValueError(msg)

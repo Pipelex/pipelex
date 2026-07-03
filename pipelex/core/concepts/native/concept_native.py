@@ -35,6 +35,27 @@ class NativeConceptCode(StrEnum):
         return f"{self.value}[]"
 
     @property
+    def is_composite(self) -> bool:
+        """Whether this native concept can hold a named composition (a PipeParallel combination)."""
+        match self:
+            case NativeConceptCode.COMPOSITE:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
+
+    @property
     def concept_ref(self) -> str:
         return f"{SpecialDomain.NATIVE}.{self.value}"
 

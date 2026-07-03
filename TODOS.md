@@ -62,11 +62,11 @@ Enforced at the one non-stamping leaf: `PipeParallel` always combines its branch
 
 Acceptance: parallel always combines (live + dry), `combined_output` fully gone from source and fixtures, `native.Composite` round-trips, static validation catches bad `output` declarations at `/validate` time, all gates green.
 
-- [ ] Verify acceptance criteria + full gates.
-- [ ] Commit Phase 1.
-- [ ] Update this file (checkpoint log below) + design doc status for cold start.
-- [ ] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 1 diff (pointer only).
-- [ ] Triage findings: fix defects / defer tradeoffs to `wip/required-main-stuff/`.
+- [x] Verify acceptance criteria + full gates (`make agent-check` + full `make agent-test` green).
+- [x] Commit Phase 1 — `757146324` on top of `1b26b3fae`.
+- [x] Update this file (checkpoint log below) + design doc status for cold start.
+- [x] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 1 diff (pointer only).
+- [x] Triage findings: review found NO correctness bugs; duplicated native-concept match extracted to `NativeConceptCode.is_composite` (fixed); double-parse finding deferred → `wip/required-main-stuff/deferred-phase-1-review.md`.
 
 ## Phase 2 — Enforce the invariant across in-repo surfaces
 
@@ -89,7 +89,7 @@ Acceptance: no defensive main-stuff branch left for completed live runs; wire `m
 - [ ] Commit Phase 2.
 - [ ] Update this file (checkpoint log: final call-site audit results, `final_stuff_code` decision) + design doc status.
 - [ ] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 2 diff (pointer only).
-- [ ] Triage findings: fix defects / defer tradeoffs to `wip/required-main-stuff/`.
+- [x] Triage findings: review found NO correctness bugs; duplicated native-concept match extracted to `NativeConceptCode.is_composite` (fixed); double-parse finding deferred → `wip/required-main-stuff/deferred-phase-1-review.md`.
 
 ## Phase 3 — Cross-repo sweep (GATED)
 
