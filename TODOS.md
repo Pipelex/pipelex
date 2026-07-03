@@ -44,15 +44,15 @@ At every CHECKPOINT block below, before touching the next phase:
 
 The only `pipelex/` change for v1 (design §5.4). Neutral names (`owner_id`, not org), no store, no resolver.
 
-- [ ] `InferenceProfileRef` model — new `pipelex/pipe_run/inference_profile_ref.py`: `owner_id: str`, `profile_id: str`, `fingerprint: str`; `ConfigDict(frozen=True, extra="forbid")`; style-mirror `QualifiedRef`/`ModelHandle` (small frozen value object, keyword-only factory if useful).
-- [ ] `PipeRunParams.inference_profile_ref: InferenceProfileRef | None = Field(default=None, frozen=True)` (`pipelex/pipe_run/pipe_run_params.py:140`, `extra="forbid"` — declared optional field is safe; frozen like `run_mode` so sub-pipe code can't mutate it in place, while `model_copy(update=...)` stamping still works).
-- [ ] Mirror into `CogtRunParams` (`pipelex/cogt/content_generation/cogt_run_params.py:41`, frozen + forbid — optional with default so existing stubs stay valid) and thread it in the `cogt_run_params` property (`pipe_run_params.py:177-184`) so the ref reaches every inference assignment (needed for Binding B worker-side verification and §12 attribution).
-- [ ] Optional keyword `inference_profile_ref=None` on `PipeRunParamsFactory.make_run_params` (`pipe_run_params_factory.py:13`) — the single writer.
-- [ ] Update the `cogt_run_params.py` module docstring (it documents which fields cross into activities).
-- [ ] Tests — extend `tests/unit/pipelex/pipe_run/test_cogt_run_params_carrier.py` (derivation into `CogtRunParams`, frozen-ness, default-None); JSON round-trip of `PipeRunParams` and an assignment carrying the ref (mirror `test_assignment_models_schema.py` round-trips); preservation through `make_deep_copy` / `copy_by_injecting_multiplicity` and a controller `model_copy(update=...)` site; stamping-by-`model_copy` works despite frozen field.
-- [ ] Docs: brief addition where run-params directives are documented + `CHANGELOG.md` `[Unreleased]` entry.
+- [x] `InferenceProfileRef` model — new `pipelex/pipe_run/inference_profile_ref.py`: `owner_id`/`profile_id`/`fingerprint` (all `min_length=1`); `ConfigDict(frozen=True, extra="forbid")`; `ref_str` property for logs.
+- [x] `PipeRunParams.inference_profile_ref: InferenceProfileRef | None = Field(default=None, frozen=True)`.
+- [x] Mirror into `CogtRunParams` (optional with default) and thread it in the `cogt_run_params` property so the ref reaches every inference assignment.
+- [x] Optional keyword `inference_profile_ref=None` on `PipeRunParamsFactory.make_run_params`.
+- [x] Update the `cogt_run_params.py` module docstring.
+- [x] Tests — new `tests/unit/pipelex/pipe_run/test_inference_profile_ref.py` (one class per module rule; covers default-None, old-writer payload validation, carrier derivation, JSON round-trips, frozen-field mutation rejection, `model_copy(update=...)` stamping, copy preservation, factory pass-through, forbid-extras, empty-field rejection).
+- [x] Docs: `docs/under-the-hood/pipe-routing-and-execution.md` PipeJob table + `CHANGELOG.md` `[Unreleased]` entry.
 
-**CHECKPOINT 1** — gates: `make agent-check` + `make agent-test` (full suite; `make tb` for a quick boot sanity mid-way). Then: commit, update Cold-start state, fan out `/code-review` (Sonnet-5, context = this repo + commit SHA only). No sign-off needed, but report Q6 recommendation to the user in the checkpoint summary so the Phase 2b decision is unblocked early.
+**CHECKPOINT 1 — DONE (2026-07-03).** Gates green (`make agent-check`, full `make agent-test`). Committed as `4921a031d` on `feature/BYOK-per-request`. Fresh-context Sonnet `/code-review` fan-out ran on the commit: one low-severity doc-consistency finding (cogt_run_params docstring "single writer" claim vs the orchestrator-seam stamp path) — fixed and amended in; everything else survived scrutiny explicitly (wire compat, frozen contracts, propagation, tests, changelog). Q6 recommendation reported to user: hosted adapter as a thin Python package inside `pipelex-api-hosted`.
 
 ### 1b. `pipelex_shared`: profile schema, adapter, KMS envelope (`infra-python-tools`, new branch off `dev`)
 
@@ -179,9 +179,10 @@ Not planned in detail here. Trigger: self-serve BYOK demand. Scope: `InferenceSc
 
 ## Cold-start state (update at every checkpoint)
 
-**Last updated:** 2026-07-03 — plan written, no implementation started yet.
+**Last updated:** 2026-07-03 — Checkpoint 1 CLEARED; starting Phase 1b.
 
-- **Where we are:** design approved-for-implementation at v1 scope (foundation + Binding B). Exploration of all six repos done; findings condensed above. Next action: Phase 1a in this worktree.
-- **Branches:** core `_byok` = `feature/BYOK-per-request` @ `36a995e6e` (design doc committed). No branches created yet in other repos.
+- **Where we are:** Phase 1a (core ref) DONE + review-triaged — final commit `4921a031d` on `feature/BYOK-per-request` (amended in the one review finding, a docstring-consistency fix). All gates green.
+- **Deviations from plan:** tests went into a new module `test_inference_profile_ref.py` instead of extending `test_cogt_run_params_carrier.py` (one-TestClass-per-module rule); ref fields got `min_length=1` wire hygiene; assignment-level round-trip covered via `CogtRunParams` round-trip rather than a full `LLMAssignment` construction (the carrier is the field under test; assignments embed it verbatim).
+- **Branches:** core `_byok` = `feature/BYOK-per-request` @ `4921a031d`. Phase 1b branch in `infra-python-tools` off `dev` — see below.
 - **Pending sign-offs:** Q6 (hosted adapter location) — needed before Phase 2b; Q2 launch posture — needed at Checkpoint 5; infra task-role split + CMK key policy — Checkpoint 4.
-- **Open items:** none yet.
+- **Next:** Phase 1b in `infra-python-tools`.
