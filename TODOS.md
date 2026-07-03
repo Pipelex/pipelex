@@ -56,15 +56,15 @@ The only `pipelex/` change for v1 (design §5.4). Neutral names (`owner_id`, not
 
 ### 1b. `pipelex_shared`: profile schema, adapter, KMS envelope (`infra-python-tools`, new branch off `dev`)
 
-- [ ] Schema `src/pipelex_shared/schemas/inference_profile.py` — three-model split per `method.py` convention: `InferenceProfileSaveBody` (client-writable: `name`, `binding` (v1: `placement` + `task_queue`), `backends` overlay, `routing_profile`, `deck` overlay, write-only `credentials` map), `InferenceProfile` (storage: + `profile_id`, `org_id`, `created_by_user_id`, `credentials_ciphertext`, `credentials_version`, `fingerprint`, `enabled`, timestamps), `InferenceProfilePublic` (excludes ciphertext and any credential material). Overlay fields = neutral dict/pydantic shapes schema-validated per Q7 (no invented config language — mirrors the `.pipelex/inference/` tree).
-- [ ] Fingerprint helper: SHA-256 over canonical JSON of the non-secret overlay + `credentials_version` (mirror `LibraryCrate.compute_fingerprint_from_content` approach).
-- [ ] KMS envelope helper (net-new; nothing to reuse): `GenerateDataKey` + AES-GCM via `cryptography` (already a dep), ciphertext blob = wrapped key + nonce + ct; `kms:Decrypt` path; KMS key ARN from env; `EncryptionContext={org_id, profile_id}`.
-- [ ] Adapter `src/pipelex_shared/adapters/dynamodb/inference_profile.py` — `PK=ORG#{org_id}`, `SK=INFERENCE_PROFILE#{profile_id}`, CRUD + list (`begins_with`), no GSI needed; clone `method.py` shape incl. `remove_specific_keys`/`convert_floats_to_decimal`.
-- [ ] Org default pointer (A5): `default_inference_profile_id` on the Organization schema + an `update_profile`-style setter on the org adapter.
-- [ ] `IDPrefix.INFERENCE_PROFILE = "ip"` + `new_inference_profile_id()` in `core/id_minter.py`.
-- [ ] Tests: adapter moto tests incl. **cross-org isolation** (mirror `test_method_adapter.py::test_org_isolation`); schema tests (Public never carries credentials); envelope round-trip (moto KMS) + tamper/wrong-context failure.
+- [x] Schema `src/pipelex_shared/schemas/inference_profile.py` — three-model split (`InferenceProfileSaveBody` with write-only `credentials`, `InferenceProfile` storage shape with `to_public()`, `InferenceProfilePublic`) + `InferenceProfileBinding` (placement requires `task_queue`; `scoped` reserved). Overlay fields = plain dicts mirroring the `.pipelex/inference/` tree (Q7: schema-level validation only).
+- [x] Fingerprint: `InferenceProfile.compute_fingerprint()` — SHA-256 over canonical JSON of binding + overlay + `credentials_version` (ciphertext deliberately excluded: re-encryption ≠ rotation).
+- [x] KMS envelope `adapters/kms_envelope.py`: `GenerateDataKey` + AES-256-GCM, versioned base64 blob, `EncryptionContext={org_id, profile_id}`, everything fails closed via new `KmsEnvelopeError` (`exceptions/kms_exceptions.py`).
+- [x] Adapter `adapters/dynamodb/inference_profile.py` — method.py clone; `get_profile` returns storage shape (worker boot), `list_profiles` public-only.
+- [x] Org default pointer (A5): `Organization.default_inference_profile_id` + dedicated `set_default_inference_profile` setter (None = REMOVE; distinct from `update_profile`'s None-means-skip convention).
+- [x] `IDPrefix.INFERENCE_PROFILE = "iprof"` + `new_inference_profile_id()` (deviation: `iprof` not `ip` — avoids reading as an IP address).
+- [x] Tests: adapter moto tests incl. cross-org isolation; schema tests (Public never carries ciphertext; fingerprint semantics); KMS envelope round-trip + wrong-context + tamper + malformed + version drills; org-pointer set/clear/missing-org/legacy-row tests.
 
-**CHECKPOINT 2** — gates: `make agent-check` + `make agent-test` in `infra-python-tools`. Commit, update Cold-start state, fan out `/code-review` (pointer = infra-python-tools branch diff vs `dev`).
+**CHECKPOINT 2 — DONE (2026-07-03).** Gates green (`make agent-check`, `make agent-test`). Final commit `367720fbc` on `feature/inference-profiles` (branched off `dev`; amended in the review fixes). Fresh-context Sonnet `/code-review` ran with a dedicated crypto sub-review; triage outcome — **fixed:** KMS `Decrypt` now pins `KeyId` (confused-deputy), out-of-range-nonce tampering now surfaces as `KmsEnvelopeError` (was raw `ValueError`), fingerprint canonicalized against DDB `Decimal` rehydration (was unstable across round-trip), ciphertext read split into opt-in `get_profile_with_ciphertext` with `get_profile` public-by-default (was docstring-guarded), log scrubber hardened (whole `credentials` objects + `sk-`/`sk-ant-` prefixes), pre-existing `save_method`/`save_profile` stale `updated_at` fixed; **deferred to `wip/byok-api/deferred-review-findings.md`:** CMK-replacement/re-encrypt story, SaveBody credential echo in 422s (SecretStr decision at Phase 1c), Decimal normalization in the Phase 2c materializer, list pagination.
 
 ### 1c. Platform: CRUD routes + org-id forwarding (`pipelex-platform`, new branch off `dev`)
 
@@ -179,10 +179,11 @@ Not planned in detail here. Trigger: self-serve BYOK demand. Scope: `InferenceSc
 
 ## Cold-start state (update at every checkpoint)
 
-**Last updated:** 2026-07-03 — Checkpoint 1 CLEARED; starting Phase 1b.
+**Last updated:** 2026-07-03 — Checkpoints 1 and 2 CLEARED; starting Phase 1c.
 
-- **Where we are:** Phase 1a (core ref) DONE + review-triaged — final commit `4921a031d` on `feature/BYOK-per-request` (amended in the one review finding, a docstring-consistency fix). All gates green.
-- **Deviations from plan:** tests went into a new module `test_inference_profile_ref.py` instead of extending `test_cogt_run_params_carrier.py` (one-TestClass-per-module rule); ref fields got `min_length=1` wire hygiene; assignment-level round-trip covered via `CogtRunParams` round-trip rather than a full `LLMAssignment` construction (the carrier is the field under test; assignments embed it verbatim).
-- **Branches:** core `_byok` = `feature/BYOK-per-request` @ `4921a031d`. Phase 1b branch in `infra-python-tools` off `dev` — see below.
-- **Pending sign-offs:** Q6 (hosted adapter location) — needed before Phase 2b; Q2 launch posture — needed at Checkpoint 5; infra task-role split + CMK key policy — Checkpoint 4.
-- **Next:** Phase 1b in `infra-python-tools`.
+- **Where we are:** Phase 1a (core ref) DONE — `4921a031d` on core `feature/BYOK-per-request`. Phase 1b (pipelex_shared foundation) DONE — `367720fbc` on infra-python-tools `feature/inference-profiles`, review-hardened (see Checkpoint 2 block). All gates green in both repos. Neither branch pushed.
+- **Deviations from plan so far:** ID prefix is `iprof` (not `ip`); core tests in a new module (one-TestClass-per-module); ciphertext read renamed to `get_profile_with_ciphertext`; scrubber hardening + `save_method` timestamp fix rode along as flag-and-fix.
+- **Branches:** core `_byok` = `feature/BYOK-per-request` @ `4921a031d` (+tracker commits). `infra-python-tools` = `feature/inference-profiles` @ `367720fbc`.
+- **Phase 1c pin note:** the platform's `pipelex-shared` pin is git+ssh **by SHA** — an unpushed SHA cannot be uv-locked. For local dev/tests, install the local checkout editable into the platform venv (do NOT commit an editable pin — precedent: cookbook track); the real pin bump + `uv lock` happens once `feature/inference-profiles` is pushed (needs user go-ahead to push).
+- **Pending sign-offs:** Q6 (hosted adapter location) — before Phase 2b; Q2 launch posture — Checkpoint 5; infra task-role split + CMK key policy — Checkpoint 4; **push approval** for the two feature branches (blocks the platform pin bump landing).
+- **Next:** Phase 1c in `pipelex-platform` (branch off `dev`).
