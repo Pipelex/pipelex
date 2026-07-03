@@ -1,6 +1,6 @@
 # Required main stuff — PipeParallel always combines
 
-**Branch:** `feature/Required-main-stuff` · **Status:** Phase 1 COMPLETE (Checkpoint 1 cleared — always-combine landed, `combined_output` deleted, `native.Composite` shipped, static validation live; decisions & deviations in `TODOS.md` → Checkpoint log). Next: Phase 2 (invariant enforcement across in-repo surfaces).
+**Branch:** `feature/Required-main-stuff` · **Status:** Phases 1–2 COMPLETE (Checkpoint 2 cleared — invariant enforced at every in-repo post-run boundary: wire `main_stuff_name` required, delivery always writes `main_stuff.*`, defensive branches gone, `final_stuff_code` honored on the parallel's combined stuff; decisions & audit in `TODOS.md` → Checkpoint log). Next: Phase 3 (cross-repo sweep, GATED on merge to `main` + version cut).
 
 ## 1. Problem
 

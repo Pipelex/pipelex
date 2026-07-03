@@ -72,24 +72,24 @@ Acceptance: parallel always combines (live + dry), `combined_output` fully gone 
 
 Once every pipe stamps, "a completed run has a main stuff" is guaranteed; tighten the defensive branches from optional to direct.
 
-- [ ] Graph tracer output-spec branch in `pipelex/core/pipes/pipe_abstract.py` — remove the defensive branch and its apologetic comment ("main_stuff may not exist for pipes like PipeParallel…").
-- [ ] Delivery executor `pipelex/pipe_run/delivery_executor.py`: always write the `main_stuff.*` artifact files for completed runs (kills the "empty envelope" failure mode).
-- [ ] CLI run cores: `pipelex/cli/commands/run/_run_core.py` + `pipelex/cli/agent_cli/commands/run/_run_core.py` — drop the "no main output produced" branches for live runs.
-- [ ] OTel telemetry attribute extraction: `pipelex/system/telemetry/otel_factory.py`.
-- [ ] Wire models go non-optional (`main_stuff_name: str`): `pipelex/runtime_bridge/payloads.py`, `pipelex/runtime_bridge/serialization.py` (`resolve_main_stuff_root_key`), `pipelex/pipeline/pipeline_response.py` (`PipelexRunResultExecute`), `pipelex/cli/agent_cli/commands/run/_run_core_api.py`. Temporal payload history is not a concern — never shipped to prod.
-- [ ] Audit every remaining `get_optional_main_stuff` call site: `WorkingMemory.get_optional_main_stuff` itself **stays** (pre-run/empty memory legitimately has none); each post-run boundary call site is either tightened or justified in the checkpoint log.
-- [ ] Resolve the **`final_stuff_code`** open question (design §7) using the Phase 1c findings: presumably honor it on the combined stuff like operators do.
-- [ ] Gates: `make agent-check` + full `make agent-test` green.
+- [x] Graph tracer output-spec branch in `pipelex/core/pipes/pipe_abstract.py` — remove the defensive branch and its apologetic comment ("main_stuff may not exist for pipes like PipeParallel…").
+- [x] Delivery executor `pipelex/pipe_run/delivery_executor.py`: always write the `main_stuff.*` artifact files for completed runs (kills the "empty envelope" failure mode).
+- [x] CLI run cores: `pipelex/cli/commands/run/_run_core.py` + `pipelex/cli/agent_cli/commands/run/_run_core.py` — drop the "no main output produced" branches for live runs.
+- [x] OTel telemetry attribute extraction: `pipelex/system/telemetry/otel_factory.py`.
+- [x] Wire models go non-optional (`main_stuff_name: str`): `pipelex/runtime_bridge/payloads.py`, `pipelex/runtime_bridge/serialization.py` (`resolve_main_stuff_root_key`), `pipelex/pipeline/pipeline_response.py` (`PipelexRunResultExecute`), `pipelex/cli/agent_cli/commands/run/_run_core_api.py`. Temporal payload history is not a concern — never shipped to prod.
+- [x] Audit every remaining `get_optional_main_stuff` call site: `WorkingMemory.get_optional_main_stuff` itself **stays** (pre-run/empty memory legitimately has none); each post-run boundary call site is either tightened or justified in the checkpoint log.
+- [x] Resolve the **`final_stuff_code`** open question (design §7) using the Phase 1c findings: presumably honor it on the combined stuff like operators do.
+- [x] Gates: `make agent-check` + full `make agent-test` green.
 
 ### ⛔ CHECKPOINT 2 — MANDATORY STOP
 
 Acceptance: no defensive main-stuff branch left for completed live runs; wire `main_stuff_name` non-optional; call-site audit documented; all gates green. Cross-repo work starts fresh from here — this checkpoint's TODOS update is the cold-start context for that session.
 
-- [ ] Verify acceptance criteria + full gates.
-- [ ] Commit Phase 2.
-- [ ] Update this file (checkpoint log: final call-site audit results, `final_stuff_code` decision) + design doc status.
-- [ ] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 2 diff (pointer only).
-- [x] Triage findings: review found NO correctness bugs; duplicated native-concept match extracted to `NativeConceptCode.is_composite` (fixed); double-parse finding deferred → `wip/required-main-stuff/deferred-phase-1-review.md`.
+- [x] Verify acceptance criteria + full gates.
+- [x] Commit Phase 2 — `3c3cf4570` on top of `9acbd7a86`.
+- [x] Update this file (checkpoint log: final call-site audit results, `final_stuff_code` decision) + design doc status.
+- [x] Fan out context-free Sonnet-5 `/code-review` sub-agent on the Phase 2 diff (pointer only).
+- [x] Triage findings: ONE confirmed bug (reproduced by the reviewer) — `PipeCondition`'s `continue` outcome doesn't stamp a main stuff, so the tightened tracer epilogue crashed with a raw `WorkingMemoryStuffNotFoundError` whenever a condition continued with no pre-existing main stuff under active tracing. FIXED at the semantic site (see Checkpoint 2 log "Review triage"). All other tightened surfaces judged internally consistent by the review; no simplification findings.
 
 ## Phase 3 — Cross-repo sweep (GATED)
 
@@ -117,7 +117,7 @@ Acceptance: every consumer repo aligned with the released pipelex version; confo
 
 ## Open questions (from design §7 — resolve during implementation)
 
-- [ ] `final_stuff_code`: investigate in Phase 1c, resolve in Phase 2.
+- [x] `final_stuff_code`: RESOLVED in Phase 2 — the parallel honors it on the combined stuff (see Checkpoint 2 log).
 - [ ] Graph `execution_data` key `combined_output_concept`: keep name in Phase 1 for `mthds-ui` compat; rename decision in Phase 3 (`mthds-ui` row).
 - [ ] `add_each_output` naming: recommendation is **keep** (pure churn otherwise); revisit only if MTHDS spec editors want it (Phase 3, `mthds/` row).
 - [ ] `PipeOutputAbstract` (mthds-python): check for encoded optionality (Phase 3, SDKs row).
@@ -154,6 +154,27 @@ Acceptance: every consumer repo aligned with the released pipelex version; confo
 
 **New/updated tests:** `tests/unit/pipelex/core/stuffs/test_composite_content.py` (round-trips incl. transport dump→hydrate), `tests/unit/pipelex/pipe_controllers/parallel/` (blueprint accept/reject + data.py), `tests/integration/.../pipe_parallel/test_pipe_parallel_always_combines.py` (+ fixture `parallel_always_combine.mthds`; stale-stamp regression + terminal-parallel main stuff; dry parity via `pipe_run_mode` parametrization), `tests/integration/.../pipe_parallel/test_pipe_parallel_output_validation.py` (library-level accept/reject via `acquire_library`). e2e graph expectations updated: the add_each-only graph now expects `parallel_combine: 2` edges.
 
-### Checkpoint 2 — not reached
+### Checkpoint 2 — reached (Phase 2 complete)
+
+**Code state:** Phase 2 fully implemented on `feature/Required-main-stuff`; commit `3c3cf4570` on top of `9acbd7a86`. `make agent-check` green; full `make agent-test` green (all tests passing). TDD followed: red tests written and confirmed failing before each behavioral change.
+
+**What landed (invariant enforcement, per-surface):**
+
+- **Graph tracer epilogue** (`pipe_abstract.py` `_run_pipe_traced` success path): `get_main_stuff()` direct read; `output_spec` built unconditionally; the `main_stuff is not None` gate on `output_concept_data` removed. The apologetic comment is gone.
+- **Delivery executor** (`generate_result_files`): typed path reads `get_main_stuff()` (raises `WorkingMemoryStuffNotFoundError` when absent); raw path raises `PipeJobError` when the raw dump lacks a main stuff. The `try_local_hydrate_stuff` → raw-render fallback is unchanged (it's about local class availability, not missing main stuff). A missing main stuff surfaces as `StorageDeliveryError` at the `_store_results` boundary — the same handling path as any storage failure, so the caller's failure-webhook behavior is unchanged.
+- **CLI run cores:** human core pretty-prints/saves/CSV-exports via `main_stuff` directly (the "--save-csv: no main stuff produced" exit branch is deleted); agent core builds `main_stuff_json` + `compact_result` unconditionally; agent API-runner core raises `PipeExecutionError` when a completed response has no main stuff under the announced key (the `main_stuff_name`-extension *name* fallback to `MAIN_STUFF_NAME` is kept — that's protocol-extension handling, not invariant softening).
+- **OTel** (`make_output_json`): direct read; the `"{}"` fallback is gone (called on the success path only).
+- **Wire models:** `PipelexPipeRunOutput.main_stuff_name: str` (required) and `PipelexRunResultExecute.main_stuff_name: str`. `resolve_main_stuff_root_key` returns `str` and raises `PipeJobError` on a memory with no main stuff; `PipelexRunResultExecute.from_pipe_output` now uses it (previously `aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME)` — which could announce a key that wasn't actually in `root`).
+- **`PipeOutput.optional_main_stuff` DELETED** (breaking, in changelog). Workspace grep: only external consumer is `pipelex-demo-vibe` examples → Phase 3 sweep list.
+
+**`final_stuff_code` resolution (design §7):** the parallel now honors it on the combined stuff. Implementation: `_run_branches_and_combine` captures `pipe_run_params.final_stuff_code` and clears it *before* branch fan-out (branches deep-copy the params, so they must not inherit the parent's requested code), then passes it as the new `code=` param on `StuffFactory.combine_stuffs` → `make_stuff`. Live/dry parity for free (shared helper). Pinned by `test_pipe_parallel_final_stuff_code.py` (combined stuff carries the code; branch outputs don't). **Noted, not addressed (pre-existing gaps, out of scope):** only `PipeLLM`/`PipeStructure` honor `final_stuff_code` among operators; `PipeBatch` still clears it on entry rather than stamping its aggregate list with it.
+
+**Call-site audit (final state):** `grep get_optional_main_stuff` across `pipelex/` + `tests/` → the definition in `working_memory.py` (kept: pre-run/empty memory legitimately has none; public API for SDK-side pre-run checks) plus ONE justified in-source caller added by the review triage: `PipeCondition`'s pre-delivery checks (a mid-run "is there something to pass through / did anything get delivered" probe — legitimately optional at that point, converted into a loud `PipeRunError` when absent). Every post-run boundary call site was tightened.
+
+**Review triage (Checkpoint 2):** The context-free review found and reproduced one real bug: the Phase 1 premise "every pipe stamps" was FALSE for `PipeCondition`'s `continue` outcome (live path returned the memory untouched) and for the dry run of an all-special-outcomes condition — so the tightened tracer epilogue (which fires on EVERY pipe node) crashed with a raw `WorkingMemoryStuffNotFoundError` on any continue-with-no-prior-main-stuff under tracing. Resolution (design-consistent, not a defensive revert): `continue` IS pass-through delivery — the delivered main stuff is the one already in memory; with nothing to pass through the pipe now raises a clear actionable `PipeRunError` at the semantic site ("map the outcome to a pipe, or place this condition after a producing step"), in both live and dry paths. Pinned by `tests/integration/.../pipe_condition/test_pipe_condition_continue_delivery.py` (pass-through identity + both fail-loud cases; run params constructed directly so keyless forced-DRY coercion can't swap the exercised path). Suite gap noted by the reviewer (nothing drove continue-with-no-main-stuff under tracing) is now covered. The reviewer confirmed the parallel `final_stuff_code` capture/clear mirrors `PipeBatch`'s existing pattern, and `combine_stuffs(code=)` has no empty-string/double-stamp edge. Related known-shaky area: `test_pipe_condition_continue_output_type.py` stays xfail (separate pre-existing bug, batch-over-continue aggregation semantics — untouched by this fix since batch branches always have a main stuff stamped).
+
+**Test changes:** new `tests/integration/.../pipe_parallel/test_pipe_parallel_final_stuff_code.py`; `test_output_serialization.py` extended (aliased/direct root-key resolution + missing-main-stuff raises); `test_input_models.py` pins `main_stuff_name` required; `test_delivery_executor.py` mocks now carry a real main stuff + two new missing-main-stuff raise tests + `main_stuff.*` files asserted stored; `test_run_core_execution.py` obsolete `test_save_csv_no_main_stuff_exits` deleted; `test_run_pipe_tracer_metadata.py` + `test_run_cost_report.py` mock outputs made invariant-compliant; `test_mock_usage_direct.py` tightened.
+
+**Cross-repo consequences flagged for Phase 3:** `main_stuff_name` is now required on the `/execute` response extension and `PipelexPipeRunOutput` — the closed `pipelex-transport` library and any consumer parsing these payloads must be checked; `pipelex-demo-vibe` uses the deleted `optional_main_stuff`.
 
 ### Checkpoint 3 — not reached
