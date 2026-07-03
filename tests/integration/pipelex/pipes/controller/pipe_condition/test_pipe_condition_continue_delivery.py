@@ -76,6 +76,10 @@ class TestPipeConditionContinueDelivery:
         )
 
         assert pipe_output.main_stuff.stuff_code == input_text_stuff.stuff_code
+        # Run identity must survive the pass-through: the continue path builds its own PipeOutput,
+        # so it must stamp pipeline_run_id like every other controller — otherwise the blocking
+        # bridge serializes SpecialPipelineId.UNTITLED and callers track the wrong run.
+        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
 
     async def test_continue_without_main_stuff_fails_loud(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
         """With nothing to pass through, `continue` is a clear PipeRunError at the pipe level."""
@@ -108,3 +112,21 @@ class TestPipeConditionContinueDelivery:
                 working_memory=working_memory,
                 pipe_run_params=_make_run_params(PipeRunMode.DRY),
             )
+
+    async def test_dry_run_continue_with_main_stuff_preserves_run_id(
+        self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
+        """Dry-run parity path (all-special-outcomes condition with a pre-existing main stuff) must also
+        stamp pipeline_run_id, like the live continue path — the dry-run PipeOutput is built directly too.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
+        pipe_condition = _make_continue_only_condition()
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(_make_input_text_stuff())
+
+        pipe_output = await pipe_condition.run_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=_make_run_params(PipeRunMode.DRY),
+        )
+
+        assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id

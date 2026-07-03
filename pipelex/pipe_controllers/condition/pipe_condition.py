@@ -255,7 +255,7 @@ class PipeCondition(PipeController):
                     "pipe, or place this condition after a step that produces the output to pass through."
                 )
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            return PipeOutput(working_memory=working_memory)
+            return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
@@ -356,4 +356,4 @@ class PipeCondition(PipeController):
                 "mapped and no pre-existing main stuff, the run cannot deliver an output."
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-        return PipeOutput(working_memory=working_memory)
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
