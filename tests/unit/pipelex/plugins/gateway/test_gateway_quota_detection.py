@@ -70,7 +70,7 @@ def _make_gateway_img_gen_worker(mocker: MockerFixture) -> GatewayImgGenWorker:
     mock_model.model_id = "gpt-image-1"
     mock_model.name = "gpt-image-1"
     mock_model.tag = "test-imggen-tag"
-    mock_model.extra_headers = {}
+    mock_model.extra_headers = {"endpoint_path": "/gpt-image-1"}
     mock_model.rules = mocker.MagicMock()
     worker.inference_model = mock_model
 

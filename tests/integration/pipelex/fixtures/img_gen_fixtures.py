@@ -13,13 +13,10 @@ def skip_if_img_gen_params_unsupported(
     *,
     has_input_images: bool = False,
 ) -> None:
-    """Call from tests: pytest.skip if any param value isn't supported by the model's rules."""
-    if inference_model.rules is None:
-        return
+    """Call from tests: pytest.skip if any param value isn't supported by the model."""
     reasons = ImgGenParamSupport.check_job_params(
-        rules=inference_model.rules,
+        inference_model=inference_model,
         params=params,
-        model_name=inference_model.name,
         has_input_images=has_input_images,
     )
     if reasons:

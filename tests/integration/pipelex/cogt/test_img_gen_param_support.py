@@ -115,9 +115,8 @@ class TestImgGenParamSupportIntegration:
             output_format=ImageFormat.JPEG,
         )
         reasons = ImgGenParamSupport.check_job_params(
-            rules=spec.rules,
+            inference_model=spec,
             params=params,
-            model_name=spec.name,
         )
         assert len(reasons) >= 1
         assert any("landscape_4_3" in reason.lower() for reason in reasons)
@@ -133,9 +132,8 @@ class TestImgGenParamSupportIntegration:
             output_format=ImageFormat.PNG,
         )
         reasons = ImgGenParamSupport.check_job_params(
-            rules=spec.rules,
+            inference_model=spec,
             params=params,
-            model_name=spec.name,
         )
         assert reasons == []
 
