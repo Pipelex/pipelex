@@ -58,6 +58,42 @@ A token with no registered orchestrator (its plugin is not installed) raises `Mi
 
 ---
 
+## Bundle validators: the `/validate` counterpart
+
+`/validate` rides the same open-token seam as `run`. A **bundle validator** produces a validation verdict for one orchestration mode, the way an orchestrator runs a pipe for one mode: the core `direct` plugin contributes the in-process validator, and an external orchestrator plugin contributes a worker-dispatched validator under its own token — which core never names. A host runtime resolves the requested mode and dispatches through the `BundleValidatorRegistry` on the hub instead of branching on a backend.
+
+A validator satisfies `BundleValidatorProtocol` (`pipelex/plugins/bundle_validator_registry.py`):
+
+```python
+class BundleValidatorProtocol(Protocol):
+    async def validate_bundles(
+        self,
+        *,
+        mthds_contents: list[str],
+        mthds_sources: list[str] | None,
+        allow_signatures: bool,
+        library_dirs: Sequence[Path] | None,
+    ) -> BundleValidationVerdict: ...
+```
+
+Two contract points distinguish it from `OrchestratorProtocol.run`:
+
+- **No `delivery` axis.** Validation is inherently blocking, so the protocol carries no delivery parameter and no fire-and-forget capability flag.
+- **Verdict-as-value, not raise.** `validate_bundles` *returns* the verdict — `BundleValidationVerdict` is the union of the valid arm (a `ValidationReport`) and the invalid arm (an `ErrorReport` carrying `validation_errors`) — and raises only for a no-verdict infra fault, which a host runtime maps to a 5xx. This is the same valid/invalid pair the API maps onto its 200-always `/validate` wire, so the verdict contract is backend-independent.
+
+The seam is deliberately typed at the MTHDS-protocol level (`ValidationReport` from `mthds.protocol`), not the concrete `PipelexValidationReport` envelope: the concrete report's module reaches the hub, so naming it from this hub-reachable seam would close an import cycle, and the seam is generic across orchestrators (language-standard altitude), so it speaks the protocol report — the Pipelex-runtime envelope is the concrete `ValidationReport` subtype the validators actually produce, and the API recovers that precise type at its edge. `library_dirs` is host context the in-process arm needs to load the method library; a worker-dispatched arm ignores it — its worker loads its own library.
+
+A plugin contributes one per token, right next to its orchestrator:
+
+```python
+registrar.add_orchestrator(mode=DIRECT_ORCHESTRATION_MODE, orchestrator=DirectOrchestrator())
+registrar.add_bundle_validator(mode=DIRECT_ORCHESTRATION_MODE, validator=DirectBundleValidator())
+```
+
+The failure modes mirror the orchestrator seam exactly: a duplicate token fails loud at discovery (`DuplicateBundleValidatorError`, naming both plugins), and a lookup miss raises `MissingBundleValidatorError` — the same generic, plugin-decoupled message shape as `MissingOrchestratorError` (*"is its plugin installed?"*), with the same `"direct"` special case reporting a boot/discovery fault.
+
+---
+
 ## HTTP error mappers: rendering an orchestrator's transport faults
 
 An orchestrator's *runtime* (a Temporal client, a Mistral workflow runner) raises SDK-specific transport faults — a server unreachable, a workflow timeout — that a host runtime serving HTTP must turn into a proper error response, not a catch-all 500. But core names no web framework and the SDK lives only in the plugin, so the host (`pipelex-api`) cannot itself know how to classify `temporalio.TemporalError`.
@@ -95,10 +131,15 @@ if registrar.config.plugins.boot_orchestrator == self.name:
     registrar.claim_task_manager(_setup_temporal_task_manager)
     registrar.claim_pipe_router(_make_temporal_pipe_router)
     registrar.claim_pipe_run(_make_temporal_pipe_run)
+    registrar.claim_isolated_execution_probe(_temporal_isolated_execution_probe)
     registrar.add_teardown(_teardown_temporal)
 ```
 
 Each `claim_*` takes a **thunk** (a zero-arg factory), never a constructed instance. The thunk runs only at the boot apply-point, so `register` itself imports no `temporalio` — even on a worker. This is the deferred-thunk rule that keeps the import-light invariant intact at boot.
+
+### The isolated-execution-probe slot
+
+The first four slots swap in the runtime's implementations of core execution services. The fifth, `claim_isolated_execution_probe`, is different in kind: its thunk resolves not a service but an **ambient predicate** (`Callable[[], bool]`) reporting whether the current call runs inside an isolated sub-execution — a Temporal activity — whose side-effecting emissions must not be written into the parent run's replay-deterministic buffer. `ReportingManager` consults it (`hub.is_in_isolated_execution()`) to route an activity-side usage emission to the per-process log instead of the workflow's registered buffer. It exists as a hub slot for the same reason the others do: only a boot-orchestrator plugin whose runtime has a replay/activity split knows how to answer, and core names no such runtime. Unclaimed (any in-process boot), the hub's core default answers "never isolated" — the in-process orchestrator has no such split.
 
 Because the gate is a name-match, `plugins.boot_orchestrator` must name a plugin that actually registered. After discovery, `Pipelex.setup` rejects a `boot_orchestrator` that no registered plugin carries — a typo or a missing plugin (e.g. `--orchestrator temporal` without `pipelex-temporal` installed) raises `UnknownBootOrchestratorError` instead of silently running in-process: nothing would claim the hub slots, so the process would otherwise fall through to the core defaults and execute on the wrong runtime. The check matches against **plugin names** (the same namespace the gate uses), not the `orchestration_mode` registry — a plugin's name and the token(s) it serves are separate namespaces that *may* differ, even where a shipped plugin keeps them identical (`pipelex-temporal` is named `temporal` and serves `temporal`). The error names no specific plugin, keeping core decoupled.
 
@@ -110,7 +151,7 @@ At each ordered hub slot, `Pipelex.setup` resolves in this precedence:
 2. a plugin slot-claim thunk;
 3. the core default.
 
-A slot claim must never silently override an explicit injection. Teardown runs the plugin-registered teardown callbacks **LIFO**, before core teardown, so a worker's in-flight runtime resources release first.
+A slot claim must never silently override an explicit injection. Two slots take no explicit `setup()` parameter and so skip step 1: the task manager (no core default either — unclaimed means no task manager wiring at all) and the isolated-execution probe (whose core default is the always-False predicate above). Teardown runs the plugin-registered teardown callbacks **LIFO**, before core teardown, so a worker's in-flight runtime resources release first.
 
 ---
 
@@ -138,7 +179,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 | Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
 | Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
 | Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by `pipelex-transport`) |
-| Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`) |
+| Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_bundle_validator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`), `pipelex.plugins.bundle_validator_registry` (`BundleValidatorProtocol`, `BundleValidationVerdict`) |
 | Execution protocols | `PipeRouterProtocol`, `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |
 | Payload / core types | `PipeJob`, `PipeOutput`, `DeliveryAssignment`, `WorkingMemory` (+ factory, `dump_for_transport`), `JobMetadata`, `LibraryCrate` |
 | Library + hub scoping | `set_current_library` / `get_current_library`, `scoped_pipe_router`, `get_class_registry` (per-call library hydration via `library_crate_dump`) |
@@ -153,8 +194,8 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 
 `pipelex_temporal/temporal_plugin.py` (in the external `pipelex-temporal` distribution) is the reference orchestrator plugin. Its `register`:
 
-- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`). It advertises `supports_fire_and_forget = True`, and its `run` branches on the endpoint-chosen `delivery`: `BLOCKING` awaits completion and reports `make_workflow_id(...)`; `FIRE_AND_FORGET` calls `.start(...)` and returns an `is_completed=False` output carrying the workflow id;
-- **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
+- **always** (regardless of the boot gate): contributes a single `TemporalOrchestrator` registered once under the `"temporal"` token (import-light; `temporalio` is pulled lazily inside `run`), the matching `TemporalBundleValidator` under the same token (the worker-dispatched `/validate` arm), and an HTTP error mapper classifying Temporal transport faults. The orchestrator advertises `supports_fire_and_forget = True`, and its `run` branches on the endpoint-chosen `delivery`: `BLOCKING` awaits completion and reports `make_workflow_id(...)`; `FIRE_AND_FORGET` calls `.start(...)` and returns an `is_completed=False` output carrying the workflow id;
+- **only when `plugins.boot_orchestrator == "temporal"`**: claims the content-generator / task-manager / pipe-router / pipe-run / isolated-execution-probe hub slots with thunks and registers the teardown callback — booting this process as a Temporal-default runtime.
 
 The orchestrator itself (`pipelex_temporal/temporal_orchestrators.py`) carries both delivery bodies behind one exhaustive `match delivery`, keeping the `WorkflowExecutionError` catch and the `make_workflow_id` recompute in the blocking arm. It serializes its `PipeOutput` through `pipelex.runtime_bridge.serialization`, shared with the core DIRECT orchestrator so the boundary shape cannot drift.
 

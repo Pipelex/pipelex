@@ -43,7 +43,7 @@ class PipelexPlugin(Protocol):
     def register(self, registrar: PluginRegistrar) -> None: ...
 ```
 
-`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again at CLI-build to harvest plugin-contributed commands).
+`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again whenever the `pipelex plugins list` diagnostic command re-discovers plugins to print what each contributed).
 
 `targets_api` is checked against `PLUGIN_API_VERSION`. A mismatch fails loud with `PluginApiVersionMismatchError` — a single coarse integer gate, not semver-range matching.
 
