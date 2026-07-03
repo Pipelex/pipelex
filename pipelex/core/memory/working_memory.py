@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryStuffAttributeNotFoundError,
@@ -39,6 +40,11 @@ StuffArtefactDict = dict[str, StuffArtefact]
 class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: dict[str, str] = Field(default_factory=dict)
+    # The absence ledger (D2): recorded facts that a named slot holds no value, with provenance.
+    # A name may carry both a value and a record (D4 plural normalization note); the value wins
+    # for consumers — records are consulted only when no Stuff is present, and enumerated whole
+    # by the run report.
+    absences: dict[str, AbsenceRecord] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_stuff_names(self) -> Self:
@@ -94,6 +100,46 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
         )
 
+    def record_absence(self, record: AbsenceRecord) -> None:
+        """Record that the slot named by the record holds no value (keyed by variable name)."""
+        self.absences[record.variable_name] = record
+
+    def get_optional_absence(self, name: str) -> AbsenceRecord | None:
+        return self.absences.get(name)
+
+    def record_new_main_absence(self, record: AbsenceRecord) -> None:
+        """Record a pipe-output absence as the resolved main result.
+
+        Marks both the named slot and the main-stuff position, and removes any stale main stuff
+        so a previous value cannot masquerade as this pipe's output. The previous value stays in
+        memory under its own name — memory is otherwise unchanged.
+        """
+        self.remove_main_stuff()
+        self.remove_alias_to_main_stuff()
+        self.record_absence(record)
+        self.absences[MAIN_STUFF_NAME] = record
+
+    def resolve_stuff(self, name: str) -> Stuff | AbsenceRecord:
+        """Tri-state resolved accessor for post-run reads: a value or a recorded absence.
+
+        A present Stuff wins over a ledger note under the same name. A slot with neither a value
+        nor a record is a hard miss — never produced, which is a bug, not an absence.
+        """
+        if stuff := self.get_optional_stuff(name=name):
+            return stuff
+        if record := self.get_optional_absence(name=name):
+            return record
+        raise WorkingMemoryStuffNotFoundError(
+            variable_name=name,
+            message=(
+                f"Stuff '{name}' not found in working memory and no absence is recorded for it. "
+                f"Valid keys are: {self.list_keys()}; recorded absences: {list(self.absences.keys())}"
+            ),
+        )
+
+    def resolve_main_stuff(self) -> Stuff | AbsenceRecord:
+        return self.resolve_stuff(name=MAIN_STUFF_NAME)
+
     def get_stuffs(self, names: set[str]) -> list[Stuff]:
         the_stuffs: list[Stuff] = []
         for name in names:
@@ -119,6 +165,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
     def set_stuff(self, *, name: str, stuff: Stuff):
         self.root[name] = stuff
+        # A value written under a name supersedes its absence record.
+        self.absences.pop(name, None)
 
     def is_stuff_exists(self, name: str) -> bool:
         return name in self.root or name in self.aliases
@@ -146,6 +194,9 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
     def set_new_main_stuff(self, stuff: Stuff, *, name: str | None = None):
         # TODO: Add unit tests for this method
+        # A real main output supersedes any positional main-stuff absence record; named-slot
+        # records for other variables stay (they remain genuinely absent).
+        self.absences.pop(MAIN_STUFF_NAME, None)
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])

@@ -212,21 +212,26 @@ class SubPipe(BaseModel):
             for req_var in required_variables:
                 if not req_var.startswith("_"):
                     required_stuff_names.add(get_root_from_dotted_path(req_var))
-            try:
-                required_stuffs = working_memory.get_stuffs(names=required_stuff_names)
-            except WorkingMemoryStuffNotFoundError as exc:
+            # A recorded absence is not a miss: the sub-pipe's own gate applies the trichotomy
+            # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
+            missing_names = [
+                name
+                for name in sorted(required_stuff_names)
+                if working_memory.get_optional_stuff(name) is None and working_memory.get_optional_absence(name) is None
+            ]
+            if missing_names:
                 sub_pipe_path = [*sub_pipe_run_params.pipe_stack, self.pipe_code]
                 sub_pipe_path_str = ".".join(sub_pipe_path)
-                error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+                error_details = f"SubPipe '{sub_pipe_path_str}', required_variables: {required_variables}, missing: '{missing_names[0]}'"
                 msg = f"Some required stuff(s) not found: {error_details}"
                 raise PipeRunInputsError(
                     message=msg,
                     run_mode=sub_pipe_run_params.run_mode,
                     pipe_code=self.pipe_code,
-                    variable_name=exc.variable_name,
+                    variable_name=missing_names[0],
                     concept_code=None,
-                ) from exc
-            log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
+                )
+            log.verbose(working_memory.get_existing_stuffs(names=required_stuff_names), title=f"Required stuffs for {self.pipe_code}")
             pipe_output = await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,

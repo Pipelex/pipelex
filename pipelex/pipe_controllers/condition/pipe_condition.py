@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
@@ -272,14 +272,19 @@ class PipeCondition(PipeController):
         required_variables = chosen_pipe.required_variables()
         # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
         required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
-        try:
-            working_memory.get_stuffs(names=required_stuff_names)
-        except WorkingMemoryStuffNotFoundError as exc:
+        # A recorded absence is not a miss: the chosen pipe's own gate applies the trichotomy
+        # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
+        missing_names = [
+            name
+            for name in sorted(required_stuff_names)
+            if working_memory.get_optional_stuff(name) is None and working_memory.get_optional_absence(name) is None
+        ]
+        if missing_names:
             pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
             pipe_condition_path_str = ".".join(pipe_condition_path)
-            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{missing_names[0]}'"
             msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
