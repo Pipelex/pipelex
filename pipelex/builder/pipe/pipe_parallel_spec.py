@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field
 from rich.console import Group
 from rich.table import Table
 from rich.text import Text
@@ -8,54 +8,32 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
-from pipelex.cogt.content_generation.dry_run_factory import MockFormat
-from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import Self
 
 
 class PipeParallelSpec(PipeSpec):
     """Spec for parallel pipe execution in the Pipelex framework.
 
     PipeParallel enables concurrent execution of multiple pipes, improving performance
-    for independent operations. All parallel pipes receive the same input context
-    and their outputs can be combined or kept separate.
+    for independent operations. All parallel pipes receive the same input context.
+    Their outputs are always combined into the pipe's declared output concept — either
+    `Composite` (untyped named composition) or a structured concept whose fields
+    correspond to the branch result names.
 
     Validation Rules:
         1. Branches list must not be empty.
         2. Each branch must be a valid SubPipeSpec.
-        3. combined_output, when specified, must be a valid ConceptCode in PascalCase.
-        4. Pipe codes in branches must reference existing pipes (snake_case).
+        3. Pipe codes in branches must reference existing pipes (snake_case).
+        4. The output must be `Composite` or a structured concept compatible with the
+           branch result names (validated at the blueprint/library level).
 
     """
 
     type: Literal["PipeParallel"] = "PipeParallel"
     pipe_category: Literal["PipeController"] = "PipeController"
     branches: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
-    add_each_output: bool = Field(description="Whether to include individual pipe outputs in the combined result.")
-    combined_output: str | None = Field(
-        default=None,
-        description="Optional ConceptCode in PascalCase for the combined output structure.",
-        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
-    )
-
-    @field_validator("combined_output", mode="before")
-    @classmethod
-    def validate_combined_output(cls, combined_output: str) -> str:
-        if combined_output:
-            validate_concept_ref_or_code(concept_ref_or_code=combined_output)
-        return combined_output
-
-    @model_validator(mode="after")
-    def validate_output_options(self) -> Self:
-        if not self.add_each_output and not self.combined_output:
-            msg = (
-                "PipeParallel requires either add_each_output to be True or combined_output to be set, "
-                "or both, otherwise the pipe won't output anything"
-            )
-            raise ValueError(msg)
-        return self
+    add_each_output: bool = Field(description="Whether to also expose each branch output by its result name in memory.")
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -69,8 +47,6 @@ class PipeParallelSpec(PipeSpec):
         # Add parallel configuration
         parallel_group.renderables.append(Text())  # Blank line
         parallel_group.renderables.append(Text.from_markup(f"Add Each Output: [bold yellow]{self.add_each_output}[/bold yellow]"))
-        if self.combined_output:
-            parallel_group.renderables.append(Text.from_markup(f"Combined Output: [bold green]{self.combined_output}[/bold green]"))
 
         # Add parallel branches as a table
         parallel_group.renderables.append(Text())  # Blank line
@@ -107,5 +83,4 @@ class PipeParallelSpec(PipeSpec):
             pipe_category=self.pipe_category,
             branches=core_branches,
             add_each_output=self.add_each_output,
-            combined_output=self.combined_output,
         )

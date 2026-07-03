@@ -1,17 +1,19 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
@@ -23,7 +25,6 @@ from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from collections.abc import Coroutine
@@ -38,7 +39,6 @@ class PipeParallel(PipeController):
 
     parallel_sub_pipes: list[SubPipe]
     add_each_output: bool
-    combined_output: Concept | None
 
     @field_validator("parallel_sub_pipes", mode="before")
     @classmethod
@@ -102,15 +102,6 @@ class PipeParallel(PipeController):
                     needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
-    @model_validator(mode="after")
-    def validate_fields_add_each_output_and_combined_output(self) -> Self:
-        # Validate that either add_each_output or combined_output is set
-        if not self.add_each_output and not self.combined_output:
-            msg = f"PipeParallel'{self.code}'requires either add_each_output or combined_output to be set"
-            raise ValueError(msg)
-
-        return self
-
     @override
     def validate_inputs_static(self):
         pass
@@ -121,15 +112,192 @@ class PipeParallel(PipeController):
 
     @override
     def validate_output_static(self):
-        pass
+        if self.output.multiplicity is not None:
+            msg = (
+                f"PipeParallel '{self.code}' output must not declare a multiplicity: "
+                "a parallel combination is a named composite, never a list (a list aggregation is PipeBatch's shape)."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+            )
+        output_concept = self.output.concept
+        if Concept.is_native_concept(concept=output_concept):
+            native_code = NativeConceptCode(output_concept.code)
+            match native_code:
+                case NativeConceptCode.COMPOSITE:
+                    pass
+                case (
+                    NativeConceptCode.DYNAMIC
+                    | NativeConceptCode.TEXT
+                    | NativeConceptCode.IMAGE
+                    | NativeConceptCode.DOCUMENT
+                    | NativeConceptCode.HTML
+                    | NativeConceptCode.TEXT_AND_IMAGES
+                    | NativeConceptCode.NUMBER
+                    | NativeConceptCode.PAGE
+                    | NativeConceptCode.JSON
+                    | NativeConceptCode.SEARCH_RESULT
+                    | NativeConceptCode.ANYTHING
+                ):
+                    msg = (
+                        f"PipeParallel '{self.code}' output '{output_concept.concept_ref}' is invalid: "
+                        "the output of a parallel must be 'Composite' or a structured concept whose fields "
+                        "correspond to the branch result names."
+                    )
+                    raise PipeValidationError(
+                        message=msg,
+                        error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                        domain_code=self.domain_code,
+                        pipe_code=self.code,
+                        provided_concept_code=output_concept.concept_ref,
+                    )
 
     @override
     def validate_output_with_library(self):
-        pass
+        """Check that the declared output structure can hold the branch results.
+
+        The declared output is either `Composite` (the untyped composition vehicle — accepts any
+        branch names) or a structured concept whose fields are compatible with the branch `result`
+        names: required fields ⊆ result names, result names ⊆ declared fields. This turns the
+        runtime combine failure into an author-time error surfaced by `/validate`.
+        """
+        structure_class = self.output.concept.get_structure_class()
+        if issubclass(structure_class, CompositeContent):
+            return
+
+        result_names = {sub_pipe.output_name for sub_pipe in self.parallel_sub_pipes if sub_pipe.output_name}
+        declared_fields = set(structure_class.model_fields.keys())
+        required_fields = {field_name for field_name, field_info in structure_class.model_fields.items() if field_info.is_required()}
+
+        missing_required_fields = required_fields - result_names
+        if missing_required_fields:
+            msg = (
+                f"PipeParallel '{self.code}' output '{self.output.concept.concept_ref}' requires field(s) "
+                f"{sorted(missing_required_fields)} that no branch produces. Branch result names: {sorted(result_names)}. "
+                "Each required field of the output structure must match a branch result name."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+                variable_names=sorted(missing_required_fields),
+            )
+
+        extraneous_result_names = result_names - declared_fields
+        if extraneous_result_names:
+            msg = (
+                f"PipeParallel '{self.code}' output '{self.output.concept.concept_ref}' has no field for branch "
+                f"result(s) {sorted(extraneous_result_names)}. Declared fields: {sorted(declared_fields)}. "
+                "Every branch result name must match a field of the output structure, or use 'Composite' "
+                "as the output for an untyped composition."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+                variable_names=sorted(extraneous_result_names),
+            )
 
     @override
     def pipe_dependencies(self) -> set[str]:
         return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
+
+    async def _run_branches_and_combine(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None,
+        library_crate: "LibraryCrate | None",
+    ) -> PipeOutput:
+        """Run all branches on deep copies of the memory, then always combine their outputs.
+
+        Shared by live and dry run: the sub-pipes' own run_pipe dispatch honors the run mode,
+        so live and dry runs stamp the same combined main stuff shape.
+        """
+        tasks: list[Coroutine[Any, Any, PipeOutput]] = []
+
+        for sub_pipe in self.parallel_sub_pipes:
+            tasks.append(
+                sub_pipe.run_pipe(
+                    calling_pipe_code=self.code,
+                    job_metadata=job_metadata,
+                    working_memory=working_memory.make_deep_copy(),
+                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                    library_crate=library_crate,
+                ),
+            )
+
+        pipe_outputs = await asyncio.gather(*tasks)
+
+        output_stuffs: dict[str, Stuff] = {}
+        output_stuff_contents: dict[str, StuffContent] = {}
+
+        for output_index, pipe_output in enumerate(pipe_outputs):
+            output_stuff = pipe_output.main_stuff
+            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
+            if not sub_pipe_output_name:
+                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' output name not specified"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            if sub_pipe_output_name in output_stuffs:
+                # TODO: check that at the blueprint / factory level
+                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            if self.add_each_output:
+                working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
+            output_stuffs[sub_pipe_output_name] = output_stuff
+            output_stuff_contents[sub_pipe_output_name] = output_stuff.content
+            log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
+
+        # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
+        # a pipe run always delivers a main stuff.
+        combined_output_stuff = StuffFactory.combine_stuffs(
+            concept=self.output.concept,
+            stuff_contents=output_stuff_contents,
+            name=output_name,
+        )
+        working_memory.set_new_main_stuff(
+            stuff=combined_output_stuff,
+            name=output_name,
+        )
+
+        # Register parallel combine edges BEFORE register_branch_outputs, because
+        # register_parallel_combine snapshots the original branch producers from
+        # _stuff_producer_map before register_controller_output overrides them
+        self._register_parallel_combine_with_graph_tracer(
+            job_metadata=job_metadata,
+            combined_stuff=combined_output_stuff,
+            branch_stuffs=output_stuffs,
+        )
+
+        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
+        self._register_branch_outputs_with_graph_tracer(
+            job_metadata=job_metadata,
+            output_stuffs=output_stuffs,
+        )
+
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "branch_count": len(self.parallel_sub_pipes),
+            "add_each_output": self.add_each_output,
+            "combined_output_concept": self.output.concept.concept_ref,
+        }
+        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+
+        return PipeOutput(
+            working_memory=working_memory,
+            pipeline_run_id=job_metadata.pipeline_run_id,
+        )
 
     @override
     async def _live_run_controller_pipe(
@@ -142,87 +310,17 @@ class PipeParallel(PipeController):
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         if pipe_run_params.final_stuff_code:
-            log.verbose(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
+            # TODO(Phase 2): honor final_stuff_code on the combined stuff like operators do,
+            # instead of discarding it.
+            log.verbose(f"PipeParallel.run_pipe() discarding final_stuff_code: {pipe_run_params.final_stuff_code}")
             pipe_run_params.final_stuff_code = None
 
-        tasks: list[Coroutine[Any, Any, PipeOutput]] = []
-
-        for sub_pipe in self.parallel_sub_pipes:
-            tasks.append(
-                sub_pipe.run_pipe(
-                    calling_pipe_code=self.code,
-                    job_metadata=job_metadata,
-                    working_memory=working_memory.make_deep_copy(),
-                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
-                    library_crate=library_crate,
-                ),
-            )
-
-        pipe_outputs = await asyncio.gather(*tasks)
-
-        output_stuff_content_items: list[StuffContent] = []
-        output_stuffs: dict[str, Stuff] = {}
-        output_stuff_contents: dict[str, StuffContent] = {}
-
-        # TODO: refactor this to use a specific function for this that can also be used in dry run
-        for output_index, pipe_output in enumerate(pipe_outputs):
-            output_stuff = pipe_output.main_stuff
-            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
-            if not sub_pipe_output_name:
-                msg = "PipeParallel requires a result specified for each parallel sub pipe"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            if self.add_each_output:
-                working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
-            output_stuff_content_items.append(output_stuff.content)
-            if sub_pipe_output_name in output_stuffs:
-                # TODO: check that at the blueprint / factory level
-                msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            output_stuffs[sub_pipe_output_name] = output_stuff
-            if sub_pipe_output_name in output_stuff_contents:
-                # TODO: check that at the blueprint / factory level
-                msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            output_stuff_contents[sub_pipe_output_name] = output_stuff.content
-            log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
-
-        if self.combined_output:
-            combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=self.combined_output,
-                stuff_contents=output_stuff_contents,
-                name=output_name,
-            )
-            working_memory.set_new_main_stuff(
-                stuff=combined_output_stuff,
-                name=output_name,
-            )
-
-            # Register parallel combine edges BEFORE register_branch_outputs, because
-            # register_parallel_combine snapshots the original branch producers from
-            # _stuff_producer_map before register_controller_output overrides them
-            self._register_parallel_combine_with_graph_tracer(
-                job_metadata=job_metadata,
-                combined_stuff=combined_output_stuff,
-                branch_stuffs=output_stuffs,
-            )
-
-        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
-        self._register_branch_outputs_with_graph_tracer(
+        return await self._run_branches_and_combine(
             job_metadata=job_metadata,
-            output_stuffs=output_stuffs,
-        )
-
-        # Capture execution data for the graph tracer
-        execution_data_dict: dict[str, Any] = {
-            "branch_count": len(self.parallel_sub_pipes),
-            "add_each_output": self.add_each_output,
-            "combined_output_concept": self.combined_output.concept_ref if self.combined_output else None,
-        }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-
-        return PipeOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            library_crate=library_crate,
         )
 
     @override
@@ -235,7 +333,7 @@ class PipeParallel(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        # 1. Validate that all sub-pipes exist
+        # Validate that all sub-pipes exist before dispatching the dry branches
         for sub_pipe in self.parallel_sub_pipes:
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe_code)
@@ -243,84 +341,12 @@ class PipeParallel(PipeController):
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 2. Run all sub-pipes in dry mode
-        tasks: list[Coroutine[Any, Any, PipeOutput]] = []
-
-        for sub_pipe in self.parallel_sub_pipes:
-            tasks.append(
-                sub_pipe.run_pipe(
-                    calling_pipe_code=self.code,
-                    job_metadata=job_metadata,
-                    working_memory=working_memory.make_deep_copy(),
-                    sub_pipe_run_params=pipe_run_params.make_deep_copy(),
-                    library_crate=library_crate,
-                ),
-            )
-
-        pipe_outputs = await asyncio.gather(*tasks)
-
-        # 3. Process outputs as in the regular run
-        output_stuffs: dict[str, Stuff] = {}
-        output_stuff_contents: dict[str, StuffContent] = {}
-
-        for output_index, pipe_output in enumerate(pipe_outputs):
-            output_stuff = pipe_output.main_stuff
-            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
-            if not sub_pipe_output_name:
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' output name not specified"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
-            if self.add_each_output:
-                working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
-
-            if sub_pipe_output_name in output_stuffs:
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = (
-                    f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
-                )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-
-            output_stuffs[sub_pipe_output_name] = output_stuff
-            output_stuff_contents[sub_pipe_output_name] = output_stuff.content
-
-        # 4. Handle combined output if specified
-        if self.combined_output:
-            combined_output_stuff = StuffFactory.combine_stuffs(
-                concept=self.combined_output,
-                stuff_contents=output_stuff_contents,
-                name=output_name,
-            )
-            working_memory.set_new_main_stuff(
-                stuff=combined_output_stuff,
-                name=output_name,
-            )
-
-            # Register parallel combine edges BEFORE register_branch_outputs, because
-            # register_parallel_combine snapshots the original branch producers from
-            # _stuff_producer_map before register_controller_output overrides them
-            self._register_parallel_combine_with_graph_tracer(
-                job_metadata=job_metadata,
-                combined_stuff=combined_output_stuff,
-                branch_stuffs=output_stuffs,
-            )
-
-        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
-        self._register_branch_outputs_with_graph_tracer(
+        return await self._run_branches_and_combine(
             job_metadata=job_metadata,
-            output_stuffs=output_stuffs,
-        )
-
-        execution_data_dict: dict[str, Any] = {
-            "branch_count": len(self.parallel_sub_pipes),
-            "add_each_output": self.add_each_output,
-            "combined_output_concept": self.combined_output.concept_ref if self.combined_output else None,
-        }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-
-        return PipeOutput(
             working_memory=working_memory,
-            pipeline_run_id=job_metadata.pipeline_run_id,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            library_crate=library_crate,
         )
 
     def _register_branch_outputs_with_graph_tracer(

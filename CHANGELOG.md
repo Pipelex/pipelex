@@ -2,8 +2,18 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`PipeParallel` always combines (breaking):** A parallel now always combines its branch outputs into its declared `output` concept and stamps the combination as its main output — a pipe run always delivers a main stuff. The `combined_output` field is deleted from the MTHDS language: `output` is now the (single, truthful) combination concept. Migration: pipes declaring both fields just drop the `combined_output` line; `add_each_output`-only pipes replace their placeholder `output` with `Composite` or a structured concept matching the branch `result` names. `add_each_output` keeps its meaning (also expose each branch output by name) and now defaults to `false` with no one-of-two constraint.
+- **Static validation of parallel outputs:** The declared `output` of a `PipeParallel` is validated at author time: it must be `Composite` or a structured concept whose fields are compatible with the branch `result` names (required fields ⊆ result names; result names ⊆ declared fields). Scalar native concepts (`Text`, `Image`, ...), `Dynamic`, `Anything`, and multiplicity suffixes (`Foo[]`, `Foo[N]`) are rejected by `/validate` and library loading instead of failing at runtime inside the combine step.
+
+### Added
+
+- **`native.Composite` concept:** New native concept backed by `CompositeContent` — an untyped named composition holding its sub-contents as top-level fields (no wrapper key). It is the combination vehicle for parallels whose authors don't want to declare a bespoke concept, and supports the full content surface: `smart_dump`, kajson/transport round-trip, and markdown/HTML rendering.
+
 ### Fixed
 
+- **Stale main stuff after an `add_each_output`-only parallel:** A pipeline ending in an `add_each_output`-only `PipeParallel` used to silently report the *previous* step's output (or even an input) as its main result, and such a parallel as the top-level pipe on the API path completed with no main stuff at all. The parallel now always stamps its combined output, in live and dry runs alike.
 - **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
 - **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), mirroring `teardown`. Previously a failed boot could poison a subsequent boot in the same process — surfacing as a "LogConfig is already set" error or a stale, half-populated class registry.
 

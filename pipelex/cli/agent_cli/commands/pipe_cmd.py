@@ -128,8 +128,6 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: tomlkit.TOMLDo
 
     elif isinstance(pipe_spec, PipeParallelSpec):
         pipe_table.add("add_each_output", pipe_spec.add_each_output)
-        if pipe_spec.combined_output:
-            pipe_table.add("combined_output", pipe_spec.combined_output)
         branches_array = tomlkit.array()
         for branch in pipe_spec.branches:
             branch_inline = tomlkit.inline_table()
