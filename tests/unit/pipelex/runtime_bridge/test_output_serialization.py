@@ -52,7 +52,6 @@ class TestSerializeCompletedOutput:
         assert dto.usage_assembly_error == "usage boom"
         assert dto.graph_assembly_error == "graph boom"
         assert dto.pipeline_run_id == "run-with-usage"
-        assert dto.is_completed is True
 
     def test_absent_assembly_serializes_to_none(self) -> None:
         """When the run produced no usage/graph, the boundary fields stay None (not [])."""

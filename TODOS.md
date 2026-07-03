@@ -105,6 +105,8 @@ Acceptance: no defensive main-stuff branch left for completed live runs; wire `m
 - [ ] `pipelex-website/` — `docs/mthds-doc.md`.
 - [ ] Demo/workshop repos — `illustration_generator/bundle.mthds` copies.
 - [ ] SDKs (`pipelex-sdk-js/`, `mthds-python/`) + `pipelex-starter-python/` — tighten `main_stuff` handling for completed runs; check `PipeOutputAbstract` (mthds-python) for encoded main-stuff optionality (design §7). Full `find_main_content` cleanup also needs the companion track — do only the invariant-side tightening here.
+- [ ] `pipelex-temporal/` (private) — adapt to the split orchestrator SPI: move the `FIRE_AND_FORGET` arm out of `match delivery` into `start(...)` returning `PipelexPipeDispatchAck`; `run(...)` keeps only the blocking arm (no `delivery` param, no `is_completed`). Same check for `pipelex-mistralai-workflows/` if it registers an orchestrator.
+- [ ] `pipelex-api/` — `/execute` calls `orchestrator.run(...)` without `delivery`; `/start` calls `orchestrator.start(...)` and reads the ack's `workflow_id` (today it reads `run_output.workflow_id` off a degenerate `PipelexPipeRunOutput`).
 
 ### ⛔ CHECKPOINT 3 — MANDATORY STOP
 
@@ -181,5 +183,6 @@ Acceptance: every consumer repo aligned with the released pipelex version; confo
 
 - Merged `origin/dev` into the branch (`fc96c1d96`; only conflict = both sides' `[Unreleased]` changelog sections, combined into unified Added/Changed/Fixed). Post-merge `make agent-check` green; full `make agent-test` re-run on the merged tree.
 - PR **#1014** opened against `dev`. Phase 3 stays gated until the PR is merged and a pipelex version is cut.
+- **Review round 1 (codex bot, CONFIRMED REAL):** requiring `main_stuff_name` on `PipelexPipeRunOutput` broke the fire-and-forget arm — `pipelex-temporal`'s `FIRE_AND_FORGET` branch constructs the payload with `main_stuff_name=None, is_completed=False` (its only not-completed constructor anywhere). Resolution chosen by the user (NOT the "make it optional again" convenient fix, which would re-spread null-guards): **split the delivery axis into the type system.** `OrchestratorProtocol` now has `run(...) -> PipelexPipeRunOutput` (blocking, completed, `main_stuff_name` stays required) and `start(...) -> PipelexPipeDispatchAck` (new ids-only ack model: `pipeline_run_id` + `workflow_id`); the `delivery` param is gone from the SPI (`DeliveryMode` stays as wire-input vocab picking the method); `PipelexPipeRunOutput.is_completed` DELETED — nothing anywhere read it. DIRECT implements `start` by raising `PipelexBridgeDispatchError` (unreachable behind the `supports_fire_and_forget` gate). Docs (`orchestrator-plugins.md`) + changelog updated; new Phase 3 rows added for `pipelex-temporal` and `pipelex-api`.
 
 ### Checkpoint 3 — not reached

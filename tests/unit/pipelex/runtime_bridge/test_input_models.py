@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.runtime_bridge.delivery_mode import DeliveryMode
-from pipelex.runtime_bridge.payloads import PipelexPipeRunInput, PipelexPipeRunOutput
+from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunInput, PipelexPipeRunOutput
 
 
 class TestInputOutputModels:
@@ -45,7 +45,7 @@ class TestInputOutputModels:
 
     def test_output_required_fields(self):
         with pytest.raises(ValidationError):
-            PipelexPipeRunOutput.model_validate({"output_dict": {}})  # missing pipeline_run_id and is_completed
+            PipelexPipeRunOutput.model_validate({"output_dict": {}})  # missing pipeline_run_id and main_stuff_name
 
     def test_output_requires_main_stuff_name(self):
         """A completed run always delivers a main stuff, so the boundary DTO requires its name."""
@@ -54,7 +54,6 @@ class TestInputOutputModels:
                 {
                     "output_dict": {},
                     "pipeline_run_id": "run-1",
-                    "is_completed": True,
                 }
             )
 
@@ -63,9 +62,21 @@ class TestInputOutputModels:
             PipelexPipeRunOutput.model_validate(
                 {
                     "output_dict": {},
+                    "main_stuff_name": "main",
+                    "pipeline_run_id": "run-1",
+                    "rogue_field": 42,
+                }
+            )
+
+    def test_output_rejects_is_completed(self):
+        """The completed-run DTO has no is_completed flag: a fire-and-forget dispatch returns a PipelexPipeDispatchAck instead."""
+        with pytest.raises(ValidationError):
+            PipelexPipeRunOutput.model_validate(
+                {
+                    "output_dict": {},
+                    "main_stuff_name": "main",
                     "pipeline_run_id": "run-1",
                     "is_completed": True,
-                    "rogue_field": 42,
                 }
             )
 
@@ -75,8 +86,28 @@ class TestInputOutputModels:
             main_stuff_name="main",
             pipeline_run_id="run-1",
             workflow_id=None,
-            is_completed=True,
             graph_spec_dump=None,
         )
         round_tripped = PipelexPipeRunOutput.model_validate(original.model_dump(mode="json"))
         assert round_tripped == original
+
+    def test_dispatch_ack_requires_both_ids(self):
+        """A fire-and-forget ack is ids-only, and both ids are required — a genuine enqueue always has a workflow id."""
+        ack = PipelexPipeDispatchAck(pipeline_run_id="run-1", workflow_id="wf-1")
+        assert ack.pipeline_run_id == "run-1"
+        assert ack.workflow_id == "wf-1"
+        with pytest.raises(ValidationError):
+            PipelexPipeDispatchAck.model_validate({"pipeline_run_id": "run-1"})
+        with pytest.raises(ValidationError):
+            PipelexPipeDispatchAck.model_validate({"workflow_id": "wf-1"})
+
+    def test_dispatch_ack_forbids_output_fields(self):
+        """The ack must not smuggle completed-run fields."""
+        with pytest.raises(ValidationError):
+            PipelexPipeDispatchAck.model_validate(
+                {
+                    "pipeline_run_id": "run-1",
+                    "workflow_id": "wf-1",
+                    "output_dict": {},
+                }
+            )

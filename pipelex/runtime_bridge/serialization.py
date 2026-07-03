@@ -69,7 +69,6 @@ def serialize_completed_output(
         main_stuff_name=main_stuff_name,
         pipeline_run_id=pipe_output.pipeline_run_id,
         workflow_id=workflow_id,
-        is_completed=True,
         graph_spec_dump=graph_spec_dump,
         graph_assembly_error=pipe_output.graph_assembly_error,
         tokens_usages_dump=tokens_usages_dump,
