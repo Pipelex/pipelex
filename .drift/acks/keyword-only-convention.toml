@@ -1,0 +1,8 @@
+contract = "keyword-only-convention"
+digest = "sha256:36e661cb6a2b7dc41b959780be78a2d94dd2554ef08688581583bb72bb11d3e8"
+reviewed_by = "Claude (Fable 5)"
+reviewed_at = "2026-07-03T19:51:01Z"
+rationale = "Initial review: verified every claim in docs/contribute/keyword-only-arguments.md against keyword_only_guard.py — the rule, both exceptions, the symmetric-tuple allowlist entries, all carve-out categories, the escape-hatch placement, --fix insertion/unfixable shapes/re-parse safety, and the make/CI/hook gates. All accurate; no doc change needed."
+
+[trigger_files]
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:7030c7d666929b899880c02863f5719c62a3e26a"

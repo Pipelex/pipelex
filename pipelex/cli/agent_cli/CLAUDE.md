@@ -9,7 +9,7 @@ Two independent options control the two output streams:
 - `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `init`, `models`, `check-model`, `doctor`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
 - `--error-format markdown|json` — **error reporting** (stderr). Optional. When omitted, **inherits the value of `--format`**, so `--format json` still flips both as it did historically. Accepted by the same commands as `--format`.
 
-Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, log-level/runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
+Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
 
 `inputs`, `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
 
@@ -24,19 +24,17 @@ Markdown structure per command:
 
 The CLI is consumed by a set of Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
 
-- Skills repo: `../skills/skills/` (relative to project root)
-- Skills: `mthds-build`, `mthds-check`, `mthds-edit`, `mthds-explain`, `mthds-fix`, `mthds-inputs`, `mthds-install`, `mthds-pkg`, `mthds-run`
+- Skills location: `../mthds-plugins/mthds/skills/` (relative to project root) — one `mthds-*` directory per skill
 - Each skill is a `SKILL.md` with optional `references/` dir
-- Shared reference docs: `../skills/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`)
+- Shared reference docs: `../mthds-plugins/mthds/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`, …)
 
 When changing CLI command signatures, output schemas, or error types, check whether the affected skills need updating.
 
 ## Code Layout
 
 ```
-_agent_cli.py                  # Typer app setup, version callback
+_agent_cli.py                  # Typer app setup, version callback, PipelexAgentCLI(TyperGroup) — command registration, ordering
 commands/
-  _agent_cli.py                # PipelexAgentCLI(TyperGroup) — command registration, ordering
   agent_output.py              # agent_success(), agent_error(), error hints/domains
   agent_cli_factory.py         # make_pipelex_for_agent_cli() — init with JSON errors
   run/                         # run — execute pipeline (pipe|bundle|method subcommands)
@@ -75,7 +73,7 @@ commands/
 
 | Command | Does |
 |---------|------|
-| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
+| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing (via `primary_backend`), and gateway terms; telemetry is seeded from a template, not `--config`. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |

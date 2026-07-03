@@ -2,7 +2,7 @@
 
 ## Status
 
-Design proposal, responding to the research brief "Deterministic Traceability Contracts for Docs, Code, and Tests". Not yet implemented. Decisions below are proposals for arbitrage, not settled.
+Design accepted and implemented (engine in Phase 1, wiring/seeds/docs in Phase 2 — see `TODOS.md` for execution state and the engineering-review decisions that refined this text). The main refinement over the original proposal: digests are computed from the **git index** (staged blob OIDs via `git ls-files -s`), not from working-tree bytes — see "The validity rule" below.
 
 ## Problem
 
@@ -34,7 +34,7 @@ This is the main deviation from the brief. The brief computes obligations from a
 
 > A contract is **fulfilled** iff the stored ack digest equals the digest recomputed from the current tree. Otherwise it is **open**.
 
-The digest for a contract is `sha256` over: the contract's own definition (canonically serialized), plus the sorted list of `(path, content-hash)` pairs for every tracked file matching its trigger globs. Content hashes are git blob hashes (`git hash-object` on working-tree content), so hashing is cheap, deterministic, and identical to what lands in the commit.
+The digest for a contract is `sha256` over: the contract's own definition (canonically serialized — sorted keys and sorted glob lists, so reformatting or reordering `drift.toml` never churns the digest), plus the sorted list of `(path, content-hash)` pairs for every tracked file matching its trigger globs. Content hashes are the **staged blob OIDs from the git index**, read via a single `git ls-files -s` over the matched paths — matching and hashing share the same index source, hashing is filter-normalized (CRLF/smudge safe), and the digest covers exactly what lands in the commit. The cost of index semantics: trigger files must be `git add`-ed before `drift ack` to be covered (staged, not committed; other unstaged changes are fine).
 
 Properties that fall out of this rule:
 
@@ -43,7 +43,7 @@ Properties that fall out of this rule:
 - **Editing a contract's definition forces a re-ack** (the definition is inside its own digest). Widening a trigger glob or adding a review target is itself a reviewable event.
 - **Adding a contract forces an initial review** — a new contract has no ack, so it is open until someone reviews the targets once and acks. Adoption is explicit, contract by contract.
 - **File deletion and rename are covered** — the matched-file set is part of the digest.
-- **Two branches touching the same contract conflict in its ack file at merge.** That conflict is a feature: the combined content was never reviewed. Resolution is mechanical — finish the merge, re-run `drift ack` on the merged tree.
+- **Merges are backstopped by the digest, not by conflicts.** Two branches re-acking the same contract *can* conflict in its ack file, but a line-wise auto-merge can just as well splice the two acks into one neither branch reviewed — do not rely on the conflict. The guarantee is that `drift check` recomputes the digest over the merged tree, so a spliced or stale ack fails the check: the combined content was never reviewed as a whole. Resolution either way — finish the merge, review, re-run `drift ack` on the merged tree.
 
 Timestamps and reviewer identity are recorded for human audit, but they carry no validity semantics — exactly the brief's "hashes over timestamps" conclusion, taken one step further by removing the diff too.
 
@@ -146,13 +146,13 @@ User-facing configuration docs must track the config model and the shipped defau
 
 ### `drift check`
 
-The CI gate. Pure and fast (glob matching + hashing, no subprocesses): it validates that the manifest parses and is schema-valid, that every trigger glob matches at least one tracked file (dead globs are manifest rot — hard error), that every review target resolves to something that exists, that every contract has an ack, and that every ack digest matches the recomputed digest. Non-zero exit prints, per open contract, the same actionable block CI users get from the other check targets — ending with "run `make drift-plan`".
+The CI gate. Pure and fast (glob matching + digest comparison; it shells only to git plumbing — `ls-files` — and never executes verify commands): it validates that the manifest parses and is schema-valid, that every trigger glob matches at least one tracked file (dead globs are manifest rot — hard error), that every review target resolves to something that exists, that every contract has an ack, and that every ack digest matches the recomputed digest. Non-zero exit prints, per open contract, the same actionable block CI users get from the other check targets — ending with "run `make drift-plan`".
 
 `drift check` goes into `make check` and CI. It deliberately does **not** go into `make agent-check`: that target is the tight post-edit lint loop, and doc-review obligations belong at the end of a change, not after every edit. The failure message in CI is the agent's entry point.
 
 ### `drift ack`
 
-Requires `--rationale`. Runs the contract's `verify_commands` first; any failure aborts the ack — no `--skip-verify` flag in the MVP, because every escape hatch here is a rubber-stamp invitation, and the real escape hatch already exists (acking with a rationale that says "no doc change needed" is legitimate and cheap). `reviewed_by` defaults from `git config user.name`, overridable with `--by` (agents pass their identity). Recomputes the digest from the working tree at ack time, writes the ack file; the ack then gets committed together with the change it covers. If files move again after the ack, CI's `drift check` catches the mismatch — so a clean tree is *not* required.
+Requires `--rationale`. Runs the contract's `verify_commands` first; any failure aborts the ack — no `--skip-verify` flag in the MVP, because every escape hatch here is a rubber-stamp invitation, and the real escape hatch already exists (acking with a rationale that says "no doc change needed" is legitimate and cheap). `reviewed_by` defaults from `git config user.name`, overridable with `--by` (agents pass their identity). Recomputes the digest from the **index** at ack time (stage trigger files with `git add` first — unstaged edits and untracked files are not covered, and the command warns when it sees one matching the triggers), writes the ack file; the ack then gets committed together with the change it covers. If files move again after the ack, CI's `drift check` catches the mismatch — so a clean tree is *not* required.
 
 ## Decisions, mapped to the brief's open questions
 
@@ -180,8 +180,8 @@ And one addition: it does not handle cross-repo contracts. The spec/conformance 
 - **Rubber-stamping.** The tool cannot force a real review. Mitigations: mandatory rationale, PR-visible ack diffs, verify commands at ack time, and — most importantly — keeping the contract count low enough that each open contract is a genuine event rather than background noise. If we observe reflexive acks ("docs fine" on every PR), the contract is mis-scoped: either narrow its triggers or mechanize it into a derived check.
 - **Review fatigue from over-broad triggers.** `pipelex/cli/**` will open the cli-docs contract on pure refactors. Acceptable at first (the ack costs a sentence); if it grates, narrow triggers to the surface-defining modules rather than adding bypass mechanisms.
 - **Manifest rot.** Dead globs and vanished review targets are hard `check` failures, so rot is loud, not silent.
-- **Ack-file merge conflicts.** Scoped per contract and semantically correct (combined content was unreviewed). Documented resolution: merge, then re-ack.
-- **Line-ending/filter edge cases.** Blob hashes are computed on working-tree bytes; a smudge/clean filter or CRLF checkout could make local and CI hashes differ. No such filters exist in this repo today; if one appears, hash the staged blob instead. Noted, not solved.
+- **Ack-file merge conflicts.** Scoped per contract; possible but not guaranteed (a line-wise auto-merge can splice two acks silently). The real safety net is the post-merge digest recompute in `drift check`. Documented resolution: merge, review, then re-ack.
+- **Line-ending/filter edge cases.** Resolved by construction: digests use staged blob OIDs from the index, which are filter-normalized, so a smudge/clean filter or CRLF checkout cannot make local and CI hashes differ.
 
 ## Seed contracts
 

@@ -11,15 +11,17 @@ Pipelex uses a TOML-based configuration system with **shipped defaults** plus **
 - **Shipped defaults**: Pipelex ships default values that are maintained in the Pipelex repository (contributors will see them in the repo root `pipelex.toml`). This is the baseline used by the installed package.
 - **Project overrides**: a project that *uses* Pipelex typically customizes behavior via files created in `.pipelex/`.
 
-You can create the project configuration files by running:
+You can create the configuration files by running:
 
 ```bash
-pipelex init config
+pipelex init config          # creates the global config at ~/.pipelex/
+pipelex init config --local  # creates the project config at {project_root}/.pipelex/
 ```
 
 !!! important "Configuration Setup Notes"
-    1. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
-    2. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
+    1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory; pass `--local` to create the project-level `.pipelex/` instead.
+    2. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
+    3. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
 
@@ -33,23 +35,25 @@ The main project configuration files are:
 
 ## Overrides (advanced)
 
-In addition to `.pipelex/pipelex.toml`, Pipelex can apply override files at the **project root** (not in `.pipelex/`) for machine- and environment-specific settings:
+In addition to the base `pipelex.toml`, Pipelex applies override files from **inside** each `.pipelex/` directory (both the global `~/.pipelex/` and the project's `.pipelex/`) for machine- and environment-specific settings:
 
 1. `pipelex_local.toml`
 2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests may use `tests/pipelex_unit_test.toml`)
+3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests use `tests/pipelex_unit_test.toml`, the one override file read outside a `.pipelex/` directory)
 4. `pipelex_override.toml` (recommended to gitignore)
+5. `pipelex_temporary_override.toml` (recommended to gitignore)
 
 !!! info "Contributor details"
     For the full “where defaults live” and “how config is merged” explanation, see [Configuration Internals](../contribute/configuration-defaults-and-overrides.md).
 
 ## Configuration Structure
 
-The configuration is organized into three main sections:
+The configuration is organized into four main sections:
 
 1. `[pipelex]` - Core Pipelex settings
 2. `[cogt]` - Cognitive tools and LLM settings
 3. `[plugins]` - Plugin-specific configurations
+4. `[migration]` - Migration helpers for renamed settings
 
 Each section contains multiple subsections for specific features and functionalities.
 
@@ -57,23 +61,20 @@ Each section contains multiple subsections for specific features and functionali
 
 Pipelex uses a sophisticated configuration override system that loads and merges configurations in a specific order. This allows for fine-grained control over settings in different environments and scenarios.
 
-The exact loading sequence is:
+The exact loading sequence is (later wins, per leaf key):
 
 1. Base configuration from the installed Pipelex package (`pipelex.toml`)
-2. Your project's base configuration (`pipelex.toml` in your project root)
-3. Local overrides (`pipelex_local.toml`)
-4. Environment-specific overrides (`pipelex_{environment}.toml`)
-   - Example environments: `local`, `dev`, `staging`, `prod` — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-5. Run mode overrides (`pipelex_{run_mode}.toml`)
-   - Example run modes: normal, unit_test
-6. Final overrides (`pipelex_override.toml`) (recommended to put in .gitignore)
+2. Global base configuration (`~/.pipelex/pipelex.toml`)
+3. Global override sequence, from `~/.pipelex/`: `pipelex_local.toml`, `pipelex_{environment}.toml`, `pipelex_{run_mode}.toml`, `pipelex_override.toml`, `pipelex_temporary_override.toml`
+4. Your project's base configuration (`{project_root}/.pipelex/pipelex.toml`)
+5. Project override sequence, from the project's `.pipelex/`: the same five files as step 3
+6. Programmatic overrides passed in code, if any
 
-Each subsequent configuration file in this sequence can override settings from the previous ones. This means:
+Notes on the override sequence:
 
-- Settings in `pipelex_local.toml` override the base configuration
-- Environment-specific settings override local settings
-- Run mode settings override environment settings
-- Super user settings override all previous settings
+- `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
+- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
+- Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
 
 ### Override File Naming
 

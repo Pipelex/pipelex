@@ -1,0 +1,47 @@
+# Drift contracts — declared review obligations between code, docs, and tests.
+#
+# A contract says: when these trigger files change, these review targets must be
+# re-examined against the change, and the examination must be recorded with
+# `make drift-ack CONTRACT=<id> RATIONALE="…"`. `make drift-check` gates CI on it.
+# See docs/contribute/drift-contracts.md for the full workflow.
+#
+# Keep this manifest small: every contract here must earn its friction. Anything
+# mechanizable (regenerate-and-diff, referential integrity) belongs in a derived
+# check (check-config-sync, check-mthds-schema, …), never in a review contract.
+
+version = 1
+
+[contracts.config-docs]
+description = "User-facing configuration docs must track the config model and the shipped defaults."
+triggers = [
+  "pipelex/system/configuration/**/*.py",
+  "pipelex/pipelex.toml",
+]
+review = [
+  "docs/configuration/**/*.md",
+]
+verify_commands = ["make tb"]
+
+[contracts.cli-docs]
+description = "CLI docs and the agent-CLI contract doc must track the CLI surface."
+triggers = [
+  "pipelex/cli/**/*.py",
+]
+exclude = [
+  "pipelex/cli/dev_cli/**",
+]
+review = [
+  "docs/tools/cli/",
+  "pipelex/cli/agent_cli/CLAUDE.md",
+]
+verify_commands = []
+
+[contracts.keyword-only-convention]
+description = "The keyword-only-arguments doc is the convention's specification and must track the guard's behavior."
+triggers = [
+  "pipelex/cli/dev_cli/commands/keyword_only_guard.py",
+]
+review = [
+  "docs/contribute/keyword-only-arguments.md",
+]
+verify_commands = []

@@ -98,8 +98,7 @@ pipelex-agent init [--config/-c JSON] [--global/-g]
 {
   "backends": ["openai", "anthropic"],
   "primary_backend": "openai",
-  "accept_gateway_terms": true,
-  "telemetry_mode": "off"
+  "accept_gateway_terms": true
 }
 ```
 
@@ -110,13 +109,14 @@ All fields are optional:
 | `backends` | `list[str]` | Backend keys to enable (e.g. `openai`, `anthropic`, `pipelex_gateway`). Omit to keep template defaults. |
 | `primary_backend` | `str` | Required only when 2+ backends are selected and `pipelex_gateway` is not among them. |
 | `accept_gateway_terms` | `bool` | Required when `pipelex_gateway` is in backends. |
-| `telemetry_mode` | `str` | `off` (default), `anonymous`, or `identified`. |
+
+Telemetry is not configured via `--config`: init seeds a `telemetry.toml` from a template (a global init writes an active one; a project init drops a commented-out one).
 
 **Examples:**
 
 ```bash
 # Initialize with OpenAI backend (project-level)
-pipelex-agent init --config '{"backends": ["openai"], "telemetry_mode": "off"}'
+pipelex-agent init --config '{"backends": ["openai"]}'
 
 # Initialize globally with gateway
 pipelex-agent init -g --config '{"backends": ["pipelex_gateway"], "accept_gateway_terms": true}'

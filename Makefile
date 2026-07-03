@@ -194,6 +194,7 @@ export HELP
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
     rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko check-rules check-urls cu insert-skeleton \
+	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -341,6 +342,30 @@ fix-keyword-only: env
 
 fko: fix-keyword-only
 	@echo "> done: fko = fix-keyword-only"
+
+drift-plan: env
+	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
+
+dp: drift-plan
+	@echo "> done: dp = drift-plan"
+
+drift-check: env
+	$(call PRINT_TITLE,"Checking drift contracts — review obligations between code and docs")
+	$(VENV_PIPELEX_DEV) drift check --quiet
+
+dc: drift-check
+	@echo "> done: dc = drift-check"
+
+drift-ack: env
+	$(call PRINT_TITLE,"Recording drift ack")
+	@if [ -z "$(CONTRACT)" ]; then \
+		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
+		exit 1; \
+	fi
+	$(VENV_PIPELEX_DEV) drift ack "$(CONTRACT)" --rationale "$(RATIONALE)" $(if $(BY),--by "$(BY)")
+
+da: drift-ack
+	@echo "> done: da = drift-ack"
 
 generate-mthds-schema: env
 	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
@@ -1078,7 +1103,7 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only
