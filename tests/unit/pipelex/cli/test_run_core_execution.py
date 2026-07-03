@@ -82,10 +82,10 @@ class TestRunCoreExecution:
         graph_spec: Any | None = None,
     ) -> Any:
         working_memory = mocker.MagicMock()
-        working_memory.get_optional_main_stuff.return_value = main_stuff
+        working_memory.get_main_stuff.return_value = main_stuff
         working_memory.smart_dump.return_value = {"stuff": "dump"}
         return SimpleNamespace(
-            optional_main_stuff=main_stuff,
+            main_stuff=main_stuff,
             graph_spec=graph_spec,
             working_memory=working_memory,
         )
@@ -276,17 +276,6 @@ class TestRunCoreExecution:
         """An unsupported table suffix fails before anything runs."""
         with pytest.raises(typer.Exit) as exc_info:
             _run_async(_call_execute_run(save_csv="out.xlsx"))
-
-        assert exc_info.value.exit_code == 1
-
-    @pytest.mark.usefixtures("config_mock", "console")
-    def test_save_csv_no_main_stuff_exits(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """--save-csv with no main stuff produced is an error after the run."""
-        pipe_output = self._make_pipe_output(mocker, main_stuff=None)
-        self._mock_runner(mocker, pipe_output)
-
-        with pytest.raises(typer.Exit) as exc_info:
-            _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))
 
         assert exc_info.value.exit_code == 1
 

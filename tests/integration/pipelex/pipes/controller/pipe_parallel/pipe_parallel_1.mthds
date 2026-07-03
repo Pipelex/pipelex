@@ -14,7 +14,6 @@ description = "Analyze document length and content in parallel"
 inputs = { document = "DocumentInput" }
 output = "CombinedAnalysis"
 add_each_output = true
-combined_output = "CombinedAnalysis"
 branches = [
   { pipe = "analyze_length", result = "length_result" },
   { pipe = "analyze_content", result = "content_result" },

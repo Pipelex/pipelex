@@ -1,12 +1,11 @@
 from typing import Literal
 
-from pydantic import field_validator, model_validator
 from typing_extensions import override
 
-from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
-from pipelex.types import Self
 
 
 class PipeParallelBlueprint(PipeBlueprint):
@@ -14,7 +13,6 @@ class PipeParallelBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeController"] = "PipeController"
     branches: list[SubPipeBlueprint]
     add_each_output: bool = False
-    combined_output: str | None = None
 
     @property
     @override
@@ -22,29 +20,29 @@ class PipeParallelBlueprint(PipeBlueprint):
         """Return the set of pipe codes from the parallel branches."""
         return {branch.pipe for branch in self.branches}
 
-    @field_validator("combined_output", mode="before")
-    @classmethod
-    def validate_combined_output(cls, combined_output: str) -> str:
-        if combined_output:
-            if not is_concept_ref_or_code_valid(concept_ref_or_code=combined_output):
-                msg = f"Combined output '{combined_output}' is not a valid concept string or code"
-                raise ValueError(msg)
-        return combined_output
-
-    @model_validator(mode="after")
-    def validate_output_options(self) -> Self:
-        if not self.add_each_output and not self.combined_output:
-            msg = (
-                "PipeParallel requires either add_each_output to be True or combined_output to be set, "
-                "or both, otherwise the pipe won't output anything"
-            )
-            raise ValueError(msg)
-        return self
-
-    @override
-    def validate_inputs(self):
-        pass
-
     @override
     def validate_output(self):
-        pass
+        """A parallel always combines its branch outputs into its declared output.
+
+        The combination is a named composite, so the output must be `Composite` or a structured
+        concept — never a scalar native concept, `Dynamic`, `Anything`, or a list (a list
+        aggregation is PipeBatch's shape). The structured concept's field compatibility with the
+        branch result names is checked later, at library validation time.
+        """
+        # generic_validate_output already checked the syntax, so this parse cannot fail
+        output_parse_result = parse_concept_with_multiplicity(self.output)
+        if output_parse_result.multiplicity is not None:
+            msg = (
+                f"PipeParallel output '{self.output}' must not declare a multiplicity: "
+                "a parallel combination is a named composite, never a list (a list aggregation is PipeBatch's shape)."
+            )
+            raise ValueError(msg)
+        concept_ref_or_code = output_parse_result.concept_ref_or_code
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
+            native_code = NativeConceptCode(concept_ref_or_code.split(".")[-1])
+            if not native_code.is_composite:
+                msg = (
+                    f"PipeParallel output '{self.output}' is invalid: the output of a parallel must be 'Composite' "
+                    "or a structured concept whose fields correspond to the branch result names."
+                )
+                raise ValueError(msg)

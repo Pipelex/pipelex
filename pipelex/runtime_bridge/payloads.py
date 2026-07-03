@@ -37,15 +37,21 @@ class PipelexPipeRunInput(BaseModel):
 
 
 class PipelexPipeRunOutput(BaseModel):
-    """JSON-safe output crossing the host-runtime / Temporal boundary."""
+    """JSON-safe output of a COMPLETED run crossing the host-runtime / Temporal boundary.
+
+    This is the return shape of a blocking dispatch (``OrchestratorProtocol.run``); a
+    fire-and-forget dispatch returns a ``PipelexPipeDispatchAck`` instead — which is why
+    a completed-run field like ``main_stuff_name`` can be required here with no
+    "not finished yet" escape hatch.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     output_dict: dict[str, Any]
-    main_stuff_name: str | None = None
+    # A completed run always delivers a main stuff; this is the actual `root` key it lives under.
+    main_stuff_name: str
     pipeline_run_id: str
     workflow_id: str | None = None
-    is_completed: bool
     graph_spec_dump: dict[str, Any] | None = None
     # graph_assembly_error / usage_assembly_error mirror the same fields on PipeOutput: a non-None
     # value means assembly of the graph / token usage failed, which a host must be able to tell
@@ -55,3 +61,19 @@ class PipelexPipeRunOutput(BaseModel):
     graph_assembly_error: str | None = None
     tokens_usages_dump: list[dict[str, Any]] | None = None
     usage_assembly_error: str | None = None
+
+
+class PipelexPipeDispatchAck(BaseModel):
+    """JSON-safe acknowledgment of a fire-and-forget dispatch.
+
+    Returned by ``OrchestratorProtocol.start`` once an async-capable orchestrator has
+    genuinely enqueued the job: nothing has run yet, so there is no output and no main
+    stuff — only the ids a caller needs to track the run. Keeping this a distinct type
+    (instead of an "incomplete" ``PipelexPipeRunOutput``) is what lets the completed-run
+    payload require ``main_stuff_name`` outright.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    pipeline_run_id: str
+    workflow_id: str
