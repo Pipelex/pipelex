@@ -180,6 +180,6 @@ Acceptance: every consumer repo aligned with the released pipelex version; confo
 ### Between checkpoints — PR opened toward the Phase 3 gate
 
 - Merged `origin/dev` into the branch (`fc96c1d96`; only conflict = both sides' `[Unreleased]` changelog sections, combined into unified Added/Changed/Fixed). Post-merge `make agent-check` green; full `make agent-test` re-run on the merged tree.
-- PR opened against `dev` (see branch on GitHub). Phase 3 stays gated until the PR is merged and a pipelex version is cut.
+- PR **#1014** opened against `dev`. Phase 3 stays gated until the PR is merged and a pipelex version is cut.
 
 ### Checkpoint 3 — not reached
