@@ -47,6 +47,17 @@ class TestInputOutputModels:
         with pytest.raises(ValidationError):
             PipelexPipeRunOutput.model_validate({"output_dict": {}})  # missing pipeline_run_id and is_completed
 
+    def test_output_requires_main_stuff_name(self):
+        """A completed run always delivers a main stuff, so the boundary DTO requires its name."""
+        with pytest.raises(ValidationError):
+            PipelexPipeRunOutput.model_validate(
+                {
+                    "output_dict": {},
+                    "pipeline_run_id": "run-1",
+                    "is_completed": True,
+                }
+            )
+
     def test_output_forbids_extra_fields(self):
         with pytest.raises(ValidationError):
             PipelexPipeRunOutput.model_validate(

@@ -42,7 +42,8 @@ class PipelexPipeRunOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     output_dict: dict[str, Any]
-    main_stuff_name: str | None = None
+    # A completed run always delivers a main stuff; this is the actual `root` key it lives under.
+    main_stuff_name: str
     pipeline_run_id: str
     workflow_id: str | None = None
     is_completed: bool

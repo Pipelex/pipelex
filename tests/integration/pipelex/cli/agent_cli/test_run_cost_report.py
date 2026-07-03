@@ -14,11 +14,30 @@ from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core  # no
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.job_metadata import JobMetadata
 
 _RUN_CORE_MODULE = "pipelex.cli.agent_cli.commands.run._run_core"
+
+
+def _memory_with_main_stuff() -> WorkingMemory:
+    """A completed run always delivers a main stuff — the mocked runner output must honor that."""
+    stuff = Stuff(
+        stuff_code="main-code",
+        stuff_name="result",
+        concept=Concept(
+            code="Text",
+            domain_code="native",
+            description="Plain text",
+            structure_class_name="TextContent",
+        ),
+        content=TextContent(text="the result"),
+    )
+    return WorkingMemory(root={"result": stuff}, aliases={MAIN_STUFF_NAME: "result"})
 
 
 def _non_zero_usage(job_metadata: JobMetadata) -> LLMTokensUsage:
@@ -63,7 +82,7 @@ class TestAgentRunCostReport:
 
     async def test_cost_report_in_with_memory_json(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         pipe_output = PipeOutput(
-            working_memory=WorkingMemory(),
+            working_memory=_memory_with_main_stuff(),
             pipeline_run_id="agent-run",
             tokens_usages=[_non_zero_usage(job_metadata)],
         )
@@ -83,7 +102,7 @@ class TestAgentRunCostReport:
     async def test_cost_report_for_free_model_run(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         """A free/zero-price model with real tokens still surfaces a cost_report (total_cost 0)."""
         pipe_output = PipeOutput(
-            working_memory=WorkingMemory(),
+            working_memory=_memory_with_main_stuff(),
             pipeline_run_id="agent-free",
             tokens_usages=[_free_model_usage(job_metadata)],
         )
@@ -102,7 +121,7 @@ class TestAgentRunCostReport:
 
     async def test_no_cost_report_for_dry_run(self, mocker: MockerFixture, job_metadata: JobMetadata, tmp_path: Path) -> None:
         pipe_output = PipeOutput(
-            working_memory=WorkingMemory(),
+            working_memory=_memory_with_main_stuff(),
             pipeline_run_id="agent-dry",
             tokens_usages=[_zero_cost_usage(job_metadata)],
         )

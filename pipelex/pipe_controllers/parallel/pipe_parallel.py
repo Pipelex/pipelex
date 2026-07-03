@@ -208,6 +208,13 @@ class PipeParallel(PipeController):
         Shared by live and dry run: the sub-pipes' own run_pipe dispatch honors the run mode,
         so live and dry runs stamp the same combined main stuff shape.
         """
+        # A requested final_stuff_code applies to this pipe's own final output — the COMBINED
+        # stuff (e.g. PipeBatch pre-allocates it so its aggregated item identity matches the
+        # branch's final output in the graph). Capture it and clear it before fanning out, so the
+        # branch runs (which deep-copy the params) don't stamp it on their own outputs.
+        final_stuff_code = pipe_run_params.final_stuff_code
+        pipe_run_params.final_stuff_code = None
+
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
         for sub_pipe in self.parallel_sub_pipes:
@@ -250,6 +257,7 @@ class PipeParallel(PipeController):
             concept=self.output.concept,
             stuff_contents=output_stuff_contents,
             name=output_name,
+            code=final_stuff_code,
         )
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
@@ -294,12 +302,6 @@ class PipeParallel(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        if pipe_run_params.final_stuff_code:
-            # TODO(Phase 2): honor final_stuff_code on the combined stuff like operators do,
-            # instead of discarding it.
-            log.verbose(f"PipeParallel.run_pipe() discarding final_stuff_code: {pipe_run_params.final_stuff_code}")
-            pipe_run_params.final_stuff_code = None
-
         return await self._run_branches_and_combine(
             job_metadata=job_metadata,
             working_memory=working_memory,

@@ -102,9 +102,8 @@ class OtelFactory:
         Returns:
             JSON string representing the output, potentially truncated.
         """
-        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-        if main_stuff is None:
-            return "{}"
+        # Called on the success path only — a completed pipe run always delivers a main stuff.
+        main_stuff = pipe_output.working_memory.get_main_stuff()
 
         output_dict: dict[str, Any] = {
             "concept": main_stuff.concept.simple_concept_ref,
