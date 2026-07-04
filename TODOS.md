@@ -30,6 +30,7 @@ Implements [wip/drift-contracts-design.md](wip/drift-contracts-design.md). Read 
     6. **Scope accepted as-is** — keep `plan`'s per-file trigger-diff in Phase 1 (highest-value packet content, cheap with CC).
 - **Cross-model tensions — KEPT AS DESIGNED** (codex pushed on these; decision is to keep the design and let dogfooding rule): no-skip-verify (capture an audited-skip idea as a deferred item only), broad `cli-docs` trigger, three seeds vs a one-contract spike, the checkpoint `/code-review` protocol, and strict TDD (TDD the engine logic; test-after is fine for Typer wiring / rich-panel formatting). `config-docs` trigger breadth is a **dogfood-watch** item (candidate to narrow to `configs.py` + `config_model.py` + `pipelex.toml` if it opens on config plumbing edits).
 - **Open questions:** (none blocking — the audited-skip-verify escape hatch is deferred, not open)
+- **Dogfood-phase addition (2026-07-04, user-requested):** repo-local skill `.claude/skills/drift-review/` — guides the resolve workflow (plan → genuine review → stage → ack) and makes a dogfood-log entry mandatory per ack (`wip/drift-contracts/dogfood-log.md`, created on first use; verdicts real-catch / clean-pass / friction). This pulls the "repo-local skill" idea forward from Phase 3 at the user's request; the Phase 3 checkbox about teaching the workflow should account for it. Smoke-tested against a synthetic repo: a fresh Sonnet agent found and fixed real doc staleness and acked with an honest rationale.
 
 ## Checkpoint protocol (mandatory — applies to every checkpoint below)
 
