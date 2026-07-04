@@ -2,6 +2,11 @@
 
 ## [v0.37.0] - 2026-07-04
 
+### Highlights
+
+- **`PipeParallel` always combines — and every run has a main output** — A parallel now always combines its branch outputs into its declared `output` concept (with the new `native.Composite` concept as the ready-made combination vehicle), the `combined_output` field is deleted from the MTHDS language, and the main-stuff invariant is enforced end to end: every completed pipe run delivers a `main_stuff`, so downstream surfaces (delivery, graph tracing, telemetry, wire models) can rely on it unconditionally.
+- **Portable, statically validated image generation** — A new portable `size` parameter (`"1k"`/`"2k"`/`"4k"` tiers or exact pixel dimensions) carries the same size intent across providers, Gemini models gain image-to-image editing and extreme banner aspect ratios, and Google image models are now validated against declarative geometry rules at blueprint-load time — unsatisfiable requests fail fast instead of at the provider call.
+
 ### Added
 
 - **Portable image size (`size`) for `PipeImgGen`:** New `size` parameter accepting portable tiers (`"1k"`, `"2k"`, `"4k"`) or exact pixel dimensions (e.g. `"2048x1152"`). A tier means "this pixel class at my chosen `aspect_ratio`", mapped to each provider's own grid; an exact size is deterministic (declaring `aspect_ratio` alongside it is a validation error). Unsatisfiable requests fail as hard validation errors at blueprint-load time, never warn-and-ignore. When `size` is unset, no size intent is sent and the provider default applies. The MTHDS JSON Schema exposes the field, and an optional `size` default is supported in `[cogt.img_gen_config.img_gen_param_defaults]`.
