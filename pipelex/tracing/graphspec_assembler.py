@@ -23,6 +23,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    output_digest_is_optional,
 )
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -298,6 +299,19 @@ class _AssemblerState:
         node_data.status = NodeStatus.SKIPPED
         node_data.skip_reason = event.skip_reason
 
+        # A lifted pipe with a PLURAL output still wrote a real empty-list Stuff (D4) — register
+        # it so downstream DATA edges resolve (mirrors GraphTracer.on_pipe_end_skipped).
+        if event.output_concept_data:
+            concept_ref = f"{event.output_concept_data.get('domain_code', '')}.{event.output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = event.output_concept_data
+        if event.output_spec is not None:
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if event.output_spec.digest not in input_digests:
+                node_data.output_specs.append(event.output_spec)
+                if event.output_spec.digest:
+                    self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
     def _handle_edge_event(self, event: EdgeEvent) -> None:
         # DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE are regenerated
         # in pass 2 with full cross-worker visibility — skip to avoid duplicates.
@@ -399,16 +413,12 @@ class _AssemblerState:
     def _is_optional_output_digest(self, *, producer_node_id: str, digest: str) -> bool:
         """Whether the producer registered this digest as a declared-optional (`?`) output.
 
-        Mirrors GraphTracer._is_optional_output_digest — the marker rides the output
-        IOSpec's ``extra`` dict.
+        Node lookup here; the marker semantics live in the shared `output_digest_is_optional`.
         """
         producer_data = self._nodes.get(producer_node_id)
         if producer_data is None:
             return False
-        for output_spec in producer_data.output_specs:
-            if output_spec.digest == digest:
-                return bool(output_spec.extra.get("optional"))
-        return False
+        return output_digest_is_optional(producer_data.output_specs, digest=digest)
 
     def _generate_data_edges(self) -> None:
         """Generate DATA edges by correlating input digests with producer nodes.

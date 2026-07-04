@@ -11,9 +11,7 @@ from collections.abc import Sequence
 
 from pydantic import BaseModel, Field
 
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.pipeline.controller_taint import ControllerTaintAnalysis
 
 
 class LiftablePipeEntry(BaseModel):
@@ -32,29 +30,23 @@ class LiftablePipeEntry(BaseModel):
     """Where the possible absence originates (human-readable)."""
 
 
-def build_liftable_pipes(pipes: Sequence[PipeAbstract]) -> list[LiftablePipeEntry]:
+def build_liftable_pipes(taint_analyses: Sequence[ControllerTaintAnalysis]) -> list[LiftablePipeEntry]:
     """Project the controllers' taint analyses into `liftable_pipes` entries.
 
     Sequences contribute their lifted steps; parallels contribute their liftable branches
     (a parallel nested in a sequence reports its branches under itself, so there is no
-    double-reporting). Must run while the validation library is loaded — the analyses
-    resolve child pipes through the hub.
+    double-reporting).
 
     Args:
-        pipes: The loaded pipes to analyze (typically `ValidateBundleResult.pipes`).
+        taint_analyses: The controllers' analyses from `collect_controller_taint_analyses`
+            (one taint walk per validate pass, shared with `build_optionality_warnings`).
 
     Returns:
         Entries in deterministic order (by controller ref, then flow order).
     """
     entries: list[LiftablePipeEntry] = []
-    for pipe in sorted(pipes, key=lambda loaded_pipe: loaded_pipe.pipe_ref):
-        if isinstance(pipe, PipeSequence):
-            liftable_steps = pipe.analyze_taint().liftable_steps
-        elif isinstance(pipe, PipeParallel):
-            liftable_steps = pipe.analyze_branch_taint().liftable_steps
-        else:
-            continue
-        for liftable_step in liftable_steps:
+    for taint_analysis in taint_analyses:
+        for liftable_step in taint_analysis.liftable_steps:
             entries.append(
                 LiftablePipeEntry(
                     pipe_ref=liftable_step.pipe_ref,

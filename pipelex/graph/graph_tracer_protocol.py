@@ -138,6 +138,8 @@ class GraphTracerProtocol(Protocol):
         *,
         ended_at: datetime,
         skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         """Record that a pipe was lifted (skipped) because a plain input resolved absent (D3).
 
@@ -149,6 +151,11 @@ class GraphTracerProtocol(Protocol):
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the skip was decided.
             skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote, when there is one — a
+                PLURAL output normalizes to an empty list (D4) that downstream pipes consume,
+                so it must register in the producer map for DATA edges. None for a singular
+                output (a recorded absence has no payload).
+            output_concept_data: Optional serialized concept dict for that output's concept.
         """
         ...
 
@@ -357,6 +364,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         *,
         ended_at: datetime,
         skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         pass
 

@@ -4,6 +4,7 @@ This module defines the canonical, versioned data model for Pipelex run graphs.
 GraphSpec is renderer-agnostic and designed for JSON serialization.
 """
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
@@ -196,6 +197,20 @@ class IOSpec(BaseModel):
     def truncate_preview(cls, value: str | None) -> str | None:
         """Truncate preview to MAX_PREVIEW_LENGTH."""
         return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
+
+
+def output_digest_is_optional(output_specs: Sequence[IOSpec], *, digest: str) -> bool:
+    """Whether a producer registered ``digest`` as a declared-optional (`?`) output.
+
+    The optional marker rides the output IOSpec's ``extra`` dict (set at the pipe-run
+    epilogue from the pipe's declared output presence). One helper for both graph builders
+    (in-process GraphTracer and the event-replay assembler) so the optional-edge computation
+    cannot drift between them.
+    """
+    for output_spec in output_specs:
+        if output_spec.digest == digest:
+            return bool(output_spec.extra.get("optional"))
+    return False
 
 
 class NodeIOSpec(BaseModel):

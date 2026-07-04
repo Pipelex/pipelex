@@ -23,7 +23,7 @@ from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.absence import AbsenceRecord
-from pipelex.core.memory.absence_render import build_absence_markdown, build_absence_payload
+from pipelex.core.memory.absence_render import build_absence_json, build_absence_markdown
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -247,7 +247,7 @@ async def _execute_run(
     if save_main_stuff and output_path:
         if isinstance(main_resolved, AbsenceRecord):
             absence_json_path = output_path / "main_stuff.json"
-            absence_json_path.write_text(json.dumps(build_absence_payload(main_resolved), indent=2), encoding="utf-8")
+            absence_json_path.write_text(build_absence_json(main_resolved), encoding="utf-8")
             log.verbose(f"Main stuff absence JSON saved to: {absence_json_path}")
             saved_main_stuff_formats.append("json")
 

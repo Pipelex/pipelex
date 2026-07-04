@@ -329,6 +329,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         node_id: str | None,
         ended_at: datetime,
         skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         """Record that a pipe was lifted (skipped) because a plain input resolved absent.
 
@@ -337,6 +339,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the skip was decided.
             skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote (PLURAL outputs normalize
+                to an empty list, D4) — registered in the producer map for DATA edges.
+            output_concept_data: Optional serialized concept dict for that output's concept.
         """
         if node_id is None:
             return
@@ -349,6 +354,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             node_id=node_id,
             ended_at=ended_at,
             skip_reason=skip_reason,
+            output_spec=output_spec,
+            output_concept_data=output_concept_data,
         )
 
     def on_pipe_end_error(

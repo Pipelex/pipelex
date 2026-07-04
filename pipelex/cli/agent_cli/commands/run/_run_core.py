@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import html
 import json
 import shutil
 from pathlib import Path
@@ -14,7 +13,7 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
-from pipelex.core.memory.absence_render import build_absence_markdown, build_absence_payload
+from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown, build_absence_payload
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -82,14 +81,12 @@ async def run_pipeline_core(
     main_stuff_json: dict[str, Any]
     compact_result: dict[str, Any]
     if isinstance(main_resolved, AbsenceRecord):
-        absence_payload = build_absence_payload(main_resolved)
-        absence_json_text = clean_json_dumps(absence_payload, indent=2)
         main_stuff_json = {
-            "json": absence_json_text,
+            "json": build_absence_json(main_resolved),
             "markdown": build_absence_markdown(main_resolved),
-            "html": f"<pre>{html.escape(absence_json_text)}</pre>",
+            "html": build_absence_html(main_resolved),
         }
-        compact_result = absence_payload
+        compact_result = build_absence_payload(main_resolved)
     else:
         main_stuff = main_resolved
         main_stuff_json = {

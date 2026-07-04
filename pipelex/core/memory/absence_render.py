@@ -7,17 +7,34 @@ the delivery executor, the CLI run cores, and telemetry cannot drift:
 
 - the JSON payload carries an ``"absent": true`` discriminator beside the record fields, so a
   consumer can tell an absence document from a value dump;
-- the markdown is a human-readable summary with the provenance chain.
+- the markdown is a human-readable summary with the provenance chain;
+- the HTML is the JSON payload escaped inside a ``<pre>`` block.
 """
 
+import html
 from typing import Any
 
 from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 def build_absence_payload(absence_record: AbsenceRecord) -> dict[str, Any]:
     """The JSON-safe absence document: ``{"absent": true, ...record fields...}``."""
     return {"absent": True, **absence_record.model_dump()}
+
+
+def build_absence_json(absence_record: AbsenceRecord) -> str:
+    """The absence payload serialized as indented JSON (one serializer for every surface)."""
+    return clean_json_dumps(build_absence_payload(absence_record), indent=2)
+
+
+def build_absence_html(absence_record: AbsenceRecord) -> str:
+    """The HTML absence document: the JSON payload escaped inside a ``<pre>`` block.
+
+    Escaping before embedding is the same XSS-hardening as the raw-JSON value fallback —
+    record fields carry user-controlled strings.
+    """
+    return f"<pre>{html.escape(build_absence_json(absence_record))}</pre>"
 
 
 def build_absence_markdown(absence_record: AbsenceRecord) -> str:

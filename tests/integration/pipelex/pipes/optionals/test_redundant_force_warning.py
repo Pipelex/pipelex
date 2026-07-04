@@ -17,6 +17,7 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
+from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.system.registries.func_registry import func_registry
 
@@ -113,7 +114,7 @@ class TestRedundantForceWarning:
         load_empty_library()
         seq_guaranteed, _ = _build_force_pipes()
 
-        warnings = build_optionality_warnings([seq_guaranteed])
+        warnings = build_optionality_warnings(collect_controller_taint_analyses([seq_guaranteed]))
 
         assert len(warnings) == 1
         warning = warnings[0]
@@ -130,7 +131,7 @@ class TestRedundantForceWarning:
         load_empty_library()
         _, seq_asserting = _build_force_pipes()
 
-        assert build_optionality_warnings([seq_asserting]) == []
+        assert build_optionality_warnings(collect_controller_taint_analyses([seq_asserting])) == []
 
     def test_meaningful_in_one_flow_silences_the_redundant_one(self, load_empty_library: Callable[[], str]):
         """The lint aggregates across flows: one asserting flow silences the redundant observation,
@@ -139,4 +140,4 @@ class TestRedundantForceWarning:
         load_empty_library()
         seq_guaranteed, seq_asserting = _build_force_pipes()
 
-        assert build_optionality_warnings([seq_guaranteed, seq_asserting]) == []
+        assert build_optionality_warnings(collect_controller_taint_analyses([seq_guaranteed, seq_asserting])) == []

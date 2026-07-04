@@ -19,6 +19,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    output_digest_is_optional,
 )
 from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
@@ -371,16 +372,12 @@ class GraphTracer(GraphTracerProtocol):
     def _is_optional_output_digest(self, *, producer_node_id: str, digest: str) -> bool:
         """Whether the producer registered this digest as a declared-optional (`?`) output.
 
-        The optional marker rides the output IOSpec's ``extra`` dict (set at the pipe-run
-        epilogue from the pipe's declared output presence).
+        Node lookup here; the marker semantics live in the shared `output_digest_is_optional`.
         """
         producer_data = self._nodes.get(producer_node_id)
         if producer_data is None:
             return False
-        for output_spec in producer_data.output_specs:
-            if output_spec.digest == digest:
-                return bool(output_spec.extra.get("optional"))
-        return False
+        return output_digest_is_optional(producer_data.output_specs, digest=digest)
 
     def _generate_batch_item_edges(self) -> None:
         """Generate BATCH_ITEM edges for batch fan-out.
@@ -884,8 +881,15 @@ class GraphTracer(GraphTracerProtocol):
         *,
         ended_at: datetime,
         skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
-        """Record that a pipe was lifted (skipped): its own node state, with the reason."""
+        """Record that a pipe was lifted (skipped): its own node state, with the reason.
+
+        A lifted pipe with a PLURAL output still writes a real empty-list Stuff (D4) that
+        downstream pipes consume — its spec registers in the producer map exactly like a
+        success output, so the DATA edge to those consumers resolves.
+        """
         if not self._is_active:
             return
 
@@ -896,6 +900,21 @@ class GraphTracer(GraphTracerProtocol):
         node_data.ended_at = ended_at
         node_data.status = NodeStatus.SKIPPED
         node_data.skip_reason = skip_reason
+
+        # Accumulate output concept data (deduplicated) — mirrors on_pipe_end_success
+        if output_concept_data is not None:
+            concept_ref = f"{output_concept_data.get('domain_code', '')}.{output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = output_concept_data
+
+        # Store output spec and register in producer map — mirrors on_pipe_end_success
+        # (including the pass-through check, vacuous here since the empty list is fresh)
+        if output_spec is not None:
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if output_spec.digest not in input_digests:
+                node_data.output_specs.append(output_spec)
+                if output_spec.digest:
+                    self._stuff_producer_map[output_spec.digest] = node_id
 
         # Emit PipeEndSkippedEvent
         if self._event_log is not None:
@@ -909,6 +928,8 @@ class GraphTracer(GraphTracerProtocol):
                     node_id=node_id,
                     ended_at=ended_at,
                     skip_reason=skip_reason,
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data or {},
                 )
             )
 

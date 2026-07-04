@@ -14,6 +14,7 @@ from pipelex.hub import (
     set_current_library,
 )
 from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
@@ -115,7 +116,9 @@ async def validate_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
-        "warnings": [warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(result.pipes)],
+        "warnings": [
+            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+        ],
     }
 
 
@@ -224,5 +227,7 @@ async def validate_pipe_in_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
-        "warnings": [warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(result.pipes)],
+        "warnings": [
+            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+        ],
     }

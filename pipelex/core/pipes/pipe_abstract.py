@@ -706,21 +706,14 @@ class PipeAbstract(ABC, BaseModel):
                 )
             raise
 
-        # Record graph tracing success — a lifted (skipped) pipe ends its node in the distinct
+        # Record graph tracing completion — a lifted (skipped) pipe ends its node in the distinct
         # `skipped` state with the skip reason; every other completion is a success.
         if tracer_manager is not None and parent_trace_context is not None:
-            if presence_scan.liftable:
-                tracer_manager.on_pipe_end_skipped(
-                    lookup_key=parent_trace_context.lookup_key,
-                    node_id=graph_node_id,
-                    ended_at=datetime.now(timezone.utc),
-                    skip_reason=self._make_skip_reason(liftable=presence_scan.liftable),
-                )
-                return pipe_output
-
             # Capture output spec for data flow tracking — a completed pipe run always resolves its
             # declared output: a value or a recorded absence. An absent output has no payload to
-            # capture; the node still ends successfully.
+            # capture. A LIFTED pipe with a PLURAL output still wrote a real empty-list Stuff (D4)
+            # that downstream pipes consume, so its spec must register in the producer map exactly
+            # like a produced value — otherwise the consumers' DATA edges silently drop.
             main_resolved = pipe_output.working_memory.resolve_main_stuff()
             output_spec: IOSpec | None = None
             output_concept_data: dict[str, Any] | None = None
@@ -749,13 +742,43 @@ class PipeAbstract(ABC, BaseModel):
                 if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry:
                     output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept, library_crate=library_crate)
 
-            tracer_manager.on_pipe_end_success(
-                lookup_key=parent_trace_context.lookup_key,
-                node_id=graph_node_id,
-                ended_at=datetime.now(timezone.utc),
-                output_spec=output_spec,
-                output_concept_data=output_concept_data,
-            )
+            if presence_scan.liftable:
+                tracer_manager.on_pipe_end_skipped(
+                    lookup_key=parent_trace_context.lookup_key,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(timezone.utc),
+                    skip_reason=self._make_skip_reason(liftable=presence_scan.liftable),
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data,
+                )
+                # Plural companion slots also wrote real empty-list Stuffs on the lift — register
+                # them as this node's outputs so their downstream DATA edges resolve too.
+                # (graph_node_id is set whenever tracing recorded the start; guard for the type.)
+                if graph_node_id is not None:
+                    for companion_slot in self.lifted_companion_slots():
+                        if not companion_slot.is_plural:
+                            continue
+                        companion_stuff = pipe_output.working_memory.get_optional_stuff(companion_slot.slot_name)
+                        if companion_stuff is None:
+                            continue
+                        tracer_manager.register_controller_output(
+                            lookup_key=parent_trace_context.lookup_key,
+                            node_id=graph_node_id,
+                            output_spec=IOSpec(
+                                name=companion_slot.slot_name,
+                                concept=companion_stuff.concept.code,
+                                content_type=companion_stuff.content.content_type,
+                                digest=companion_stuff.stuff_code,
+                            ),
+                        )
+            else:
+                tracer_manager.on_pipe_end_success(
+                    lookup_key=parent_trace_context.lookup_key,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(timezone.utc),
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data,
+                )
 
         return pipe_output
 

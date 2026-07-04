@@ -12,7 +12,7 @@ from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceRecord
-from pipelex.core.memory.absence_render import build_absence_markdown, build_absence_payload
+from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -174,11 +174,9 @@ class DeliveryExecutor:
         The JSON carries an explicit ``"absent": true`` discriminator beside the record fields so
         a consumer polling ``main_stuff.json`` can tell an absence document from a value dump.
         """
-        json_text = clean_json_dumps(build_absence_payload(absence_record), indent=2)
-        files["main_stuff.json"] = ResultFile(data=json_text.encode("utf-8"), content_type="application/json")
+        files["main_stuff.json"] = ResultFile(data=build_absence_json(absence_record).encode("utf-8"), content_type="application/json")
         files["main_stuff.md"] = ResultFile(data=build_absence_markdown(absence_record).encode("utf-8"), content_type="text/markdown")
-        # Same XSS-hardening as the raw fallback: escape before embedding in <pre>.
-        files["main_stuff.html"] = ResultFile(data=f"<pre>{html.escape(json_text)}</pre>".encode(), content_type="text/html")
+        files["main_stuff.html"] = ResultFile(data=build_absence_html(absence_record).encode("utf-8"), content_type="text/html")
 
     @classmethod
     def try_local_hydrate_stuff(cls, stuff_raw: dict[str, Any]) -> Stuff | None:

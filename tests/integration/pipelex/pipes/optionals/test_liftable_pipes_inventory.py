@@ -16,6 +16,7 @@ from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequen
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
+from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.liftable_pipes import build_liftable_pipes
 from pipelex.pipeline.validation_report import PipelexValidationReport
 from pipelex.system.registries.func_registry import func_registry
@@ -113,7 +114,7 @@ class TestLiftablePipesInventory:
         pipe_codes = _build_lift_chain_pipes()
         pipes = [get_pipe_library().get_required_pipe(pipe_code=pipe_code) for pipe_code in pipe_codes]
 
-        entries = build_liftable_pipes(pipes)
+        entries = build_liftable_pipes(collect_controller_taint_analyses(pipes))
 
         by_pipe_ref = {entry.pipe_ref: entry for entry in entries}
         assert set(by_pipe_ref.keys()) == {f"{_DOMAIN_CODE}.inv_step_a", f"{_DOMAIN_CODE}.inv_step_b"}
@@ -167,7 +168,7 @@ class TestLiftablePipesInventory:
         )
         pipe_library.add_new_pipe(pipe=parallel)
 
-        entries = build_liftable_pipes([parallel, branch_found, branch_base])
+        entries = build_liftable_pipes(collect_controller_taint_analyses([parallel, branch_found, branch_base]))
 
         assert len(entries) == 1
         entry = entries[0]

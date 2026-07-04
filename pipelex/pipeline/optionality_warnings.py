@@ -22,33 +22,26 @@ from typing import TYPE_CHECKING
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
-from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
+from pipelex.pipeline.controller_taint import ControllerTaintAnalysis
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.absence_taint import ForceConsumptionInfo
 
 
-def build_optionality_warnings(pipes: Sequence[PipeAbstract]) -> list[ValidationErrorItem]:
+def build_optionality_warnings(taint_analyses: Sequence[ControllerTaintAnalysis]) -> list[ValidationErrorItem]:
     """Project the controllers' taint analyses into advisory `warnings` items.
 
-    Must run while the validation library is loaded — the analyses resolve child pipes
-    through the hub (same requirement as `build_liftable_pipes`).
-
     Args:
-        pipes: The loaded pipes to analyze (typically `ValidateBundleResult.pipes`).
+        taint_analyses: The controllers' analyses from `collect_controller_taint_analyses`
+            (one taint walk per validate pass, shared with `build_liftable_pipes`).
 
     Returns:
         One `optional_force_redundant` item per (pipe, `!`-input) whose slot is guaranteed
         present in every analyzed flow, in deterministic order (by pipe_ref, then variable).
     """
     observations: list[ForceConsumptionInfo] = []
-    for pipe in sorted(pipes, key=lambda loaded_pipe: loaded_pipe.pipe_ref):
-        if isinstance(pipe, PipeSequence):
-            observations.extend(pipe.analyze_taint().force_consumptions)
-        elif isinstance(pipe, PipeParallel):
-            observations.extend(pipe.analyze_branch_taint().force_consumptions)
+    for taint_analysis in taint_analyses:
+        observations.extend(taint_analysis.force_consumptions)
 
     asserted: set[tuple[str, str]] = set()
     redundant: dict[tuple[str, str], list[ForceConsumptionInfo]] = {}

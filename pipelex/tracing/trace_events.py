@@ -108,6 +108,11 @@ class PipeEndSkippedEvent(TraceEvent):
     node_id: str
     ended_at: datetime
     skip_reason: str
+    output_spec: IOSpec | None = None
+    """A lifted pipe with a PLURAL output still writes a real empty-list Stuff (D4) — its spec
+    rides the skip event so the digest registers in the producer map and downstream DATA edges
+    resolve. None for a singular output (a recorded absence has no payload)."""
+    output_concept_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class EdgeEvent(TraceEvent):
