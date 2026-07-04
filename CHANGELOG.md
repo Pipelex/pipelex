@@ -24,7 +24,7 @@
 - **Type preservation across transport:** `Composite` components (and their nested lists) now retain strict types across transport boundaries (`dump_for_transport` / hydration) via private class markers.
 - **`PipeParallel` honors `final_stuff_code`:** A requested final stuff code (e.g. from a `PipeBatch`) is now correctly stamped on the parallel's combined output.
 - **Docs — inference plugins:** Rewrote `using-inference-plugins.md` to demonstrate a genuine `pipelex.plugins` entry-point package instead of a legacy config workaround.
-- **Linting pipeline:** `plxt lint` now validates `.mthds` files against the locally generated schema (`derived/mthds_schema.json`) rather than the released schema bundled with `plxt`.
+- **Linting pipeline (repo-local):** in the pipelex repo itself, `plxt lint` now validates `.mthds` files against the locally generated schema (`derived/mthds_schema.json`) rather than the released schema bundled with `plxt`. This is a `.pipelex/plxt.toml` override for this repo only — the `plxt.toml` template distributed by `pipelex init config` is unchanged.
 - **Dry-run mocks:** Reduced the default dry-run mock list generation from 3 items to 2 to cut dry-run processing time.
 - Bumped `mthds` dependency from `>=0.6.0` to `>=0.7.0`.
 
@@ -164,7 +164,7 @@
 - **Mistral chat requests now send the system message before the user message**: `make_simple_messages` previously appended it after the user message, contradicting its own docstring and the OpenAI-typed sibling.
 - **String concept values in bundle specs are constructible again**: a bare string in the `ConceptSpec | str` union now validates (no longer crashing the `mode="before"` validator) and passes through to the blueprint as the concept's description instead of into `structure`, where the loader rejected it.
 - **LocalObserver JSONL records always carry the true lifecycle event name**: a payload's own `event_type` key can no longer overwrite the event name in the written record, which had broken event-type filtering for JSONL consumers.
-- **Tests under `tests/**/build/`are no longer silently skipped**: pytest's default`norecursedirs`includes`build`, so the whole `tests/unit/pipelex/cli/commands/build/`tree was never collected; the config now overrides`norecursedirs`and sets`testpaths = ["tests"]`.
+- **Tests under `tests/**/build/` are no longer silently skipped**: pytest's default `norecursedirs` includes `build`, so the whole `tests/unit/pipelex/cli/commands/build/` tree was never collected; the config now overrides `norecursedirs` and sets `testpaths = ["tests"]`.
 - **`Anything`-output option numbering is now deterministic**: the output renderer sorts a `PipeCondition`'s possible outputs by pipe code instead of iterating a set, so `output_option_N` / `schema_option_N` numbering is stable across runs.
 - **Documentation examples**: Updated code snippets in `docs/under-the-hood/` to match the new keyword-only signatures.
 - **Test mock assertions**: Migrated mock assertions from `.call_args.args` to `.call_args.kwargs` to reflect keyword-only calls.
