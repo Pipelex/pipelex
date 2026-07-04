@@ -202,7 +202,6 @@ class TestImageToImageGeneration:
         input_images: list[PromptImage] = [PromptImageUri(uri=uri) for uri in image_uris]
         img_gen_prompt = ImgGenPrompt(
             positive_text=Img2ImgTestCases.EDIT_PROMPT_MULTI,
-            negative_text="distorted, artifacts",
             input_images=input_images,
         )
 

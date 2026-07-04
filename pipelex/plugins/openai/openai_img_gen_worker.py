@@ -21,7 +21,6 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 
@@ -73,8 +72,9 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
 
         images_response: ImagesResponse
         try:
-            if image_arg := args_dict.get("image"):
-                args_dict["image"] = self._convert_image_data_urls_for_openai_sdk(image_arg=image_arg)
+            # The args factory maps input images to httpx-style file tuples under "image", which is
+            # only valid on the images.edit route (images.generate rejects it with a 400).
+            if "image" in args_dict:
                 if args_dict.pop("moderation", None) is not None:
                     log.warning("OpenAI images.edit does not accept 'moderation'; dropping the kwarg")
                 images_response = cast("ImagesResponse", await self.openai_client.images.edit(**args_dict))
@@ -181,29 +181,6 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 ),
             )
         return generated_images
-
-    @staticmethod
-    def _convert_image_data_urls_for_openai_sdk(image_arg: Any) -> list[tuple[str, bytes, str]]:
-        """Convert shared GPT Image data URLs into the OpenAI SDK's multipart file tuples."""
-        if not isinstance(image_arg, list):
-            msg = f"OpenAI image edit expected a list of image data URLs, got '{type(image_arg).__name__}'"
-            raise ImgGenParameterError(msg)
-
-        image_data_urls = cast("list[Any]", image_arg)
-        image_files: list[tuple[str, bytes, str]] = []
-        for index, image_data_url in enumerate(image_data_urls):
-            if not isinstance(image_data_url, str):
-                msg = f"OpenAI image edit expected image #{index} to be a data URL, got '{type(image_data_url).__name__}'"
-                raise ImgGenParameterError(msg)
-            extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=image_data_url)
-            if extracted is None:
-                msg = "OpenAI image edit expected base64 data URLs from the shared image argument factory"
-                raise ImgGenParameterError(msg)
-            base64_str, mime_type = extracted
-            file_extension = mime_type.split("/", 1)[1].replace("jpeg", "jpg")
-            image_bytes = base64.b64decode(base64_str)
-            image_files.append((f"image_{index}.{file_extension}", image_bytes, mime_type))
-        return image_files
 
     @staticmethod
     def _get_requested_size(args_dict: dict[str, Any]) -> str | None:

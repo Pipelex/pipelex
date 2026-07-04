@@ -69,7 +69,6 @@ def serialize_completed_output(
         main_stuff_name=main_stuff_name,
         pipeline_run_id=pipe_output.pipeline_run_id,
         workflow_id=workflow_id,
-        is_completed=True,
         graph_spec_dump=graph_spec_dump,
         graph_assembly_error=pipe_output.graph_assembly_error,
         tokens_usages_dump=tokens_usages_dump,
@@ -77,13 +76,16 @@ def serialize_completed_output(
     )
 
 
-def resolve_main_stuff_root_key(pipe_output: PipeOutput) -> str | None:
+def resolve_main_stuff_root_key(pipe_output: PipeOutput) -> str:
     """Return the actual ``root`` dict key under which the main stuff lives.
 
     The main stuff can either sit directly at ``root[MAIN_STUFF_NAME]`` or be
     referenced via ``aliases[MAIN_STUFF_NAME]`` pointing at its real name.
     Callers indexing the output_dict need the actual root key, not the
     stuff's display ``stuff_name``.
+
+    A completed run always delivers a main stuff — a working memory without
+    one at this boundary is a contract violation and raises ``PipeJobError``.
     """
     working_memory = pipe_output.working_memory
     if MAIN_STUFF_NAME in working_memory.root:
@@ -91,4 +93,7 @@ def resolve_main_stuff_root_key(pipe_output: PipeOutput) -> str | None:
     aliased_target = working_memory.aliases.get(MAIN_STUFF_NAME)
     if aliased_target is not None and aliased_target in working_memory.root:
         return aliased_target
-    return None
+    msg = (
+        f"Completed run '{pipe_output.pipeline_run_id}' delivered no main stuff in its working memory — a completed run always delivers a main stuff."
+    )
+    raise PipeJobError(msg)

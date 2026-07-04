@@ -73,7 +73,6 @@ class TestPipeParallelValidation:
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
             branches=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
             add_each_output=True,
-            combined_output=None,
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
@@ -125,7 +124,6 @@ class TestPipeParallelValidation:
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
             branches=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
-            combined_output=None,
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(
@@ -143,7 +141,6 @@ class TestPipeParallelValidation:
         assert pipe_parallel.output.concept.code == concept_3.code
         assert pipe_parallel.output.concept.domain_code == domain_code
         assert pipe_parallel.add_each_output is True
-        assert pipe_parallel.combined_output is None
 
         concept_library.teardown()
 
@@ -180,7 +177,6 @@ class TestPipeParallelValidation:
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
             branches=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
-            combined_output=None,
         )
 
         pipe_parallel = PipeFactory[PipeParallel].make_from_blueprint(

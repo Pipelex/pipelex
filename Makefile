@@ -839,7 +839,9 @@ plxt-format: env
 	$(call PRINT_TITLE,"Formatting MTHDS/TOML with plxt")
 	$(VENV_PLXT) fmt
 
-plxt-lint: env
+# plxt validates .mthds files against the locally generated schema (see .pipelex/plxt.toml),
+# so make sure it exists and is fresh before linting.
+plxt-lint: env generate-mthds-schema-quiet
 	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 
@@ -893,7 +895,7 @@ merge-check-plxt-format: env
 	$(call PRINT_TITLE,"Checking MTHDS/TOML formatting with plxt")
 	$(VENV_PLXT) fmt --check
 
-merge-check-plxt-lint: env
+merge-check-plxt-lint: env generate-mthds-schema-quiet
 	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 

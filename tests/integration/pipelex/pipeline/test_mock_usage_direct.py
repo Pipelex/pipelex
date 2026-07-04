@@ -111,7 +111,7 @@ class TestMockUsageDirect:
         aggregated = CostRegistry.aggregate_costs(pipe_output.tokens_usages)
         assert aggregated.has_reportable_usage
         # The structured output was produced by the mock object builder (a Topic with a name).
-        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+        main_stuff = pipe_output.working_memory.get_main_stuff()
         assert main_stuff is not None
 
     async def test_cost_report_renders_for_mock_usage(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:

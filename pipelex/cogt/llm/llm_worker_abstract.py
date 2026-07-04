@@ -9,9 +9,10 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.exceptions import JobMetadataError
 from pipelex.pipeline.job_metadata import UnitJobId
@@ -24,6 +25,7 @@ from pipelex.system.telemetry.otel_constants import (
 )
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -31,6 +33,8 @@ if TYPE_CHECKING:
     from pydantic import BaseModel
 
     from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.llm.llm_job_components import LLMJobParams
+    from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -38,15 +42,18 @@ if TYPE_CHECKING:
 class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     def __init__(
         self,
+        inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
         """Initialize the LLMWorker.
 
         Args:
+            inference_model (InferenceModelSpec): The inference model to be used by the worker.
             reporting_delegate (ReportingProtocol | None): An optional report delegate for reporting unit jobs.
 
         """
         InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
+        self.inference_model = inference_model
 
     #########################################################
     # Instance methods
@@ -55,33 +62,31 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
     @property
     @override
     def desc(self) -> str:
-        return "If you're using an external plugin, override this method to describe your llm worker"
+        return self.inference_model.tag
 
     @property
-    @abstractmethod
     def is_gen_object_supported(self) -> bool:
-        return False
+        return self.inference_model.is_gen_object_supported
 
     @property
-    @abstractmethod
     def is_vision_supported(self) -> bool:
-        return False
+        return self.inference_model.is_vision_supported
 
     #########################################################
-    # OTel helper methods - override in subclasses with model info
+    # OTel helper methods
     #########################################################
 
     def _get_provider_name(self) -> str:
-        """Get the GenAI provider name (e.g., 'openai', 'anthropic'). Override in subclass."""
-        return "unknown"
+        """Get the GenAI provider name from the inference model backend."""
+        return self.inference_model.backend_name
 
     def _get_request_model_name(self) -> str:
-        """Get the request model name. Override in subclass."""
-        return "unknown"
+        """Get the model name from the inference model."""
+        return self.inference_model.name
 
     def _get_response_model_name(self) -> str:
-        """Get the response model name. Override in subclass."""
-        return "unknown"
+        """Get the response model name from the inference model."""
+        return self.inference_model.model_id
 
     def _start_otel_span_llm(self, llm_job: LLMJob, *, output_type: InferenceOutputType, output_class_name: str | None = None) -> Span | None:
         """Start an OTel span for the LLM job and return it.
@@ -318,11 +323,51 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         self,
         llm_job: LLMJob,
     ):
+        log.dev(f"✨ {self.desc} ✨")
+
         # Verify that the job is valid
         llm_job.validate_before_execution()
 
         # Verify feasibility
         self._check_can_perform_job(llm_job=llm_job)
+
+        # Start the job lifecycle: stamps started_at and initializes the token-usage report
+        llm_job.llm_job_before_start(inference_model=self.inference_model)
+        llm_job.applied_job_params = self._apply_constraints(llm_job=llm_job)
+
+    def _apply_constraints(self, llm_job: LLMJob) -> LLMJobParams | None:
+        """Apply constraints from the inference model to job params.
+
+        Args:
+            llm_job: The LLM job containing the original job params
+
+        Returns:
+            A copy of job_params with constraints applied, or None if no changes were needed
+
+        """
+        original_params = llm_job.job_params
+        new_temperature = original_params.temperature
+        max_tokens = original_params.max_tokens or self.inference_model.max_tokens
+        new_max_tokens = max_tokens
+        has_changes = False
+
+        # Temperature constraints
+        if ListedConstraint.TEMPERATURE_MUST_BE_MULTIPLIED_BY_2 in self.inference_model.listed_constraints:
+            new_temperature *= 2
+            has_changes = True
+        fixed_temperature = self.inference_model.valued_constraints.get(ValuedConstraint.FIXED_TEMPERATURE)
+        if fixed_temperature is not None and new_temperature != fixed_temperature:
+            log.warning(
+                f"Model {self.inference_model.desc} used with temperature {new_temperature}, "
+                f"but it must be {fixed_temperature} for this model so we forced it to {fixed_temperature}"
+            )
+            new_temperature = fixed_temperature
+            has_changes = True
+
+        if not has_changes:
+            return None
+
+        return original_params.model_copy(update={"temperature": new_temperature, "max_tokens": new_max_tokens})
 
     async def _after_text_job(
         self,
@@ -356,7 +401,44 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
-        pass
+        self._check_vision_support(llm_job=llm_job)
+        self._check_document_support(llm_job=llm_job)
+
+    def _validate_no_reasoning_for_structured_gen(self, job_params: LLMJobParams):
+        if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
+            msg = f"Model '{self.inference_model.desc}' does not support reasoning parameters for structured generation"
+            raise LLMCapabilityError(msg)
+
+    def _check_vision_support(self, llm_job: LLMJob):
+        if llm_job.llm_prompt.user_images:
+            if not self.inference_model.is_vision_supported:
+                msg = f"LLM Engine '{self.inference_model.tag}' does not support vision."
+                raise LLMCapabilityError(msg)
+
+            nb_images = len(llm_job.llm_prompt.user_images)
+            max_prompt_images = self.inference_model.max_prompt_images or 5000
+            if nb_images > max_prompt_images:
+                msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
+                raise LLMCapabilityError(msg)
+
+    def _check_document_support(self, llm_job: LLMJob):
+        if not llm_job.llm_prompt.user_documents:
+            return
+
+        if not self.inference_model.is_document_supported:
+            msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
+            raise LLMCapabilityError(msg)
+
+        # Check each document's type is supported
+        supported = self.inference_model.supported_document_types
+        for doc in llm_job.llm_prompt.user_documents:
+            doc_type = doc.get_document_type()
+            # Skip validation for unknown types - let the provider handle it
+            if doc_type == UNKNOWN_FILE_TYPE:
+                continue
+            if doc_type not in supported:
+                msg = f"LLM Engine '{self.inference_model.tag}' does not support {doc_type} documents."
+                raise LLMCapabilityError(msg)
 
     async def gen_text(
         self,

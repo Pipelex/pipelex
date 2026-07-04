@@ -56,5 +56,6 @@ class RoutingProfileFactory:
             description=blueprint.description,
             default=blueprint.default,
             routes=blueprint.routes,
+            optional_routes=blueprint.optional_routes,
             fallback_order=blueprint.fallback_order,
         )

@@ -2,6 +2,7 @@ from typing import Any, ClassVar
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -102,6 +103,7 @@ class CoreRegistryModels(RegistryModels):
         PageContent,
         JSONContent,
         SearchResultContent,
+        CompositeContent,
     ]
 
     EXPERIMENTAL: ClassVar[list[ModelType]] = [

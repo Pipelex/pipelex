@@ -1,20 +1,62 @@
 # Changelog
 
-## [Unreleased]
+## [v0.37.0] - 2026-07-04
+
+### Highlights
+
+- **`PipeParallel` always combines — and every run has a main output** — A parallel now always combines its branch outputs into its declared `output` concept (with the new `native.Composite` concept as the ready-made combination vehicle), the `combined_output` field is deleted from the MTHDS language, and the main-stuff invariant is enforced end to end: every completed pipe run delivers a `main_stuff`, so downstream surfaces (delivery, graph tracing, telemetry, wire models) can rely on it unconditionally.
+- **Portable, statically validated image generation** — A new portable `size` parameter (`"1k"`/`"2k"`/`"4k"` tiers or exact pixel dimensions) carries the same size intent across providers, Gemini models gain image-to-image editing and extreme banner aspect ratios, and Google image models are now validated against declarative geometry rules at blueprint-load time — unsatisfiable requests fail fast instead of at the provider call.
+
+### Added
+
+- **Portable image size (`size`) for `PipeImgGen`:** New `size` parameter accepting portable tiers (`"1k"`, `"2k"`, `"4k"`) or exact pixel dimensions (e.g. `"2048x1152"`). A tier means "this pixel class at my chosen `aspect_ratio`", mapped to each provider's own grid; an exact size is deterministic (declaring `aspect_ratio` alongside it is a validation error). Unsatisfiable requests fail as hard validation errors at blueprint-load time, never warn-and-ignore. When `size` is unset, no size intent is sent and the provider default applies. The MTHDS JSON Schema exposes the field, and an optional `size` default is supported in `[cogt.img_gen_config.img_gen_param_defaults]`.
+- **`native.Composite` concept:** New native concept backed by `CompositeContent` — an untyped, named composition holding sub-contents as top-level fields, serving as the default combination vehicle for parallel branches. Supports the full content surface: `smart_dump`, kajson/transport round-trip, and markdown/HTML rendering.
+- **Gemini image-to-image (img2img) support:** The Google img-gen worker now forwards input images to the Gemini API as inline parts, enabling image editing and multi-image composition for the `nano-banana` models (including the new `nano-banana-2-lite`). Every img-gen worker now validates input images against the model's declared capability at job start, rejecting img2img on unsupported models with a clean `ImgGenParameterError` before any provider call.
+- **Banner aspect ratios:** Support for extreme banner formats (`landscape_4_1`, `landscape_8_1`, `portrait_1_4`, `portrait_1_8`) from Gemini 3.1 image models. All other image-gen backends reject them with a clean parameter error.
+- **Static validation for Google image models:** Google image models now use `rules` blocks (geometry taxonomies like `gemini_3_flash`) in the backend deck, catching unsupported aspect-ratio and size combinations at blueprint-load time. The Google img-gen factory is keyed by taxonomy instead of hardcoded model names (Breaking: the `GoogleImageGenModel` name enum is removed — model handles are deck config, not code constants).
+
+### Changed
+
+- **`PipeParallel` always combines (Breaking):** A `PipeParallel` controller now always combines its branch outputs into its declared `output` concept and stamps it as the main output. The declared `output` is strictly validated at author time and must be `Composite` or a structured concept whose fields and types match the branch `result` names. Combination replaces the removed `combined_output` field. Migration: pipes declaring both fields just drop the `combined_output` line; `add_each_output`-only pipes replace their placeholder `output` with `Composite` or a matching structured concept. `add_each_output` keeps its meaning and now defaults to `false`.
+- **Main-stuff invariant enforced (Breaking):** Every pipe run now guarantees a `main_stuff`; defensive "maybe there is no main stuff" branches are removed, wire models make the field required (`main_stuff_name: str` on `PipelexPipeRunOutput` and the `/execute` response extension), and `PipeOutput.optional_main_stuff` is replaced by `PipeOutput.main_stuff`.
+- **Orchestrator SPI delivery split (Breaking):** `OrchestratorProtocol.run` is now strictly the blocking arm (returning a completed `PipelexPipeRunOutput`). A new `OrchestratorProtocol.start` handles fire-and-forget, returning a `PipelexPipeDispatchAck` (IDs only). `PipelexPipeRunOutput.is_completed` is deleted — it is always a completed output now.
+- **`LLMWorkerInternalAbstract` folded (Breaking):** Removed and folded into `LLMWorkerAbstract`, which now owns the whole job lifecycle (capability checks, constraints, telemetry). Subclasses extend `LLMWorkerAbstract` directly and implement `_gen_text`/`_gen_object`, nothing else.
+- **Type preservation across transport:** `Composite` components (and their nested lists) now retain strict types across transport boundaries (`dump_for_transport` / hydration) via private class markers.
+- **`PipeParallel` honors `final_stuff_code`:** A requested final stuff code (e.g. from a `PipeBatch`) is now correctly stamped on the parallel's combined output.
+- **Docs — inference plugins:** Rewrote `using-inference-plugins.md` to demonstrate a genuine `pipelex.plugins` entry-point package instead of a legacy config workaround.
+- **Linting pipeline (repo-local):** in the pipelex repo itself, `plxt lint` now validates `.mthds` files against the locally generated schema (`derived/mthds_schema.json`) rather than the released schema bundled with `plxt`. This is a `.pipelex/plxt.toml` override for this repo only — the `plxt.toml` template distributed by `pipelex init config` is unchanged.
+- **Dry-run mocks:** Reduced the default dry-run mock list generation from 3 items to 2 to cut dry-run processing time.
+- Bumped `mthds` dependency from `>=0.6.0` to `>=0.7.0`.
 
 ### Fixed
 
-- **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
-- **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), mirroring `teardown`. Previously a failed boot could poison a subsequent boot in the same process — surfacing as a "LogConfig is already set" error or a stale, half-populated class registry.
+- **`PipeCondition` pass-through failure:** A `continue` outcome with no pre-existing main stuff now fails loudly and actionably at the pipe level instead of crashing downstream surfaces.
+- **Stale main stuff in parallels:** A pipeline ending in an `add_each_output`-only `PipeParallel` no longer silently reports the previous step's output as its main result.
+- **`add_each_output` optional in the builder spec:** `PipeParallelSpec` now defaults `add_each_output` to `false` like the blueprint does, so a generated always-combine spec with just `branches` and `output` no longer fails validation before `to_blueprint()`.
+- **Google img-gen size handling:** The native Google worker and gateway path now send the requested `image_size` to the Gemini API instead of hardcoding `"1K"`, making 2K/4K generation reachable.
+- **Img2img support checks:** The capability check now keys off the model's declared `inputs` rather than requiring an `input_images` rule, which had falsely reported Gemini models as unsupported.
+- **Routing profile optional routes:** `optional_routes` declared in `routing_profiles.toml` are no longer silently dropped by the factory.
+- **Unknown boot orchestrator fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution.
+- **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), so a failed boot no longer poisons a subsequent boot in the same process.
+- **HuggingFace streaming errors:** The provider error-body reader now safely tolerates unread `httpx` streaming responses without crashing with `httpx.ResponseNotRead`.
+
+### Removed
+
+- **`combined_output` field (Breaking):** Removed from the MTHDS language for `PipeParallel`; pipes now declare their combination target directly in the `output` field.
+- **Legacy external plugin setter (Breaking):** Removed `set_llm_worker_from_external_plugin` from the inference manager, fully replaced by the `pipelex.plugins` entry point.
+
+### Security
+
+- **Transformers vulnerability:** Bumped `transformers` past CVE-2026-4372 (GHSA-29pf-2h5f-8g72) to resolve a high-severity RCE. To unblock this, the `huggingface` extra now requires `huggingface_hub>=1.5.0,<2.0.0` (Breaking).
 
 ## [v0.36.0] - 2026-06-30
 
 ### Highlights
 
 - **Orchestration plugin SPI** — Pipelex opens its execution path to pluggable orchestrators: the orchestrator that runs a job is now chosen per call by an open `orchestration_mode` token, with the core shipping an in-process `direct` orchestrator and the contract ready for plugins to supply distributed backends.
-    - **Orchestration plugin contract (`orchestration_mode` + `DeliveryMode`)**: The contract is built on two independent axes — an open `orchestration_mode` token (which orchestrator runs the job — `direct` in core, other modes supplied by plugins) and a closed `DeliveryMode` enum (the wait-semantics axis — `BLOCKING` / `FIRE_AND_FORGET`). An orchestrator plugin implements `OrchestratorProtocol.run` with a required `delivery: DeliveryMode` keyword and declares a `supports_fire_and_forget: bool` capability; the orchestrator registries are keyed by the `orchestration_mode` token. `PipelexPipeRunInput` carries `orchestration_mode` + `delivery`.
-    - **Orchestrator-dispatched `/validate`**: A new per-call bundle-validator seam (`BundleValidatorProtocol` / `BundleValidatorRegistry`) makes `/validate` dispatch by `orchestration_mode` the way `/start` runs a pipe — `direct` validates in-process, distributed modes dispatch the job to a worker — with a byte-identical verdict across backends. The core `direct` plugin registers an in-process `DirectBundleValidator`.
-    - **Honest fire-and-forget delivery**: A fire-and-forget `/start` request is honored only when the resolved orchestrator can do genuine async; an orchestrator that cannot (e.g. the in-process `direct` mode) returns a 4xx rather than running the job to completion and falsely acking.
+  - **Orchestration plugin contract (`orchestration_mode` + `DeliveryMode`)**: The contract is built on two independent axes — an open `orchestration_mode` token (which orchestrator runs the job — `direct` in core, other modes supplied by plugins) and a closed `DeliveryMode` enum (the wait-semantics axis — `BLOCKING` / `FIRE_AND_FORGET`). An orchestrator plugin implements `OrchestratorProtocol.run` with a required `delivery: DeliveryMode` keyword and declares a `supports_fire_and_forget: bool` capability; the orchestrator registries are keyed by the `orchestration_mode` token. `PipelexPipeRunInput` carries `orchestration_mode` + `delivery`.
+  - **Orchestrator-dispatched `/validate`**: A new per-call bundle-validator seam (`BundleValidatorProtocol` / `BundleValidatorRegistry`) makes `/validate` dispatch by `orchestration_mode` the way `/start` runs a pipe — `direct` validates in-process, distributed modes dispatch the job to a worker — with a byte-identical verdict across backends. The core `direct` plugin registers an in-process `DirectBundleValidator`.
+  - **Honest fire-and-forget delivery**: A fire-and-forget `/start` request is honored only when the resolved orchestrator can do genuine async; an orchestrator that cannot (e.g. the in-process `direct` mode) returns a 4xx rather than running the job to completion and falsely acking.
 
 ### Added
 
@@ -75,23 +117,24 @@
 ### Highlights
 
 - **Structured validation errors** — validation failures now return a typed, per-error `validation_errors[]` on the error wire instead of a bare `detail` string, with the same shape across the HTTP API and the agent CLI.
-    - **Structured `validation_errors` on the error wire**: `ErrorReport` gains a typed `validation_errors: list[ValidationErrorItem] | None` field. `ValidateBundleError.to_error_report()` flattens its per-error data onto it via a single shared builder (`pipelex/pipeline/validation_errors.py`), so the structured error report an HTTP API surfaces carries machine-mappable per-error diagnostics — `category`, `message`, identity fields, and a `source` (declaring file) for cross-file mapping — instead of only a `detail` string. The closed `ValidationErrorCategory` set is `blueprint_validation` / `pipe_factory` / `pipe_validation` / `dry_run`; a **residual dry-run failure** (`DryRunError` / `PipeRunError`, no structured locator) is projected as one `dry_run` item **only when no categorized error has data**, so an invalid verdict always carries a non-empty `validation_errors[]` (the structured-info invariant) rather than a bare message. The same builder feeds the agent CLI's `validation_errors` JSON array, so the CLI and API structured shapes cannot drift. The list is surfaced under STRICT disclosure (`_STRICT_KEPT_FIELDS`) because it describes the caller's own submitted bundle, not server internals.
-    - **Changed — agent CLI `validation_errors` shape**: the `validate` commands' error envelope now omits null-valued keys per entry (`exclude_none`) and gains the previously-dropped `source`, `field_name`, and `concept_code` fields. Entries are guaranteed to carry `category` and `message`; all other keys are present only when populated, so consumers must treat them as optional rather than assume a fixed key set.
-    - **Per-content `source` on the in-memory validate path**: `PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_source=...)` and `validate_bundle(mthds_sources=...)` let a caller attach a logical source to each in-memory bundle string, threaded into `blueprint.source`. A sourceless `mthds_contents` submission previously produced `source=None`, breaking cross-file diagnostics; a host (e.g. an HTTP API) can now pass per-item sources so the structured `validation_errors` carry a real owning file. The on-disk CLI path is unchanged (it already records real file paths).
-    - **`dry_run` validation category**: `ValidationErrorCategory` gains a `dry_run` value. A dry-run residual failure that previously produced a bare-message `ValidateBundleError` with an empty `validation_errors[]` now surfaces one structured `dry_run` item carrying the message (graph-level, so typically no `source`) — closing the structured-info gap that drove consumers to fabricate a category.
+  - **Structured `validation_errors` on the error wire**: `ErrorReport` gains a typed `validation_errors: list[ValidationErrorItem] | None` field. `ValidateBundleError.to_error_report()` flattens its per-error data onto it via a single shared builder (`pipelex/pipeline/validation_errors.py`), so the structured error report an HTTP API surfaces carries machine-mappable per-error diagnostics — `category`, `message`, identity fields, and a `source` (declaring file) for cross-file mapping — instead of only a `detail` string. The closed `ValidationErrorCategory` set is `blueprint_validation` / `pipe_factory` / `pipe_validation` / `dry_run`; a **residual dry-run failure** (`DryRunError` / `PipeRunError`, no structured locator) is projected as one `dry_run` item **only when no categorized error has data**, so an invalid verdict always carries a non-empty `validation_errors[]` (the structured-info invariant) rather than a bare message. The same builder feeds the agent CLI's `validation_errors` JSON array, so the CLI and API structured shapes cannot drift. The list is surfaced under STRICT disclosure (`_STRICT_KEPT_FIELDS`) because it describes the caller's own submitted bundle, not server internals.
+  - **Changed — agent CLI `validation_errors` shape**: the `validate` commands' error envelope now omits null-valued keys per entry (`exclude_none`) and gains the previously-dropped `source`, `field_name`, and `concept_code` fields. Entries are guaranteed to carry `category` and `message`; all other keys are present only when populated, so consumers must treat them as optional rather than assume a fixed key set.
+  - **Per-content `source` on the in-memory validate path**: `PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_source=...)` and `validate_bundle(mthds_sources=...)` let a caller attach a logical source to each in-memory bundle string, threaded into `blueprint.source`. A sourceless `mthds_contents` submission previously produced `source=None`, breaking cross-file diagnostics; a host (e.g. an HTTP API) can now pass per-item sources so the structured `validation_errors` carry a real owning file. The on-disk CLI path is unchanged (it already records real file paths).
+  - **`dry_run` validation category**: `ValidationErrorCategory` gains a `dry_run` value. A dry-run residual failure that previously produced a bare-message `ValidateBundleError` with an empty `validation_errors[]` now surfaces one structured `dry_run` item carrying the message (graph-level, so typically no `source`) — closing the structured-info gap that drove consumers to fabricate a category.
 
 - **Keyword-only argument enforcement** — a mechanical guard enforces the keyword-only argument convention across `pipelex/`, end to end — local autofix through the CI gate.
-    - **Keyword-only AST guard**: A custom AST-based linter (`pipelex-dev check-keyword-only` / `make cko`) that mechanically enforces the keyword-only argument convention across `pipelex/`, wired into `make check` and `make agent-check`.
-    - **Keyword-only auto-fix**: A non-gating `--fix` mode (`pipelex-dev check-keyword-only --fix` / `make fix-keyword-only` / `make fko`) that rewrites every mechanically-fixable violation by inserting a bare `*` as far left as possible (after `self`/`cls`), re-parsing each rewrite before writing and reporting the shapes it can't fix mechanically. It runs early in `make agent-check`; the read-only check still runs last and owns the pass/fail gate.
-    - **Claude Code hook**: A `PostToolUse` bash hook (`.claude/hooks/check-keyword-only.sh`) that runs the guard on edited files for immediate blocking feedback to AI agents.
-    - **CI integration**: A dedicated `lint-keyword-only` job in the GitHub Actions linting workflow to block non-compliant signatures from merging.
-    - **Convention documentation**: New `docs/contribute/keyword-only-arguments.md`, plus updates to `CLAUDE.md` and `AGENTS.md` establishing the keyword-only convention as a standing rule.
+  - **Keyword-only AST guard**: A custom AST-based linter (`pipelex-dev check-keyword-only` / `make cko`) that mechanically enforces the keyword-only argument convention across `pipelex/`, wired into `make check` and `make agent-check`.
+  - **Keyword-only auto-fix**: A non-gating `--fix` mode (`pipelex-dev check-keyword-only --fix` / `make fix-keyword-only` / `make fko`) that rewrites every mechanically-fixable violation by inserting a bare `*` as far left as possible (after `self`/`cls`), re-parsing each rewrite before writing and reporting the shapes it can't fix mechanically. It runs early in `make agent-check`; the read-only check still runs last and owns the pass/fail gate.
+  - **Claude Code hook**: A `PostToolUse` bash hook (`.claude/hooks/check-keyword-only.sh`) that runs the guard on edited files for immediate blocking feedback to AI agents.
+  - **CI integration**: A dedicated `lint-keyword-only` job in the GitHub Actions linting workflow to block non-compliant signatures from merging.
+  - **Convention documentation**: New `docs/contribute/keyword-only-arguments.md`, plus updates to `CLAUDE.md` and `AGENTS.md` establishing the keyword-only convention as a standing rule.
 
 ### Added
 
 - **`is_valid` on the canonical validation report**: `PipelexValidationReport` gains `is_valid: Literal[True] = True`, the always-true discriminant of the valid arm of the hosted `/validate` response union (mirrored by pipelex-api's `InvalidReport`'s `Literal[False]`). It sits beside `is_runnable`: a sound bundle may still be not-yet-runnable.
 - **Offline CLI unit tests**: Coverage for the pipelex-internal logic behind the CLI commands — `doctor` diagnostics, `run` execution and its sync wrapper, the `build` codegen cores, the readiness gate, `show`/`which`, and the gateway/telemetry/signature error handlers (the spec'd CLI interface stays owned by the conformance suite).
 - **Offline inference & runtime unit tests**: Coverage for layers that can break without a provider — structured-output↔instructor mode mapping, model-deck reference checks, the image-gen argument and worker-routing factories, gateway request-shaping and extract parsing, the Mistral factory, the local observer sink, the output renderer, builder spec validation / `to_blueprint()`, the pipeline runner's error paths, the TOML config-sync engine, and the storage config validators.
+
 ### Changed
 
 - **[BREAKING] Keyword-only public API**: Top-level public surfaces now require keyword arguments after the first parameter. A caller passing a second-or-later argument positionally must switch to keyword form — affected methods include `Pipelex.make(integration_mode, *, ...)`, `Pipelex.setup(integration_mode, *, ...)`, and `PipelexHub.setup_config(config_cls, *, ...)`. Downstream consumers to check: `pipelex-api`, `pipelex-worker`, `n8n-nodes-pipelex`, cookbook, starter.
@@ -116,7 +159,7 @@
 - **Qualified same-domain pipe references resolve across files**: a controller referencing a sibling-file pipe by qualified name (`research.find_key_findings`) is now deferred to the merged library like bare references; a reference no file declares is still rejected at load.
 - **Concepts-only loading validates concept references**: the `pipelex structures` / `load_concepts_only` path now runs the cross-file concept-reference check (batching sibling files into one pass) instead of silently accepting a structure field pointing at an undeclared concept.
 - **Multi-file dependency packages reconcile signatures with their definitions**: a dependency package split into a `PipeSignature` header plus its concrete sibling now goes through the same additive merge instead of colliding on the duplicate code and dropping one declaration by load order.
-- **OpenAI image moderation mapping was inverted**: `is_moderated=true` sent the *less* restrictive `moderation="low"` and `false` sent `"auto"` — the mapping now matches the flag (enabled → `"auto"`, disabled → `"low"`). `ImgGenSetting.is_moderated` also defaults to `None`, so workers omit the parameter and the provider's own default applies (which also stops force-disabling FAL's `enable_safety_checker`).
+- **OpenAI image moderation mapping was inverted**: `is_moderated=true` sent the _less_ restrictive `moderation="low"` and `false` sent `"auto"` — the mapping now matches the flag (enabled → `"auto"`, disabled → `"low"`). `ImgGenSetting.is_moderated` also defaults to `None`, so workers omit the parameter and the provider's own default applies (which also stops force-disabling FAL's `enable_safety_checker`).
 - **Storage config validation now covers every provider and requires a real `{hash}` slot**: the `uri_format` check is enforced uniformly across local / in-memory / S3 / GCP — every placeholder must be a plain supported `{name}`, a `{hash}` slot is required (GCP previously accepted the bare substring `hash`, silently overwriting every stored object), and buckets must set a positive `signed_urls_lifespan_seconds`. A misconfigured format now fails fast at Pipelex boot instead of at the first content store.
 - **Mistral chat requests now send the system message before the user message**: `make_simple_messages` previously appended it after the user message, contradicting its own docstring and the OpenAI-typed sibling.
 - **String concept values in bundle specs are constructible again**: a bare string in the `ConceptSpec | str` union now validates (no longer crashing the `mode="before"` validator) and passes through to the blueprint as the concept's description instead of into `structure`, where the loader rejected it.
@@ -143,6 +186,7 @@
 - **`--dry-run` now mocks at the cogt leaf instead of swapping out the operators.** `run_mode` rides a new `CogtRunParams` carrier (derived from `PipeRunParams.run_mode`, stamped on every cogt assignment), so a DRY run mocks **inside** the inference leaf at zero AI cost, with no API keys and no storage IO (the img/extract DRY branches sit above the store step). `ContentGeneratorDry` is deleted: operators no longer swap generators (the base operator's dry path simply reuses the live path), and the in-process validation scopes pass an inline `ContentGenerator`. Object mocks are now schema-built; classes with exotic format constraints should declare `examples`/`mock_format` (a re-validation failure surfaces as a typed `DryRunObjectFidelityError`, and a deterministic mock-build failure as the new `DryRunMockBuildError`).
 - **Unified dry run — `--mock-inference` removed (breaking).** There is now exactly one non-live run mode: `--dry-run`. The mock-inference mode is retired; its capability — non-zero synthetic usage so the cost report renders — survives as an **internal** `is_mock_usage` sub-flag of DRY on `CogtRunParams` (replacing `is_mock_inference`; setting it on a LIVE run is a validation error). It is exposed on the Python surface (`PipelexMTHDSProtocol` / `execute` / `prepare_pipe_job` via `is_mock_usage=...`) and as a hidden test-only CLI trigger, deliberately undocumented. Dry-run leaf coverage was already uniform across every operator, so `MockInferenceUnsupportedError` and its img-gen/extract/search guards are deleted; `MockInferenceObjectFidelityError` is renamed `DryRunObjectFidelityError` (mock-built objects are DRY-only now); the `mock_inference` usage sentinel is renamed `mock_usage`.
 - **Keyless boot (`needs_inference=False`) now forces every run to DRY instead of installing a mock generator.** Generator selection is purely backend-keyed; the forced-DRY flag is consumed at `PipeRunParamsFactory.make_run_params` — the single writer of `run_mode` — so every execution entry point is covered, including the runtime bridge.
+
 ### Removed
 
 - **`dry_run_config.apply_to_jinja2_rendering`** config key: it was dead — PipeCompose renders templates directly and the jinja2 parse check survives in the templating leaf's DRY branch. Remove it from your `.pipelex/pipelex.toml` override if present (config is strict and will reject the unknown key).
@@ -943,7 +987,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0] - 2026-02-25
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1246,7 +1290,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b3] - 2026-02-11
 
-**Highlights:**
+### Highlights
 
 - **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
 - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
@@ -1318,7 +1362,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b2] - 2026-01-20
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1534,7 +1578,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.17.0] - 2025-11-27
 
-**Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
+### Highlights
+
+- Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 
 ### Fixed
 
@@ -1553,7 +1599,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.16.0] - 2025-11-25
 
-**Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+### Highlights
+
+- Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
 You can run the same pipe at the same times as much as you want, with different inputs.
 Side effets: Unit tests now run in 30s.
 
@@ -1664,7 +1712,9 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.15.0] - 2025-11-07
 
-**Highlights:** This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
+### Highlights
+
+This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
 
 ### Added
 
@@ -1771,7 +1821,7 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.13.0] - 2025-10-21
 
-### Highlights - Simplifying pipeline execution and improving developer experience
+### Highlights
 
 This release focuses on making Pipelex more accessible and easier to use, with major improvements to the CLI, simplified syntax for multiplicity, and a complete documentation overhaul:
 
@@ -1816,7 +1866,9 @@ This release focuses on making Pipelex more accessible and easier to use, with m
 
 ## [v0.12.0] - 2025-10-15
 
-### Highlights - Moving fast and breaking things
+### Highlights
+
+Moving fast and breaking things:
 
 - Added the new builder pipeline system for auto-generating Pipelex bundles from user briefs
   - it's a pipeline to generate pipelines, and it works!
@@ -2060,9 +2112,9 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 ## [v0.10.0] - 2025-09-17
 
-### Highlight: New Inference Backend Configuration System
+### Highlights
 
-We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
+**New Inference Backend Configuration System** — We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
 - **Get started in seconds** with [Pipelex Inference](configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
@@ -2115,7 +2167,7 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 
 ## [v0.9.5] - 2025-09-12
 
-### Highlight
+### Highlights
 
 - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
@@ -2409,9 +2461,9 @@ Simplified input memory:
 
 ## [v0.5.0] - 2025-07-01
 
-### Highlight: Vibe Coding an AI workflow becomes a reality
+### Highlights
 
-**Create AI workflows from natural language without writing code** - The combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
+**Vibe Coding an AI workflow becomes a reality** — Create AI workflows from natural language without writing code: the combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
 
 ### Added
 
@@ -2568,7 +2620,9 @@ Simplified input memory:
 
 ## [v0.4.0] - 2025-06-16
 
-### Highlight: Complete documentation overhaul
+### Highlights
+
+Complete documentation overhaul:
 
 - **MkDocs** setup for static web docs generation
   - **Material** for MkDocs theme, custom styling and navigation

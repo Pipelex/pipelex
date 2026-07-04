@@ -38,7 +38,7 @@ We strongly encourage you to clone the [Pipelex Cookbook repository](https://git
 
 - [**Synthetic Data**](./gen-synthetic-data.md) — Generate diverse synthetic data samples from a description.
 - [**Expense Data with Receipts**](./gen-expense-data.md) — Generate complete expense datasets with receipt images and fraud scenarios.
-- [**Using Inference Plugins**](./using-inference-plugins.md) — Route model calls through custom provider configurations.
+- [**Using Inference Plugins**](./using-inference-plugins.md) — Install an inference-backend plugin and run a method against the model it serves, with zero API keys.
 
 ## Work in Progress
 
