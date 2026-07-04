@@ -35,10 +35,6 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     def main_stuff(self) -> Stuff:
         return self.working_memory.get_main_stuff()
 
-    @property
-    def optional_main_stuff(self) -> Stuff | None:
-        return self.working_memory.get_optional_main_stuff()
-
     def main_stuff_as_list(self, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
         """Get main stuff content as ListContent with items of type StuffContentType.
         If the items are of possibly various types, use item_type=StuffContent.

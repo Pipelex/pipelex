@@ -88,6 +88,11 @@ class DeliveryExecutor:
           registered classes; on failure it falls back to a generic dict
           render so built-in content types still get typed rendering and
           dynamic concepts produce a readable JSON dump.
+
+        A completed run always delivers a main stuff, so the main_stuff.*
+        artifact files are always produced — a working memory without one is
+        a contract violation that fails the delivery loudly, never an "empty
+        envelope" silently missing its result files.
         """
         files: dict[str, ResultFile] = {}
 
@@ -97,19 +102,21 @@ class DeliveryExecutor:
                 content_type="application/json",
             )
             raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
-            main_stuff = self.try_local_hydrate_stuff(raw_main_stuff) if raw_main_stuff is not None else None
-            if main_stuff is not None:
-                await self._generate_main_stuff_files(main_stuff, files=files)
-            elif raw_main_stuff is not None:
+            if raw_main_stuff is None:
+                msg = "Delivery of a completed run found no main stuff in the raw working memory — a completed run always delivers a main stuff."
+                raise PipeJobError(msg)
+            hydrated_main_stuff = self.try_local_hydrate_stuff(raw_main_stuff)
+            if hydrated_main_stuff is not None:
+                await self._generate_main_stuff_files(hydrated_main_stuff, files=files)
+            else:
                 self._generate_main_stuff_files_from_raw(raw_main_stuff, files=files)
         else:
             files["working_memory.json"] = ResultFile(
                 data=clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8"),
                 content_type="application/json",
             )
-            main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-            if main_stuff is not None:
-                await self._generate_main_stuff_files(main_stuff, files=files)
+            main_stuff = pipe_output.working_memory.get_main_stuff()
+            await self._generate_main_stuff_files(main_stuff, files=files)
 
         graph_spec = pipe_output.graph_spec
         if graph_spec:

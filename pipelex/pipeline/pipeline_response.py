@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from mthds.protocol.models import RunResultExecute, RunResultStart
 
-from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.runtime_bridge.serialization import resolve_main_stuff_root_key
 from pipelex.types import StrEnum
 
 
@@ -30,7 +30,8 @@ class PipelexRunResultExecute(RunResultExecute[PipeOutput]):
     created_at: str
     state: RunState
     finished_at: str | None = None
-    main_stuff_name: str | None = None
+    # A completed run always delivers a main stuff; this is the actual working-memory root key it lives under.
+    main_stuff_name: str
 
     @classmethod
     def from_pipe_output(
@@ -48,7 +49,7 @@ class PipelexRunResultExecute(RunResultExecute[PipeOutput]):
             state=state,
             finished_at=finished_at,
             pipe_output=pipe_output,
-            main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
+            main_stuff_name=resolve_main_stuff_root_key(pipe_output=pipe_output),
         )
 
 

@@ -2,6 +2,7 @@ from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -27,10 +28,32 @@ class NativeConceptCode(StrEnum):
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
     ANYTHING = "Anything"
+    COMPOSITE = "Composite"
 
     @property
     def as_output_multiple_indeterminate(self) -> str:
         return f"{self.value}[]"
+
+    @property
+    def is_composite(self) -> bool:
+        """Whether this native concept can hold a named composition (a PipeParallel combination)."""
+        match self:
+            case NativeConceptCode.COMPOSITE:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
 
     @property
     def concept_ref(self) -> str:
@@ -68,6 +91,8 @@ class NativeConceptCode(StrEnum):
                 return JSONContent
             case NativeConceptCode.SEARCH_RESULT:
                 return SearchResultContent
+            case NativeConceptCode.COMPOSITE:
+                return CompositeContent
             case NativeConceptCode.ANYTHING:
                 # This doesn't have a dedicated content class
                 return None
@@ -123,6 +148,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
             ):
                 return False
 
@@ -145,6 +171,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
             ):
                 return False
             case NativeConceptCode.DYNAMIC:
