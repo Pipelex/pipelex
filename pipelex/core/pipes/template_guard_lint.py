@@ -8,6 +8,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
 
 
@@ -40,11 +41,18 @@ def lint_optional_input_guards(
     optional_variable_names = {input_name for input_name, stuff_spec in inputs.root.items() if stuff_spec.presence.is_optional}
     if not optional_variable_names:
         return
-    findings = detect_unguarded_optional_references(
-        template_category=template_category,
-        template_source=rewrite_template_sigils(template_source),
-        optional_variable_names=optional_variable_names,
-    )
+    try:
+        findings = detect_unguarded_optional_references(
+            template_category=template_category,
+            template_source=rewrite_template_sigils(template_source),
+            optional_variable_names=optional_variable_names,
+        )
+    except Jinja2DetectVariablesError:
+        # An unparseable template is not this lint's concern: the template-parsing gates
+        # (blueprint validation, the dry-run variable detection) report syntax errors through
+        # their own typed channels. Raising here — often inside a pydantic model validator —
+        # would leak an internal exception type past callers expecting ValidationError.
+        return
     if not findings:
         return
     finding = findings[0]

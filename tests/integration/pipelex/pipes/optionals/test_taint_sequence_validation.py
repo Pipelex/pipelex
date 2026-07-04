@@ -129,6 +129,8 @@ class TestSequenceTaintValidation:
         error = exc_info.value
         assert error.error_type == PipeValidationErrorType.OPTIONAL_NOT_HANDLED
         assert error.pipe_code == "taint_sequence"
+        # The structured field carries the origin variable identifier, not prose.
+        assert error.variable_names == ["source"]
         # The message names the absence source and the fixes.
         assert "source" in str(error)
         assert "?" in str(error)

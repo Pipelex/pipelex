@@ -16,8 +16,12 @@ from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
+from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.search.pipe_search import PipeSearch
+from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 
 _DOMAIN_CODE = "test_optionals_guard_lint"
 
@@ -143,6 +147,68 @@ class TestOptionalGuardLint:
         wrapped = extract_wrapped_pipe_validation_error(exc_info.value.errors()[0])
         assert wrapped is not None
         assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+
+    # ---- PipeSearch / PipeImgGen templates ----
+
+    def test_unguarded_optional_in_search_prompt_is_rejected(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
+        with pytest.raises(ValidationError) as exc_info:
+            PipeFactory[PipeSearch].make_from_blueprint(
+                domain_code=_DOMAIN_CODE,
+                pipe_code="guard_lint_search",
+                blueprint=PipeSearchBlueprint(
+                    description="Search over a maybe-absent slot, unguarded",
+                    inputs={"maybe_topic": "Text?"},
+                    output="SearchResult[]",
+                    prompt="latest news about {{ maybe_topic }}",
+                ),
+            )
+        wrapped = extract_wrapped_pipe_validation_error(exc_info.value.errors()[0])
+        assert wrapped is not None
+        assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+
+    def test_unguarded_optional_in_img_gen_prompt_is_rejected(self, load_empty_library: Callable[[], None]):
+        load_empty_library()
+        with pytest.raises(ValidationError) as exc_info:
+            PipeFactory[PipeImgGen].make_from_blueprint(
+                domain_code=_DOMAIN_CODE,
+                pipe_code="guard_lint_img_gen",
+                blueprint=PipeImgGenBlueprint(
+                    description="Image prompt over a maybe-absent slot, unguarded",
+                    inputs={"maybe_style": "Text?"},
+                    output="Image",
+                    prompt="a landscape in the style of {{ maybe_style }}",
+                ),
+            )
+        wrapped = extract_wrapped_pipe_validation_error(exc_info.value.errors()[0])
+        assert wrapped is not None
+        assert wrapped.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+
+    # ---- Unparseable templates stay the parsing gates' concern ----
+
+    def test_broken_expression_does_not_leak_internal_error(self, load_empty_library: Callable[[], None]):
+        """A syntactically broken expression on a pipe with optional inputs must not surface the
+        internal Jinja2DetectVariablesError through the guard-lint at construction time — syntax
+        errors belong to the template-parsing gates and their typed channels.
+        """
+        load_empty_library()
+        try:
+            PipeFactory[PipeCondition].make_from_blueprint(
+                domain_code=_DOMAIN_CODE,
+                pipe_code="guard_lint_broken_expression",
+                blueprint=PipeConditionBlueprint(
+                    description="Condition with a broken expression over an optional input",
+                    inputs={"maybe_var": "Text?"},
+                    output="Text?",
+                    expression_template="{{ maybe_var.",
+                    outcomes={"yes": "continue"},
+                    default_outcome="continue",
+                ),
+            )
+        except ValidationError:
+            # A wrapped pydantic error from a parsing gate is fine — a raw
+            # Jinja2DetectVariablesError escaping construction is what this test forbids.
+            pass
 
     def test_guarded_compose_template_is_accepted(self, load_empty_library: Callable[[], None]):
         load_empty_library()

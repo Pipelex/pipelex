@@ -13,6 +13,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_content_generator, get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
@@ -57,6 +58,16 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             except ModelChoiceNotFoundError as exc:
                 msg = f"Search choice '{self.search_choice}' was not found in the model deck"
                 raise ValueError(msg) from exc
+
+        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        lint_optional_input_guards(
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            inputs=self.inputs,
+            template_source=self.prompt_blueprint.template,
+            template_category=self.prompt_blueprint.category,
+            template_label="prompt",
+        )
 
     @override
     def validate_inputs_with_library(self):

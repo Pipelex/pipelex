@@ -24,6 +24,10 @@ class TestDetectUnguardedOptionalReferences:
             ("nested_guard", "{% if assessment %}{% for item in assessment.items %}{{ item }}{% endfor %}{% endif %}"),
             ("non_optional_vars_untouched", "{{ topic }} and {{ topic.detail }}"),
             ("no_references_at_all", "static text only"),
+            ("and_short_circuit_deep_test", "{% if assessment and assessment.flag %}x{% endif %}"),
+            ("and_short_circuit_guards_body", "{% if assessment and assessment.flag %}{{ assessment.detail }}{% endif %}"),
+            ("set_before_read", "{% set assessment = 'x' %}{{ assessment }}"),
+            ("nested_set_shadows", "{% if topic %}{% set assessment = 'fallback' %}{{ assessment }}{% endif %}"),
         ],
     )
     def test_guarded_references_produce_no_findings(self, topic: str, template_source: str):
@@ -46,6 +50,8 @@ class TestDetectUnguardedOptionalReferences:
             ("filtered_unguarded", "{{ assessment|length }}", "assessment"),
             ("inline_cond_else_side", "{{ 'x' if topic else assessment.amount }}", "assessment.amount"),
             ("tag_filter_from_plain_at_sigil", '{{ assessment|tag("assessment") }}', "assessment"),
+            ("attr_on_subscript_result", "{{ assessment[0].field }}", "assessment"),
+            ("read_before_set", "Value: {{ assessment }} {% set assessment = 'x' %}", "assessment"),
         ],
     )
     def test_unguarded_references_are_reported(self, topic: str, template_source: str, expected_path: str):

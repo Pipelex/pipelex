@@ -9,14 +9,15 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, is_multiplicity_compatible
+from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
     LiftableStepInfo,
     SequenceTaintAnalysis,
     SlotTaint,
-    effective_consumption_presence,
+    is_plural_step_result,
+    scan_taint_triggers,
 )
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -129,7 +130,7 @@ class PipeSequence(PipeController):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-                variable_names=[taint_analysis.output_taint.source],
+                variable_names=[taint_analysis.output_taint.origin_slot_name],
             )
 
     def analyze_taint(self) -> SequenceTaintAnalysis:
@@ -144,7 +145,10 @@ class PipeSequence(PipeController):
         slot_taints: dict[str, SlotTaint] = {}
         for input_name, stuff_spec in self.inputs.root.items():
             if stuff_spec.presence.is_optional and not stuff_spec.is_multiple():
-                slot_taints[input_name] = SlotTaint(source=f"optional input '{input_name}' of pipe '{self.code}'")
+                slot_taints[input_name] = SlotTaint(
+                    source=f"optional input '{input_name}' of pipe '{self.code}'",
+                    origin_slot_name=input_name,
+                )
 
         liftable_steps: list[LiftableStepInfo] = []
         last_step_taint: SlotTaint | None = None
@@ -160,28 +164,15 @@ class PipeSequence(PipeController):
                 continue
 
             # How does this step consume the currently tainted slots?
-            trigger_names: list[str] = []
-            trigger_taint: SlotTaint | None = None
-            for named_stuff_spec in sub_pipe.needed_inputs().named_stuff_specs:
-                incoming_taint = slot_taints.get(named_stuff_spec.variable_name)
-                if incoming_taint is None:
-                    continue
-                match effective_consumption_presence(sub_pipe, named_stuff_spec=named_stuff_spec):
-                    case PresenceMarker.PLAIN:
-                        trigger_names.append(named_stuff_spec.variable_name)
-                        if trigger_taint is None:
-                            trigger_taint = incoming_taint
-                    case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
-                        # Absorbed or asserted: the taint terminates at this consumption.
-                        continue
-
-            step_lifted = bool(trigger_names) and trigger_taint is not None
+            trigger_scan = scan_taint_triggers(sub_pipe, slot_taints=slot_taints)
+            trigger_taint = trigger_scan.trigger_taint
+            step_lifted = bool(trigger_scan.trigger_names) and trigger_taint is not None
             if step_lifted and trigger_taint is not None:
                 liftable_steps.append(
                     LiftableStepInfo(
                         within_pipe_ref=self.pipe_ref,
                         pipe_ref=sub_pipe.pipe_ref,
-                        trigger_variable_names=tuple(trigger_names),
+                        trigger_variable_names=trigger_scan.trigger_names,
                         absence_source=trigger_taint.source,
                     ),
                 )
@@ -189,31 +180,50 @@ class PipeSequence(PipeController):
             # The step's own output presence. A plural result is never tainted (D4): a lifted
             # plural output normalizes to an empty list and a batched step compacts.
             output_slot_name = sequential_sub_pipe.output_name
-            is_plural_result = (
-                sequential_sub_pipe.batch_params is not None
-                or sequential_sub_pipe.output_multiplicity is not None
-                or sub_pipe.output.multiplicity is not None
+            is_plural_result = is_plural_step_result(
+                sub_pipe,
+                step_output_multiplicity=sequential_sub_pipe.output_multiplicity,
+                has_batch_params=sequential_sub_pipe.batch_params is not None,
             )
             step_output_taint: SlotTaint | None = None
             if not is_plural_result:
                 if step_lifted and trigger_taint is not None:
                     step_output_taint = SlotTaint(
                         source=trigger_taint.source,
+                        origin_slot_name=trigger_taint.origin_slot_name,
                         chain=(
                             *trigger_taint.chain,
-                            f"pipe '{sub_pipe.code}' may be skipped when '{trigger_names[0]}' is absent"
+                            f"pipe '{sub_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent"
                             + (f" → slot '{output_slot_name}'" if output_slot_name else ""),
                         ),
                     )
                 elif sub_pipe.output.presence.is_optional:
-                    step_output_taint = SlotTaint(source=f"optional output of pipe '{sub_pipe.code}'")
+                    step_output_taint = SlotTaint(
+                        source=f"optional output of pipe '{sub_pipe.code}'",
+                        origin_slot_name=output_slot_name or sub_pipe.code,
+                    )
 
             # An add_each_output parallel also writes each branch's result slot into this flow.
             if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
-                if step_lifted and step_output_taint is not None:
-                    for parallel_sub_pipe in sub_pipe.parallel_sub_pipes:
-                        if parallel_sub_pipe.output_name:
-                            slot_taints[parallel_sub_pipe.output_name] = step_output_taint
+                if step_lifted and trigger_taint is not None:
+                    # The whole parallel lifts: companion (branch) slots resolve exactly like the
+                    # runtime `_make_lifted_output` does — singular slots go absent, plural slots
+                    # become guaranteed empty lists (D4).
+                    for companion_slot in sub_pipe.lifted_companion_slots():
+                        if companion_slot.is_plural:
+                            slot_taints.pop(companion_slot.slot_name, None)
+                        else:
+                            slot_taints[companion_slot.slot_name] = SlotTaint(
+                                source=trigger_taint.source,
+                                origin_slot_name=trigger_taint.origin_slot_name,
+                                chain=(
+                                    *trigger_taint.chain,
+                                    (
+                                        f"pipe '{sub_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent"
+                                        f" → branch slot '{companion_slot.slot_name}'"
+                                    ),
+                                ),
+                            )
                 else:
                     branch_taints = sub_pipe.analyze_branch_taint().branch_taints
                     for parallel_sub_pipe in sub_pipe.parallel_sub_pipes:

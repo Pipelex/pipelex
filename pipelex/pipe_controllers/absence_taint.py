@@ -17,11 +17,13 @@ presence-resolution helper so the pipeline layer (liftable-pipe inventory) can c
 same shapes without importing controller internals.
 """
 
+from typing import NamedTuple
+
 from pydantic.dataclasses import dataclass
 
 from pipelex.core.pipes.inputs.input_stuff_specs import NamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ class SlotTaint:
     """A maybe-absent slot: where the absence originates and how it propagated here."""
 
     source: str
+    origin_slot_name: str
     chain: tuple[str, ...] = ()
 
     def describe(self) -> str:
@@ -62,6 +65,49 @@ class ParallelTaintAnalysis:
 
     branch_taints: dict[str, SlotTaint]
     liftable_steps: tuple[LiftableStepInfo, ...]
+
+
+class TaintTriggerScan(NamedTuple):
+    """How a pipe consumes the currently tainted slots: the plain-consumed (lift-trigger)
+    variable names and the first trigger's taint (for provenance chaining).
+    """
+
+    trigger_names: tuple[str, ...]
+    trigger_taint: SlotTaint | None
+
+
+def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint]) -> TaintTriggerScan:
+    """Apply the D3 trichotomy to a pipe's needed inputs against the given taint map.
+
+    A tainted slot consumed PLAIN is a lift trigger; consumed `?` (absorb) or `!` (assert),
+    the taint terminates at that consumption.
+    """
+    trigger_names: list[str] = []
+    trigger_taint: SlotTaint | None = None
+    for named_stuff_spec in pipe.needed_inputs().named_stuff_specs:
+        incoming_taint = slot_taints.get(named_stuff_spec.variable_name)
+        if incoming_taint is None:
+            continue
+        match effective_consumption_presence(pipe, named_stuff_spec=named_stuff_spec):
+            case PresenceMarker.PLAIN:
+                trigger_names.append(named_stuff_spec.variable_name)
+                if trigger_taint is None:
+                    trigger_taint = incoming_taint
+            case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
+                continue
+    return TaintTriggerScan(trigger_names=tuple(trigger_names), trigger_taint=trigger_taint)
+
+
+def is_plural_step_result(
+    pipe: PipeAbstract,
+    *,
+    step_output_multiplicity: VariableMultiplicity | None,
+    has_batch_params: bool,
+) -> bool:
+    """Whether a step's result slot is plural — a plural result is never tainted (D4:
+    a lifted plural output is the empty list; a batched step compacts).
+    """
+    return has_batch_params or step_output_multiplicity is not None or pipe.output.multiplicity is not None
 
 
 def effective_consumption_presence(pipe: PipeAbstract, *, named_stuff_spec: NamedStuffSpec) -> PresenceMarker:

@@ -57,6 +57,19 @@ class AbsentInput(NamedTuple):
     absence_record: AbsenceRecord
 
 
+class CompanionSlot(NamedTuple):
+    """One extra slot a pipe would have written into working memory besides its main output
+    (e.g. an `add_each_output` parallel's branch result slots). When the pipe is lifted, each
+    companion slot must be resolved too — a recorded absence for a singular slot, an empty
+    list for a plural one (D4) — or downstream consumers would hit a hard neither-value-nor-record miss.
+    """
+
+    slot_name: str
+    concept: Concept
+    is_plural: bool
+    producing_pipe_code: str
+
+
 class InputPresenceScan(NamedTuple):
     """The runtime trichotomy (D3) applied to a pipe's needed inputs against working memory.
 
@@ -733,6 +746,12 @@ class PipeAbstract(ABC, BaseModel):
 
         return pipe_output
 
+    def lifted_companion_slots(self) -> list[CompanionSlot]:
+        """Extra slots this pipe would have written besides its main output, to resolve when it
+        is lifted. Default: none; an `add_each_output` PipeParallel reports its branch slots.
+        """
+        return []
+
     def _make_lifted_output(
         self,
         job_metadata: JobMetadata,
@@ -745,16 +764,19 @@ class PipeAbstract(ABC, BaseModel):
 
         A plural output does not go absent: it normalizes to an empty list (D4) — `[]`-emptiness
         is the absence story for plurals — with a ledger note kept for observability; taint stops.
+        Companion slots the pipe would also have written (`lifted_companion_slots`) are resolved
+        the same way, so no downstream consumer meets a neither-value-nor-record hard miss.
         """
         lifted_input = liftable[0]
         absent_names = ", ".join(absent.named_stuff_spec.variable_name for absent in liftable)
         output_slot_name = output_name or MAIN_STUFF_NAME
         log.info(f"Skipping {self.type} '{self.code}': absent input(s): {absent_names}")
 
+        skip_reason = f"skipped because input '{lifted_input.named_stuff_spec.variable_name}' is absent"
         skip_record = AbsenceRecord(
             variable_name=output_slot_name,
             kind=AbsenceKind.SKIPPED,
-            reason=f"skipped because input '{lifted_input.named_stuff_spec.variable_name}' is absent",
+            reason=skip_reason,
             producing_pipe=self.code,
             upstream=lifted_input.absence_record,
         )
@@ -770,6 +792,26 @@ class PipeAbstract(ABC, BaseModel):
             working_memory.record_absence(skip_record)
         else:
             working_memory.record_new_main_absence(skip_record)
+
+        for companion_slot in self.lifted_companion_slots():
+            companion_record = AbsenceRecord(
+                variable_name=companion_slot.slot_name,
+                kind=AbsenceKind.SKIPPED,
+                reason=skip_reason,
+                producing_pipe=companion_slot.producing_pipe_code,
+                upstream=lifted_input.absence_record,
+            )
+            if companion_slot.is_plural:
+                empty_companion_stuff = Stuff(
+                    concept=companion_slot.concept,
+                    content=ListContent[StuffContent](items=[]),
+                    stuff_name=companion_slot.slot_name,
+                    stuff_code=shortuuid.uuid()[:5],
+                )
+                working_memory.set_stuff(name=companion_slot.slot_name, stuff=empty_companion_stuff)
+                working_memory.record_absence(companion_record)
+            else:
+                working_memory.record_resolved_absence(companion_record)
 
         return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 

@@ -14,8 +14,8 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
+from pipelex.core.pipes.pipe_abstract import CompanionSlot
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -27,7 +27,8 @@ from pipelex.pipe_controllers.absence_taint import (
     LiftableStepInfo,
     ParallelTaintAnalysis,
     SlotTaint,
-    effective_consumption_presence,
+    is_plural_step_result,
+    scan_taint_triggers,
 )
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
@@ -246,7 +247,10 @@ class PipeParallel(PipeController):
         optional_input_taints: dict[str, SlotTaint] = {}
         for input_name, stuff_spec in self.inputs.root.items():
             if stuff_spec.presence.is_optional and not stuff_spec.is_multiple():
-                optional_input_taints[input_name] = SlotTaint(source=f"optional input '{input_name}' of pipe '{self.code}'")
+                optional_input_taints[input_name] = SlotTaint(
+                    source=f"optional input '{input_name}' of pipe '{self.code}'",
+                    origin_slot_name=input_name,
+                )
 
         branch_taints: dict[str, SlotTaint] = {}
         liftable_steps: list[LiftableStepInfo] = []
@@ -254,49 +258,69 @@ class PipeParallel(PipeController):
             branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
             if branch_pipe is None:
                 continue
-            trigger_names: list[str] = []
-            trigger_taint: SlotTaint | None = None
-            for named_stuff_spec in branch_pipe.needed_inputs().named_stuff_specs:
-                incoming_taint = optional_input_taints.get(named_stuff_spec.variable_name)
-                if incoming_taint is None:
-                    continue
-                match effective_consumption_presence(branch_pipe, named_stuff_spec=named_stuff_spec):
-                    case PresenceMarker.PLAIN:
-                        trigger_names.append(named_stuff_spec.variable_name)
-                        if trigger_taint is None:
-                            trigger_taint = incoming_taint
-                    case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
-                        # Absorbed or asserted: the taint terminates at this consumption.
-                        continue
-            if trigger_names and trigger_taint is not None:
+            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints)
+            if trigger_scan.trigger_names and trigger_scan.trigger_taint is not None:
                 liftable_steps.append(
                     LiftableStepInfo(
                         within_pipe_ref=self.pipe_ref,
                         pipe_ref=branch_pipe.pipe_ref,
-                        trigger_variable_names=tuple(trigger_names),
-                        absence_source=trigger_taint.source,
+                        trigger_variable_names=trigger_scan.trigger_names,
+                        absence_source=trigger_scan.trigger_taint.source,
                     ),
                 )
             if not sub_pipe.output_name:
                 continue
-            is_plural_result = (
-                sub_pipe.batch_params is not None or sub_pipe.output_multiplicity is not None or branch_pipe.output.multiplicity is not None
-            )
-            if is_plural_result:
+            if is_plural_step_result(
+                branch_pipe, step_output_multiplicity=sub_pipe.output_multiplicity, has_batch_params=sub_pipe.batch_params is not None
+            ):
                 continue
-            if trigger_names and trigger_taint is not None:
+            if trigger_scan.trigger_names and trigger_scan.trigger_taint is not None:
                 branch_taints[sub_pipe.output_name] = SlotTaint(
-                    source=trigger_taint.source,
+                    source=trigger_scan.trigger_taint.source,
+                    origin_slot_name=trigger_scan.trigger_taint.origin_slot_name,
                     chain=(
-                        *trigger_taint.chain,
-                        f"branch '{branch_pipe.code}' may be skipped when '{trigger_names[0]}' is absent → result '{sub_pipe.output_name}'",
+                        *trigger_scan.trigger_taint.chain,
+                        (
+                            f"branch '{branch_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent"
+                            f" → result '{sub_pipe.output_name}'"
+                        ),
                     ),
                 )
             elif branch_pipe.output.presence.is_optional:
                 branch_taints[sub_pipe.output_name] = SlotTaint(
                     source=f"optional output of branch pipe '{branch_pipe.code}' (result '{sub_pipe.output_name}')",
+                    origin_slot_name=sub_pipe.output_name,
                 )
         return ParallelTaintAnalysis(branch_taints=branch_taints, liftable_steps=tuple(liftable_steps))
+
+    @override
+    def lifted_companion_slots(self) -> list[CompanionSlot]:
+        """When an `add_each_output` parallel is lifted, every branch result slot it would have
+        written must be resolved too: a recorded absence for singular results, an empty list for
+        plural ones (D4).
+        """
+        if not self.add_each_output:
+            return []
+        companion_slots: list[CompanionSlot] = []
+        for sub_pipe in self.parallel_sub_pipes:
+            if not sub_pipe.output_name:
+                continue
+            branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
+            if branch_pipe is None:
+                continue
+            companion_slots.append(
+                CompanionSlot(
+                    slot_name=sub_pipe.output_name,
+                    concept=branch_pipe.output.concept,
+                    is_plural=is_plural_step_result(
+                        branch_pipe,
+                        step_output_multiplicity=sub_pipe.output_multiplicity,
+                        has_batch_params=sub_pipe.batch_params is not None,
+                    ),
+                    producing_pipe_code=branch_pipe.code,
+                ),
+            )
+        return companion_slots
 
     # Note: builtins.type because the `type: Literal["PipeParallel"]` field shadows the
     # builtin in this class body, where signature annotations are evaluated.

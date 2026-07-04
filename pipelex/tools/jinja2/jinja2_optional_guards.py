@@ -70,17 +70,12 @@ class _GuardWalker:
         self._seen_paths.add(full_path)
         self.findings.append(UnguardedOptionalReference(variable_name=root_name, path=full_path))
 
-    def _is_relevant(self, node: nodes.Node, *, guarded: frozenset[str], declared: frozenset[str]) -> str | None:
-        """Return the full path when `node` is a reference to an unguarded optional variable."""
-        full_path = _build_full_path(node)
-        if full_path is None:
-            return None
+    def _is_unguarded_optional(self, full_path: str, *, guarded: frozenset[str], declared: frozenset[str]) -> bool:
+        """Whether the dotted path references an optional variable that is neither guarded
+        nor shadowed by a local declaration.
+        """
         root_name = get_root_from_dotted_path(full_path)
-        if root_name not in self.optional_variable_names:
-            return None
-        if root_name in guarded or root_name in declared:
-            return None
-        return full_path
+        return root_name in self.optional_variable_names and root_name not in guarded and root_name not in declared
 
     def _guard_vars(self, test_node: nodes.Node) -> frozenset[str]:
         """Variables positively guaranteed present inside the body guarded by `test_node`."""
@@ -98,7 +93,13 @@ class _GuardWalker:
             return
         if isinstance(test_node, nodes.Test) and test_node.name in _PRESENCE_TEST_NAMES and isinstance(test_node.node, nodes.Name):
             return
-        if isinstance(test_node, (nodes.And, nodes.Or)):
+        if isinstance(test_node, nodes.And):
+            # `and` short-circuits: the right operand only evaluates when the left is truthy,
+            # so the left operand's guard extends over the right (`{% if var and var.attr %}`).
+            self._walk_test(test_node.left, guarded=guarded, declared=declared)
+            self._walk_test(test_node.right, guarded=guarded | self._guard_vars(test_node.left), declared=declared)
+            return
+        if isinstance(test_node, nodes.Or):
             self._walk_test(test_node.left, guarded=guarded, declared=declared)
             self._walk_test(test_node.right, guarded=guarded, declared=declared)
             return
@@ -107,41 +108,53 @@ class _GuardWalker:
             return
         self.walk(test_node, guarded=guarded, declared=declared)
 
-    def _local_declarations(self, node: nodes.Node) -> frozenset[str]:
-        """Names declared at this node's scope: `{% set %}` / macros in a Template body, loop
-        targets (+ the implicit `loop`), and macro parameters.
+    def _walk_body(self, body_nodes: list[nodes.Node], *, guarded: frozenset[str], declared: frozenset[str]) -> None:
+        """Walk a statement body sequentially: a `{% set %}` or `{% macro %}` declares its name
+        for SUBSEQUENT statements only — a read occurring before the assignment still refers to
+        the (possibly undefined) context value and must be classified against it.
         """
-        local_declared: set[str] = set()
-        if isinstance(node, nodes.Template):
-            for body_node in node.body:
-                if isinstance(body_node, nodes.Assign) and isinstance(body_node.target, nodes.Name):
-                    local_declared.add(body_node.target.name)
-                elif isinstance(body_node, nodes.Macro):
-                    local_declared.add(body_node.name)
-        if isinstance(node, nodes.For):
-            if isinstance(node.target, nodes.Name):
-                local_declared.add(node.target.name)
-            elif isinstance(node.target, nodes.Tuple):
-                for item in node.target.items:
-                    if isinstance(item, nodes.Name):
-                        local_declared.add(item.name)
-            local_declared.add("loop")
-        if isinstance(node, nodes.Macro):
-            local_declared.update(arg.name for arg in node.args)
-        return frozenset(local_declared)
+        for body_node in body_nodes:
+            if isinstance(body_node, nodes.Assign):
+                # The assignment's right-hand side is evaluated against the current scope.
+                self.walk(body_node.node, guarded=guarded, declared=declared)
+                if isinstance(body_node.target, nodes.Name):
+                    declared |= {body_node.target.name}
+                continue
+            if isinstance(body_node, nodes.Macro):
+                declared |= {body_node.name}
+            self.walk(body_node, guarded=guarded, declared=declared)
 
     def walk(self, node: nodes.Node, *, guarded: frozenset[str], declared: frozenset[str]) -> None:
-        declared |= self._local_declarations(node)
+        if isinstance(node, nodes.Template):
+            self._walk_body(node.body, guarded=guarded, declared=declared)
+            return
 
         if isinstance(node, nodes.If):
             body_guarded = guarded | self._guard_vars(node.test)
             self._walk_test(node.test, guarded=guarded, declared=declared)
-            for body_node in node.body:
-                self.walk(body_node, guarded=body_guarded, declared=declared)
+            self._walk_body(node.body, guarded=body_guarded, declared=declared)
             for elif_node in node.elif_:
                 self.walk(elif_node, guarded=guarded, declared=declared)
-            for else_node in node.else_:
-                self.walk(else_node, guarded=guarded, declared=declared)
+            self._walk_body(node.else_, guarded=guarded, declared=declared)
+            return
+
+        if isinstance(node, nodes.For):
+            # The iterable is evaluated before the loop targets bind.
+            self.walk(node.iter, guarded=guarded, declared=declared)
+            loop_declared: set[str] = {"loop"}
+            if isinstance(node.target, nodes.Name):
+                loop_declared.add(node.target.name)
+            elif isinstance(node.target, nodes.Tuple):
+                for item in node.target.items:
+                    if isinstance(item, nodes.Name):
+                        loop_declared.add(item.name)
+            self._walk_body(node.body, guarded=guarded, declared=declared | loop_declared)
+            self._walk_body(node.else_, guarded=guarded, declared=declared)
+            return
+
+        if isinstance(node, nodes.Macro):
+            macro_declared = frozenset(arg.name for arg in node.args)
+            self._walk_body(node.body, guarded=guarded, declared=declared | macro_declared)
             return
 
         if isinstance(node, nodes.CondExpr):
@@ -153,10 +166,16 @@ class _GuardWalker:
             return
 
         if isinstance(node, (nodes.Name, nodes.Getattr)):
-            full_path = self._is_relevant(node, guarded=guarded, declared=declared)
-            if full_path is not None:
+            full_path = _build_full_path(node)
+            if full_path is None:
+                # Not a plain Name/Getattr chain (e.g. an attribute on a subscript or call
+                # result): keep walking inward so inner references still get classified.
+                for child in node.iter_child_nodes():
+                    self.walk(child, guarded=guarded, declared=declared)
+                return
+            if self._is_unguarded_optional(full_path, guarded=guarded, declared=declared):
                 self._record(full_path)
-            # Never recurse into a Name/Getattr chain: the full path is the reference.
+            # Never recurse into a resolvable Name/Getattr chain: the full path is the reference.
             return
 
         for child in node.iter_child_nodes():
