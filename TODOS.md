@@ -184,7 +184,7 @@ Not planned in detail here. Trigger: self-serve BYOK demand. Scope: `InferenceSc
 
 **Open PRs / merge order (Phase 1 Foundation):**
 
-1. **pipelex-shared** [infra-python-tools#34](https://github.com/Pipelex/infra-python-tools/pull/34) → `main` (bumped to v0.34.0). Merge first, then **tag v0.34.0**.
+1. **pipelex-shared** [infra-python-tools#35](https://github.com/Pipelex/infra-python-tools/pull/35) → `main`, from branch **`release/v0.34.0`** (v0.34.0). Merge first, then **tag v0.34.0**. (Branch-flow guard: this repo has NO `dev` branch and rejects `feature/* → main` — releases must come from `release/vX.Y.Z`. The original `feature/inference-profiles` PR #34 was closed + superseded; the code commit `7e32c8c` the platform pins is reachable on `release/v0.34.0`.)
 2. **platform** [pipelex-platform#76](https://github.com/Pipelex/pipelex-platform/pull/76) → `dev` (v0.2.5). ⚠️ Before merging, **flip its `pipelex-shared` pin `@7e32c8c` → `@v0.34.0` + `uv lock`** (currently a temporary SHA pin so CI is green).
 3. **core** [pipelex#1019](https://github.com/Pipelex/pipelex/pull/1019) → `dev` (independent; core is 3 behind dev — rebase if GitHub flags conflicts).
 4. **infra** [pipelex-api-infra#185](https://github.com/Pipelex/pipelex-api-infra/pull/185) → `main` (independent; **`apply` before the platform KMS routes run in an env**).
