@@ -127,6 +127,11 @@ class PipeValidationErrorType(StrEnum):
     OPTIONAL_INPUT_UNGUARDED = "optional_input_unguarded"
     OPTIONAL_BRANCH_REQUIRED_FIELD = "optional_branch_required_field"
 
+    # Advisory-only (rides the validation report's `warnings` array, never raised as an error):
+    # a `!` (force) input whose slot is guaranteed present in every analyzed flow — the
+    # assertion can never fire.
+    OPTIONAL_FORCE_REDUNDANT = "optional_force_redundant"
+
     # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
     # merged library (a referenced concept or dependency pipe does not resolve).
     UNRESOLVED_CONCEPT = "unresolved_concept"

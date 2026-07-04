@@ -1,12 +1,42 @@
 """Unit tests for OTel utility functions."""
 
+import json
+
 import pytest
 
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.system.telemetry.otel_factory import OtelFactory
 
 
 class TestOtelFactory:
     """Test OTel factory utilities."""
+
+    # --- make_output_json tests ---
+
+    def test_make_output_json_absent_main_output(self) -> None:
+        """An absent main output serializes to an explicit absence payload — the span ends
+        successfully, never raises (a completed run always resolves its declared output).
+        """
+        memory = WorkingMemory()
+        memory.record_new_main_absence(
+            AbsenceRecord(
+                variable_name="summary",
+                kind=AbsenceKind.SKIPPED,
+                reason="skipped because input 'analysis' is absent",
+                producing_pipe="summarize",
+            )
+        )
+        pipe_output = PipeOutput(working_memory=memory, pipeline_run_id="run-absent")
+
+        output_json = OtelFactory.make_output_json(pipe_output=pipe_output, max_length=None)
+
+        payload = json.loads(output_json)
+        assert payload["absent"] is True
+        assert payload["variable_name"] == "summary"
+        assert payload["kind"] == "skipped"
+        assert payload["reason"] == "skipped because input 'analysis' is absent"
 
     # --- make_truncated_content tests ---
 

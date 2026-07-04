@@ -20,6 +20,7 @@ from pipelex.tracing.trace_events import (
     ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
+    PipeEndSkippedEvent,
     PipeEndSuccessEvent,
     PipeStartEvent,
     TraceEvent,
@@ -126,6 +127,15 @@ class TestTraceEvents:
             },
         ),
         (
+            "pipe_end_skipped",
+            TraceEventKind.PIPE_END_SKIPPED,
+            {
+                "node_id": _Shared.NODE_ID,
+                "ended_at": _Shared.TIMESTAMP,
+                "skip_reason": "skipped because input 'source' is absent",
+            },
+        ),
+        (
             "edge",
             TraceEventKind.EDGE,
             {
@@ -198,6 +208,7 @@ class TestTraceEvents:
         TraceEventKind.PIPE_START: PipeStartEvent,
         TraceEventKind.PIPE_END_SUCCESS: PipeEndSuccessEvent,
         TraceEventKind.PIPE_END_ERROR: PipeEndErrorEvent,
+        TraceEventKind.PIPE_END_SKIPPED: PipeEndSkippedEvent,
         TraceEventKind.EDGE: EdgeEvent,
         TraceEventKind.CONTROLLER_OUTPUT: ControllerOutputEvent,
         TraceEventKind.BATCH_ITEM: BatchItemEvent,

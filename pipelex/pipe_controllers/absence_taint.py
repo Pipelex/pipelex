@@ -52,11 +52,28 @@ class LiftableStepInfo:
 
 
 @dataclass(frozen=True)
+class ForceConsumptionInfo:
+    """One `!` (force) consumption observed during a controller walk.
+
+    ``is_asserting`` is True when the consumed slot was maybe-absent at that point of the flow
+    (the `!` can fire — meaningful) and False when the slot was guaranteed present (the `!` can
+    never fire in this flow — a candidate for the useless-`!` lint, subject to cross-flow
+    aggregation: one asserting flow silences the redundant observations).
+    """
+
+    within_pipe_ref: str
+    pipe_ref: str
+    variable_name: str
+    is_asserting: bool
+
+
+@dataclass(frozen=True)
 class SequenceTaintAnalysis:
     """Result of the taint walk over a PipeSequence's steps."""
 
     liftable_steps: tuple[LiftableStepInfo, ...]
     output_taint: SlotTaint | None
+    force_consumptions: tuple[ForceConsumptionInfo, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -65,37 +82,54 @@ class ParallelTaintAnalysis:
 
     branch_taints: dict[str, SlotTaint]
     liftable_steps: tuple[LiftableStepInfo, ...]
+    force_consumptions: tuple[ForceConsumptionInfo, ...] = ()
 
 
 class TaintTriggerScan(NamedTuple):
     """How a pipe consumes the currently tainted slots: the plain-consumed (lift-trigger)
-    variable names and the first trigger's taint (for provenance chaining).
+    variable names, the first trigger's taint (for provenance chaining), and the `!`
+    consumptions split by whether the slot was maybe-absent (asserting) or guaranteed
+    (redundant candidate) at this point of the flow.
     """
 
     trigger_names: tuple[str, ...]
     trigger_taint: SlotTaint | None
+    asserting_force_names: tuple[str, ...] = ()
+    redundant_force_names: tuple[str, ...] = ()
 
 
 def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint]) -> TaintTriggerScan:
     """Apply the D3 trichotomy to a pipe's needed inputs against the given taint map.
 
     A tainted slot consumed PLAIN is a lift trigger; consumed `?` (absorb) or `!` (assert),
-    the taint terminates at that consumption.
+    the taint terminates at that consumption. `!` consumptions are also classified for the
+    useless-`!` lint: asserting when the slot was tainted, redundant when it was guaranteed.
     """
     trigger_names: list[str] = []
     trigger_taint: SlotTaint | None = None
+    asserting_force_names: list[str] = []
+    redundant_force_names: list[str] = []
     for named_stuff_spec in pipe.needed_inputs().named_stuff_specs:
         incoming_taint = slot_taints.get(named_stuff_spec.variable_name)
-        if incoming_taint is None:
-            continue
         match effective_consumption_presence(pipe, named_stuff_spec=named_stuff_spec):
             case PresenceMarker.PLAIN:
-                trigger_names.append(named_stuff_spec.variable_name)
-                if trigger_taint is None:
-                    trigger_taint = incoming_taint
-            case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
+                if incoming_taint is not None:
+                    trigger_names.append(named_stuff_spec.variable_name)
+                    if trigger_taint is None:
+                        trigger_taint = incoming_taint
+            case PresenceMarker.FORCE:
+                if incoming_taint is not None:
+                    asserting_force_names.append(named_stuff_spec.variable_name)
+                else:
+                    redundant_force_names.append(named_stuff_spec.variable_name)
+            case PresenceMarker.OPTIONAL:
                 continue
-    return TaintTriggerScan(trigger_names=tuple(trigger_names), trigger_taint=trigger_taint)
+    return TaintTriggerScan(
+        trigger_names=tuple(trigger_names),
+        trigger_taint=trigger_taint,
+        asserting_force_names=tuple(asserting_force_names),
+        redundant_force_names=tuple(redundant_force_names),
+    )
 
 
 def is_plural_step_result(

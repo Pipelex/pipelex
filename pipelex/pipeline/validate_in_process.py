@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -34,6 +34,7 @@ from pipelex.hub import (
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
+from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.pipe_io_contracts import PipeIOContract, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
@@ -109,6 +110,7 @@ async def validate_bundles_in_process(
         validation_library_id = get_current_library_id_or_none()
         pipe_io_contracts: dict[str, PipeIOContract] = build_pipe_io_contracts(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(result.pipes)
+        warnings: list[ValidationErrorItem] = build_optionality_warnings(result.pipes)
         graph_target_ref = graph_pipe_code if graph_pipe_code is not None else select_primary_blueprint(result.blueprints).main_pipe_ref
         graph_spec: GraphSpec | None = await best_effort_graph_spec(
             pipe_ref=graph_target_ref,
@@ -144,4 +146,5 @@ async def validate_bundles_in_process(
         dry_run_result=result.dry_run_result,
         pending_signatures=result.pending_signatures,
         graph_spec=graph_spec,
+        warnings=warnings,
     )

@@ -84,6 +84,13 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
                 ),
             ]
 
+    # Advisory lints (e.g. the useless-`!` lint) — informational: the bundle IS valid.
+    warnings: list[dict[str, Any]] = result.get("warnings") or []
+    if warnings:
+        lines += ["", f"## Warnings ({len(warnings)})", ""]
+        for warning in warnings:
+            lines.append(f"- **{warning.get('error_type') or warning.get('category')}** — {warning.get('message')}")
+
     graph_files = result.get("graph_files")
     if isinstance(graph_files, dict):
         lines += ["", "## Graph files", ""]

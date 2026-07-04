@@ -13,6 +13,7 @@ from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
+    ForceConsumptionInfo,
     LiftableStepInfo,
     SequenceTaintAnalysis,
     SlotTaint,
@@ -151,6 +152,7 @@ class PipeSequence(PipeController):
                 )
 
         liftable_steps: list[LiftableStepInfo] = []
+        force_consumptions: list[ForceConsumptionInfo] = []
         last_step_taint: SlotTaint | None = None
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
@@ -165,6 +167,14 @@ class PipeSequence(PipeController):
 
             # How does this step consume the currently tainted slots?
             trigger_scan = scan_taint_triggers(sub_pipe, slot_taints=slot_taints)
+            for asserting_name in trigger_scan.asserting_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(within_pipe_ref=self.pipe_ref, pipe_ref=sub_pipe.pipe_ref, variable_name=asserting_name, is_asserting=True)
+                )
+            for redundant_name in trigger_scan.redundant_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(within_pipe_ref=self.pipe_ref, pipe_ref=sub_pipe.pipe_ref, variable_name=redundant_name, is_asserting=False)
+                )
             trigger_taint = trigger_scan.trigger_taint
             step_lifted = bool(trigger_scan.trigger_names) and trigger_taint is not None
             if step_lifted and trigger_taint is not None:
@@ -242,7 +252,11 @@ class PipeSequence(PipeController):
                     slot_taints[output_slot_name] = step_output_taint
             last_step_taint = step_output_taint
 
-        return SequenceTaintAnalysis(liftable_steps=tuple(liftable_steps), output_taint=last_step_taint)
+        return SequenceTaintAnalysis(
+            liftable_steps=tuple(liftable_steps),
+            output_taint=last_step_taint,
+            force_consumptions=tuple(force_consumptions),
+        )
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:

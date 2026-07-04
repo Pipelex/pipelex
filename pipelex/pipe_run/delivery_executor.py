@@ -12,6 +12,7 @@ from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_markdown, build_absence_payload
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -173,31 +174,9 @@ class DeliveryExecutor:
         The JSON carries an explicit ``"absent": true`` discriminator beside the record fields so
         a consumer polling ``main_stuff.json`` can tell an absence document from a value dump.
         """
-        absence_dict: dict[str, Any] = {"absent": True, **absence_record.model_dump()}
-        json_text = clean_json_dumps(absence_dict, indent=2)
+        json_text = clean_json_dumps(build_absence_payload(absence_record), indent=2)
         files["main_stuff.json"] = ResultFile(data=json_text.encode("utf-8"), content_type="application/json")
-
-        md_lines = [
-            "# Output absent",
-            "",
-            "The run completed with no value for its declared output.",
-            "",
-            f"- **Slot:** `{absence_record.variable_name}`",
-            f"- **Kind:** {absence_record.kind}",
-            f"- **Reason:** {absence_record.reason}",
-        ]
-        if absence_record.producing_pipe:
-            md_lines.append(f"- **Produced by:** pipe `{absence_record.producing_pipe}`")
-        chain = absence_record.provenance_chain()
-        if len(chain) > 1:
-            md_lines.extend(["", "## Provenance", ""])
-            for chain_index, chained_record in enumerate(chain):
-                producer_suffix = f" (pipe `{chained_record.producing_pipe}`)" if chained_record.producing_pipe else ""
-                md_lines.append(
-                    f"{chain_index + 1}. `{chained_record.variable_name}` — {chained_record.kind}: {chained_record.reason}{producer_suffix}"
-                )
-        md_text = "\n".join(md_lines) + "\n"
-        files["main_stuff.md"] = ResultFile(data=md_text.encode("utf-8"), content_type="text/markdown")
+        files["main_stuff.md"] = ResultFile(data=build_absence_markdown(absence_record).encode("utf-8"), content_type="text/markdown")
         # Same XSS-hardening as the raw fallback: escape before embedding in <pre>.
         files["main_stuff.html"] = ResultFile(data=f"<pre>{html.escape(json_text)}</pre>".encode(), content_type="text/html")
 

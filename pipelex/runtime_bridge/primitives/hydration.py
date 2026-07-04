@@ -4,6 +4,7 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -143,6 +144,9 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
     Must be called AFTER load_from_crate() has registered dynamic classes
     in the scoped ClassRegistry. Uses concept.structure_class_name to look up
     the correct StuffContent subclass from the registry.
+
+    The absence ledger round-trips too: a recorded absence must survive cross-process
+    transit, or a resolved-as-absent slot would degrade to a hard miss on the other side.
     """
     working_memory = WorkingMemory()
 
@@ -166,4 +170,13 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
         working_memory.root[stuff_name] = stuff
 
     working_memory.aliases = working_memory_raw.get("aliases", {})
+
+    raw_absences: dict[str, Any] = working_memory_raw.get("absences", {})
+    for absence_name, absence_raw in raw_absences.items():
+        try:
+            working_memory.absences[absence_name] = AbsenceRecord.model_validate(absence_raw)
+        except ValidationError as exc:
+            msg = f"Failed to hydrate absence record '{absence_name}': {exc}"
+            raise PipeJobError(msg) from exc
+
     return working_memory

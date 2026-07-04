@@ -15,6 +15,7 @@ from pipelex.hub import (
 )
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
@@ -104,7 +105,8 @@ async def validate_bundle_core(
     # Consume the real per-pipe status from the sweep — a fixed all-"SUCCESS" list would hide allowed
     # failures and SKIPPED cross-package pipes the dry-run actually recorded (C-8). pending_signatures
     # is the library-wide set of still-unimplemented forward declarations — a non-blocking nudge on a
-    # successful lenient (--allow-signatures) run.
+    # successful lenient (--allow-signatures) run. warnings is the advisory lint channel (e.g. the
+    # useless-`!` lint) — same item shape as validation errors, never flips the verdict.
     return {
         "success": True,
         "is_valid": True,
@@ -113,6 +115,7 @@ async def validate_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
+        "warnings": [warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(result.pipes)],
     }
 
 
@@ -211,7 +214,8 @@ async def validate_pipe_in_bundle_core(
 
     # Consume the real per-pipe status from the sliced sweep — a fixed "SUCCESS" would hide an allowed
     # failure or a cross-package SKIPPED the dry-run actually recorded (C-8). pending_signatures is the
-    # library-wide set of still-unimplemented forward declarations.
+    # library-wide set of still-unimplemented forward declarations. warnings aggregates over the whole
+    # loaded bundle (the lint's cross-flow aggregation needs every flow, not just the sliced pipe).
     return {
         "success": True,
         "is_valid": True,
@@ -220,4 +224,5 @@ async def validate_pipe_in_bundle_core(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
+        "warnings": [warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(result.pipes)],
     }

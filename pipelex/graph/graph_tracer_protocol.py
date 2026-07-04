@@ -132,6 +132,26 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent (D3).
+
+        A skip is a successful outcome (the run continues; the pipe's output is a recorded
+        absence), rendered as its own node state so "why did my workflow produce nothing?"
+        is answerable from the graph.
+
+        Args:
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+        """
+        ...
+
     def add_edge(
         self,
         *,
@@ -141,6 +161,7 @@ class GraphTracerProtocol(Protocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         """Add an edge between two nodes.
 
@@ -151,6 +172,7 @@ class GraphTracerProtocol(Protocol):
             label: Optional label for the edge.
             source_stuff_digest: Optional stuff digest for the source (for batch edges).
             target_stuff_digest: Optional stuff digest for the target (for batch edges).
+            optional: Marker for a data edge fed by a declared-optional (`?`) output.
         """
         ...
 
@@ -329,6 +351,16 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pass
 
     @override
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+    ) -> None:
+        pass
+
+    @override
     def add_edge(
         self,
         *,
@@ -338,6 +370,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         pass
 

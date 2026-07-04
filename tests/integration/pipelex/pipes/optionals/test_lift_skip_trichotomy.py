@@ -279,11 +279,11 @@ class TestLiftSkipTrichotomy:
         # The empty list is a real output: it is the main stuff.
         assert pipe_output.main_stuff.stuff_name == "items"
 
-    async def test_lifted_pipe_under_tracer_ends_node_without_output_spec(
+    async def test_lifted_pipe_under_tracer_ends_node_skipped(
         self, job_metadata: JobMetadata, load_empty_library: Callable[[], str], mocker: MockerFixture
     ):
-        """The graph-tracer epilogue fires on every pipe run: a lifted pipe must end its node
-        successfully with no output spec instead of crashing on the absent main stuff.
+        """The graph-tracer epilogue fires on every pipe run: a lifted pipe ends its node in the
+        distinct `skipped` state with the skip reason (Step E) — never a crash, never an error node.
         """
         load_empty_library()
         pipe = _make_pipe_func("opt_lift_traced", source_ref="Text")
@@ -310,6 +310,7 @@ class TestLiftSkipTrichotomy:
         )
 
         assert isinstance(pipe_output.working_memory.resolve_main_stuff(), AbsenceRecord)
-        mock_manager.on_pipe_end_success.assert_called_once()
-        assert mock_manager.on_pipe_end_success.call_args.kwargs["output_spec"] is None
+        mock_manager.on_pipe_end_skipped.assert_called_once()
+        assert "source" in mock_manager.on_pipe_end_skipped.call_args.kwargs["skip_reason"]
+        mock_manager.on_pipe_end_success.assert_not_called()
         mock_manager.on_pipe_end_error.assert_not_called()

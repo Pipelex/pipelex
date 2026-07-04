@@ -83,12 +83,60 @@ class TestRunCoreExecution:
     ) -> Any:
         working_memory = mocker.MagicMock()
         working_memory.get_main_stuff.return_value = main_stuff
+        working_memory.resolve_main_stuff.return_value = main_stuff
         working_memory.smart_dump.return_value = {"stuff": "dump"}
         return SimpleNamespace(
             main_stuff=main_stuff,
             graph_spec=graph_spec,
             working_memory=working_memory,
         )
+
+    def _make_absent_main_pipe_output(self) -> Any:
+        """A pipe output whose main output resolved absent (real WorkingMemory, recorded absence)."""
+        from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord  # noqa: PLC0415
+        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+
+        memory = WorkingMemory()
+        memory.record_new_main_absence(
+            AbsenceRecord(
+                variable_name="summary",
+                kind=AbsenceKind.SKIPPED,
+                reason="skipped because input 'analysis' is absent",
+                producing_pipe="summarize",
+            )
+        )
+        return SimpleNamespace(graph_spec=None, working_memory=memory)
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_absent_main_output_prints_absence_and_saves_artifact(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
+        """An absent main output is a success: the recap prints the absence (no crash) and
+        --save-main-stuff writes an explicit absence artifact, not value files.
+        """
+        pipe_output = self._make_absent_main_pipe_output()
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(
+            _call_execute_run(
+                no_pretty_print=False,
+                save_main_stuff=True,
+                output_dir=str(tmp_path),
+            )
+        )
+
+        output = console.export_text()
+        assert "Pipeline execution completed successfully" in output
+        assert "resolved absent" in output
+        assert "skipped because input 'analysis' is absent" in output
+
+        output_dirs = list(tmp_path.glob("test_pipe_output*"))
+        assert len(output_dirs) == 1
+        absence_json = json.loads((output_dirs[0] / "main_stuff.json").read_text(encoding="utf-8"))
+        assert absence_json["absent"] is True
+        assert absence_json["variable_name"] == "summary"
+        assert absence_json["reason"] == "skipped because input 'analysis' is absent"
+        assert (output_dirs[0] / "main_stuff.md").exists()
+        # Nothing to view: the interactive viewer is not produced for an absence.
+        assert not (output_dirs[0] / "main_stuff_viewer.html").exists()
 
     @pytest.mark.usefixtures("config_mock")
     def test_happy_path_prints_recap(self, mocker: MockerFixture, console: Console) -> None:

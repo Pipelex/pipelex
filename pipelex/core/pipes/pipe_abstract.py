@@ -706,11 +706,21 @@ class PipeAbstract(ABC, BaseModel):
                 )
             raise
 
-        # Record graph tracing success
+        # Record graph tracing success — a lifted (skipped) pipe ends its node in the distinct
+        # `skipped` state with the skip reason; every other completion is a success.
         if tracer_manager is not None and parent_trace_context is not None:
+            if presence_scan.liftable:
+                tracer_manager.on_pipe_end_skipped(
+                    lookup_key=parent_trace_context.lookup_key,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(timezone.utc),
+                    skip_reason=self._make_skip_reason(liftable=presence_scan.liftable),
+                )
+                return pipe_output
+
             # Capture output spec for data flow tracking — a completed pipe run always resolves its
             # declared output: a value or a recorded absence. An absent output has no payload to
-            # capture; the node still ends successfully. (The distinct `skipped` node state is Step E.)
+            # capture; the node still ends successfully.
             main_resolved = pipe_output.working_memory.resolve_main_stuff()
             output_spec: IOSpec | None = None
             output_concept_data: dict[str, Any] | None = None
@@ -730,6 +740,9 @@ class PipeAbstract(ABC, BaseModel):
                     data_html=main_stuff.content.rendered_pretty_html()
                     if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
                     else None,
+                    # The optional-edge marker (D8): a data edge fed by this output reports that the
+                    # value may be absent in other runs.
+                    extra={"optional": True} if self.output.presence.is_optional else {},
                 )
 
                 # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
@@ -752,6 +765,11 @@ class PipeAbstract(ABC, BaseModel):
         """
         return []
 
+    @classmethod
+    def _make_skip_reason(cls, *, liftable: list[AbsentInput]) -> str:
+        """The one skip-reason wording, shared by the absence record and the graph node."""
+        return f"skipped because input '{liftable[0].named_stuff_spec.variable_name}' is absent"
+
     def _make_lifted_output(
         self,
         job_metadata: JobMetadata,
@@ -772,7 +790,7 @@ class PipeAbstract(ABC, BaseModel):
         output_slot_name = output_name or MAIN_STUFF_NAME
         log.info(f"Skipping {self.type} '{self.code}': absent input(s): {absent_names}")
 
-        skip_reason = f"skipped because input '{lifted_input.named_stuff_spec.variable_name}' is absent"
+        skip_reason = self._make_skip_reason(liftable=liftable)
         skip_record = AbsenceRecord(
             variable_name=output_slot_name,
             kind=AbsenceKind.SKIPPED,

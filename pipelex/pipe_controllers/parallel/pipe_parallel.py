@@ -24,6 +24,7 @@ from pipelex.graph.graphspec import IOSpec
 from pipelex.hub import get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.absence_taint import (
+    ForceConsumptionInfo,
     LiftableStepInfo,
     ParallelTaintAnalysis,
     SlotTaint,
@@ -254,11 +255,24 @@ class PipeParallel(PipeController):
 
         branch_taints: dict[str, SlotTaint] = {}
         liftable_steps: list[LiftableStepInfo] = []
+        force_consumptions: list[ForceConsumptionInfo] = []
         for sub_pipe in self.parallel_sub_pipes:
             branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
             if branch_pipe is None:
                 continue
             trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints)
+            for asserting_name in trigger_scan.asserting_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=branch_pipe.pipe_ref, variable_name=asserting_name, is_asserting=True
+                    )
+                )
+            for redundant_name in trigger_scan.redundant_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=branch_pipe.pipe_ref, variable_name=redundant_name, is_asserting=False
+                    )
+                )
             if trigger_scan.trigger_names and trigger_scan.trigger_taint is not None:
                 liftable_steps.append(
                     LiftableStepInfo(
@@ -291,7 +305,11 @@ class PipeParallel(PipeController):
                     source=f"optional output of branch pipe '{branch_pipe.code}' (result '{sub_pipe.output_name}')",
                     origin_slot_name=sub_pipe.output_name,
                 )
-        return ParallelTaintAnalysis(branch_taints=branch_taints, liftable_steps=tuple(liftable_steps))
+        return ParallelTaintAnalysis(
+            branch_taints=branch_taints,
+            liftable_steps=tuple(liftable_steps),
+            force_consumptions=tuple(force_consumptions),
+        )
 
     @override
     def lifted_companion_slots(self) -> list[CompanionSlot]:
@@ -458,7 +476,7 @@ class PipeParallel(PipeController):
             log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
         # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
-        # a pipe run always delivers a main stuff.
+        # a pipe run always resolves its declared output — the combine is the parallel's value arm.
         combined_output_stuff = StuffFactory.combine_stuffs(
             concept=self.output.concept,
             stuff_contents=output_stuff_contents,

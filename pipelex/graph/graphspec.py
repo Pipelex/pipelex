@@ -241,6 +241,8 @@ class NodeSpec(BaseModel):
     description: str | None = None
     domain_code: str | None = None
     status: NodeStatus = Field(strict=False)
+    # Why a `skipped` node was lifted (names the absent input); None for every other status.
+    skip_reason: str | None = None
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(
         default_factory=NodeIOSpec,
@@ -262,6 +264,8 @@ class EdgeSpec(BaseModel):
     source: str
     target: str
     kind: EdgeKind = Field(strict=False)
+    # A data edge fed by a declared-optional (`?`) output: the value may be absent in other runs.
+    optional: bool = False
     label: str | None = None
     # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
     source_stuff_digest: str | None = None

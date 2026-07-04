@@ -17,6 +17,7 @@ from typing import Literal
 from mthds.protocol.models import ValidationReport
 from pydantic import Field
 
+from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
@@ -58,6 +59,11 @@ class PipelexValidationReport(ValidationReport):
     validated_pipes: list[ValidatedPipeEntry] = Field(default_factory=empty_list_factory_of(ValidatedPipeEntry))
     """Per-pipe sweep outcomes (`{pipe_ref, status}`) — the same entries as the agent-CLI envelope."""
 
+    warnings: list[ValidationErrorItem] = Field(default_factory=empty_list_factory_of(ValidationErrorItem))
+    """Advisory findings (lints) on a VALID bundle — same item shape as `validation_errors`,
+    but they never flip `is_valid`. First occupant: the useless-`!` lint
+    (`optional_force_redundant`)."""
+
     pending_signatures: list[str] = Field(default_factory=list)
     """Qualified refs of pipes still declared as `PipeSignature` in the assembled library."""
 
@@ -73,6 +79,7 @@ def build_validation_report(
     pending_signatures: list[str],
     graph_spec: GraphSpec | None = None,
     liftable_pipes: list[LiftablePipeEntry] | None = None,
+    warnings: list[ValidationErrorItem] | None = None,
 ) -> PipelexValidationReport:
     """Assemble the canonical `PipelexValidationReport` from its ingredients.
 
@@ -87,6 +94,7 @@ def build_validation_report(
         pending_signatures: Library-wide unsatisfied signature refs.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
         liftable_pipes: Entries from `build_liftable_pipes`, when the caller computed them.
+        warnings: Advisory items from `build_optionality_warnings`, when the caller computed them.
 
     Returns:
         The canonical report.
@@ -99,4 +107,5 @@ def build_validation_report(
         validated_pipes=build_validated_pipes(dry_run_result),
         pending_signatures=pending_signatures,
         is_runnable=not pending_signatures,
+        warnings=warnings or [],
     )

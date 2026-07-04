@@ -322,6 +322,35 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             return
         tracer.register_execution_data(node_id=node_id, execution_data=execution_data)
 
+    def on_pipe_end_skipped(
+        self,
+        *,
+        lookup_key: str,
+        node_id: str | None,
+        ended_at: datetime,
+        skip_reason: str,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+        """
+        if node_id is None:
+            return
+
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+
+        tracer.on_pipe_end_skipped(
+            node_id=node_id,
+            ended_at=ended_at,
+            skip_reason=skip_reason,
+        )
+
     def on_pipe_end_error(
         self,
         *,

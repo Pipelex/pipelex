@@ -262,6 +262,19 @@ class StuffArtefact:
         msg = f"'{content_type}' content does not support len()."
         raise TypeError(msg)
 
+    def __bool__(self) -> bool:
+        """A present artefact is truthy; a ListContent artefact follows list emptiness.
+
+        Load-bearing for the optionals guard idiom: without `__bool__`, Jinja2's truth test
+        (`{% if var %}`, `@?var`'s expansion) falls through to `__len__`, which raises for
+        non-list content — the D7-blessed guard would crash on a PRESENT singular value.
+        An empty list is falsy on purpose (D4: `[]`-emptiness is the absence story for plurals).
+        """
+        content = self._stuff.content
+        if isinstance(content, ListContent):
+            return len(content) > 0
+        return True
+
     # -------------------------------------------------------------------------
     # Dict-like iteration (for template compatibility)
     # Named with 'iter_' prefix to avoid conflicts with content fields

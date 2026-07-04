@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import json
 import shutil
 from pathlib import Path
@@ -12,6 +13,8 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
+from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_markdown, build_absence_payload
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -73,13 +76,28 @@ async def run_pipeline_core(
     )
     pipe_output = response.pipe_output
 
-    main_stuff = pipe_output.working_memory.get_main_stuff()
-    main_stuff_json: dict[str, Any] = {
-        "json": await main_stuff.content.rendered_json_async(),
-        "markdown": await main_stuff.content.rendered_markdown_async(),
-        "html": await main_stuff.content.rendered_html_async(),
-    }
-    compact_result: dict[str, Any] = json.loads(main_stuff_json["json"])
+    # A completed run always resolves its declared output: a value or a recorded absence. An
+    # absent main output renders the explicit absence document on every arm of the envelope.
+    main_resolved = pipe_output.working_memory.resolve_main_stuff()
+    main_stuff_json: dict[str, Any]
+    compact_result: dict[str, Any]
+    if isinstance(main_resolved, AbsenceRecord):
+        absence_payload = build_absence_payload(main_resolved)
+        absence_json_text = clean_json_dumps(absence_payload, indent=2)
+        main_stuff_json = {
+            "json": absence_json_text,
+            "markdown": build_absence_markdown(main_resolved),
+            "html": f"<pre>{html.escape(absence_json_text)}</pre>",
+        }
+        compact_result = absence_payload
+    else:
+        main_stuff = main_resolved
+        main_stuff_json = {
+            "json": await main_stuff.content.rendered_json_async(),
+            "markdown": await main_stuff.content.rendered_markdown_async(),
+            "html": await main_stuff.content.rendered_html_async(),
+        }
+        compact_result = json.loads(main_stuff_json["json"])
 
     result = build_run_output(
         with_memory=with_memory,

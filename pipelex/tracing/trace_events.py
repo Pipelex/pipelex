@@ -22,6 +22,7 @@ class TraceEventKind(StrEnum):
     PIPE_START = "pipe_start"
     PIPE_END_SUCCESS = "pipe_end_success"
     PIPE_END_ERROR = "pipe_end_error"
+    PIPE_END_SKIPPED = "pipe_end_skipped"
     EDGE = "edge"
     CONTROLLER_OUTPUT = "controller_output"
     BATCH_ITEM = "batch_item"
@@ -96,6 +97,19 @@ class PipeEndErrorEvent(TraceEvent):
     error: ErrorSpec
 
 
+class PipeEndSkippedEvent(TraceEvent):
+    """Emitted when a pipe is lifted (skipped) because a plain input resolved absent (D3).
+
+    A skip is a successful outcome — the run continues and the pipe's output is a recorded
+    absence — but it gets its own node state so graph consumers can render it distinctly.
+    """
+
+    event_kind: Literal[TraceEventKind.PIPE_END_SKIPPED] = TraceEventKind.PIPE_END_SKIPPED
+    node_id: str
+    ended_at: datetime
+    skip_reason: str
+
+
 class EdgeEvent(TraceEvent):
     """Emitted when an edge is added (CONTAINS, SELECTED_OUTCOME, etc.)."""
 
@@ -104,6 +118,7 @@ class EdgeEvent(TraceEvent):
     source_node_id: str
     target_node_id: str
     edge_kind: EdgeKind
+    optional: bool = False
     label: str | None = None
     source_stuff_digest: str | None = None
     target_stuff_digest: str | None = None
@@ -175,6 +190,7 @@ AnyTraceEvent = Annotated[
     PipeStartEvent
     | PipeEndSuccessEvent
     | PipeEndErrorEvent
+    | PipeEndSkippedEvent
     | EdgeEvent
     | ControllerOutputEvent
     | BatchItemEvent
