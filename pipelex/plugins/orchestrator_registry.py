@@ -21,7 +21,7 @@ class OrchestratorProtocol(Protocol):
     The wait-semantics axis (``DeliveryMode`` on the wire input) is expressed here as
     which method the endpoint calls, so each return type is truthful on its own:
 
-    - ``run`` is the BLOCKING arm — it awaits completion and returns the completed-run
+    - ``execute`` is the BLOCKING arm — it awaits completion and returns the completed-run
       ``PipelexPipeRunOutput`` (which therefore always carries a main stuff).
     - ``start`` is the FIRE_AND_FORGET arm — it genuinely enqueues the job and returns
       a ``PipelexPipeDispatchAck`` (ids only; nothing has run yet).
@@ -35,7 +35,7 @@ class OrchestratorProtocol(Protocol):
 
     supports_fire_and_forget: bool
 
-    async def run(
+    async def execute(
         self,
         *,
         pipe_job: "PipeJob",

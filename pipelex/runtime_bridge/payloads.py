@@ -39,7 +39,7 @@ class PipelexPipeRunInput(BaseModel):
 class PipelexPipeRunOutput(BaseModel):
     """JSON-safe output of a COMPLETED run crossing the host-runtime / Temporal boundary.
 
-    This is the return shape of a blocking dispatch (``OrchestratorProtocol.run``); a
+    This is the return shape of a blocking dispatch (``OrchestratorProtocol.execute``); a
     fire-and-forget dispatch returns a ``PipelexPipeDispatchAck`` instead — which is why
     a completed-run field like ``main_stuff_name`` can be required here with no
     "not finished yet" escape hatch.

@@ -31,7 +31,7 @@ class DirectOrchestrator:
     # rather than running blocking and falsely acking.
     supports_fire_and_forget = False
 
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:
+    async def execute(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:
         # DIRECT mode forces in-process execution even inside a Temporal-enabled
         # worker. Scope the in-process router as the active router for the WHOLE
         # run so nested controller sub-pipes — which dispatch through
