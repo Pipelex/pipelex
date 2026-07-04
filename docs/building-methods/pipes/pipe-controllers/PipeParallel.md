@@ -24,6 +24,14 @@ The declared `output` of a `PipeParallel` is the concept the branch results are 
 
 Anything else is rejected at validation time: scalar native concepts (`Text`, `Image`, ...), `Dynamic`, `Anything`, and multiplicity suffixes (`Foo[]`, `Foo[3]`) are all invalid — a parallel combination is a named composite, never a scalar or a list (a list aggregation is [`PipeBatch`](PipeBatch.md)'s shape).
 
+### Combining under absence
+
+A branch result may legitimately be **absent** at run time: the branch pipe declares an optional output (`?`), or the branch is lifted (skipped) because a plain input is fed by one of the parallel's own optional (`?`) inputs. The combine handles absence by output kind:
+
+-   **`Composite` output**: the absent component is simply omitted from the combined object (an absence note is kept in the ledger for observability).
+-   **Structured output, non-required field**: the absence is absorbed as the field's default (`null` unless the field declares another default).
+-   **Structured output, required field**: this is rejected **statically** at validation time (`optional_branch_required_field`) — a required field cannot be fed by a maybe-absent branch. Make the field non-required, or sink the absence upstream with a `?` input on the branch path.
+
 ## Configuration
 
 `PipeParallel` is configured in your pipeline's `.mthds` file.

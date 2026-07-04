@@ -33,7 +33,7 @@ def _make_continue_only_condition() -> PipeCondition:
     blueprint = PipeConditionBlueprint(
         description="Absence gate for continue-delivery tests",
         inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
-        output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}?",
         expression_template="{% if input_text.text %}skip{% else %}skip{% endif %}",
         outcomes={"skip": SpecialOutcome.CONTINUE},
         default_outcome=SpecialOutcome.CONTINUE,

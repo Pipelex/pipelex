@@ -21,6 +21,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.bundle_validator import DryRunOutput
+from pipelex.pipeline.liftable_pipes import LiftablePipeEntry
 from pipelex.pipeline.pipe_io_contracts import PipeIOContract
 from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -46,6 +47,10 @@ class PipelexValidationReport(ValidationReport):
     pipe_io_contracts: dict[str, PipeIOContract] = Field(default_factory=dict)
     """Per-pipe input/output contracts, keyed by namespaced `pipe_ref` (`domain.code`)."""
 
+    liftable_pipes: list[LiftablePipeEntry] = Field(default_factory=empty_list_factory_of(LiftablePipeEntry))
+    """Pipes that may be skipped (lifted) when an optional slot resolves absent — the
+    build-time visibility that the implicit-lifting design (D3) commits to."""
+
     graph_spec: GraphSpec | None = None
     """Best-effort execution graph of the declared main pipe; `None` when the batch
     declares no `main_pipe` or the graph dry-run degrades."""
@@ -67,6 +72,7 @@ def build_validation_report(
     dry_run_result: dict[str, DryRunOutput],
     pending_signatures: list[str],
     graph_spec: GraphSpec | None = None,
+    liftable_pipes: list[LiftablePipeEntry] | None = None,
 ) -> PipelexValidationReport:
     """Assemble the canonical `PipelexValidationReport` from its ingredients.
 
@@ -80,6 +86,7 @@ def build_validation_report(
         dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`).
         pending_signatures: Library-wide unsatisfied signature refs.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
+        liftable_pipes: Entries from `build_liftable_pipes`, when the caller computed them.
 
     Returns:
         The canonical report.
@@ -87,6 +94,7 @@ def build_validation_report(
     return PipelexValidationReport(
         bundle_blueprint=select_primary_blueprint(blueprints).blueprint,
         pipe_io_contracts=pipe_io_contracts,
+        liftable_pipes=liftable_pipes or [],
         graph_spec=graph_spec,
         validated_pipes=build_validated_pipes(dry_run_result),
         pending_signatures=pending_signatures,

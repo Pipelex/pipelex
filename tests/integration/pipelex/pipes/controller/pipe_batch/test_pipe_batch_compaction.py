@@ -62,7 +62,7 @@ def _build_compacting_batch() -> PipeBatch:
         blueprint=PipeConditionBlueprint(
             description="Keep items starting with 'good', continue on the rest",
             inputs={"item": "Text"},
-            output="Text",
+            output="Text?",
             expression_template="{% if item.text.startswith('good') %}keep{% else %}reject{% endif %}",
             outcomes={"keep": "opt_batch_shout"},
             default_outcome=SpecialOutcome.CONTINUE,

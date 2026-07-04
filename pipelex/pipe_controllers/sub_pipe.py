@@ -210,8 +210,16 @@ class SubPipe(BaseModel):
             # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
             required_stuff_names: set[str] = set()
             for req_var in required_variables:
-                if not req_var.startswith("_"):
-                    required_stuff_names.add(get_root_from_dotted_path(req_var))
+                if req_var.startswith("_"):
+                    continue
+                root_name = get_root_from_dotted_path(req_var)
+                # A variable declared optional (`?`) on the sub-pipe is never presence-required
+                # (the `@?` fix, D7): the pipe runs with the slot absent and its guarded
+                # templates handle it.
+                declared_spec = sub_pipe.inputs.root.get(root_name)
+                if declared_spec is not None and declared_spec.presence.is_optional:
+                    continue
+                required_stuff_names.add(root_name)
             # A recorded absence is not a miss: the sub-pipe's own gate applies the trichotomy
             # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
             missing_names = working_memory.list_missing_names(names=required_stuff_names)

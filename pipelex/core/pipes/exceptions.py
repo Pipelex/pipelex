@@ -118,6 +118,15 @@ class PipeValidationErrorType(StrEnum):
     # optionals design).
     OPTIONAL_MARKER_INVALID = "optional_marker_invalid"
 
+    # Static absence-taint violations (D6/D7/D11 of the optionals design): a maybe-absent slot
+    # escaping through a non-optional controller boundary; a `continue`-reachable PipeCondition
+    # without a `?` output; an unguarded template reference to a declared-optional input; a
+    # required structure field fed by a maybe-absent PipeParallel branch.
+    OPTIONAL_NOT_HANDLED = "optional_not_handled"
+    OPTIONAL_OUTPUT_REQUIRED = "optional_output_required"
+    OPTIONAL_INPUT_UNGUARDED = "optional_input_unguarded"
+    OPTIONAL_BRANCH_REQUIRED_FIELD = "optional_branch_required_field"
+
     # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
     # merged library (a referenced concept or dependency pipe does not resolve).
     UNRESOLVED_CONCEPT = "unresolved_concept"

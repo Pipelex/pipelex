@@ -12,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -107,7 +108,16 @@ class PipeCondition(PipeController):
 
     @override
     def validate_inputs_static(self):
-        pass
+        # Guard-lint (D7): a declared-optional input referenced unguarded in the expression
+        # would evaluate over an undefined variable when the value is absent.
+        lint_optional_input_guards(
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            inputs=self.inputs,
+            template_source=self.expression,
+            template_category=TemplateCategory.EXPRESSION,
+            template_label="expression",
+        )
 
     @override
     def validate_inputs_with_library(self):
@@ -115,7 +125,26 @@ class PipeCondition(PipeController):
 
     @override
     def validate_output_static(self):
-        pass
+        # OPTIONAL_OUTPUT_REQUIRED (D5/D6): `continue` resolves the declared output as ABSENT
+        # (design §14), so a `continue`-reachable condition must declare its output optional —
+        # otherwise the no-output path would be invisible to the type system, which is exactly
+        # the invisible-optional wart this feature removes.
+        continue_reachable = SpecialOutcome.is_continue(self.default_outcome) or any(
+            SpecialOutcome.is_continue(outcome) for outcome in self.outcome_map.values()
+        )
+        if continue_reachable and not self.output.presence.is_optional:
+            msg = (
+                f"PipeCondition '{self.code}' can resolve to 'continue', which resolves the declared output as absent, "
+                f"but its output '{self.output.concept.concept_ref}' is not declared optional. "
+                f"Declare the output optional ('{self.output.concept.concept_ref}?'), or remove the 'continue' outcome."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+            )
 
     @override
     def validate_output_with_library(self):
@@ -132,6 +161,27 @@ class PipeCondition(PipeController):
         if not mapped_pipe_codes:
             # No actual pipes to validate against (all special outcomes)
             return
+
+        # Boundary taint (D6): a mapped pipe with an optional output makes this condition's own
+        # output maybe-absent, so the condition must declare `?` too — otherwise the taint would
+        # silently escape through the condition boundary.
+        if not self.output.presence.is_optional:
+            for pipe_code in sorted(mapped_pipe_codes):
+                mapped_pipe = get_required_pipe(pipe_code=pipe_code)
+                if mapped_pipe.output.presence.is_optional:
+                    msg = (
+                        f"PipeCondition '{self.code}' maps outcome pipe '{pipe_code}' whose output "
+                        f"'{mapped_pipe.output.concept.concept_ref}' is declared optional, but the condition's own output "
+                        f"'{self.output.concept.concept_ref}' is not. Declare the condition's output optional "
+                        f"('{self.output.concept.concept_ref}?') so the maybe-absent result stays visible downstream."
+                    )
+                    raise PipeValidationError(
+                        message=msg,
+                        error_type=PipeValidationErrorType.OPTIONAL_NOT_HANDLED,
+                        domain_code=self.domain_code,
+                        pipe_code=self.code,
+                        provided_concept_code=self.output.concept.concept_ref,
+                    )
 
         # Collect all unique output concept refs from mapped pipes
         mapped_output_refs: set[str] = set()
@@ -271,6 +321,13 @@ class PipeCondition(PipeController):
         required_variables = chosen_pipe.required_variables()
         # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
         required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
+        # A variable declared optional (`?`) on the chosen pipe is never presence-required (the
+        # `@?` fix, D7): the pipe runs with the slot absent and its guarded templates handle it.
+        required_stuff_names = {
+            name
+            for name in required_stuff_names
+            if not ((declared_spec := chosen_pipe.inputs.root.get(name)) is not None and declared_spec.presence.is_optional)
+        }
         # A recorded absence is not a miss: the chosen pipe's own gate applies the trichotomy
         # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
         missing_names = working_memory.list_missing_names(names=required_stuff_names)

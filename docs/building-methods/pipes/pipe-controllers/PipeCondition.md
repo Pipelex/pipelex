@@ -144,6 +144,8 @@ Beside pipe names, an outcome (or the `default_outcome`) can be one of two speci
 - **`fail`**: the run fails loudly with an error naming the pipe and the evaluated expression. Use it to make "this should never happen" branches explicit.
 - **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output (with the evaluated expression as the reason) and the run continues as a success — the rest of the working memory is unchanged.
 
+Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).
+
 ### What happens downstream of `continue`
 
 An absent output propagates like any recorded absence:
@@ -162,7 +164,7 @@ An absent output propagates like any recorded absence:
 type = "PipeCondition"
 description = "Builds a constraint for approved links, skips rejected ones"
 inputs = { verified_link = "VerifiedLink" }
-output = "Constraint"
+output = "Constraint?"
 expression = "verified_link.verdict"
 default_outcome = "continue"
 
