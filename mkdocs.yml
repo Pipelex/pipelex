@@ -249,6 +249,7 @@ plugins:
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
+        - building-methods/pipes/understanding-optionality.md: "Understanding Optionality"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
         - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
@@ -457,6 +458,7 @@ nav:
         - Pipe Output: building-methods/pipes/pipe-output.md
         - CSV Input & Output: building-methods/pipes/csv-input-and-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
+        - Understanding Optionality: building-methods/pipes/understanding-optionality.md
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md

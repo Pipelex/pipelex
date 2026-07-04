@@ -28,6 +28,12 @@ Results always preserve input order regardless of the concurrency bound. If a br
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
+## Compaction Under Absence
+
+When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch leaves an absence record in the ledger for observability.
+
+This is the batch arm of the "route or skip" pattern: batch over items with a condition branch pipe that builds a result for the items that qualify and `continue`s past the rest — the output is the compacted list of qualifying results. See [Understanding Optionality](../understanding-optionality.md) for the full absence model.
+
 ## Configuration
 
 `PipeBatch` is configured in your pipeline's `.mthds` file.
@@ -85,3 +91,4 @@ How this works:
 ## Related Documentation
 
 - [Understanding Multiplicity](../understanding-multiplicity.md) - How Pipelex handles lists and batch processing
+- [Understanding Optionality](../understanding-optionality.md) - Presence markers, absence records, and compaction

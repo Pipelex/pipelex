@@ -156,7 +156,7 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 
 ## Input JSON Format
 
-The input JSON file should contain a dictionary where keys are input variable names:
+The input JSON file should contain a dictionary where keys are input variable names. An input declared optional (`?`) on the entry pipe may be omitted — the run records a `not_provided` absence for it instead of failing (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)):
 
 ```json
 {
@@ -171,6 +171,10 @@ The input JSON file should contain a dictionary where keys are input variable na
 ## Output Format
 
 The output JSON contains the complete working memory after pipeline execution, including all intermediate results and the final output.
+
+### Absent main output
+
+A run whose main output resolves as a recorded absence (an optional `?` output that produced nothing — e.g. a `PipeCondition` `continue` outcome, or a skipped producer) is a **successful** run. The CLI prints the absence with its reason and provenance chain, and `--save-main-stuff` writes an explicit absence artifact instead of a value dump: `main_stuff.json` is `{"absent": true, ...}` with the absence record, `main_stuff.md` is a human-readable summary, and `main_stuff.html` renders the same document (no interactive viewer is produced — there is nothing to view). `--save-csv` reports that there is no tabular value to save.
 
 ## Related Documentation
 
