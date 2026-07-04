@@ -1,4 +1,6 @@
-# Optionals — phase-1 implementation plan
+# Optionals — phase-1 implementation plan (CLOSED — phase 1 complete)
+
+> **Status: COMPLETE.** All steps A–F landed and the FINAL CHECKPOINT cleared — see `TODOS.md` (checkpoint log + hand-off notes) at the worktree root. Live follow-ups: the release-time conformance gate removal and cross-repo wave items in `wip/optionals/deferred-step-f-notes.md`. This document is kept as the narrative record; `wip/optionals-design.md` remains the design reference (incl. phases 2–3).
 
 Branch `feature/Optionals` (worktree `_optionals`). Design: `wip/optionals-design.md` — all decisions D1–D11 decided. This plan covers **phase 1 of §17**: the complete language core in pipelex, with `docs/specs/` + `conformance/` moving in the same change. The LLM maybe-wrapper (phase 2) and ergonomics (phase 3) are out of scope; the cross-repo wave (mthds spec, vscode/plxt, mthds-ui, skills) follows the pipelex release and must land **after** the Required-main-stuff Phase 3 sweep.
 
