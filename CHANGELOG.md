@@ -987,7 +987,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0] - 2026-02-25
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1290,7 +1290,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b3] - 2026-02-11
 
-**Highlights:**
+### Highlights
 
 - **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
 - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
@@ -1362,7 +1362,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b2] - 2026-01-20
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1578,7 +1578,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.17.0] - 2025-11-27
 
-**Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
+### Highlights
+
+- Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 
 ### Fixed
 
@@ -1597,7 +1599,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.16.0] - 2025-11-25
 
-**Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+### Highlights
+
+- Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
 You can run the same pipe at the same times as much as you want, with different inputs.
 Side effets: Unit tests now run in 30s.
 
@@ -1708,7 +1712,9 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.15.0] - 2025-11-07
 
-**Highlights:** This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
+### Highlights
+
+This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
 
 ### Added
 
@@ -1815,7 +1821,7 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.13.0] - 2025-10-21
 
-### Highlights - Simplifying pipeline execution and improving developer experience
+### Highlights
 
 This release focuses on making Pipelex more accessible and easier to use, with major improvements to the CLI, simplified syntax for multiplicity, and a complete documentation overhaul:
 
@@ -1860,7 +1866,9 @@ This release focuses on making Pipelex more accessible and easier to use, with m
 
 ## [v0.12.0] - 2025-10-15
 
-### Highlights - Moving fast and breaking things
+### Highlights
+
+Moving fast and breaking things:
 
 - Added the new builder pipeline system for auto-generating Pipelex bundles from user briefs
   - it's a pipeline to generate pipelines, and it works!
@@ -2104,9 +2112,9 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 ## [v0.10.0] - 2025-09-17
 
-### Highlight: New Inference Backend Configuration System
+### Highlights
 
-We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
+**New Inference Backend Configuration System** — We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
 - **Get started in seconds** with [Pipelex Inference](configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
@@ -2159,7 +2167,7 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 
 ## [v0.9.5] - 2025-09-12
 
-### Highlight
+### Highlights
 
 - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
@@ -2453,9 +2461,9 @@ Simplified input memory:
 
 ## [v0.5.0] - 2025-07-01
 
-### Highlight: Vibe Coding an AI workflow becomes a reality
+### Highlights
 
-**Create AI workflows from natural language without writing code** - The combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
+**Vibe Coding an AI workflow becomes a reality** — Create AI workflows from natural language without writing code: the combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
 
 ### Added
 
@@ -2612,7 +2620,9 @@ Simplified input memory:
 
 ## [v0.4.0] - 2025-06-16
 
-### Highlight: Complete documentation overhaul
+### Highlights
+
+Complete documentation overhaul:
 
 - **MkDocs** setup for static web docs generation
   - **Material** for MkDocs theme, custom styling and navigation
