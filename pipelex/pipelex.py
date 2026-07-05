@@ -56,6 +56,7 @@ from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
+from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
@@ -90,7 +91,6 @@ from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -304,10 +304,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.func_registry = func_registry or FuncRegistry()
         self.pipelex_hub.set_func_registry(func_registry=self.func_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
-        if storage_provider is None:
-            storage_config = get_config().pipelex.storage_config
-            storage_provider = make_storage_provider_from_config(storage_config)
-        self.pipelex_hub.set_storage_provider(storage_provider)
+        # Storage is selected from the config-driven StorageProviderRegistry, which needs the
+        # plugin registrar — built below at the plugin-discovery phase — so its resolution and
+        # hub-set happen there (after secrets is on the hub, so the GCP factory's secret read works).
 
         # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
         stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
@@ -405,6 +404,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
         self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
+        storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)
+        self.pipelex_hub.set_storage_provider_registry(storage_provider_registry)
+        # Storage provider precedence: explicit setup() param > config-selected registry factory.
+        # The built-in StoragePlugin supplies every method, so there is no separate core default.
+        # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
+        if storage_provider is None:
+            storage_config = get_config().pipelex.storage_config
+            storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
+        self.pipelex_hub.set_storage_provider(storage_provider)
 
         self.pipelex_hub.set_dry_run_forced(not needs_inference)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.

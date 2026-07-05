@@ -11,7 +11,12 @@ if TYPE_CHECKING:
 # v2 added the optional ``add_http_error_mapper`` capability (a framework-agnostic
 # transport-fault → ``ErrorReport`` mapping a host runtime renders into its own
 # HTTP error response).
-PLUGIN_API_VERSION: int = 2
+#
+# v3 added ``add_storage_provider`` — a config-selected, process-global storage-provider
+# registry (``storage_config.method`` picks the factory at boot). This same v3 also carries
+# the secrets-provider registry, so external plugins re-declare ``targets_api`` only once
+# across both additions.
+PLUGIN_API_VERSION: int = 3
 
 
 @runtime_checkable
