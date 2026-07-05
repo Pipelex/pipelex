@@ -13,9 +13,10 @@ if TYPE_CHECKING:
 # HTTP error response).
 #
 # v3 added ``add_storage_provider`` — a config-selected, process-global storage-provider
-# registry (``storage_config.method`` picks the factory at boot). This same v3 also carries
-# the secrets-provider registry, so external plugins re-declare ``targets_api`` only once
-# across both additions.
+# registry (``storage_config.method`` picks the factory at boot). v3 is also pre-reserved for
+# the upcoming secrets-provider registry: DX-1 batches both menu additions under this single
+# bump so external plugins re-declare ``targets_api`` only once. That ``add_secrets_provider``
+# menu method is not in the tree yet — it lands in a follow-up commit under this same v3.
 PLUGIN_API_VERSION: int = 3
 
 
