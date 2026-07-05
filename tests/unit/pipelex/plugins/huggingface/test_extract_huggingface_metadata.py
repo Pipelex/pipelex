@@ -7,17 +7,19 @@ Distills an ``HfHubHTTPError`` / ``InferenceTimeoutError`` into a
 
 from __future__ import annotations
 
-import requests
+import httpx
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
 from pipelex.cogt.inference.error_classification import extract_huggingface_metadata
 
 
 def _make_hf_http_error(status_code: int, headers: dict[str, str] | None = None, body_text: str = "") -> HfHubHTTPError:
-    response = requests.Response()
-    response.status_code = status_code
-    response.headers.update(headers or {})
-    response._content = body_text.encode("utf-8") if body_text else b""  # noqa: SLF001
+    response = httpx.Response(
+        status_code=status_code,
+        headers=headers,
+        text=body_text,
+        request=httpx.Request("POST", "https://router.huggingface.co/test"),
+    )
     return HfHubHTTPError(message=f"HTTP {status_code}", response=response)
 
 
@@ -57,6 +59,26 @@ class TestExtractHuggingFaceMetadata:
         assert metadata.status_code == 502
         assert metadata.provider_error_code is None
         assert isinstance(metadata.body, str)
+
+    def test_unread_streaming_response_body_is_tolerated(self) -> None:
+        """An unread streaming ``httpx.Response`` (hub 1.x async streaming error) must not crash the reader.
+
+        Accessing ``.text`` on such a response raises ``httpx.ResponseNotRead``; the
+        best-effort reader must swallow it and still return status/header metadata.
+        """
+        response = httpx.Response(
+            status_code=503,
+            headers={"x-request-id": "hf-req-stream", "retry-after": "7"},
+            content=iter([b'{"error": "overloaded"}']),
+            request=httpx.Request("POST", "https://router.huggingface.co/test"),
+        )
+        exc = HfHubHTTPError(message="HTTP 503", response=response)
+        metadata = extract_huggingface_metadata(exc)
+        assert metadata.status_code == 503
+        assert metadata.request_id == "hf-req-stream"
+        assert metadata.retry_after_seconds == 7.0
+        assert metadata.body is None
+        assert metadata.provider_error_code is None
 
     def test_inference_timeout_has_no_status(self) -> None:
         exc = InferenceTimeoutError("timed out")

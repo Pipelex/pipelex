@@ -16,7 +16,7 @@ def render_value_html(value: Any) -> str:
     Uses match/case to handle all common Pydantic field types:
     - None: renders as <em>None</em>
     - StuffContent subclasses: calls rendered_html() recursively
-    - str: escapes HTML (or passes through if already HTML)
+    - str: always escaped — a value that merely looks like HTML is untrusted input
     - bool: renders as "True" or "False" (must be before int, as bool is subclass of int)
     - int: renders as string
     - float: renders as string
@@ -34,10 +34,6 @@ def render_value_html(value: Any) -> str:
             return value.rendered_html()
 
         case str():
-            # If it looks like HTML (starts with <), render as-is
-            stripped = value.strip()
-            if stripped.startswith("<") and (">" in stripped):
-                return value
             return html_module.escape(value)
 
         case bool():

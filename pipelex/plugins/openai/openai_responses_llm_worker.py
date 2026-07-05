@@ -27,7 +27,7 @@ from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.config import get_config
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
+class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         openai_responses_factory: OpenAIResponsesFactory,

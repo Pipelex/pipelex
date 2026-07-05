@@ -3,6 +3,7 @@
 import io
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 
 import pytest
 from PIL import Image
@@ -123,8 +124,11 @@ class TestPipeImgGen:
             parsed_url = urlparse(image_content.public_url)
             if parsed_url.scheme in {"http", "https"}:
                 image_bytes = await fetch_file_from_url_httpx(url=image_content.public_url)
+            elif parsed_url.scheme == "file":
+                # file:// paths are URI-formatted (percent-encoded) — decode before touching the filesystem
+                image_bytes = Path(url2pathname(parsed_url.path)).read_bytes()
             else:
-                image_bytes = Path(parsed_url.path).read_bytes()
+                image_bytes = Path(image_content.public_url).read_bytes()
             with Image.open(io.BytesIO(image_bytes)) as generated_image:
                 assert generated_image.size == (expected_width, expected_height), (
                     f"{topic}: expected {expected_width}x{expected_height}, got {generated_image.size[0]}x{generated_image.size[1]}"

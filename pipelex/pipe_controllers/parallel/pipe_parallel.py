@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -164,7 +165,22 @@ class PipeParallel(PipeController):
         names: required fields ⊆ result names, result names ⊆ declared fields. This turns the
         runtime combine failure into an author-time error surfaced by `/validate`.
         """
-        structure_class = self.output.concept.get_structure_class()
+        try:
+            structure_class = self.output.concept.get_structure_class()
+        except ConceptValueError as exc:
+            # A plain ValueError would escape the /validate sweep and abort the whole bundle;
+            # convert it so this pipe alone is reported as failed.
+            msg = (
+                f"PipeParallel '{self.code}' output '{self.output.concept.concept_ref}' has no registered "
+                f"structure class ('{self.output.concept.structure_class_name}'): {exc}"
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+            ) from exc
         if issubclass(structure_class, CompositeContent):
             return
 
@@ -367,7 +383,23 @@ class PipeParallel(PipeController):
             if branch_pipe.output.multiplicity is not None:
                 # A list-producing branch combines as a ListContent, not as the item class.
                 continue
-            branch_structure_class = branch_pipe.output.concept.get_structure_class()
+            try:
+                branch_structure_class = branch_pipe.output.concept.get_structure_class()
+            except ConceptValueError as exc:
+                # Same conversion as the output lookup above: keep the failure per-pipe.
+                msg = (
+                    f"PipeParallel '{self.code}' branch '{sub_pipe.pipe_code}' output "
+                    f"'{branch_pipe.output.concept.concept_ref}' has no registered structure class "
+                    f"('{branch_pipe.output.concept.structure_class_name}'): {exc}"
+                )
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    provided_concept_code=branch_pipe.output.concept.concept_ref,
+                    variable_names=[sub_pipe.output_name],
+                ) from exc
             if not issubclass(branch_structure_class, field_annotation):
                 msg = (
                     f"PipeParallel '{self.code}' branch '{sub_pipe.pipe_code}' produces "
