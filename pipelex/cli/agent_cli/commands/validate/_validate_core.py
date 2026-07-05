@@ -59,6 +59,9 @@ async def validate_all_core(
         # is_runnable = not pending. `validate all` now makes a strict runnability claim (the consumer
         # gates the exit code on it unless --allow-signatures), so both keys ride the envelope.
         pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
+        # warnings: same advisory lint channel as the bundle surfaces — `validate all` has the
+        # whole library loaded, which is all the flow context the cross-flow aggregation needs.
+        library_pipes = list(get_pipe_library().get_pipes_dict().values())
         return {
             "success": True,
             "is_valid": True,
@@ -66,6 +69,9 @@ async def validate_all_core(
             "total_pipes": len(dry_run_results),
             "pending_signatures": pending_signatures,
             "is_runnable": not pending_signatures,
+            "warnings": [
+                warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(library_pipes))
+            ],
         }
     finally:
         # Restore the caller's outer current-library FIRST (so the guarantee survives a teardown

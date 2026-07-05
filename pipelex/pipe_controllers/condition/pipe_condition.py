@@ -123,16 +123,17 @@ class PipeCondition(PipeController):
     def validate_inputs_with_library(self):
         pass
 
+    @property
+    def _continue_reachable(self) -> bool:
+        return SpecialOutcome.is_continue(self.default_outcome) or any(SpecialOutcome.is_continue(outcome) for outcome in self.outcome_map.values())
+
     @override
     def validate_output_static(self):
         # OPTIONAL_OUTPUT_REQUIRED (D5/D6): `continue` resolves the declared output as ABSENT
         # (design §14), so a `continue`-reachable condition must declare its output optional —
         # otherwise the no-output path would be invisible to the type system, which is exactly
         # the invisible-optional wart this feature removes.
-        continue_reachable = SpecialOutcome.is_continue(self.default_outcome) or any(
-            SpecialOutcome.is_continue(outcome) for outcome in self.outcome_map.values()
-        )
-        if continue_reachable and not self.output.presence.is_optional:
+        if self._continue_reachable and not self.output.presence.is_optional:
             msg = (
                 f"PipeCondition '{self.code}' can resolve to 'continue', which resolves the declared output as absent, "
                 f"but its output '{self.output.concept.concept_ref}' is not declared optional. "
@@ -408,10 +409,18 @@ class PipeCondition(PipeController):
         }
         self._register_execution_data(job_metadata, execution_data=execution_data_dict)
         # Dry-run parity with the live `continue` arm: with only special outcomes mapped, no pipe
-        # dry-ran into this memory — the only live outcomes would be `continue` (absent) or `fail`,
-        # so the declared output resolves absent, memory otherwise unchanged. (The static rule
-        # "continue-reachable ⇒ `?` output" is Step D's OPTIONAL_OUTPUT_REQUIRED.)
+        # dry-ran into this memory. When `continue` is reachable the declared output resolves
+        # absent, memory otherwise unchanged (the static rule "continue-reachable ⇒ `?` output" is
+        # Step D's OPTIONAL_OUTPUT_REQUIRED). A fail-only condition has no absent arm — every live
+        # path raises — so fabricating an absence would let dry-run bless a method that can only
+        # fail at runtime.
         if not self.pipe_dependencies():
+            if not self._continue_reachable:
+                msg = (
+                    f"PipeCondition '{self.code}' maps every outcome (and the default) to 'fail': "
+                    f"every live run of this pipe raises. Map at least one outcome to a pipe or to 'continue'."
+                )
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,

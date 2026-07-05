@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
@@ -391,35 +391,6 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             error_type=error_type,
             error_message=error_message,
             error_stack=error_stack,
-        )
-
-    def add_edge(
-        self,
-        *,
-        lookup_key: str,
-        source_node_id: str,
-        target_node_id: str,
-        edge_kind: EdgeKind,
-        label: str | None = None,
-    ) -> None:
-        """Add an edge between two nodes.
-
-        Args:
-            lookup_key: The tracer lookup key.
-            source_node_id: The source node ID.
-            target_node_id: The target node ID.
-            edge_kind: The type of edge.
-            label: Optional label for the edge.
-        """
-        tracer = self._get_tracer(lookup_key)
-        if tracer is None:
-            return
-
-        tracer.add_edge(
-            source_node_id=source_node_id,
-            target_node_id=target_node_id,
-            edge_kind=edge_kind,
-            label=label,
         )
 
     def register_controller_output(

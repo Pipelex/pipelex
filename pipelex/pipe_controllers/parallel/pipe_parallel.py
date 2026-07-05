@@ -491,13 +491,17 @@ class PipeParallel(PipeController):
                             f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
                         )
                         raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-                branch_record = (
-                    branch_resolved
-                    if branch_resolved.variable_name == sub_pipe_output_name
-                    else branch_resolved.model_copy(update={"variable_name": sub_pipe_output_name})
-                )
-                # Resolution, not a note: a stale value under the result name must not outrank it.
-                working_memory.record_resolved_absence(branch_record)
+                if self.add_each_output:
+                    # Branch results are parent slots only under add_each_output — same gate as the
+                    # present arm below and as lifted_companion_slots(). Writing the record without
+                    # the gate would clobber an unrelated same-named parent value.
+                    branch_record = (
+                        branch_resolved
+                        if branch_resolved.variable_name == sub_pipe_output_name
+                        else branch_resolved.model_copy(update={"variable_name": sub_pipe_output_name})
+                    )
+                    # Resolution, not a note: a stale value under the result name must not outrank it.
+                    working_memory.record_resolved_absence(branch_record)
                 log.verbose(f"PipeParallel '{self.code}': branch result '{sub_pipe_output_name}' is absent, omitted from the combine")
                 continue
             output_stuff = branch_resolved

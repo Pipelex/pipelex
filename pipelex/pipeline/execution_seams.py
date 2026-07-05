@@ -227,7 +227,15 @@ async def prepare_pipe_job(
         named_stuff_spec
         for named_stuff_spec in pipe.inputs.named_stuff_specs
         if named_stuff_spec.presence.is_optional
-        and (working_memory is None or working_memory.get_optional_stuff(named_stuff_spec.variable_name) is None)
+        and (
+            working_memory is None
+            or (
+                working_memory.get_optional_stuff(named_stuff_spec.variable_name) is None
+                # A slot already resolved as a recorded absence was NOT omitted — re-recording
+                # would downgrade its provenance to a fresh not-provided.
+                and working_memory.get_optional_absence(named_stuff_spec.variable_name) is None
+            )
+        )
     ]
     if omitted_optional_specs:
         if working_memory is None:

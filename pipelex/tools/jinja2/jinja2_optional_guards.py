@@ -117,12 +117,29 @@ class _GuardWalker:
             if isinstance(body_node, nodes.Assign):
                 # The assignment's right-hand side is evaluated against the current scope.
                 self.walk(body_node.node, guarded=guarded, declared=declared)
-                if isinstance(body_node.target, nodes.Name):
-                    declared |= {body_node.target.name}
+                declared |= self._assign_target_names(body_node.target)
+                continue
+            if isinstance(body_node, nodes.AssignBlock):
+                # `{% set x %}...{% endset %}`: the body (and filter) evaluate against the
+                # current scope; the target declares for subsequent statements only — and the
+                # target itself is a store, never a read.
+                self._walk_body(body_node.body, guarded=guarded, declared=declared)
+                if body_node.filter is not None:
+                    self.walk(body_node.filter, guarded=guarded, declared=declared)
+                declared |= self._assign_target_names(body_node.target)
                 continue
             if isinstance(body_node, nodes.Macro):
                 declared |= {body_node.name}
             self.walk(body_node, guarded=guarded, declared=declared)
+
+    @classmethod
+    def _assign_target_names(cls, target: nodes.Node) -> frozenset[str]:
+        """The names a `{% set %}` target declares — a plain Name or a Tuple of Names."""
+        if isinstance(target, nodes.Name):
+            return frozenset({target.name})
+        if isinstance(target, nodes.Tuple):
+            return frozenset(item.name for item in target.items if isinstance(item, nodes.Name))
+        return frozenset()
 
     def walk(self, node: nodes.Node, *, guarded: frozenset[str], declared: frozenset[str]) -> None:
         if isinstance(node, nodes.Template):

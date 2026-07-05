@@ -136,6 +136,20 @@ class TestAbsenceLedger:
         assert working_memory.resolve_stuff("draft") == record
         assert isinstance(working_memory.resolve_main_stuff(), AbsenceRecord)
 
+    def test_get_optional_absence_follows_aliases(self):
+        """An alias to a resolved-absent slot surfaces the record — mirroring get_optional_stuff —
+        instead of degrading the alias name to a neither-value-nor-record hard miss.
+        """
+        working_memory = WorkingMemory()
+        working_memory.set_stuff(name="draft", stuff=_make_text_stuff("draft"))
+        working_memory.add_alias("draft_alias", target="draft")
+        record = _make_record("draft")
+        working_memory.record_resolved_absence(record)
+
+        assert working_memory.get_optional_absence("draft_alias") == record
+        assert working_memory.resolve_stuff("draft_alias") == record
+        assert working_memory.list_missing_names({"draft_alias"}) == []
+
     def test_record_absence_is_a_note_beside_a_value(self):
         """The plain record_absence stays a ledger NOTE: a value under the same name is kept and
         wins in resolve_stuff (the D4 plural empty-list note depends on this).

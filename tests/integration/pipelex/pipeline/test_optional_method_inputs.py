@@ -9,11 +9,12 @@ import pytest
 from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex.config import get_config
-from pipelex.core.memory.absence import AbsenceKind
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
@@ -106,6 +107,42 @@ class TestOptionalMethodInputs:
         assert job_memory is not None
         assert job_memory.get_optional_absence("source") is None
         assert job_memory.get_optional_stuff("source") is not None
+
+    async def test_preexisting_absence_record_keeps_its_provenance(self, load_empty_library: Callable[[], str]):
+        """A caller-provided WorkingMemory whose `?` slot already resolved as a recorded absence
+        (e.g. a previous run's output chained in) keeps that record — prepare_pipe_job must not
+        downgrade it to a fresh not-provided.
+        """
+        library_id = load_empty_library()
+        pipe = _make_method_pipe()
+        execution_config = get_config().pipelex.pipeline_execution_config
+
+        chained_memory = WorkingMemoryFactory.make_from_single_stuff(StuffFactory.make_from_str("penalties", name="topic"))
+        upstream_record = AbsenceRecord(
+            variable_name="source",
+            kind=AbsenceKind.SKIPPED,
+            reason="skipped because input 'clause' is absent",
+            producing_pipe="extract_source",
+        )
+        chained_memory.record_absence(upstream_record)
+
+        pipe_job = await prepare_pipe_job(
+            pipe=pipe,
+            library_id=library_id,
+            execution_config=execution_config,
+            pipe_run_mode=PipeRunMode.LIVE,
+            pipeline_run_id="test-optional-method-inputs-chained",
+            user_id="pytest",
+            inputs=chained_memory,
+        )
+
+        job_memory = pipe_job.working_memory
+        assert job_memory is not None
+        record = job_memory.get_optional_absence("source")
+        assert record is not None
+        assert record.kind == AbsenceKind.SKIPPED
+        assert record.producing_pipe == "extract_source"
+        assert record.reason == "skipped because input 'clause' is absent"
 
     async def test_missing_required_error_hints_omittable_optionals(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """Omitting a required input still fails, but the message now names the optional inputs

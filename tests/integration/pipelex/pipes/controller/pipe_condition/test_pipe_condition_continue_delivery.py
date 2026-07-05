@@ -23,6 +23,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -137,6 +138,37 @@ class TestPipeConditionContinueDelivery:
         assert resolved_main.kind == AbsenceKind.DECLARED_ABSENT
         assert resolved_main.producing_pipe == "continue_gate"
         assert pipe_output.pipeline_run_id == job_metadata.pipeline_run_id
+
+    async def test_dry_run_fail_only_condition_raises(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+        """A fail-only condition has no absent arm — every live path raises — so dry-run must
+        raise too instead of fabricating an absence that would bless an always-failing method.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
+        blueprint = PipeConditionBlueprint(
+            description="Fail-only condition (assert-style misauthoring)",
+            inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+            expression_template="{{ input_text.text }}",
+            outcomes={"bad": SpecialOutcome.FAIL},
+            default_outcome=SpecialOutcome.FAIL,
+        )
+        pipe_condition = PipeFactory[PipeCondition].make_from_blueprint(
+            domain_code="test_integration",
+            pipe_code="fail_only_gate",
+            blueprint=blueprint,
+        )
+        working_memory = WorkingMemoryFactory.make_empty()
+        working_memory.set_stuff(name="input_text", stuff=_make_input_text_stuff())
+
+        with pytest.raises(PipeRunError) as exc_info:
+            await pipe_condition.run_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=_make_run_params(PipeRunMode.DRY),
+            )
+        message = str(exc_info.value)
+        assert "fail_only_gate" in message
+        assert "fail" in message
 
     async def test_dry_run_all_special_outcomes_supersedes_previous_main_stuff(
         self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]

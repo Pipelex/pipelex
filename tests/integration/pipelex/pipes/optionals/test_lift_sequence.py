@@ -3,7 +3,7 @@ each step's own gate decides (skip / run / force). The absorbing `?` step sinks 
 the method boundary, so the sequence delivers a real main stuff (Step B scope).
 """
 
-from typing import Callable
+from typing import Callable, cast
 
 import pytest
 from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -13,6 +13,7 @@ from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_pipe_library
@@ -168,6 +169,54 @@ class TestLiftSequence:
         # Run-report enumeration: the ledger lists exactly the genuinely absent slots — the
         # positional main-stuff record was superseded when the sink delivered a real output.
         assert set(result_memory.absences.keys()) == {"source", "a_out", "b_out"}
+
+    async def test_lifted_step_honors_invocation_multiplicity_override(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
+        """A singular-output pipe invoked with a plural override (`multiple_output = true` on the
+        sub-pipe) normalizes its lifted output to the empty list — matching what the static taint
+        pass promised downstream list consumers — instead of recording a singular absence.
+        """
+        load_empty_library()
+        step_a = PipeFactory[PipeFunc].make_from_blueprint(
+            domain_code=_DOMAIN_CODE,
+            pipe_code="opt_seq_step_a",
+            blueprint=PipeFuncBlueprint(
+                description="Consumes the maybe-absent source (plain input): lifted when source is absent",
+                inputs={"source": "Text"},
+                output="Text",
+                function_name="optionals_seq_echo_source",
+            ),
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            StuffFactory.make_from_str("penalties", name="topic"),
+        )
+        working_memory.record_absence(
+            AbsenceRecord(
+                variable_name="source",
+                kind=AbsenceKind.NOT_PROVIDED,
+                reason="optional input 'source' was not provided by the caller",
+            ),
+        )
+        run_params = _make_live_run_params()
+        # The invocation-level override a SubPipe applies (`multiple_output = true`).
+        run_params.output_multiplicity = True
+
+        pipe_output = await step_a.run_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=run_params,
+            output_name="a_out",
+        )
+
+        result_memory = pipe_output.working_memory
+        lifted_stuff = result_memory.get_optional_stuff("a_out")
+        assert lifted_stuff is not None
+        lifted_content = lifted_stuff.content
+        assert isinstance(lifted_content, ListContent)
+        assert cast("ListContent[TextContent]", lifted_content).items == []
+        # The ledger keeps the observability note beside the empty-list value.
+        note = result_memory.get_optional_absence("a_out")
+        assert note is not None
+        assert note.kind == AbsenceKind.SKIPPED
 
     async def test_sequence_runs_fully_when_source_provided(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """With source present, nothing is lifted and the sink gets the analysis arm."""

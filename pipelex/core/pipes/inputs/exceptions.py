@@ -56,9 +56,14 @@ class OptionalValueAbsentError(PipeRunError):
 
     ``error_domain = RUNTIME``: the failure is data-dependent — the method's assumption failed
     on this input data, not on the caller's request shape.
+
+    ``_authors_caller_facing_message``: the message and user action describe the caller's own
+    method and data (pipe codes, variable names, ledger reasons — no server internals), and the
+    caller is the only one who can act on them; they must survive STRICT disclosure.
     """
 
     error_domain = ErrorDomain.RUNTIME
+    _authors_caller_facing_message = True
 
     def __init__(
         self,

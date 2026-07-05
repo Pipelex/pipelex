@@ -225,6 +225,33 @@ class TestPipeParallelAbsence:
         assert "opt_par_find" in message
         assert "found_result" in message
 
+    async def test_absent_branch_without_add_each_output_leaves_parent_slot_untouched(
+        self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]
+    ):
+        """Without add_each_output, branch result names are not parent slots: an absent branch must
+        not clobber an unrelated same-named value in the parent memory (present branches don't).
+        """
+        load_empty_library()
+        parallel = _build_parallel(output_ref="Composite", structure_class_names=[], add_each_output=False)
+        working_memory = _make_absent_source_memory()
+        working_memory.add_new_stuff(name="found_result", stuff=StuffFactory.make_from_str("pre-existing unrelated value", name="found_result"))
+
+        pipe_output = await parallel.run_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=_make_live_run_params(),
+        )
+
+        main_stuff = pipe_output.main_stuff
+        assert isinstance(main_stuff.content, CompositeContent)
+        assert set(main_stuff.content.components.keys()) == {"base_result"}
+
+        result_memory = pipe_output.working_memory
+        surviving = result_memory.get_optional_stuff("found_result")
+        assert surviving is not None
+        assert surviving.as_text.text == "pre-existing unrelated value"
+        assert result_memory.get_optional_absence("found_result") is None
+
     async def test_all_branches_present_combines_as_before(self, job_metadata: JobMetadata, load_empty_library: Callable[[], str]):
         """With every branch present, the combine is byte-for-byte the pre-optionals behavior."""
         load_empty_library()

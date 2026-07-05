@@ -118,7 +118,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         self.record_absence(record)
 
     def get_optional_absence(self, name: str) -> AbsenceRecord | None:
-        return self.absences.get(name)
+        """Alias-aware, mirroring `get_optional_stuff`: an alias to a resolved-absent slot must
+        surface the record, not degrade to a hard miss.
+        """
+        if record := self.absences.get(name):
+            return record
+        if alias := self.aliases.get(name):
+            return self.absences.get(alias)
+        return None
 
     def record_new_main_absence(self, record: AbsenceRecord) -> None:
         """Record a pipe-output absence as the resolved main result.

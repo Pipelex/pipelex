@@ -28,6 +28,10 @@ class TestDetectUnguardedOptionalReferences:
             ("and_short_circuit_guards_body", "{% if assessment and assessment.flag %}{{ assessment.detail }}{% endif %}"),
             ("set_before_read", "{% set assessment = 'x' %}{{ assessment }}"),
             ("nested_set_shadows", "{% if topic %}{% set assessment = 'fallback' %}{{ assessment }}{% endif %}"),
+            ("set_block_before_read", "{% set assessment %}fallback{% endset %}{{ assessment }}"),
+            ("set_block_target_is_a_store_not_a_read", "{% set assessment %}fallback{% endset %}"),
+            ("set_block_body_guarded", "{% set summary %}{% if assessment %}{{ assessment.amount }}{% endif %}{% endset %}{{ summary }}"),
+            ("tuple_set_shadows", "{% set assessment, other = 'a', 'b' %}{{ assessment }}"),
         ],
     )
     def test_guarded_references_produce_no_findings(self, topic: str, template_source: str):
@@ -52,6 +56,8 @@ class TestDetectUnguardedOptionalReferences:
             ("tag_filter_from_plain_at_sigil", '{{ assessment|tag("assessment") }}', "assessment"),
             ("attr_on_subscript_result", "{{ assessment[0].field }}", "assessment"),
             ("read_before_set", "Value: {{ assessment }} {% set assessment = 'x' %}", "assessment"),
+            ("set_block_body_reads_optional", "{% set summary %}{{ assessment }}{% endset %}{{ summary }}", "assessment"),
+            ("read_before_set_block", "{{ assessment }}{% set assessment %}x{% endset %}", "assessment"),
         ],
     )
     def test_unguarded_references_are_reported(self, topic: str, template_source: str, expected_path: str):

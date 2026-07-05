@@ -27,7 +27,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
@@ -662,6 +662,7 @@ class PipeAbstract(ABC, BaseModel):
                     job_metadata=job_metadata,
                     working_memory=working_memory,
                     liftable=presence_scan.liftable,
+                    pipe_run_params=pipe_run_params,
                     output_name=output_name,
                 )
             else:
@@ -799,12 +800,15 @@ class PipeAbstract(ABC, BaseModel):
         *,
         working_memory: WorkingMemory,
         liftable: list[AbsentInput],
+        pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
         """Skip this pipe (implicit lifting, D3) and record its output as absent with provenance.
 
         A plural output does not go absent: it normalizes to an empty list (D4) — `[]`-emptiness
         is the absence story for plurals — with a ledger note kept for observability; taint stops.
+        Plurality is resolved like the run path resolves it (declared multiplicity + the
+        invocation-level override), matching what the static taint pass promised downstream.
         Companion slots the pipe would also have written (`lifted_companion_slots`) are resolved
         the same way, so no downstream consumer meets a neither-value-nor-record hard miss.
         """
@@ -821,7 +825,11 @@ class PipeAbstract(ABC, BaseModel):
             producing_pipe=self.code,
             upstream=lifted_input.absence_record,
         )
-        if self.output.multiplicity:
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=self.output.multiplicity,
+            override_multiplicity=pipe_run_params.output_multiplicity,
+        )
+        if multiplicity_resolution.is_multiple_outputs_enabled:
             empty_list_stuff = Stuff(
                 concept=self.output.concept,
                 content=ListContent[StuffContent](items=[]),
