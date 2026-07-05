@@ -44,6 +44,19 @@ output = "Text"
 prompt = "Summarize $doc."
 """
 
+# Typeless header: the same forward-declaration of `summarize`, written WITHOUT the `type` tag.
+# The before-validator normalizes it to a PipeSignature, so the new surface must reconcile
+# identically to the explicit-tag header above.
+DEP_TYPELESS_HEADER_MTHDS = """\
+domain = "summary_dep"
+description = "Dependency header declaring a summarize signature without a type tag"
+
+[pipe.summarize]
+description = "Summarize a document (contract only)."
+inputs = { doc = "Text" }
+output = "Text"
+"""
+
 # A second concrete `summarize` (genuine duplicate) for the negative case.
 DEP_CONCRETE_DUP_MTHDS = """\
 domain = "summary_dep"
@@ -109,6 +122,34 @@ class TestDependencyMultiFileReconciliation:
         summarize_pipes = [pipe for pipe in child_library.pipe_library.get_pipes() if pipe.code == "summarize"]
         assert len(summarize_pipes) == 1, "Signature and concrete must reconcile to exactly one pipe"
         assert not summarize_pipes[0].is_signature, "The concrete definition must win over the forward signature"
+
+    def test_typeless_header_and_concrete_sibling_reconcile_to_concrete(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """A TYPELESS header (no `type`) + concrete sibling collapse to a single concrete pipe.
+
+        Confirms the new typeless-signature surface reconciles exactly like the explicit-tag header:
+        the before-validator normalizes the typeless section to a PipeSignature, and the concrete wins.
+        """
+        library_manager = get_library_manager()
+        library = LibraryFactory.make_empty()
+        mocker.patch.object(library_manager, "get_current_library", return_value=library)
+
+        manager = LibraryManager()
+        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            library=library,
+            resolved_dep=self._build_resolved_dep(
+                tmp_path=tmp_path,
+                file_contents=[("header.mthds", DEP_TYPELESS_HEADER_MTHDS), ("definition.mthds", DEP_CONCRETE_MTHDS)],
+            ),
+        )
+
+        child_library = library.dependency_libraries["summary_dep"]
+        summarize_pipes = [pipe for pipe in child_library.pipe_library.get_pipes() if pipe.code == "summarize"]
+        assert len(summarize_pipes) == 1, "Typeless signature and concrete must reconcile to exactly one pipe"
+        assert not summarize_pipes[0].is_signature, "The concrete definition must win over the typeless forward signature"
 
     def test_two_concrete_definitions_raise(
         self,

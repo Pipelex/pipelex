@@ -15,6 +15,17 @@ from pipelex.types import Self, StrEnum
 # executable kinds (a signature blueprint carries `type = "PipeSignature"`, `pipe_category = None`).
 PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"
 
+# The exact set of keys a *typeless* `[pipe.x]` section may declare and still be a signature
+# (contract only). A section with no `type` whose keys are a subset of this set is normalized to a
+# `PipeSignature`; any other key present means the author is describing an implementation, which must
+# name its `type` — that is a hard error (see the `pipe` before-validator in
+# `pipelex_bundle_blueprint.py`). `source` is a non-user blueprint field, admitted defensively so
+# this set matches `PipeSignatureBlueprint`'s writable contract; it is unreachable via the stray-key
+# path today (a section carrying `source` was dumped from a blueprint, so it also carries `type`,
+# which short-circuits before this set is consulted). Single source of truth for the blueprint and
+# spec (authoring) layers.
+SIGNATURE_ONLY_KEYS: frozenset[str] = frozenset({"description", "inputs", "output", "signature_for", "source"})
+
 
 class PipeCategory(StrEnum):
     PIPE_OPERATOR = "PipeOperator"

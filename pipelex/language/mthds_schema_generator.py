@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Fields that are injected at load time, never written by users in .mthds files
@@ -28,6 +29,10 @@ _PIPE_INTERNAL_FIELDS = {"pipe_category"}
 # get_args(...)[0] is the Union, and get_args(union) yields the member classes, whose
 # __name__ matches the Pydantic $defs key.
 _PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in get_args(get_args(PipeBlueprintUnion)[0]))
+
+# The signature arm is the one typeless arm: `_require_type_on_pipe_definitions` leaves its `type`
+# OPTIONAL (not forced into `required`) so a contract-only table with no `type` matches it.
+_SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 
 
 def generate_mthds_schema() -> dict[str, Any]:
@@ -123,22 +128,32 @@ def _promote_schema_required_fields(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def _require_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
-    """Force `type` into the `required` array of every pipe blueprint definition.
+    """Normalize the `type` discriminator across pipe blueprint definitions for Draft-4 `oneOf`.
 
-    Each pipe blueprint declares `type` as a Literal with a default
-    (e.g. `type: Literal["PipeLLM"] = "PipeLLM"`), so Pydantic omits it from
-    `required`. The runtime union disambiguates with `Field(discriminator="type")`,
-    but `_convert_to_draft4` strips `discriminator` (Draft 4 has none). Without a
-    required `type`, a type-less table like `{description, output}` matches several
-    `oneOf` arms at once and `oneOf` rejects the multi-match with an ambiguous error.
-    Requiring `type` per variant makes a typed table match exactly one arm and a
-    type-less table fail with a clear "missing type".
+    The runtime union disambiguates with `Field(discriminator="type")`, but `_convert_to_draft4`
+    strips `discriminator` (Draft 4 has none), so the arms must self-disambiguate. Two shapes:
+
+    - **Concrete arms** declare `type` as a Literal with a default (e.g.
+      `type: Literal["PipeLLM"] = "PipeLLM"`), so Pydantic omits it from `required`. We force `type`
+      into `required` so a typed table matches exactly one arm and a table lacking `type` fails these
+      arms cleanly instead of ambiguously multi-matching.
+    - **The signature arm** is the one typeless arm: we *skip* it, leaving `type` OPTIONAL. Pydantic
+      already emits its `type` as an `enum: ["PipeSignature"]` property with a default (so it is
+      absent from `required`), and every pipe def has `additionalProperties: false`. A typeless
+      contract table `{description, output, inputs?}` therefore matches only this arm (concrete arms
+      require `type`); a table with a *concrete* `type` fails this arm on the enum and matches only
+      its own arm; a typeless table with a stray field matches no arm at all. An explicit
+      `type = "PipeSignature"` table still validates here too — the language surface keeps accepting
+      the old tag for now; rejecting it (removing `type` from this arm) and migrating the fixtures is
+      the gate-locked breaking step.
     """
     schema = copy.deepcopy(schema)
     defs_key = "$defs" if "$defs" in schema else "definitions"
     definitions = schema.get(defs_key, {})
 
     for def_name in _PIPE_DEFINITION_NAMES:
+        if def_name == _SIGNATURE_DEFINITION_NAME:
+            continue
         def_schema = definitions.get(def_name)
         if def_schema is None or "type" not in def_schema.get("properties", {}):
             continue

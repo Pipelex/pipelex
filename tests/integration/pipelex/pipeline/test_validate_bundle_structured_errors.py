@@ -74,6 +74,17 @@ output = "Text"
 prompt = "Do something magical with $text"
 """
 
+_TYPELESS_IMPL_FIELD_MTHDS = """
+domain = "structured_typeless_impl"
+main_pipe = "summarize_doc"
+
+[pipe.summarize_doc]
+description = "Looks like an implementation but names no type."
+inputs = { doc = "Text" }
+output = "Text"
+prompt = "Summarize $doc."
+"""
+
 _PROMPT_INPUT_MISMATCH_MTHDS = """
 domain = "structured_prompt_mismatch"
 main_pipe = "greet_person"
@@ -173,6 +184,23 @@ class TestValidateBundleStructuredErrors:
         assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
         assert item.pipe_code == "mystery"
         assert item.domain_code == "structured_bad_pipe_type"
+
+    async def test_typeless_pipe_with_impl_field_is_a_categorized_blueprint_item(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A typeless pipe that declares an implementation field (`prompt`) surfaces as a categorized
+        blueprint item with the MISSING_PIPE_TYPE error_type and the pipe locator — not a bare residual.
+        """
+        load_empty_library()
+        items = await _validation_errors_for(_TYPELESS_IMPL_FIELD_MTHDS)
+        type_items = [item for item in items if item.error_type == PipeValidationErrorType.MISSING_PIPE_TYPE]
+        assert type_items, f"Expected a missing_pipe_type item, got {[(i.category, i.error_type) for i in items]}"
+        item = type_items[0]
+        assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
+        assert item.pipe_code == "summarize_doc"
+        assert item.domain_code == "structured_typeless_impl"
+        assert "prompt" in item.message
 
     async def test_missing_input_variable_now_carries_the_pipe_code_locator(
         self,

@@ -1,113 +1,172 @@
-# Cookbook "hello plugin" → real inference-backend plugin (Option B)
+# Implementation plan — PipeSignature is not a type
 
-Status: **CHECKPOINT B CLEARED — TRACK COMPLETE (2026-07-03).** Phases 0–4 done and ALL COMMITTED. Pipelex (`feature/More-plugins`): `2f9b7e1d9` (optional_routes fix), `dee230f46` (LLM worker fold, breaking), plus the docs+tracker commit carrying this file. Cookbook (`dev`): `ecb231c` (the whole example; root `pyproject.toml`/`uv.lock` editable pin deliberately left uncommitted — flip to `pipelex==X.Y.Z` at release, see caveat below). Only remaining action = release ordering (step 3 below). This tracker is retired.
+**Branch:** `feature/PipeSignature-not-a-type`
+**Design doc:** [`wip/pipe-signature-not-a-type.md`](wip/pipe-signature-not-a-type.md) — read this first for the *why*.
+**Status:** NOT STARTED · Phase 0/3
 
-## NEXT SESSION — start here
+## Goal in one line
 
-1. **Commit slicing first** (user to approve slices). This worktree (`_plugins`, branch `feature/More-plugins`) holds four separable concerns — do NOT mix them:
-   - `optional_routes` factory fix: `pipelex/cogt/model_routing/routing_profile_factory.py` + `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` + its CHANGELOG "Fixed" entry.
-   - LLM worker fold (breaking): `llm_worker_abstract.py` (folded), `llm_worker_internal_abstract.py` (deleted), `llm_utils.py` + `llm_generate.py` (dump gating moved), `inference_manager{,_protocol}.py` (legacy setter removed), 6 re-parented workers under `pipelex/plugins/`, reworked tests (`test_worker_error_enrichment`, `test_external_plugin`, `test_llm_gen_text`, `test_setup_inference_workers`, factory/manager types) + the two CHANGELOG "Changed" entries.
-   - Orchestrator-plugins docs from a PRIOR session (unrelated to this track — `docs/under-the-hood/orchestrator-plugins.md` etc.).
-   - `TODOS.md` (this tracker).
-   Cookbook side = one coherent commit (example package, `.pipelex/inference/` config, `.mthds`, README×2, CHANGELOG, `test_bundles.py`, mypy exclude) — but the `[tool.uv.sources]` editable pin in `pyproject.toml`/`uv.lock` must NOT ship (see editable-pin caveat below).
-2. **Phase 4 — docs rewrite** (checkboxes below). Also re-check `docs/under-the-hood/inference-backend-plugins.md`'s worker section against the folded base (constructor now takes `inference_model`; no lifecycle gotchas left to document).
-3. **Release ordering**: pipelex release > 0.36.0 (breaking changelog) → flip cookbook pin to `pipelex==X.Y.Z` → cookbook release. Before the pipelex release, grep `pipelex-temporal` + `pipelex-mistralai-workflows` for LLM worker subclasses / `set_llm_worker_from_external_plugin` (expected: none — both are orchestrator-only).
+Drop `type = "PipeSignature"` from the language: a `[pipe.x]` section with **no `type`** and **nothing but the contract** (`description` + `output`, optional `inputs`, optional `signature_for`) **is** a `PipeSignature`. Anything else without a `type` is a hard error.
 
-All gates were green at session end (2026-07-03): pipelex `make agent-check` + `make tb` + FULL `make agent-test`; cookbook `make agent-check` + `make agent-test` + hello-plugin real run end-to-end.
+## Settled decisions (from the design doc)
 
-## Goal
+- **D1** — Signatures only. Concrete pipes keep explicit `type`. No inference from fields (impossible anyway — `prompt` is shared by PipeLLM and PipeImgGen).
+- **D2** — Typeless + any non-contract field ⇒ **hard error**, no leniency, no type-guessing. Legal typeless keys are exactly `{description, inputs, output, signature_for, source}`.
+- **D3** — Explicit `type = "PipeSignature"` ⇒ **rejected** with a migration error. No transitional alias.
+- **D4** — Keep the optional `signature_for` hint.
 
-Replace the legacy cookbook example `pipelex-cookbook/examples/c_advanced/using_inference_plugins/` with a genuine entry-point plugin that demonstrates the real plugin system. Today that example is a single `.mthds` file whose `model` field references the handle `llm_plugin_example_using_openai` — a name **defined nowhere** (not in the cookbook's `.pipelex/inference/`, not in the core kit). "Plugin" in its name is pre-plugin-system vocabulary meaning "custom model config entry"; the example has only ever run as DRY RUN (see `pipelex-cookbook/.pipelex/traces/`). Decision taken with the user (2026-07-03): **Option B** — make it an actual `pipelex.plugins` entry-point plugin, not a config-only reframe.
+## Phasing rationale (why this order)
 
-## Background: the plugin system (cold-start summary)
+`make agent-check` runs `plxt-lint`, which **regenerates the JSON schema from the Python models and then lints every `.mthds` file against it** (Makefile:842-845). So the language-schema generator and the fixture migration are gate-locked: fixtures can only drop the tag once the schema accepts typeless sections. To keep every checkpoint green *and* reviewable in isolation, we go **additive first, breaking last**:
 
-The pipelex repo (this worktree, `_plugins`) has a discovery-based plugin system. Everything below is verified against the current tree:
+- **Phase 1** makes typeless-signatures work at runtime *and* in the schema, while the old explicit tag still parses (both accepted). Tested with inline TOML/dicts so no fixture files move yet.
+- **Phase 2** mirrors the same additive support in the spec (authoring) layer.
+- **Phase 3** flips to rejecting the old tag, migrates all fixtures, rewords rendering, and updates docs — the one breaking phase.
 
-- **Contract** (`pipelex/plugins/contract.py`): a plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` protocol — `name: str`, `targets_api: int` (must equal `PLUGIN_API_VERSION`, currently **2**), and `register(self, registrar) -> None`. `register` is **side-effect-free**: it may only call registrar menu methods — no I/O, no SDK import, no client construction. Heavy work goes inside the `make_worker` closures.
-- **Discovery** (`pipelex/plugins/discovery.py`): `build_registrar` iterates `BUILTIN_PLUGINS` then external entry points in group **`pipelex.plugins`**. An entry point may resolve to a plugin instance or a zero-arg factory returning one. Denylist via `plugins.disabled` config; fail-loud on duplicates/version mismatch/broken plugin.
-- **Inference seam** (`pipelex/plugins/inference_backend_registry.py`): `registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="<token>", make_worker=...)`. A model's `sdk` field selects the backend factory; worker factories hold no match over SDK strings. `MakeWorkerFn` is called as `make_worker(*, inference_model: InferenceModelSpec, backend: InferenceBackend, sdk_clients: SdkClientRegistry, reporting_delegate: ReportingProtocol | None) -> InferenceWorkerAbstract`. Use `require_sdk(...)` inside `make_worker` for optional-dependency guards.
-- **Minimal LLM worker**: subclass `LLMWorkerAbstract` (`pipelex/cogt/llm/llm_worker_abstract.py`); since the fold (see follow-up below) the abstract surface is just `_gen_text` + `_gen_object` — the base takes `inference_model` in `__init__`, owns the job lifecycle, and derives capability flags from the spec.
-- **Optional companion**: `registrar.add_model_lister(sdk="<token>", lister=...)` — powers `pipelex show models`.
-- **Reference implementations**: smallest builtin = `pipelex/plugins/blackboxai/blackboxai_plugin.py` (one `add_inference_backend`, lazy imports inside `_make_..._worker`). External entry-point precedents = `pipelex-temporal` (`pipelex_temporal/temporal_plugin.py`) and `pipelex-mistralai-workflows`.
-- **Canonical authoring doc**: `docs/under-the-hood/inference-backend-plugins.md` (the "acme" walkthrough — the cookbook example should be its living counterpart).
-- **Verification command**: `pipelex plugins list` prints every discovered plugin (origin builtin/external, status, API version, contributions).
+One commit per phase (repo convention). Nothing pushed until the user says so.
 
-Model config layer (how a `.mthds` `model` handle reaches the plugin): the cookbook's `.pipelex/inference/backends.toml` declares backends keyed by name (`[hello]`, `enabled`, `api_key`...); per-backend model files `backends/<name>.toml` declare model sections with `[defaults]` carrying `sdk = "<token>"` — the section header is the model handle referenced from `.mthds`. The `add-model` skill (in this repo's `.claude/skills/`) documents the full add-a-model procedure including routing profiles.
+---
 
-## Decisions
+## Fan-out convention for `/code-review` (used at every checkpoint)
 
-- **D1 — worker shape**: a deterministic, zero-key "hello" echo worker (returns a canned/derived completion) so the example runs everywhere with no credentials; the rewritten docs page points to `inference-backend-plugins.md` for wrapping a real SDK. Rationale: cookbook examples must be runnable; the seam being demonstrated is discovery/registration, not OpenAI usage. (Override here if we'd rather wrap the OpenAI SDK.)
-- **D2 — package location**: the plugin package lives inside the example dir, e.g. `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with its own `pyproject.toml`, installed with `uv pip install -e` (cookbook already uses uv). It is NOT a dependency of the cookbook's root `pyproject.toml` — installing it is the demonstrated step.
-- **D3 — naming**: retire the dangling handle `llm_plugin_example_using_openai`. New names: plugin `hello-inference` (entry-point name `hello_inference`), sdk token `hello`, backend `[hello]`, model handle e.g. `hello-1`. No `pipelex_` prefix anywhere user-facing that belongs to the example.
+Spawn the reviewer as a **fresh Sonnet-5 sub-agent with NO inherited context** (`subagent_type: general-purpose`, `model: sonnet` — **not** `fork`, which would inherit this plan). Hand it *only* a pointer to the changes:
 
-## Phases
+> Run the `/code-review` skill on the changes in `<commit SHA>` (or `git diff <base>..HEAD`, or the unstaged working tree). We want clean, solid software — flag over-engineering, dead code, and any correctness bug. Report findings only; do not fix.
 
-### Phase 0 — Recon in the cookbook repo
+Do **not** pass the plan, the design doc, the decisions, or any rationale. Let the review land cold. Triage its findings back in TODOS.md (fix / defer-to-wip / refute) before clearing the checkpoint.
 
-- [x] Verify how a custom backend + model file wires end-to-end in the cookbook's current `.pipelex/` layout: add a scratch `[hello]` backend + `backends/hello.toml` model with `sdk = "hello"` and confirm the failure mode is `InferenceBackendNotFoundError` for `(llm, hello)` (proves config resolves and the missing piece is exactly the plugin). **DONE** — exact friendly message confirmed: "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?".
-- [x] Confirm whether routing profiles (`.pipelex/inference/routing_profiles.toml`) need an entry for a directly-referenced model handle, or whether `model = { model = "hello-1" }` in `.mthds` bypasses routing. **ANSWERED: routing is NOT bypassed.** `ModelManager.build_deck` routes every known model through the active profile; a DEFAULT match whose backend lacks the model spec **silently drops the model from the deck** (only the `internal` backend is tried as fallback). So the example needs an exact route. We use `optional_routes = { "hello-1" = "hello" }` in the active `all_pipelex_gateway` profile — optional routes only apply when the target backend is enabled, so the entry is inert if `[hello]` is disabled. **This surfaced a real core bug (fixed here, see below).**
-- [x] ~~Check the cookbook's pinned `pipelex` version supports the plugin system~~ — resolved 2026-07-03: the cookbook now sources `pipelex` **editable from this worktree** (`pipelex-cookbook/pyproject.toml` `[tool.uv.sources] pipelex = { path = "../_plugins", editable = true }`), so it runs against this tree's tip. Any pipelex-side change needed for the example is made HERE and is live in the cookbook immediately.
+---
 
-### Phase 1 — The plugin package (in `pipelex-cookbook`) — DONE
+## Phase 0 — Baseline (quick)
 
-- [x] Create `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with `pyproject.toml`: distribution name `hello-inference-plugin`, entry point `hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"` (module path deviates from the plan's `hello_inference_plugin:...` — no-re-exports rule forbids defining the class in `__init__.py`; layout mirrors the builtins' `<name>_plugin.py`), dependency on `pipelex`, hatchling build, `py.typed` marker (needed by the cookbook's mypy).
-- [x] Implement `HelloInferencePlugin` in `hello_inference_plugin/hello_plugin.py`: `name = "hello_inference"`, `targets_api = PLUGIN_API_VERSION`, side-effect-free `register`, worker import deferred into the `_make_hello_llm_worker` closure.
-- [x] Implement `HelloLLMWorker(LLMWorkerAbstract)` in `hello_llm_worker.py`: deterministic `_gen_text` (canned haiku + word-count token usage), `_gen_object` raises `LLMCapabilityError`; capability flags come from the model spec via the base class. (An earlier gotcha — workers had to call `llm_job.llm_job_before_start` themselves or reporting crashed on a `None` duration — was eliminated by folding `LLMWorkerInternalAbstract` into `LLMWorkerAbstract` in core, see below.)
-- [x] Bonus TAKEN: `registrar.add_model_lister(sdk="hello", lister=...)` in `hello_list.py` — reads the models from the backend config (no remote API), lights up `pipelex show models hello`.
+- [x] Confirm branch is green from a clean state: `make agent-check && make agent-test`. — both green (exit 0).
+- [x] Note the baseline SHA here for the Phase-1 review diff base: `04434f78586b328e080fd76b50bf46b00e0b6765`.
 
-### Phase 2 — Config + method files (in `pipelex-cookbook`) — DONE
+---
 
-- [x] `[hello]` backend added to `.pipelex/inference/backends.toml` (enabled, no key), `backends/hello.toml` declares `hello-1` with `sdk = "hello"`, and `optional_routes = { "hello-1" = "hello" }` added to the active `all_pipelex_gateway` profile in `routing_profiles.toml`.
-- [x] `hello_plugin.mthds` references `hello-1`; dangling handle `llm_plugin_example_using_openai` retired.
+## Phase 1 — Additive typeless-signature support (blueprint + language schema)
 
-### Phase 3 — End-to-end verification (in `pipelex-cookbook`) — DONE
+The heart of the change. Make "no type + contract-only ⇒ signature" true at runtime and in the schema. Keep the old explicit tag parsing for now (rejection is Phase 3).
 
-- [x] `uv pip install -e examples/c_advanced/using_inference_plugins/hello_inference_plugin` (left installed in the cookbook venv).
-- [x] `pipelex plugins list` shows `hello_inference | external | registered | 2 | inference backend llm:hello + model lister hello`.
-- [x] Dry run AND real run green — real run outputs the deterministic haiku, zero keys. `pipelex show models hello` lists `hello-1`.
-- [x] Negative check: after uninstall, run fails with the friendly "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?" — and the DRY RUN still passes without the plugin (worker creation is lazy), so cookbook CI needs nothing installed.
-- [x] Housekeeping: example README written (install → discover → run → failure mode → docs link); cookbook CHANGELOG `[Unreleased]` entry; root README bullet under "Advanced Methods"; `tests/e2e/test_bundles.py` stale special-cases removed (`NEEDS_OPENAI_KEY` and `GHA_DISABLED` both emptied — the example no longer needs a key nor a GHA skip); cookbook `pyproject.toml` mypy `exclude` gains the nested plugin dir (module-name clash: resolve as the installed package, not via `examples/` traversal).
-- Gates: cookbook `make agent-check` + `make agent-test` green; all `tests/e2e/test_bundles.py` dry-run cases pass (hello_plugin auto-discovered, no special-casing). Pipelex-side `make agent-check` green + targeted cogt tests pass.
+- [x] Introduce a single named constant for the legal signature-only key set `{description, inputs, output, signature_for, source}`. → `SIGNATURE_ONLY_KEYS` (frozenset) added next to `PIPE_SIGNATURE_TYPE_TAG` in `pipelex/core/pipes/pipe_blueprint.py`. Single source of truth for blueprint + (Phase 2) spec layers.
+- [x] Extend the `pipe` `mode="before"` validator in `pipelex/core/bundles/pipelex_bundle_blueprint.py` (`validate_pipe_keys`) with per-section normalization (new helper `_normalize_typeless_signature`):
+  - `type` present (or an already-built blueprint instance / non-dict) → untouched.
+  - `type` absent, keys ⊆ `SIGNATURE_ONLY_KEYS` → inject internal `type = "PipeSignature"` so the union routes to `PipeSignatureBlueprint`.
+  - `type` absent, any other key present → raise the **teaching error** (names the offending field(s), states the rule, gives both fixes; does **not** guess a type).
+  - `type = "PipeSignature"` written explicitly → still accepted this phase.
+- [x] Route the teaching error through the existing categorizer → new `MISSING_PIPE_TYPE` value on `PipeValidationErrorType` + `_categorize_missing_pipe_type_error` in `validation_error_categorizer.py` (the error is raised on the aggregate `pipe` field, so the pipe_code is recovered from the message; sits alongside `UNKNOWN_PIPE_TYPE`, category `blueprint_validation`).
+- [x] Schema generator `pipelex/language/mthds_schema_generator.py`: **`_require_type_on_pipe_definitions` now skips the signature arm**, leaving its `type` OPTIONAL (Pydantic already emits `enum: ["PipeSignature"]` with a default). **Deviation from the literal checklist wording, intentional for Phase 1:** the design doc / this bullet describe the *end-state* (remove `type` from the signature arm → an explicit tag then fails the schema). Doing that in Phase 1 breaks every still-tagged fixture under `plxt-lint` (verified: `error[schema]: Additional properties are not allowed ('type' ...)`). Since Phase 1 is additive (both forms accepted, **no fixtures move yet**), the arm keeps `type` optional. Disambiguation verified for all cases: typeless contract → 1 match (signature arm); typeless+stray → 0; concrete typed → 1 (own arm); explicit `PipeSignature` → 1 (still valid); typo'd type → 0. **Removing `type` from the arm + migrating fixtures is the gate-locked Phase-3 breaking step.**
+- [x] Regenerate the derived schema (`.venv/bin/pipelex-dev generate-mthds-schema`) — runs clean; `plxt lint` clean across all fixtures.
+- [x] Tests (inline TOML/dicts — no fixture files yet), in `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py`:
+  - typeless contract ⇒ `PipeSignatureBlueprint`, `is_signature is True`, `pipe_category is None`.
+  - contract with **no `inputs`** is valid.
+  - typeless + a stray field ⇒ teaching error (asserts message names the field + both fixes).
+  - explicit `type = "PipeSignature"` still accepted.
+  - typeless header vs. typed definition reconciles (concrete wins) — added to `tests/unit/pipelex/libraries/test_dependency_multi_file_reconciliation.py`.
+  - categorizer routing: `MISSING_PIPE_TYPE` structured item with pipe locator — added to `tests/integration/pipelex/pipeline/test_validate_bundle_structured_errors.py`.
+- [x] Schema tests in `tests/unit/pipelex/language/test_mthds_schema.py`: typeless contract validates; typeless + stray field fails; typo'd `type` fails; explicit tag still validates (Phase-1 guard); `type`-required test now excludes the signature arm.
+- [x] `make agent-check && make agent-test` green (full suite, exit 0).
 
-**CHECKPOINT A — CLEARED 2026-07-03.** Working end-to-end in the cookbook. NOT committed yet in either repo (user to arbitrate commit slicing; this worktree also has unrelated uncommitted orchestrator-plugins docs).
+### ⛔ CHECKPOINT 1 — STOP
 
-#### Follow-up DONE (in this worktree): LLM worker family symmetry (fold `LLMWorkerInternalAbstract` → `LLMWorkerAbstract`)
+- [x] Commit the phase (one commit). Record SHA: `7cdc429028650f0694380d7af415f431287935a0`.
+- [x] Update the **Cold-start snapshot** below (what changed, where the seam lives, what's verified, what's next).
+- [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff, per the fan-out convention above. Triage findings here:
+  - Findings: cold Sonnet-5 review, no blocker/major (core mechanism verified correct: fresh dicts/no input mutation, deterministic message order, sound pipe-code regex recovery, correct Draft-4 `oneOf` disambiguation). Minor/nits only:
+    - **F1 (minor)** — a typeless section that is a subset of the allowed keys but omits a required contract field (`description`/`output`) is injected as a signature, then fails with a bare uncategorized pydantic "Field required" residual (dropped from structured `validation_errors[]`). Reviewer confirmed **not a regression** (concrete `PipeLLM` missing `output` behaves identically today) and the safety invariant holds (errors, never silent mock).
+    - **F2 (nit)** — the `source` comment on `SIGNATURE_ONLY_KEYS` overstated present behavior.
+    - **F3 (nit)** — message↔categorizer coupling; already guarded (marker comment + integration test).
+    - **F4 (nit)** — hardcoded counts in TODOS.
+    - **F5 (context)** — spec layer not yet mirrored = Phase 2 by design.
+  - Actions taken / deferred-to-wip: **F1** → added guard test `test_typeless_section_missing_required_contract_field_still_errors` (pins the safety invariant) + **deferred** the broader categorization-completeness fix to `wip/pipe-signature-not-a-type.md` (it's a pre-existing general gap whose fix also changes concrete-pipe categorization — out of scope here). **F2** → comment corrected (kept `source` per D2). **F3** → no change (adequately guarded). **F4** → counts removed. **F5** → no action (next phase). All folded into the Phase-1 commit (amended); revised SHA recorded below.
+- [ ] Only then proceed to Phase 2.
 
-Decided with the user right after Checkpoint A: `LLMWorkerInternalAbstract` was a remnant of the pre-plugin-system "fake plugin" era, and the base `LLMWorkerAbstract` had a hole in its template method (external workers had to call `llm_job_before_start` themselves or reporting crashed). Fixed structurally, matching the other three families:
+---
 
-- `LLMWorkerAbstract.__init__` now takes `inference_model`; the base owns the lifecycle (`llm_job_before_start`, spec-driven capability checks, constraints, spec-based OTel names). `LLMWorkerInternalAbstract` deleted; all builtin LLM workers re-parented.
-- Legacy `set_llm_worker_from_external_plugin` (manager + protocol) removed — pre-plugin-system path registering spec-less worker classes by handle; its test reworked to drive an out-of-tree `LLMWorkerAbstract` subclass with a real spec.
-- Import-cycle lesson (user cares): `pipelex/hub.py` imports the worker ABCs at module level, and `pipelex.config.get_config` imports the hub — so **nothing in hub's import closure may import `pipelex.config` at module level**. The dump gating that caused this moved to the `llm_generate` funnel; `dump_prompt`/`dump_response_from_text_gen` in `llm_utils` are config-gated internally (llm_utils left hub's closure when the ABC dropped it). NO lazy imports. Pre-existing deeper inversion flagged, not fixed: `config.py → hub` and `configs.py → aws_config.py → hub` mean the config layer sits ON TOP of the hub — a future refactor could move the config singleton below the hub and dissolve this class of cycle for good.
-- Cookbook side: `HelloLLMWorker` shrank to `_gen_text` + `_gen_object` only (the teaching outcome we wanted); breaking changelog entries added in pipelex CHANGELOG `[Unreleased]`.
+## Phase 2 — Spec (authoring) layer
 
-#### Core bug found & fixed during Phase 0 (in this worktree)
+Mirror the additive support so AI-authored specs get the identical clean surface. Specs are the builder convenience format (`pipelex/builder/pipe/`); they convert via `to_blueprint()`.
 
-`RoutingProfileFactory.make_routing_profile` (`pipelex/cogt/model_routing/routing_profile_factory.py`) parsed + validated `optional_routes` from `routing_profiles.toml` but never passed it to the built `RoutingProfile` — TOML optional routes silently did nothing (nothing in the tree used them; zero test coverage). Fixed (one-line pass-through), new test module `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` (factory pass-through + enabled/disabled gating), CHANGELOG `[Unreleased]` entry added. **Consequence for the cookbook:** its `[Unreleased]` note says the example requires `pipelex` > 0.36.0 — the cookbook-side release must wait for (or pin past) the pipelex release carrying this fix. Related pre-existing wart spotted, NOT fixed: `RoutingProfile.get_backend_match_for_model` mutates `self.routes` in place when merging optional routes (`possible_routes = self.routes` without copy) — harmless today (idempotent merge), flag if it ever bites.
+- [ ] Add the same `mode="before"` normalization wherever spec dicts are validated into `PipeSpecUnion` (`pipelex/builder/pipe/pipe_spec_union.py` + the parse site). Reuse the signature-only key constant from Phase 1. Same three rules (explicit tag still accepted this phase).
+- [ ] Confirm whether the spec layer has its own JSON-schema surface (e.g. a build/authoring API schema). If yes, apply the same signature-arm treatment; if no, note it here so the next session doesn't re-investigate: `__________`.
+- [ ] Tests: typeless spec ⇒ `PipeSignatureSpec` ⇒ `to_blueprint()` ⇒ `PipeSignatureBlueprint` with matching contract; typeless spec + stray field ⇒ teaching error.
+- [ ] `make agent-check && make agent-test` green.
 
-### Phase 4 — Docs rewrite (in the pipelex repo, this worktree) — DONE 2026-07-03
+### ⛔ CHECKPOINT 2 — STOP
 
-- [x] Rewrote `docs/cookbook/using-inference-plugins.md`: what a plugin is (entry point + `PipelexPlugin` + registrar), package layout, model-config side (`.pipelex/inference/`, optional route), install + `pipelex plugins list` + run walkthrough, failure mode, links to `under-the-hood/inference-backend-plugins.md`. Stale `.pipelex/pipelex.toml` claim gone; GitHub badge now points at the example dir. Also updated the stale blurb in `docs/cookbook/index.md`.
-- [x] Audited `docs/features/llm-integration.md` — contains no plugin terminology at all (nothing to fix); the stale "plugins" mention was the cookbook page's own link text, now rewritten. Workspace-wide grep: no other legacy "plugin = config entry" language in docs (remaining "plugin" hits are the unrelated Claude Code skills plugin page).
-- [x] Re-checked `docs/under-the-hood/inference-backend-plugins.md` worker section against the folded base: acme example already passes `inference_model` to the worker, no lifecycle gotchas documented — one stale bit found & fixed: lookup-miss error is `InferenceBackendNotFoundError`, not `NotImplementedError` (the doc's own fail-loud table already had it right).
-- [x] `make docs-check` (strict mkdocs build) green.
-- [x] Changelog entry under `[Unreleased]` (brief docs entry under "Changed").
+- [ ] Commit the phase. Record SHA: `__________`.
+- [ ] Update the **Cold-start snapshot** below.
+- [ ] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fan-out convention). Triage:
+  - Findings: `__________`
+  - Actions taken / deferred: `__________`
+- [ ] Only then proceed to Phase 3.
 
-**CHECKPOINT B (final)** — Phase 4 work all done; **only the commits remain** (user to approve the slices from "NEXT SESSION" step 1, plus these Phase 4 docs edits which ride with the tracker/docs concern or their own docs slice). Once committed in both repos, note the commit SHAs here and retire/archive this tracker. Release ordering reminder (step 3 above) still applies before shipping either side.
+---
 
-## Cross-repo map
+## Phase 3 — Breaking cleanup, fixture migration, docs
 
-| Repo | Work |
-|---|---|
-| `pipelex-cookbook` | plugin package, backend/model config, `.mthds`, run verification (Phases 0–3) |
-| `pipelex` (this worktree `_plugins`) | docs page rewrite + terminology audit (Phase 4), plus any core change the example surfaces |
+The one breaking phase: reject the old tag, migrate every bundle, reword rendering, update docs. Everything below lands green together because schema regeneration + fixture migration are gate-locked.
 
-**Editable-pin caveat**: the cookbook's `[tool.uv.sources]` editable pin on `../_plugins` is a local dev convenience (set by the user 2026-07-03) and must NOT ship: before merging/releasing the cookbook side, flip back to a PyPI `pipelex==X.Y.Z` pin carrying whatever core changes this work needed (same playbook as the pipelex-api editable-pin precedent — editable local paths break CI). If the example needs no core change, the flip-back is to the current release.
+- [ ] Blueprint before-validator: `type = "PipeSignature"` written explicitly ⇒ **migration error** (D3): "`PipeSignature` is no longer a pipe type. Delete the `type` line — a pipe with no type and no implementation is a signature."
+- [ ] Spec before-validator: same rejection.
+- [ ] Schema generator: ensure the regenerated schema no longer lists `PipeSignature` as a selectable `type` value anywhere (the tag is internal-only now). Verify `plxt-lint` rejects an explicit `type = "PipeSignature"` in a `.mthds` file.
+- [ ] Migrate the 8 bundle fixtures — delete the `type = "PipeSignature"` line from each (they become the typeless regression corpus):
+  - `tests/e2e/fixtures/signature_bundles/signature_only.mthds`
+  - `tests/e2e/fixtures/signature_bundles/mixed_with_signature_step.mthds`
+  - `tests/e2e/fixtures/signature_bundles/signature_with_structured_output.mthds`
+  - `tests/e2e/fixtures/signature_bundles/multi_input_multiplicity.mthds`
+  - `tests/e2e/pipelex/pipes/additive_multi_file_library/header_and_definition/header.mthds`
+  - `tests/e2e/pipelex/pipes/additive_multi_file_library/signature_only/header.mthds`
+  - `tests/e2e/pipelex/pipes/additive_multi_file_library/recursive_refinement/write_research_brief.mthds`
+  - `tests/e2e/pipelex/pipes/additive_multi_file_library/recursive_refinement/bundle.mthds`
+- [ ] `pipe_signature_spec.py` `rendered_pretty`: drop the `Type: PipeSignature (...)` line; present it as "Signature (contract only)".
+- [ ] Add a test asserting the migration error fires on an explicit tag (blueprint + spec).
+- [ ] Docs — teach "omit the type," remove the `type = "PipeSignature"` idiom:
+  - `docs/building-methods/pipes/signature-pipes.md`
+  - `docs/building-methods/pipes/index.md`
+  - `docs/tools/cli/validate.md`, `docs/tools/cli/agent-cli.md`
+  - `docs/errors/pipe-signature-not-executable-error.md`, `docs/errors/authoring-and-language.md`, `docs/under-the-hood/error-model.md`
+  - `pipelex/cli/agent_cli/CLAUDE.md`
+- [ ] CHANGELOG.md `[Unreleased]`: **breaking** — `type = "PipeSignature"` removed; a typeless contract-only pipe is now a signature. Note the JSON-schema shape change.
+- [ ] `make agent-check && make agent-test` green (full suite, not targeted — this is the wrap-up).
 
-## Gotchas for a cold start
+### ⛔ CHECKPOINT 3 — STOP (final)
 
-- `register` must stay side-effect-free and import-light; anything heavy goes inside `make_worker`. Discovery runs `build_registrar` at boot AND in `pipelex plugins list`.
-- `targets_api` must equal `PLUGIN_API_VERSION` (2) or discovery fails loud with `PluginApiVersionMismatchError`.
-- The keyword-only-arguments convention is enforced on `pipelex/` source only, but the example package should follow it anyway — it's teaching material.
-- Worker subclass signatures must match `LLMWorkerAbstract` exactly (use `@override`); the reporting/telemetry plumbing is inherited, don't reimplement it.
-- Don't edit `docs/errors/` pages by hand (generated); nothing here should need new error classes anyway.
-- Stale-terminology precedent: on 2026-07-03 we already fixed "CLI-build command harvest" leftovers in `contract.py`, `discovery.py`, and `inference-backend-plugins.md` — same spirit applies to any old "LLM plugin" config-speak found during Phase 4.
+- [ ] Commit the phase. Record SHA: `__________`.
+- [ ] Update the **Cold-start snapshot** below to the finished state.
+- [ ] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fan-out convention). Triage:
+  - Findings: `__________`
+  - Actions taken / deferred: `__________`
+- [ ] Record the **gated cross-repo follow-up**: the MTHDS JSON Schema copies in `mthds`, `vscode-pipelex`, `mthds-ui` drift (signature arm no longer requires `type`). Propagate via the `mthds-schema-sync` skill, **gated on the released pipelex version** — not on this branch.
+- [ ] Hand back to the user for review / merge decision (do not push unprompted).
+
+---
+
+## Invariants to preserve (regression guardrails — do not break)
+
+- Reconciliation keys off `is_signature` class identity (`library_crate_factory.py:170-201`): concrete beats signature, contracts must match, two matching signatures tie-break deterministically. Untouched by this change — add a regression test, don't refactor.
+- Strict validation still refuses bundles that contain a signature; `--allow-signatures` still dry-runs signatures as mocks (`validate_bundle.py`, `cli/commands/validate/_validate_core.py`). Keyed off the pending-signatures set / `is_signature`. Untouched.
+- `PipeSignature` stays a valid **internal** discriminator value (the before-validator injects it); it is only rejected as a **user-written** value. Don't remove it from `valid_pipe_type_tags()` without confirming the injected value still passes `validate_pipe_type`.
+
+---
+
+## Cold-start snapshot (updated at each checkpoint)
+
+> Keep this current so a fresh session can resume with zero re-investigation. Template to fill at each checkpoint:
+>
+> - **Phase reached / last green SHA:** …
+> - **What changed and where the seam lives:** …
+> - **What is verified (tests/gates run):** …
+> - **Open threads / review findings deferred:** …
+> - **Exact next action:** …
+
+- **Phase reached / last green SHA:** Phase 1 complete (additive typeless-signature support). Baseline (review diff base) = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 commit SHA = `7cdc429028650f0694380d7af415f431287935a0`.
+- **What changed and where the seam lives:**
+  - The single choke point is `PipelexBundleBlueprint.validate_pipe_keys` (`pipe`, `mode="before"`) in `pipelex/core/bundles/pipelex_bundle_blueprint.py`, with the new helper `_normalize_typeless_signature`. A typeless `[pipe.x]` whose keys ⊆ `SIGNATURE_ONLY_KEYS` gets `type = "PipeSignature"` injected (routes to `PipeSignatureBlueprint`); a typeless section with any other key raises the teaching error; a section that already names a `type` (or is a built blueprint instance) is untouched. Runs *before* the discriminated union, so it intercepts what used to be `union_tag_not_found`.
+  - `SIGNATURE_ONLY_KEYS` (frozenset `{description, inputs, output, signature_for, source}`) lives next to `PIPE_SIGNATURE_TYPE_TAG` in `pipelex/core/pipes/pipe_blueprint.py` — the single source of truth the Phase-2 spec layer will reuse.
+  - Error surfacing: `PipeValidationErrorType.MISSING_PIPE_TYPE` (new) + `_categorize_missing_pipe_type_error` in `validation_error_categorizer.py`. The teaching error is raised on the aggregate `pipe` field (loc `("pipe",)`, no pipe_code), so the categorizer recovers the pipe_code from the message via a stable marker (`_MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"`). Category = `blueprint_validation`.
+  - Schema: `_require_type_on_pipe_definitions` in `mthds_schema_generator.py` **skips** the signature arm (`_SIGNATURE_DEFINITION_NAME`), leaving `type` optional (`enum: ["PipeSignature"]`). See the Phase-1 schema note above — this is the additive shape; Phase 3 removes `type` from the arm (breaking) + migrates fixtures in the same commit.
+- **What is verified (tests/gates run):** `make agent-check` fully green (ruff/plxt/pyright-0/mypy-0/keyword-only). `plxt lint` clean across all still-tagged fixtures. Targeted suite (schema + blueprint-union + reconciliation + structured-errors) all pass. Full `make agent-test` green (exit 0). Disambiguation matrix hand-verified (typeless→1, stray→0, typed→1, explicit-tag→1, typo→0).
+- **Invariants confirmed untouched:** reconciliation keys off `is_signature` (regression test added with a typeless header); `PipeSignature` stays a valid internal discriminator (`valid_pipe_type_tags()` unchanged; injected value passes `validate_pipe_type`).
+- **Open threads / review findings deferred:** Checkpoint-1 cold review found no blocker/major. One deferred item captured in `wip/pipe-signature-not-a-type.md` → "Deferred follow-ups": categorizing the bare pydantic residual for a typeless section missing a required contract field (a pre-existing general gap that also affects concrete pipes). Safety invariant is guarded by a test.
+- **Exact next action:** Phase 2 — mirror the same additive normalization in the spec (authoring) layer: `PipeSpecUnion` is validated via `bundle_spec.py` `pipe: dict[str, PipeSpecUnion]` and `pipelex/builder/operations/pipe_ops.py` (`spec_class.model_validate`). Add a matching `mode="before"` normalization reusing `SIGNATURE_ONLY_KEYS`. Confirm whether the spec layer has its own JSON-schema surface (note the finding in the Phase-2 checklist).

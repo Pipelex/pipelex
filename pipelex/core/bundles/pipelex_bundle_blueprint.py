@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -9,6 +9,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, SIGNATURE_ONLY_KEYS
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -124,14 +125,52 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("pipe", mode="before")
     @classmethod
-    def validate_pipe_keys(cls, pipe: dict[str, PipeBlueprintUnion] | None) -> dict[str, PipeBlueprintUnion] | None:
+    def validate_pipe_keys(cls, pipe: Any) -> Any:
+        """Validate pipe codes and normalize typeless sections before the discriminated union runs.
+
+        A `[pipe.x]` section with no `type` whose keys are exactly the signature contract
+        (`SIGNATURE_ONLY_KEYS`) is normalized by injecting the internal `PipeSignature`
+        discriminator, so the union routes it to `PipeSignatureBlueprint` — the author never writes
+        the tag. A typeless section that declares anything more is describing an implementation
+        without naming its type, which is a hard error. A section that already names a `type` (or is
+        an already-built blueprint instance rather than a raw dict) passes through untouched.
+        """
         if pipe is None:
             return None
-        for pipe_code in pipe:
-            if not is_pipe_code_valid(pipe_code=pipe_code):
+        if not isinstance(pipe, dict):
+            # Let the field type raise its own "should be a dict" error.
+            return pipe
+        typed_pipe = cast("dict[Any, Any]", pipe)
+        normalized: dict[Any, Any] = {}
+        for pipe_code, pipe_section in typed_pipe.items():
+            if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 raise ValueError(msg)
-        return pipe
+            normalized[pipe_code] = cls._normalize_typeless_signature(pipe_code, pipe_section=pipe_section)
+        return normalized
+
+    @classmethod
+    def _normalize_typeless_signature(cls, pipe_code: Any, *, pipe_section: Any) -> Any:
+        """Inject the internal `PipeSignature` tag on a typeless contract-only section, or reject a
+        typeless section that declares more than the contract. Non-dict values and sections that
+        already name a `type` pass through unchanged.
+        """
+        if not isinstance(pipe_section, dict):
+            return pipe_section
+        typed_section = cast("dict[str, Any]", pipe_section)
+        if "type" in typed_section:
+            return typed_section
+        stray_keys = [key for key in typed_section if key not in SIGNATURE_ONLY_KEYS]
+        if stray_keys:
+            stray = ", ".join(f"`{key}`" for key in stray_keys)
+            msg = (
+                f"Pipe `{pipe_code}` has no `type` but declares {stray}. "
+                "A pipe with no `type` may declare only `description`, `inputs`, and `output` — that is a "
+                "signature (contract only). To implement it, add the appropriate `type` (`PipeLLM`, `PipeImgGen`, …). "
+                f"To keep it a contract, remove {stray}."
+            )
+            raise ValueError(msg)
+        return {**typed_section, "type": PIPE_SIGNATURE_TYPE_TAG}
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":

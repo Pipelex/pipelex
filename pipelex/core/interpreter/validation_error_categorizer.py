@@ -14,6 +14,10 @@ from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validatio
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 
+# Distinctive fragment of the typeless-pipe teaching error raised by the `pipe` before-validator
+# (`PipelexBundleBlueprint._normalize_typeless_signature`). Kept in sync with that message.
+_MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
+
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
     """Extract variable names from error messages like 'Missing input variable(s): var1, var2.'"""
@@ -70,6 +74,39 @@ def _categorize_input_validation_error(
         )
 
     return None
+
+
+def _categorize_missing_pipe_type_error(
+    message: str,
+    *,
+    domain: str | None,
+    source: str | None,
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize the typeless-pipe teaching error raised by the `pipe` before-validator.
+
+    A `[pipe.x]` section with no `type` that declares more than the signature contract is rejected
+    with a teaching message (see `PipelexBundleBlueprint._normalize_typeless_signature`). The error
+    is raised on the aggregate `pipe` field, so its pydantic `loc` carries no pipe code — recover it
+    from the message so agent/API surfaces get a clean `MISSING_PIPE_TYPE` item with a pipe locator.
+
+    Args:
+        message: The error message from the validation
+        domain: Domain code
+        source: Source file path
+
+    Returns:
+        Categorized error data, or None if not the typeless-pipe teaching error
+    """
+    if _MISSING_PIPE_TYPE_MARKER not in message:
+        return None
+    pipe_code_match = re.search(r"Pipe `([^`]+)` has no `type`", message)
+    return PipelexBundleBlueprintValidationErrorData(
+        error_type=PipeValidationErrorType.MISSING_PIPE_TYPE,
+        domain_code=domain,
+        source=source,
+        pipe_code=pipe_code_match.group(1) if pipe_code_match else None,
+        message=message,
+    )
 
 
 def _categorize_syntax_validation_error(
@@ -251,6 +288,16 @@ def categorize_blueprint_validation_error(
             pipe_code=pipe_code,
             message=message,
         )
+
+    # Typeless pipe declaring more than the signature contract. Raised on the aggregate `pipe`
+    # field, so the pipe_code is recovered from the message rather than the (bare) `loc`.
+    missing_type_error = _categorize_missing_pipe_type_error(
+        message=message,
+        domain=domain,
+        source=source,
+    )
+    if missing_type_error:
+        return missing_type_error
 
     # Try to categorize input validation errors (missing/unused inputs)
     input_error = _categorize_input_validation_error(

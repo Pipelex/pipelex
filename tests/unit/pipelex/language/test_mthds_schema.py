@@ -9,6 +9,7 @@ import pytest
 
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -189,34 +190,71 @@ class TestMthdsSchemaGeneration:
         assert has_template, "Should have a 'template' variant"
         assert has_nested, "Should have a 'nested construct' variant"
 
-    def test_type_required_on_every_pipe_oneof_arm(self, schema: dict[str, Any]) -> None:
-        """Every pipe blueprint variant in the pipe `oneOf` must require `type`.
+    def test_type_required_on_every_concrete_pipe_arm(self, schema: dict[str, Any]) -> None:
+        """Every *concrete* pipe arm requires `type`; the signature arm is the one typeless arm.
 
-        Reads the arm names straight from the generated `oneOf`, so a newly added
-        pipe type is covered automatically — this doubles as the drift guard.
+        Reads the arm names straight from the generated `oneOf`, so a newly added pipe type is
+        covered automatically — this doubles as the drift guard. The signature arm keeps `type`
+        OPTIONAL (a contract-only table has no `type`), so it must NOT list `type` in `required`.
         """
         definitions = schema["definitions"]
         arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
         arm_def_names = [arm["$ref"].rsplit("/", 1)[-1] for arm in arms]
 
         assert arm_def_names, "The pipe union oneOf should have at least one arm"
+        signature_def_name = PipeSignatureBlueprint.__name__
+        assert signature_def_name in arm_def_names, "The signature arm must be present in the pipe union"
         for def_name in arm_def_names:
             required = definitions[def_name].get("required", [])
-            assert "type" in required, f"{def_name} must list 'type' in its required array (got {required})"
+            if def_name == signature_def_name:
+                assert "type" not in required, f"the signature arm must NOT require 'type' (got {required})"
+            else:
+                assert "type" in required, f"{def_name} must list 'type' in its required array (got {required})"
 
     @pytest.mark.parametrize(
         "table",
         [
-            pytest.param({"description": "no type at all", "output": "Text"}, id="bare-minimal"),
-            # A table whose fields uniquely identify PipeFunc but omits `type`. Before the
-            # fix this matched exactly one arm and validated; requiring `type` rejects it.
-            pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "do_it"}, id="unique-fields"),
+            pytest.param({"description": "bare contract", "output": "Text"}, id="bare-contract"),
+            pytest.param({"description": "with inputs", "output": "Text", "inputs": {"doc": "Text"}}, id="with-inputs"),
+            pytest.param({"description": "with hint", "output": "Text", "signature_for": "PipeLLM"}, id="with-signature-for"),
         ],
     )
-    def test_typeless_pipe_table_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
-        """A pipe table without `type` must fail validation (no ambiguous multi-match)."""
+    def test_typeless_contract_table_matches_signature_arm(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
+        """A typeless section carrying only the contract validates — it is a signature."""
         validator = _pipe_union_oneof_validator(schema)
-        assert not validator.is_valid(table), f"A type-less pipe table must be rejected: {table}"
+        errors = sorted(validator.iter_errors(table), key=str)
+        assert not errors, f"A typeless contract table must validate, got errors: {[e.message for e in errors]}"
+
+    @pytest.mark.parametrize(
+        "table",
+        [
+            # A typeless table that adds an implementation field beyond the contract. `prompt` is
+            # shared by PipeLLM/PipeImgGen and `function_name` uniquely looks like PipeFunc, but with
+            # no `type` neither matches any arm.
+            pytest.param({"description": "looks like an impl", "output": "Text", "prompt": "do it"}, id="stray-prompt"),
+            pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "do_it"}, id="stray-function-name"),
+        ],
+    )
+    def test_typeless_table_with_stray_field_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
+        """A typeless section that declares more than the contract matches no arm."""
+        validator = _pipe_union_oneof_validator(schema)
+        assert not validator.is_valid(table), f"A typeless non-contract table must be rejected: {table}"
+
+    def test_typoed_type_is_rejected(self, schema: dict[str, Any]) -> None:
+        """A misspelled `type` matches no arm (not a concrete kind; the signature arm pins the tag)."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeLLMM", "description": "typo", "output": "Text"}
+        assert not validator.is_valid(table)
+
+    def test_explicit_signature_tag_still_validates(self, schema: dict[str, Any]) -> None:
+        """Additive surface: an explicit `type = "PipeSignature"` table still validates.
+
+        The language keeps accepting the old tag for now; rejecting it (and migrating fixtures) is
+        the later gate-locked breaking step.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeSignature", "description": "explicit tag", "output": "Text"}
+        assert validator.is_valid(table)
 
     @pytest.mark.parametrize("pipe_type", sorted(_PIPE_KIND_EXTRA_FIELDS))
     def test_typed_pipe_table_matches_exactly_one_arm(self, schema: dict[str, Any], pipe_type: str) -> None:
