@@ -1,113 +1,173 @@
-# Cookbook "hello plugin" → real inference-backend plugin (Option B)
+# Master plan — Provider plugins: storage & secrets
 
-Status: **CHECKPOINT B CLEARED — TRACK COMPLETE (2026-07-03).** Phases 0–4 done and ALL COMMITTED. Pipelex (`feature/More-plugins`): `2f9b7e1d9` (optional_routes fix), `dee230f46` (LLM worker fold, breaking), plus the docs+tracker commit carrying this file. Cookbook (`dev`): `ecb231c` (the whole example; root `pyproject.toml`/`uv.lock` editable pin deliberately left uncommitted — flip to `pipelex==X.Y.Z` at release, see caveat below). Only remaining action = release ordering (step 3 below). This tracker is retired.
+Status: **Phase 1 DONE + Checkpoint 1 CLEARED.** Phase 1 code = `8268ff08f`; clean-room review triage fix = `58961848a`. Branch: `feature/More-plugins-2` (worktree `_plugins`). Nothing pushed. This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
-## NEXT SESSION — start here
+**Cold-start (resume here):** Storage seam (storage plan Phases 1–3) is landed + reviewed. **Next action = Phase 2** (storage tests + docs): registry hit/miss (`UnknownStorageMethodError`) + duplicate fail-loud, parametrized boot per built-in method, external-plugin integration test, new `docs/under-the-hood/storage-provider-plugins.md`, CHANGELOG `[Unreleased]`. The secrets vertical (Phases 3–4) and the W-A `build_registrar` boot move are untouched. Key as-built deviations from the linked plan are under "Phase 1 — as-built" below.
 
-1. **Commit slicing first** (user to approve slices). This worktree (`_plugins`, branch `feature/More-plugins`) holds four separable concerns — do NOT mix them:
-   - `optional_routes` factory fix: `pipelex/cogt/model_routing/routing_profile_factory.py` + `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` + its CHANGELOG "Fixed" entry.
-   - LLM worker fold (breaking): `llm_worker_abstract.py` (folded), `llm_worker_internal_abstract.py` (deleted), `llm_utils.py` + `llm_generate.py` (dump gating moved), `inference_manager{,_protocol}.py` (legacy setter removed), 6 re-parented workers under `pipelex/plugins/`, reworked tests (`test_worker_error_enrichment`, `test_external_plugin`, `test_llm_gen_text`, `test_setup_inference_workers`, factory/manager types) + the two CHANGELOG "Changed" entries.
-   - Orchestrator-plugins docs from a PRIOR session (unrelated to this track — `docs/under-the-hood/orchestrator-plugins.md` etc.).
-   - `TODOS.md` (this tracker).
-   Cookbook side = one coherent commit (example package, `.pipelex/inference/` config, `.mthds`, README×2, CHANGELOG, `test_bundles.py`, mypy exclude) — but the `[tool.uv.sources]` editable pin in `pyproject.toml`/`uv.lock` must NOT ship (see editable-pin caveat below).
-2. **Phase 4 — docs rewrite** (checkboxes below). Also re-check `docs/under-the-hood/inference-backend-plugins.md`'s worker section against the folded base (constructor now takes `inference_model`; no lifecycle gotchas left to document).
-3. **Release ordering**: pipelex release > 0.36.0 (breaking changelog) → flip cookbook pin to `pipelex==X.Y.Z` → cookbook release. Before the pipelex release, grep `pipelex-temporal` + `pipelex-mistralai-workflows` for LLM worker subclasses / `set_llm_worker_from_external_plugin` (expected: none — both are orchestrator-only).
+> Replaces the retired cookbook hello-plugin tracker (complete; recoverable in git history).
 
-All gates were green at session end (2026-07-03): pipelex `make agent-check` + `make tb` + FULL `make agent-test`; cookbook `make agent-check` + `make agent-test` + hello-plugin real run end-to-end.
+## What & why (cold-start summary)
 
-## Goal
+Promote the two dependency-injection seams that pass all plugin criteria — **storage provider** and **secrets provider** — to formal `pipelex.plugins` entry-point plugins, so third parties can ship `pipelex-storage-<backend>` / `pipelex-secrets-<backend>` packages selected at deploy time. Chosen after a full boot-audit of DI seams; everything else is already a plugin, a boot-orchestrator-owned hub slot, or a population/config point that should stay one.
 
-Replace the legacy cookbook example `pipelex-cookbook/examples/c_advanced/using_inference_plugins/` with a genuine entry-point plugin that demonstrates the real plugin system. Today that example is a single `.mthds` file whose `model` field references the handle `llm_plugin_example_using_openai` — a name **defined nowhere** (not in the cookbook's `.pipelex/inference/`, not in the core kit). "Plugin" in its name is pre-plugin-system vocabulary meaning "custom model config entry"; the example has only ever run as DRY RUN (see `pipelex-cookbook/.pipelex/traces/`). Decision taken with the user (2026-07-03): **Option B** — make it an actual `pipelex.plugins` entry-point plugin, not a config-only reframe.
+**Read these three before starting** (they hold the detailed steps this master plan sequences):
 
-## Background: the plugin system (cold-start summary)
+- `wip/plugins/README.md` — the track's shared decisions + boot-audit rationale + the new mechanism.
+- `wip/plugins/storage-provider-plugin.md` — storage detail (defines the shared mechanism). **Lands first.**
+- `wip/plugins/secrets-provider-plugin.md` — secrets detail (reuses the mechanism; **Decision W already RESOLVED = W-A**).
 
-The pipelex repo (this worktree, `_plugins`) has a discovery-based plugin system. Everything below is verified against the current tree:
+**The new mechanism (both seams share it):** a *keyed registry + config-selected singleton*. Plugins register N provider factories keyed by an open method token (mirroring `OrchestrationMode`); at boot, core reads one config field (`storage_config.method` / `secrets_config.method`), looks the token up in the registry, and calls the factory to produce the one provider set on the hub. Deliberately **not** a `HubSlot` (those are orchestrator-coupled).
 
-- **Contract** (`pipelex/plugins/contract.py`): a plugin is any object satisfying the `@runtime_checkable` `PipelexPlugin` protocol — `name: str`, `targets_api: int` (must equal `PLUGIN_API_VERSION`, currently **2**), and `register(self, registrar) -> None`. `register` is **side-effect-free**: it may only call registrar menu methods — no I/O, no SDK import, no client construction. Heavy work goes inside the `make_worker` closures.
-- **Discovery** (`pipelex/plugins/discovery.py`): `build_registrar` iterates `BUILTIN_PLUGINS` then external entry points in group **`pipelex.plugins`**. An entry point may resolve to a plugin instance or a zero-arg factory returning one. Denylist via `plugins.disabled` config; fail-loud on duplicates/version mismatch/broken plugin.
-- **Inference seam** (`pipelex/plugins/inference_backend_registry.py`): `registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="<token>", make_worker=...)`. A model's `sdk` field selects the backend factory; worker factories hold no match over SDK strings. `MakeWorkerFn` is called as `make_worker(*, inference_model: InferenceModelSpec, backend: InferenceBackend, sdk_clients: SdkClientRegistry, reporting_delegate: ReportingProtocol | None) -> InferenceWorkerAbstract`. Use `require_sdk(...)` inside `make_worker` for optional-dependency guards.
-- **Minimal LLM worker**: subclass `LLMWorkerAbstract` (`pipelex/cogt/llm/llm_worker_abstract.py`); since the fold (see follow-up below) the abstract surface is just `_gen_text` + `_gen_object` — the base takes `inference_model` in `__init__`, owns the job lifecycle, and derives capability flags from the spec.
-- **Optional companion**: `registrar.add_model_lister(sdk="<token>", lister=...)` — powers `pipelex show models`.
-- **Reference implementations**: smallest builtin = `pipelex/plugins/blackboxai/blackboxai_plugin.py` (one `add_inference_backend`, lazy imports inside `_make_..._worker`). External entry-point precedents = `pipelex-temporal` (`pipelex_temporal/temporal_plugin.py`) and `pipelex-mistralai-workflows`.
-- **Canonical authoring doc**: `docs/under-the-hood/inference-backend-plugins.md` (the "acme" walkthrough — the cookbook example should be its living counterpart).
-- **Verification command**: `pipelex plugins list` prints every discovered plugin (origin builtin/external, status, API version, contributions).
+## Locked decisions (do not re-litigate)
 
-Model config layer (how a `.mthds` `model` handle reaches the plugin): the cookbook's `.pipelex/inference/backends.toml` declares backends keyed by name (`[hello]`, `enabled`, `api_key`...); per-backend model files `backends/<name>.toml` declare model sections with `[defaults]` carrying `sdk = "<token>"` — the section header is the model handle referenced from `.mthds`. The `add-model` skill (in this repo's `.claude/skills/`) documents the full add-a-model procedure including routing profiles.
+- **DX-1 — one API bump.** `PLUGIN_API_VERSION` 2→3, done once on this branch. Both seams land before any release, so external plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) re-declare `targets_api=3` exactly once. Discovery uses strict-equality, so any menu addition is a breaking bump.
+- **DX-2 — unconditional builtins.** `StoragePlugin` and `SecretsPlugin` join `CORE_UNCONDITIONAL_PLUGIN_NAMES` — required infra can't be disabled into a broken boot.
+- **DX-3 — external-provider config surface is a follow-up**, not built here (fixed typed sub-configs only in Phase scope).
+- **D1 / S1 — open method token.** `method` config fields accept an open `str`, validated at registry lookup (unknown → `UnknownStorageMethodError` / `UnknownSecretsMethodError`), not at parse.
+- **W-A (secrets boot ordering) — RESOLVED.** The `# needed for gateway check` comment at `pipelex.py:211` is stale; the gateway path is secrets-free. Move the pure `build_registrar(config=get_config())` call up (after line 209, before 212), select secrets from the registry there, delete the hardcoded `EnvSecretsProvider()`. Zero ordering risk. See secrets doc § The wrinkle.
 
-## Decisions
+## Sequencing
 
-- **D1 — worker shape**: a deterministic, zero-key "hello" echo worker (returns a canned/derived completion) so the example runs everywhere with no credentials; the rewritten docs page points to `inference-backend-plugins.md` for wrapping a real SDK. Rationale: cookbook examples must be runnable; the seam being demonstrated is discovery/registration, not OpenAI usage. (Override here if we'd rather wrap the OpenAI SDK.)
-- **D2 — package location**: the plugin package lives inside the example dir, e.g. `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with its own `pyproject.toml`, installed with `uv pip install -e` (cookbook already uses uv). It is NOT a dependency of the cookbook's root `pyproject.toml` — installing it is the demonstrated step.
-- **D3 — naming**: retire the dangling handle `llm_plugin_example_using_openai`. New names: plugin `hello-inference` (entry-point name `hello_inference`), sdk token `hello`, backend `[hello]`, model handle e.g. `hello-1`. No `pipelex_` prefix anywhere user-facing that belongs to the example.
+Storage vertical (Phases 1–2) → Secrets vertical (Phases 3–4) → Release gating (Phase 5). One coherent commit per phase; a mandatory checkpoint after each.
 
-## Phases
+---
 
-### Phase 0 — Recon in the cookbook repo
+## ⛔ Checkpoint protocol (MANDATORY at every checkpoint — do not skip, do not merge phases)
 
-- [x] Verify how a custom backend + model file wires end-to-end in the cookbook's current `.pipelex/` layout: add a scratch `[hello]` backend + `backends/hello.toml` model with `sdk = "hello"` and confirm the failure mode is `InferenceBackendNotFoundError` for `(llm, hello)` (proves config resolves and the missing piece is exactly the plugin). **DONE** — exact friendly message confirmed: "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?".
-- [x] Confirm whether routing profiles (`.pipelex/inference/routing_profiles.toml`) need an entry for a directly-referenced model handle, or whether `model = { model = "hello-1" }` in `.mthds` bypasses routing. **ANSWERED: routing is NOT bypassed.** `ModelManager.build_deck` routes every known model through the active profile; a DEFAULT match whose backend lacks the model spec **silently drops the model from the deck** (only the `internal` backend is tried as fallback). So the example needs an exact route. We use `optional_routes = { "hello-1" = "hello" }` in the active `all_pipelex_gateway` profile — optional routes only apply when the target backend is enabled, so the entry is inert if `[hello]` is disabled. **This surfaced a real core bug (fixed here, see below).**
-- [x] ~~Check the cookbook's pinned `pipelex` version supports the plugin system~~ — resolved 2026-07-03: the cookbook now sources `pipelex` **editable from this worktree** (`pipelex-cookbook/pyproject.toml` `[tool.uv.sources] pipelex = { path = "../_plugins", editable = true }`), so it runs against this tree's tip. Any pipelex-side change needed for the example is made HERE and is live in the cookbook immediately.
+At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 
-### Phase 1 — The plugin package (in `pipelex-cookbook`) — DONE
+1. **Verify progress.** Run the gates for the phase and paste real results:
+   - Always: `make agent-check` (pyright/ruff/mypy/plxt/keyword-only) + `make tb` (boot sequence — critical whenever config/registry wiring changed).
+   - Test phases (2, 4) and the final phase: full `make agent-test`. Intermediate phases may scope to the phase's tests but must still pass `agent-check` + `tb`.
+   - If a gate fails: fix before proceeding; a checkpoint is not cleared with a red gate.
 
-- [x] Create `examples/c_advanced/using_inference_plugins/hello_inference_plugin/` with `pyproject.toml`: distribution name `hello-inference-plugin`, entry point `hello_inference = "hello_inference_plugin.hello_plugin:HelloInferencePlugin"` (module path deviates from the plan's `hello_inference_plugin:...` — no-re-exports rule forbids defining the class in `__init__.py`; layout mirrors the builtins' `<name>_plugin.py`), dependency on `pipelex`, hatchling build, `py.typed` marker (needed by the cookbook's mypy).
-- [x] Implement `HelloInferencePlugin` in `hello_inference_plugin/hello_plugin.py`: `name = "hello_inference"`, `targets_api = PLUGIN_API_VERSION`, side-effect-free `register`, worker import deferred into the `_make_hello_llm_worker` closure.
-- [x] Implement `HelloLLMWorker(LLMWorkerAbstract)` in `hello_llm_worker.py`: deterministic `_gen_text` (canned haiku + word-count token usage), `_gen_object` raises `LLMCapabilityError`; capability flags come from the model spec via the base class. (An earlier gotcha — workers had to call `llm_job.llm_job_before_start` themselves or reporting crashed on a `None` duration — was eliminated by folding `LLMWorkerInternalAbstract` into `LLMWorkerAbstract` in core, see below.)
-- [x] Bonus TAKEN: `registrar.add_model_lister(sdk="hello", lister=...)` in `hello_list.py` — reads the models from the backend config (no remote API), lights up `pipelex show models hello`.
+2. **Commit, then update this file for cold start.** Commit the phase as one commit. Then edit `TODOS.md` (and/or the linked wip doc) so a brand-new session could resume with no lost context: tick the phase's checkboxes, record the **commit SHA**, any decisions taken or deviations from the linked plan, the current state of the code, and the exact next action. Treat this as a handoff you won't be present to explain.
 
-### Phase 2 — Config + method files (in `pipelex-cookbook`) — DONE
+3. **Fan-out a Sonnet-5 `/code-review` sub-agent — with NO inherited context.** Spawn a **fresh** sub-agent (never a fork) whose entire input is a *pointer to the phase's changes* — the commit SHA / `git diff <base>..HEAD` / the working-tree file list — and nothing else. Do **not** hand it the plan, the rationale, the decisions, or your conclusions; a clean-room review is the point (we want clean solid software, not over-engineering). Spawn template:
 
-- [x] `[hello]` backend added to `.pipelex/inference/backends.toml` (enabled, no key), `backends/hello.toml` declares `hello-1` with `sdk = "hello"`, and `optional_routes = { "hello-1" = "hello" }` added to the active `all_pipelex_gateway` profile in `routing_profiles.toml`.
-- [x] `hello_plugin.mthds` references `hello-1`; dangling handle `llm_plugin_example_using_openai` retired.
+   ```
+   Agent(
+     subagent_type: "general-purpose",   # fresh context — NOT "fork"
+     model: "sonnet",                     # Sonnet-5
+     description: "code-review phase N",
+     prompt: "Run the /code-review skill on the changes in commit <SHA> "
+             "(inspect via `git diff <SHA>^..<SHA>` in /Users/lchoquel/repos/Pipelex/_plugins). "
+             "Review ONLY those changes. You have no prior context and should assume none. "
+             "Focus: correctness bugs, and over-engineering / unnecessary abstraction / "
+             "speculative generality. Report findings ranked most-severe first; "
+             "if nothing substantive, say so plainly."
+   )
+   ```
 
-### Phase 3 — End-to-end verification (in `pipelex-cookbook`) — DONE
+   Then **triage** the findings: apply genuine bug/simplification fixes in a follow-up commit; capture design-tradeoff findings (not silent bugs) as a deferred note under `wip/plugins/` rather than reflexively applying the convenient fix. Record the triage outcome in this file. Only then move to the next phase.
 
-- [x] `uv pip install -e examples/c_advanced/using_inference_plugins/hello_inference_plugin` (left installed in the cookbook venv).
-- [x] `pipelex plugins list` shows `hello_inference | external | registered | 2 | inference backend llm:hello + model lister hello`.
-- [x] Dry run AND real run green — real run outputs the deterministic haiku, zero keys. `pipelex show models hello` lists `hello-1`.
-- [x] Negative check: after uninstall, run fails with the friendly "No inference backend registered for sdk 'hello' in the llm family. Is its plugin installed and enabled?" — and the DRY RUN still passes without the plugin (worker creation is lazy), so cookbook CI needs nothing installed.
-- [x] Housekeeping: example README written (install → discover → run → failure mode → docs link); cookbook CHANGELOG `[Unreleased]` entry; root README bullet under "Advanced Methods"; `tests/e2e/test_bundles.py` stale special-cases removed (`NEEDS_OPENAI_KEY` and `GHA_DISABLED` both emptied — the example no longer needs a key nor a GHA skip); cookbook `pyproject.toml` mypy `exclude` gains the nested plugin dir (module-name clash: resolve as the installed package, not via `examples/` traversal).
-- Gates: cookbook `make agent-check` + `make agent-test` green; all `tests/e2e/test_bundles.py` dry-run cases pass (hello_plugin auto-discovered, no special-casing). Pipelex-side `make agent-check` green + targeted cogt tests pass.
+---
 
-**CHECKPOINT A — CLEARED 2026-07-03.** Working end-to-end in the cookbook. NOT committed yet in either repo (user to arbitrate commit slicing; this worktree also has unrelated uncommitted orchestrator-plugins docs).
+## Phase 1 — Storage: mechanism + builtin plugin + boot wiring
+*(Detail: `wip/plugins/storage-provider-plugin.md` Phases 1–3. Delivers a working config-selected storage plugin.)*
 
-#### Follow-up DONE (in this worktree): LLM worker family symmetry (fold `LLMWorkerInternalAbstract` → `LLMWorkerAbstract`)
+- [x] `PLUGIN_API_VERSION` 2→3 in `pipelex/plugins/contract.py` (the one batched bump — DX-1).
+- [x] Registrar (`pipelex/plugins/registrar.py`): `storage_providers` dict field + `add_storage_provider(*, method, factory)` via the `_add` helper; `StorageProviderFactoryFn` alias.
+- [x] New `pipelex/plugins/storage_provider_registry.py`: `StorageProviderRegistry` (mirror `OrchestratorRegistry`: `get_optional`/`get_required`/`has`/`methods`).
+- [x] New `UnknownStorageMethodError` in `pipelex/plugins/exceptions.py`.
+- [x] Hub (`pipelex/hub.py`): `set_/get_storage_provider_registry` + module accessor.
+- [x] New `pipelex/plugins/storage/storage_plugin.py`: `StoragePlugin` (`name="storage"`) + module-level factory closures (`_make_local/_in_memory/_s3/_gcp_storage_provider`) holding the exact bodies moved from the deleted `make_storage_provider_from_config` `match` arms (keep `lazy_validate()`; keep GCP's `get_secrets_provider()` read — legal at the boot apply-point).
+- [x] `pipelex/plugins/builtins.py`: register `StoragePlugin()`; add `"storage"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- [x] Boot (`pipelex.py`): build + `set_storage_provider_registry(...)` alongside the other registries; replace the `make_storage_provider_from_config` block with registry selection (explicit param > `registry.get_required(method=config.method)(config)`).
+- [x] Delete `pipelex/tools/storage/storage_provider_factory.py` (grep for other importers first — and re-home them).
+- [x] D1: relax `StorageProviderConfig.method` to open `str`.
 
-Decided with the user right after Checkpoint A: `LLMWorkerInternalAbstract` was a remnant of the pre-plugin-system "fake plugin" era, and the base `LLMWorkerAbstract` had a hole in its template method (external workers had to call `llm_job_before_start` themselves or reporting crashed). Fixed structurally, matching the other three families:
+### Phase 1 — as-built (deviations & decisions, for cold start)
 
-- `LLMWorkerAbstract.__init__` now takes `inference_model`; the base owns the lifecycle (`llm_job_before_start`, spec-driven capability checks, constraints, spec-based OTel names). `LLMWorkerInternalAbstract` deleted; all builtin LLM workers re-parented.
-- Legacy `set_llm_worker_from_external_plugin` (manager + protocol) removed — pre-plugin-system path registering spec-less worker classes by handle; its test reworked to drive an out-of-tree `LLMWorkerAbstract` subclass with a real spec.
-- Import-cycle lesson (user cares): `pipelex/hub.py` imports the worker ABCs at module level, and `pipelex.config.get_config` imports the hub — so **nothing in hub's import closure may import `pipelex.config` at module level**. The dump gating that caused this moved to the `llm_generate` funnel; `dump_prompt`/`dump_response_from_text_gen` in `llm_utils` are config-gated internally (llm_utils left hub's closure when the ABC dropped it). NO lazy imports. Pre-existing deeper inversion flagged, not fixed: `config.py → hub` and `configs.py → aws_config.py → hub` mean the config layer sits ON TOP of the hub — a future refactor could move the config singleton below the hub and dissolve this class of cycle for good.
-- Cookbook side: `HelloLLMWorker` shrank to `_gen_text` + `_gen_object` only (the teaching outcome we wanted); breaking changelog entries added in pipelex CHANGELOG `[Unreleased]`.
+- **Boot ordering (resolved a plan ambiguity).** The old factory ran at `pipelex.py:307-310`, *before* `build_registrar` (~393), but the registry only exists after `build_registrar`. So storage selection **moved down** to sit right beside the other registry constructions (after the 4 `set_*_registry` calls): build `StorageProviderRegistry(plugin_registrar.storage_providers)` → `set_storage_provider_registry` → `if storage_provider is None: select via registry` → `set_storage_provider`. Verified safe: no `get_storage_provider()` consumer runs during `setup()` before that point (all consumers are run-time), and secrets is on the hub (line 306) so the GCP factory's secret read works. This is byte-equivalent to the old factory and forward-compatible with the Phase 3 W-A move (which relocates only the `build_registrar` *call*, not the storage registry construction).
+- **`DuplicateStorageProviderError` added** (not in the plan checklist but required by the `_add` `on_duplicate` contract; mirrors `DuplicateOrchestratorError`).
+- **D1 blast radius.** `method: StorageMethod` → `method: str = Field(strict=False)` forced a `case _` in `storage_path` + `uri_format` (and the model-validator) because `reportMatchNotExhaustive` fires on open `str`. Empirically confirmed the field coerces a `StrEnum` input to a plain `str` and accepts an external token (e.g. `"azure"`) at parse. Same `case _` added to the two test-side matches (`test_storage_config.py`, `generator_fixtures.py`).
+- **Test re-homing.** `test_storage_provider_factory.py` **deleted** (its SUT is gone; Phase 2 adds the registry + parametrized-boot seam tests that supersede it). `generator_fixtures.py` now selects through `get_storage_provider_registry().get_required(...)`. `test_storage_provider_config.py`'s strict-coercion test rewritten to the D1 open-token behavior (`method == "local"` as plain str; `"azure"` accepted at parse).
+- **Built-in tokens** registered as the `StorageMethod` enum values (`StrEnum` keys are interchangeable with their plain-str form in dict lookup, so boot's plain-str `config.method` resolves them).
 
-#### Core bug found & fixed during Phase 0 (in this worktree)
+### ⛔ CHECKPOINT 1 — run the protocol above (verify → commit + update → clean-room /code-review → triage)
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright/mypy/keyword-only all pass), `make tb` (9 passed), `pipelex plugins list` shows `storage` (builtin, API 3, 4 contributions), boot `method="local"`→`LocalStorageProvider` / `method="in_memory"`→`InMemoryStorageProvider`, unknown token → `UnknownStorageMethodError`. Targeted `tests/unit/pipelex/plugins/ tests/unit+integration/.../tools/storage/` = 1036 passed; re-homed fixture consumers = 4 passed.
+- [x] Commit SHA recorded here: `8268ff08f`
+- [x] Cold-start state updated in this file.
+- [x] Sonnet-5 clean-room `/code-review` fanned out on `8268ff08f`; findings triaged. **Outcome:** review verified correctness (byte-identical factory bodies, safe `StorageMethod→str` D1 relaxation, correct boot ordering, keyword-only compliant, no bare `except`). 3 findings:
+  1. *contract.py v3 comment implied secrets registry already exists* → **FIXED** in follow-up `58961848a` (reworded to "pre-reserved / lands in a follow-up").
+  2. *storage-selection path has no direct automated test after deleting the factory test* → **deferred to Phase 2 as already planned** (Phase 2 checklist adds registry hit/miss + duplicate + parametrized-boot). Manually smoke-verified this phase.
+  3. *`StorageProviderRegistry.get_optional`/`has` have no caller* → **kept (no change).** Confirmed by grep that all sibling read-views (orchestrator/bundle_validator/model_lister) expose the identical shape; `has` is family-wide unused and `get_optional` used by exactly one. It's an established, plan-mandated registry-family convention, not speculative surface — trimming would make storage the odd one out.
+  Reviewer also noted a benign boot-ordering nuance: a bad storage config now fails *after* `models_manager.setup()` rather than immediately after secrets (necessary consequence of needing the registrar built first; behavior otherwise byte-equivalent).
 
-`RoutingProfileFactory.make_routing_profile` (`pipelex/cogt/model_routing/routing_profile_factory.py`) parsed + validated `optional_routes` from `routing_profiles.toml` but never passed it to the built `RoutingProfile` — TOML optional routes silently did nothing (nothing in the tree used them; zero test coverage). Fixed (one-line pass-through), new test module `tests/unit/pipelex/cogt/model_routing/test_routing_profile_optional_routes.py` (factory pass-through + enabled/disabled gating), CHANGELOG `[Unreleased]` entry added. **Consequence for the cookbook:** its `[Unreleased]` note says the example requires `pipelex` > 0.36.0 — the cookbook-side release must wait for (or pin past) the pipelex release carrying this fix. Related pre-existing wart spotted, NOT fixed: `RoutingProfile.get_backend_match_for_model` mutates `self.routes` in place when merging optional routes (`possible_routes = self.routes` without copy) — harmless today (idempotent merge), flag if it ever bites.
+---
 
-### Phase 4 — Docs rewrite (in the pipelex repo, this worktree) — DONE 2026-07-03
+## Phase 2 — Storage: tests + docs
+*(Detail: `wip/plugins/storage-provider-plugin.md` Phases 4–5.)*
 
-- [x] Rewrote `docs/cookbook/using-inference-plugins.md`: what a plugin is (entry point + `PipelexPlugin` + registrar), package layout, model-config side (`.pipelex/inference/`, optional route), install + `pipelex plugins list` + run walkthrough, failure mode, links to `under-the-hood/inference-backend-plugins.md`. Stale `.pipelex/pipelex.toml` claim gone; GitHub badge now points at the example dir. Also updated the stale blurb in `docs/cookbook/index.md`.
-- [x] Audited `docs/features/llm-integration.md` — contains no plugin terminology at all (nothing to fix); the stale "plugins" mention was the cookbook page's own link text, now rewritten. Workspace-wide grep: no other legacy "plugin = config entry" language in docs (remaining "plugin" hits are the unrelated Claude Code skills plugin page).
-- [x] Re-checked `docs/under-the-hood/inference-backend-plugins.md` worker section against the folded base: acme example already passes `inference_model` to the worker, no lifecycle gotchas documented — one stale bit found & fixed: lookup-miss error is `InferenceBackendNotFoundError`, not `NotImplementedError` (the doc's own fail-loud table already had it right).
-- [x] `make docs-check` (strict mkdocs build) green.
-- [x] Changelog entry under `[Unreleased]` (brief docs entry under "Changed").
+- [ ] Unit: `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate-registration fail-loud via `_add`.
+- [ ] Boot (parametrized): each built-in `method` yields the right provider on the hub; s3/gcp arms raise `MissingDependencyError` only when *selected* with the SDK absent, never at registration.
+- [ ] Integration: an external test plugin registering a fake `method` (entry-point discovered) is selectable via config — mirror the inference external-plugin test harness.
+- [ ] New `docs/under-the-hood/storage-provider-plugins.md` (mirror `orchestrator-plugins.md` structure); mkdocs nav; update any "the plugin seams are …" enumerations.
+- [ ] CHANGELOG `[Unreleased]`: "breaking" `PLUGIN_API_VERSION` 2→3; storage is now a plugin seam.
 
-**CHECKPOINT B (final)** — Phase 4 work all done; **only the commits remain** (user to approve the slices from "NEXT SESSION" step 1, plus these Phase 4 docs edits which ride with the tracker/docs concern or their own docs slice). Once committed in both repos, note the commit SHAs here and retire/archive this tracker. Release ordering reminder (step 3 above) still applies before shipping either side.
+### ⛔ CHECKPOINT 2 — run the protocol above
+- [ ] Full `make agent-test` green (+ `agent-check`).
+- [ ] Commit SHA recorded here: `__________`
+- [ ] Cold-start state updated.
+- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged. Outcome: `__________`
 
-## Cross-repo map
+---
 
-| Repo | Work |
-|---|---|
-| `pipelex-cookbook` | plugin package, backend/model config, `.mthds`, run verification (Phases 0–3) |
-| `pipelex` (this worktree `_plugins`) | docs page rewrite + terminology audit (Phase 4), plus any core change the example surfaces |
+## Phase 3 — Secrets: mechanism + config + builtin plugin + boot wiring (W-A)
+*(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 1–3. W-A is locked — this is a build instruction, not an investigation.)*
 
-**Editable-pin caveat**: the cookbook's `[tool.uv.sources]` editable pin on `../_plugins` is a local dev convenience (set by the user 2026-07-03) and must NOT ship: before merging/releasing the cookbook side, flip back to a PyPI `pipelex==X.Y.Z` pin carrying whatever core changes this work needed (same playbook as the pipelex-api editable-pin precedent — editable local paths break CI). If the example needs no core change, the flip-back is to the current release.
+- [ ] Registrar: `secrets_providers` dict + `add_secrets_provider(*, method, factory)` via `_add`; `SecretsProviderFactoryFn` alias. *(API already at 3 from Phase 1 — no second bump.)*
+- [ ] New `pipelex/plugins/secrets_provider_registry.py`: `SecretsProviderRegistry`.
+- [ ] New `UnknownSecretsMethodError` in `pipelex/plugins/exceptions.py`.
+- [ ] Hub: `set_/get_secrets_provider_registry` + module accessor.
+- [ ] New config `SecretsProviderConfig` (`pipelex/tools/secrets/secrets_config.py`), `method: str = Field(strict=False)`, **no class default** (default lives in TOML). Confirm placement with config owner (sibling of `storage_config` under `pipelex.*`).
+- [ ] `pipelex/pipelex.toml`: add `[pipelex.secrets_config]` with `method = "env"`; wire `secrets_config` into the owning config model. Add the same real-valued block to `.pipelex/pipelex.toml` override (never commented out). Run `make tb` after.
+- [ ] New `pipelex/plugins/secrets/secrets_plugin.py`: `SecretsPlugin` + `_make_env_secrets_provider(config)` → `EnvSecretsProvider()`.
+- [ ] `builtins.py`: register `SecretsPlugin()`; add `"secrets"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- [ ] **W-A boot edit** (`pipelex.py`): move `build_registrar(config=get_config())` (393-394) up to after line 209 / before 212; keep downstream registry constructions referencing `self._plugin_registrar`; optionally move the `boot_orchestrator` gate (401-403) up for fail-fast. Build + `set_secrets_provider_registry(...)` there.
+- [ ] **Delete lines 211-212** (stale `# needed for gateway check` + hardcoded `EnvSecretsProvider()`); replace with registry selection (explicit `setup(secrets_provider=...)` param still wins). Drop the now-unused `EnvSecretsProvider` import from `pipelex.py`.
 
-## Gotchas for a cold start
+### ⛔ CHECKPOINT 3 — run the protocol above
+- [ ] Gates green (`agent-check` + `tb`; `pipelex plugins list` shows `secrets`; a run with default `method="env"`; `get_secret(...)` still resolves env vars).
+- [ ] Commit SHA recorded here: `__________`
+- [ ] Cold-start state updated.
+- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged (pay attention to the boot-order move — a reviewer with no context is the right check on it). Outcome: `__________`
 
-- `register` must stay side-effect-free and import-light; anything heavy goes inside `make_worker`. Discovery runs `build_registrar` at boot AND in `pipelex plugins list`.
-- `targets_api` must equal `PLUGIN_API_VERSION` (2) or discovery fails loud with `PluginApiVersionMismatchError`.
-- The keyword-only-arguments convention is enforced on `pipelex/` source only, but the example package should follow it anyway — it's teaching material.
-- Worker subclass signatures must match `LLMWorkerAbstract` exactly (use `@override`); the reporting/telemetry plumbing is inherited, don't reimplement it.
-- Don't edit `docs/errors/` pages by hand (generated); nothing here should need new error classes anyway.
-- Stale-terminology precedent: on 2026-07-03 we already fixed "CLI-build command harvest" leftovers in `contract.py`, `discovery.py`, and `inference-backend-plugins.md` — same spirit applies to any old "LLM plugin" config-speak found during Phase 4.
+---
+
+## Phase 4 — Secrets: tests + docs
+*(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 4–5.)*
+
+- [ ] Unit: `SecretsProviderRegistry` hit/miss (`UnknownSecretsMethodError`) + duplicate fail-loud.
+- [ ] Boot: default config yields `EnvSecretsProvider` on the hub; explicit `setup(secrets_provider=...)` overrides.
+- [ ] Integration: external test plugin registering a fake secrets `method` is selectable via config.
+- [ ] Ordering guard: a boot with a non-env secrets method has secrets on the hub before storage's GCP arm reads it (assert boot order).
+- [ ] New `docs/under-the-hood/secrets-provider-plugins.md` (emphasize the lazy optional-dep closure for SDK-backed providers like Vault/AWS); mkdocs nav; update seam enumerations.
+- [ ] CHANGELOG `[Unreleased]`: secrets is now a plugin seam.
+
+### ⛔ CHECKPOINT 4 — run the protocol above
+- [ ] Full `make agent-test` green (+ `agent-check`).
+- [ ] Commit SHA recorded here: `__________`
+- [ ] Cold-start state updated.
+- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged. Outcome: `__________`
+
+---
+
+## Phase 5 — Release gating & cross-repo (documentation in this branch; execution is release-gated)
+
+- [ ] Record in the CHANGELOG / release notes: `pipelex-temporal` and `pipelex-mistralai-workflows` must bump `targets_api` to 3 when the pipelex version carrying this lands (they register no provider; the bump is the only change). Do NOT touch those repos here.
+- [ ] Confirm the whole branch is one clean sequence of per-phase commits; open the PR to the intended base.
+
+### ⛔ CHECKPOINT 5 (final) — run the protocol above, whole-branch scope
+- [ ] Full `make agent-test` + `make agent-check` + `make tb` all green on the final tip.
+- [ ] Final Sonnet-5 clean-room `/code-review` over the **whole-branch diff** (`git diff <branch-base>..HEAD`) — a last over-engineering sweep across both seams together. Findings triaged. Outcome: `__________`
+- [ ] This file updated to DONE with all SHAs; deferred follow-ups (DX-3 external config passthrough, first real external provider, cookbook example) captured under `wip/plugins/`.
+
+---
+
+## Deferred follow-ups (not in this plan — see wip docs)
+
+- DX-3 external-provider config passthrough (storage D3 / secrets S4).
+- First real external provider (e.g. Vault / AWS Secrets Manager) as proof-of-seam — likely a private package if hosted-platform-targeted.
+- Cookbook `pipelex-storage-hello` external-plugin example, mirroring the hello-inference-plugin track.
