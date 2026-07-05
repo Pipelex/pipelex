@@ -27,7 +27,7 @@
 
 ### Documentation
 
-- **Optionality guide:** New [Understanding Optionality](docs/building-methods/pipes/understanding-optionality.md) page beside the multiplicity guide — presence markers, the runtime trichotomy (skip / run / fail), absence records and provenance, template guards, controllers under absence, and the static safety net. PipeBatch documents compaction under absence, PipeLLM documents the `@?` optional block sigil, and the run CLI page documents the absence artifact an absent main output produces.
+- **Optionality guide:** New "Understanding Optionality" page (`docs/building-methods/pipes/understanding-optionality.md`) beside the multiplicity guide — presence markers, the runtime trichotomy (skip / run / fail), absence records and provenance, template guards, controllers under absence, and the static safety net. PipeBatch documents compaction under absence, PipeLLM documents the `@?` optional block sigil, and the run CLI page documents the absence artifact an absent main output produces.
 
 ## [v0.37.0] - 2026-07-04
 
