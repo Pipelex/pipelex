@@ -5,8 +5,11 @@ import json
 import pytest
 
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.system.telemetry.otel_factory import OtelFactory
 
 
@@ -37,6 +40,37 @@ class TestOtelFactory:
         assert payload["variable_name"] == "summary"
         assert payload["kind"] == "skipped"
         assert payload["reason"] == "skipped because input 'analysis' is absent"
+
+    # --- make_inputs_json tests ---
+
+    def test_make_inputs_json_captures_recorded_absence(self) -> None:
+        """An input slot resolved as a recorded absence captures as the explicit absence
+        payload — a legitimately omitted optional never breaks span input capture.
+        """
+        memory = WorkingMemoryFactory.make_from_single_stuff(StuffFactory.make_from_str("penalties", name="topic"))
+        memory.record_absence(
+            AbsenceRecord(
+                variable_name="clause",
+                kind=AbsenceKind.NOT_PROVIDED,
+                reason="optional input 'clause' was not provided by the caller",
+            )
+        )
+
+        inputs_json = OtelFactory.make_inputs_json(memory, needed_input_names={"topic", "clause"}, max_length=None)
+
+        payload = json.loads(inputs_json)
+        assert payload["topic"]["content"] == {"text": "penalties"}
+        assert payload["clause"]["absent"] is True
+        assert payload["clause"]["kind"] == "not_provided"
+
+    def test_make_inputs_json_neither_value_nor_record_raises(self) -> None:
+        """A slot with neither a value nor a recorded absence is the bug case — the capture
+        raises loudly instead of silently omitting the input.
+        """
+        memory = WorkingMemory()
+
+        with pytest.raises(WorkingMemoryStuffNotFoundError):
+            OtelFactory.make_inputs_json(memory, needed_input_names={"ghost"}, max_length=None)
 
     # --- make_truncated_content tests ---
 

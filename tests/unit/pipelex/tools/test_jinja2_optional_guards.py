@@ -32,6 +32,9 @@ class TestDetectUnguardedOptionalReferences:
             ("set_block_target_is_a_store_not_a_read", "{% set assessment %}fallback{% endset %}"),
             ("set_block_body_guarded", "{% set summary %}{% if assessment %}{{ assessment.amount }}{% endif %}{% endset %}{{ summary }}"),
             ("tuple_set_shadows", "{% set assessment, other = 'a', 'b' %}{{ assessment }}"),
+            ("with_shadow_local", "{% with assessment = 'x' %}{{ assessment }}{% endwith %}"),
+            ("for_filter_bare_presence_probe", "{% for item in topic_items if assessment %}{{ item }}{% endfor %}"),
+            ("for_filter_target_shadows", "{% for assessment in topic_items if assessment.flag %}{{ assessment }}{% endfor %}"),
         ],
     )
     def test_guarded_references_produce_no_findings(self, topic: str, template_source: str):
@@ -58,6 +61,9 @@ class TestDetectUnguardedOptionalReferences:
             ("read_before_set", "Value: {{ assessment }} {% set assessment = 'x' %}", "assessment"),
             ("set_block_body_reads_optional", "{% set summary %}{{ assessment }}{% endset %}{{ summary }}", "assessment"),
             ("read_before_set_block", "{{ assessment }}{% set assessment %}x{% endset %}", "assessment"),
+            ("with_value_reads_optional", "{% with local = assessment %}{{ local }}{% endwith %}", "assessment"),
+            ("with_body_reads_other_optional", "{% with other = 'x' %}{{ assessment.amount }}{% endwith %}", "assessment.amount"),
+            ("for_filter_deep_access", "{% for item in topic_items if assessment.flag %}{{ item }}{% endfor %}", "assessment.flag"),
         ],
     )
     def test_unguarded_references_are_reported(self, topic: str, template_source: str, expected_path: str):

@@ -123,13 +123,14 @@ class TestOptionalsShowcaseE2E:
         assert response.pipe_output.main_stuff.as_text.text == "extracted: clause 12"
 
     async def test_cli_run_core_writes_absence_artifact(self, tmp_path: Path):
-        """The unmocked plain-CLI run core, fed the bundle file with the optional omitted, writes
-        the explicit absence artifact (json + md, no interactive viewer) and the working memory
-        dump carrying the ledger.
+        """The unmocked plain-CLI run core (`run pipe <code> -L <dir>` shape), with the optional
+        omitted, writes the explicit absence artifact (json + md, no interactive viewer) and the
+        working memory dump carrying the ledger. Loading via the library dir (not bundle_path)
+        also auto-registers the co-located @pipe_func implementations.
         """
         await _execute_run(
             "oshow_lift_only_flow",
-            bundle_path=str(_FIXTURE_DIR / "optionals_showcase.mthds"),
+            bundle_path=None,
             inputs=None,
             save_working_memory=True,
             working_memory_path=None,
@@ -141,7 +142,7 @@ class TestOptionalsShowcaseE2E:
             dry_run=False,
             mock_usage=False,
             mock_inputs=False,
-            library_dir=None,
+            library_dir=[str(_FIXTURE_DIR)],
         )
 
         output_dirs = list(tmp_path.glob("oshow_lift_only_flow_output*"))

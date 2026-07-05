@@ -165,8 +165,24 @@ class _GuardWalker:
                 for item in node.target.items:
                     if isinstance(item, nodes.Name):
                         loop_declared.add(item.name)
+            if node.test is not None:
+                # The loop filter evaluates after the target binds per item, so a shadowing
+                # target stays a local while an optional read in the filter gets classified.
+                # Its guard vars deliberately do NOT bless the body (same conservative stance
+                # as else-arms and inverted guards).
+                self._walk_test(node.test, guarded=guarded, declared=declared | loop_declared)
             self._walk_body(node.body, guarded=guarded, declared=declared | loop_declared)
             self._walk_body(node.else_, guarded=guarded, declared=declared)
+            return
+
+        if isinstance(node, nodes.With):
+            # The bound values are evaluated before the targets bind; the body then reads the
+            # locals, never the shadowed optionals. Walking the targets as children would
+            # miscount the store-context Names as reads.
+            for value in node.values:
+                self.walk(value, guarded=guarded, declared=declared)
+            with_declared = frozenset(target.name for target in node.targets if isinstance(target, nodes.Name))
+            self._walk_body(node.body, guarded=guarded, declared=declared | with_declared)
             return
 
         if isinstance(node, nodes.Macro):
