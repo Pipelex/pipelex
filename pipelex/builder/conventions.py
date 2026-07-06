@@ -8,3 +8,4 @@ from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 
 DEFAULT_BUNDLE_FILE_NAME = f"bundle{MTHDS_EXTENSION}"
 DEFAULT_INPUTS_FILE_NAME = "inputs.json"
+DEFAULT_INPUTS_TOML_FILE_NAME = "inputs.toml"

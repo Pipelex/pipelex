@@ -36,7 +36,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for testing",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}?",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -112,7 +112,7 @@ class TestPipeConditionSimple:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for short text testing",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
-            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+            output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}?",
             expression_template="{% if input_text.text|length > 5 %}long{% else %}short{% endif %}",
             outcomes={"long": "capitalize_long_text", "short": "add_prefix_short_text"},
             default_outcome=SpecialOutcome.CONTINUE,

@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any, cast
+from enum import StrEnum
+from typing import Any, Self, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
@@ -16,7 +17,6 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
-from pipelex.types import Self, StrEnum
 
 
 class ConceptStructureSpecFieldType(StrEnum):

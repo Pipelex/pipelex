@@ -52,7 +52,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @override
     def required_variables(self) -> set[str]:
-        return set(self.inputs.required_names)
+        return set(self.inputs.declared_names)
 
     @model_validator(mode="after")
     def validate_fields(self) -> Self:

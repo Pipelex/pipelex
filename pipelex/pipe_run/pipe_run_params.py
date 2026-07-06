@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any
+from enum import StrEnum
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -10,7 +11,6 @@ from pipelex.core.memory.working_memory import BATCH_ITEM_STUFF_NAME, MAIN_STUFF
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, VariableMultiplicityResolution
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode  # noqa: TC001 — pydantic resolves the field annotation at runtime
 from pipelex.pipeline.exceptions import PipeStackOverflowError
-from pipelex.types import Self, StrEnum
 
 
 class PipeRunParamKey(StrEnum):

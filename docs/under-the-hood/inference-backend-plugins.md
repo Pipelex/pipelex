@@ -241,6 +241,9 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
+- [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `storage_config.method`)
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `secrets_config.method`)
 - [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)

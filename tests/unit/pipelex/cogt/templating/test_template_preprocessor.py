@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
-from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.cogt.templating.template_preprocessor import preprocess_template, rewrite_template_sigils
 
 
 class TestTemplatePreprocessor:
@@ -762,6 +762,19 @@ Line after"""
         result = preprocess_template(template)
         expected = "Use $var here."
         assert result == expected
+
+    def test_rewrite_template_sigils_is_not_idempotent_for_escaped_literals(self):
+        """`rewrite_template_sigils` must be applied exactly once per authored template — it is
+        NOT idempotent for escaped literals. `$$var` collapses to a literal `$var` on the first
+        pass, which a second pass would (wrongly) interpolate. This pins the contract that makes
+        "preprocess once, store authored source" mandatory: callers must never re-feed
+        already-preprocessed output back through the rewriter (see PipeCompose template mode).
+        """
+        once = rewrite_template_sigils("Use $$var here.")
+        assert once == "Use $var here."
+        twice = rewrite_template_sigils(once)
+        assert twice == "Use {{ var|format() }} here."
+        assert once != twice, "escaped-literal rewrite is not idempotent — preprocess exactly once"
 
     def test_escape_does_not_consume_legit_variable(self):
         """Escape on one token must not affect a legitimate variable later in the string."""

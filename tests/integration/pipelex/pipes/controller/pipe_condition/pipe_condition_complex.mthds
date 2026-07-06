@@ -12,7 +12,7 @@ ProcessingContext = "Combined processing context"
 type                = "PipeCondition"
 description         = "Primary routing by document type"
 inputs              = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
-output              = "native.Text"
+output              = "native.Text?"
 expression_template = "{{ doc_request.document_type }}"
 default_outcome     = "continue"
 
@@ -26,7 +26,7 @@ legal     = "legal_document_router"
 type                = "PipeCondition"
 description         = "Route technical documents by priority and user level"
 inputs              = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
-output              = "native.Text"
+output              = "native.Text?"
 expression_template = "{% if doc_request.priority == 'urgent' %}urgent_tech{% elif user_profile.user_level == 'expert' and doc_request.complexity == 'high' %}expert_tech{% else %}standard_tech{% endif %}"
 default_outcome     = "continue"
 
@@ -40,7 +40,7 @@ standard_tech = "standard_technical_processor"
 type                = "PipeCondition"
 description         = "Route business documents by department and priority"
 inputs              = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
-output              = "native.Text"
+output              = "native.Text?"
 expression_template = "{% if doc_request.priority == 'urgent' %}urgent_business{% elif user_profile.department == 'finance' %}finance_business{% elif user_profile.department == 'marketing' %}marketing_business{% else %}general_business{% endif %}"
 default_outcome     = "continue"
 
@@ -55,7 +55,7 @@ general_business   = "general_business_processor"
 type                = "PipeCondition"
 description         = "Route legal documents by complexity and user level"
 inputs              = { doc_request = "DocumentRequest", user_profile = "UserProfile" }
-output              = "native.Text"
+output              = "native.Text?"
 expression_template = "{% if doc_request.complexity == 'high' and user_profile.user_level != 'beginner' %}complex_legal{% elif doc_request.language != 'english' %}international_legal{% else %}standard_legal{% endif %}"
 default_outcome     = "continue"
 

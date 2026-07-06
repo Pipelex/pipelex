@@ -11,6 +11,8 @@ from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -89,10 +91,13 @@ class DeliveryExecutor:
           render so built-in content types still get typed rendering and
           dynamic concepts produce a readable JSON dump.
 
-        A completed run always delivers a main stuff, so the main_stuff.*
-        artifact files are always produced — a working memory without one is
-        a contract violation that fails the delivery loudly, never an "empty
-        envelope" silently missing its result files.
+        A completed run always resolves its declared output: a value or a
+        recorded absence. The main_stuff.* artifact files are always produced —
+        for an absent output they are an explicit absence artifact (never an
+        error: an absent result is a first-class success). A working memory
+        with neither a value nor a recorded absence is a contract violation
+        that fails the delivery loudly, never an "empty envelope" silently
+        missing its result files.
         """
         files: dict[str, ResultFile] = {}
 
@@ -103,20 +108,30 @@ class DeliveryExecutor:
             )
             raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
             if raw_main_stuff is None:
-                msg = "Delivery of a completed run found no main stuff in the raw working memory — a completed run always delivers a main stuff."
-                raise PipeJobError(msg)
-            hydrated_main_stuff = self.try_local_hydrate_stuff(raw_main_stuff)
-            if hydrated_main_stuff is not None:
-                await self._generate_main_stuff_files(hydrated_main_stuff, files=files)
+                main_absence = self._get_raw_main_absence(pipe_output.working_memory_raw)
+                if main_absence is None:
+                    msg = (
+                        "Delivery of a completed run found neither a main stuff nor a recorded absence in the raw "
+                        "working memory — a completed run always resolves its declared output."
+                    )
+                    raise PipeJobError(msg)
+                self._generate_absence_files(main_absence, files=files)
             else:
-                self._generate_main_stuff_files_from_raw(raw_main_stuff, files=files)
+                hydrated_main_stuff = self.try_local_hydrate_stuff(raw_main_stuff)
+                if hydrated_main_stuff is not None:
+                    await self._generate_main_stuff_files(hydrated_main_stuff, files=files)
+                else:
+                    self._generate_main_stuff_files_from_raw(raw_main_stuff, files=files)
         else:
             files["working_memory.json"] = ResultFile(
                 data=clean_json_dumps(pipe_output.working_memory.smart_dump(), indent=2).encode("utf-8"),
                 content_type="application/json",
             )
-            main_stuff = pipe_output.working_memory.get_main_stuff()
-            await self._generate_main_stuff_files(main_stuff, files=files)
+            main_resolved = pipe_output.working_memory.resolve_main_stuff()
+            if isinstance(main_resolved, AbsenceRecord):
+                self._generate_absence_files(main_resolved, files=files)
+            else:
+                await self._generate_main_stuff_files(main_resolved, files=files)
 
         graph_spec = pipe_output.graph_spec
         if graph_spec:
@@ -134,6 +149,34 @@ class DeliveryExecutor:
         if isinstance(candidate, dict):
             return cast("dict[str, Any]", candidate)
         return None
+
+    @classmethod
+    def _get_raw_main_absence(cls, working_memory_raw: dict[str, Any]) -> AbsenceRecord | None:
+        """Extract the recorded main-output absence from a raw working_memory's ledger, if any.
+
+        A malformed record is treated as missing (the caller then fails the delivery loudly as a
+        contract violation) rather than half-rendered.
+        """
+        absences: dict[str, Any] = working_memory_raw.get("absences", {})
+        candidate = absences.get(MAIN_STUFF_NAME)
+        if not isinstance(candidate, dict):
+            return None
+        try:
+            return AbsenceRecord.model_validate(candidate)
+        except ValidationError as exc:
+            log.warning(f"Malformed main-output absence record in raw working memory, treating as missing: {exc}")
+            return None
+
+    @classmethod
+    def _generate_absence_files(cls, absence_record: AbsenceRecord, *, files: dict[str, ResultFile]) -> None:
+        """Render the explicit absence artifact for an absent main output.
+
+        The JSON carries an explicit ``"absent": true`` discriminator beside the record fields so
+        a consumer polling ``main_stuff.json`` can tell an absence document from a value dump.
+        """
+        files["main_stuff.json"] = ResultFile(data=build_absence_json(absence_record).encode("utf-8"), content_type="application/json")
+        files["main_stuff.md"] = ResultFile(data=build_absence_markdown(absence_record).encode("utf-8"), content_type="text/markdown")
+        files["main_stuff.html"] = ResultFile(data=build_absence_html(absence_record).encode("utf-8"), content_type="text/html")
 
     @classmethod
     def try_local_hydrate_stuff(cls, stuff_raw: dict[str, Any]) -> Stuff | None:

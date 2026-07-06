@@ -249,6 +249,7 @@ plugins:
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
+        - building-methods/pipes/understanding-optionality.md: "Understanding Optionality"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
         - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
@@ -316,6 +317,8 @@ plugins:
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
+        - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
+        - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
@@ -457,6 +460,7 @@ nav:
         - Pipe Output: building-methods/pipes/pipe-output.md
         - CSV Input & Output: building-methods/pipes/csv-input-and-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
+        - Understanding Optionality: building-methods/pipes/understanding-optionality.md
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
@@ -547,6 +551,8 @@ nav:
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
+      - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
+      - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
       - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md

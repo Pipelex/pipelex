@@ -1,6 +1,6 @@
 """Shared fixtures for tracing tests."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pipelex.graph.graphspec import EdgeKind, NodeKind
 from pipelex.tracing.trace_events import EdgeEvent, PipeStartEvent
@@ -15,7 +15,7 @@ def make_trace_event(
     return PipeStartEvent(
         pipeline_run_id=pipeline_run_id,
         workflow_id=workflow_id,
-        timestamp=datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC),
         sequence=sequence,
         node_id=f"graph_1:{workflow_id}:node_{sequence}",
         pipe_code="test_pipe",
@@ -33,7 +33,7 @@ def make_edge_event(
     return EdgeEvent(
         pipeline_run_id=pipeline_run_id,
         workflow_id=workflow_id,
-        timestamp=datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc),
+        timestamp=datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC),
         sequence=sequence,
         edge_id=f"graph_1:{workflow_id}:edge_{sequence}",
         source_node_id=f"graph_1:{workflow_id}:node_0",

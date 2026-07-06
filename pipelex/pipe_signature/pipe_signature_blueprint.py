@@ -14,7 +14,12 @@ class PipeSignatureBlueprint(PipeBlueprint):
     before all its pipes are implemented.
     """
 
-    type: Literal["PipeSignature"] = "PipeSignature"
+    # `exclude=True`: the tag is an internal union discriminator, not a language-surface field. A
+    # signature has no `type` in `.mthds` (the author omits it — omitting the type IS the signature),
+    # so it must not serialize one. This also keeps internal dump→revalidate round-trips typeless: the
+    # dumped section carries no `type`, so the bundle before-validator re-injects it via
+    # `normalize_typeless_signature_section` instead of tripping the explicit-tag migration error.
+    type: Literal["PipeSignature"] = Field(default="PipeSignature", exclude=True)
     # Outside the executable taxonomy: no `PipeCategory`. Keep `exclude=True` (overriding the field
     # type drops the base's `Field(exclude=True)` unless re-specified) so it never serializes into `.mthds`.
     pipe_category: None = Field(default=None, exclude=True)

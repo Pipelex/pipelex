@@ -27,6 +27,7 @@ own page. Classes are grouped by subsystem.
 - [`InputStuffSpecsError`](input-stuff-specs-error.md) — Input stuff specs
 - [`InputStuffSpecsFactoryError`](input-stuff-specs-factory-error.md) — Input stuff specs factory
 - [`NativeConceptDefinitionError`](native-concept-definition-error.md) — Native concept definition
+- [`OptionalValueAbsentError`](optional-value-absent-error.md) — Optional value absent
 - [`PipeFactoryError`](pipe-factory-error.md) — Pipe factory
 - [`PipeInputError`](pipe-input-error.md) — Pipe input
 - [`PipeInputsFactoryError`](pipe-inputs-factory-error.md) — Pipe inputs factory

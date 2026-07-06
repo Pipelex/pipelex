@@ -10,11 +10,12 @@ import typer
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import inputs_core
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -33,16 +34,22 @@ def inputs_bundle_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    template_format: Annotated[
+        InputsTemplateFormat,
+        typer.Option("--format", help="Inputs template format: 'json' for the JSON result envelope (default), 'toml' for raw TOML on stdout"),
+    ] = InputsTemplateFormat.JSON,
 ) -> None:
-    """Generate example input JSON from a bundle file (.mthds) or pipeline directory.
+    """Generate an example inputs template from a bundle file (.mthds) or pipeline directory.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
+    success, JSON to stderr on error with exit code 1.
 
     Examples:
         pipelex-agent inputs bundle my_bundle.mthds
         pipelex-agent inputs bundle my_bundle.mthds --pipe my_pipe
         pipelex-agent inputs bundle pipeline_01/
         pipelex-agent inputs bundle pipeline_01/ --pipe my_pipe
+        pipelex-agent inputs bundle pipeline_01/ --format toml
     """
     bundle_path: str | None = None
     target_path = Path(path)
@@ -87,7 +94,7 @@ def inputs_bundle_cmd(
 
     try:
         result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=Path(bundle_path), library_dirs=library_dirs))  # type: ignore[arg-type]
-        agent_success(result)
+        emit_inputs_result(result, template_format=template_format)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
@@ -100,14 +107,7 @@ def inputs_bundle_cmd(
         agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
-        agent_success(
-            {
-                "success": True,
-                "pipe_code": pipe_code,
-                "inputs": {},
-                "message": str(exc),
-            }
-        )
+        emit_no_inputs_result(pipe_code, message=str(exc), template_format=template_format)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

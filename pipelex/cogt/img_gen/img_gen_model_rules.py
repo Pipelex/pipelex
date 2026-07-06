@@ -12,7 +12,7 @@ The taxonomy system allows the factory to generate the correct API arguments for
 without hardcoding provider-specific logic throughout the codebase.
 """
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class ImgGenArgTopic(StrEnum):

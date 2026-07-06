@@ -1,11 +1,10 @@
 import types
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
 from pipelex.hub import get_class_registry
-from pipelex.types import StrEnum
 
 
 def _build_type_hints_namespace() -> dict[str, Any]:

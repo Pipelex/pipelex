@@ -17,6 +17,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
@@ -80,6 +81,22 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
             self._validate_param_support_against_model_rules()
+
+        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        for template_blueprint, template_label in [
+            (self.img_gen_prompt_blueprint.prompt_blueprint, "prompt"),
+            (self.img_gen_prompt_blueprint.negative_prompt_blueprint, "negative_prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=template_blueprint.template,
+                template_category=template_blueprint.category,
+                template_label=template_label,
+            )
 
     def _validate_param_support_against_model_rules(self) -> None:
         """If `img_gen_choice` resolves to a concrete inference model with rules,

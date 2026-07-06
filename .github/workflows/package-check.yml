@@ -15,15 +15,15 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Check requires-python floor stays at >=3.10
+      - name: Check requires-python floor stays at >=3.11
         run: |
-          if ! grep -qE "^[[:space:]]*requires-python[[:space:]]*=[[:space:]]*['\"][^'\"]*>=3\.10([^0-9A-Za-z][^'\"]*)?['\"]" pyproject.toml; then
-            echo "❌ requires-python must start at >=3.10 — pipelex core supports Python 3.10+."
+          if ! grep -qE "^[[:space:]]*requires-python[[:space:]]*=[[:space:]]*['\"][^'\"]*>=3\.11([^0-9A-Za-z][^'\"]*)?['\"]" pyproject.toml; then
+            echo "❌ requires-python must start at >=3.11 — pipelex core supports Python 3.11+."
             echo "The Mistral Workflows orchestration integration that needs Python 3.12 ships as the"
             echo "separate pipelex-mistralai-workflows package; do not raise pipelex's own floor for it."
             exit 1
           fi
-          echo "✅ requires-python floor is >=3.10"
+          echo "✅ requires-python floor is >=3.11"
 
       - name: Check if uv.lock is up to date
         run: |

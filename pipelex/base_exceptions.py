@@ -1,11 +1,11 @@
 from collections.abc import Iterator
+from enum import StrEnum
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 

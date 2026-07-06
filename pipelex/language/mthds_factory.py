@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
 import tomlkit
@@ -9,7 +10,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint

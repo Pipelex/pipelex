@@ -1,6 +1,5 @@
 import logging
-
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 # custom logging level for development, between DEBUG and INFO
 LOGGING_LEVEL_DEV = 15

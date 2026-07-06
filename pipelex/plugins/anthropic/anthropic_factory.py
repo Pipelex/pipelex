@@ -1,4 +1,5 @@
 import math
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic
@@ -18,7 +19,6 @@ from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicFactoryError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time

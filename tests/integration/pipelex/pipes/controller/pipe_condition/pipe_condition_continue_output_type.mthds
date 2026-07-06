@@ -19,7 +19,7 @@ branch_pipe_code = "build_or_skip"
 type                = "PipeCondition"
 description         = "Routes approved links to builder, rejected links to skip (continue)."
 inputs              = { verified_link = "VerifiedLink" }
-output              = "Constraint"
+output              = "Constraint?"
 expression_template = "{{ verified_link.verdict }}"
 default_outcome     = "continue"
 

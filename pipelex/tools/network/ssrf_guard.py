@@ -69,7 +69,7 @@ async def resolve_to_allowed_ips(
     except socket.gaierror as exc:
         msg = f"Could not resolve host {host!r}."
         raise httpcore.ConnectError(msg) from exc
-    except asyncio.TimeoutError as exc:  # noqa: UP041 — asyncio.TimeoutError is distinct from builtin TimeoutError pre-3.11; project targets 3.10+
+    except TimeoutError as exc:
         msg = f"Timed out resolving host {host!r}."
         raise httpcore.ConnectTimeout(msg) from exc
     resolved_ips = [str(addr_info[4][0]) for addr_info in addr_infos]

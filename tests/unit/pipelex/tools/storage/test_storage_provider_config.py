@@ -88,11 +88,16 @@ class TestStorageProviderConfig:
             StorageProviderConfig(method=method)
         assert expected_message in str(exc_info.value)
 
-    def test_method_string_coercion_despite_strict_mode(self):
-        """The method field is Field(strict=False), so a plain string coerces to StorageMethod under strict config."""
+    def test_method_is_open_str_token(self):
+        """D1: method is an open str token stored verbatim. A built-in name is a plain string (equal to its
+        StorageMethod value), and an unknown/external name is accepted at parse — its installability is
+        validated later at registry lookup, not at parse — so a config naming an out-of-tree provider loads.
+        """
         provider_config = StorageProviderConfig.model_validate({"method": "local", "local": make_local_config()})
-        assert isinstance(provider_config.method, StorageMethod)
+        assert provider_config.method == "local"
         assert provider_config.method == StorageMethod.LOCAL
+        external_config = StorageProviderConfig.model_validate({"method": "azure"})
+        assert external_config.method == "azure"
 
     @pytest.mark.parametrize(
         ("method", "field_name", "sub_config_factory", "expected_uri_format"),

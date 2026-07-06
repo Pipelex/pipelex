@@ -5,7 +5,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -162,7 +162,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         }
     """
     result: dict[str, Any] = {
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "llm": {},
         "img_gen": {},
         "text_extractor": {},
@@ -509,7 +509,7 @@ def _generate_fixtures_python(
     Returns:
         Python module source code.
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     lines = [
         '"""AUTO-GENERATED - DO NOT EDIT.',

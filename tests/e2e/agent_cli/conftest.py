@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -239,7 +239,7 @@ def write_remote_config_cache(pipelex_dir: Path, raw_config: dict[str, Any]) -> 
     cache_path = cache_dir / "remote_config.json"
     payload = {
         "schema_version": CACHE_SCHEMA_VERSION,
-        "cached_at": datetime.now(tz=timezone.utc).isoformat(),
+        "cached_at": datetime.now(tz=UTC).isoformat(),
         "raw_config": raw_config,
     }
     cache_path.write_text(json.dumps(payload), encoding="utf-8")

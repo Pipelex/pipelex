@@ -45,8 +45,10 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     doc = tomlkit.document()
     pipe_item_table = tomlkit.table()
 
-    # Add type
-    pipe_item_table.add("type", pipe_spec.type)
+    # Add type — a signature is typeless (no type line; omitting the type IS the signature); every
+    # concrete pipe names its type.
+    if not isinstance(pipe_spec, PipeSignatureSpec):
+        pipe_item_table.add("type", pipe_spec.type)
 
     # Add description
     pipe_item_table.add("description", format_toml_string(pipe_spec.description))
@@ -184,7 +186,13 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: tomlkit.TOMLDo
 def pipe_cmd(
     pipe_type: Annotated[
         str | None,
-        typer.Option("--type", "--pipe-type", "--pipe_type", "-t", help=f"Pipe type. Must be one of: {list(pipe_type_to_spec_class)}"),
+        typer.Option(
+            "--type",
+            "--pipe-type",
+            "--pipe_type",
+            "-t",
+            help=f"Pipe type. Must be one of: {list(pipe_type_to_spec_class)}. Omit for a signature (contract only, no type).",
+        ),
     ] = None,
     spec: Annotated[
         str | None,
@@ -226,9 +234,19 @@ def pipe_cmd(
         ]
     }
 
+    PipeSignature (contract only — omit the type): a pipe with no type and no implementation is a
+    signature. Omit --type (and any "type" key) and declare only the contract:
+    {
+        "pipe_code": "summarize_doc",
+        "description": "Produces a summary of a document.",
+        "inputs": {"doc": "Document"},
+        "output": "Text"
+    }
+
     Examples:
         pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "summarize", ...}'
         pipelex-agent pipe --type PipeSequence --spec-file pipe.json
+        pipelex-agent pipe --spec '{"pipe_code": "summarize_doc", "description": "...", "output": "Text"}'
     """
     # Validate that exactly one of spec or spec_file is provided
     if spec is None and spec_file is None:
@@ -256,14 +274,35 @@ def pipe_cmd(
     elif "pipe_type" in spec_data:
         spec_data.pop("pipe_type")
 
-    # Resolve pipe type: CLI option takes precedence, then extract from spec JSON
-    resolved_pipe_type: str
+    # Resolve pipe type: CLI option takes precedence, then extract from spec JSON, else None (typeless).
+    # A typeless spec is a signature — parse_pipe_spec routes it to PipeSignatureSpec (or raises a
+    # teaching error if it declares more than the contract). An explicit "PipeSignature" is rejected
+    # there with a migration error — a signature has no type.
+    resolved_pipe_type: str | None
     if pipe_type is not None:
         resolved_pipe_type = pipe_type
     elif "type" in spec_data:
-        resolved_pipe_type = spec_data.pop("type")
+        raw_pipe_type = spec_data.pop("type")
+        if raw_pipe_type is None:
+            # A signature is authored by OMITTING the `type` key — an explicit null is not the same as
+            # absent, and must not silently collapse to a typeless signature.
+            agent_error(
+                "A JSON `type` key cannot be null. Delete the `type` key — a pipe with no `type` and no "
+                "implementation is a signature (contract only).",
+                error_type="ArgumentError",
+            )
+        if not isinstance(raw_pipe_type, str):
+            # A non-string `type` (list/dict/number) is an authoring mistake — sanitize it at this
+            # untrusted-input boundary so it surfaces as an actionable ArgumentError, not a cryptic
+            # internal TypeError (an unhashable list/dict would blow up the membership test downstream).
+            agent_error(
+                f"Invalid pipe type '{raw_pipe_type}'. Must be one of: {list(pipe_type_to_spec_class)}, "
+                "or omit `type` for a signature (contract only, no type).",
+                error_type="ArgumentError",
+            )
+        resolved_pipe_type = raw_pipe_type
     else:
-        agent_error("Pipe type must be provided either via --type or as 'type' in the JSON spec", error_type="ArgumentError")
+        resolved_pipe_type = None
 
     # Validate and convert spec
     try:

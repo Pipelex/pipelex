@@ -12,7 +12,7 @@ from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType, valid_pipe_type_tags
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN, PresenceMarker, parse_concept_with_multiplicity
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_snake_case, normalize_to_ascii
@@ -31,10 +31,17 @@ class PipeSpec(StructuredContent):
         - []: variable-length list (e.g., "Text[]")
         - [N]: exactly N items (e.g., "Image[3]" for 3 images)
 
+    Presence Notation:
+        Singular inputs and outputs may carry a presence marker after the concept name:
+        - ?: optional (e.g., "PenaltyClause?" — the slot may legitimately hold no value)
+        - !: force (inputs only, e.g., "PenaltyClause!" — assert the value is present, error if absent)
+        Presence markers never combine with multiplicity brackets: an absent plural is the empty list.
+
     Examples:
         inputs = {"document": "Document", "queries": "Text[]"}  # single document, multiple texts
         output = "Article[]"  # produces a list of articles
         output = "Image[5]"  # produces exactly 5 images
+        output = "PenaltyClause?"  # may produce no value
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -55,17 +62,20 @@ class PipeSpec(StructuredContent):
     description: str = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
         description=(
-            "Input specifications mapping variable names to concept codes with optional multiplicity. "
+            "Input specifications mapping variable names to concept codes with optional multiplicity or presence marker. "
             "Keys: input names in snake_case. "
-            "Values: ConceptCodes in PascalCase with optional brackets. "
-            "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), 'domain.Concept[]' (domain-qualified list)."
+            "Values: ConceptCodes in PascalCase with optional brackets, or a presence marker on singular forms. "
+            "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), "
+            "'domain.Concept[]' (domain-qualified list), 'Clause?' (optional input), 'Clause!' (force: error if absent)."
         ),
         json_schema_extra={"mock_format": MockFormat.DICT_SNAKE_KEY_PASCAL_VALUE},
     )
     output: str = Field(
         description=(
-            "Output concept code in PascalCase with optional multiplicity brackets. "
-            "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images). "
+            "Output concept code in PascalCase with optional multiplicity brackets, or '?' on singular forms "
+            "to declare the pipe may produce no value ('!' is not allowed on outputs). "
+            "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images), "
+            "'PenaltyClause?' (may produce no value). "
             "IMPORTANT: Always use PascalCase for the concept name."
         ),
         json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
@@ -88,8 +98,21 @@ class PipeSpec(StructuredContent):
     @field_validator("output", mode="after")
     @classmethod
     def validate_output(cls, output: str) -> str:
-        # Extract concept without multiplicity for validation
+        # Extract concept without multiplicity/presence markers for validation
         parse_result = parse_concept_with_multiplicity(output)
+        # Mirror the blueprint grammar rules (D1, D4): `!` never on outputs, `?` never with multiplicity
+        if parse_result.presence.is_force:
+            msg = (
+                f"Invalid output: '{output}'. The force marker '!' is not allowed on outputs — "
+                f"it is a use-site assertion for inputs. To declare that this pipe may produce no value, use '?'."
+            )
+            raise ValueError(msg)
+        if parse_result.presence.is_optional and parse_result.multiplicity is not None:
+            msg = (
+                f"Invalid output: '{output}'. The optional marker '?' cannot be combined with multiplicity: "
+                f"a plural slot is never absent — when nothing is found, it is the empty list."
+            )
+            raise ValueError(msg)
         try:
             validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept_ref_or_code)
         except ConceptStringError as exc:
@@ -109,17 +132,30 @@ class PipeSpec(StructuredContent):
                 msg = f"Invalid input name syntax '{input_name}'. Must be in snake_case."
                 raise ValueError(msg)
 
-            # Validate the concept spec format with optional multiplicity brackets
-            # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-            match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
+            # Validate the concept spec format: optional multiplicity brackets then optional
+            # presence marker. Pattern allows: ConceptName, domain.ConceptName, ConceptName[],
+            # ConceptName[N], ConceptName?, ConceptName!
+            match = re.match(MULTIPLICITY_PATTERN, concept_spec)
             if not match:
                 msg = (
                     f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
-                    f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                    f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]' where N is an integer, "
+                    f"with an optional presence marker '?' or '!' on singular forms (e.g. 'ConceptName?')."
                 )
                 raise ValueError(msg)
 
-            # Extract the concept part (without multiplicity) and validate it
+            # Mirror the blueprint grammar rule (D1, D4): presence markers never combine with multiplicity
+            bracket_content = match.group(2)
+            presence = PresenceMarker.from_symbol(match.group(3))
+            if not presence.is_plain and bracket_content is not None:
+                msg = (
+                    f"Invalid input '{input_name}': '{concept_spec}'. "
+                    f"The presence marker '{presence.symbol}' cannot be combined with multiplicity: "
+                    f"a plural slot is never absent — when nothing is found, it is the empty list."
+                )
+                raise ValueError(msg)
+
+            # Extract the concept part (without markers) and validate it
             concept_ref_or_code = match.group(1)
             try:
                 validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)

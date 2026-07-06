@@ -4,7 +4,7 @@ Validates that when an EventLogProtocol is provided, GraphTracer emits the
 correct trace events as a side effect alongside its existing in-memory accumulation.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
@@ -57,7 +57,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",
@@ -91,7 +91,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         parent_id, child_ctx = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="parent_pipe",
@@ -127,7 +127,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",
@@ -168,7 +168,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",
@@ -208,7 +208,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ctx_a = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="pipe_a",
@@ -256,7 +256,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="parallel_pipe",
@@ -346,7 +346,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 
         # Create controller node
         ctrl_id, ctrl_ctx = tracer.on_pipe_start(
@@ -411,7 +411,7 @@ class TestGraphTracerEventEmission:
             data_inclusion=make_defaulted_data_inclusion_config(),
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _child_ctx = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",
@@ -444,7 +444,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",
@@ -468,7 +468,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_a, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="pipe_a",
@@ -507,7 +507,7 @@ class TestGraphTracerEventEmission:
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         for index in range(5):
             node_id, _ = tracer.on_pipe_start(
                 trace_context=context,
@@ -534,7 +534,7 @@ class TestGraphTracerEventEmission:
             data_inclusion=make_defaulted_data_inclusion_config(),
         )
 
-        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+        started_at = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
         node_id, _ = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",

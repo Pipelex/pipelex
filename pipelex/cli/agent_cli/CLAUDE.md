@@ -11,7 +11,9 @@ Two independent options control the two output streams:
 
 Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, log-level/runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
 
-`inputs`, `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
+`concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
+
+`inputs` is a deliberate deviation: its `--format` takes `json|toml` (an `InputsTemplateFormat`, NOT the `markdown|json` `CliOutputFormat` pair) because it selects the **template serialization**, not a presentation style. `json` (default) keeps the structured success envelope; `toml` prints the raw TOML template to stdout, in the same spirit as the `concept`/`pipe` raw-TOML passthrough. A pipe with no inputs prints a TOML comment line in `toml` mode (valid TOML, loads back as an empty dict). `inputs` still has no `--error-format` — its errors keep flowing through the ContextVar's JSON default.
 
 Markdown structure per command:
 
@@ -80,9 +82,9 @@ commands/
 | `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
-| `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
+| `inputs` | Generates an example inputs template for a pipe/bundle/method (pipe\|bundle\|method subcommands). `--format json\|toml` (template serialization, default: json — NOT the markdown\|json pair); `toml` prints raw TOML to stdout |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
-| `pipe` | Converts a JSON pipe spec (typed) into raw TOML (stdout) |
+| `pipe` | Converts a JSON pipe spec into raw TOML (stdout). A spec with a `type` (via `--type` or a `type` key) is that concrete pipe; a **typeless** spec (no `type`) is a signature and renders a `[pipe.x]` section with no type line. An explicit `type = "PipeSignature"` is rejected with a migration error — `PipeSignature` is not a type. |
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |

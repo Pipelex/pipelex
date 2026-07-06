@@ -1,12 +1,12 @@
 import difflib
 import re
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import typer
 
 from pipelex.kit.index_models import KitIndex, Target
 from pipelex.kit.paths import get_kit_agents_dir
-from pipelex.types import Traversable
 
 
 def _read_agent_file(*, agents_dir: Traversable, name: str) -> str:

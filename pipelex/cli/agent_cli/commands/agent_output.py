@@ -22,6 +22,7 @@ import sys
 import traceback
 from collections.abc import Callable
 from contextvars import ContextVar
+from enum import StrEnum
 from typing import Any, NoReturn, cast
 
 import typer
@@ -30,7 +31,6 @@ from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.tools.misc.json_utils import clean_json_dumps
-from pipelex.types import StrEnum
 
 # Module-level capture for setup-time warnings (currently used by RemoteConfigStaleWarning).
 # The agent CLI factory writes here when it catches a stale-cache warning during ``Pipelex.make``
@@ -138,6 +138,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors
     "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
+    "TomlError": "Fix the TOML syntax error (the message includes the line and column)",
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
     "ValidationError": "Check that spec fields match the expected schema for the given type",
     "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
@@ -160,6 +161,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
+    "TomlError": "input",
     "ArgumentError": "input",
     "ValidationError": "input",
     "ValueError": "input",

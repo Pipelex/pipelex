@@ -7,15 +7,15 @@ wraps when ``instructor`` exhausts its retry loop.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from enum import StrEnum
 from typing import Any, TypeAlias, cast
 
 import httpx
 from pydantic import BaseModel, Field
 
 from pipelex.cogt.inference.provider_name import ProviderName
-from pipelex.types import StrEnum
 
 # SDK exception class-name substrings that identify a network/transport failure
 # (no HTTP status reached us). Matched case-insensitively against
@@ -362,8 +362,8 @@ def _parse_retry_after_seconds(value: Any) -> float | None:
     except (TypeError, ValueError):
         return None
     if retry_date.tzinfo is None:
-        retry_date = retry_date.replace(tzinfo=timezone.utc)
-    delta_seconds = (retry_date - datetime.now(timezone.utc)).total_seconds()
+        retry_date = retry_date.replace(tzinfo=UTC)
+    delta_seconds = (retry_date - datetime.now(UTC)).total_seconds()
     return max(delta_seconds, 0.0)
 
 

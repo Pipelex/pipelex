@@ -16,6 +16,7 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdo
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
+from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -111,8 +112,11 @@ def run_method_cmd(
     if library_dir:
         all_library_dirs.extend(library_dir)
 
+    # Resolve a relative --inputs file path against the method's directory (same rule as the main CLI)
+    effective_inputs = resolve_inputs_arg_against_dir(inputs, base_dir=Path(method_library_dirs[0]))
+
     # Load inputs: --inputs flag takes priority, then stdin fallback
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
+    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=effective_inputs, stdin_fallback=True)
 
     runner_type: RunnerType = ctx.obj["runner"]
 

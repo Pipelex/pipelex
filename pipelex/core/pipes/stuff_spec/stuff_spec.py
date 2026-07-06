@@ -4,12 +4,13 @@ from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, format_concept_with_multiplicity
 
 
 class StuffSpec(BaseModel):
     concept: Concept
     multiplicity: VariableMultiplicity | None = None
+    presence: PresenceMarker = PresenceMarker.PLAIN
 
     def is_multiple(self) -> bool:
         if self.multiplicity is None:
@@ -19,11 +20,11 @@ class StuffSpec(BaseModel):
         return self.multiplicity > 1
 
     def to_bundle_representation(self) -> str:
-        if self.multiplicity is None:
-            return self.concept.concept_ref
-        if isinstance(self.multiplicity, bool):
-            return f"{self.concept.concept_ref}[]"
-        return f"{self.concept.concept_ref}[{self.multiplicity}]"
+        return format_concept_with_multiplicity(
+            self.concept.concept_ref,
+            multiplicity=self.multiplicity,
+            presence=self.presence,
+        )
 
     def render_stuff_spec(self, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
         """Render a representation of this stuff spec.

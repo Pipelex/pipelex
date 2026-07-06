@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from typing_extensions import runtime_checkable
 
-from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_ref_or_code
+from pipelex.core.concepts.helpers import strip_markers_from_concept_ref_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -59,7 +59,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         # Validate that the specified concepts are declared in the bundle, or are natives concepts.
         if blueprint.inputs is not None:
             for input_name, input_concept_ref_or_code in blueprint.inputs.items():
-                stripped_input_concept_ref_or_code = strip_multiplicity_from_concept_ref_or_code(concept_ref_or_code=input_concept_ref_or_code)
+                stripped_input_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=input_concept_ref_or_code)
                 if "." not in stripped_input_concept_ref_or_code:
                     if (
                         not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=stripped_input_concept_ref_or_code)
@@ -74,7 +74,7 @@ class PipeFactory(Generic[PipeAbstractType]):
                         raise PipeFactoryError(msg)
 
         if "." not in blueprint.output:
-            stripped_output_concept_ref_or_code = strip_multiplicity_from_concept_ref_or_code(concept_ref_or_code=blueprint.output)
+            stripped_output_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=blueprint.output)
             if (
                 not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=stripped_output_concept_ref_or_code)
                 and stripped_output_concept_ref_or_code not in concept_codes_from_the_same_domain

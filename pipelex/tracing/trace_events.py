@@ -6,6 +6,7 @@ for NDJSON file storage and cross-worker graph assembly.
 """
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
@@ -13,7 +14,6 @@ from pydantic import BaseModel, Field
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import StrEnum
 
 
 class TraceEventKind(StrEnum):
@@ -22,6 +22,7 @@ class TraceEventKind(StrEnum):
     PIPE_START = "pipe_start"
     PIPE_END_SUCCESS = "pipe_end_success"
     PIPE_END_ERROR = "pipe_end_error"
+    PIPE_END_SKIPPED = "pipe_end_skipped"
     EDGE = "edge"
     CONTROLLER_OUTPUT = "controller_output"
     BATCH_ITEM = "batch_item"
@@ -96,6 +97,24 @@ class PipeEndErrorEvent(TraceEvent):
     error: ErrorSpec
 
 
+class PipeEndSkippedEvent(TraceEvent):
+    """Emitted when a pipe is lifted (skipped) because a plain input resolved absent (D3).
+
+    A skip is a successful outcome — the run continues and the pipe's output is a recorded
+    absence — but it gets its own node state so graph consumers can render it distinctly.
+    """
+
+    event_kind: Literal[TraceEventKind.PIPE_END_SKIPPED] = TraceEventKind.PIPE_END_SKIPPED
+    node_id: str
+    ended_at: datetime
+    skip_reason: str
+    output_spec: IOSpec | None = None
+    """A lifted pipe with a PLURAL output still writes a real empty-list Stuff (D4) — its spec
+    rides the skip event so the digest registers in the producer map and downstream DATA edges
+    resolve. None for a singular output (a recorded absence has no payload)."""
+    output_concept_data: dict[str, Any] = Field(default_factory=dict)
+
+
 class EdgeEvent(TraceEvent):
     """Emitted when an edge is added (CONTAINS, SELECTED_OUTCOME, etc.)."""
 
@@ -104,6 +123,7 @@ class EdgeEvent(TraceEvent):
     source_node_id: str
     target_node_id: str
     edge_kind: EdgeKind
+    optional: bool = False
     label: str | None = None
     source_stuff_digest: str | None = None
     target_stuff_digest: str | None = None
@@ -175,6 +195,7 @@ AnyTraceEvent = Annotated[
     PipeStartEvent
     | PipeEndSuccessEvent
     | PipeEndErrorEvent
+    | PipeEndSkippedEvent
     | EdgeEvent
     | ControllerOutputEvent
     | BatchItemEvent

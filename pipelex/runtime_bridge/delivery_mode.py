@@ -13,7 +13,7 @@ be core's call to add here, never a plugin's — which is exactly why it stays a
 unlike the open :mod:`pipelex.runtime_bridge.orchestration_mode` token.
 """
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class DeliveryMode(StrEnum):

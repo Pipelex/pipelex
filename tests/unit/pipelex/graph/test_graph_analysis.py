@@ -1,6 +1,6 @@
 """Unit tests for the GraphAnalysis model."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graph_analysis import GraphAnalysis
@@ -21,7 +21,7 @@ class TestGraphAnalysis:
     """Tests for GraphAnalysis.from_graphspec() and helper methods."""
 
     GRAPH_ID: ClassVar[str] = "analysis_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
     def _make_graph(
         self,

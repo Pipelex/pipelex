@@ -1,3 +1,4 @@
+from enum import StrEnum
 from pathlib import Path
 
 import kajson
@@ -5,7 +6,6 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
-from pipelex.types import StrEnum
 
 
 class LocalObserverEventType(StrEnum):

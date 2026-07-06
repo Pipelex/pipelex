@@ -1,4 +1,5 @@
 import re
+from enum import StrEnum
 from typing import Any
 
 from jinja2 import pass_context
@@ -11,7 +12,6 @@ from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
-from pipelex.types import StrEnum
 
 ########################################################################################
 # Jinja2 filters

@@ -1,4 +1,5 @@
 from contextvars import ContextVar
+from enum import StrEnum
 from pathlib import Path
 from typing import NoReturn
 
@@ -23,7 +24,6 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 
@@ -446,7 +446,7 @@ def handle_gateway_api_key_missing_error(exc: GatewayApiKeyMissingError) -> NoRe
     console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but the API key\nenvironment variable is not set.\n")
 
     console.print("[bold green]💡 To fix:[/bold green]")
-    console.print(f"  • Get your API key at: [cyan]{URLs.app}[/cyan]")
+    console.print(f"  • Get your API key at: [cyan]{URLs.app_cli_auth}[/cyan]")
     console.print("  • Set the [cyan]PIPELEX_GATEWAY_API_KEY[/cyan] environment variable")
     console.print()
 

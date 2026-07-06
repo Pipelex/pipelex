@@ -1,4 +1,5 @@
 from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -6,7 +7,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.types import Traversable
 
 
 def get_pipelex_mthds_files_from_package() -> list[Path]:

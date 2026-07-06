@@ -16,7 +16,7 @@ contract is locked in by ``test_remote_config_fetcher.py``):
 from __future__ import annotations
 
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -184,7 +184,7 @@ class TestSetupWithCache:
         cached_result = RemoteConfigResult(
             config=session_result.config,
             source=RemoteConfigSource.CACHED,
-            cached_at=datetime.now(tz=timezone.utc),
+            cached_at=datetime.now(tz=UTC),
         )
 
         mocker.patch(f"{PIPELEX_MODULE}.is_pipelex_gateway_enabled", return_value=True)

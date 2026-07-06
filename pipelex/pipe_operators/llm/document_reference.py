@@ -4,10 +4,10 @@ These models describe how documents are referenced in templates and guide
 the document resolution process at runtime.
 """
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 from typing_extensions import override
-
-from pipelex.types import StrEnum
 
 
 class DocumentReferenceKind(StrEnum):

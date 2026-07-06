@@ -30,7 +30,6 @@ output = "SummaryOut"
 steps = [ { pipe = "summary_sig", result = "summary" } ]
 
 [pipe.summary_sig]
-type = "PipeSignature"
 description = "Signature placeholder for the summary step."
 inputs = { doc = "SummaryDoc" }
 output = "SummaryOut"

@@ -13,7 +13,7 @@ retry of its own — layering it on top of a retrying SDK would double-retry.
 
 import email.utils
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
@@ -63,7 +63,7 @@ def _parse_retry_after(raw_value: str | None) -> float | None:
         # A zoneless or "-0000" HTTP-date parses to a naive datetime; subtracting it from an
         # aware "now" would raise TypeError. Treat such a malformed header as unusable.
         return None
-    return max((parsed_date - datetime.now(timezone.utc)).total_seconds(), 0.0)
+    return max((parsed_date - datetime.now(UTC)).total_seconds(), 0.0)
 
 
 def _transport_retry_wait(retry_state: RetryCallState) -> float:

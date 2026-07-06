@@ -28,7 +28,7 @@ Runs a pipe by code from your project's pipe library.
 
 **Options:**
 
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs (defaults to `results/`)
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output to a file
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -72,7 +72,7 @@ pipelex run pipe my_pipe -L ./pipelines -L ./shared_pipes
 pipelex run bundle <PATH> [OPTIONS]
 ```
 
-Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it.
+Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it — and so is an inputs file (`inputs.json` or `inputs.toml`) when `--inputs` is not passed (see [Input File Formats](#input-file-formats)).
 
 **Arguments:**
 
@@ -81,7 +81,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe from the bundle (defaults to the bundle's main pipe)
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -128,7 +128,7 @@ Runs a pipeline from an installed method package.
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe within the method (defaults to the method's main pipe)
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -154,9 +154,20 @@ pipelex run method invoice_extractor --pipe extract_amounts
 pipelex run method invoice_extractor --inputs invoice_data.json
 ```
 
-## Input JSON Format
+## Input File Formats
 
-The input JSON file should contain a dictionary where keys are input variable names:
+An inputs file is a dictionary whose keys are input variable names. Pipelex accepts **both JSON and TOML**, discriminated by the file extension:
+
+- A `.toml` suffix is parsed as TOML.
+- Every other value — `.json`, no extension, anything else — is parsed as JSON.
+
+There is no content sniffing: the extension alone decides. Inline JSON passed to `--inputs` (a value starting with `{`) stays JSON-only.
+
+An input declared optional (`?`) on the entry pipe may be omitted — the run records a `not_provided` absence for it instead of failing (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)).
+
+Both formats produce the same input dictionary for the value types they share, so the [PipelineInputs shapes](../../building-methods/pipes/provide-inputs.md) apply to both — with one structural exception: JSON `null` has no TOML equivalent (TOML has no null type).
+
+### JSON
 
 ```json
 {
@@ -168,9 +179,39 @@ The input JSON file should contain a dictionary where keys are input variable na
 }
 ```
 
+### TOML
+
+The same inputs in TOML. TOML's multi-line strings (`"""..."""`) make text-heavy inputs far more pleasant to author than escaped JSON:
+
+```toml
+input_variable = "simple string value"
+
+instructions = """
+Focus on payment terms.
+Flag anything that looks unusual.
+"""
+
+[another_input]
+concept = "domain_code.ConceptName"
+
+[another_input.content]
+field = "value"
+```
+
+!!! warning "TOML datetimes are not supported yet"
+    TOML parses bare datetime/date/time literals (e.g. `when = 2026-07-06`) into typed objects that have no JSON equivalent and no native concept yet, so the loader rejects them with an explicit error. Quote such values as strings (`when = "2026-07-06"`) in the meantime.
+
+### Auto-detection and ambiguity
+
+`run bundle <dir>` auto-detects a default inputs file inside the directory when `--inputs` is omitted: it looks for `inputs.json`, then `inputs.toml`. If **both** exist, the run fails with an ambiguity error asking you to pass `--inputs` explicitly — passing `--inputs` always bypasses auto-detection.
+
 ## Output Format
 
 The output JSON contains the complete working memory after pipeline execution, including all intermediate results and the final output.
+
+### Absent main output
+
+A run whose main output resolves as a recorded absence (an optional `?` output that produced nothing — e.g. a `PipeCondition` `continue` outcome, or a skipped producer) is a **successful** run. The CLI prints the absence with its reason, and `--save-main-stuff` writes an explicit absence artifact instead of a value dump: `main_stuff.json` is `{"absent": true, ...}` with the absence record, and `main_stuff.md` is a human-readable summary including the provenance chain (no HTML render or interactive viewer is produced — there is nothing to view). `--save-csv` fails with an explicit error and a non-zero exit code, the same way it does for any main output that is not a flat list — there is no tabular value to save.
 
 ## Related Documentation
 
