@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from rich.markup import escape
@@ -138,7 +138,7 @@ def _action_description(status: DeckFileStatus) -> str:
 def _apply_updates(deck_dir: Path, *, report: DeckSyncReport, no_backup: bool) -> int:
     """Apply the per-file actions described by ``report``. Returns the count of files changed."""
     kit_dir = kit_deck_dir()
-    timestamp = datetime.now(tz=timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
     actions_applied = 0
 
     for filename in sorted(report.files):

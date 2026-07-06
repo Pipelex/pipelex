@@ -1,5 +1,5 @@
 from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from pydantic import Field, RootModel, ValidationError
 
@@ -37,7 +37,6 @@ from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackP
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec

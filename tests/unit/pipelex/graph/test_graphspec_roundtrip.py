@@ -1,6 +1,6 @@
 """Unit tests for GraphSpec JSON round-trip serialization."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pipelex.graph.graphspec import (
@@ -65,12 +65,12 @@ class TestGraphSpecRoundtrip:
     def test_roundtrip_complex_graph(self) -> None:
         """Test round-trip for a complex graph with multiple nodes, edges, and timing."""
         timing1 = TimingSpec(
-            started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
-            ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
+            ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=UTC),
         )
         timing2 = TimingSpec(
-            started_at=datetime(2024, 1, 15, 10, 30, 1, tzinfo=timezone.utc),
-            ended_at=datetime(2024, 1, 15, 10, 30, 4, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 15, 10, 30, 1, tzinfo=UTC),
+            ended_at=datetime(2024, 1, 15, 10, 30, 4, tzinfo=UTC),
         )
 
         input_io = IOSpec(

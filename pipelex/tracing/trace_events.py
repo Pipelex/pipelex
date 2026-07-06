@@ -6,6 +6,7 @@ for NDJSON file storage and cross-worker graph assembly.
 """
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
@@ -13,7 +14,6 @@ from pydantic import BaseModel, Field
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import StrEnum
 
 
 class TraceEventKind(StrEnum):

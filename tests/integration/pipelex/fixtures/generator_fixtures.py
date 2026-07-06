@@ -6,8 +6,8 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
+from pipelex.hub import get_storage_provider_registry
 from pipelex.tools.storage.storage_config import StorageMethod
-from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
 
 S3_TEST_BUCKET = "pipelex-storage-test"
 GCP_TEST_BUCKET = "pipelex-storage-test"
@@ -50,8 +50,11 @@ def generated_content_factory(tmp_path: Path) -> GeneratedContentFactory:
             patched_provider_config = storage_provider_config.model_copy(update={"local": patched_local_config})
         case StorageMethod.IN_MEMORY:
             patched_provider_config = storage_provider_config
+        case _:
+            # External method token: no built-in sub-config to patch; select it as configured.
+            patched_provider_config = storage_provider_config
 
-    storage_provider = make_storage_provider_from_config(patched_provider_config)
+    storage_provider = get_storage_provider_registry().get_required(method=patched_provider_config.method)(patched_provider_config)
     return GeneratedContentFactory(storage_provider=storage_provider)
 
 

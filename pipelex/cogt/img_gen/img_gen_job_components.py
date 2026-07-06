@@ -1,5 +1,6 @@
 import re
-from typing import Annotated, Any, Literal, TypeAlias
+from enum import StrEnum
+from typing import Annotated, Any, Literal, Self, TypeAlias
 
 from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
@@ -7,7 +8,6 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.types import Self, StrEnum
 
 
 class AspectRatio(StrEnum):

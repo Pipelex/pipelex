@@ -1,6 +1,5 @@
 from importlib.resources import files
-
-from pipelex.types import Traversable
+from importlib.resources.abc import Traversable
 
 # Git-ignored config files that should not be synced between .pipelex and kit/configs.
 # These are personal override files that differ per developer/environment:

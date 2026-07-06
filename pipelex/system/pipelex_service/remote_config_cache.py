@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from json import JSONDecodeError
 from pathlib import Path
 from typing import Any
@@ -112,7 +112,7 @@ class RemoteConfigCache:
 
         cached = CachedRemoteConfig(
             schema_version=CACHE_SCHEMA_VERSION,
-            cached_at=datetime.now(tz=timezone.utc),
+            cached_at=datetime.now(tz=UTC),
             raw_config=remote_config_payload,
         )
         serialised = cached.model_dump_json()

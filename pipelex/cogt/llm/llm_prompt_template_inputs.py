@@ -13,8 +13,7 @@ from pipelex.tools.misc.string_utils import can_inject_text
 
 if TYPE_CHECKING:
     from collections.abc import ItemsView
-
-    from pipelex.types import Self
+    from typing import Self
 
 LLMPromptTemplateInputsDict = dict[str, Any]
 

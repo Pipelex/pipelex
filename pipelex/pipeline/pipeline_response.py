@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 from mthds.protocol.models import RunResultExecute, RunResultStart
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.runtime_bridge.serialization import resolve_main_stuff_root_key
-from pipelex.types import StrEnum
 
 
 class RunState(StrEnum):

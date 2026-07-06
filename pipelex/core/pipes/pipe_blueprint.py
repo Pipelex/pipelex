@@ -1,6 +1,7 @@
 import re
 from abc import ABC
-from typing import Any, cast, final
+from enum import StrEnum
+from typing import Any, Self, cast, final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -14,7 +15,6 @@ from pipelex.core.pipes.variable_multiplicity import (
     PresenceMarker,
     parse_concept_with_multiplicity,
 )
-from pipelex.types import Self, StrEnum
 
 # A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
 # `PipeCategory`. This is the one extra `type` tag the parse-time allowlists admit beyond the

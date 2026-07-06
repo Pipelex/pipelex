@@ -1,6 +1,6 @@
 """GraphTracer implementation that builds GraphSpec during pipeline execution."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from typing_extensions import override
@@ -252,7 +252,7 @@ class GraphTracer(GraphTracerProtocol):
             domain=pipeline_ref_domain,
             main_pipe=pipeline_ref_main_pipe,
         )
-        self._created_at = datetime.now(timezone.utc)
+        self._created_at = datetime.now(UTC)
         self._nodes = {}
         self._edges = []
         self._node_sequence = 0
@@ -294,7 +294,7 @@ class GraphTracer(GraphTracerProtocol):
             for node_data in self._nodes.values():
                 if node_data.status == NodeStatus.RUNNING:
                     node_data.status = NodeStatus.CANCELED
-                    node_data.ended_at = datetime.now(timezone.utc)
+                    node_data.ended_at = datetime.now(UTC)
 
             # Generate DATA edges by correlating input stuff_codes with producer nodes
             # (must happen before setting _is_active = False since add_edge checks it)
@@ -310,7 +310,7 @@ class GraphTracer(GraphTracerProtocol):
 
             graph = GraphSpec(
                 graph_id=self._graph_id or "unknown",
-                created_at=self._created_at or datetime.now(timezone.utc),
+                created_at=self._created_at or datetime.now(UTC),
                 pipeline_ref=self._pipeline_ref or PipelineRef(),
                 nodes=nodes,
                 edges=self._edges,
@@ -513,7 +513,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     list_stuff_code=list_stuff_code,
                     item_stuff_code=item_stuff_code,
@@ -557,7 +557,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     output_list_stuff_code=output_list_stuff_code,
                     item_stuff_code=item_stuff_code,
@@ -600,7 +600,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     combined_stuff_code=combined_stuff_code,
                     branch_stuff_codes=branch_stuff_codes,
@@ -720,7 +720,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
                     execution_data=execution_data,
@@ -825,7 +825,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
                     output_spec=output_spec,
@@ -970,7 +970,7 @@ class GraphTracer(GraphTracerProtocol):
                     pipeline_run_id=self._event_pipeline_run_id,
                     writer_id=self._event_writer_id(),
                     workflow_id=self._workflow_id,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     sequence=self._next_event_sequence(),
                     edge_id=edge_id,
                     source_node_id=source_node_id,

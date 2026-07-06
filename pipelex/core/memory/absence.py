@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from enum import StrEnum
 
-from pipelex.types import StrEnum
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AbsenceKind(StrEnum):

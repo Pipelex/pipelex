@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
-from pipelex.types import StrEnum
 
 VariableMultiplicity = bool | int
 

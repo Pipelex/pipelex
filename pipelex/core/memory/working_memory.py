@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Any, cast
+from typing import Any, Self, cast
 
 from mthds.protocol.working_memory import WorkingMemoryAbstract
 from pydantic import Field, model_validator
@@ -26,7 +26,6 @@ from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
-from pipelex.types import Self
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from pydantic import field_validator
 
 from pipelex.cogt.llm.reasoning_config_base import EffortToLevelMap, get_reasoning_level_str, validate_effort_to_level_map
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from google.genai import types as genai_types

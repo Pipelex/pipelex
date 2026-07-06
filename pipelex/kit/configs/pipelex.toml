@@ -120,6 +120,15 @@ project_id = ""
 signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
 
 ####################################################################################################
+# Secrets Config
+####################################################################################################
+
+[pipelex.secrets_config]
+# Secrets provider method: "env" (built-in, reads secrets from environment variables).
+# An external pipelex-secrets-<backend> plugin can add its own method (e.g. "vault").
+method = "env"
+
+####################################################################################################
 # Scan Config
 ####################################################################################################
 

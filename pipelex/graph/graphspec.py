@@ -6,12 +6,12 @@ GraphSpec is renderer-agnostic and designed for JSON serialization.
 
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from enum import StrEnum
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import Self, StrEnum
 
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200

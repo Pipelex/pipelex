@@ -1,6 +1,6 @@
 """Serialization round-trip tests for trace event models."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
@@ -34,7 +34,7 @@ class _Shared:
 
     PIPELINE_RUN_ID = "run_abc123"
     WORKFLOW_ID = "wf_pipe_router_xyz"
-    TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+    TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
     NODE_ID = "graph_1:wf_pipe_router_xyz:node_0"
     PARENT_NODE_ID = "graph_1:wf_pipe_router_xyz:node_1"
 

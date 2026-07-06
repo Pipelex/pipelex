@@ -9,7 +9,7 @@ allowing for normalized IDs (workflow_id segment stripped) and ignored TimingSpe
 """
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 import pytest
@@ -28,7 +28,7 @@ from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_conf
 _GRAPH_ID = "equiv_graph"
 _PIPELINE_RUN_ID = "equiv_run_001"
 _WORKFLOW_ID = "wf_equiv"
-_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 
 # ---------------------------------------------------------------------------
 # Structural comparison helpers

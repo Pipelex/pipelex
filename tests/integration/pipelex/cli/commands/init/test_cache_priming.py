@@ -14,7 +14,7 @@ These tests pin the helper's behaviour:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -78,7 +78,7 @@ def _store_malformed_cache(remote_config_payload: dict[str, object]) -> None:
     del remote_config_payload  # intentionally discarded — we write a deliberately broken payload
     cached = CachedRemoteConfig(
         schema_version=CACHE_SCHEMA_VERSION,
-        cached_at=datetime.now(tz=timezone.utc),
+        cached_at=datetime.now(tz=UTC),
         raw_config={},
     )
     cache_path = RemoteConfigCache.cache_path()

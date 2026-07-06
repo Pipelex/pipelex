@@ -4,6 +4,7 @@ Builds a render-specific GraphConfig, generates graph outputs, and saves them to
 Used by both the regular CLI and the agent CLI.
 """
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,6 @@ from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, sa
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.types import StrEnum
 
 
 def _sanitize_graph_name(graph_name: str) -> str:

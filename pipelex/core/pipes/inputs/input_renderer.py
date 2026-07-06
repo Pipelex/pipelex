@@ -1,11 +1,11 @@
 import json
+from enum import StrEnum
 from typing import Any
 
 import tomlkit
 
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.types import StrEnum
 
 
 class InputsTemplateFormat(StrEnum):

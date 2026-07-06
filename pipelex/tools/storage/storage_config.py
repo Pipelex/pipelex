@@ -1,12 +1,12 @@
+from enum import StrEnum
 from string import Formatter
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.storage.exceptions import StorageConfigError
-from pipelex.types import Self, StrEnum
 from pipelex.urls import URLs
 
 
@@ -171,7 +171,11 @@ class StorageGcpConfig(StorageBucketConfig):
 class StorageProviderConfig(ConfigModel):
     """Provider-selection config shared by asset storage and payload codec storage."""
 
-    method: StorageMethod = Field(strict=False)
+    # Open str token (D1): the built-ins use the StorageMethod values; an external
+    # ``pipelex-storage-<backend>`` plugin registers its own (e.g. "azure"). An unknown token is
+    # validated at registry lookup (UnknownStorageMethodError at boot), not at parse — so a config
+    # naming an external method still loads, and only the registry decides what is installable.
+    method: str = Field(strict=False)
     local: StorageLocalConfig | None = None
     in_memory: StorageInMemoryConfig | None = None
     s3: StorageS3Config | None = None
@@ -196,6 +200,10 @@ class StorageProviderConfig(ConfigModel):
                 if not self.gcp:
                     msg = "gcp config is required when method is gcp"
                     raise StorageConfigError(msg)
+            case _:
+                # External method token (D1): no built-in sub-config is required. Whether the token
+                # names an installed provider is validated at registry lookup, not here.
+                pass
         return self
 
     @property
@@ -206,7 +214,7 @@ class StorageProviderConfig(ConfigModel):
                     msg = "local config is required to access storage_path"
                     raise StorageConfigError(msg)
                 return self.local.local_storage_path
-            case StorageMethod.IN_MEMORY | StorageMethod.S3 | StorageMethod.GCP:
+            case _:
                 msg = f"storage_path is only available when method is local, but method is '{self.method}'"
                 raise StorageConfigError(msg)
 
@@ -233,6 +241,9 @@ class StorageProviderConfig(ConfigModel):
                     msg = "gcp config is required to access uri_format"
                     raise StorageConfigError(msg)
                 return self.gcp.uri_format
+            case _:
+                msg = f"uri_format is not available for method '{self.method}' (no built-in sub-config)"
+                raise StorageConfigError(msg)
 
 
 class StorageConfig(StorageProviderConfig):

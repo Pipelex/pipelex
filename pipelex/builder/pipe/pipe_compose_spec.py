@@ -1,4 +1,5 @@
-from typing import Any, Literal
+from enum import StrEnum
+from typing import Any, Literal, Self
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -14,7 +15,6 @@ from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import Self, StrEnum
 
 
 class TargetFormat(StrEnum):

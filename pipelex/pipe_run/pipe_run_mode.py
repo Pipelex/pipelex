@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class PipeRunMode(StrEnum):
