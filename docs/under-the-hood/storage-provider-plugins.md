@@ -17,7 +17,7 @@ The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchest
 
 > Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `storage_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
 
-This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism is planned to back the secrets provider seam in a follow-up (secrets is not yet registry-selected).
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism also backs the [secrets provider](secrets-provider-plugins.md) seam (`secrets_config.method`).
 
 ---
 
@@ -163,6 +163,7 @@ Use `pipelex plugins list` to see every discovered plugin, what each contributed
 
 ## Related
 
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the sibling config-selected-singleton seam riding the same mechanism; the `gcp` factory above reads its provider
 - [Inference Backend Plugins](inference-backend-plugins.md) — the per-call sibling seam and the shared discovery/denylist machinery
 - [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, plus the hub-slot mechanism storage deliberately avoids
 - [Error Model](error-model.md) — how these errors render and dereference

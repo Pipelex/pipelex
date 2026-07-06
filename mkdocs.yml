@@ -317,6 +317,7 @@ plugins:
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
+        - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
@@ -549,6 +550,7 @@ nav:
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
+      - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
       - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md
