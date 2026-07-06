@@ -1,6 +1,6 @@
 # Smart Inputs — signature-driven input shaping: design
 
-Status: **design approved — all decisions D1–D11 decided with Louis** (D1–D4 on 2026-07-06, D5–D11 approved 2026-07-07 with two amendments: the D9 resolution via a native `YesNo` concept as a companion track, and the D11 template-generation `--explicit` flag). Branch `feature/Smart-inputs` (worktree `_smart`), based on main at v0.38.0 (includes TOML inputs #1022 and Optionals phase 1 #1021). No implementation plan yet — that comes next.
+Status: **design approved — all decisions D1–D11 decided with Louis** (D1–D4 on 2026-07-06, D5–D11 approved 2026-07-07 with two amendments: the D9 resolution via a native `YesNo` concept as a companion track, and the D11 template-generation `--explicit` flag). Branch `feature/Smart-inputs` (worktree `_smart`), based on main at v0.38.0 (includes TOML inputs #1022 and Optionals phase 1 #1021). Execution order across the whole track (YesNo → Datetime → Smart Inputs, one release) is in this folder's `README.md`. No implementation plan yet — that comes next.
 
 ## 1. The problem
 
