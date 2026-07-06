@@ -2,7 +2,7 @@
 
 **Branch:** `feature/PipeSignature-not-a-type`
 **Design doc:** [`wip/pipe-signature-not-a-type.md`](wip/pipe-signature-not-a-type.md) — read this first for the *why*.
-**Status:** Phase 1 complete · Checkpoint 1 cleared · next = Phase 2 (spec authoring layer)
+**Status:** Phase 2 complete · Checkpoint 2 cleared · next = Phase 3 (breaking cleanup, fixture migration, docs)
 
 ## Goal in one line
 
@@ -97,7 +97,7 @@ Mirror the additive support so AI-authored specs get the identical clean surface
 
 ### ⛔ CHECKPOINT 2 — STOP
 
-- [x] Commit the phase. Record SHA: `34fd87849866a37f0f0005b725de7ff21960ebe5` → **amended after review to `__________`** (filled below).
+- [x] Commit the phase. Record SHA: `34fd87849866a37f0f0005b725de7ff21960ebe5` → **amended after review to `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28`**.
 - [x] Update the **Cold-start snapshot** below.
 - [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fan-out convention). Triage:
   - Findings: cold Sonnet-5 review, **no blocker/major**. The shared-helper extraction was verified behavior-identical (full diff compare + all blueprint/schema/reconciliation/structured-error suites + new spec tests pass); before-validator confirmed to handle None / non-dict / raw-dict / already-built-instance identically to the blueprint. Two minor findings + one nit, both in the areas flagged for scrutiny:
@@ -166,7 +166,7 @@ The one breaking phase: reject the old tag, migrate every bundle, reword renderi
 > - **Open threads / review findings deferred:** …
 > - **Exact next action:** …
 
-- **Phase reached / last green SHA:** Phase 2 complete (additive typeless-signature support mirrored into the spec/authoring layer). Baseline (Phase-1 review diff base) = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 commit = `e864b82486f00502206c6aa11b609b5256392e30`. Phase-2 commit SHA = `34fd87849866a37f0f0005b725de7ff21960ebe5`.
+- **Phase reached / last green SHA:** Phase 2 complete (additive typeless-signature support mirrored into the spec/authoring layer). Baseline (Phase-1 review diff base) = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 commit = `e864b82486f00502206c6aa11b609b5256392e30`. Phase-2 commit SHA = `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28` (amended in-place after the Checkpoint-2 review to fold F1/F2 fixes).
 - **What changed and where the seam lives (Phase 2, spec layer):**
   - **Shared normalizer.** The Phase-1 per-section logic is now a single module-level free function `normalize_typeless_signature_section(pipe_code, *, pipe_section, allowed_keys=SIGNATURE_ONLY_KEYS)` in `pipelex/core/pipes/pipe_blueprint.py` (next to `SIGNATURE_ONLY_KEYS`). Both layers call it: `PipelexBundleBlueprint.validate_pipe_keys` (blueprint) and the new `PipelexBundleSpec.validate_pipe_keys` (spec). This makes the teaching message — whose exact wording the categorizer's `_MISSING_PIPE_TYPE_MARKER` keys off — truly single-source. The blueprint's old `_normalize_typeless_signature` classmethod was deleted.
   - **Spec dispatch site.** `PipelexBundleSpec.pipe: dict[str, PipeSpecUnion]` (`pipelex/builder/bundle_spec.py`) gained a `@field_validator("pipe", mode="before")` that is a **full** mirror of the blueprint's: it rejects a non-snake_case dict key (`is_pipe_code_valid`) up front, then normalizes each section (typeless contract-only → inject `type = "PipeSignature"` → routes to `PipeSignatureSpec`; typeless + stray field → teaching error; typed section / already-built spec instance → untouched).
