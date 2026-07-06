@@ -43,6 +43,10 @@ class PipeInputContract(BaseModel):
     """One declared input: the concept it expects and the JSON Schema of its content."""
 
     concept_ref: str
+    optional: bool = False
+    """`True` when the input is declared optional (`?`): the caller may omit it and the pipe
+    handles absence itself. A plain or force (`!`) input reports `False` — it must be provided."""
+
     json_schema: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -51,6 +55,9 @@ class PipeOutputContract(BaseModel):
 
     concept_ref: str
     multiplicity: IOMultiplicity
+    optional: bool = False
+    """`True` when the output is declared optional (`?`): the pipe may resolve it as a recorded
+    absence instead of a value — a successful run with an absent result."""
 
 
 class PipeIOContract(BaseModel):
@@ -107,11 +114,13 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
                 schema_memo[memo_key] = json_schema
             pipe_inputs[var_name] = PipeInputContract(
                 concept_ref=stuff_spec.concept.concept_ref,
+                optional=stuff_spec.presence.is_optional,
                 json_schema=json_schema,
             )
         pipe_output = PipeOutputContract(
             concept_ref=pipe.output.concept.concept_ref,
             multiplicity=IOMultiplicity.VARIABLE if pipe.output.is_multiple() else IOMultiplicity.SINGLE,
+            optional=pipe.output.presence.is_optional,
         )
         io_contracts[pipe.pipe_ref] = PipeIOContract(inputs=pipe_inputs, output=pipe_output)
     return io_contracts

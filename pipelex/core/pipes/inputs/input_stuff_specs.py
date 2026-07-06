@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -60,7 +60,11 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
                 log.verbose(
                     f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {stuff_spec}",
                 )
-            transformed_dict[transformed_key] = StuffSpec(concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            transformed_dict[transformed_key] = StuffSpec(
+                concept=stuff_spec.concept,
+                multiplicity=stuff_spec.multiplicity,
+                presence=stuff_spec.presence,
+            )
 
         return transformed_dict
 
@@ -81,8 +85,15 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
-    def add_stuff_spec(self, variable_name: str, *, concept: Concept, multiplicity: VariableMultiplicity | None = None):
-        self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
+    def add_stuff_spec(
+        self,
+        variable_name: str,
+        *,
+        concept: Concept,
+        multiplicity: VariableMultiplicity | None = None,
+        presence: PresenceMarker = PresenceMarker.PLAIN,
+    ):
+        self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity, presence=presence)
 
     @property
     def items(self) -> list[tuple[str, StuffSpec]]:
@@ -107,9 +118,23 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         return list(self.root.keys())
 
     @property
-    def required_names(self) -> list[str]:
-        the_required_names: list[str] = []
+    def declared_names(self) -> list[str]:
+        """Every declared input name, regardless of presence marker."""
+        the_declared_names: list[str] = []
         for requirement_expression in self.root:
+            declared_variable_name = get_root_from_dotted_path(requirement_expression)
+            the_declared_names.append(declared_variable_name)
+        return the_declared_names
+
+    @property
+    def required_names(self) -> list[str]:
+        """Declared input names whose value is required at run time: plain and forced (`!`)
+        inputs. Optional (`?`) inputs are declared but may legitimately be absent.
+        """
+        the_required_names: list[str] = []
+        for requirement_expression, stuff_spec in self.root.items():
+            if stuff_spec.presence.is_optional:
+                continue
             required_variable_name = get_root_from_dotted_path(requirement_expression)
             the_required_names.append(required_variable_name)
         return the_required_names
@@ -125,6 +150,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
                     requirement_expression=requirement_expression,
                     concept=stuff_spec.concept,
                     multiplicity=stuff_spec.multiplicity,
+                    presence=stuff_spec.presence,
                 ),
             )
         return the_named_stuff_spec

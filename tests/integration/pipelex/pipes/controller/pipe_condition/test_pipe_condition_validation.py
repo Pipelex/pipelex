@@ -73,7 +73,7 @@ class TestPipeConditionValidation:
         pipe_condition_template_blueprint = PipeConditionBlueprint(
             description="Test condition with expression template",
             inputs={"var": concept_1.concept_ref},
-            output=concept_2.concept_ref,
+            output=f"{concept_2.concept_ref}?",
             expression_template="{{ var }}",
             outcomes={"value": "target_pipe"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -89,7 +89,7 @@ class TestPipeConditionValidation:
         pipe_condition_expr_blueprint = PipeConditionBlueprint(
             description="Test condition with expression",
             inputs={"var": concept_1.concept_ref},
-            output=concept_2.concept_ref,
+            output=f"{concept_2.concept_ref}?",
             expression="var",
             outcomes={"value": "target_pipe"},
             default_outcome=SpecialOutcome.CONTINUE,

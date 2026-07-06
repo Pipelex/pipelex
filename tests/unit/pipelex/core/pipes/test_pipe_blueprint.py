@@ -92,7 +92,9 @@ class TestPipeBlueprintValidation:
                 type="PipeLLM",
                 pipe_category="PipeOperator",
                 description="lorem ipsum",
-                inputs={"text": "InvalidFormat!"},
+                # NOTE: a trailing "!" is now valid grammar (force marker); use a genuinely
+                # malformed spec to exercise the syntax rejection
+                inputs={"text": "Invalid@Format"},
                 output="Text",
             )
         assert "Invalid input syntax" in str(exc_info.value)
@@ -113,7 +115,9 @@ class TestPipeBlueprintValidation:
                 pipe_category="PipeOperator",
                 description="lorem ipsum",
                 inputs={"text": "Text"},
-                output="InvalidConcept!",
+                # NOTE: a trailing "!" is now valid grammar but rejected on outputs (force marker
+                # is a use-site assertion); a genuinely malformed spec still hits the syntax error
+                output="Invalid@Concept",
             )
         assert "Invalid concept specification syntax" in str(exc_info.value)
 

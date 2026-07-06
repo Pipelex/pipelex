@@ -15,6 +15,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -90,12 +91,24 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
         for input_name, stuff_spec in self.inputs.root.items():
-            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            needed_inputs.add_stuff_spec(
+                variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+            )
         return needed_inputs
 
     @override
     def validate_inputs_static(self):
-        pass
+        # Guard-lint (D7): every template reference to a declared-optional input must be guarded.
+        # Construct mode composes structured fields, not authored templates — nothing to lint there.
+        if self.template is not None:
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=self.template,
+                template_category=self.category,
+                template_label="template",
+            )
 
     @override
     def validate_inputs_with_library(self):

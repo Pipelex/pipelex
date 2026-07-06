@@ -178,6 +178,117 @@ class TestGraphTracer:
         assert node.error.message == "Something went wrong"
         assert node.error.stack == "Traceback..."
 
+    def test_skipped_tracking(self) -> None:
+        """A lifted (skipped) pipe ends its node in the SKIPPED state with the skip reason."""
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="skip-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(UTC)
+        node_id, _ = tracer.on_pipe_start(
+            trace_context=context,
+            pipe_code="lifted_pipe",
+            pipe_type="PipeFunc",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+
+        tracer.on_pipe_end_skipped(
+            node_id=node_id,
+            ended_at=started_at + timedelta(milliseconds=5),
+            skip_reason="skipped because input 'source' is absent",
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        node = graph_spec.nodes[0]
+        assert node.status == NodeStatus.SKIPPED
+        assert node.skip_reason == "skipped because input 'source' is absent"
+        assert node.error is None
+        assert node.timing is not None
+
+    def test_skipped_plural_output_still_produces_data_edge(self) -> None:
+        """A lifted pipe with a PLURAL output wrote a real empty-list Stuff (D4) — its output spec
+        rides the skip and registers in the producer map, so the downstream DATA edge resolves.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="skip-plural-edge-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(UTC)
+        producer_id, _ = tracer.on_pipe_start(
+            trace_context=context,
+            pipe_code="lifted_plural_pipe",
+            pipe_type="PipeFunc",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        tracer.on_pipe_end_skipped(
+            node_id=producer_id,
+            ended_at=started_at + timedelta(milliseconds=5),
+            skip_reason="skipped because input 'source' is absent",
+            output_spec=IOSpec(name="items", concept="Text", digest="stuff-empty-list"),
+        )
+
+        consumer_id, _ = tracer.on_pipe_start(
+            trace_context=context,
+            pipe_code="items_consumer",
+            pipe_type="PipeFunc",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=10),
+            input_specs=[IOSpec(name="items", digest="stuff-empty-list")],
+        )
+        tracer.on_pipe_end_success(node_id=consumer_id, ended_at=started_at + timedelta(milliseconds=20))
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        skipped_node = next(node for node in graph_spec.nodes if node.node_id == producer_id)
+        assert skipped_node.status == NodeStatus.SKIPPED
+        assert [output.digest for output in skipped_node.node_io.outputs] == ["stuff-empty-list"]
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
+        assert len(data_edges) == 1
+        assert data_edges[0].source == producer_id
+        assert data_edges[0].target == consumer_id
+        assert data_edges[0].optional is False
+
+    def test_data_edge_from_optional_output_carries_marker(self) -> None:
+        """A DATA edge whose producer output is declared optional (`?`) reports optional=True."""
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="optional-edge-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(UTC)
+        producer_id, _ = tracer.on_pipe_start(
+            trace_context=context,
+            pipe_code="maybe_producer",
+            pipe_type="PipeCondition",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+        tracer.on_pipe_end_success(
+            node_id=producer_id,
+            ended_at=started_at + timedelta(milliseconds=10),
+            output_spec=IOSpec(name="verdict", digest="stuff-verdict", extra={"optional": True}),
+        )
+
+        consumer_id, _ = tracer.on_pipe_start(
+            trace_context=context,
+            pipe_code="verdict_consumer",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=20),
+            input_specs=[IOSpec(name="verdict", digest="stuff-verdict")],
+        )
+        tracer.on_pipe_end_success(node_id=consumer_id, ended_at=started_at + timedelta(milliseconds=30))
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
+        assert len(data_edges) == 1
+        assert data_edges[0].source == producer_id
+        assert data_edges[0].target == consumer_id
+        assert data_edges[0].optional is True
+
     def test_running_nodes_marked_canceled_on_teardown(self) -> None:
         """Test that running nodes are marked as canceled on teardown."""
         tracer = GraphTracer()

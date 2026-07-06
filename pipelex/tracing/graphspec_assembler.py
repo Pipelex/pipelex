@@ -23,6 +23,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    output_digest_is_optional,
 )
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -32,6 +33,7 @@ from pipelex.tracing.trace_events import (
     ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
+    PipeEndSkippedEvent,
     PipeEndSuccessEvent,
     PipeStartEvent,
     TraceEvent,
@@ -67,6 +69,7 @@ class _AssemblerNodeData:
         self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
+        self.skip_reason: str | None = None
         self.metrics: dict[str, float] = {}
         self.error: ErrorSpec | None = None
         self.input_specs: list[IOSpec] = input_specs or []
@@ -95,6 +98,7 @@ class _AssemblerNodeData:
             description=self.description,
             domain_code=self.domain_code,
             status=self.status,
+            skip_reason=self.skip_reason,
             timing=timing,
             node_io=node_io,
             error=self.error,
@@ -171,6 +175,8 @@ class _AssemblerState:
                 self._handle_pipe_end_success(event)
             elif isinstance(event, PipeEndErrorEvent):
                 self._handle_pipe_end_error(event)
+            elif isinstance(event, PipeEndSkippedEvent):
+                self._handle_pipe_end_skipped(event)
             elif isinstance(event, EdgeEvent):
                 self._handle_edge_event(event)
             elif isinstance(event, ControllerOutputEvent):
@@ -283,6 +289,29 @@ class _AssemblerState:
         node_data.status = NodeStatus.FAILED
         node_data.error = event.error
 
+    def _handle_pipe_end_skipped(self, event: PipeEndSkippedEvent) -> None:
+        node_data = self._nodes.get(event.node_id)
+        if node_data is None:
+            log.warning(f"PipeEndSkippedEvent for unknown node: {event.node_id}")
+            return
+
+        node_data.ended_at = event.ended_at
+        node_data.status = NodeStatus.SKIPPED
+        node_data.skip_reason = event.skip_reason
+
+        # A lifted pipe with a PLURAL output still wrote a real empty-list Stuff (D4) — register
+        # it so downstream DATA edges resolve (mirrors GraphTracer.on_pipe_end_skipped).
+        if event.output_concept_data:
+            concept_ref = f"{event.output_concept_data.get('domain_code', '')}.{event.output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = event.output_concept_data
+        if event.output_spec is not None:
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if event.output_spec.digest not in input_digests:
+                node_data.output_specs.append(event.output_spec)
+                if event.output_spec.digest:
+                    self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
     def _handle_edge_event(self, event: EdgeEvent) -> None:
         # DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE are regenerated
         # in pass 2 with full cross-worker visibility — skip to avoid duplicates.
@@ -293,6 +322,7 @@ class _AssemblerState:
                     source=event.source_node_id,
                     target=event.target_node_id,
                     kind=event.edge_kind,
+                    optional=event.optional,
                     label=event.label,
                     source_stuff_digest=event.source_stuff_digest,
                     target_stuff_digest=event.target_stuff_digest,
@@ -366,17 +396,29 @@ class _AssemblerState:
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         edge = EdgeSpec(
             edge_id=self._make_edge_id(),
             source=source_node_id,
             target=target_node_id,
             kind=edge_kind,
+            optional=optional,
             label=label,
             source_stuff_digest=source_stuff_digest,
             target_stuff_digest=target_stuff_digest,
         )
         self._generated_edges.append(edge)
+
+    def _is_optional_output_digest(self, *, producer_node_id: str, digest: str) -> bool:
+        """Whether the producer registered this digest as a declared-optional (`?`) output.
+
+        Node lookup here; the marker semantics live in the shared `output_digest_is_optional`.
+        """
+        producer_data = self._nodes.get(producer_node_id)
+        if producer_data is None:
+            return False
+        return output_digest_is_optional(producer_data.output_specs, digest=digest)
 
     def _generate_data_edges(self) -> None:
         """Generate DATA edges by correlating input digests with producer nodes.
@@ -397,6 +439,7 @@ class _AssemblerState:
                     target_node_id=consumer_node_id,
                     edge_kind=EdgeKind.DATA,
                     label=input_spec.name,
+                    optional=self._is_optional_output_digest(producer_node_id=producer_node_id, digest=input_spec.digest),
                 )
 
     def _generate_batch_item_edges(self) -> None:

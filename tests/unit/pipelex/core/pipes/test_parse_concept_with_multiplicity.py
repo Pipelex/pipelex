@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, parse_concept_with_multiplicity
 
 
 class TestParseConceptWithMultiplicity:
@@ -116,3 +116,62 @@ class TestParseConceptWithMultiplicity:
         result = parse_concept_with_multiplicity("a.b.c.d.Entity[]")
         assert result.concept_ref_or_code == "a.b.c.d.Entity"
         assert result.multiplicity is True
+
+    # ========== Presence marker tests ==========
+
+    def test_no_marker_means_plain_presence(self):
+        """A spec without a presence marker parses as plain presence."""
+        for spec in ["Text", "Text[]", "Text[5]", "domain.Concept"]:
+            result = parse_concept_with_multiplicity(spec)
+            assert result.presence == PresenceMarker.PLAIN
+
+    @pytest.mark.parametrize(
+        ("spec", "expected_concept", "expected_multiplicity", "expected_presence"),
+        [
+            ("Text?", "Text", None, PresenceMarker.OPTIONAL),
+            ("Text!", "Text", None, PresenceMarker.FORCE),
+            ("domain.Concept?", "domain.Concept", None, PresenceMarker.OPTIONAL),
+            ("domain.Concept!", "domain.Concept", None, PresenceMarker.FORCE),
+            ("legal.contracts.PenaltyClause?", "legal.contracts.PenaltyClause", None, PresenceMarker.OPTIONAL),
+            ("_PrivateConcept?", "_PrivateConcept", None, PresenceMarker.OPTIONAL),
+            # The parser accepts marker + multiplicity combinations (multiplicity then presence,
+            # e.g. "X[]?"); the D1 mutual-exclusion rule is enforced at the blueprint/spec layer
+            # where the context (input vs output) is known.
+            ("Text[]?", "Text", True, PresenceMarker.OPTIONAL),
+            ("Text[3]?", "Text", 3, PresenceMarker.OPTIONAL),
+            ("Text[]!", "Text", True, PresenceMarker.FORCE),
+        ],
+    )
+    def test_presence_marker_parsing(
+        self,
+        spec: str,
+        expected_concept: str,
+        expected_multiplicity: int | bool | None,
+        expected_presence: PresenceMarker,
+    ):
+        """Presence markers parse alongside multiplicity."""
+        result = parse_concept_with_multiplicity(spec)
+        assert result.concept_ref_or_code == expected_concept
+        assert result.multiplicity == expected_multiplicity
+        assert result.presence == expected_presence
+
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            "Text??",
+            "Text?!",
+            "Text!?",
+            "Text!!",
+            # Fixed order: multiplicity then presence — marker before brackets is a syntax error
+            "Text?[]",
+            "Text![3]",
+            "?Text",
+            "!Text",
+            "?",
+            "!",
+        ],
+    )
+    def test_invalid_presence_marker_syntax(self, spec: str):
+        """Doubled markers, marker-before-brackets, and bare markers are syntax errors."""
+        with pytest.raises(ValueError, match="Invalid concept specification syntax"):
+            parse_concept_with_multiplicity(spec)

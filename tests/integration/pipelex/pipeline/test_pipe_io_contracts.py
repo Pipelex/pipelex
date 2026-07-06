@@ -66,8 +66,62 @@ prompt = "Make items from:\\n@docs"
 """
 
 
+_OPTIONAL_MTHDS = """
+domain = "optional_contracts_test"
+description = "Bundle exercising presence markers on IO contracts"
+
+[concept.Verdict]
+description = "A verdict"
+
+[pipe.assess]
+type = "PipeLLM"
+description = "Assess with an optional hint"
+inputs = { doc = "Text", hint = "Text?" }
+output = "Verdict"
+prompt = '''
+Assess $doc.
+@?hint
+'''
+
+[pipe.check]
+type = "PipeLLM"
+description = "Check the doc"
+inputs = { doc = "Text" }
+output = "Verdict"
+prompt = "Check $doc"
+
+[pipe.gate]
+type = "PipeCondition"
+description = "Gate that may continue with no output"
+inputs = { doc = "Text" }
+output = "Verdict?"
+expression = "doc"
+default_outcome = "continue"
+
+[pipe.gate.outcomes]
+go = "check"
+"""
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestBuildPipeIOContracts:
+    async def test_optional_markers_reported_on_contracts(self, load_empty_library: Callable[[], str]) -> None:
+        """A `?`-declared input/output reports optional=True on its contract; plain ones False."""
+        outer_library_id = load_empty_library()
+        try:
+            result = await validate_bundle(mthds_contents=[_OPTIONAL_MTHDS])
+            io_contracts = build_pipe_io_contracts(result.pipes)
+        finally:
+            _teardown_validation_library(outer_library_id)
+
+        assess = io_contracts["optional_contracts_test.assess"]
+        assert assess.inputs["doc"].optional is False
+        assert assess.inputs["hint"].optional is True
+        assert assess.output.optional is False
+
+        gate = io_contracts["optional_contracts_test.gate"]
+        assert gate.output.optional is True
+
     async def test_multiplicity_entry_shapes(self, load_empty_library: Callable[[], str]) -> None:
         """Entries are keyed by namespaced pipe_ref; output multiplicity is single vs variable."""
         outer_library_id = load_empty_library()

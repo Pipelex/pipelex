@@ -6,6 +6,7 @@ from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryStuffAttributeNotFoundError,
@@ -38,6 +39,11 @@ StuffArtefactDict = dict[str, StuffArtefact]
 class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: dict[str, str] = Field(default_factory=dict)
+    # The absence ledger (D2): recorded facts that a named slot holds no value, with provenance.
+    # A name may carry both a value and a record (D4 plural normalization note); the value wins
+    # for consumers — records are consulted only when no Stuff is present, and enumerated whole
+    # by the run report.
+    absences: dict[str, AbsenceRecord] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_stuff_names(self) -> Self:
@@ -93,6 +99,74 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
         )
 
+    def record_absence(self, record: AbsenceRecord) -> None:
+        """Write a ledger NOTE: the record is keyed by variable name, any value under that name
+        is left in place (and wins in `resolve_stuff`). This is the observability-note arm (e.g.
+        the D4 plural empty-list note); an absence that RESOLVES a slot goes through
+        `record_resolved_absence` instead.
+        """
+        self.absences[record.variable_name] = record
+
+    def record_resolved_absence(self, record: AbsenceRecord) -> None:
+        """Record an absence as the slot's RESOLUTION: a stale value (or alias) under the same
+        name is removed so it cannot outrank the fresh absence — the mirror of `set_stuff`'s
+        value-supersedes-record invariant.
+        """
+        self.remove_stuff(name=record.variable_name)
+        self.remove_alias(alias=record.variable_name)
+        self.record_absence(record)
+
+    def get_optional_absence(self, name: str) -> AbsenceRecord | None:
+        """Alias-aware, mirroring `get_optional_stuff`: an alias to a resolved-absent slot must
+        surface the record, not degrade to a hard miss.
+        """
+        if record := self.absences.get(name):
+            return record
+        if alias := self.aliases.get(name):
+            return self.absences.get(alias)
+        return None
+
+    def record_new_main_absence(self, record: AbsenceRecord) -> None:
+        """Record a pipe-output absence as the resolved main result.
+
+        Marks both the named slot and the main-stuff position, and removes any stale value under
+        either name so a previous output cannot masquerade as this pipe's. Other names stay
+        untouched — memory is otherwise unchanged.
+        """
+        self.remove_main_stuff()
+        self.remove_alias_to_main_stuff()
+        self.record_resolved_absence(record)
+        self.absences[MAIN_STUFF_NAME] = record
+
+    def resolve_stuff(self, name: str) -> Stuff | AbsenceRecord:
+        """Tri-state resolved accessor for post-run reads: a value or a recorded absence.
+
+        A present Stuff wins over a ledger note under the same name. A slot with neither a value
+        nor a record is a hard miss — never produced, which is a bug, not an absence.
+        """
+        if stuff := self.get_optional_stuff(name=name):
+            return stuff
+        if record := self.get_optional_absence(name=name):
+            return record
+        raise WorkingMemoryStuffNotFoundError(
+            variable_name=name,
+            message=(
+                f"Stuff '{name}' not found in working memory and no absence is recorded for it. "
+                f"Valid keys are: {self.list_keys()}; recorded absences: {list(self.absences.keys())}"
+            ),
+        )
+
+    def resolve_main_stuff(self) -> Stuff | AbsenceRecord:
+        return self.resolve_stuff(name=MAIN_STUFF_NAME)
+
+    def list_missing_names(self, names: set[str]) -> list[str]:
+        """The names (sorted) that hold neither a value nor a recorded absence — genuine misses.
+
+        The shared miss-gate check for controllers: a recorded absence is not a miss (the
+        consuming pipe's own gate applies the trichotomy — skip / run / force).
+        """
+        return [name for name in sorted(names) if self.get_optional_stuff(name=name) is None and self.get_optional_absence(name=name) is None]
+
     def get_stuffs(self, names: set[str]) -> list[Stuff]:
         the_stuffs: list[Stuff] = []
         for name in names:
@@ -118,6 +192,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
     def set_stuff(self, *, name: str, stuff: Stuff):
         self.root[name] = stuff
+        # A value written under a name supersedes its absence record.
+        self.absences.pop(name, None)
 
     def is_stuff_exists(self, name: str) -> bool:
         return name in self.root or name in self.aliases
@@ -145,6 +221,9 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
     def set_new_main_stuff(self, stuff: Stuff, *, name: str | None = None):
         # TODO: Add unit tests for this method
+        # A real main output supersedes any positional main-stuff absence record; named-slot
+        # records for other variables stay (they remain genuinely absent).
+        self.absences.pop(MAIN_STUFF_NAME, None)
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])

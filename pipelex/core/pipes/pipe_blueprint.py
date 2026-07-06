@@ -7,8 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.validation import validate_input_name
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import (
+    MULTIPLICITY_PATTERN,
+    PipeVariableMultiplicityError,
+    PresenceMarker,
+    parse_concept_with_multiplicity,
+)
 
 # A signature is NOT an executable pipe kind: it is deliberately absent from `PipeType` and
 # `PipeCategory`. This is the one extra `type` tag the parse-time allowlists admit beyond the
@@ -277,17 +283,35 @@ class PipeBlueprint(ABC, BaseModel):
             for input_name, concept_spec in self.inputs.items():
                 validate_input_name(input_name)
 
-                # Validate the concept spec format with optional multiplicity brackets
-                # Pattern allows: ConceptName, domain.ConceptName, ConceptName[], ConceptName[N]
-                match = re.match(MUTLIPLICITY_PATTERN, concept_spec)
+                # Validate the concept spec format: optional multiplicity brackets then optional
+                # presence marker. Pattern allows: ConceptName, domain.ConceptName, ConceptName[],
+                # ConceptName[N], ConceptName?, ConceptName!
+                match = re.match(MULTIPLICITY_PATTERN, concept_spec)
                 if not match:
                     msg = (
                         f"Invalid input syntax for '{input_name}': '{concept_spec}'. "
-                        f"Expected format: 'ConceptName', 'ConceptName[]', or 'ConceptName[N]' where N is an integer."
+                        f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]' where N is an integer, "
+                        f"with an optional presence marker '?' or '!' on singular forms (e.g. 'ConceptName?')."
                     )
                     raise ValueError(msg)
 
-                # Extract the concept part (without multiplicity) and validate it
+                # D1/D4: presence markers are mutually exclusive with multiplicity — a plural slot's
+                # "nothing" is the empty list, so there is nothing for `?` or `!` to say.
+                bracket_content = match.group(2)
+                presence = PresenceMarker.from_symbol(match.group(3))
+                if not presence.is_plain and bracket_content is not None:
+                    msg = (
+                        f"Invalid input '{input_name}': '{concept_spec}'. "
+                        f"The presence marker '{presence.symbol}' cannot be combined with multiplicity: "
+                        f"a plural slot is never absent — when nothing is found, it is the empty list."
+                    )
+                    raise PipeValidationError(
+                        message=msg,
+                        error_type=PipeValidationErrorType.OPTIONAL_MARKER_INVALID,
+                        variable_names=[input_name],
+                    )
+
+                # Extract the concept part (without markers) and validate it
                 concept_ref_or_code = match.group(1)
                 try:
                     validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
@@ -299,12 +323,34 @@ class PipeBlueprint(ABC, BaseModel):
 
     @final
     def generic_validate_output(self):
-        # Strip multiplicity brackets before validating
+        # Strip multiplicity brackets and presence marker before validating
         try:
             output_parse_result = parse_concept_with_multiplicity(self.output)
         except PipeVariableMultiplicityError as exc:
             msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
             raise ValueError(msg) from exc
+
+        # D1: `!` is a use-site assertion — it is meaningless on outputs (a producer doesn't unwrap).
+        if output_parse_result.presence.is_force:
+            msg = (
+                f"Invalid output: '{self.output}'. The force marker '!' is not allowed on outputs — "
+                f"it is a use-site assertion for inputs. To declare that this pipe may produce no value, use '?'."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.OPTIONAL_MARKER_INVALID,
+            )
+        # D4: `?` is mutually exclusive with multiplicity — an absent plural normalizes to the empty list.
+        if output_parse_result.presence.is_optional and output_parse_result.multiplicity is not None:
+            msg = (
+                f"Invalid output: '{self.output}'. The optional marker '?' cannot be combined with multiplicity: "
+                f"a plural slot is never absent — when nothing is found, it is the empty list."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.OPTIONAL_MARKER_INVALID,
+            )
+
         try:
             validate_concept_ref_or_code(concept_ref_or_code=output_parse_result.concept_ref_or_code)
         except ConceptStringError as exc:

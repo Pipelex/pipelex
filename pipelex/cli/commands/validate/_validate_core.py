@@ -30,8 +30,10 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
+from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -41,7 +43,19 @@ from pipelex.tools.misc.string_utils import count_with_noun
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pipelex.core.pipes.pipe_abstract import PipeAbstract
+
 COMMAND = "validate"
+
+
+def _echo_optionality_warnings(pipes: list[PipeAbstract]) -> None:
+    """Render the advisory optionality lints (e.g. the useless-`!` lint) in yellow.
+
+    Advisory only — a warning never changes the validation verdict or the exit code. Requires
+    the validation library to still be loaded (the taint walk resolves child pipes via the hub).
+    """
+    for warning in build_optionality_warnings(collect_controller_taint_analyses(pipes)):
+        typer.secho(f"Warning: {warning.message}", fg=typer.colors.YELLOW)
 
 
 def _format_signatures_summary_suffix(signature_count: int) -> str:
@@ -84,6 +98,10 @@ def do_validate_all_libraries_and_dry_run(
             # validate_current_library owns the static wiring pass and the single PIPE_DRY_RUN telemetry
             # event — sweeping the library we just loaded, without teardown.
             asyncio.run(BundleValidator().validate_current_library(allow_signatures=allow_signatures))
+
+            # Advisory optionality lints over the whole loaded library (the lint's cross-flow
+            # aggregation needs every flow) — printed even when the signature gate below exits non-zero.
+            _echo_optionality_warnings(all_pipes)
 
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # library with unsatisfied PipeSignature placeholders is valid yet NOT runnable. `validate
@@ -141,6 +159,9 @@ async def _validate_pipe_or_bundle(
                 f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count)}",
                 fg=typer.colors.GREEN,
             )
+            # validate_bundle leaves its validation library open on success, so the taint walk
+            # behind the advisory lints can still resolve the bundle's pipes.
+            _echo_optionality_warnings(bundle_result.pipes)
         except FileNotFoundError as exc:
             get_console().print(Traceback())
             typer.secho(

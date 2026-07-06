@@ -19,6 +19,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    output_digest_is_optional,
 )
 from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
@@ -30,6 +31,7 @@ from pipelex.tracing.trace_events import (
     ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
+    PipeEndSkippedEvent,
     PipeEndSuccessEvent,
     PipeStartEvent,
     TraceEvent,
@@ -61,6 +63,7 @@ class _MutableNodeData:
         self.domain_code = domain_code
         self.ended_at: datetime | None = None
         self.status: NodeStatus = NodeStatus.RUNNING
+        self.skip_reason: str | None = None
         self.output_preview: str | None = None
         self.metrics: dict[str, float] = {}
         self.error: ErrorSpec | None = None
@@ -93,6 +96,7 @@ class _MutableNodeData:
             description=self.description,
             domain_code=self.domain_code,
             status=self.status,
+            skip_reason=self.skip_reason,
             timing=timing,
             node_io=node_io,
             error=self.error,
@@ -354,13 +358,26 @@ class GraphTracer(GraphTracerProtocol):
                 if producer_node_id == consumer_node_id:
                     # Don't create self-loops
                     continue
-                # Create DATA edge: producer → consumer, labeled with the stuff name
+                # Create DATA edge: producer → consumer, labeled with the stuff name. The edge
+                # carries the optional marker when the producer's output was declared `?` (the
+                # value may be absent in other runs) — read off the producer's output spec.
                 self.add_edge(
                     source_node_id=producer_node_id,
                     target_node_id=consumer_node_id,
                     edge_kind=EdgeKind.DATA,
                     label=input_spec.name,
+                    optional=self._is_optional_output_digest(producer_node_id=producer_node_id, digest=input_spec.digest),
                 )
+
+    def _is_optional_output_digest(self, *, producer_node_id: str, digest: str) -> bool:
+        """Whether the producer registered this digest as a declared-optional (`?`) output.
+
+        Node lookup here; the marker semantics live in the shared `output_digest_is_optional`.
+        """
+        producer_data = self._nodes.get(producer_node_id)
+        if producer_data is None:
+            return False
+        return output_digest_is_optional(producer_data.output_specs, digest=digest)
 
     def _generate_batch_item_edges(self) -> None:
         """Generate BATCH_ITEM edges for batch fan-out.
@@ -858,6 +875,65 @@ class GraphTracer(GraphTracerProtocol):
             )
 
     @override
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record that a pipe was lifted (skipped): its own node state, with the reason.
+
+        A lifted pipe with a PLURAL output still writes a real empty-list Stuff (D4) that
+        downstream pipes consume — its spec registers in the producer map exactly like a
+        success output, so the DATA edge to those consumers resolves.
+        """
+        if not self._is_active:
+            return
+
+        node_data = self._nodes.get(node_id)
+        if node_data is None:
+            return
+
+        node_data.ended_at = ended_at
+        node_data.status = NodeStatus.SKIPPED
+        node_data.skip_reason = skip_reason
+
+        # Accumulate output concept data (deduplicated) — mirrors on_pipe_end_success
+        if output_concept_data is not None:
+            concept_ref = f"{output_concept_data.get('domain_code', '')}.{output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = output_concept_data
+
+        # Store output spec and register in producer map — mirrors on_pipe_end_success
+        # (including the pass-through check, vacuous here since the empty list is fresh)
+        if output_spec is not None:
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if output_spec.digest not in input_digests:
+                node_data.output_specs.append(output_spec)
+                if output_spec.digest:
+                    self._stuff_producer_map[output_spec.digest] = node_id
+
+        # Emit PipeEndSkippedEvent
+        if self._event_log is not None:
+            self._emit_event(
+                PipeEndSkippedEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
+                    workflow_id=self._workflow_id,
+                    timestamp=ended_at,
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    ended_at=ended_at,
+                    skip_reason=skip_reason,
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data or {},
+                )
+            )
+
+    @override
     def add_edge(
         self,
         *,
@@ -867,6 +943,7 @@ class GraphTracer(GraphTracerProtocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         """Add an edge between two nodes."""
         if not self._is_active:
@@ -879,6 +956,7 @@ class GraphTracer(GraphTracerProtocol):
             source=source_node_id,
             target=target_node_id,
             kind=edge_kind,
+            optional=optional,
             label=label,
             source_stuff_digest=source_stuff_digest,
             target_stuff_digest=target_stuff_digest,
@@ -898,6 +976,7 @@ class GraphTracer(GraphTracerProtocol):
                     source_node_id=source_node_id,
                     target_node_id=target_node_id,
                     edge_kind=edge_kind,
+                    optional=optional,
                     label=label,
                     source_stuff_digest=source_stuff_digest,
                     target_stuff_digest=target_stuff_digest,

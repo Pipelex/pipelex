@@ -48,7 +48,9 @@ class PipelexPipeRunOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     output_dict: dict[str, Any]
-    # A completed run always delivers a main stuff; this is the actual `root` key it lives under.
+    # A completed run always resolves its declared output: a value or a recorded absence. This names
+    # the `root` key the value lives under — or, when the output resolved absent, the declared slot
+    # that keys the record in ``output_dict["absences"]`` (consumers branch on the record).
     main_stuff_name: str
     pipeline_run_id: str
     workflow_id: str | None = None
