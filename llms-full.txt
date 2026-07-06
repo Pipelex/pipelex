@@ -4874,7 +4874,7 @@ A pipeline is composed of pipes. There are two fundamental types of pipes you wi
 *   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), searching the web (`PipeSearch`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
 *   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
-A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** (`PipeSignature`) — lets you stub a pipe's contract (inputs and output) without an implementation. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.
+A third, design-time-only kind of pipe — **[Signature Pipes](./signature-pipes.md)** — lets you stub a pipe's contract (inputs and output) by declaring it with no `type` and no implementation: a typeless, contract-only pipe *is* a signature. Signatures dry-run as mocks under `--allow-signatures`, so you can sketch a pipeline top-down before writing each operator. Strict validation refuses pipelines that still depend on a signature.
 
 ## Designing a Pipeline: Composition in MTHDS
 
@@ -5751,7 +5751,44 @@ pipelex run bundle path/to/my_pipe.mthds --inputs results/inputs.json
 See more about the options of the CLI [here](../../tools/cli/index.md).
 
 !!! tip "Starting Point for Input Structure"
-    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
+    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in. Add `--format toml` to get a TOML template instead of JSON.
+
+## Input Files: JSON or TOML
+
+When you pass an inputs file to `--inputs` (or drop a default inputs file next to a bundle), Pipelex accepts **both JSON and TOML**, discriminated by the file extension — a `.toml` suffix is parsed as TOML, everything else as JSON. Both formats produce the same input dictionary, so every PipelineInputs shape below applies to either. TOML's multi-line strings make text-heavy inputs much easier to author.
+
+The JSON and TOML examples below are equivalent:
+
+**JSON:**
+```json
+{
+  "instructions": "Focus on payment terms.",
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
+    }
+  }
+}
+```
+
+**TOML:**
+```toml
+instructions = "Focus on payment terms."
+
+[invoice]
+concept = "accounting.Invoice"
+
+[invoice.content]
+invoice_number = "INV-001"
+amount = 1250.00
+```
+
+!!! warning "TOML datetimes are not supported yet"
+    A bare TOML datetime/date/time literal (e.g. `date = 2025-10-20`) is rejected with an explicit error — quote it as a string (`date = "2025-10-20"`) in the meantime.
+
+The rest of this guide shows inputs in JSON (and Python) form; translate any of them to TOML with the same structure. See the [run CLI reference](../../tools/cli/run.md#input-file-formats) for the extension rule and auto-detection behavior.
 
 ## Understanding PipelineInputs Format
 
@@ -5795,9 +5832,7 @@ The simplest case - just provide a string directly:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_text": "my text"
-  }
+  "my_text": "my text"
 }
 ```
 
@@ -5817,9 +5852,7 @@ Provide multiple text items as a list:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_texts": ["my text1", "my text2", "my text3"]
-  }
+  "my_texts": ["my text1", "my text2", "my text3"]
 }
 ```
 
@@ -5932,11 +5965,9 @@ Use the explicit format `{"concept": "...", "content": "..."}` when you need pre
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "text": {
-      "concept": "Text",
-      "content": "my text"
-    }
+  "text": {
+    "concept": "Text",
+    "content": "my text"
   }
 }
 ```
@@ -5961,11 +5992,9 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "documents": {
-      "concept": "Text",
-      "content": ["text1", "text2", "text3"]
-    }
+  "documents": {
+    "concept": "Text",
+    "content": ["text1", "text2", "text3"]
   }
 }
 ```
@@ -5977,14 +6006,12 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoice_data": {
-      "concept": "Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00,
-        "date": "2025-10-20"
-      }
+  "invoice_data": {
+    "concept": "Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00,
+      "date": "2025-10-20"
     }
   }
 }
@@ -6027,20 +6054,18 @@ This explicitly tells Pipelex to use the `Invoice` concept from the `accounting`
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoices": {
-      "concept": "Invoice",
-      "content": [
-        {
-          "invoice_number": "INV-001",
-          "amount": 1250.00
-        },
-        {
-          "invoice_number": "INV-002",
-          "amount": 890.00
-        }
-      ]
-    }
+  "invoices": {
+    "concept": "Invoice",
+    "content": [
+      {
+        "invoice_number": "INV-001",
+        "amount": 1250.00
+      },
+      {
+        "invoice_number": "INV-002",
+        "amount": 890.00
+      }
+    ]
   }
 }
 ```
@@ -6054,15 +6079,13 @@ Provide structured data as a dictionary:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "person": {
-      "concept": "PersonInfo",
-      "content": {
-        "arg1": "something",
-        "arg2": 1,
-        "arg3": {
-          "arg4": "something else"
-        }
+  "person": {
+    "concept": "PersonInfo",
+    "content": {
+      "arg1": "something",
+      "arg2": 1,
+      "arg3": {
+        "arg4": "something else"
       }
     }
   }
@@ -6080,22 +6103,20 @@ The system will:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "people": {
-      "concept": "PersonInfo",
-      "content": [
-        {
-          "arg1": "something",
-          "arg2": 1,
-          "arg3": {"arg4": "something else"}
-        },
-        {
-          "arg1": "something else",
-          "arg2": 2,
-          "arg3": {"arg4": "something else else"}
-        }
-      ]
-    }
+  "people": {
+    "concept": "PersonInfo",
+    "content": [
+      {
+        "arg1": "something",
+        "arg2": 1,
+        "arg3": {"arg4": "something else"}
+      },
+      {
+        "arg1": "something else",
+        "arg2": 2,
+        "arg3": {"arg4": "something else else"}
+      }
+    ]
   }
 }
 ```
@@ -6261,22 +6282,20 @@ inputs = {
 
 ```json
 {
-  "inputs": {
-    "text": "Analyze this contract for risks.",
-    "category": {
-      "concept": "Category",
-      "content": {
-        "name": "legal",
-        "priority": "high"
-      }
-    },
-    "options": ["option1", "option2", "option3"],
-    "invoice": {
-      "concept": "accounting.Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00
-      }
+  "text": "Analyze this contract for risks.",
+  "category": {
+    "concept": "Category",
+    "content": {
+      "name": "legal",
+      "priority": "high"
+    }
+  },
+  "options": ["option1", "option2", "option3"],
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
     }
   }
 }
@@ -7057,6 +7076,126 @@ By understanding and using multiplicity effectively, you can build pipelines tha
 
 
 
+## Understanding Optionality
+
+# Understanding Optionality
+
+Real methods meet values that may legitimately not exist: a nickname that was never provided, a document section that wasn't found, a branch of a condition that decided to produce nothing. Optionality makes that a first-class, declared part of your method's contract — instead of a crash, a fabricated placeholder, or a silent `null`.
+
+This guide explains the presence markers (`?` and `!`), what happens at run time when a value is absent, and the static validation that proves your method handles every possible absence before it ever runs.
+
+## The Presence Markers
+
+A concept reference in a pipe's `inputs` or `output` can carry a presence marker:
+
+| Declaration | Meaning |
+|---|---|
+| `notes = "Note"` | **Plain** (default): the pipe needs the value. If it is absent, the pipe is skipped (see [lifting](#the-runtime-trichotomy-skip-run-or-fail)). |
+| `notes = "Note?"` | **Optional** (`?`): the pipe runs even when the value is absent and handles absence itself. On an output, the pipe may resolve it as a *recorded absence* instead of a value. |
+| `notes = "Note!"` | **Force** (`!`, inputs only): the pipe asserts the value must be present — an absent value fails the run loudly with `OptionalValueAbsentError`, carrying the full provenance of where absence came from. |
+
+Two grammar rules keep the model coherent:
+
+- **Markers never combine with multiplicity.** `Note[]?` is invalid (`optional_marker_invalid`): a plural slot is never absent — when nothing is found, it is the **empty list**. Absence is a singular-value notion.
+- **Outputs take only `?`.** A force marker on an output has no meaning (a pipe cannot assert its own output into existence).
+
+Concept definitions, `refines`, and structure-field references never carry markers — presence is a property of a pipe's contract, not of a concept.
+
+## The Runtime Trichotomy: Skip, Run, or Fail
+
+At run time, a value slot resolves to a value **or a recorded absence** — never a silent hole. When a pipe is about to run and one of its inputs is absent, the marker decides what happens:
+
+1. **Plain input absent → the pipe is skipped (lifted).** The pipe never runs; a `skipped` absence is recorded for its output, chaining to the upstream absence that caused the skip. Downstream pipes then see that output as absent and the same rule applies — absence propagates until something handles it.
+2. **Optional (`?`) input absent → the pipe runs.** The pipe declared it can handle the absence — for template-rendering pipes that means guarding the reference (see [Guarding templates](#guarding-templates-over-optional-inputs)).
+3. **Force (`!`) input absent → the run fails loudly.** `OptionalValueAbsentError` names the variable, the pipe, and the provenance chain back to where absence entered the flow.
+
+A skipped pipe with a **plural** output resolves it as a real empty list (per the plural rule above), with a ledger note for observability — so downstream list consumers keep working.
+
+### Absence records and provenance
+
+Absence is carried as data: an `AbsenceRecord` with the variable name, a `kind` (`declared_absent` — a `?` output resolved absent; `skipped` — the producer was lifted; `not_provided` — the caller omitted an optional method input), a human-readable reason, the producing pipe, and the upstream record it chains to. Provenance is captured when absence is produced, not reconstructed at failure time — so a `!` failure or a run report can always tell you *why* a value is missing.
+
+The invariant everywhere: **a pipe run always resolves its declared output — a value, or a recorded absence.** An absent main output is a successful run; the CLI and the API deliver an explicit absence document (`{"absent": true, ...}`), never an empty result.
+
+## Optional Method Inputs
+
+A `?` on your method's entry-pipe input makes it omittable by the caller: leaving it out of `inputs.json` (or the execute request) records a `not_provided` absence instead of raising the missing-input error. Plain and `!` inputs stay required at the boundary.
+
+```toml
+[pipe.brief_flow]
+type        = "PipeSequence"
+description = "Write a brief; enrich it when a hint is provided"
+inputs      = { topic = "Topic", hint = "Hint?" }
+output      = "Brief"
+steps = [
+  { pipe = "enrich_hint", result = "enriched" },
+  { pipe = "write_brief", result = "brief" },
+]
+```
+
+Here a caller may provide only `topic`. The `enrich_hint` step (which consumes `hint` plainly) is skipped, and `write_brief` — which takes the enrichment as `Enriched?` — runs with it absent.
+
+## Guarding Templates Over Optional Inputs
+
+A template that renders an optional input must guard the reference — otherwise validation rejects it (`optional_input_unguarded`). Three guard idioms are recognized:
+
+- **The optional block sigil `@?`** — inserts the input's content when present, renders nothing when absent:
+
+```toml
+prompt = """
+Write a brief about this topic: $topic
+
+@?enriched
+"""
+```
+
+- **A presence block** — `{% if enriched %} ... {% endif %}` (any reference inside the block is guarded, including `$enriched` and attribute access).
+- **An inline presence conditional** — `{{ enriched.text if enriched else "no enrichment" }}`.
+
+The guard-lint covers every pipe that renders authored templates over its inputs: PipeLLM (prompt and system prompt), PipeCompose (template mode), PipeCondition (expression), PipeSearch, and PipeImgGen.
+
+## Controllers Under Absence
+
+Each controller has a defined behavior when a value inside its flow resolves absent:
+
+- **PipeSequence** — steps consuming an absent value plainly are lifted (skipped), and the absence propagates step to step. The sequence's own declared output must account for it: if the last producing step can be lifted, the sequence output must be declared `?` (otherwise `optional_not_handled`).
+- **PipeCondition** — the `continue` outcome resolves the declared output as a **declared-absent** record (memory otherwise unchanged). A condition that can reach `continue` must declare its output `?` (`optional_output_required`). See [PipeCondition](pipe-controllers/PipeCondition.md).
+- **PipeParallel** — combining under absence: a `Composite` output omits the absent component (with a ledger note); a structured output absorbs an absent branch into a non-required field as that field's declared default; a **required** field fed by a maybe-absent branch is rejected statically (`optional_branch_required_field`). See [PipeParallel](pipe-controllers/PipeParallel.md).
+- **PipeBatch** — absent branch results are **compacted** out of the aggregated list (a list cannot hold a hole). See [PipeBatch](pipe-controllers/PipeBatch.md).
+
+## The Static Safety Net
+
+You never discover an unhandled absence at run time. Validation walks every controller flow and computes, per slot, whether it is guaranteed present or maybe-absent — and requires every possible absence to reach an explicit sink (a `?` boundary, a guard, an absorbing field). The optionality error types:
+
+| Error | Meaning |
+|---|---|
+| `optional_marker_invalid` | Grammar misuse: a marker combined with multiplicity, or `!` on an output. |
+| `optional_not_handled` | A maybe-absent value escapes through a non-optional boundary. The message names the absence origin, the propagation path, and the fixes. |
+| `optional_output_required` | A `continue`-reachable PipeCondition without a `?` output. |
+| `optional_input_unguarded` | An unguarded template reference to a declared-optional input. |
+| `optional_branch_required_field` | A maybe-absent parallel branch feeding a required structure field. |
+
+Two more optionality facts surface on the **valid** report (`pipelex validate`, the agent CLI, and the API):
+
+- **`liftable_pipes`** — every pipe that may be silently skipped at run time, with the slots whose absence triggers the skip and where that absence can come from. Implicit lifting is acceptable *because* it is visible at build time.
+- **`warnings`** — advisory lints that never flip the verdict. The first is `optional_force_redundant`: a `!` whose slot is guaranteed present in every analyzed flow — the assertion can never fire, so the marker is dead weight.
+
+## Best Practices
+
+- **Declare `?` at the boundary you mean it.** An optional method input is a statement to your callers; an optional output is a statement to your consumers. Inside the flow, prefer letting plain pipes lift over sprinkling `?` everywhere — the skip semantics usually express "no input, no output" exactly.
+- **Guard every optional reference in templates** with `@?` when you just want the content inserted, or `{% if %}` when the surrounding prose changes with presence.
+- **Reserve `!` for genuine assertions** — places where your flow analysis says the value could be absent but you know better and want a loud failure rather than a skip. If the lint says it's redundant, remove it.
+- **Check `liftable_pipes` when validating**: it is the list of "this may silently not run" — confirm each entry is intended.
+
+## Related Documentation
+
+- [Understanding Multiplicity](understanding-multiplicity.md) — the other axis of a slot's shape; plural absence is the empty list
+- [PipeCondition](pipe-controllers/PipeCondition.md) — the `continue` outcome and its migration notes
+- [PipeParallel](pipe-controllers/PipeParallel.md) — combining under absence
+- [PipeBatch](pipe-controllers/PipeBatch.md) — compaction of absent branch results
+- [Execution Graph Tracing](../../under-the-hood/execution-graph-tracing.md) — skipped nodes, `skip_reason`, and optional data edges
+
+
 ## Overview
 
 # Pipe Operators
@@ -7376,7 +7515,7 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
-| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
+| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. For a declared-optional input (`?`), use `@?input_name` — it inserts the content when present and renders nothing when absent, and counts as a guard for the optionality lint (a bare `$var`/`@var` reference to an optional input is rejected as `optional_input_unguarded`; see [Understanding Optionality](../understanding-optionality.md)). Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
 | `structuring_method`        | string              | `"direct"` (default) generates the structured output in one LLM call. `"preliminary_text"` expands the pipe at load time into a `PipeLLM` (text) + [`PipeStructure`](./PipeStructure.md) sequence — two LLM calls. Cannot be combined with a `Text` output. | No       |
 
 ### LLM Setting Fields
@@ -8605,6 +8744,14 @@ The declared `output` of a `PipeParallel` is the concept the branch results are 
 
 Anything else is rejected at validation time: scalar native concepts (`Text`, `Image`, ...), `Dynamic`, `Anything`, and multiplicity suffixes (`Foo[]`, `Foo[3]`) are all invalid — a parallel combination is a named composite, never a scalar or a list (a list aggregation is [`PipeBatch`](PipeBatch.md)'s shape).
 
+### Combining under absence
+
+A branch result may legitimately be **absent** at run time: the branch pipe declares an optional output (`?`), or the branch is lifted (skipped) because a plain input is fed by one of the parallel's own optional (`?`) inputs. The combine handles absence by output kind:
+
+-   **`Composite` output**: the absent component is simply omitted from the combined object (an absence note is kept in the ledger for observability).
+-   **Structured output, non-required field**: the absence is absorbed as the field's default (`null` unless the field declares another default).
+-   **Structured output, required field**: this is rejected **statically** at validation time (`optional_branch_required_field`) — a required field cannot be fed by a maybe-absent branch. Make the field non-required, or sink the absence upstream with a `?` input on the branch path.
+
 ## Configuration
 
 `PipeParallel` is configured in your pipeline's `.mthds` file.
@@ -8711,6 +8858,12 @@ Results always preserve input order regardless of the concurrency bound. If a br
 
 For durable, rate-limited execution of very large batches, run the pipeline on the Temporal track.
 
+## Compaction Under Absence
+
+When a branch's result resolves as a recorded absence — typically because the branch pipe is a `PipeCondition` whose outcome was `continue`, or the branch was skipped (lifted) on an absent optional value — that branch contributes **no item** to the aggregated output list. The list is compacted: a list cannot hold a hole, and absent results are dropped rather than replaced by placeholders. Order is preserved among the results that did produce a value, and each dropped branch is logged with its absence reason.
+
+This is the batch arm of the "route or skip" pattern: batch over items with a condition branch pipe that builds a result for the items that qualify and `continue`s past the rest — the output is the compacted list of qualifying results. See [Understanding Optionality](../understanding-optionality.md) for the full absence model.
+
 ## Configuration
 
 `PipeBatch` is configured in your pipeline's `.mthds` file.
@@ -8768,6 +8921,8 @@ How this works:
 ## Related Documentation
 
 - [Understanding Multiplicity](../understanding-multiplicity.md) - How Pipelex handles lists and batch processing
+- [Understanding Optionality](../understanding-optionality.md) - Presence markers, absence records, and compaction
+
 
 ## PipeCondition
 
@@ -8780,8 +8935,8 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 `PipeCondition` is a routing mechanism. Its execution flow is as follows:
 
 1.  **Evaluate an Expression**: It takes an expression and renders it using Jinja2, with the full `WorkingMemory` available as context. This evaluation results in a simple string.
-2.  **Look Up in Pipe Map**: The resulting string is used as a key to find a corresponding pipe name in the `pipe_map`.
-3.  **Use Default (Optional)**: If the key is not found in the `pipe_map`, it will use the `default_pipe_code` if one is provided. If there's no match and no default, an error is raised.
+2.  **Look Up in the Outcome Map**: The resulting string is used as a key to find a corresponding outcome in `outcomes` — the name of a pipe to execute, or a special outcome (`continue` / `fail`).
+3.  **Use Default**: If the key is not found in `outcomes`, the `default_outcome` is used.
 4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
 ## Configuration
@@ -8798,12 +8953,12 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 | `output`                       | string         | The output concept produced by the selected pipe.                                                | Yes                            |
 | `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_template`)   |
 | `expression_template`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
-| `pipe_map`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute.                                  | Yes                            |
-| `default_pipe_code`            | string         | The name of a pipe to execute if the expression result does not match any key in `pipe_map`.                                                             | No                             |
+| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail`.                                  | Yes                            |
+| `default_outcome`            | string         | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`.                                                             | Yes                             |
 | `add_alias_from_expression_to` | string         | An advanced feature. If provided, the string result of the expression evaluation is added to the working memory as an alias with this name.               | No                             |
 
 !!! important "Output Concept Matching"
-    The output concept of the `PipeCondition` has to match the output of all the pipes in the `pipe_map`.
+    The output concept of the `PipeCondition` has to match the output of all the pipes in the `outcomes`.
 
 ### Example: Simple routing based on category
 
@@ -8823,8 +8978,9 @@ description = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
+default_outcome = "fail"
 
-[pipe.route_by_category.pipe_map]
+[pipe.route_by_category.outcomes]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"
@@ -8858,7 +9014,7 @@ Output this only: "large"
 How this works:
 1. `PipeCondition` receives input data with a `category` field (e.g., `{category: "small"}`)
 2. It evaluates the expression `"input_data.category"` which results in the string `"small"`
-3. It looks up `"small"` in the `pipe_map` and finds the corresponding pipe: `"process_small"`
+3. It looks up `"small"` in the `outcomes` and finds the corresponding pipe: `"process_small"`
 4. The `process_small` pipe is executed with the same working memory
 5. The output from `process_small` becomes the output of the entire `PipeCondition`
 
@@ -8871,9 +9027,9 @@ description = "Route with default handling"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 expression = "classification.type"
-default_pipe_code = "process_unknown"
+default_outcome = "process_unknown"
 
-[pipe.route_with_fallback.pipe_map]
+[pipe.route_with_fallback.outcomes]
 invoice = "process_invoice"
 receipt = "process_receipt"
 
@@ -8905,6 +9061,42 @@ Process this unknown document type...
 """
 ```
 
+## Special outcomes: `continue` and `fail`
+
+Beside pipe names, an outcome (or the `default_outcome`) can be one of two special outcomes:
+
+- **`fail`**: the run fails loudly with an error naming the pipe and the evaluated expression. Use it to make "this should never happen" branches explicit.
+- **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output (with the evaluated expression as the reason) and the run continues as a success — the rest of the working memory is unchanged.
+
+Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).
+
+### What happens downstream of `continue`
+
+An absent output propagates like any recorded absence:
+
+- A downstream pipe consuming it as a **plain** input is skipped (lifted), and its own output is recorded absent in turn.
+- A downstream pipe declaring the input **optional** (`?`) runs and handles both arms.
+- A downstream pipe declaring the input **forced** (`!`) fails with a typed error carrying the full provenance chain.
+- Inside a `PipeBatch`, an absent branch result is dropped from the aggregated list (compaction): batching a "keep or skip" condition over items yields a list of only the kept results.
+- Inside a `PipeParallel`, an absent branch result is omitted from the combined output (a non-required structured field absorbs it as its default — `null` unless the field declares another default).
+
+!!! warning "Breaking change: `continue` no longer passes the previous output through"
+    `continue` used to deliver the current main stuff by passing it through. It now resolves the condition's output as **absent** instead. The previous value is not lost — it stays in the working memory under its own name, so a downstream pipe consumes it explicitly by that name (declared `?` when it may be absent). If you need "use the new value if produced, otherwise the previous one", that coalescing idiom is planned as a follow-up; today, model it with an explicit downstream pipe that declares both inputs.
+
+```toml
+[pipe.build_or_skip]
+type = "PipeCondition"
+description = "Builds a constraint for approved links, skips rejected ones"
+inputs = { verified_link = "VerifiedLink" }
+output = "Constraint?"
+expression = "verified_link.verdict"
+default_outcome = "continue"
+
+[pipe.build_or_skip.outcomes]
+approved = "build_single_constraint"
+rejected = "continue"
+```
+
 ## Expression Types
 
 ### Simple Expression
@@ -8931,7 +9123,7 @@ expression_template = "{% if input_data.score >= 70 %}high{% else %}low{% endif 
 
 ### Default Routing
 ```python
-default_pipe_code = "process_unknown"
+default_outcome = "process_unknown"
 ```
 
 - Fallback pipe when no match is found
@@ -8977,9 +9169,10 @@ Signatures let an agent (or a human author) build a complete, dry-runnable bundl
 
 ## MTHDS Parameters
 
+A signature has **no `type`** — omitting the type *is* what makes a pipe a signature. A `[pipe.x]` section that declares only the contract below (and nothing else) is a signature. Adding any other field means you are describing an implementation, which must name its `type`; and writing `type = "PipeSignature"` explicitly is an error (`PipeSignature` is not a pipe type — delete the line).
+
 | Parameter           | Type   | Description                                                                                                  | Required |
 | ------------------- | ------ | ------------------------------------------------------------------------------------------------------------ | -------- |
-| `type`              | string | Always `"PipeSignature"`.                                                                                    | Yes      |
 | `description`       | string | Human-readable purpose of the contract.                                                                      | Yes      |
 | `inputs`            | object | Mapping of input variable names to concept references. Multiplicity is supported (`Doc[]`, `Image[3]`).      | No       |
 | `output`            | string | The concept the signature promises to produce. Multiplicity is supported.                                    | Yes      |
@@ -9001,13 +9194,12 @@ main_pipe = "summarize_doc"
 SigDocument = "A document concept used for testing signatures."
 
 [pipe.summarize_doc]
-type = "PipeSignature"
 description = "Produces a summary of a document (contract only)."
 inputs = { doc = "SigDocument" }
 output = "Text"
 ```
 
-Validating this in strict mode fails (the main pipe *is* a signature). Validating it with `--allow-signatures` succeeds and dry-runs to a mock `Text`.
+No `type` line — that is what makes `summarize_doc` a signature. Validating this in strict mode fails (the main pipe *is* a signature). Validating it with `--allow-signatures` succeeds and dry-runs to a mock `Text`.
 
 ### A signature inside a `PipeSequence`
 
@@ -9029,7 +9221,6 @@ output = "Text"
 prompt = "Extract text from $doc."
 
 [pipe.summarize_extracted]
-type = "PipeSignature"
 description = "Summarize extracted text (contract only)."
 inputs = { extracted = "Text" }
 output = "MixSummary"
@@ -9061,7 +9252,6 @@ FuseImage = "An image."
 FuseReport = "A report."
 
 [pipe.fuse_docs_and_images]
-type = "PipeSignature"
 description = "Combine docs and exactly 3 images (contract only)."
 inputs = { docs = "FuseDoc[]", images = "FuseImage[3]" }
 output = "FuseReport"
@@ -9094,7 +9284,7 @@ When `--all` runs in strict mode, signature pipes themselves are skipped during 
 
 ## Replacing a signature with a real implementation
 
-When you are ready to implement, change the `type` of the pipe and add the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
+When you are ready to implement, add a `type` to the pipe (a signature has none) and the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
 
 ```toml
 [pipe.summarize_extracted]
@@ -9785,7 +9975,7 @@ Runs a pipe by code from your project's pipe library.
 
 **Options:**
 
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs (defaults to `results/`)
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output to a file
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -9829,7 +10019,7 @@ pipelex run pipe my_pipe -L ./pipelines -L ./shared_pipes
 pipelex run bundle <PATH> [OPTIONS]
 ```
 
-Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it.
+Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it — and so is an inputs file (`inputs.json` or `inputs.toml`) when `--inputs` is not passed (see [Input File Formats](#input-file-formats)).
 
 **Arguments:**
 
@@ -9838,7 +10028,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe from the bundle (defaults to the bundle's main pipe)
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -9885,7 +10075,7 @@ Runs a pipeline from an installed method package.
 **Options:**
 
 - `--pipe PIPE_CODE` - Run a specific pipe within the method (defaults to the method's main pipe)
-- `--inputs`, `-i` - Path to JSON file containing inputs
+- `--inputs`, `-i` - Path to a JSON or TOML file containing inputs (discriminated by file extension — see [Input File Formats](#input-file-formats))
 - `--output-dir`, `-o` - Directory to save outputs
 - `--save-main-stuff` / `--no-save-main-stuff` - Whether to save the main output
 - `--save-working-memory` / `--no-save-working-memory` - Whether to save the full working memory
@@ -9911,9 +10101,20 @@ pipelex run method invoice_extractor --pipe extract_amounts
 pipelex run method invoice_extractor --inputs invoice_data.json
 ```
 
-## Input JSON Format
+## Input File Formats
 
-The input JSON file should contain a dictionary where keys are input variable names:
+An inputs file is a dictionary whose keys are input variable names. Pipelex accepts **both JSON and TOML**, discriminated by the file extension:
+
+- A `.toml` suffix is parsed as TOML.
+- Every other value — `.json`, no extension, anything else — is parsed as JSON.
+
+There is no content sniffing: the extension alone decides. Inline JSON passed to `--inputs` (a value starting with `{`) stays JSON-only.
+
+An input declared optional (`?`) on the entry pipe may be omitted — the run records a `not_provided` absence for it instead of failing (see [Understanding Optionality](../../building-methods/pipes/understanding-optionality.md)).
+
+Both formats produce the same input dictionary for the value types they share, so the [PipelineInputs shapes](../../building-methods/pipes/provide-inputs.md) apply to both — with one structural exception: JSON `null` has no TOML equivalent (TOML has no null type).
+
+### JSON
 
 ```json
 {
@@ -9925,9 +10126,39 @@ The input JSON file should contain a dictionary where keys are input variable na
 }
 ```
 
+### TOML
+
+The same inputs in TOML. TOML's multi-line strings (`"""..."""`) make text-heavy inputs far more pleasant to author than escaped JSON:
+
+```toml
+input_variable = "simple string value"
+
+instructions = """
+Focus on payment terms.
+Flag anything that looks unusual.
+"""
+
+[another_input]
+concept = "domain_code.ConceptName"
+
+[another_input.content]
+field = "value"
+```
+
+!!! warning "TOML datetimes are not supported yet"
+    TOML parses bare datetime/date/time literals (e.g. `when = 2026-07-06`) into typed objects that have no JSON equivalent and no native concept yet, so the loader rejects them with an explicit error. Quote such values as strings (`when = "2026-07-06"`) in the meantime.
+
+### Auto-detection and ambiguity
+
+`run bundle <dir>` auto-detects a default inputs file inside the directory when `--inputs` is omitted: it looks for `inputs.json`, then `inputs.toml`. If **both** exist, the run fails with an ambiguity error asking you to pass `--inputs` explicitly — passing `--inputs` always bypasses auto-detection.
+
 ## Output Format
 
 The output JSON contains the complete working memory after pipeline execution, including all intermediate results and the final output.
+
+### Absent main output
+
+A run whose main output resolves as a recorded absence (an optional `?` output that produced nothing — e.g. a `PipeCondition` `continue` outcome, or a skipped producer) is a **successful** run. The CLI prints the absence with its reason, and `--save-main-stuff` writes an explicit absence artifact instead of a value dump: `main_stuff.json` is `{"absent": true, ...}` with the absence record, and `main_stuff.md` is a human-readable summary including the provenance chain (no HTML render or interactive viewer is produced — there is nothing to view). `--save-csv` fails with an explicit error and a non-zero exit code, the same way it does for any main output that is not a flat list — there is no tabular value to save.
 
 ## Related Documentation
 
@@ -10371,7 +10602,7 @@ class CandidateProfile(StructuredContent):
 
 # Build Inputs
 
-Generate example input JSON for a pipe, showing the expected input structure based on the pipe's input types.
+Generate an example inputs template for a pipe, showing the expected input structure based on the pipe's input types. The template is emitted as JSON by default, or as TOML with `--format toml`.
 
 ## Usage
 
@@ -10388,7 +10619,8 @@ pipelex build inputs pipe <PIPE_CODE> [OPTIONS]
 **Options:**
 
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to `results/`)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to `results/`, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ### From a bundle
 
@@ -10404,7 +10636,8 @@ pipelex build inputs bundle <PATH> [OPTIONS]
 
 - `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to bundle's directory)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to the bundle's directory, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ### From an installed method
 
@@ -10420,7 +10653,8 @@ pipelex build inputs method <NAME> [OPTIONS]
 
 - `--pipe` - Pipe code (overrides method's `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file
+- `--output`, `-o` - Path to save the generated inputs file (filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ## Examples
 
@@ -10460,9 +10694,19 @@ pipelex build inputs pipe my_domain.my_pipe -L ./my_library/
 pipelex build inputs bundle my_bundle.mthds --output custom_inputs.json
 ```
 
+**Generate a TOML template instead of JSON:**
+
+```bash
+pipelex build inputs bundle my_bundle.mthds --format toml
+```
+
+When `--format toml` is selected and no explicit `--output` is given, the default filename becomes `inputs.toml` (instead of `inputs.json`).
+
 ## Output Format
 
-The generated JSON file contains all inputs required by the pipe, with example values based on each input's concept type:
+The generated file contains all inputs required by the pipe, with example values based on each input's concept type. Both formats carry the same structure — [`pipelex run`](../run.md#input-file-formats) accepts either.
+
+**JSON (`--format json`, default):**
 
 ```json
 {
@@ -10481,6 +10725,22 @@ The generated JSON file contains all inputs required by the pipe, with example v
 }
 ```
 
+**TOML (`--format toml`):**
+
+```toml
+[text_input]
+concept = "native.Text"
+
+[text_input.content]
+text = "text_value"
+
+[document_input]
+concept = "native.Document"
+
+[document_input.content]
+url = "url_value"
+```
+
 ### Multiplicity Support
 
 When an input has multiplicity (accepts multiple items), the content is wrapped in a list:
@@ -10496,6 +10756,16 @@ When an input has multiplicity (accepts multiple items), the content is wrapped 
     ]
   }
 }
+```
+
+In TOML, the same list of items uses the array-of-tables syntax:
+
+```toml
+[documents]
+concept = "native.Document"
+
+[[documents.content]]
+url = "url_value"
 ```
 
 ## Use Cases
@@ -10801,7 +11071,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 
 **Common options:**
 
-- `--inputs`, `-i` - Path to JSON input file
+- `--inputs`, `-i` - Path to a JSON or TOML inputs file (discriminated by file extension: `.toml` → TOML, everything else → JSON). Inline JSON (a value starting with `{`) stays JSON-only.
 - `--dry-run` - Dry-run without calling AI providers
 - `--mock-inputs` - Use mock inputs
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
@@ -10811,6 +11081,9 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
+
+!!! note "Stdin inputs stay JSON"
+    The agent CLI can also read inputs from stdin (a flat dict or a `working_memory` envelope). Stdin inputs are **JSON-only** — the extension-based TOML discrimination applies to `--inputs` file paths only. Like the main CLI, `run bundle <dir>` auto-detects `inputs.json` / `inputs.toml` when `--inputs` is omitted, erroring if both exist.
 
 ### Validate
 
@@ -10842,9 +11115,12 @@ For `bundle`, additional options are available:
 
     On a successful `validate bundle` run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). It is a non-blocking nudge: in JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement. The envelope also carries a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown states the runnability verdict in plain English — runnable when complete, NOT yet runnable above the "Pending signatures" section otherwise. Both are scoped to `validate bundle`; `validate all` / `validate pipe` omit them.
 
+!!! note "Advisory warnings on validate"
+    Whole-bundle validate surfaces (`validate bundle`, `validate method`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
+
 ### Inputs
 
-Generate example input JSON for a pipe, bundle, or method.
+Generate an example inputs template for a pipe, bundle, or method.
 
 ```bash
 pipelex-agent inputs pipe <PIPE_CODE> [OPTIONS]
@@ -10855,8 +11131,12 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--format` - Template serialization: `json` (default) or `toml`
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
+
+!!! note "`inputs --format` is `json|toml`, not `markdown|json`"
+    Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
 
 ### Flat Commands
 
@@ -10876,7 +11156,7 @@ These commands do not have subcommands:
 Commands use different stdout formats depending on their purpose:
 
 - **Markdown or JSON**: `run`, `validate`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
-- **JSON**: `inputs` — structured JSON via `agent_success()`
+- **JSON or raw TOML**: `inputs` — structured JSON via `agent_success()` by default (`--format json`), or the raw TOML template printed directly to stdout with `--format toml`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
 
@@ -10905,6 +11185,8 @@ JSON commands return the result object directly. They are not wrapped in a `stat
 ```
 
 `RemoteConfigStale` is emitted when the gateway is enabled but the remote config service is unreachable and Pipelex falls back to its on-disk cache (offline mode).
+
+Do not confuse this setup-warning shape with the `warnings` array on the `validate` envelope — validate warnings are advisory lint items that reuse the validation-error item shape (see "Advisory warnings on validate" above).
 
 **Error** — written to stderr:
 
@@ -14869,6 +15151,8 @@ class GraphSpec(BaseModel):
 | `CONTAINS` | Parent-child containment (controller → children) |
 | `SELECTED_OUTCOME` | Condition outcome selection |
 
+Every `EdgeSpec` also carries an `optional` boolean (default `false`). On a `DATA` edge it marks that the producer's output is declared optional (`?` presence marker) — the value flowed on this run but may be absent on others. Renderers can use it to draw the edge distinctly (e.g. dashed).
+
 ### Node Status
 
 | NodeStatus | Description |
@@ -14877,8 +15161,10 @@ class GraphSpec(BaseModel):
 | `RUNNING` | Currently executing |
 | `SUCCEEDED` | Completed successfully |
 | `FAILED` | Execution failed |
-| `SKIPPED` | Skipped during execution |
+| `SKIPPED` | Lifted (skipped) because a plain input resolved absent — a successful outcome, not an error |
 | `CANCELED` | Canceled before completion |
+
+A `SKIPPED` node also carries `skip_reason` (a human-readable sentence naming the absent input, e.g. `skipped because input 'source' is absent`). A lifted pipe with a plural output still writes a real empty-list value, so its node registers that output and downstream `DATA` edges resolve normally; a lifted singular output is a recorded absence with no output spec.
 
 ---
 
@@ -17830,6 +18116,9 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
+- [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `storage_config.method`)
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `secrets_config.method`)
 - [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)
@@ -17953,7 +18242,7 @@ The contract is deliberately split so no layer overreaches:
 - **Core** owns *transport* — `registrar.get_http_error_mappers()` runs every provider, builds the `{exc_type: mapper}` dict, and is fail-loud on a duplicate *resolved* exception type (naming both plugins). `ErrorReport` is a core type, so the seam carries **no** web-framework import.
 - **The host runtime** owns *presentation* — at app construction it iterates the resolved mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the `ErrorReport` through its own RFC 7807 + `DisclosureMode` path. FastAPI / Starlette stays only in the host; core and the plugin import neither.
 
-This is what lets the public `pipelex-api` base be orchestrator-agnostic and still render a Temporal (or Mistral) transport fault correctly: install the flavor's plugin and its mapper rides in; install none and there is simply nothing to wrap. The capability is optional, so it grew the plugin contract by one method → `PLUGIN_API_VERSION` is now **2**.
+This is what lets the public `pipelex-api` base be orchestrator-agnostic and still render a Temporal (or Mistral) transport fault correctly: install the flavor's plugin and its mapper rides in; install none and there is simply nothing to wrap. The capability is optional, contributing one method to the plugin contract.
 
 ---
 
@@ -18055,6 +18344,343 @@ my_runtime = "my_package.my_plugin:MyRuntimePlugin"
 ```
 
 Installing the distribution makes the mode available; uninstalling removes it. No core change, no central registration list. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+
+
+## Storage Provider Plugins
+
+# Storage Provider Plugins
+
+Every asset Pipelex persists — a generated image, an uploaded document, a payload blob — is written through a single **storage provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `storage_config.method`, names a backend, and a **storage plugin** is what teaches Pipelex how to build the provider for that method.
+
+Core names no storage backend by import or by string. The built-in providers (`local`, `in_memory`, `s3`, `gcp`) are a plugin too — the always-on `StoragePlugin` — riding the exact same seam an out-of-tree `pipelex-storage-<backend>` package would. This page documents that seam, the factory contract a plugin registers, and how to write one.
+
+---
+
+## A different shape from the inference/orchestrator seams
+
+The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchestrator-plugins.md) registries are selected **per call** — a model's `sdk`, a request's `orchestration_mode`. Storage is not: it is a **process-global singleton selected by its own config key**, independent of the orchestrator. So it rides a net-new mechanism the track calls a **keyed registry + config-selected singleton**:
+
+> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `storage_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
+
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism also backs the [secrets provider](secrets-provider-plugins.md) seam (`secrets_config.method`).
+
+---
+
+## The seam in one view
+
+```
+boot (Pipelex.setup)
+  └─ build_registrar(config)                       # pure, import-light
+       ├─ for each plugin in BUILTIN_PLUGINS         (StoragePlugin is one)
+       └─ for each installed "pipelex.plugins" entry point
+            └─ plugin.register(registrar)            # side-effect-free
+                 └─ registrar.add_storage_provider(method=…, factory=…)
+  └─ StorageProviderRegistry(registrar.storage_providers)    # stored on the hub
+  └─ storage_provider = registry.get_required(method=storage_config.method)(storage_config)
+  └─ set_storage_provider(storage_provider)          # the one provider every consumer reads
+```
+
+There is no `match storage_config.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (input normalizer, content generator, PDF/image utilities, delivery executor) keeps calling `get_storage_provider()` and is unaffected by which method was selected.
+
+The provider is resolved **after** the secrets provider is on the hub, so a factory may perform a hub secrets read at its apply-point (the `gcp` factory does — see below).
+
+### Injection precedence
+
+`Pipelex.setup` resolves the storage provider in this order:
+
+1. an explicit `setup(storage_provider=...)` parameter (test/host injection) — always wins;
+2. the config-selected registry factory (`get_required(method=storage_config.method)(config)`).
+
+There is no separate core default: the built-in `StoragePlugin` *is* the default supplier of every method, so an ordinary boot always resolves through step 2.
+
+---
+
+## The contract: `StorageProviderFactoryFn`
+
+A storage backend is a typed **callable** — whole storage config in, provider out (`pipelex/plugins/storage_provider_registry.py`):
+
+```python
+StorageProviderFactoryFn = Callable[[StorageProviderConfig], StorageProviderAbstract]
+```
+
+Passing the whole `StorageProviderConfig` (not a pre-resolved sub-config) is deliberate: it lets a factory read whatever it needs — including a hub secrets read — at the boot apply-point, never at registration.
+
+A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
+
+```python
+registrar.add_storage_provider(method="azure", factory=_make_azure_storage_provider)
+```
+
+`register` is **side-effect-free** — it may call the registrar menu and nothing else (no hub access, no I/O, no SDK import). That is what keeps `build_registrar` safe to run more than once (at boot, and again for the `pipelex plugins list` diagnostic).
+
+### Import-light registration, deferred dependency
+
+The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
+
+- **Import-light.** The plugin module must import no backend SDK at module load. Registering the built-in `s3`/`gcp` factories pulls in neither `aioboto3` nor `google-cloud-storage` — the SDK guard lives *inside* the provider's I/O methods (`_get_session` / `_get_bucket`), not its `__init__`. Selecting `s3` therefore *constructs* an `S3StorageProvider` even with the extra absent; the guard fires only on the first actual load/store.
+- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
+
+---
+
+## The built-in `StoragePlugin`
+
+`pipelex/plugins/storage/storage_plugin.py` is the reference storage plugin. It is **core-unconditional** — storage is required infra, so it joins `CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no storage:
+
+```python
+class StoragePlugin:
+    name = "storage"
+    targets_api = PLUGIN_API_VERSION
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_storage_provider(method=StorageMethod.LOCAL, factory=_make_local_storage_provider)
+        registrar.add_storage_provider(method=StorageMethod.IN_MEMORY, factory=_make_in_memory_storage_provider)
+        registrar.add_storage_provider(method=StorageMethod.S3, factory=_make_s3_storage_provider)
+        registrar.add_storage_provider(method=StorageMethod.GCP, factory=_make_gcp_storage_provider)
+```
+
+Each factory is a module-level closure that None-checks its sub-config, calls `lazy_validate()`, and constructs the provider. The built-in tokens are the `StorageMethod` enum values (`"local"`, `"in_memory"`, `"s3"`, `"gcp"`); because a `StrEnum` key compares and hashes equal to its plain-`str` form, boot's plain-`str` `config.method` resolves them.
+
+The `gcp` factory is the one that reads a secret from the hub — legal because the factory runs at the boot apply-point, after the secrets provider is set, never inside `register`:
+
+```python
+def _make_gcp_storage_provider(config: StorageProviderConfig) -> StorageProviderAbstract:
+    ...
+    return GcpStorageProvider(
+        bucket_name=config.gcp.bucket_name,
+        project_id=config.gcp.project_id,
+        credentials_file_path=get_secrets_provider().get_required_secret(secret_id="GCP_CREDENTIALS_FILE_PATH"),
+        signed_urls_lifespan=config.gcp.signed_urls_lifespan,
+    )
+```
+
+---
+
+## Selecting a method by config
+
+`storage_config.method` is an **open `str` token** (Decision D1), not a closed enum. The built-ins use the `StorageMethod` values; an external `pipelex-storage-<backend>` plugin registers its own (e.g. `"azure"`). A config naming an external method **parses fine** — the per-method sub-config validator requires a matching sub-config only for the four built-in tokens and lets any other token through:
+
+```toml
+# .pipelex/pipelex.toml
+[pipelex.storage_config]
+method = "azure"          # an out-of-tree provider — no built-in sub-config required
+```
+
+Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownStorageMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
+
+!!! note "External-provider config surface is a scoped follow-up"
+    `StorageProviderConfig` has fixed, typed per-method sub-models, so an out-of-tree `azure` provider has nowhere to read *its* structured config yet. The seam for built-in methods lands first; a generic passthrough sub-config for external providers is a captured follow-up (Decision D3), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file. **One live gap:** `StorageProviderConfig.uri_format` (read by `GeneratedContentFactory._build_storage_key` on every content store) is only defined for the four built-in methods and raises `StorageConfigError` for any other token — so an external provider selects and boots cleanly but a *generated-content store* through it fails until D3 gives external methods a `uri_format`. External providers are therefore usable today for their own direct storage API, not yet as the backing store for generated content.
+
+---
+
+## Fail-loud guarantees
+
+| Condition | Error |
+|-----------|-------|
+| `storage_config.method` names no registered provider | `UnknownStorageMethodError` (lists the registered methods) |
+| two plugins register the same `method` | `DuplicateStorageProviderError` (names both plugins) |
+| `name` (`"storage"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
+| entry point raises while loading/registering | `BrokenPluginError` |
+| optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
+
+The duplicate detection is the same fail-loud `_add` helper the inference/orchestrator menus use — a conflict names both contributing plugins, so a collision between two installed storage packages is unambiguous.
+
+---
+
+## Authoring an out-of-tree storage plugin
+
+A third-party storage plugin is a distribution that:
+
+1. implements a `StorageProviderAbstract` subclass — the three hooks `_load_with_metadata`, `_store`, and `public_url` — deferring any SDK import into those methods (import-light);
+2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_storage_provider(method="<token>", factory=...)` — and nothing else;
+3. advertises itself under the `pipelex.plugins` entry-point group:
+
+```toml
+# pyproject.toml of your plugin package
+[project.entry-points."pipelex.plugins"]
+azure_storage = "pipelex_storage_azure.plugin:AzureStoragePlugin"
+```
+
+Installing the distribution makes the method selectable (`storage_config.method = "azure"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+
+Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
+
+---
+
+## Related
+
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the sibling config-selected-singleton seam riding the same mechanism; the `gcp` factory above reads its provider
+- [Inference Backend Plugins](inference-backend-plugins.md) — the per-call sibling seam and the shared discovery/denylist machinery
+- [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, plus the hub-slot mechanism storage deliberately avoids
+- [Error Model](error-model.md) — how these errors render and dereference
+- [Architecture Overview](architecture-overview.md)
+
+
+## Secrets Provider Plugins
+
+# Secrets Provider Plugins
+
+Every credential Pipelex reads — an API key, a service-account file path, a signing secret — is resolved through a single **secrets provider** set on the hub at boot. Which provider that is comes entirely from data: one config field, `secrets_config.method`, names a backend, and a **secrets plugin** is what teaches Pipelex how to build the provider for that method.
+
+Core names no secrets backend by import or by string. The built-in `env` provider (reads secrets from environment variables) is a plugin too — the always-on `SecretsPlugin` — riding the exact same seam an out-of-tree `pipelex-secrets-<backend>` package (Vault, AWS Secrets Manager, GCP Secret Manager, …) would. This page documents that seam, the factory contract a plugin registers, and how to write one.
+
+This is the second application of the mechanism the [storage provider](storage-provider-plugins.md) seam introduced; secrets reuses it wholesale, so the two pages describe the same shape with the nouns swapped.
+
+---
+
+## A different shape from the inference/orchestrator seams
+
+The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchestrator-plugins.md) registries are selected **per call** — a model's `sdk`, a request's `orchestration_mode`. Secrets is not: it is a **process-global singleton selected by its own config key**, independent of the orchestrator. So it rides the same **keyed registry + config-selected singleton** mechanism storage uses:
+
+> Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `secrets_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
+
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Secrets selection has nothing to do with the orchestrator, so it gets its own registry and its own config key — the sibling of `storage_config.method`.
+
+---
+
+## The seam in one view
+
+```
+boot (Pipelex.setup)
+  └─ build_registrar(config)                       # pure, import-light
+       ├─ for each plugin in BUILTIN_PLUGINS         (SecretsPlugin is one)
+       └─ for each installed "pipelex.plugins" entry point
+            └─ plugin.register(registrar)            # side-effect-free
+                 └─ registrar.add_secrets_provider(method=…, factory=…)
+  └─ SecretsProviderRegistry(registrar.secrets_providers)    # stored on the hub
+  └─ secrets_provider = registry.get_required(method=secrets_config.method)(secrets_config)
+  └─ set_secrets_provider(secrets_provider)          # the one provider every consumer reads
+```
+
+There is no `match secrets_config.method:` anywhere in boot — the token set is open, so validation *is* the registry lookup. Adding a backend means registering a factory for its token; nothing in core changes. Every downstream consumer (`get_secret(...)`, telemetry credentials, the storage `gcp` arm, search/extract workers) keeps calling `get_secrets_provider()` and is unaffected by which method was selected.
+
+### Where in boot secrets is resolved
+
+Secrets is resolved **early** — right after plugin discovery, after the gateway/terms precondition gate but before the telemetry factory (its first in-process consumer) and well before storage selection. Two consequences that this ordering guarantees:
+
+- **Telemetry** receives the config-selected secrets provider when it is constructed.
+- **Storage's `gcp` factory** reads the config-selected secrets provider from the hub at *its* apply-point (it resolves `GCP_CREDENTIALS_FILE_PATH`) — secrets is already on the hub by then. This ordering is pinned by an integration test that boots a non-`env` secrets method alongside `gcp` storage and asserts the gcp arm read the external provider.
+
+### Injection precedence
+
+`Pipelex.setup` resolves the secrets provider in this order:
+
+1. an explicit `setup(secrets_provider=...)` parameter (test/host injection) — always wins;
+2. the config-selected registry factory (`get_required(method=secrets_config.method)(config)`).
+
+There is no separate core default: the built-in `SecretsPlugin` *is* the default supplier of the `env` method, so an ordinary boot always resolves through step 2.
+
+---
+
+## The contract: `SecretsProviderFactoryFn`
+
+A secrets backend is a typed **callable** — whole secrets config in, provider out (`pipelex/plugins/secrets_provider_registry.py`):
+
+```python
+SecretsProviderFactoryFn = Callable[[SecretsProviderConfig], SecretsProviderAbstract]
+```
+
+Passing the whole `SecretsProviderConfig` (not a pre-resolved sub-config) is deliberate: it lets a factory read whatever it needs — an SDK-backed provider (Vault, AWS Secrets Manager) reads its own settings — at the boot apply-point, never at registration. The built-in `env` factory ignores the config entirely.
+
+A plugin contributes one factory per method it serves by calling the registrar menu in its `register`, passing the token as a raw string:
+
+```python
+registrar.add_secrets_provider(method="vault", factory=_make_vault_secrets_provider)
+```
+
+`register` is **side-effect-free** — it may call the registrar menu and nothing else (no hub access, no I/O, no SDK import). That is what keeps `build_registrar` safe to run more than once (at boot, and again for the `pipelex plugins list` diagnostic).
+
+### Import-light registration, deferred dependency
+
+The factory is a plain callable stored at registration and **invoked only at the boot apply-point**. Two invariants follow, and they are what let an SDK-backed provider ship without weighing down every boot:
+
+- **Import-light.** The plugin module must import no backend SDK at module load. The built-in `SecretsPlugin` needs none (the `env` provider reads environment variables); an out-of-tree `pipelex-secrets-vault` plugin must keep its `hvac`/`boto3`/etc. import *inside* the provider's methods (or its factory), never at module top-level, so discovery stays import-light even when the extra is installed.
+- **Fail at use, not at boot.** An optional dependency raises `MissingDependencyError` (naming the package and the `pipelex[<extra>]` install hint) when the backend is *used*, not when it is registered or selected.
+
+---
+
+## The built-in `SecretsPlugin`
+
+`pipelex/plugins/secrets/secrets_plugin.py` is the reference secrets plugin. It is **core-unconditional** — a secrets provider is required infra, so it joins `CORE_UNCONDITIONAL_PLUGIN_NAMES` and cannot be disabled into a boot with no secrets provider:
+
+```python
+class SecretsPlugin:
+    name = "secrets"
+    targets_api = PLUGIN_API_VERSION
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_secrets_provider(method="env", factory=_make_env_secrets_provider)
+```
+
+The `env` factory ignores its config and returns a bare `EnvSecretsProvider` — the `config` parameter exists only to conform to `SecretsProviderFactoryFn`; an SDK-backed external provider is where reading the config earns its keep:
+
+```python
+def _make_env_secrets_provider(config: SecretsProviderConfig) -> SecretsProviderAbstract:
+    return EnvSecretsProvider()
+```
+
+`env` is a single-impl backend: `EnvSecretsProvider` resolves `get_required_secret` / `get_optional_secret` from environment variables, and its versioned reads (`*_specific_version`) raise `NotImplementedError` because environment variables have no version history. A full external provider (Vault, AWS Secrets Manager) implements those versioned reads.
+
+---
+
+## Selecting a method by config
+
+`secrets_config.method` is an **open `str` token** (Decision S1), not a closed enum. The built-in uses `"env"`; an external `pipelex-secrets-<backend>` plugin registers its own (e.g. `"vault"`). A config naming an external method **parses fine** — the token is stored verbatim and its installability is validated later, at registry lookup:
+
+```toml
+# .pipelex/pipelex.toml
+[pipelex.secrets_config]
+method = "vault"          # an out-of-tree provider — selected iff its plugin is installed
+```
+
+Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownSecretsMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
+
+!!! note "External-provider config surface is a scoped follow-up"
+    `SecretsProviderConfig` today carries only `method` — the built-in `env` backend needs no per-method sub-config. An out-of-tree `vault` provider has nowhere to read *its* structured config yet; a generic passthrough for external providers is a captured follow-up (Decision S4), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
+
+---
+
+## Fail-loud guarantees
+
+| Condition | Error |
+|-----------|-------|
+| `secrets_config.method` names no registered provider | `UnknownSecretsMethodError` (lists the registered methods) |
+| two plugins register the same `method` | `DuplicateSecretsProviderError` (names both plugins) |
+| `name` (`"secrets"`) in `plugins.disabled` | `CoreUnconditionalPluginDisabledError` |
+| entry point raises while loading/registering | `BrokenPluginError` |
+| optional SDK missing at use | `MissingDependencyError` (package + `pipelex[<extra>]` hint) |
+
+The duplicate detection is the same fail-loud `_add` helper the inference/orchestrator/storage menus use — a conflict names both contributing plugins, so a collision between two installed secrets packages is unambiguous.
+
+---
+
+## Authoring an out-of-tree secrets plugin
+
+A third-party secrets plugin is a distribution that:
+
+1. implements a `SecretsProviderAbstract` subclass — `get_required_secret` / `get_optional_secret`, the versioned `*_specific_version` reads, and `set_secret_as_env_var` — deferring any SDK import into those methods (import-light);
+2. defines a plugin class (`name`, `targets_api`, `register`) whose `register` calls `add_secrets_provider(method="<token>", factory=...)` — and nothing else;
+3. advertises itself under the `pipelex.plugins` entry-point group:
+
+```toml
+# pyproject.toml of your plugin package
+[project.entry-points."pipelex.plugins"]
+vault_secrets = "pipelex_secrets_vault.plugin:VaultSecretsPlugin"
+```
+
+Installing the distribution makes the method selectable (`secrets_config.method = "vault"`); uninstalling removes it. No core change, no central registration list — *presence* is the source of truth. A discovered plugin can be quarantined without uninstalling via the `plugins.disabled` denylist (matched against the entry-point name *before* load, so a broken install can still be disabled to recover startup — see [Inference Backend Plugins](inference-backend-plugins.md) for the shared discovery/denylist machinery).
+
+Use `pipelex plugins list` to see every discovered plugin, what each contributed, and its denylist state.
+
+---
+
+## Related
+
+- [Storage Provider Plugins](storage-provider-plugins.md) — the sibling config-selected-singleton seam this one mirrors; its `gcp` arm reads the secrets provider at boot
+- [Secrets Provider Injection](../advanced/secrets-provider-injection.md) — supplying a custom secrets provider from your own vault or secrets manager
+- [Inference Backend Plugins](inference-backend-plugins.md) — the per-call sibling seam and the shared discovery/denylist machinery
+- [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, plus the hub-slot mechanism these config-selected seams deliberately avoid
+- [Error Model](error-model.md) — how these errors render and dereference
+- [Architecture Overview](architecture-overview.md)
 
 
 ## Error Model
