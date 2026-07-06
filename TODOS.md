@@ -1,9 +1,10 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Storage vertical DONE. Secrets vertical Phase 3 DONE + Checkpoint 3 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **Storage vertical DONE. Secrets vertical Phases 3–4 DONE + Checkpoints 3–4 CLEARED.** Only Phase 5 (release gating / cross-repo bookkeeping) remains. Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
 Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
+- `65603e912` — test: secrets-provider seam tests + docs (**Phase 4 — the review target**)
 - `fdf3e114b` — fix: Phase-3 review triage (kit-config sync + stale boot comment)
 - `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 code — the review target**)
 - `3940eb7a2` — docs: Phase 2 checkpoint bookkeeping — storage vertical done
@@ -14,7 +15,7 @@ Commits on the branch (newest substantive first; run `git log` for the exact tip
 - `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-**Cold-start (resume here):** The **storage vertical is complete** and the **secrets vertical mechanism + config + builtin plugin + boot wiring is complete** (Phase 3 code `8a0b32668` + review triage `fdf3e114b`, Checkpoint 3 cleared). All gates green (`agent-check`, `tb`, full `agent-test`, plus `check-config-sync` after the kit-config sync fix) and manual smokes pass (`pipelex plugins list` shows `secrets`; default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`). **Next action = Phase 4** (Secrets tests + docs): unit tests for `SecretsProviderRegistry` hit/miss + duplicate; boot test (default→`EnvSecretsProvider`, explicit `setup(secrets_provider=...)` overrides); external-plugin integration test (mirror `test_storage_external_plugin.py`); the storage↔secrets ordering guard; new `docs/under-the-hood/secrets-provider-plugins.md` + mkdocs nav; CHANGELOG `[Unreleased]`. Key Phase-3 as-built deviations (esp. the W-A boot-placement refinement) are under "Phase 3 — as-built" below. `PLUGIN_API_VERSION` is already 3 — **no second bump**.
+**Cold-start (resume here):** The **storage vertical is complete** and the **entire secrets vertical is complete** — mechanism + config + builtin plugin + boot wiring (Phase 3 `8a0b32668` + `fdf3e114b`) AND tests + docs (Phase 4 `65603e912`), Checkpoints 3–4 cleared. All gates green (`agent-check`, `tb`, `check-config-sync`, full `agent-test`). **Next action = Phase 5** (release gating & final whole-branch review): it is documentation/bookkeeping only — record the cross-repo `targets_api=3` bump obligation for `pipelex-temporal` / `pipelex-mistralai-workflows` in the CHANGELOG (do NOT touch those repos here), confirm the branch is one clean commit sequence, then run **Checkpoint 5** (final whole-branch Sonnet clean-room `/code-review` over `git diff 04434f785..HEAD` as a last over-engineering sweep across both seams). `PLUGIN_API_VERSION` is already 3 — **no second bump**. Key Phase-4 as-built notes are under "Phase 4 — as-built" below.
 
 > ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
@@ -180,18 +181,27 @@ At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 ## Phase 4 — Secrets: tests + docs
 *(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 4–5.)*
 
-- [ ] Unit: `SecretsProviderRegistry` hit/miss (`UnknownSecretsMethodError`) + duplicate fail-loud.
-- [ ] Boot: default config yields `EnvSecretsProvider` on the hub; explicit `setup(secrets_provider=...)` overrides.
-- [ ] Integration: external test plugin registering a fake secrets `method` is selectable via config.
-- [ ] Ordering guard: a boot with a non-env secrets method has secrets on the hub before storage's GCP arm reads it (assert boot order).
-- [ ] New `docs/under-the-hood/secrets-provider-plugins.md` (emphasize the lazy optional-dep closure for SDK-backed providers like Vault/AWS); mkdocs nav; update seam enumerations.
-- [ ] CHANGELOG `[Unreleased]`: secrets is now a plugin seam.
+- [x] Unit: `SecretsProviderRegistry` hit/miss (`UnknownSecretsMethodError`) + duplicate fail-loud. → `test_secrets_provider_registry.py` (byte-for-byte mirror of `test_storage_provider_registry.py`).
+- [x] Boot: default config yields `EnvSecretsProvider` on the hub; explicit `setup(secrets_provider=...)` overrides. → `test_secrets_external_plugin.py` (first two methods). Plus a `test_secrets_plugin.py` unit (plugin registers the `env` factory; factory constructs `EnvSecretsProvider`), mirroring `test_storage_plugin.py` but lean (single builtin, no optional-dep matrix).
+- [x] Integration: external test plugin registering a fake secrets `method` (`"test_secret"`, entry-point discovered) is selectable via config. → `test_secrets_external_plugin.py`.
+- [x] Ordering guard: a boot with a non-env secrets method has secrets on the hub before storage's GCP arm reads it. → `test_secrets_external_plugin.py::test_config_selected_secrets_provider_is_read_by_storage_gcp_arm_at_boot`.
+- [x] New `docs/under-the-hood/secrets-provider-plugins.md` (emphasizes the lazy optional-dep closure for SDK-backed Vault/AWS providers + the boot-ordering relationship); mkdocs nav (both blocks); cross-links (storage↔secrets both directions, inference-backend Related, secrets-provider-injection); updated the storage page's stale "planned" forward-ref.
+- [x] CHANGELOG `[Unreleased]`: secrets is now a plugin seam; folded `add_secrets_provider` into the existing `PLUGIN_API_VERSION` 2→3 note.
 
-### ⛔ CHECKPOINT 4 — run the protocol above
-- [ ] Full `make agent-test` green (+ `agent-check`).
-- [ ] Commit SHA recorded here: `__________`
-- [ ] Cold-start state updated.
-- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged. Outcome: `__________`
+### Phase 4 — as-built (deviations & decisions, for cold start)
+
+- **The ordering guard is stronger than "assert boot order" implied — telemetry ALSO consumes the config-selected secrets provider, earlier.** First cut asserted `requested_secret_ids == ["GCP_CREDENTIALS_FILE_PATH"]` (exact). It failed: the recorded list led with `POSTHOG_ENDPOINT`, `POSTHOG_API_KEY`, … — the **telemetry factory** reads secrets from the same provider *before* storage is selected (secrets resolves right before the telemetry factory; storage much later). This is extra confirmation of correct ordering, not a bug. Fixed to a **membership** check: `"GCP_CREDENTIALS_FILE_PATH" in requested_secret_ids`. That token is requested **only** by storage's gcp factory (grep-confirmed), so its presence uniquely proves the gcp arm read the external provider from the hub. (Telemetry reads secrets even with `needs_inference=False` — it resolves the POSTHOG keys to build the manager, then the disabled path ignores them; the fake returning a canned gcp path for POSTHOG_* doesn't break boot.)
+- **The gcp override needs BOTH `bucket_name` and `project_id`.** Base `pipelex.toml` ships `[pipelex.storage_config.gcp]` with `bucket_name = ""` **and** `project_id = ""`; `StorageGcpConfig.lazy_validate()` (run inside the gcp factory) rejects either empty. So the ordering-guard boot passes `config_overrides={"pipelex": {"storage_config": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}}}}` (deep-merge fills the rest). `GcpStorageProvider.__init__` only stores fields (the `find_spec`/creds-file check lives in `_get_bucket`), so constructing it at boot with a fake creds path is import-light and does no I/O — safe even though `google-cloud-storage` is installed here.
+- **Default-env boot is deterministic on this branch.** `test_default_config_yields_the_env_provider_on_the_hub` boots with no `secrets_config` override and asserts `env`. Verified the machine global `~/.pipelex/pipelex.toml` has **no** `secrets_config` block (it's net-new here), so unlike storage's `method=s3` global-override gotcha, secrets has no machine override to fight — default→`env` holds locally and in CI.
+- **Import-light test NOT extended for secrets (deliberate, unlike storage Phase 2).** `test_import_light_boot.py` gained a storage assert because s3/gcp are SDK-backed and BLOCKED there — a real import-light risk. The only builtin secrets method is `env` (no SDK), so an added `assert registrar.secrets_providers` would restate the registry unit test, not pin an import-light invariant. Left untouched to avoid over-engineering; an external SDK-backed secrets plugin would carry its own import-light guarantee.
+- **Test module layout** (one TestClass per module): `test_secrets_provider_registry.py` (registry read-view + duplicate), `test_secrets_plugin.py` (builtin plugin + env factory), `test_secrets_external_plugin.py` (integration: default/override/external/ordering — one class, four methods). Integration harness identical to `test_storage_external_plugin.py`: `mocker.patch("pipelex.plugins.discovery._external_entry_points", …)` keeps the real `BUILTIN_PLUGINS`, per-module autouse teardown-first `reset_pipelex_config_fixture`. The fake external provider is a `SecretsProviderAbstract` subclass recording requested secret ids.
+- **The Phase-3 escapee stayed fixed.** `test_hub_slot_injection_precedence.py` (fixed in Phase 3 to inject `EnvSecretsProvider()` in its four boots) passed under the full suite — no new escapee surfaced.
+
+### ⛔ CHECKPOINT 4 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), `check-config-sync` PASSED, **full `make agent-test` (exit 0, "All tests passed")**. Targeted secrets-seam trio green in isolation (11 passed).
+- [x] Commit SHA recorded here: `65603e912`
+- [x] Cold-start state updated in this file.
+- [x] Sonnet-5 clean-room `/code-review` fanned out on `65603e912` (fresh general-purpose agent, no context, pointed only at the commit). **Outcome: no substantive findings — nothing to fix, nothing to defer.** The reviewer ran all three test files against the tree (11 passed) and traced every factual claim to source: confirmed the secrets-before-telemetry-before-storage boot ordering in `pipelex.py`, the `gcp` factory's lazy credential check (fake creds path never touches disk / needs no GCP SDK at boot), telemetry's always-on `${POSTHOG_*}` secret resolution (validating the ordering-guard's membership-check rationale), `PLUGIN_API_VERSION` still `3` (changelog correctly folds in, no second bump), and identical nav placement in both mkdocs blocks. Verdict: assertions are concrete and non-tautological (the ordering guard is a genuine regression guard — reordering secrets-after-storage would raise or read the wrong provider inside the gcp factory), no over-engineering (secrets tests deliberately leaner than storage's — no optional-dep matrix, accurate to the single-impl `env` seam), no doc/code contradictions, all cross-links resolve.
 
 ---
 
