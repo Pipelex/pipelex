@@ -223,3 +223,27 @@ class TestOptionalGuardLint:
             ),
         )
         assert compose.code == "guard_lint_compose_ok"
+
+    def test_escaped_dollar_literal_in_compose_is_not_a_false_positive(self, load_empty_library: Callable[[], None]):
+        """Regression: `$$maybe_note` is an escaped literal `$maybe_note`, not a reference.
+
+        PipeCompose must store its template in authored form so the guard-lint rewrites sigils
+        exactly once. When PipeCompose stored the already-preprocessed template instead, the
+        lint's own `rewrite_template_sigils` ran a second time and resurrected the escaped
+        literal (`$$maybe_note` → `$maybe_note` → `{{ maybe_note|format() }}`), wrongly raising
+        OPTIONAL_INPUT_UNGUARDED on a pipe that never references the optional input.
+        """
+        load_empty_library()
+        compose = PipeFactory[PipeCompose].make_from_blueprint(
+            domain_code=_DOMAIN_CODE,
+            pipe_code="guard_lint_compose_escaped",
+            blueprint=PipeComposeBlueprint(
+                description="Compose whose template escapes a literal `$` before an optional input's name",
+                inputs={"maybe_note": "Text?"},
+                output="Text",
+                template="The literal token is $$maybe_note here.",
+            ),
+        )
+        assert compose.code == "guard_lint_compose_escaped"
+        # The stored template stays authored (escaped), so a single downstream rewrite keeps it literal.
+        assert compose.template == "The literal token is $$maybe_note here."

@@ -182,9 +182,12 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             agent_error(f"Failed to parse inline JSON inputs: {exc}", error_type="JSONDecodeError", cause=exc)
     else:
         try:
-            loaded = load_inputs_dict_from_path(Path(inputs_arg))
+            # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+            # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+            inputs_path = Path(inputs_arg).expanduser()
+            loaded = load_inputs_dict_from_path(inputs_path)
             # Resolve relative url paths against the inputs file's parent directory
-            base_dir = Path(inputs_arg).parent.resolve()
+            base_dir = inputs_path.parent.resolve()
             return resolve_inputs_paths(loaded, base_dir=base_dir)
         except FileNotFoundError as exc:
             agent_error(f"Input file not found: {inputs_arg}", error_type="FileNotFoundError", cause=exc)

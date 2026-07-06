@@ -65,6 +65,11 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             msg = "Template source is required for template mode"
             raise PipeComposeFactoryError(msg)
 
+        # Preprocess here only to validate at load time (sigil syntax + Jinja2 parseability).
+        # The PipeCompose stores the *authored* source, like every other pipe (PipeLLM,
+        # PipeImgGen, PipeSearch), so downstream sigil rewrites (guard-lint, render) run exactly
+        # once. Storing the preprocessed form instead double-rewrote escaped literals (`$$var` →
+        # `$var` → `{{ var|format() }}`), causing false OPTIONAL_INPUT_UNGUARDED and render corruption.
         try:
             preprocessed_template = preprocess_template(template_source, declared_inputs=set(inputs.variables))
         except TemplateSigilSyntaxError as exc:
@@ -85,7 +90,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             description=description,
             inputs=inputs,
             output=output,
-            template=preprocessed_template,
+            template=template_source,
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,

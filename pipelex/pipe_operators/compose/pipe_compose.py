@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
@@ -71,10 +72,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.template is None:
             return set()
 
+        # `self.template` is authored source (sigils not yet rewritten), so rewrite once before
+        # detecting Jinja2 variables — otherwise `$var` / `@var` sigils go unseen as required inputs.
         try:
             full_paths = detect_jinja2_required_variables(
                 template_category=self.category,
-                template_source=self.template,
+                template_source=rewrite_template_sigils(self.template),
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"

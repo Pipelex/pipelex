@@ -153,9 +153,12 @@ async def _execute_run(
                 raise typer.Exit(1) from json_decode_exc
         else:
             try:
-                pipeline_inputs = load_inputs_dict_from_path(Path(inputs))
+                # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+                # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+                inputs_path = Path(inputs).expanduser()
+                pipeline_inputs = load_inputs_dict_from_path(inputs_path)
                 # Resolve relative url paths against the inputs file's parent directory
-                base_dir = Path(inputs).parent.resolve()
+                base_dir = inputs_path.parent.resolve()
                 pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:

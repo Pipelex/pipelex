@@ -36,6 +36,10 @@
 ### Fixed
 
 - **Template truth-tests on singular values no longer crash:** `{% if var %}` (and `@?var`, which expands to it) on a present singular value used to raise `TypeError: '…' content does not support len().` — Jinja2's truth test fell through to the artefact's list-only `__len__`. `StuffArtefact` now defines `__bool__`: a present non-list artefact is truthy, a list artefact follows list emptiness. This makes the optionals guard idiom safe on both arms.
+- **`PipeCompose` escaped-sigil literals (`$$`, `@@`) no longer double-rewrite:** `PipeCompose` alone stored its template already-preprocessed and then re-ran the sigil rewriter at guard-lint and render time. Because the escape collapse (`$$name` → `$name`) is not idempotent, the second pass resurrected escaped literals into interpolations — raising a spurious `optional_input_unguarded` on a `$$name` that only *looks* like an optional reference, and silently rendering the value of `name` instead of the literal `$name`. `PipeCompose` now stores authored source and rewrites exactly once, like every other pipe.
+- **`--inputs ~/…` now expands on `run pipe` / `run bundle`:** a quoted or `=`-form tilde path (`--inputs "~/inputs.json"`, which the shell leaves unexpanded) is now `expanduser()`-ed before loading, resolving to the home directory instead of failing on a literal `~` — matching the existing `run method` behavior, on both the human and agent CLIs.
+- **Invalid storage/secrets `method` errors stay actionable under STRICT:** `UnknownStorageMethodError` / `UnknownSecretsMethodError` are marked caller-facing, so their "registered methods: … — check `storage_config.method`" guidance survives STRICT error disclosure instead of being redacted to a generic internal-error message.
+- **Non-string JSON pipe `type` gives an actionable error:** a `type` that is a list/dict/number in a `pipelex-agent pipe` JSON spec now surfaces as an `ArgumentError` naming the valid pipe types, instead of a cryptic internal `TypeError: unhashable type`.
 - **GitHub Actions:** Removed an invalid `environment` block from the `manual-trigger-tests-check.yml` workflow.
 
 ### Documentation

@@ -291,6 +291,15 @@ def pipe_cmd(
                 "implementation is a signature (contract only).",
                 error_type="ArgumentError",
             )
+        if not isinstance(raw_pipe_type, str):
+            # A non-string `type` (list/dict/number) is an authoring mistake — sanitize it at this
+            # untrusted-input boundary so it surfaces as an actionable ArgumentError, not a cryptic
+            # internal TypeError (an unhashable list/dict would blow up the membership test downstream).
+            agent_error(
+                f"Invalid pipe type '{raw_pipe_type}'. Must be one of: {list(pipe_type_to_spec_class)}, "
+                "or omit `type` for a signature (contract only, no type).",
+                error_type="ArgumentError",
+            )
         resolved_pipe_type = raw_pipe_type
     else:
         resolved_pipe_type = None
