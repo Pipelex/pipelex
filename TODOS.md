@@ -1,6 +1,6 @@
 # TOML pipeline inputs — feature/Inputs
 
-Status: **CHECKPOINT 1 CLEARED (2026-07-06)** — Phases 1+2 implemented and green (`make agent-check` + targeted CLI unit/integration/e2e tests). Uncommitted in the worktree; next up is Phase 3. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
+Status: **CHECKPOINT 2 CLEARED (2026-07-06)** — Phases 1+2 committed (`9041c6986`), Phase 3 implemented and green (`make agent-check` + targeted CLI/core/builder unit, integration and e2e tests, including the new generate→dry-run e2e chain). Next up is Phase 4 (docs + changelog + full gates). This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
 
 ## Goal
 
@@ -43,15 +43,15 @@ Accept pipeline inputs as TOML in addition to JSON, discriminated by file extens
 
 **CHECKPOINT 1 — CLEARED 2026-07-06.** TOML inputs load end-to-end on both surfaces; `make agent-check` fully green (pyright/mypy/ruff/keyword-only); the full CLI unit, integration, and e2e test paths pass, including the new subprocess TOML dry run against the real binary. Work is uncommitted — commit before starting Phase 3.
 
-### Phase 3 — Template generation `--format toml`
+### Phase 3 — Template generation `--format toml` — DONE
 
-- [ ] Refactor `InputStuffSpecs.render_inputs` to expose the template dict (e.g. `build_inputs_template() -> dict`), keeping `render_inputs` as the JSON serializer over it.
-- [ ] TOML serializer for templates using `tomlkit` (pretty, preserves our intended layout). First verify what `render_stuff_spec` can emit: any `None` (or other TOML-unrepresentable value) in template placeholders must be handled deliberately (omit the key or substitute a placeholder string) — pin the choice with a test.
-- [ ] Main CLI `pipelex build inputs pipe|bundle|method`: add `--format json|toml` (StrEnum from `pipelex.types`, default `json`); when `toml`, serialize with the new serializer and default the output filename to `inputs.toml` (`_inputs_core.py` default-path logic).
-- [ ] Agent CLI `pipelex-agent inputs pipe|bundle|method`: same `--format json|toml` option. Note the deviation: elsewhere on the agent CLI `--format` means `markdown|json`; the `inputs` commands are currently format-less always-JSON. Keep the flag name, different enum, and document it in `pipelex/cli/agent_cli/CLAUDE.md` (commands table + output-contract section). TOML output goes to stdout raw, same spirit as the `concept`/`pipe` raw-TOML passthrough commands.
-- [ ] Round-trip test: a `--format toml` generated template loads back through the Phase-1 loader and resolves to the same dict as the JSON template.
+- [x] `InputStuffSpecs.build_inputs_template() -> dict` exposed; `render_inputs` (both the method and the module-level function in `input_renderer.py`) is now the JSON serializer over it.
+- [x] TOML serializer `serialize_inputs_template_to_toml` in `pipelex/core/pipes/inputs/input_renderer.py` (tomlkit), plus `render_inputs_toml(pipe)` and the `InputsTemplateFormat` StrEnum (`json|toml`). Verified the generator never emits `None` placeholders (Optionals are unwrapped to their inner type), but the pinned defensive policy is: None → `""` recursively, so keys stay visible in the template (`test_inputs_template_toml.py`).
+- [x] Main CLI `pipelex build inputs pipe|bundle|method`: `--format json|toml` (param `template_format`, default `json`); `toml` defaults the output filename to `inputs.toml` (next to bundle / `results/` / method `results/` — all three default-path sites).
+- [x] Agent CLI `pipelex-agent inputs pipe|bundle|method`: same `--format json|toml`; `toml` prints the raw TOML template to stdout via shared `emit_inputs_result`/`emit_no_inputs_result` helpers in agent `_inputs_core.py` (no-inputs case prints a TOML comment line — valid TOML, loads as `{}`). Deviation documented in `pipelex/cli/agent_cli/CLAUDE.md` (output-format section + commands table); `test_inputs_format_unaffected.py` reworked to pin the new contract (InputsTemplateFormat, still no `--error-format`).
+- [x] Round-trip tests: unit (`test_inputs_template_roundtrip.py` — TOML template loads through the Phase-1 loader identically to its JSON twin) and e2e (`test_toml_inputs_build.py` — real binary generates `inputs.toml` from the csv_demo fixture, then a dry run consumes it).
 
-**CHECKPOINT 2** — template generation done both surfaces; commit boundary.
+**CHECKPOINT 2 — CLEARED 2026-07-06.** Template generation done on both surfaces; `make agent-check` fully green; targeted CLI + core + builder unit/integration/e2e suites pass (incl. the generate→dry-run e2e chain and a manual raw-TOML smoke of the agent CLI). Committed at this boundary.
 
 ### Phase 4 — Docs, changelog, final gates
 
