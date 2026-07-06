@@ -1,6 +1,6 @@
 import re
 from abc import ABC
-from typing import Any, final
+from typing import Any, cast, final
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -18,13 +18,42 @@ PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"
 # The exact set of keys a *typeless* `[pipe.x]` section may declare and still be a signature
 # (contract only). A section with no `type` whose keys are a subset of this set is normalized to a
 # `PipeSignature`; any other key present means the author is describing an implementation, which must
-# name its `type` — that is a hard error (see the `pipe` before-validator in
-# `pipelex_bundle_blueprint.py`). `source` is a non-user blueprint field, admitted defensively so
-# this set matches `PipeSignatureBlueprint`'s writable contract; it is unreachable via the stray-key
-# path today (a section carrying `source` was dumped from a blueprint, so it also carries `type`,
-# which short-circuits before this set is consulted). Single source of truth for the blueprint and
-# spec (authoring) layers.
+# name its `type` — that is a hard error (see `normalize_typeless_signature_section` below). `source`
+# is a non-user blueprint field, admitted defensively so this set matches `PipeSignatureBlueprint`'s
+# writable contract; it is unreachable via the stray-key path today (a section carrying `source` was
+# dumped from a blueprint, so it also carries `type`, which short-circuits before this set is
+# consulted). Single source of truth for the blueprint and spec (authoring) layers — the spec layer
+# reuses it augmented with its structural `pipe_code` field (see `SIGNATURE_ONLY_SPEC_KEYS`).
 SIGNATURE_ONLY_KEYS: frozenset[str] = frozenset({"description", "inputs", "output", "signature_for", "source"})
+
+
+def normalize_typeless_signature_section(pipe_code: Any, *, pipe_section: Any, allowed_keys: frozenset[str] = SIGNATURE_ONLY_KEYS) -> Any:
+    """Inject the internal `PipeSignature` tag on a typeless contract-only section, or reject a
+    typeless section that declares more than the contract. Non-dict values and sections that already
+    name a `type` pass through unchanged.
+
+    Shared by the blueprint (`PipelexBundleBlueprint`) and spec (`PipelexBundleSpec`) `pipe`
+    before-validators so the teaching message — whose exact wording the validation-error categorizer
+    keys off (`_MISSING_PIPE_TYPE_MARKER` in `validation_error_categorizer.py`) — has a single source
+    of truth. `allowed_keys` differs per layer: the spec section additionally carries the structural
+    `pipe_code` field, so it passes `SIGNATURE_ONLY_SPEC_KEYS`.
+    """
+    if not isinstance(pipe_section, dict):
+        return pipe_section
+    typed_section = cast("dict[str, Any]", pipe_section)
+    if "type" in typed_section:
+        return typed_section
+    stray_keys = [key for key in typed_section if key not in allowed_keys]
+    if stray_keys:
+        stray = ", ".join(f"`{key}`" for key in stray_keys)
+        msg = (
+            f"Pipe `{pipe_code}` has no `type` but declares {stray}. "
+            "A pipe with no `type` may declare only `description`, `inputs`, and `output` — that is a "
+            "signature (contract only). To implement it, add the appropriate `type` (`PipeLLM`, `PipeImgGen`, …). "
+            f"To keep it a contract, remove {stray}."
+        )
+        raise ValueError(msg)
+    return {**typed_section, "type": PIPE_SIGNATURE_TYPE_TAG}
 
 
 class PipeCategory(StrEnum):

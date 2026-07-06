@@ -9,7 +9,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
-from pipelex.core.pipes.pipe_blueprint import PIPE_SIGNATURE_TYPE_TAG, SIGNATURE_ONLY_KEYS
+from pipelex.core.pipes.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -146,31 +146,8 @@ class PipelexBundleBlueprint(BaseModel):
             if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 raise ValueError(msg)
-            normalized[pipe_code] = cls._normalize_typeless_signature(pipe_code, pipe_section=pipe_section)
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section)
         return normalized
-
-    @classmethod
-    def _normalize_typeless_signature(cls, pipe_code: Any, *, pipe_section: Any) -> Any:
-        """Inject the internal `PipeSignature` tag on a typeless contract-only section, or reject a
-        typeless section that declares more than the contract. Non-dict values and sections that
-        already name a `type` pass through unchanged.
-        """
-        if not isinstance(pipe_section, dict):
-            return pipe_section
-        typed_section = cast("dict[str, Any]", pipe_section)
-        if "type" in typed_section:
-            return typed_section
-        stray_keys = [key for key in typed_section if key not in SIGNATURE_ONLY_KEYS]
-        if stray_keys:
-            stray = ", ".join(f"`{key}`" for key in stray_keys)
-            msg = (
-                f"Pipe `{pipe_code}` has no `type` but declares {stray}. "
-                "A pipe with no `type` may declare only `description`, `inputs`, and `output` — that is a "
-                "signature (contract only). To implement it, add the appropriate `type` (`PipeLLM`, `PipeImgGen`, …). "
-                f"To keep it a contract, remove {stray}."
-            )
-            raise ValueError(msg)
-        return {**typed_section, "type": PIPE_SIGNATURE_TYPE_TAG}
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":

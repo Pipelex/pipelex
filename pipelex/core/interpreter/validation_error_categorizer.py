@@ -14,8 +14,9 @@ from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validatio
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 
-# Distinctive fragment of the typeless-pipe teaching error raised by the `pipe` before-validator
-# (`PipelexBundleBlueprint._normalize_typeless_signature`). Kept in sync with that message.
+# Distinctive fragment of the typeless-pipe teaching error raised by the `pipe` before-validators
+# (via `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and
+# spec layers). Kept in sync with that single-source message.
 _MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
 
 
@@ -85,8 +86,8 @@ def _categorize_missing_pipe_type_error(
     """Categorize the typeless-pipe teaching error raised by the `pipe` before-validator.
 
     A `[pipe.x]` section with no `type` that declares more than the signature contract is rejected
-    with a teaching message (see `PipelexBundleBlueprint._normalize_typeless_signature`). The error
-    is raised on the aggregate `pipe` field, so its pydantic `loc` carries no pipe code — recover it
+    with a teaching message (see `normalize_typeless_signature_section` in `pipe_blueprint.py`). The
+    error is raised on the aggregate `pipe` field, so its pydantic `loc` carries no pipe code — recover it
     from the message so agent/API surfaces get a clean `MISSING_PIPE_TYPE` item with a pipe locator.
 
     Args:
