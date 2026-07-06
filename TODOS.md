@@ -2,7 +2,7 @@
 
 **Branch:** `feature/PipeSignature-not-a-type`
 **Design doc:** [`wip/pipe-signature-not-a-type.md`](wip/pipe-signature-not-a-type.md) — read this first for the *why*.
-**Status:** NOT STARTED · Phase 0/3
+**Status:** Phase 1 complete · Checkpoint 1 cleared · next = Phase 2 (spec authoring layer)
 
 ## Goal in one line
 
@@ -69,7 +69,7 @@ The heart of the change. Make "no type + contract-only ⇒ signature" true at ru
 
 ### ⛔ CHECKPOINT 1 — STOP
 
-- [x] Commit the phase (one commit). Record SHA: `7cdc429028650f0694380d7af415f431287935a0`.
+- [x] Commit the phase (one commit). Record SHA: `e864b82486f00502206c6aa11b609b5256392e30`.
 - [x] Update the **Cold-start snapshot** below (what changed, where the seam lives, what's verified, what's next).
 - [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff, per the fan-out convention above. Triage findings here:
   - Findings: cold Sonnet-5 review, no blocker/major (core mechanism verified correct: fresh dicts/no input mutation, deterministic message order, sound pipe-code regex recovery, correct Draft-4 `oneOf` disambiguation). Minor/nits only:
@@ -160,7 +160,7 @@ The one breaking phase: reject the old tag, migrate every bundle, reword renderi
 > - **Open threads / review findings deferred:** …
 > - **Exact next action:** …
 
-- **Phase reached / last green SHA:** Phase 1 complete (additive typeless-signature support). Baseline (review diff base) = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 commit SHA = `7cdc429028650f0694380d7af415f431287935a0`.
+- **Phase reached / last green SHA:** Phase 1 complete (additive typeless-signature support). Baseline (review diff base) = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 commit SHA = `e864b82486f00502206c6aa11b609b5256392e30`.
 - **What changed and where the seam lives:**
   - The single choke point is `PipelexBundleBlueprint.validate_pipe_keys` (`pipe`, `mode="before"`) in `pipelex/core/bundles/pipelex_bundle_blueprint.py`, with the new helper `_normalize_typeless_signature`. A typeless `[pipe.x]` whose keys ⊆ `SIGNATURE_ONLY_KEYS` gets `type = "PipeSignature"` injected (routes to `PipeSignatureBlueprint`); a typeless section with any other key raises the teaching error; a section that already names a `type` (or is a built blueprint instance) is untouched. Runs *before* the discriminated union, so it intercepts what used to be `union_tag_not_found`.
   - `SIGNATURE_ONLY_KEYS` (frozenset `{description, inputs, output, signature_for, source}`) lives next to `PIPE_SIGNATURE_TYPE_TAG` in `pipelex/core/pipes/pipe_blueprint.py` — the single source of truth the Phase-2 spec layer will reuse.
