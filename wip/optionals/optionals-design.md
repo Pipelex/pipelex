@@ -1,6 +1,6 @@
 # Optionals in the MTHDS conceptual typing system — design choices
 
-Status: **design approved — all decisions D1–D11 decided.** Branch `feature/Optionals`; implementation plan in `wip/optionals-plan.md`. This document records the design space for adding optionality (`?`) to concept refs: each decision, the options considered, the chosen option, and its consequences. Decisions are numbered D1–D11 and summarized at the end.
+Status: **design approved — all decisions D1–D11 decided.** Branch `feature/Optionals`; implementation plan in `wip/optionals/optionals-plan.md`. This document records the design space for adding optionality (`?`) to concept refs: each decision, the options considered, the chosen option, and its consequences. Decisions are numbered D1–D11 and summarized at the end.
 
 ## 1. The problem
 
@@ -218,7 +218,7 @@ Success-path observability matters equally: the run report enumerates recorded a
 
 - **Required-main-stuff invariant (PR #1014).** The invariant "a pipe run always delivers a main stuff" is enforced and test-pinned at every post-run boundary. Reconciliation: an `AbsenceRecord` satisfies the invariant as the terminal state of `main_stuff` when (and only when) the method output is declared `?` — the invariant generalizes to "main stuff is always *resolved*: a value or a recorded absence". Concrete consequences:
   - **`continue` semantics change (breaking).** Current behavior: `continue` = pass-through-or-error (deliver the current main stuff; `PipeRunError` if there is none, live and dry-run alike), pinned by `test_pipe_condition_continue_delivery.py` including run-id stamping. Phase 1 replaces it with **`continue` = declared output absent, memory otherwise unchanged**: the runtime records an absence for the declared output instead of passing through or raising, the pinned tests are rewritten (not extended), and the dry-run all-special-outcomes guard becomes "legal iff the output is declared `?` → record absence". The pass-through runtime error becomes unreachable for validated bundles once `continue`-reachable ⇒ `?` output is statically enforced (D6's `OPTIONAL_OUTPUT_REQUIRED`).
-  - **Migration note — the pass-through capability disappears.** "If the value is already fine, `continue` and deliver it as-is" is expressible today. Under optionals the condition's output is absent instead; the previous value remains in memory under its own name, so downstream consumes it explicitly (`?` input + `@?` guard) — the ergonomic replacement is coalescing (`??`, D10/phase 2), which this strengthens the case for pulling forward. The phase-1 docs and changelog must state the migration idiom explicitly (breaking).
+  - **Migration note — the pass-through capability disappears.** "If the value is already fine, `continue` and deliver it as-is" is expressible today. Under optionals the condition's output is absent instead; the previous value remains in memory under its own name, so downstream consumes it explicitly (`?` input + `@?` guard) — the ergonomic replacement is coalescing (`??`, D10), pulled forward into phase 2 for exactly this reason. The phase-1 docs and changelog must state the migration idiom explicitly (breaking).
   - **The tightened boundaries are the phase-1 absence-arm checklist.** These sites now read the main stuff directly and raise when it is missing; each must learn the "resolved as absent" arm: the graph-tracer epilogue in `pipe_abstract.py` (`get_main_stuff()` direct), the delivery executor (typed and raw-transport arms both raise), the CLI run cores (bare, agent, agent-API), `otel_factory.py`, and `resolve_main_stuff_root_key` in `runtime_bridge/serialization.py` (raises `PipeJobError`).
   - **Wire constraint: `main_stuff_name` stays required.** `PipelexPipeRunOutput` and `PipelexRunResultExecute` require `main_stuff_name: str` (fire-and-forget is a separate `PipelexPipeDispatchAck`). Do not re-optionalize it — that would undo #1014 and re-spread null guards. D8's shape: `main_stuff_name` keeps naming the declared output slot; the run result's absence records mark that slot absent; consumers branch on the structured absence record (presentation-vs-contract, as with `/validate`'s `is_valid`).
   - **No resurrection of `PipeOutput.optional_main_stuff`** (deleted in #1014). The new accessor is tri-state *resolved* (Stuff | AbsenceRecord) — never `None` for a completed run.
@@ -232,10 +232,10 @@ Success-path observability matters equally: the run report enumerates recorded a
 - **Pre-existing wart to fix while in the area:** structure-field shorthand strings default to `required=True` while the expanded `ConceptStructureBlueprint` defaults `required=False` — opposite defaults for the same concept. Unrelated to slot optionality but adjacent enough to confuse; fix or at least document deliberately.
 - **Not in scope:** structure-field `?` sugar (e.g. `concept_ref = "X?"` meaning `required=false`). It would create two spellings for one thing and blur the slot-vs-field distinction §3 works hard to establish. Revisit only if field/slot unification ever becomes a goal.
 
-## 15. Phase-2 candidates (design now, ship later)
+## 15. Later-phase candidates (design now, ship later)
 
 - **`try?` analog — `on_error = "absent"`.** A pipe attribute, legal only when the output is `?`: a failing pipe degrades to a recorded absence (kind = `failed`, reason = the error) instead of failing the run. Powerful resilience primitive (flaky enrichment step → absent, not dead run). Two hard requirements inherited from our error-handling principles: the underlying error must still be fully captured in the run report/trace (degraded success, never a swallowed failure), and terminal-failure webhooks/notifications semantics must be worked out so "degraded" is distinguishable from "clean". Scoping to *which* errors degrade (inference errors yes, config errors no?) is the main open design question.
-- **Coalescing — the `??`.** Input-level defaults. For native concepts (Text, Number...) a literal default is easy (`v = { concept = "Text?", default = "N/A" }` — note this finally motivates an expanded input table form). For structured concepts, a default *pipe* (`fallback = "make_default_x"`) is the more MTHDS-native shape. Both deferrable; nothing in phase 1 blocks either.
+- **Coalescing — the `??`.** **Committed to phase 2** (it replaces the `continue` pass-through phase 1 broke — §13 migration note). Input-level defaults. For native concepts (Text, Number...) a literal default is easy (`v = { concept = "Text?", default = "N/A" }` — note this finally motivates an expanded input table form). For structured concepts, a default *pipe* (`fallback = "make_default_x"`) is the more MTHDS-native shape. Nothing in phase 1 blocks either form.
 - **Presence-branching sugar for PipeCondition.** The v1 idiom is `expression_template = "{{ 'present' if penalty_clause is defined else 'absent' }}"` with outcomes mapped on `present`/`absent`. If it proves common, add first-class sugar (e.g. `switch_on_presence = "penalty_clause"`). Idiom first, sugar on evidence.
 
 ## 16. Blast radius
@@ -262,8 +262,8 @@ Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the
 ## 17. Phasing
 
 - **Phase 1 — the language core (pipelex + spec/conformance).** D1 grammar, D2 ledger, D3 trichotomy + lifting, D4 plural rules, PipeCondition `continue` integration, optional method inputs, D6 taint validation + new error types, D7 template guard-lint + `@?` fix, D9 error classes + failure UX, IO-contract `optional` flag, run-result absence records, graph `skipped` state. This is a complete, useful feature on its own — even before LLM maybe-outputs, it legitimizes conditional flows and optional method inputs.
-- **Phase 2 — producing absence from models.** PipeLLM/`Text?` maybe-wrapper with reasons, batch compaction if not in 1.
-- **Phase 3 — ergonomics.** `on_error = "absent"`, coalescing/defaults, presence sugar, dual-arm dry run if warranted.
+- **Phase 2 — producing absence from models + coalescing.** PipeLLM/`Text?` maybe-wrapper with reasons, and `??` coalescing/defaults (pulled forward from phase 3: it is the ergonomic replacement for the `continue` pass-through that phase 1 broke — see the §13 migration note). Batch compaction shipped in phase 1 (Step C).
+- **Phase 3 — ergonomics.** `on_error = "absent"`, presence sugar, dual-arm dry run if warranted.
 - **Cross-repo wave** after the pipelex release: mthds spec pages, vscode/plxt, mthds-ui, skills.
 
 ## 18. Decision summary
@@ -279,5 +279,5 @@ Sequencing note: per workspace rules, `docs/specs/` + `conformance/` move in the
 | D7 | Templates | Absent = undefined (loud on deep use) + static guard-lint; `@?` finally means optional |
 | D8 | Wire | `optional` on IO contracts; absence records in run results; absent main output = success, not error |
 | D9 | Errors | `OptionalValueAbsentError` with provenance chain; RFC 7807 + error pages via existing machinery |
-| D10 | Deferred | `on_error = "absent"` (`try?`), coalescing (`??`), presence sugar — phase 2/3, semantics sketched now |
+| D10 | Deferred | Coalescing (`??`) — phase 2 (the `continue` migration's ergonomic replacement); `on_error = "absent"` (`try?`), presence sugar — phase 3; semantics sketched now |
 | D11 | Parallel combine | Absent branch → optional structure field absorbs as field-`None` / `Composite` omits the component + ledger note; required field fed maybe-absent = static error |
