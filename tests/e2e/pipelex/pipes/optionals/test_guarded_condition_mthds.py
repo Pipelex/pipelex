@@ -12,6 +12,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.core.memory.absence import AbsenceKind
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 _FIXTURE_DIR = Path(__file__).parent / "guarded_condition"
 _BUNDLE_PATH = _FIXTURE_DIR / "guarded_condition.mthds"
@@ -56,8 +57,18 @@ class TestGuardedConditionExpression:
         )
         assert unguarded_text != guarded_text
 
+        # Register the bundle's @pipe_func impls so PipeFunc construction succeeds and the load-time
+        # guard lint — not a missing-function error — is what rejects the unguarded variant. Without
+        # this, the raw-content load path never walks a folder to register funcs, so construction
+        # fails first and the failure "passes" for the wrong reason (and only on some xdist workers).
+        FuncRegistryUtils.register_funcs_in_folder(folder_path=_FIXTURE_DIR)
+
         runner = PipelexMTHDSProtocol()
         with pytest.raises(PipelexError) as exc_info:
             await runner.execute(mthds_contents=[unguarded_text], inputs={})
 
-        assert "flag" in str(exc_info.value)
+        # The load-time guard lint (OPTIONAL_INPUT_UNGUARDED) is raised inside a pydantic validator,
+        # so it surfaces wrapped in a PipeExecutionError → pydantic ValidationError rather than on the
+        # __cause__ chain. Match its distinctive verdict text: the missing-function error (the wrong
+        # reason this control used to pass for) never contains "unguarded".
+        assert "'flag' unguarded" in str(exc_info.value)
