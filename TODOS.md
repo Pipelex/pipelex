@@ -1,8 +1,21 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Phase 1 DONE + Checkpoint 1 CLEARED.** Phase 1 code = `8268ff08f`; clean-room review triage fix = `58961848a`. Branch: `feature/More-plugins-2` (worktree `_plugins`). Nothing pushed. This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **Phase 1 DONE + Checkpoint 1 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
-**Cold-start (resume here):** Storage seam (storage plan Phases 1–3) is landed + reviewed. **Next action = Phase 2** (storage tests + docs): registry hit/miss (`UnknownStorageMethodError`) + duplicate fail-loud, parametrized boot per built-in method, external-plugin integration test, new `docs/under-the-hood/storage-provider-plugins.md`, CHANGELOG `[Unreleased]`. The secrets vertical (Phases 3–4) and the W-A `build_registrar` boot move are untouched. Key as-built deviations from the linked plan are under "Phase 1 — as-built" below.
+Commits on the branch (tip → base):
+
+- `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping ← **current HEAD**
+- `58961848a` — fix: contract.py v3 comment (Checkpoint-1 review triage)
+- `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code — the review target**)
+- `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
+
+**Cold-start (resume here):** Storage seam (storage plan Phases 1–3) is landed + reviewed. **Next action = Phase 2** (storage tests + docs): unit `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate fail-loud via `_add`; parametrized boot per built-in `method` (s3/gcp `MissingDependencyError` only when *selected* with SDK absent); an external test-plugin integration test (entry-point discovered, selectable via config — mirror the inference external-plugin harness); new `docs/under-the-hood/storage-provider-plugins.md` + mkdocs nav; CHANGELOG `[Unreleased]` (breaking `PLUGIN_API_VERSION` 2→3). Checkpoint 2 gate = **full `make agent-test`** (test phase). The secrets vertical (Phases 3–4) and the W-A `build_registrar` boot move are untouched. Key as-built deviations are under "Phase 1 — as-built" below.
+
+**Environment notes for the next session (avoid rediscovering these):**
+
+- **Targeted tests for the storage seam:** `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/plugins/ tests/unit/pipelex/tools/storage/ tests/integration/pipelex/tools/storage/` (Phase 2 also needs `tests/integration/pipelex/plugins/` for the external-plugin harness). But Checkpoint 2 requires the **full** `make agent-test`.
+- **This machine's global `~/.pipelex/pipelex.toml` sets `storage_config.method = "s3"`**, so a plain `Pipelex.make(needs_inference=False)` boot smoke test yields an `S3StorageProvider`, *not* `local` (base + repo `.pipelex/` both say `local`; the global override wins). To smoke a specific method faithfully, pass `config_overrides={"pipelex": {"storage_config": {"method": "local"}}}` in a fresh interpreter. This is a machine/global-config condition, **not** a bug in the seam — don't chase it.
+- **Empirically confirmed** (so Phase 2 boot tests can rely on it): `StorageProviderConfig.method: str = Field(strict=False)` coerces a `StrEnum` input to a plain `str`, accepts an external token (e.g. `"azure"`) at parse, and `StrEnum` registry keys resolve against a plain-str `config.method` in dict lookup.
 
 > Replaces the retired cookbook hello-plugin tracker (complete; recoverable in git history).
 
