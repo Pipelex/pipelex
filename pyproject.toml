@@ -143,7 +143,7 @@ build-backend = "hatchling.build"
 [tool.mypy]
 check_untyped_defs = true
 exclude = ["^.*\\.venv/.*$"]
-mypy_path = ".:typings"
+mypy_path = "."
 packages = ["pipelex", "tests"]
 plugins = ["pydantic.mypy"]
 python_version = "3.11"
