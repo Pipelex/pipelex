@@ -163,7 +163,7 @@ An inputs file is a dictionary whose keys are input variable names. Pipelex acce
 
 There is no content sniffing: the extension alone decides. Inline JSON passed to `--inputs` (a value starting with `{`) stays JSON-only.
 
-Both formats produce the same input dictionary, so anything you can express in JSON you can express in TOML. The [PipelineInputs shapes](../../building-methods/pipes/provide-inputs.md) apply to both.
+Both formats produce the same input dictionary for the value types they share, so the [PipelineInputs shapes](../../building-methods/pipes/provide-inputs.md) apply to both — with one structural exception: JSON `null` has no TOML equivalent (TOML has no null type).
 
 ### JSON
 
