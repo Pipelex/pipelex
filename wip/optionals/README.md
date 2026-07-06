@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-**Phase 1 (the language core) is COMPLETE** — all steps A–F landed, final checkpoint cleared. The authoritative record is `TODOS.md` at the worktree root (checkpoint log, decisions/deviations, hand-off notes). PR #1021 → dev is merge-ready; Louis merges.
+**Phase 1 (the language core) is COMPLETE** — all steps A–F landed, final checkpoint cleared. The authoritative record is [optionals-phase1-tracker.md](optionals-phase1-tracker.md) (archived from the worktree-root `TODOS.md`; checkpoint log, decisions/deviations, hand-off notes). PR #1021 → dev is merge-ready; Louis merges.
 
 **Decided:** `??` coalescing is pulled forward from phase 3 into phase 2 — it is the ergonomic replacement for the `continue` pass-through that phase 1 broke (design doc §13 migration note, §17 phasing).
 
@@ -16,6 +16,7 @@
 
 - [optionals-design.md](optionals-design.md) — the design reference: decisions D1–D11, phasing (§17), decision summary. Still authoritative for future phases.
 - [optionals-plan.md](optionals-plan.md) — the phase-1 narrative plan (steps A–F). CLOSED; kept as the record the tracker implements.
+- [optionals-phase1-tracker.md](optionals-phase1-tracker.md) — the phase-1 tracker (checkpoint log, decisions/deviations log, cold-start context). CLOSED; archived here from the worktree-root `TODOS.md` now that phase 1 is done.
 - [deferred-step-f-notes.md](deferred-step-f-notes.md) — **live follow-ups**: the conformance gate-removal checklist for the release, the hosted-wire absence-records pin, PipeBatch ledger-parity question, a pre-existing template-variable detection quirk.
 - [deferred-absence-handling-dedup.md](deferred-absence-handling-dedup.md), [deferred-step-d-review-tradeoffs.md](deferred-step-d-review-tradeoffs.md), [deferred-step-e-review-tradeoffs.md](deferred-step-e-review-tradeoffs.md) — design-tradeoff findings from the checkpoint cold reviews, deliberately not applied; triage on demand.
 - [optionals-phase1-highlights.html](optionals-phase1-highlights.html) — presentation artifact summarizing phase 1.

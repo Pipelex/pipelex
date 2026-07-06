@@ -1,5 +1,7 @@
 # Optionals phase 1 — tracker (CLOSED — phase 1 complete)
 
+> Archived from `TODOS.md` at the worktree root into `wip/optionals/` now that phase 1 is done. See [README.md](README.md) for current track status and what comes next.
+
 **Phase 1 is COMPLETE** (all steps A–F done, FINAL CHECKPOINT cleared — see the checkpoint log). This tracker is kept as the feature's record; the only live follow-ups are the hand-off notes in "Cold-start context" and `wip/optionals/deferred-step-f-notes.md`.
 
 Branch `feature/Optionals` (worktree `_optionals`). This file is the single live tracker: progress checkboxes, checkpoint log, decisions/deviations. Reference docs: `wip/optionals/optionals-design.md` (decisions D1–D11, all decided) and `wip/optionals/optionals-plan.md` (the narrative plan this tracker implements — steps A–F map one-to-one).
