@@ -11,7 +11,12 @@ if TYPE_CHECKING:
 # v2 added the optional ``add_http_error_mapper`` capability (a framework-agnostic
 # transport-fault → ``ErrorReport`` mapping a host runtime renders into its own
 # HTTP error response).
-PLUGIN_API_VERSION: int = 2
+#
+# v3 added ``add_storage_provider`` and ``add_secrets_provider`` — two config-selected,
+# process-global provider registries (``storage_config.method`` / ``secrets_config.method`` pick
+# the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
+# re-declare ``targets_api`` only once.
+PLUGIN_API_VERSION: int = 3
 
 
 @runtime_checkable

@@ -26,6 +26,9 @@ bucket_name = ""
 project_id = ""
 signed_urls_lifespan_seconds = 3600
 
+[pipelex.secrets_config]
+method = "env" # env (built-in); an external plugin may add e.g. vault
+
 [pipelex.observer_config]
 observer_dir = "results/observer"
 

@@ -1,72 +1,234 @@
-# TOML pipeline inputs — feature/Inputs
+# Master plan — Provider plugins: storage & secrets
 
-Status: **CHECKPOINT 3 CLEARED (2026-07-06)** — all four phases done and committed. Phases 1+2 (`9041c6986`), Phase 3 (`1fdfd26d0`), Phase 4 docs + changelog (`5ebd9bef2`), with full `make agent-check` + `make agent-test` green. Feature is ready for PR to dev — nothing pushed. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
+Status: **TRACK COMPLETE. All 5 phases DONE + all 5 Checkpoints CLEARED.** Both provider verticals (storage + secrets) shipped as config-selected plugin seams; Phase 5 (release gating / cross-repo bookkeeping) done and Checkpoint 5 (final whole-branch clean-room review) cleared with its triage applied. Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream) — the PR to the intended base is Louis's call. This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
-## Goal
+Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
-Accept pipeline inputs as TOML in addition to JSON, discriminated by file extension, on both CLI surfaces (`pipelex run pipe|bundle|method` and `pipelex-agent run ...`). Also let the input-template generators (`pipelex build inputs ...`, `pipelex-agent inputs ...`) emit TOML via `--format toml`. TOML's multi-line strings make text-heavy inputs much more pleasant to author than JSON.
+- `0bbc39474` — fix: Checkpoint-5 whole-branch review triage (**Phase 5 / Checkpoint 5 — the review-triage commit**)
+- `65603e912` — test: secrets-provider seam tests + docs (**Phase 4 — the review target**)
+- `fdf3e114b` — fix: Phase-3 review triage (kit-config sync + stale boot comment)
+- `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 code — the review target**)
+- `3940eb7a2` — docs: Phase 2 checkpoint bookkeeping — storage vertical done
+- `37a3b72f1` — fix: Phase-2 review triage (doc tense + stronger gcp secret-wiring assert)
+- `f08193e81` — test: storage-provider seam tests + docs (**Phase 2**)
+- `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping
+- `58961848a` — fix: contract.py v3 comment (Checkpoint-1 review triage)
+- `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
+- `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-## Current state (verified against this tree)
+**Cold-start (resume here):** **The whole track is COMPLETE — nothing left to build.** Both provider verticals shipped (storage Phases 1–2, secrets Phases 3–4) and Phase 5 (release gating) + Checkpoint 5 (final whole-branch clean-room review + triage) are done. All gates green on the final tip: `agent-check`, `tb`, `check-config-sync`, full `agent-test`. The **only remaining action is Louis's**: open the PR `feature/More-plugins-2` → intended base, and (when the pipelex version carrying this lands) execute the cross-repo obligations recorded in the CHANGELOG — `pipelex-mistralai-workflows` bumps `targets_api` to 3 (bump-only); `pipelex-temporal` bumps `targets_api` to 3 **and** migrates its payload-codec factory off the removed `make_storage_provider_from_config` to `get_storage_provider_registry().get_required(...)`. Deferred design follow-ups (D3 external config passthrough incl. the external-method `uri_format` gap, first real external provider, cookbook example) are captured in `wip/plugins/`. `PLUGIN_API_VERSION` is 3.
 
-- Both surfaces take `--inputs` and discriminate by content prefix, not extension: `startswith("{")` → inline JSON, else → JSON file via `load_json_dict_from_path` + `resolve_inputs_paths`. Main CLI: `pipelex/cli/commands/run/_run_core.py:140-164`. Agent CLI: `pipelex/cli/agent_cli/commands/run/stdin_resolver.py` (`parse_cli_inputs` → `_parse_inputs_arg`).
-- The agent CLI additionally reads JSON from stdin (flat dict or `working_memory` envelope) — `stdin_resolver.py:_read_stdin_inputs`.
-- `run bundle <dir>` auto-detects `inputs.json` (`DEFAULT_INPUTS_FILE_NAME` in `pipelex/builder/conventions.py`) — main `cli/commands/run/bundle_cmd.py:149`, agent `cli/agent_cli/commands/run/bundle_cmd.py:118`.
-- TOML loading machinery already exists and is unused on this path: `pipelex/tools/misc/toml_utils.py` (`load_toml_from_path` via `tomli`, raising `TomlError`; `tomlkit` for writing).
-- Template generation: main CLI `build inputs` uses `render_inputs` (`pipelex/core/pipes/inputs/input_renderer.py`) → `InputStuffSpecs.render_inputs` (`input_stuff_specs.py:153`) which builds a dict then `json.dumps` — the dict is trivially extractable for a TOML serializer. Agent CLI `inputs` uses `build_inputs_for_pipe` (`pipelex/builder/operations/inputs_ops.py`) which already returns the dict.
-- The API runner receives the already-parsed dict, so this feature is purely client-side parsing — no wire or server change.
+> ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
-## Decisions (settled with Louis, 2026-07-06)
+**Environment notes for the next session (avoid rediscovering these):**
 
-- **D1 — extension discrimination.** `.toml` suffix → TOML loader; every other value (including `.json` and extensionless) keeps today's JSON behavior. No content sniffing.
-- **D2 — inline and stdin stay JSON-only.** The `{`-prefix inline path is untouched; inline TOML is ambiguous with file paths. Agent-CLI stdin (flat dict + `working_memory` envelope) stays JSON-only.
-- **D3 — auto-detect both, error on ambiguity.** `run bundle <dir>` auto-detects `inputs.toml` alongside `inputs.json`; if both exist, hard error telling the user to pass `--inputs` explicitly.
-- **D4 — TOML datetimes rejected for now.** `tomli` parses TOML datetime/date/time into Python objects with no JSON equivalent. Adding `DATETIME` to `NativeConceptCode` is deferred to its own track; until then the loader rejects any datetime-typed value with an explicit not-implemented error.
-- **D5 — template generation gets `--format json|toml`** (default `json`) on both surfaces; when `toml` is selected and no explicit output path is given, the default filename becomes `inputs.toml`.
-- **D6 — everything lands in pipelex first.** No `docs/specs/` or `conformance/` edits ride this branch: conformance pins the released pipelex, so its tests can't go green until this ships in a release. Spec + conformance + skills + mthds-js sweep is an explicitly deferred follow-up wave (see "Deferred" below).
+- **Targeted tests for the storage seam:** `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/unit/pipelex/plugins/ tests/unit/pipelex/tools/storage/ tests/integration/pipelex/tools/storage/` (Phase 2 also needs `tests/integration/pipelex/plugins/` for the external-plugin harness). But Checkpoint 2 requires the **full** `make agent-test`.
+- **This machine's global `~/.pipelex/pipelex.toml` sets `storage_config.method = "s3"`**, so a plain `Pipelex.make(needs_inference=False)` boot smoke test yields an `S3StorageProvider`, *not* `local` (base + repo `.pipelex/` both say `local`; the global override wins). To smoke a specific method faithfully, pass `config_overrides={"pipelex": {"storage_config": {"method": "local"}}}` in a fresh interpreter. This is a machine/global-config condition, **not** a bug in the seam — don't chase it.
+- **Empirically confirmed** (so Phase 2 boot tests can rely on it): `StorageProviderConfig.method: str = Field(strict=False)` coerces a `StrEnum` input to a plain `str`, accepts an external token (e.g. `"azure"`) at parse, and `StrEnum` registry keys resolve against a plain-str `config.method` in dict lookup.
 
-## Phases
+> Replaces the retired cookbook hello-plugin tracker (complete; recoverable in git history).
 
-### Phase 1 — Shared inputs-file loader — DONE
+## What & why (cold-start summary)
 
-- [x] New module `pipelex/cli/commands/run/_inputs_file_loader.py`: `load_inputs_dict_from_path(path: Path) -> dict[str, Any]`. Suffix match: `.toml` → `load_toml_from_path`; else → `load_json_dict_from_path`. Also hosts the shared auto-detect probe `find_default_inputs_file(directory)` (D3).
-- [x] Datetime guard: recursive walk rejecting `datetime.datetime` / `date` / `time` instances, run on both formats. New `pipelex/cli/commands/run/exceptions.py` with `InputsDatetimeNotSupportedError` and `AmbiguousInputsFilesError` — both carry class-level `error_domain = INPUT` + `user_action` (CHANGE_INPUT), so the agent envelope self-describes and they must NOT get `AGENT_ERROR_HINTS`/`AGENT_ERROR_DOMAINS` entries (enforced by `test_agent_output_drift.py`). Messages include the offending key path (e.g. `record.entries[0].when`) and the quote-as-string workaround.
-- [x] `pipelex-dev generate-error-pages` run — new pages `docs/errors/inputs-datetime-not-supported-error.md`, `docs/errors/ambiguous-inputs-files-error.md` (+ index update).
-- [x] Unit tests: `tests/unit/pipelex/cli/commands/run/test_inputs_file_loader.py` (loads, extension rule, TomlError, datetime top-level/nested/all four TOML datetime flavors, JsonTypeError, multi-line string) and `test_inputs_file_probe.py` (json-only / toml-only / neither / both-ambiguous).
+Promote the two dependency-injection seams that pass all plugin criteria — **storage provider** and **secrets provider** — to formal `pipelex.plugins` entry-point plugins, so third parties can ship `pipelex-storage-<backend>` / `pipelex-secrets-<backend>` packages selected at deploy time. Chosen after a full boot-audit of DI seams; everything else is already a plugin, a boot-orchestrator-owned hub slot, or a population/config point that should stay one.
 
-### Phase 2 — Wire into both run surfaces — DONE
+**Read these three before starting** (they hold the detailed steps this master plan sequences):
 
-- [x] Main CLI `_run_core.py`: swapped to the shared loader; new except branches for `TomlError` and `InputsDatetimeNotSupportedError`; also fixed a pre-existing gap — invalid JSON in an inputs *file* (`json.JSONDecodeError`) previously escaped to the generic traceback handler, now gets a friendly message on both surfaces. The `JsonTypeError` wording stays JSON-specific (it can only fire on the JSON branch).
-- [x] Agent CLI `stdin_resolver.py::_parse_inputs_arg`: same swap; `agent_error` branches for `TomlError` / `InputsDatetimeNotSupportedError` / `json.JSONDecodeError`. `AGENT_ERROR_HINTS` + `AGENT_ERROR_DOMAINS` got `TomlError` entries (it has no class-level metadata — kept generic since TomlError also fires outside inputs loading); the two new errors self-describe (see Phase 1).
-- [x] Auto-detect + ambiguity (D3): `DEFAULT_INPUTS_TOML_FILE_NAME` in `conventions.py`; both `bundle_cmd.py` sites probe via the shared `find_default_inputs_file`. The probe is skipped entirely when `--inputs` is passed, so the ambiguity rule only bites on auto-detect (both surfaces).
-- [x] Verified `run method --inputs relative/path.toml` comes free: main-CLI `method_cmd.py` joins `method_dir / inputs_path` preserving the suffix. Also fixed a pre-existing asymmetry (Louis's call): the *agent* CLI `run method` used to treat `--inputs` as cwd-relative; both surfaces now resolve relative `--inputs` file paths against the method dir via the shared `resolve_inputs_arg_against_dir` helper in `_inputs_file_loader.py` (inline JSON and absolute paths pass through).
-- [x] Tests: e2e subprocess dry run with `inputs.toml` + relative `url` resolution (`tests/e2e/pipelex/cli/test_toml_inputs_run.py`, staged csv_demo fixture); main-CLI auto-detect/ambiguity/explicit-bypass (`tests/unit/pipelex/cli/commands/run/test_bundle_cmd_auto_inputs.py`); agent-CLI auto-detect + ambiguity envelope + bypass (`tests/unit/pipelex/cli/agent_cli/test_run_bundle_auto_inputs.py`); `.toml` branch + error envelopes in `test_stdin_resolver.py`; TOML load/resolve + error exits in `test_run_core_execution.py`; method-dir `--inputs` resolution helper (`test_inputs_arg_resolution.py`) + agent `run method` relative-path resolution (`test_run_method_inputs_resolution.py`).
+- `wip/plugins/README.md` — the track's shared decisions + boot-audit rationale + the new mechanism.
+- `wip/plugins/storage-provider-plugin.md` — storage detail (defines the shared mechanism). **Lands first.**
+- `wip/plugins/secrets-provider-plugin.md` — secrets detail (reuses the mechanism; **Decision W already RESOLVED = W-A**).
 
-**CHECKPOINT 1 — CLEARED 2026-07-06.** TOML inputs load end-to-end on both surfaces; `make agent-check` fully green (pyright/mypy/ruff/keyword-only); the full CLI unit, integration, and e2e test paths pass, including the new subprocess TOML dry run against the real binary. Work is uncommitted — commit before starting Phase 3.
+**The new mechanism (both seams share it):** a *keyed registry + config-selected singleton*. Plugins register N provider factories keyed by an open method token (mirroring `OrchestrationMode`); at boot, core reads one config field (`storage_config.method` / `secrets_config.method`), looks the token up in the registry, and calls the factory to produce the one provider set on the hub. Deliberately **not** a `HubSlot` (those are orchestrator-coupled).
 
-### Phase 3 — Template generation `--format toml` — DONE
+## Locked decisions (do not re-litigate)
 
-- [x] `InputStuffSpecs.build_inputs_template() -> dict` exposed; `render_inputs` (both the method and the module-level function in `input_renderer.py`) is now the JSON serializer over it.
-- [x] TOML serializer `serialize_inputs_template_to_toml` in `pipelex/core/pipes/inputs/input_renderer.py` (tomlkit), plus `render_inputs_toml(pipe)` and the `InputsTemplateFormat` StrEnum (`json|toml`). Verified the generator never emits `None` placeholders (Optionals are unwrapped to their inner type), but the pinned defensive policy is: None → `""` recursively, so keys stay visible in the template (`test_inputs_template_toml.py`).
-- [x] Main CLI `pipelex build inputs pipe|bundle|method`: `--format json|toml` (param `template_format`, default `json`); `toml` defaults the output filename to `inputs.toml` (next to bundle / `results/` / method `results/` — all three default-path sites).
-- [x] Agent CLI `pipelex-agent inputs pipe|bundle|method`: same `--format json|toml`; `toml` prints the raw TOML template to stdout via shared `emit_inputs_result`/`emit_no_inputs_result` helpers in agent `_inputs_core.py` (no-inputs case prints a TOML comment line — valid TOML, loads as `{}`). Deviation documented in `pipelex/cli/agent_cli/CLAUDE.md` (output-format section + commands table); `test_inputs_format_unaffected.py` reworked to pin the new contract (InputsTemplateFormat, still no `--error-format`).
-- [x] Round-trip tests: unit (`test_inputs_template_roundtrip.py` — TOML template loads through the Phase-1 loader identically to its JSON twin) and e2e (`test_toml_inputs_build.py` — real binary generates `inputs.toml` from the csv_demo fixture, then a dry run consumes it).
+- **DX-1 — one API bump.** `PLUGIN_API_VERSION` 2→3, done once on this branch. Both seams land before any release, so external plugins (`pipelex-temporal`, `pipelex-mistralai-workflows`) re-declare `targets_api=3` exactly once. Discovery uses strict-equality, so any menu addition is a breaking bump.
+- **DX-2 — unconditional builtins.** `StoragePlugin` and `SecretsPlugin` join `CORE_UNCONDITIONAL_PLUGIN_NAMES` — required infra can't be disabled into a broken boot.
+- **DX-3 — external-provider config surface is a follow-up**, not built here (fixed typed sub-configs only in Phase scope).
+- **D1 / S1 — open method token.** `method` config fields accept an open `str`, validated at registry lookup (unknown → `UnknownStorageMethodError` / `UnknownSecretsMethodError`), not at parse.
+- **W-A (secrets boot ordering) — RESOLVED, refined in Phase 3.** The `# needed for gateway check` comment was stale; the gateway path is secrets-free, so the hardcoded `EnvSecretsProvider()` is gone and secrets is now config-selected from the registry. **Placement deviation (deliberate, see "Phase 3 — as-built"):** the plan's literal W-A said move the `build_registrar` call *above the gateway block* (after line 209 / before old 212). Phase 3 instead placed it *after* the gateway service/terms-check block and *just before the telemetry factory* (secrets' true first consumer). Both satisfy W-A's only hard constraint (secrets resolved before telemetry); the after-the-gate placement additionally preserves precondition-gate-first semantics (an unaccepted-terms / first-run boot fails fast before any discovery work) — a contract two `__new__`-based gateway-terms unit tests encode, which the above-the-gate placement broke.
 
-**CHECKPOINT 2 — CLEARED 2026-07-06.** Template generation done on both surfaces; `make agent-check` fully green; targeted CLI + core + builder unit/integration/e2e suites pass (incl. the generate→dry-run e2e chain and a manual raw-TOML smoke of the agent CLI). Committed at this boundary.
+## Sequencing
 
-### Phase 4 — Docs, changelog, final gates — DONE
+Storage vertical (Phases 1–2) → Secrets vertical (Phases 3–4) → Release gating (Phase 5). One coherent commit per phase; a mandatory checkpoint after each.
 
-- [x] `docs/tools/cli/run.md`: reworked "Input JSON Format" → "Input File Formats" section (extension rule, JSON + TOML examples with multi-line strings, datetime-limitation warning, auto-detect/ambiguity note); all three `--inputs` option lines and the `run bundle` intro updated to mention JSON-or-TOML + inputs-file auto-detect.
-- [x] `docs/building-methods/pipes/provide-inputs.md`: new "Input Files: JSON or TOML" section (extension rule, equivalent JSON/TOML example, datetime-limitation warning, pointer to run CLI reference); `build inputs` tip mentions `--format toml`.
-- [x] `docs/tools/cli/build/inputs.md`: `--format json|toml` on all three subcommands, `--output` default-filename behavior (`inputs.json`/`inputs.toml`), `--format toml` example, TOML output + multiplicity examples; frontmatter/intro reworded.
-- [x] `docs/tools/cli/agent-cli.md`: `run --inputs` JSON-or-TOML + stdin-stays-JSON/auto-detect note; `inputs --format json|toml` deviation note; Output Contract updated for inputs' dual output. (`pipelex/cli/agent_cli/CLAUDE.md` was already updated in Phase 3.)
-- [x] `CHANGELOG.md` under `[Unreleased]`: Added — TOML inputs (extension-discriminated) + `--format toml` template generation; TOML-datetime limitation noted.
-- [x] Full `make agent-check` (pyright/mypy/ruff/plxt/keyword-only all green) + `make agent-test` (full suite green).
+---
 
-**CHECKPOINT 3 (final) — CLEARED 2026-07-06.** All phases done; gates fully green; docs + changelog landed. Phase 4 changes uncommitted at this boundary — commit, then open the PR to dev. Nothing pushed.
+## ⛔ Checkpoint protocol (MANDATORY at every checkpoint — do not skip, do not merge phases)
 
-## Deferred — follow-up wave AFTER this ships in a pipelex release (NOT this branch)
+At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 
-- **Spec + conformance sync (D6).** Grep `docs/specs/` (workspace root) for the `--inputs` surface (command-surface-map, protocol spec); add the extension rule + `--format toml` to the spec prose and matching conformance tests with the bidirectional `> Verified by:` ↔ `pytest.mark.spec` links. Gated on the conformance venv's pipelex pin reaching the release that carries this feature (same de-gate pattern as the Optionals track).
-- **Skills sweep.** `mthds-plugins` skills (`mthds-run`, `mthds-inputs`) document `inputs.json`; update after release (published plugin, separate repo).
-- **mthds-js check.** Verify `mthds-agent` passes `--inputs` through opaquely (no client-side `.json` assumption) — expected no-op.
-- **DATETIME native concept.** Add `DATETIME` to `NativeConceptCode`, then replace the Phase-1 datetime guard with real support. Own track.
+1. **Verify progress.** Run the gates for the phase and paste real results:
+   - Always: `make agent-check` (pyright/ruff/mypy/plxt/keyword-only) + `make tb` (boot sequence — critical whenever config/registry wiring changed).
+   - Test phases (2, 4) and the final phase: full `make agent-test`. Intermediate phases may scope to the phase's tests but must still pass `agent-check` + `tb`.
+   - If a gate fails: fix before proceeding; a checkpoint is not cleared with a red gate.
+
+2. **Commit, then update this file for cold start.** Commit the phase as one commit. Then edit `TODOS.md` (and/or the linked wip doc) so a brand-new session could resume with no lost context: tick the phase's checkboxes, record the **commit SHA**, any decisions taken or deviations from the linked plan, the current state of the code, and the exact next action. Treat this as a handoff you won't be present to explain.
+
+3. **Fan-out a Sonnet-5 `/code-review` sub-agent — with NO inherited context.** Spawn a **fresh** sub-agent (never a fork) whose entire input is a *pointer to the phase's changes* — the commit SHA / `git diff <base>..HEAD` / the working-tree file list — and nothing else. Do **not** hand it the plan, the rationale, the decisions, or your conclusions; a clean-room review is the point (we want clean solid software, not over-engineering). Spawn template:
+
+   ```
+   Agent(
+     subagent_type: "general-purpose",   # fresh context — NOT "fork"
+     model: "sonnet",                     # Sonnet-5
+     description: "code-review phase N",
+     prompt: "Run the /code-review skill on the changes in commit <SHA> "
+             "(inspect via `git diff <SHA>^..<SHA>` in /Users/lchoquel/repos/Pipelex/_plugins). "
+             "Review ONLY those changes. You have no prior context and should assume none. "
+             "Focus: correctness bugs, and over-engineering / unnecessary abstraction / "
+             "speculative generality. Report findings ranked most-severe first; "
+             "if nothing substantive, say so plainly."
+   )
+   ```
+
+   Then **triage** the findings: apply genuine bug/simplification fixes in a follow-up commit; capture design-tradeoff findings (not silent bugs) as a deferred note under `wip/plugins/` rather than reflexively applying the convenient fix. Record the triage outcome in this file. Only then move to the next phase.
+
+---
+
+## Phase 1 — Storage: mechanism + builtin plugin + boot wiring
+*(Detail: `wip/plugins/storage-provider-plugin.md` Phases 1–3. Delivers a working config-selected storage plugin.)*
+
+- [x] `PLUGIN_API_VERSION` 2→3 in `pipelex/plugins/contract.py` (the one batched bump — DX-1).
+- [x] Registrar (`pipelex/plugins/registrar.py`): `storage_providers` dict field + `add_storage_provider(*, method, factory)` via the `_add` helper; `StorageProviderFactoryFn` alias.
+- [x] New `pipelex/plugins/storage_provider_registry.py`: `StorageProviderRegistry` (mirror `OrchestratorRegistry`: `get_optional`/`get_required`/`has`/`methods`).
+- [x] New `UnknownStorageMethodError` in `pipelex/plugins/exceptions.py`.
+- [x] Hub (`pipelex/hub.py`): `set_/get_storage_provider_registry` + module accessor.
+- [x] New `pipelex/plugins/storage/storage_plugin.py`: `StoragePlugin` (`name="storage"`) + module-level factory closures (`_make_local/_in_memory/_s3/_gcp_storage_provider`) holding the exact bodies moved from the deleted `make_storage_provider_from_config` `match` arms (keep `lazy_validate()`; keep GCP's `get_secrets_provider()` read — legal at the boot apply-point).
+- [x] `pipelex/plugins/builtins.py`: register `StoragePlugin()`; add `"storage"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- [x] Boot (`pipelex.py`): build + `set_storage_provider_registry(...)` alongside the other registries; replace the `make_storage_provider_from_config` block with registry selection (explicit param > `registry.get_required(method=config.method)(config)`).
+- [x] Delete `pipelex/tools/storage/storage_provider_factory.py` (grep for other importers first — and re-home them).
+- [x] D1: relax `StorageProviderConfig.method` to open `str`.
+
+### Phase 1 — as-built (deviations & decisions, for cold start)
+
+- **Boot ordering (resolved a plan ambiguity).** The old factory ran at `pipelex.py:307-310`, *before* `build_registrar` (~393), but the registry only exists after `build_registrar`. So storage selection **moved down** to sit right beside the other registry constructions (after the 4 `set_*_registry` calls): build `StorageProviderRegistry(plugin_registrar.storage_providers)` → `set_storage_provider_registry` → `if storage_provider is None: select via registry` → `set_storage_provider`. Verified safe: no `get_storage_provider()` consumer runs during `setup()` before that point (all consumers are run-time), and secrets is on the hub (line 306) so the GCP factory's secret read works. This is byte-equivalent to the old factory and forward-compatible with the Phase 3 W-A move (which relocates only the `build_registrar` *call*, not the storage registry construction).
+- **`DuplicateStorageProviderError` added** (not in the plan checklist but required by the `_add` `on_duplicate` contract; mirrors `DuplicateOrchestratorError`).
+- **D1 blast radius.** `method: StorageMethod` → `method: str = Field(strict=False)` forced a `case _` in `storage_path` + `uri_format` (and the model-validator) because `reportMatchNotExhaustive` fires on open `str`. Empirically confirmed the field coerces a `StrEnum` input to a plain `str` and accepts an external token (e.g. `"azure"`) at parse. Same `case _` added to the two test-side matches (`test_storage_config.py`, `generator_fixtures.py`).
+- **Test re-homing.** `test_storage_provider_factory.py` **deleted** (its SUT is gone; Phase 2 adds the registry + parametrized-boot seam tests that supersede it). `generator_fixtures.py` now selects through `get_storage_provider_registry().get_required(...)`. `test_storage_provider_config.py`'s strict-coercion test rewritten to the D1 open-token behavior (`method == "local"` as plain str; `"azure"` accepted at parse).
+- **Built-in tokens** registered as the `StorageMethod` enum values (`StrEnum` keys are interchangeable with their plain-str form in dict lookup, so boot's plain-str `config.method` resolves them).
+
+### ⛔ CHECKPOINT 1 — run the protocol above (verify → commit + update → clean-room /code-review → triage)
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright/mypy/keyword-only all pass), `make tb` (9 passed), `pipelex plugins list` shows `storage` (builtin, API 3, 4 contributions), boot `method="local"`→`LocalStorageProvider` / `method="in_memory"`→`InMemoryStorageProvider`, unknown token → `UnknownStorageMethodError`. Targeted `tests/unit/pipelex/plugins/ tests/unit+integration/.../tools/storage/` = 1036 passed; re-homed fixture consumers = 4 passed.
+- [x] Commit SHA recorded here: `8268ff08f`
+- [x] Cold-start state updated in this file.
+- [x] Sonnet-5 clean-room `/code-review` fanned out on `8268ff08f`; findings triaged. **Outcome:** review verified correctness (byte-identical factory bodies, safe `StorageMethod→str` D1 relaxation, correct boot ordering, keyword-only compliant, no bare `except`). 3 findings:
+  1. *contract.py v3 comment implied secrets registry already exists* → **FIXED** in follow-up `58961848a` (reworded to "pre-reserved / lands in a follow-up").
+  2. *storage-selection path has no direct automated test after deleting the factory test* → **deferred to Phase 2 as already planned** (Phase 2 checklist adds registry hit/miss + duplicate + parametrized-boot). Manually smoke-verified this phase.
+  3. *`StorageProviderRegistry.get_optional`/`has` have no caller* → **kept (no change).** Confirmed by grep that all sibling read-views (orchestrator/bundle_validator/model_lister) expose the identical shape; `has` is family-wide unused and `get_optional` used by exactly one. It's an established, plan-mandated registry-family convention, not speculative surface — trimming would make storage the odd one out.
+  Reviewer also noted a benign boot-ordering nuance: a bad storage config now fails *after* `models_manager.setup()` rather than immediately after secrets (necessary consequence of needing the registrar built first; behavior otherwise byte-equivalent).
+
+---
+
+## Phase 2 — Storage: tests + docs
+*(Detail: `wip/plugins/storage-provider-plugin.md` Phases 4–5.)*
+
+- [x] Unit: `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate-registration fail-loud via `_add`. → `test_storage_provider_registry.py`.
+- [x] Built-in factories: each built-in `method` yields the right provider (registry selection); gcp reads its credentials from the hub secrets provider. → `test_storage_plugin.py`. *(Reframed from "parametrized boot" to direct factory-selection — see as-built; the boot-select line is covered end-to-end by the integration test.)*
+- [x] Integration: an external test plugin registering a fake `method` (entry-point discovered) is selectable via config, and lands on the hub. → `test_storage_external_plugin.py`.
+- [x] Import-light registration pinned: s3/gcp factories register without importing their SDK. → `test_import_light_boot.py` (added `google.cloud.storage` to BLOCKED + assert `storage_providers`).
+- [x] New `docs/under-the-hood/storage-provider-plugins.md` (mirrors `orchestrator-plugins.md`); mkdocs nav (both blocks); cross-links from `inference-backend-plugins.md` Related. *(No "the plugin seams are …" enumeration exists to update — grep-verified.)*
+- [x] CHANGELOG `[Unreleased]`: "breaking" `PLUGIN_API_VERSION` 2→3; storage is now a plugin seam. *(Added a fresh `[Unreleased]` — none existed, branch base was v0.37.0.)*
+
+### Phase 2 — as-built (deviations & decisions, for cold start)
+
+- **The s3/gcp SDK guard is deferred to *use*, not *selection* (plan text was imprecise).** The plan/detail-doc said "s3/gcp arms raise `MissingDependencyError` only when *selected* with the SDK absent." Not so: `S3StorageProvider.__init__` / `GcpStorageProvider.__init__` only store fields; the `find_spec` guard lives in `_get_session` / `_get_bucket`, invoked inside the I/O methods. So *selecting* (constructing) s3/gcp NEVER raises `MissingDependencyError` even with the SDK absent — the error is deferred to first load/store. The correct invariant Phase 2 pins is therefore **import-light registration** (the s3/gcp factories register without importing their SDK), done by extending `test_import_light_boot.py`. The `MissingDependencyError`-on-use path is already covered by the dedicated `test_{s3,gcp}_storage_provider.py`, so it is not re-tested in the seam tests (avoids redundancy). Both aioboto3 and google-cloud-storage happen to be installed in this dev venv, so an in-process "SDK absent" test would need to mock `find_spec` anyway.
+- **Phase-1 latent breakage found + fixed (Phase-1 escapee).** `tests/integration/pipelex/system/test_hub_slot_injection_precedence.py` booted with an empty fake registrar and no explicit `storage_provider`; Phase 1's new selection path (`get_required(method=config.method)`) now rejects that with `UnknownStorageMethodError`. Checkpoint 1 only ran the plugins/storage dirs, not `system/`, so it escaped — the full `make agent-test` at Checkpoint 2 caught it. Fixed by injecting a dependency-free `InMemoryStorageProvider()` in the four boots (this suite tests hub slots, not storage). Grep-verified it was the *only* test with the empty-registrar-boot pattern (`test_plugin_discovery` / `test_import_light_boot` call `build_registrar` directly, never `Pipelex.make`, so they're unaffected).
+- **Test layout** (one TestClass per module): registry read-view + duplicate (`test_storage_provider_registry.py`, mirrors `test_bundle_validator_registry.py`); built-in factories + gcp secret-wiring (`test_storage_plugin.py`); integration discovery→selection→hub (`test_storage_external_plugin.py`). Config helpers reused from `tests/unit/pipelex/tools/storage/test_storage_provider_config.py` (`make_{local,in_memory,s3,gcp}_config`) — local construction touches no filesystem (no tmp_path needed).
+- **Integration harness** = `mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[SimpleNamespace(name=..., load=lambda: FakePluginClass)])` (discovery instantiates a callable/class), keep the real `BUILTIN_PLUGINS`, boot `Pipelex.make(needs_inference=False, config_overrides={"pipelex": {"storage_config": {"method": "test_mem"}}})`, assert `get_storage_provider()` is the fake + registry `.has(method="test_mem")`. An external method token loads fine (the config validator's `case _: pass`). Per-module autouse `reset_pipelex_config_fixture` (teardown-first) overrides the global module fixture (mirror of the two existing `system/` boot-test modules). This is also the harness template for the Phase 4 secrets external-plugin test.
+- **GCP secret-wiring assertion (Phase-2 review triage).** The first cut only asserted the secret was *requested*; the clean-room reviewer flagged it didn't assert the *value* flowed. Strengthened via `mocker.patch(..., wraps=GcpStorageProvider)` + `assert_called_once_with(credentials_file_path=fake_secrets.credentials_path, …)` — the repo-idiomatic way (`reportPrivateUsage`/`SLF001` both hard-block a `provider._credentials_file_path` read, so no private access / suppressions).
+
+### ⛔ CHECKPOINT 2 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**. Targeted storage-seam + at-risk boot test also green in isolation.
+- [x] Commit SHAs: `f08193e81` (Phase 2 code/tests/docs/changelog) + `37a3b72f1` (review triage).
+- [x] Cold-start state updated in this file.
+- [x] Sonnet clean-room `/code-review` fanned out on `f08193e81`; findings triaged. **Outcome:** 2 findings, **both genuine and applied** in `37a3b72f1`. (1) *High — doc/code contradiction:* the new page reasserted "the same mechanism backs the secrets provider seam" as present tense, but secrets is not yet registry-selected (and commit `58961848a` had just retracted the same claim in `contract.py`) → reworded to planned/future. (2) *Medium — test gap:* the gcp test checked the secret was requested but not that its value reached the provider → added the wraps-ctor `assert_called_once_with` above. Reviewer otherwise verified: no correctness bugs, no over-engineering, mocks faithful to the real contracts, no tautological assertions, no redundancy across the three new files, all doc snippets match source, MkDocs/pytest conventions respected.
+
+---
+
+## Phase 3 — Secrets: mechanism + config + builtin plugin + boot wiring (W-A)
+*(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 1–3. W-A is locked — this is a build instruction, not an investigation.)*
+
+- [x] Registrar: `secrets_providers` dict + `add_secrets_provider(*, method, factory)` via `_add`; `SecretsProviderFactoryFn` alias. *(API already at 3 from Phase 1 — no second bump.)*
+- [x] New `pipelex/plugins/secrets_provider_registry.py`: `SecretsProviderRegistry`.
+- [x] New `UnknownSecretsMethodError` in `pipelex/plugins/exceptions.py`. *(Also added `DuplicateSecretsProviderError` — required by the `_add` `on_duplicate` contract, mirroring storage.)*
+- [x] Hub: `set_/get_secrets_provider_registry` + module accessor.
+- [x] New config `SecretsProviderConfig` (`pipelex/tools/secrets/secrets_config.py`), `method: str = Field(strict=False)`, **no class default**. Placed as sibling of `storage_config` under `pipelex.*` (single flat model, no `SecretsConfig` subclass needed — secrets has no is_fetch/is_upload analogue).
+- [x] `pipelex/pipelex.toml`: added `[pipelex.secrets_config] method = "env"`; wired `secrets_config: SecretsProviderConfig` into the `Pipelex` config model. Same real-valued block added to `.pipelex/pipelex.toml` override. `make tb` green.
+- [x] New `pipelex/plugins/secrets/secrets_plugin.py`: `SecretsPlugin` + `_make_env_secrets_provider(config)` → `EnvSecretsProvider()` (unused `config` param carries `# noqa: ARG001`, the plugins-dir convention for a callback-signature-conforming factory).
+- [x] `builtins.py`: registered `SecretsPlugin()` in `BUILTIN_PLUGINS`; added `"secrets"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- [x] **W-A boot edit** (`pipelex.py`): `build_registrar` + boot-orchestrator gate + secrets registry/selection now sit **just before the telemetry factory** (not above the gateway block — see as-built). Downstream registry constructions still reference the same `plugin_registrar`.
+- [x] **Deleted** the stale `# needed for gateway check` + hardcoded `EnvSecretsProvider()`; replaced with registry selection (explicit `setup(secrets_provider=...)` still wins). Dropped the now-unused `EnvSecretsProvider` import from `pipelex.py`.
+
+### Phase 3 — as-built (deviations & decisions, for cold start)
+
+- **W-A boot placement refined — after the precondition gate, not above the gateway block (the one real deviation).** The plan's literal W-A said move `build_registrar(config=get_config())` up to *before the gateway service block* (after line 209 / old line 212). Doing exactly that broke two unit tests — `tests/unit/pipelex/system/pipelex_service/test_gateway_terms_check.py::{test_first_run_raises_inference_setup_required, test_needs_inference_true_raises_when_terms_not_accepted}`. Those tests exercise the gateway terms/first-run gate in isolation via `Pipelex.__new__(Pipelex)` (skipping `__init__`, so no config/hub is set) and rely on `setup()` reaching the terms-check `raise` **before** touching `get_config()` / `self.pipelex_hub`. Moving `build_registrar(config=get_config())` above the gate made `setup()` call `get_config()` first → `RuntimeError: Config instance is not set`. **Resolution:** placed the whole plugin-discovery + boot-orchestrator gate + secrets-registry/selection block **after** the gateway service/terms-check block and **immediately before the telemetry factory** — telemetry (`make_telemetry_manager`) is the *true first consumer* of `secrets_provider`, which is W-A's only hard constraint. This is strictly better than the plan's literal placement: the terms/first-run precondition gate fails fast before any discovery work, and no `__new__` test needed changing for the gate. (The boot-orchestrator gate also moved to this spot — still far earlier than its original post-`models_manager.setup` position, so fail-fast is preserved.)
+- **`DuplicateSecretsProviderError` added** (not in the plan checklist) — required by the `_add` `on_duplicate` contract; mirrors `DuplicateStorageProviderError` / `DuplicateOrchestratorError`.
+- **`SecretsProviderConfig` is a single flat model**, not a base+subclass like storage's `StorageProviderConfig`/`StorageConfig`. Storage's subclass exists only to add `is_fetch_remote_content_enabled`/`is_upload_local_content_enabled`; secrets has no such extra fields, so a lone `SecretsProviderConfig(ConfigModel)` with just `method` is the clean-solid shape (no speculative base).
+- **Phase-1 escapee proactively found + fixed (same class as storage's).** `test_hub_slot_injection_precedence.py` boots a fake **empty** registrar (patched into `build_registrar`) and passed an explicit `storage_provider` but no `secrets_provider`; the new secrets selection path (`get_required(method="env")`) rejects the empty registry with `UnknownSecretsMethodError`. Fixed by injecting `EnvSecretsProvider()` in the four boots (+ docstring updated). Grep-verified this was the only `Pipelex.make` boot with a mocked empty/partial registrar (the plugins-dir tests call `build_registrar` directly; `test_storage_external_plugin` keeps the real `BUILTIN_PLUGINS`, so its `env` secrets provider is present). Caught here via the full `make agent-test` rather than escaping to a later checkpoint.
+- **The env factory ignores config.** `_make_env_secrets_provider(config)` returns a bare `EnvSecretsProvider()`; the `config` param exists only to conform to `SecretsProviderFactoryFn = Callable[[SecretsProviderConfig], ...]` (an SDK-backed external provider would read its own settings from it). Marked `# noqa: ARG001`, the established plugins-dir convention (see linkup/bedrock/azure_rest workers).
+
+### ⛔ CHECKPOINT 3 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**, `check-config-sync` PASSED (after the triage fix). Manual smokes: `pipelex plugins list` shows `secrets` (builtin, API 3, `secrets provider env`); default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`.
+- [x] Commit SHAs: `8a0b32668` (Phase 3 code) + `fdf3e114b` (review triage).
+- [x] Cold-start state updated in this file.
+- [x] Sonnet clean-room `/code-review` fanned out on `8a0b32668` (fresh general-purpose agent, no context, pointed only at the commit); findings triaged. **Outcome:** reviewer confirmed **no correctness bug in the boot-order move** (traced every consumer: `build_registrar` is pure, runs after the gateway/terms gate and before the telemetry factory, its only pre-hub consumer; `UnknownBootOrchestratorError` moving earlier is a correct fail-fast improvement). 4 findings:
+  1. *High — kit-config drift:* `pipelex/kit/configs/pipelex.toml` (the `pipelex init` template) missing the new `[pipelex.secrets_config]` block ⇒ `make check-config-sync` fails (CI + `make check` gate; **not** in `agent-check`, which is why Checkpoint-3 gates missed it). → **FIXED** in `fdf3e114b` via `make up-kit-configs`. *(Reconciled against the `worker_scopes` "not in kit copies" false-positive memory: that gate compares kit-configs ↔ `.pipelex` only, not the base `pipelex.toml`; a net-new section in `.pipelex` genuinely diverges — real, not a false positive.)*
+  2. *Medium — stale comment:* the secrets-hub-set comment still said the registrar is "built below," but the reorder moved that build above it. → **FIXED** in `fdf3e114b` (reworded).
+  3. *Over-engineering flag (registry+plugin+config+exceptions for a one-impl seam)* → **kept, no change.** Reviewer explicitly called it "consistent architecture applied deliberately across provider verticals, not a bug" — it is the plan-mandated byte-for-byte mirror of the accepted storage vertical.
+  4. *Docs + dedicated tests missing* → **deferred to Phase 4 as planned** (Phase 3 = mechanism/boot; Phase 4 = tests + docs, exactly as storage split 1↔2).
+
+---
+
+## Phase 4 — Secrets: tests + docs
+*(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 4–5.)*
+
+- [x] Unit: `SecretsProviderRegistry` hit/miss (`UnknownSecretsMethodError`) + duplicate fail-loud. → `test_secrets_provider_registry.py` (byte-for-byte mirror of `test_storage_provider_registry.py`).
+- [x] Boot: default config yields `EnvSecretsProvider` on the hub; explicit `setup(secrets_provider=...)` overrides. → `test_secrets_external_plugin.py` (first two methods). Plus a `test_secrets_plugin.py` unit (plugin registers the `env` factory; factory constructs `EnvSecretsProvider`), mirroring `test_storage_plugin.py` but lean (single builtin, no optional-dep matrix).
+- [x] Integration: external test plugin registering a fake secrets `method` (`"test_secret"`, entry-point discovered) is selectable via config. → `test_secrets_external_plugin.py`.
+- [x] Ordering guard: a boot with a non-env secrets method has secrets on the hub before storage's GCP arm reads it. → `test_secrets_external_plugin.py::test_config_selected_secrets_provider_is_read_by_storage_gcp_arm_at_boot`.
+- [x] New `docs/under-the-hood/secrets-provider-plugins.md` (emphasizes the lazy optional-dep closure for SDK-backed Vault/AWS providers + the boot-ordering relationship); mkdocs nav (both blocks); cross-links (storage↔secrets both directions, inference-backend Related, secrets-provider-injection); updated the storage page's stale "planned" forward-ref.
+- [x] CHANGELOG `[Unreleased]`: secrets is now a plugin seam; folded `add_secrets_provider` into the existing `PLUGIN_API_VERSION` 2→3 note.
+
+### Phase 4 — as-built (deviations & decisions, for cold start)
+
+- **The ordering guard is stronger than "assert boot order" implied — telemetry ALSO consumes the config-selected secrets provider, earlier.** First cut asserted `requested_secret_ids == ["GCP_CREDENTIALS_FILE_PATH"]` (exact). It failed: the recorded list led with `POSTHOG_ENDPOINT`, `POSTHOG_API_KEY`, … — the **telemetry factory** reads secrets from the same provider *before* storage is selected (secrets resolves right before the telemetry factory; storage much later). This is extra confirmation of correct ordering, not a bug. Fixed to a **membership** check: `"GCP_CREDENTIALS_FILE_PATH" in requested_secret_ids`. That token is requested **only** by storage's gcp factory (grep-confirmed), so its presence uniquely proves the gcp arm read the external provider from the hub. (Telemetry reads secrets even with `needs_inference=False` — it resolves the POSTHOG keys to build the manager, then the disabled path ignores them; the fake returning a canned gcp path for POSTHOG_* doesn't break boot.)
+- **The gcp override needs BOTH `bucket_name` and `project_id`.** Base `pipelex.toml` ships `[pipelex.storage_config.gcp]` with `bucket_name = ""` **and** `project_id = ""`; `StorageGcpConfig.lazy_validate()` (run inside the gcp factory) rejects either empty. So the ordering-guard boot passes `config_overrides={"pipelex": {"storage_config": {"method": "gcp", "gcp": {"bucket_name": "test-bucket", "project_id": "test-project"}}}}` (deep-merge fills the rest). `GcpStorageProvider.__init__` only stores fields (the `find_spec`/creds-file check lives in `_get_bucket`), so constructing it at boot with a fake creds path is import-light and does no I/O — safe even though `google-cloud-storage` is installed here.
+- **Default-env boot is deterministic on this branch.** `test_default_config_yields_the_env_provider_on_the_hub` boots with no `secrets_config` override and asserts `env`. Verified the machine global `~/.pipelex/pipelex.toml` has **no** `secrets_config` block (it's net-new here), so unlike storage's `method=s3` global-override gotcha, secrets has no machine override to fight — default→`env` holds locally and in CI.
+- **Import-light test NOT extended for secrets (deliberate, unlike storage Phase 2).** `test_import_light_boot.py` gained a storage assert because s3/gcp are SDK-backed and BLOCKED there — a real import-light risk. The only builtin secrets method is `env` (no SDK), so an added `assert registrar.secrets_providers` would restate the registry unit test, not pin an import-light invariant. Left untouched to avoid over-engineering; an external SDK-backed secrets plugin would carry its own import-light guarantee.
+- **Test module layout** (one TestClass per module): `test_secrets_provider_registry.py` (registry read-view + duplicate), `test_secrets_plugin.py` (builtin plugin + env factory), `test_secrets_external_plugin.py` (integration: default/override/external/ordering — one class, four methods). Integration harness identical to `test_storage_external_plugin.py`: `mocker.patch("pipelex.plugins.discovery._external_entry_points", …)` keeps the real `BUILTIN_PLUGINS`, per-module autouse teardown-first `reset_pipelex_config_fixture`. The fake external provider is a `SecretsProviderAbstract` subclass recording requested secret ids.
+- **The Phase-3 escapee stayed fixed.** `test_hub_slot_injection_precedence.py` (fixed in Phase 3 to inject `EnvSecretsProvider()` in its four boots) passed under the full suite — no new escapee surfaced.
+
+### ⛔ CHECKPOINT 4 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), `check-config-sync` PASSED, **full `make agent-test` (exit 0, "All tests passed")**. Targeted secrets-seam trio green in isolation (11 passed).
+- [x] Commit SHA recorded here: `65603e912`
+- [x] Cold-start state updated in this file.
+- [x] Sonnet-5 clean-room `/code-review` fanned out on `65603e912` (fresh general-purpose agent, no context, pointed only at the commit). **Outcome: no substantive findings — nothing to fix, nothing to defer.** The reviewer ran all three test files against the tree (11 passed) and traced every factual claim to source: confirmed the secrets-before-telemetry-before-storage boot ordering in `pipelex.py`, the `gcp` factory's lazy credential check (fake creds path never touches disk / needs no GCP SDK at boot), telemetry's always-on `${POSTHOG_*}` secret resolution (validating the ordering-guard's membership-check rationale), `PLUGIN_API_VERSION` still `3` (changelog correctly folds in, no second bump), and identical nav placement in both mkdocs blocks. Verdict: assertions are concrete and non-tautological (the ordering guard is a genuine regression guard — reordering secrets-after-storage would raise or read the wrong provider inside the gcp factory), no over-engineering (secrets tests deliberately leaner than storage's — no optional-dep matrix, accurate to the single-impl `env` seam), no doc/code contradictions, all cross-links resolve.
+
+---
+
+## Phase 5 — Release gating & cross-repo (documentation in this branch; execution is release-gated)
+
+- [x] Record in the CHANGELOG / release notes the cross-repo `targets_api=3` obligation. **Corrected during Checkpoint-5 triage (F2):** the original wording ("they register no provider; the bump is the only change") was wrong for `pipelex-temporal`. `pipelex-mistralai-workflows` is bump-only, but `pipelex-temporal`'s payload-codec factory imports the now-removed `make_storage_provider_from_config`, so it needs the `targets_api` bump **and** a code migration to `get_storage_provider_registry().get_required(...)`. CHANGELOG now says this + carries a `### Removed` bullet for the deleted factory. Did NOT touch those repos here.
+- [x] Confirmed the whole branch is one clean per-phase commit sequence (feat/test → triage → bookkeeping per phase; `git log 04434f785..HEAD`). Opening the PR to the intended base is **left to Louis** (nothing pushed; no upstream).
+
+### ⛔ CHECKPOINT 5 (final) — CLEARED
+- [x] Gates green on the final tip: `make agent-check` (ruff/plxt/pyright 0 errors/mypy 2084 files/keyword-only), `make tb` (9 passed), `make check-config-sync` (passed), **full `make agent-test` (exit 0, "All tests passed")** — run both before the triage (tip `65603e912`+bookkeeping) and again after the triage commit `0bbc39474`.
+- [x] Final Sonnet-5 clean-room `/code-review` over the **whole-branch diff** (`git diff 04434f785..HEAD`) — fresh general-purpose agent, no inherited context, 10 finder angles + line-by-line + a test-quality pass. **Outcome: migration verified largely clean and faithful** (behavior-preserving factory→plugin split, correct secrets→hub→telemetry→storage→gcp-reads-secrets boot ordering, safe `StorageMethod`→`str` widening, conventions honored). 9 findings, all triaged in `0bbc39474`:
+  - **F2 [MED-HIGH] — FIXED (genuine, was actively misleading):** deleting `make_storage_provider_from_config` breaks `pipelex-temporal` at import (its codec factory calls it); CHANGELOG claimed a `targets_api` bump was temporal's only change. Corrected CHANGELOG + wip doc + added Removed bullet.
+  - **F6 [LOW] — FIXED (simplification):** removed dead `get_optional` from both registries (no production consumer; `get_required` doesn't delegate to it; only its own unit tests used it). This reverses Checkpoint-1's keep-decision, which rested on a factual misread — siblings expose `get_optional`+`has`, while storage/secrets hard-fail via `get_required`+`methods`, so `get_optional` was a vestigial mechanical copy, not a convention match.
+  - **F3 [MED] — FIXED:** added symmetric storage injection-precedence test (was tested for secrets only).
+  - **F5 [LOW] — FIXED:** parametrized `test_disabling_core_unconditional_plugin_raises` over `direct/storage/secrets/openai`.
+  - **F8 [LOW] — FIXED:** `contract.py` v3 comment no longer says `add_secrets_provider` is "in a follow-up commit" (it landed in Phase 3).
+  - **F9 [LOW] — FIXED:** `orchestrator-plugins.md` no longer claims `PLUGIN_API_VERSION` "is now 2".
+  - **F1 [HIGH per reviewer] — DEFERRED to D3 (design tradeoff, not a silent bug):** external storage method boots/selects cleanly but crashes on the first *generated-content* store because `uri_format` is defined only for the built-in methods (raises loudly on `case _:`). External config surface is explicitly the D3 follow-up; strengthened the D3 note + added a docs-page caveat. External providers are usable today for their own storage API, not yet as the generated-content backing store.
+  - **F7 [LOW] — KEPT:** `Field(strict=False)` on the `method` fields is cosmetically vestigial but removal risks a config-parse regression at enum-member call sites for zero benefit.
+  - **F4 [MED] — SKIPPED:** a `lazy_validate` negative-path factory test (trivial 3-line wiring; per-config validation already covered) — avoided test bloat.
+- [x] This file updated to DONE with all SHAs; deferred follow-ups (D3 external config passthrough incl. the `uri_format` gap, first real external provider, cookbook example) captured under `wip/plugins/`.
+
+---
+
+## Deferred follow-ups (not in this plan — see wip docs)
+
+- DX-3 external-provider config passthrough (storage D3 / secrets S4).
+- First real external provider (e.g. Vault / AWS Secrets Manager) as proof-of-seam — likely a private package if hosted-platform-targeted.
+- Cookbook `pipelex-storage-hello` external-plugin example, mirroring the hello-inference-plugin track.
