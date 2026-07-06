@@ -1,6 +1,6 @@
 """Tests for GraphSpecAssembler."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind, NodeStatus
@@ -24,7 +24,7 @@ _GRAPH_ID = "test_graph"
 _PIPELINE_RUN_ID = "run_001"
 _WF_A = "wf_a"
 _WF_B = "wf_b"
-_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 
 
 def _time_at(seconds: int) -> datetime:

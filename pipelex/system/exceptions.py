@@ -1,8 +1,8 @@
 import logging
+from enum import StrEnum
 from typing import ClassVar
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.types import StrEnum
 
 
 class ToolError(PipelexError):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -189,7 +189,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
             raise PipelineRequestError(msg)
 
-        created_at = datetime.now(timezone.utc).isoformat()
+        created_at = datetime.now(UTC).isoformat()
 
         # Use provided config or get default
         execution_config = self.execution_config or get_config().pipelex.pipeline_execution_config
@@ -313,7 +313,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         }
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
 
-        finished_at = datetime.now(timezone.utc).isoformat()
+        finished_at = datetime.now(UTC).isoformat()
         return PipelexRunResultExecute.from_pipe_output(
             pipe_output=pipe_output,
             pipeline_run_id=pipe_output.pipeline_run_id,

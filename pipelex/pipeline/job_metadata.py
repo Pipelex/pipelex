@@ -1,11 +1,11 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 from pipelex.graph.trace_context import TraceContext
 from pipelex.system.telemetry.otel_context import OtelContext
-from pipelex.types import StrEnum
 
 
 class JobCategory(StrEnum):

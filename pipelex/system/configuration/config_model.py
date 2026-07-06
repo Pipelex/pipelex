@@ -1,9 +1,9 @@
+from enum import StrEnum
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.system.exceptions import ConfigModelError
-from pipelex.types import StrEnum
 
 StrEnumType = TypeVar("StrEnumType", bound=StrEnum)
 

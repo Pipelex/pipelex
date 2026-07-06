@@ -14,6 +14,7 @@ Example template usage:
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Iterator
 
 from typing_extensions import override
@@ -21,7 +22,6 @@ from typing_extensions import override
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff import Stuff

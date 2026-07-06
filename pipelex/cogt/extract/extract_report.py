@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -5,7 +6,6 @@ from pydantic import BaseModel
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import StrEnum
 
 
 class ExtractTokenCostReportField(StrEnum):

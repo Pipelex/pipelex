@@ -1,8 +1,7 @@
 import io
+from enum import StrEnum
 
 from PIL import Image
-
-from pipelex.types import StrEnum
 
 
 class ImageFormat(StrEnum):

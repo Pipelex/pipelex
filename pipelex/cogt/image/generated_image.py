@@ -11,9 +11,9 @@ from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 if TYPE_CHECKING:
-    from PIL import Image
+    from typing import Self
 
-    from pipelex.types import Self
+    from PIL import Image
 
 
 class GeneratedImageRawDetails(CustomBaseModel):

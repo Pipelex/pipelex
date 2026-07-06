@@ -1,5 +1,7 @@
 """Unit tests for ConceptRepresentationGenerator."""
 
+from enum import StrEnum
+
 from pydantic import Field
 
 from pipelex.core.concepts.concept import Concept
@@ -10,7 +12,6 @@ from pipelex.core.concepts.concept_representation_generator import (
     generate_python_representation,
 )
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.types import StrEnum
 
 # =============================================================================
 # Test Fixtures - Simple classes for unit testing

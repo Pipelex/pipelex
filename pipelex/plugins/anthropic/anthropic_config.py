@@ -1,9 +1,10 @@
+from enum import StrEnum
+
 from pydantic import field_validator
 
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.llm.reasoning_config_base import EffortToLevelMap, get_reasoning_level_str, validate_effort_to_level_map
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import StrEnum
 
 
 class AnthropicEffortLevel(StrEnum):

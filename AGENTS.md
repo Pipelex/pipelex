@@ -103,12 +103,7 @@
 
 ### Python Version Compatibility
 
-- The project supports Python 3.10+ (`requires-python = ">=3.10,<3.15"`). Never use features introduced after Python 3.10 without a compatibility fallback.
-- Common pitfalls:
-  - `datetime.UTC` was added in Python 3.11. Use `datetime.timezone.utc` instead.
-  - `StrEnum` was added in Python 3.11. Always import it from `pipelex.types` which handles retrocompatibility.
-  - `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
-  - `ExceptionGroup` / `except*` was added in Python 3.11. Avoid unless using the `exceptiongroup` backport.
+- `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
 
 ### Variables, loops and indexes
 
@@ -123,9 +118,9 @@
 - When you need the enum value as a string, don't use `str(enum_var)` or `enum_var.value`, just use `enum_var` itself, that is the point of using StrEnum!
 - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add @property methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
 - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
-- `StrEnum` must be imported from `pipelex.types` (handles python retrocompatibility):
+- Import `StrEnum` directly from the stdlib:
   ```python
-  from pipelex.types import StrEnum
+  from enum import StrEnum
   ```
 
 ### Optionals
@@ -183,9 +178,10 @@
 
 #### StrEnum and Self type
 
-- Both `StrEnum` and `Self` must be imported from `pipelex.types` (handles python retrocompatibility):
+- Import `StrEnum` and `Self` directly from the stdlib:
   ```python
-  from pipelex.types import Self, StrEnum
+  from enum import StrEnum
+  from typing import Self
   ```
 
 ### Typing

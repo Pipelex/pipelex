@@ -1,4 +1,5 @@
 import re
+from enum import StrEnum
 
 from pipelex.system.environment import get_optional_env, get_required_env
 from pipelex.system.exceptions import EnvVarNotFoundError
@@ -9,7 +10,6 @@ from pipelex.tools.secrets.exceptions import (
     VarNotFoundError,
 )
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.types import StrEnum
 
 
 class VarPrefix(StrEnum):

@@ -3,6 +3,7 @@ import string
 import types
 import typing
 from collections.abc import Callable
+from enum import StrEnum
 from typing import Any, Union, get_args, get_origin
 
 from polyfactory.factories.pydantic_factory import ModelFactory
@@ -11,7 +12,6 @@ from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-from pipelex.types import StrEnum
 
 
 class MockFormat(StrEnum):

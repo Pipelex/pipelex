@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import Field
 
 from pipelex import log
@@ -7,7 +9,6 @@ from pipelex.system.environment import get_required_env
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.aws.exceptions import AwsCredentialsError
 from pipelex.tools.secrets.exceptions import SecretNotFoundError
-from pipelex.types import StrEnum
 
 
 class AwsKeyMethod(StrEnum):

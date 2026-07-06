@@ -7,6 +7,8 @@ worker's error family, with a human-readable message and a structured
 ``UserAction``.
 """
 
+from enum import StrEnum
+
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -21,7 +23,6 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult
-from pipelex.types import StrEnum
 
 
 class InferenceErrorFamily(StrEnum):

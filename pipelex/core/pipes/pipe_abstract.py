@@ -1,7 +1,7 @@
 import traceback
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, final
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Self, final
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
@@ -36,7 +36,6 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.graph.trace_context import TraceContext
@@ -500,7 +499,7 @@ class PipeAbstract(ABC, BaseModel):
         if parent_trace_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                started_at = datetime.now(timezone.utc)
+                started_at = datetime.now(UTC)
                 node_kind = NodeKind.CONTROLLER if self.is_controller else NodeKind.OPERATOR
 
                 # Capture input specs from working memory for data flow tracking
@@ -594,7 +593,7 @@ class PipeAbstract(ABC, BaseModel):
                 tracer_manager.on_pipe_end_error(
                     lookup_key=parent_trace_context.lookup_key,
                     node_id=graph_node_id,
-                    ended_at=datetime.now(timezone.utc),
+                    ended_at=datetime.now(UTC),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
                     error_stack=error_stack,
@@ -629,7 +628,7 @@ class PipeAbstract(ABC, BaseModel):
             tracer_manager.on_pipe_end_success(
                 lookup_key=parent_trace_context.lookup_key,
                 node_id=graph_node_id,
-                ended_at=datetime.now(timezone.utc),
+                ended_at=datetime.now(UTC),
                 output_spec=output_spec,
                 output_concept_data=output_concept_data,
             )

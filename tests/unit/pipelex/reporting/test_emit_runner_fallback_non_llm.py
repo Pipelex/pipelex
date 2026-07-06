@@ -9,7 +9,7 @@ the ``AnyTokensUsage`` discriminated union restores the right concrete type on
 read-back, and that it prices into the run total.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -78,7 +78,7 @@ def _trace_context(run_id: str, tracer_key: str) -> TraceContext:
 
 
 def _job_metadata(run_id: str, tracer_key: str) -> JobMetadata:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return JobMetadata(
         user_id="test-user",
         pipeline_run_id=run_id,

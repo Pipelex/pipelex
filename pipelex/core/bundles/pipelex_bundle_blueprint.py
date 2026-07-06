@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -24,7 +25,6 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 PipeBlueprintUnion = Annotated[

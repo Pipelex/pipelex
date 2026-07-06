@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -8,7 +9,6 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.typing.structure_printer import StructurePrinter
-from pipelex.types import StrEnum
 
 
 # Test Enums

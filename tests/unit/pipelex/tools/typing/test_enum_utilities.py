@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 from pipelex.tools.typing.pydantic_utils import (
@@ -5,7 +7,6 @@ from pipelex.tools.typing.pydantic_utils import (
     clean_model_to_dict,
     convert_strenum_to_str,
 )
-from pipelex.types import StrEnum
 
 
 class SimpleEnum(StrEnum):

@@ -1,6 +1,6 @@
 """Types for the init command UI."""
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class InitFocus(StrEnum):

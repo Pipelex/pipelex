@@ -1,4 +1,6 @@
+from enum import StrEnum
 from functools import partial
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -11,7 +13,6 @@ from pipelex.tools.secrets.exceptions import UnknownVarPrefixError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import substitute_vars
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
-from pipelex.types import Self, StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"

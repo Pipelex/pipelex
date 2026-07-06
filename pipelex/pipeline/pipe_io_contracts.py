@@ -17,6 +17,7 @@ library's window, before teardown. (Registry teardown hygiene is tracked in the
 workspace-root `wip/library-lifecycle-hygiene.md`.)
 """
 
+from enum import StrEnum
 from typing import Any, Sequence
 
 from pydantic import BaseModel, Field, PydanticUndefinedAnnotation, PydanticUserError
@@ -25,7 +26,6 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import PipeIOContractError
-from pipelex.types import StrEnum
 
 
 class IOMultiplicity(StrEnum):

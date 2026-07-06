@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from enum import StrEnum
 from typing import cast
 
 from pydantic import Field, field_validator
@@ -11,7 +12,6 @@ from rich.logging import RichHandler
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.tools.log.log_levels import LogLevel
-from pipelex.types import StrEnum
 
 
 class LogMode(StrEnum):
