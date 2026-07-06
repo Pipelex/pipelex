@@ -12,9 +12,6 @@ on:
 jobs:
   manual-trigger-tests:
     runs-on: ubuntu-latest
-    environment:
-      name: manual-trigger-tests-check
-      url: ${{ github.server_url }}/${{ github.repository }}/deployments/activity_log?environment=manual-trigger-tests-check
     steps:
       - name: Initialize check
         run: |

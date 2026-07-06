@@ -61,9 +61,6 @@ dependencies = [
   "urllib3>=2.7.0",
 ]
 
-[tool.uv.sources]
-mthds = { git = "https://github.com/mthds-ai/mthds-python.git", rev = "2047818704b941246694c845fa026f4369a1d473" }
-
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
