@@ -1,15 +1,19 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Phase 1 DONE + Checkpoint 1 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **Storage vertical DONE — Phases 1–2 DONE + Checkpoints 1–2 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
 Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
+- `37a3b72f1` — fix: Phase-2 review triage (doc tense + stronger gcp secret-wiring assert)
+- `f08193e81` — test: storage-provider seam tests + docs (**Phase 2 — the review target**)
 - `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping
 - `58961848a` — fix: contract.py v3 comment (Checkpoint-1 review triage)
-- `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code — the review target**)
+- `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-**Cold-start (resume here):** Storage seam (storage plan Phases 1–3) is landed + reviewed. **Next action = Phase 2** (storage tests + docs): unit `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate fail-loud via `_add`; parametrized boot per built-in `method` (s3/gcp `MissingDependencyError` only when *selected* with SDK absent); an external test-plugin integration test (entry-point discovered, selectable via config — mirror the inference external-plugin harness); new `docs/under-the-hood/storage-provider-plugins.md` + mkdocs nav; CHANGELOG `[Unreleased]` (breaking `PLUGIN_API_VERSION` 2→3). Checkpoint 2 gate = **full `make agent-test`** (test phase). The secrets vertical (Phases 3–4) and the W-A `build_registrar` boot move are untouched. Key as-built deviations are under "Phase 1 — as-built" below.
+**Cold-start (resume here):** The **storage vertical is complete** (mechanism + builtin plugin + boot wiring + tests + docs + changelog, all reviewed). **Next action = Phase 3** (Secrets vertical): mirror the storage seam for secrets — `secrets_providers` registrar dict + `add_secrets_provider`, `SecretsProviderRegistry`, `UnknownSecretsMethodError`, hub accessors, new `SecretsProviderConfig` (+ TOML wiring in `pipelex.toml` and `.pipelex/pipelex.toml`), `SecretsPlugin` (`_make_env_secrets_provider`), builtins registration + `"secrets"` unconditional, and the **W-A boot edit** (move the `build_registrar(config=get_config())` *call* up to after line 209 / before 212, select secrets from the registry there, delete the hardcoded `EnvSecretsProvider()` at 211-212). W-A is LOCKED (see § Locked decisions) — a build instruction, not an investigation. Checkpoint 3 gate = `agent-check` + `tb` (+ `pipelex plugins list` shows `secrets`). `PLUGIN_API_VERSION` is already 3 — **no second bump**. Key as-built deviations for both phases are under "Phase 1 — as-built" and "Phase 2 — as-built" below.
+
+> ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
 **Environment notes for the next session (avoid rediscovering these):**
 
@@ -113,17 +117,26 @@ At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 ## Phase 2 — Storage: tests + docs
 *(Detail: `wip/plugins/storage-provider-plugin.md` Phases 4–5.)*
 
-- [ ] Unit: `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate-registration fail-loud via `_add`.
-- [ ] Boot (parametrized): each built-in `method` yields the right provider on the hub; s3/gcp arms raise `MissingDependencyError` only when *selected* with the SDK absent, never at registration.
-- [ ] Integration: an external test plugin registering a fake `method` (entry-point discovered) is selectable via config — mirror the inference external-plugin test harness.
-- [ ] New `docs/under-the-hood/storage-provider-plugins.md` (mirror `orchestrator-plugins.md` structure); mkdocs nav; update any "the plugin seams are …" enumerations.
-- [ ] CHANGELOG `[Unreleased]`: "breaking" `PLUGIN_API_VERSION` 2→3; storage is now a plugin seam.
+- [x] Unit: `StorageProviderRegistry` hit/miss (`UnknownStorageMethodError`) + duplicate-registration fail-loud via `_add`. → `test_storage_provider_registry.py`.
+- [x] Built-in factories: each built-in `method` yields the right provider (registry selection); gcp reads its credentials from the hub secrets provider. → `test_storage_plugin.py`. *(Reframed from "parametrized boot" to direct factory-selection — see as-built; the boot-select line is covered end-to-end by the integration test.)*
+- [x] Integration: an external test plugin registering a fake `method` (entry-point discovered) is selectable via config, and lands on the hub. → `test_storage_external_plugin.py`.
+- [x] Import-light registration pinned: s3/gcp factories register without importing their SDK. → `test_import_light_boot.py` (added `google.cloud.storage` to BLOCKED + assert `storage_providers`).
+- [x] New `docs/under-the-hood/storage-provider-plugins.md` (mirrors `orchestrator-plugins.md`); mkdocs nav (both blocks); cross-links from `inference-backend-plugins.md` Related. *(No "the plugin seams are …" enumeration exists to update — grep-verified.)*
+- [x] CHANGELOG `[Unreleased]`: "breaking" `PLUGIN_API_VERSION` 2→3; storage is now a plugin seam. *(Added a fresh `[Unreleased]` — none existed, branch base was v0.37.0.)*
 
-### ⛔ CHECKPOINT 2 — run the protocol above
-- [ ] Full `make agent-test` green (+ `agent-check`).
-- [ ] Commit SHA recorded here: `__________`
-- [ ] Cold-start state updated.
-- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged. Outcome: `__________`
+### Phase 2 — as-built (deviations & decisions, for cold start)
+
+- **The s3/gcp SDK guard is deferred to *use*, not *selection* (plan text was imprecise).** The plan/detail-doc said "s3/gcp arms raise `MissingDependencyError` only when *selected* with the SDK absent." Not so: `S3StorageProvider.__init__` / `GcpStorageProvider.__init__` only store fields; the `find_spec` guard lives in `_get_session` / `_get_bucket`, invoked inside the I/O methods. So *selecting* (constructing) s3/gcp NEVER raises `MissingDependencyError` even with the SDK absent — the error is deferred to first load/store. The correct invariant Phase 2 pins is therefore **import-light registration** (the s3/gcp factories register without importing their SDK), done by extending `test_import_light_boot.py`. The `MissingDependencyError`-on-use path is already covered by the dedicated `test_{s3,gcp}_storage_provider.py`, so it is not re-tested in the seam tests (avoids redundancy). Both aioboto3 and google-cloud-storage happen to be installed in this dev venv, so an in-process "SDK absent" test would need to mock `find_spec` anyway.
+- **Phase-1 latent breakage found + fixed (Phase-1 escapee).** `tests/integration/pipelex/system/test_hub_slot_injection_precedence.py` booted with an empty fake registrar and no explicit `storage_provider`; Phase 1's new selection path (`get_required(method=config.method)`) now rejects that with `UnknownStorageMethodError`. Checkpoint 1 only ran the plugins/storage dirs, not `system/`, so it escaped — the full `make agent-test` at Checkpoint 2 caught it. Fixed by injecting a dependency-free `InMemoryStorageProvider()` in the four boots (this suite tests hub slots, not storage). Grep-verified it was the *only* test with the empty-registrar-boot pattern (`test_plugin_discovery` / `test_import_light_boot` call `build_registrar` directly, never `Pipelex.make`, so they're unaffected).
+- **Test layout** (one TestClass per module): registry read-view + duplicate (`test_storage_provider_registry.py`, mirrors `test_bundle_validator_registry.py`); built-in factories + gcp secret-wiring (`test_storage_plugin.py`); integration discovery→selection→hub (`test_storage_external_plugin.py`). Config helpers reused from `tests/unit/pipelex/tools/storage/test_storage_provider_config.py` (`make_{local,in_memory,s3,gcp}_config`) — local construction touches no filesystem (no tmp_path needed).
+- **Integration harness** = `mocker.patch("pipelex.plugins.discovery._external_entry_points", return_value=[SimpleNamespace(name=..., load=lambda: FakePluginClass)])` (discovery instantiates a callable/class), keep the real `BUILTIN_PLUGINS`, boot `Pipelex.make(needs_inference=False, config_overrides={"pipelex": {"storage_config": {"method": "test_mem"}}})`, assert `get_storage_provider()` is the fake + registry `.has(method="test_mem")`. An external method token loads fine (the config validator's `case _: pass`). Per-module autouse `reset_pipelex_config_fixture` (teardown-first) overrides the global module fixture (mirror of the two existing `system/` boot-test modules). This is also the harness template for the Phase 4 secrets external-plugin test.
+- **GCP secret-wiring assertion (Phase-2 review triage).** The first cut only asserted the secret was *requested*; the clean-room reviewer flagged it didn't assert the *value* flowed. Strengthened via `mocker.patch(..., wraps=GcpStorageProvider)` + `assert_called_once_with(credentials_file_path=fake_secrets.credentials_path, …)` — the repo-idiomatic way (`reportPrivateUsage`/`SLF001` both hard-block a `provider._credentials_file_path` read, so no private access / suppressions).
+
+### ⛔ CHECKPOINT 2 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**. Targeted storage-seam + at-risk boot test also green in isolation.
+- [x] Commit SHAs: `f08193e81` (Phase 2 code/tests/docs/changelog) + `37a3b72f1` (review triage).
+- [x] Cold-start state updated in this file.
+- [x] Sonnet clean-room `/code-review` fanned out on `f08193e81`; findings triaged. **Outcome:** 2 findings, **both genuine and applied** in `37a3b72f1`. (1) *High — doc/code contradiction:* the new page reasserted "the same mechanism backs the secrets provider seam" as present tense, but secrets is not yet registry-selected (and commit `58961848a` had just retracted the same claim in `contract.py`) → reworded to planned/future. (2) *Medium — test gap:* the gcp test checked the secret was requested but not that its value reached the provider → added the wraps-ctor `assert_called_once_with` above. Reviewer otherwise verified: no correctness bugs, no over-engineering, mocks faithful to the real contracts, no tautological assertions, no redundancy across the three new files, all doc snippets match source, MkDocs/pytest conventions respected.
 
 ---
 
