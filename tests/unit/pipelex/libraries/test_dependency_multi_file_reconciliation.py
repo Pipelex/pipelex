@@ -25,7 +25,6 @@ domain = "summary_dep"
 description = "Dependency header declaring a summarize signature"
 
 [pipe.summarize]
-type = "PipeSignature"
 description = "Summarize a document (contract only)."
 inputs = { doc = "Text" }
 output = "Text"

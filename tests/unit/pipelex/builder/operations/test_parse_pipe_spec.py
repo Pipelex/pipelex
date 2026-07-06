@@ -19,6 +19,8 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
+from pipelex.core.pipes.pipe_blueprint import PipeType
 from tests.unit.pipelex.builder.operations.test_data import PipeOpsTestData
 
 _BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC
@@ -36,6 +38,45 @@ class TestParsePipeSpec:
     def test_error_lists_valid_types(self) -> None:
         with pytest.raises(ValueError, match="PipeLLM"):
             parse_pipe_spec({"pipe_code": "x", "description": "x"}, pipe_type="PipeBogus")
+
+    # -- typeless signature (no type) -------------------------------------
+
+    def test_typeless_spec_becomes_signature(self) -> None:
+        """A typeless contract-only spec (pipe_type=None) routes to PipeSignatureSpec — omitting the
+        type IS the signature.
+        """
+        result = parse_pipe_spec(
+            {"pipe_code": "summarize_doc", "description": "Summarize a doc.", "inputs": {"doc": "Document"}, "output": "Text"},
+            pipe_type=None,
+        )
+        assert isinstance(result, PipeSignatureSpec)
+        assert result.to_blueprint().is_signature is True
+
+    def test_typeless_spec_preserves_signature_for_hint(self) -> None:
+        result = parse_pipe_spec(
+            {"pipe_code": "x", "description": "d", "inputs": {"doc": "Text"}, "output": "Text", "signature_for": "PipeLLM"},
+            pipe_type=None,
+        )
+        assert isinstance(result, PipeSignatureSpec)
+        assert result.signature_for is PipeType.PIPE_LLM
+
+    def test_explicit_signature_tag_rejected_with_migration_error(self) -> None:
+        """`PipeSignature` is no longer a selectable type: passing it is a migration error (never a
+        generic 'Invalid pipe type', and never routed through the spec-class map).
+        """
+        with pytest.raises(ValueError, match="is no longer a pipe type") as exc_info:
+            parse_pipe_spec(
+                {"pipe_code": "x", "description": "d", "inputs": {"doc": "Text"}, "output": "Text"},
+                pipe_type="PipeSignature",
+            )
+        assert "Invalid pipe type" not in str(exc_info.value)
+
+    def test_typeless_spec_with_stray_field_raises_teaching_error(self) -> None:
+        with pytest.raises(ValueError, match="has no `type` but declares `prompt`"):
+            parse_pipe_spec(
+                {"pipe_code": "x", "description": "d", "inputs": {"doc": "Text"}, "output": "Text", "prompt": "do it"},
+                pipe_type=None,
+            )
 
     # -- pipe_code aliases ------------------------------------------------
 

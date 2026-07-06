@@ -26,9 +26,10 @@ Signatures let an agent (or a human author) build a complete, dry-runnable bundl
 
 ## MTHDS Parameters
 
+A signature has **no `type`** — omitting the type *is* what makes a pipe a signature. A `[pipe.x]` section that declares only the contract below (and nothing else) is a signature. Adding any other field means you are describing an implementation, which must name its `type`; and writing `type = "PipeSignature"` explicitly is an error (`PipeSignature` is not a pipe type — delete the line).
+
 | Parameter           | Type   | Description                                                                                                  | Required |
 | ------------------- | ------ | ------------------------------------------------------------------------------------------------------------ | -------- |
-| `type`              | string | Always `"PipeSignature"`.                                                                                    | Yes      |
 | `description`       | string | Human-readable purpose of the contract.                                                                      | Yes      |
 | `inputs`            | object | Mapping of input variable names to concept references. Multiplicity is supported (`Doc[]`, `Image[3]`).      | No       |
 | `output`            | string | The concept the signature promises to produce. Multiplicity is supported.                                    | Yes      |
@@ -50,13 +51,12 @@ main_pipe = "summarize_doc"
 SigDocument = "A document concept used for testing signatures."
 
 [pipe.summarize_doc]
-type = "PipeSignature"
 description = "Produces a summary of a document (contract only)."
 inputs = { doc = "SigDocument" }
 output = "Text"
 ```
 
-Validating this in strict mode fails (the main pipe *is* a signature). Validating it with `--allow-signatures` succeeds and dry-runs to a mock `Text`.
+No `type` line — that is what makes `summarize_doc` a signature. Validating this in strict mode fails (the main pipe *is* a signature). Validating it with `--allow-signatures` succeeds and dry-runs to a mock `Text`.
 
 ### A signature inside a `PipeSequence`
 
@@ -78,7 +78,6 @@ output = "Text"
 prompt = "Extract text from $doc."
 
 [pipe.summarize_extracted]
-type = "PipeSignature"
 description = "Summarize extracted text (contract only)."
 inputs = { extracted = "Text" }
 output = "MixSummary"
@@ -110,7 +109,6 @@ FuseImage = "An image."
 FuseReport = "A report."
 
 [pipe.fuse_docs_and_images]
-type = "PipeSignature"
 description = "Combine docs and exactly 3 images (contract only)."
 inputs = { docs = "FuseDoc[]", images = "FuseImage[3]" }
 output = "FuseReport"
@@ -143,7 +141,7 @@ When `--all` runs in strict mode, signature pipes themselves are skipped during 
 
 ## Replacing a signature with a real implementation
 
-When you are ready to implement, change the `type` of the pipe and add the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
+When you are ready to implement, add a `type` to the pipe (a signature has none) and the operator-specific fields. The pipe code, `description`, `inputs`, and `output` typically carry over unchanged — that is the value of having declared the contract first.
 
 ```toml
 [pipe.summarize_extracted]

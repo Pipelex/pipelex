@@ -30,8 +30,9 @@ _PIPE_INTERNAL_FIELDS = {"pipe_category"}
 # __name__ matches the Pydantic $defs key.
 _PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in get_args(get_args(PipeBlueprintUnion)[0]))
 
-# The signature arm is the one typeless arm: `_require_type_on_pipe_definitions` leaves its `type`
-# OPTIONAL (not forced into `required`) so a contract-only table with no `type` matches it.
+# The signature arm is the one typeless arm: `_normalize_type_on_pipe_definitions` REMOVES `type` from
+# it entirely, so a contract-only table with no `type` matches it and an explicit `type = "PipeSignature"`
+# is rejected (extra property under the arm's `additionalProperties: false`).
 _SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 
 
@@ -52,7 +53,7 @@ def generate_mthds_schema() -> dict[str, Any]:
 
     schema = _remove_internal_fields(schema)
     schema = _promote_schema_required_fields(schema)
-    schema = _require_type_on_pipe_definitions(schema)
+    schema = _normalize_type_on_pipe_definitions(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
 
@@ -127,7 +128,7 @@ def _promote_schema_required_fields(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def _require_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
+def _normalize_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
     """Normalize the `type` discriminator across pipe blueprint definitions for Draft-4 `oneOf`.
 
     The runtime union disambiguates with `Field(discriminator="type")`, but `_convert_to_draft4`
@@ -137,25 +138,29 @@ def _require_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
       `type: Literal["PipeLLM"] = "PipeLLM"`), so Pydantic omits it from `required`. We force `type`
       into `required` so a typed table matches exactly one arm and a table lacking `type` fails these
       arms cleanly instead of ambiguously multi-matching.
-    - **The signature arm** is the one typeless arm: we *skip* it, leaving `type` OPTIONAL. Pydantic
-      already emits its `type` as an `enum: ["PipeSignature"]` property with a default (so it is
-      absent from `required`), and every pipe def has `additionalProperties: false`. A typeless
-      contract table `{description, output, inputs?}` therefore matches only this arm (concrete arms
-      require `type`); a table with a *concrete* `type` fails this arm on the enum and matches only
-      its own arm; a typeless table with a stray field matches no arm at all. An explicit
-      `type = "PipeSignature"` table still validates here too — the language surface keeps accepting
-      the old tag for now; rejecting it (removing `type` from this arm) and migrating the fixtures is
-      the gate-locked breaking step.
+    - **The signature arm** is the one typeless arm: we REMOVE `type` from it entirely (property and
+      `required`). Every pipe def has `additionalProperties: false`, so the signature arm becomes
+      `{description, output, inputs?, signature_for?}` with no `type`. A typeless contract table
+      therefore matches only this arm (concrete arms require `type`); a table with a *concrete* `type`
+      fails this arm (extra `type` property) and matches only its own arm; a typeless table with a
+      stray field matches no arm; and an explicit `type = "PipeSignature"` is rejected here too (extra
+      `type` property) — the language surface no longer accepts the retired tag.
     """
     schema = copy.deepcopy(schema)
     defs_key = "$defs" if "$defs" in schema else "definitions"
     definitions = schema.get(defs_key, {})
 
     for def_name in _PIPE_DEFINITION_NAMES:
-        if def_name == _SIGNATURE_DEFINITION_NAME:
-            continue
         def_schema = definitions.get(def_name)
-        if def_schema is None or "type" not in def_schema.get("properties", {}):
+        if def_schema is None:
+            continue
+        properties = def_schema.get("properties", {})
+        if def_name == _SIGNATURE_DEFINITION_NAME:
+            # Typeless arm: no `type` at all, so an explicit tag is rejected as an extra property.
+            properties.pop("type", None)
+            _remove_from_required(def_schema, field_names={"type"})
+            continue
+        if "type" not in properties:
             continue
         required = def_schema.setdefault("required", [])
         if "type" not in required:

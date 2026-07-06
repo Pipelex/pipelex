@@ -78,23 +78,28 @@ class TestPipeSignatureBlueprintUnion:
         assert isinstance(loaded, PipeSignatureBlueprint)
         assert loaded.inputs is None
 
-    def test_explicit_signature_tag_still_accepted(self) -> None:
-        """Additive phase: an explicitly written `type = "PipeSignature"` still parses (rejected later)."""
-        bundle = PipelexBundleBlueprint.model_validate(
-            {
-                "domain": "sig_union_demo",
-                "pipe": {
-                    "summarize_doc": {
-                        "type": "PipeSignature",
-                        "description": "Summarize a document (contract only).",
-                        "inputs": {"doc": "SigUnionDoc"},
-                        "output": "SigUnionSummary",
+    def test_explicit_signature_tag_rejected(self) -> None:
+        """`PipeSignature` is no longer a pipe type: writing it explicitly is a migration error that
+        names the pipe and points the author at the typeless form.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            PipelexBundleBlueprint.model_validate(
+                {
+                    "domain": "sig_union_demo",
+                    "pipe": {
+                        "summarize_doc": {
+                            "type": "PipeSignature",
+                            "description": "Summarize a document (contract only).",
+                            "inputs": {"doc": "SigUnionDoc"},
+                            "output": "SigUnionSummary",
+                        },
                     },
-                },
-            }
-        )
-        assert bundle.pipe is not None
-        assert isinstance(bundle.pipe["summarize_doc"], PipeSignatureBlueprint)
+                }
+            )
+        message = str(exc_info.value)
+        assert "summarize_doc" in message
+        assert "is no longer a pipe type" in message
+        assert "Delete the `type` line" in message
 
     def test_typeless_section_with_impl_field_raises_teaching_error(self) -> None:
         """A typeless section carrying an implementation field is a hard error naming the field and

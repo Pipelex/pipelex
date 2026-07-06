@@ -44,11 +44,14 @@ class PipeSignatureSpec(PipeSpec):
           cannot be selected here.
     """
 
+    # Internal `PipeSpecUnion` discriminator, never written by the author and never rendered as a
+    # "type" line (a signature is typeless). `SkipJsonSchema` keeps it out of the authoring schema.
     type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
-    # Spec-layer display/authoring tag only: NOT propagated by `to_blueprint()`, which leaves the
-    # blueprint (and runtime) at `pipe_category = None` because a signature is outside the executable
-    # taxonomy. Kept per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; it only
-    # surfaces in `rendered_pretty` below.
+    # Spec-layer authoring tag only: NOT propagated by `to_blueprint()`, which leaves the blueprint
+    # (and runtime) at `pipe_category = None` because a signature is outside the executable taxonomy.
+    # Retained per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; no longer
+    # surfaced in `rendered_pretty` (a signature now renders as "Signature (contract only)", with no
+    # type/category line).
     pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
     signature_for: PipeType | None = Field(
         default=None,
@@ -70,7 +73,7 @@ class PipeSignatureSpec(PipeSpec):
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{escape(self.pipe_code)}[/red]\n", style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
+        pipe_group.renderables.append(Text.from_markup("[bold magenta]Signature[/bold magenta] (contract only)\n"))
         pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{escape(self.description)}[/yellow italic]\n"))
 
         if not self.inputs:

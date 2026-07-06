@@ -1,9 +1,9 @@
 """Unit tests for typeless-signature normalization in the spec (authoring) layer.
 
-Mirrors the blueprint-layer behavior (Phase 1): a `[pipe.x]` spec section with no `type` whose keys
-are exactly the signature contract is normalized to a `PipeSignatureSpec`; a typeless section with
-any stray field raises the teaching error. An explicit `type = "PipeSignature"` is still accepted in
-this phase (rejection is Phase 3).
+Mirrors the blueprint-layer behavior: a `[pipe.x]` spec section with no `type` whose keys are exactly
+the signature contract is normalized to a `PipeSignatureSpec`; a typeless section with any stray field
+raises the teaching error; and an explicit `type = "PipeSignature"` is rejected with the migration
+error (a signature has no type).
 """
 
 from typing import Any
@@ -123,19 +123,24 @@ class TestPipelexBundleSpecTypelessSignature:
                 }
             )
 
-    def test_explicit_signature_tag_still_accepted(self) -> None:
-        """Phase-2 guard: an explicit `type = "PipeSignature"` still parses (rejection is Phase 3)."""
-        bundle_spec = _bundle_with_pipe(
-            {
-                "type": "PipeSignature",
-                "pipe_code": "summarize_doc",
-                "description": "Produces a summary of a document.",
-                "inputs": {"doc": "Document"},
-                "output": "Summary",
-            }
-        )
-        assert bundle_spec.pipe is not None
-        assert isinstance(bundle_spec.pipe["summarize_doc"], PipeSignatureSpec)
+    def test_explicit_signature_tag_rejected(self) -> None:
+        """`PipeSignature` is no longer a pipe type: writing it explicitly in a spec section is a
+        migration error naming the pipe and pointing at the typeless form.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            _bundle_with_pipe(
+                {
+                    "type": "PipeSignature",
+                    "pipe_code": "summarize_doc",
+                    "description": "Produces a summary of a document.",
+                    "inputs": {"doc": "Document"},
+                    "output": "Summary",
+                }
+            )
+        message = str(exc_info.value)
+        assert "summarize_doc" in message
+        assert "is no longer a pipe type" in message
+        assert "Delete the `type` line" in message
 
     def test_typed_section_left_untouched(self) -> None:
         """A section that names its own `type` is not normalized — it routes to its concrete spec."""

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`PipeSignature` is not a pipe type (Breaking):** A signature is now declared by **omitting** `type` — a `[pipe.x]` section with no `type` and nothing but the contract (`description`, `output`, optional `inputs`, optional `signature_for`) *is* a `PipeSignature`. Writing `type = "PipeSignature"` explicitly is rejected with a migration error ("`PipeSignature` is no longer a pipe type — delete the `type` line"), and a typeless section that declares any non-contract field is a hard error naming the field. The `pipelex-agent pipe` authoring command mirrors this: a typeless JSON spec (no `type`) renders a `[pipe.x]` section with no type line, and `--type PipeSignature` is rejected. **MTHDS JSON Schema shape change:** the signature arm no longer carries a `type` property (an explicit tag now fails schema validation), so the downstream schema copies (`mthds`, `vscode-pipelex`, `mthds-ui`) must be re-synced on the next release via the `mthds-schema-sync` skill.
+
 ## [v0.37.0] - 2026-07-04
 
 ### Highlights

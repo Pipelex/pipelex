@@ -46,6 +46,16 @@ class TestCliPipeCmd:
         result = parse_pipe_spec(spec, pipe_type=pipe_type)
         assert result.pipe_code == "test"
 
+    def test_typeless_spec_renders_signature_without_type_line(self) -> None:
+        """No type resolved (typeless) → a signature; the CLI TOML omits the `type` line entirely."""
+        spec = parse_pipe_spec(
+            {"pipe_code": "summarize_doc", "description": "Summarize a doc.", "inputs": {"doc": "Document"}, "output": "Text"},
+            pipe_type=None,
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert "[pipe.summarize_doc]" in toml
+        assert "type =" not in toml
+
     # -- CLI TOML serialization (uses format_toml_string) -----------------
 
     def test_llm_model_appears_in_toml(self) -> None:

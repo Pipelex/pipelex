@@ -7,7 +7,6 @@ FuseImage  = "An image used in the multiplicity signature test."
 FuseReport = "A report produced from documents and images."
 
 [pipe.fuse_docs_and_images]
-type        = "PipeSignature"
 description = "Combine docs and exactly 3 images (contract only)."
 inputs      = { docs = "FuseDoc[]", images = "FuseImage[3]" }
 output      = "FuseReport"

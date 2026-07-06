@@ -29,7 +29,8 @@ _PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
     "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
     "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},
     "PipeSequence": {"steps": [{"pipe": "sub_pipe"}]},
-    "PipeSignature": {},
+    # `PipeSignature` is deliberately absent: a signature is typeless, so there is no typed table for
+    # it — an explicit `type = "PipeSignature"` table matches no arm (see test_explicit_signature_tag_is_rejected).
 }
 
 
@@ -194,8 +195,10 @@ class TestMthdsSchemaGeneration:
         """Every *concrete* pipe arm requires `type`; the signature arm is the one typeless arm.
 
         Reads the arm names straight from the generated `oneOf`, so a newly added pipe type is
-        covered automatically — this doubles as the drift guard. The signature arm keeps `type`
-        OPTIONAL (a contract-only table has no `type`), so it must NOT list `type` in `required`.
+        covered automatically — this doubles as the drift guard. The signature arm is the one typeless
+        arm: it has NO `type` property at all (an explicit `type = "PipeSignature"` is rejected as an
+        extra property under `additionalProperties: false`), so it lists `type` in neither `properties`
+        nor `required`.
         """
         definitions = schema["definitions"]
         arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
@@ -206,7 +209,9 @@ class TestMthdsSchemaGeneration:
         assert signature_def_name in arm_def_names, "The signature arm must be present in the pipe union"
         for def_name in arm_def_names:
             required = definitions[def_name].get("required", [])
+            properties = definitions[def_name].get("properties", {})
             if def_name == signature_def_name:
+                assert "type" not in properties, f"the signature arm must have NO 'type' property (got {sorted(properties)})"
                 assert "type" not in required, f"the signature arm must NOT require 'type' (got {required})"
             else:
                 assert "type" in required, f"{def_name} must list 'type' in its required array (got {required})"
@@ -246,15 +251,14 @@ class TestMthdsSchemaGeneration:
         table = {"type": "PipeLLMM", "description": "typo", "output": "Text"}
         assert not validator.is_valid(table)
 
-    def test_explicit_signature_tag_still_validates(self, schema: dict[str, Any]) -> None:
-        """Additive surface: an explicit `type = "PipeSignature"` table still validates.
-
-        The language keeps accepting the old tag for now; rejecting it (and migrating fixtures) is
-        the later gate-locked breaking step.
+    def test_explicit_signature_tag_is_rejected(self, schema: dict[str, Any]) -> None:
+        """An explicit `type = "PipeSignature"` table matches no arm: the signature arm has no `type`
+        property (extra property under `additionalProperties: false`) and every concrete arm pins its
+        own `type` enum. `PipeSignature` is no longer a selectable type.
         """
         validator = _pipe_union_oneof_validator(schema)
         table = {"type": "PipeSignature", "description": "explicit tag", "output": "Text"}
-        assert validator.is_valid(table)
+        assert not validator.is_valid(table)
 
     @pytest.mark.parametrize("pipe_type", sorted(_PIPE_KIND_EXTRA_FIELDS))
     def test_typed_pipe_table_matches_exactly_one_arm(self, schema: dict[str, Any], pipe_type: str) -> None:
@@ -285,14 +289,20 @@ class TestMthdsSchemaGeneration:
         assert validator.is_valid(table) is should_validate, f"size={size_value!r} should {'' if should_validate else 'not '}validate"
 
     def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
-        """Guard: the test's per-kind table map covers exactly the pipe kinds in the schema.
+        """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
 
         If a new pipe type is added, this fails until a minimal table is provided —
-        keeping `test_typed_pipe_table_matches_exactly_one_arm` exhaustive.
+        keeping `test_typed_pipe_table_matches_exactly_one_arm` exhaustive. The signature arm is
+        excluded: it is typeless (no `type` enum) and is not a selectable type.
         """
         definitions = schema["definitions"]
         arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
-        schema_types = {definitions[arm["$ref"].rsplit("/", 1)[-1]]["properties"]["type"]["enum"][0] for arm in arms}
+        signature_def_name = PipeSignatureBlueprint.__name__
+        schema_types = {
+            definitions[def_name]["properties"]["type"]["enum"][0]
+            for arm in arms
+            if (def_name := arm["$ref"].rsplit("/", 1)[-1]) != signature_def_name
+        }
         assert set(_PIPE_KIND_EXTRA_FIELDS) == schema_types
 
 
