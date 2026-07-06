@@ -1,173 +1,72 @@
-# Implementation plan — PipeSignature is not a type
+# TOML pipeline inputs — feature/Inputs
 
-**Branch:** `feature/PipeSignature-not-a-type`
-**Design doc:** [`wip/pipe-signature-not-a-type.md`](wip/pipe-signature-not-a-type.md) — read this first for the *why*.
-**Status:** Phase 3 complete (code + tests + docs green) · pending Checkpoint-3 cold review + commit SHA · this is the final phase
+Status: **CHECKPOINT 3 CLEARED (2026-07-06)** — all four phases done and committed. Phases 1+2 (`9041c6986`), Phase 3 (`1fdfd26d0`), Phase 4 docs + changelog (`5ebd9bef2`), with full `make agent-check` + `make agent-test` green. Feature is ready for PR to dev — nothing pushed. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
 
-## Goal in one line
+## Goal
 
-Drop `type = "PipeSignature"` from the language: a `[pipe.x]` section with **no `type`** and **nothing but the contract** (`description` + `output`, optional `inputs`, optional `signature_for`) **is** a `PipeSignature`. Anything else without a `type` is a hard error.
+Accept pipeline inputs as TOML in addition to JSON, discriminated by file extension, on both CLI surfaces (`pipelex run pipe|bundle|method` and `pipelex-agent run ...`). Also let the input-template generators (`pipelex build inputs ...`, `pipelex-agent inputs ...`) emit TOML via `--format toml`. TOML's multi-line strings make text-heavy inputs much more pleasant to author than JSON.
 
-## Settled decisions (from the design doc)
+## Current state (verified against this tree)
 
-- **D1** — Signatures only. Concrete pipes keep explicit `type`. No inference from fields (impossible anyway — `prompt` is shared by PipeLLM and PipeImgGen).
-- **D2** — Typeless + any non-contract field ⇒ **hard error**, no leniency, no type-guessing. Legal typeless keys are exactly `{description, inputs, output, signature_for, source}`.
-- **D3** — Explicit `type = "PipeSignature"` ⇒ **rejected** with a migration error. No transitional alias.
-- **D4** — Keep the optional `signature_for` hint.
+- Both surfaces take `--inputs` and discriminate by content prefix, not extension: `startswith("{")` → inline JSON, else → JSON file via `load_json_dict_from_path` + `resolve_inputs_paths`. Main CLI: `pipelex/cli/commands/run/_run_core.py:140-164`. Agent CLI: `pipelex/cli/agent_cli/commands/run/stdin_resolver.py` (`parse_cli_inputs` → `_parse_inputs_arg`).
+- The agent CLI additionally reads JSON from stdin (flat dict or `working_memory` envelope) — `stdin_resolver.py:_read_stdin_inputs`.
+- `run bundle <dir>` auto-detects `inputs.json` (`DEFAULT_INPUTS_FILE_NAME` in `pipelex/builder/conventions.py`) — main `cli/commands/run/bundle_cmd.py:149`, agent `cli/agent_cli/commands/run/bundle_cmd.py:118`.
+- TOML loading machinery already exists and is unused on this path: `pipelex/tools/misc/toml_utils.py` (`load_toml_from_path` via `tomli`, raising `TomlError`; `tomlkit` for writing).
+- Template generation: main CLI `build inputs` uses `render_inputs` (`pipelex/core/pipes/inputs/input_renderer.py`) → `InputStuffSpecs.render_inputs` (`input_stuff_specs.py:153`) which builds a dict then `json.dumps` — the dict is trivially extractable for a TOML serializer. Agent CLI `inputs` uses `build_inputs_for_pipe` (`pipelex/builder/operations/inputs_ops.py`) which already returns the dict.
+- The API runner receives the already-parsed dict, so this feature is purely client-side parsing — no wire or server change.
 
-## Phasing rationale (why this order)
+## Decisions (settled with Louis, 2026-07-06)
 
-`make agent-check` runs `plxt-lint`, which **regenerates the JSON schema from the Python models and then lints every `.mthds` file against it** (Makefile:842-845). So the language-schema generator and the fixture migration are gate-locked: fixtures can only drop the tag once the schema accepts typeless sections. To keep every checkpoint green *and* reviewable in isolation, we go **additive first, breaking last**:
+- **D1 — extension discrimination.** `.toml` suffix → TOML loader; every other value (including `.json` and extensionless) keeps today's JSON behavior. No content sniffing.
+- **D2 — inline and stdin stay JSON-only.** The `{`-prefix inline path is untouched; inline TOML is ambiguous with file paths. Agent-CLI stdin (flat dict + `working_memory` envelope) stays JSON-only.
+- **D3 — auto-detect both, error on ambiguity.** `run bundle <dir>` auto-detects `inputs.toml` alongside `inputs.json`; if both exist, hard error telling the user to pass `--inputs` explicitly.
+- **D4 — TOML datetimes rejected for now.** `tomli` parses TOML datetime/date/time into Python objects with no JSON equivalent. Adding `DATETIME` to `NativeConceptCode` is deferred to its own track; until then the loader rejects any datetime-typed value with an explicit not-implemented error.
+- **D5 — template generation gets `--format json|toml`** (default `json`) on both surfaces; when `toml` is selected and no explicit output path is given, the default filename becomes `inputs.toml`.
+- **D6 — everything lands in pipelex first.** No `docs/specs/` or `conformance/` edits ride this branch: conformance pins the released pipelex, so its tests can't go green until this ships in a release. Spec + conformance + skills + mthds-js sweep is an explicitly deferred follow-up wave (see "Deferred" below).
 
-- **Phase 1** makes typeless-signatures work at runtime *and* in the schema, while the old explicit tag still parses (both accepted). Tested with inline TOML/dicts so no fixture files move yet.
-- **Phase 2** mirrors the same additive support in the spec (authoring) layer.
-- **Phase 3** flips to rejecting the old tag, migrates all fixtures, rewords rendering, and updates docs — the one breaking phase.
+## Phases
 
-One commit per phase (repo convention). Nothing pushed until the user says so.
+### Phase 1 — Shared inputs-file loader — DONE
 
----
+- [x] New module `pipelex/cli/commands/run/_inputs_file_loader.py`: `load_inputs_dict_from_path(path: Path) -> dict[str, Any]`. Suffix match: `.toml` → `load_toml_from_path`; else → `load_json_dict_from_path`. Also hosts the shared auto-detect probe `find_default_inputs_file(directory)` (D3).
+- [x] Datetime guard: recursive walk rejecting `datetime.datetime` / `date` / `time` instances, run on both formats. New `pipelex/cli/commands/run/exceptions.py` with `InputsDatetimeNotSupportedError` and `AmbiguousInputsFilesError` — both carry class-level `error_domain = INPUT` + `user_action` (CHANGE_INPUT), so the agent envelope self-describes and they must NOT get `AGENT_ERROR_HINTS`/`AGENT_ERROR_DOMAINS` entries (enforced by `test_agent_output_drift.py`). Messages include the offending key path (e.g. `record.entries[0].when`) and the quote-as-string workaround.
+- [x] `pipelex-dev generate-error-pages` run — new pages `docs/errors/inputs-datetime-not-supported-error.md`, `docs/errors/ambiguous-inputs-files-error.md` (+ index update).
+- [x] Unit tests: `tests/unit/pipelex/cli/commands/run/test_inputs_file_loader.py` (loads, extension rule, TomlError, datetime top-level/nested/all four TOML datetime flavors, JsonTypeError, multi-line string) and `test_inputs_file_probe.py` (json-only / toml-only / neither / both-ambiguous).
 
-## Fan-out convention for `/code-review` (used at every checkpoint)
+### Phase 2 — Wire into both run surfaces — DONE
 
-Spawn the reviewer as a **fresh Sonnet-5 sub-agent with NO inherited context** (`subagent_type: general-purpose`, `model: sonnet` — **not** `fork`, which would inherit this plan). Hand it *only* a pointer to the changes:
+- [x] Main CLI `_run_core.py`: swapped to the shared loader; new except branches for `TomlError` and `InputsDatetimeNotSupportedError`; also fixed a pre-existing gap — invalid JSON in an inputs *file* (`json.JSONDecodeError`) previously escaped to the generic traceback handler, now gets a friendly message on both surfaces. The `JsonTypeError` wording stays JSON-specific (it can only fire on the JSON branch).
+- [x] Agent CLI `stdin_resolver.py::_parse_inputs_arg`: same swap; `agent_error` branches for `TomlError` / `InputsDatetimeNotSupportedError` / `json.JSONDecodeError`. `AGENT_ERROR_HINTS` + `AGENT_ERROR_DOMAINS` got `TomlError` entries (it has no class-level metadata — kept generic since TomlError also fires outside inputs loading); the two new errors self-describe (see Phase 1).
+- [x] Auto-detect + ambiguity (D3): `DEFAULT_INPUTS_TOML_FILE_NAME` in `conventions.py`; both `bundle_cmd.py` sites probe via the shared `find_default_inputs_file`. The probe is skipped entirely when `--inputs` is passed, so the ambiguity rule only bites on auto-detect (both surfaces).
+- [x] Verified `run method --inputs relative/path.toml` comes free: main-CLI `method_cmd.py` joins `method_dir / inputs_path` preserving the suffix. Also fixed a pre-existing asymmetry (Louis's call): the *agent* CLI `run method` used to treat `--inputs` as cwd-relative; both surfaces now resolve relative `--inputs` file paths against the method dir via the shared `resolve_inputs_arg_against_dir` helper in `_inputs_file_loader.py` (inline JSON and absolute paths pass through).
+- [x] Tests: e2e subprocess dry run with `inputs.toml` + relative `url` resolution (`tests/e2e/pipelex/cli/test_toml_inputs_run.py`, staged csv_demo fixture); main-CLI auto-detect/ambiguity/explicit-bypass (`tests/unit/pipelex/cli/commands/run/test_bundle_cmd_auto_inputs.py`); agent-CLI auto-detect + ambiguity envelope + bypass (`tests/unit/pipelex/cli/agent_cli/test_run_bundle_auto_inputs.py`); `.toml` branch + error envelopes in `test_stdin_resolver.py`; TOML load/resolve + error exits in `test_run_core_execution.py`; method-dir `--inputs` resolution helper (`test_inputs_arg_resolution.py`) + agent `run method` relative-path resolution (`test_run_method_inputs_resolution.py`).
 
-> Run the `/code-review` skill on the changes in `<commit SHA>` (or `git diff <base>..HEAD`, or the unstaged working tree). We want clean, solid software — flag over-engineering, dead code, and any correctness bug. Report findings only; do not fix.
+**CHECKPOINT 1 — CLEARED 2026-07-06.** TOML inputs load end-to-end on both surfaces; `make agent-check` fully green (pyright/mypy/ruff/keyword-only); the full CLI unit, integration, and e2e test paths pass, including the new subprocess TOML dry run against the real binary. Work is uncommitted — commit before starting Phase 3.
 
-Do **not** pass the plan, the design doc, the decisions, or any rationale. Let the review land cold. Triage its findings back in TODOS.md (fix / defer-to-wip / refute) before clearing the checkpoint.
+### Phase 3 — Template generation `--format toml` — DONE
 
----
+- [x] `InputStuffSpecs.build_inputs_template() -> dict` exposed; `render_inputs` (both the method and the module-level function in `input_renderer.py`) is now the JSON serializer over it.
+- [x] TOML serializer `serialize_inputs_template_to_toml` in `pipelex/core/pipes/inputs/input_renderer.py` (tomlkit), plus `render_inputs_toml(pipe)` and the `InputsTemplateFormat` StrEnum (`json|toml`). Verified the generator never emits `None` placeholders (Optionals are unwrapped to their inner type), but the pinned defensive policy is: None → `""` recursively, so keys stay visible in the template (`test_inputs_template_toml.py`).
+- [x] Main CLI `pipelex build inputs pipe|bundle|method`: `--format json|toml` (param `template_format`, default `json`); `toml` defaults the output filename to `inputs.toml` (next to bundle / `results/` / method `results/` — all three default-path sites).
+- [x] Agent CLI `pipelex-agent inputs pipe|bundle|method`: same `--format json|toml`; `toml` prints the raw TOML template to stdout via shared `emit_inputs_result`/`emit_no_inputs_result` helpers in agent `_inputs_core.py` (no-inputs case prints a TOML comment line — valid TOML, loads as `{}`). Deviation documented in `pipelex/cli/agent_cli/CLAUDE.md` (output-format section + commands table); `test_inputs_format_unaffected.py` reworked to pin the new contract (InputsTemplateFormat, still no `--error-format`).
+- [x] Round-trip tests: unit (`test_inputs_template_roundtrip.py` — TOML template loads through the Phase-1 loader identically to its JSON twin) and e2e (`test_toml_inputs_build.py` — real binary generates `inputs.toml` from the csv_demo fixture, then a dry run consumes it).
 
-## Phase 0 — Baseline (quick)
+**CHECKPOINT 2 — CLEARED 2026-07-06.** Template generation done on both surfaces; `make agent-check` fully green; targeted CLI + core + builder unit/integration/e2e suites pass (incl. the generate→dry-run e2e chain and a manual raw-TOML smoke of the agent CLI). Committed at this boundary.
 
-- [x] Confirm branch is green from a clean state: `make agent-check && make agent-test`. — both green (exit 0).
-- [x] Note the baseline SHA here for the Phase-1 review diff base: `04434f78586b328e080fd76b50bf46b00e0b6765`.
+### Phase 4 — Docs, changelog, final gates — DONE
 
----
+- [x] `docs/tools/cli/run.md`: reworked "Input JSON Format" → "Input File Formats" section (extension rule, JSON + TOML examples with multi-line strings, datetime-limitation warning, auto-detect/ambiguity note); all three `--inputs` option lines and the `run bundle` intro updated to mention JSON-or-TOML + inputs-file auto-detect.
+- [x] `docs/building-methods/pipes/provide-inputs.md`: new "Input Files: JSON or TOML" section (extension rule, equivalent JSON/TOML example, datetime-limitation warning, pointer to run CLI reference); `build inputs` tip mentions `--format toml`.
+- [x] `docs/tools/cli/build/inputs.md`: `--format json|toml` on all three subcommands, `--output` default-filename behavior (`inputs.json`/`inputs.toml`), `--format toml` example, TOML output + multiplicity examples; frontmatter/intro reworded.
+- [x] `docs/tools/cli/agent-cli.md`: `run --inputs` JSON-or-TOML + stdin-stays-JSON/auto-detect note; `inputs --format json|toml` deviation note; Output Contract updated for inputs' dual output. (`pipelex/cli/agent_cli/CLAUDE.md` was already updated in Phase 3.)
+- [x] `CHANGELOG.md` under `[Unreleased]`: Added — TOML inputs (extension-discriminated) + `--format toml` template generation; TOML-datetime limitation noted.
+- [x] Full `make agent-check` (pyright/mypy/ruff/plxt/keyword-only all green) + `make agent-test` (full suite green).
 
-## Phase 1 — Additive typeless-signature support (blueprint + language schema)
+**CHECKPOINT 3 (final) — CLEARED 2026-07-06.** All phases done; gates fully green; docs + changelog landed. Phase 4 changes uncommitted at this boundary — commit, then open the PR to dev. Nothing pushed.
 
-The heart of the change. Make "no type + contract-only ⇒ signature" true at runtime and in the schema. Keep the old explicit tag parsing for now (rejection is Phase 3).
+## Deferred — follow-up wave AFTER this ships in a pipelex release (NOT this branch)
 
-- [x] Introduce a single named constant for the legal signature-only key set `{description, inputs, output, signature_for, source}`. → `SIGNATURE_ONLY_KEYS` (frozenset) added next to `PIPE_SIGNATURE_TYPE_TAG` in `pipelex/core/pipes/pipe_blueprint.py`. Single source of truth for blueprint + (Phase 2) spec layers.
-- [x] Extend the `pipe` `mode="before"` validator in `pipelex/core/bundles/pipelex_bundle_blueprint.py` (`validate_pipe_keys`) with per-section normalization (new helper `_normalize_typeless_signature`):
-  - `type` present (or an already-built blueprint instance / non-dict) → untouched.
-  - `type` absent, keys ⊆ `SIGNATURE_ONLY_KEYS` → inject internal `type = "PipeSignature"` so the union routes to `PipeSignatureBlueprint`.
-  - `type` absent, any other key present → raise the **teaching error** (names the offending field(s), states the rule, gives both fixes; does **not** guess a type).
-  - `type = "PipeSignature"` written explicitly → still accepted this phase.
-- [x] Route the teaching error through the existing categorizer → new `MISSING_PIPE_TYPE` value on `PipeValidationErrorType` + `_categorize_missing_pipe_type_error` in `validation_error_categorizer.py` (the error is raised on the aggregate `pipe` field, so the pipe_code is recovered from the message; sits alongside `UNKNOWN_PIPE_TYPE`, category `blueprint_validation`).
-- [x] Schema generator `pipelex/language/mthds_schema_generator.py`: **`_require_type_on_pipe_definitions` now skips the signature arm**, leaving its `type` OPTIONAL (Pydantic already emits `enum: ["PipeSignature"]` with a default). **Deviation from the literal checklist wording, intentional for Phase 1:** the design doc / this bullet describe the *end-state* (remove `type` from the signature arm → an explicit tag then fails the schema). Doing that in Phase 1 breaks every still-tagged fixture under `plxt-lint` (verified: `error[schema]: Additional properties are not allowed ('type' ...)`). Since Phase 1 is additive (both forms accepted, **no fixtures move yet**), the arm keeps `type` optional. Disambiguation verified for all cases: typeless contract → 1 match (signature arm); typeless+stray → 0; concrete typed → 1 (own arm); explicit `PipeSignature` → 1 (still valid); typo'd type → 0. **Removing `type` from the arm + migrating fixtures is the gate-locked Phase-3 breaking step.**
-- [x] Regenerate the derived schema (`.venv/bin/pipelex-dev generate-mthds-schema`) — runs clean; `plxt lint` clean across all fixtures.
-- [x] Tests (inline TOML/dicts — no fixture files yet), in `tests/integration/pipelex/pipe_signature/test_pipe_signature_in_blueprint_union.py`:
-  - typeless contract ⇒ `PipeSignatureBlueprint`, `is_signature is True`, `pipe_category is None`.
-  - contract with **no `inputs`** is valid.
-  - typeless + a stray field ⇒ teaching error (asserts message names the field + both fixes).
-  - explicit `type = "PipeSignature"` still accepted.
-  - typeless header vs. typed definition reconciles (concrete wins) — added to `tests/unit/pipelex/libraries/test_dependency_multi_file_reconciliation.py`.
-  - categorizer routing: `MISSING_PIPE_TYPE` structured item with pipe locator — added to `tests/integration/pipelex/pipeline/test_validate_bundle_structured_errors.py`.
-- [x] Schema tests in `tests/unit/pipelex/language/test_mthds_schema.py`: typeless contract validates; typeless + stray field fails; typo'd `type` fails; explicit tag still validates (Phase-1 guard); `type`-required test now excludes the signature arm.
-- [x] `make agent-check && make agent-test` green (full suite, exit 0).
-
-### ⛔ CHECKPOINT 1 — STOP
-
-- [x] Commit the phase (one commit). Record SHA: `e864b82486f00502206c6aa11b609b5256392e30`.
-- [x] Update the **Cold-start snapshot** below (what changed, where the seam lives, what's verified, what's next).
-- [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff, per the fan-out convention above. Triage findings here:
-  - Findings: cold Sonnet-5 review, no blocker/major (core mechanism verified correct: fresh dicts/no input mutation, deterministic message order, sound pipe-code regex recovery, correct Draft-4 `oneOf` disambiguation). Minor/nits only:
-    - **F1 (minor)** — a typeless section that is a subset of the allowed keys but omits a required contract field (`description`/`output`) is injected as a signature, then fails with a bare uncategorized pydantic "Field required" residual (dropped from structured `validation_errors[]`). Reviewer confirmed **not a regression** (concrete `PipeLLM` missing `output` behaves identically today) and the safety invariant holds (errors, never silent mock).
-    - **F2 (nit)** — the `source` comment on `SIGNATURE_ONLY_KEYS` overstated present behavior.
-    - **F3 (nit)** — message↔categorizer coupling; already guarded (marker comment + integration test).
-    - **F4 (nit)** — hardcoded counts in TODOS.
-    - **F5 (context)** — spec layer not yet mirrored = Phase 2 by design.
-  - Actions taken / deferred-to-wip: **F1** → added guard test `test_typeless_section_missing_required_contract_field_still_errors` (pins the safety invariant) + **deferred** the broader categorization-completeness fix to `wip/pipe-signature-not-a-type.md` (it's a pre-existing general gap whose fix also changes concrete-pipe categorization — out of scope here). **F2** → comment corrected (kept `source` per D2). **F3** → no change (adequately guarded). **F4** → counts removed. **F5** → no action (next phase). All folded into the Phase-1 commit (amended); revised SHA recorded below.
-- [ ] Only then proceed to Phase 2.
-
----
-
-## Phase 2 — Spec (authoring) layer
-
-Mirror the additive support so AI-authored specs get the identical clean surface. Specs are the builder convenience format (`pipelex/builder/pipe/`); they convert via `to_blueprint()`.
-
-- [x] Add the same `mode="before"` normalization wherever spec dicts are validated into `PipeSpecUnion`. **The one production dispatch site for raw typeless dicts is `PipelexBundleSpec.pipe: dict[str, PipeSpecUnion]`** (`pipelex/builder/bundle_spec.py`) — added a `@field_validator("pipe", mode="before")` (`validate_pipe_keys`) that mirrors the blueprint layer. To avoid message drift with the categorizer marker (Phase-1 F3), the normalizer was **extracted into a single shared free function** `normalize_typeless_signature_section(pipe_code, *, pipe_section, allowed_keys)` in `pipelex/core/pipes/pipe_blueprint.py` (next to `SIGNATURE_ONLY_KEYS`); both the blueprint's `validate_pipe_keys` and the spec's now call it. The blueprint's old `_normalize_typeless_signature` classmethod was removed. **Key-set difference:** a spec section carries the structural `pipe_code` field (the blueprint uses the dict key), so the spec passes `SIGNATURE_ONLY_SPEC_KEYS = SIGNATURE_ONLY_KEYS | {"pipe_code"}` (defined in `bundle_spec.py`).
-  - **Second candidate site investigated & ruled out:** `pipe_ops.py` `parse_pipe_spec` (`spec_class.model_validate`) and its only caller, the agent-CLI single-pipe `pipe` command (`pipe_cmd.py`), **always resolve an explicit type upstream** — `pipe_cmd.py:266` hard-errors if neither `--type` nor a `type` key is given, and `parse_pipe_spec` sets `spec_data["type"]` before validating. So a typeless dict never reaches that `model_validate`; no normalization is reachable there in Phase 2. `--type PipeSignature` still works there today (it's in `pipe_type_to_spec_class`). **Phase-3 gap flagged** (see below).
-- [x] Confirm whether the spec layer has its own JSON-schema surface (e.g. a build/authoring API schema). If yes, apply the same signature-arm treatment; if no, note it here so the next session doesn't re-investigate: **No dedicated authoring schema.** The only generated/committed JSON Schema is `derived/mthds_schema.json`, produced from the **blueprint** layer (`mthds_schema_generator.py` → `PipelexBundleBlueprint.model_json_schema()`, handled in Phase 1). The spec models (`PipeSpecUnion` / `PipelexBundleSpec`) call `model_json_schema()` only ad-hoc for dry-run mock formats (`json_schema_extra={"mock_format": ...}`); the signature spec already hides its internal tags with `SkipJsonSchema[...]` on `type`/`pipe_category`. Nothing to regenerate or sync for the spec layer.
-- [x] Tests: typeless spec ⇒ `PipeSignatureSpec` ⇒ `to_blueprint()` ⇒ `PipeSignatureBlueprint` with matching contract; typeless spec + stray field ⇒ teaching error. → `tests/unit/pipelex/builder/test_bundle_spec_typeless_signature.py` (also covers `signature_for` hint, explicit-tag-still-accepted Phase-2 guard, typed-section-untouched, already-built-instance passthrough).
-- [x] `make agent-check && make agent-test` green. — agent-check: ruff/plxt/pyright-0/mypy-0/keyword-only all pass; full agent-test exit 0 ("All tests passed").
-
-**Phase-3 gap flagged (single-pipe signature authoring):** once Phase 3 rejects the explicit `type = "PipeSignature"`, the agent-CLI single-pipe `pipe` command will have **no way to author a signature** (can't pass `--type PipeSignature` any more, and `pipe_cmd.py` errors on absent type). Phase-3 decision: either (a) make `pipe_cmd.py`/`parse_pipe_spec` route a typeless spec to `PipeSignatureSpec`, or (b) accept that signatures are only authored at the bundle level. Not implemented now (belongs with the breaking phase).
-
-### ⛔ CHECKPOINT 2 — STOP
-
-- [x] Commit the phase. Record SHA: `34fd87849866a37f0f0005b725de7ff21960ebe5` → **amended after review to `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28`**.
-- [x] Update the **Cold-start snapshot** below.
-- [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fan-out convention). Triage:
-  - Findings: cold Sonnet-5 review, **no blocker/major**. The shared-helper extraction was verified behavior-identical (full diff compare + all blueprint/schema/reconciliation/structured-error suites + new spec tests pass); before-validator confirmed to handle None / non-dict / raw-dict / already-built-instance identically to the blueprint. Two minor findings + one nit, both in the areas flagged for scrutiny:
-    - **F1 (minor)** — `SIGNATURE_ONLY_SPEC_KEYS` reused `SIGNATURE_ONLY_KEYS` wholesale, carrying the **blueprint-only `source`** into the spec allowlist. `PipeSpec` has no `source` (extra="forbid"), so a typeless section with `source` was injected then failed with a raw pydantic `extra_forbidden` instead of the clean teaching error — defeating the Phase-2 goal for that key.
-    - **F2 (minor)** — the spec's `validate_pipe_keys` only mirrored the *normalization* half of the blueprint's, not the **snake_case dict-key check**. A non-snake_case `[pipe.X]` key slipped through the spec layer and only failed later (worse-shaped, wrapped) in `to_blueprint()`. Docstring over-claimed "mirrors the blueprint layer."
-    - **F3 (nit)** — the static teaching message lists only `description`/`inputs`/`output`, not `signature_for`/`source`/`pipe_code`.
-  - Actions taken / deferred: **F1 → fixed** — `SIGNATURE_ONLY_SPEC_KEYS = (SIGNATURE_ONLY_KEYS - {"source"}) | {"pipe_code"}`; the allowlist now reflects the spec's real field surface. Guard test `test_typeless_with_blueprint_only_source_field_raises_teaching_error` (asserts teaching error, not raw `extra_forbidden`). **F2 → fixed** — added the same `is_pipe_code_valid` dict-key check to the spec's `validate_pipe_keys` (now a full mirror; docstring updated). Guard test `test_invalid_pipe_dict_key_rejected_at_spec_level`. **F3 → refuted** (no change) — intentional pedagogical simplification; the message teaches the core contract, optional/structural keys are deliberately omitted (same disposition as Phase-1 F2). *(Pre-existing key-vs-`pipe_code`-field reconciliation smell the reviewer noted in passing is out of scope — orthogonal to signatures, not introduced here.)* All folded into the Phase-2 commit (amended); revised SHA recorded below.
-- [ ] Only then proceed to Phase 3.
-
----
-
-## Phase 3 — Breaking cleanup, fixture migration, docs
-
-The one breaking phase: reject the old tag, migrate every bundle, reword rendering, update docs. Everything below lands green together because schema regeneration + fixture migration are gate-locked.
-
-- [x] Blueprint before-validator: `type = "PipeSignature"` written explicitly ⇒ **migration error** (D3). Implemented in the **shared** `normalize_typeless_signature_section` (`pipe_blueprint.py`) via `explicit_signature_tag_migration_message(pipe_code)` — so blueprint AND spec layers reject it from one source. Message: "Pipe `<code>` sets `type = "PipeSignature"`, which is no longer a pipe type. Delete the `type` line — a pipe with no `type` and no implementation is a signature (contract only)."
-- [x] Spec before-validator: same rejection (shared helper — free).
-- [x] **Round-trip safety (new, load-bearing):** `PipeSignatureBlueprint.type` now `Field(exclude=True)` so a signature never serializes its tag. This keeps the `bundle_elaborator.py:94` dump→revalidate round-trip typeless (re-injected), while a **user-written** tag still reaches the validator and is rejected. Verified: signature dump has no `type`, round-trip routes to `PipeSignatureBlueprint`, explicit tag rejected, typeless still routes. (No direct single-pipe `PipeBlueprintUnion` validation exists — all pipe-dict validation flows through `validate_pipe_keys`, which re-injects.)
-- [x] **Migration error categorized** → `UNKNOWN_PIPE_TYPE` (a *declared-but-invalid* type — an explicit `type = "PipeSignature"` DID declare a type; it is just no longer valid). Deliberately **not** `MISSING_PIPE_TYPE`, which the enum documents as the *no-type-declared* case — that stays reserved for the typeless-with-stray-field teaching error. The two markers map to the two distinct categories; pipe-code recovered from the shared ``Pipe `<code>``` prefix. *(This split corrected a first-pass mislabel — Louis flagged that a written tag can't be "missing.")*
-- [x] **Single-pipe authoring (Phase-2 gap — decision: typeless→signature, Louis chose uniform):** `parse_pipe_spec(pipe_type: str | None)` now routes a typeless spec to `PipeSignatureSpec` and rejects `pipe_type="PipeSignature"` with the migration error; `pipe_cmd.py` allows absent `--type`; `pipe_type_to_spec_class` no longer lists `PipeSignature` (not a selectable type); both TOML renderers (`pipe_ops.pipe_spec_to_toml` **and** `pipe_cmd._pipe_spec_to_toml`) omit the `type` line for a signature.
-- [x] Schema generator: `_normalize_type_on_pipe_definitions` (renamed from `_require_type_...`) now **removes `type` from the signature arm entirely** — an explicit tag fails the schema as an extra property under `additionalProperties: false`. Regenerated `derived/mthds_schema.json` (42 defs). Verified against the Draft-4 validator: typeless contract ✓, typeless+stray ✗, explicit tag ✗, concrete ✓, typo'd type ✗. `plxt-lint` passes over the migrated typeless fixtures.
-- [x] Migrate the 8 bundle fixtures — `type = "PipeSignature"` line deleted from each (9 lines total; `write_research_brief.mthds` had 2). They are now the typeless regression corpus. Comments referencing the *concept* `PipeSignature` left intact (still accurate).
-- [x] `pipe_signature_spec.py` `rendered_pretty`: drops the `Type: PipeSignature (...)` line → "Signature (contract only)". `pipe_category` field retained (taxonomy-refactor scope decision) but comment updated (no longer surfaced).
-- [x] Tests: migration error asserted at blueprint, spec, and single-pipe layers; categorizer → `MISSING_PIPE_TYPE` (new `test_explicit_signature_tag_is_a_categorized_blueprint_item`); typeless single-pipe → signature + no-type TOML (both renderers); schema `test_explicit_signature_tag_is_rejected` + coverage-guard fixed for the typeless arm; all Phase-1/2 "explicit tag still accepted" guard tests **flipped** to rejection; inline-TOML test bundles migrated to typeless.
-- [x] Docs — taught "omit the type" and removed the idiom **only where it appeared**: `signature-pipes.md` (Parameters table drops the `type` row + teaching lead-in; 3 examples de-tagged; "Replacing a signature" reworded), `index.md` (typeless framing), `pipelex/cli/agent_cli/CLAUDE.md` (`pipe` row). **The other plan-listed docs needed NO change** — `validate.md`, `agent-cli.md`, the error pages, and `error-model.md` reference the *concept* `PipeSignature` / `--allow-signatures` / `pending_signatures` / the runtime error, none of which teach the `type =` idiom (avoided gratuitous churn).
-- [x] CHANGELOG.md — added `[Unreleased]` section (there was none) with the **breaking** entry + the MTHDS-JSON-Schema shape-change note (downstream copies re-sync gated on release).
-- [x] `make agent-check` green (ruff/plxt/pyright-0/mypy-0/keyword-only) **and** full `make agent-test` green ("All tests passed").
-
-### ⛔ CHECKPOINT 3 — STOP (final)
-
-- [x] Commit the phase. Record SHA: **`843673324`** (amended from `702f2eff5` to fold the two review fixes — F1 categorizer split + F2 renderer `signature_for`).
-- [x] Update the **Cold-start snapshot** below to the finished state.
-- [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fresh, no inherited context; 10 finder angles + empirical REPL checks of the round-trip and Draft-4 schema). Triage:
-  - **Angles verified clean:** the explicit-tag round-trip false-positive (traced every dump→revalidate; only `bundle_elaborator.py:94` exists, and the `exclude=True` keeps it typeless) and the Draft-4 `oneOf` disambiguation (ran the real generated schema through `jsonschema.Draft4Validator`). No bug in either — corroborates our own checks.
-  - **F1 (major) — categorizer mislabel.** Explicit `type = "PipeSignature"` was bucketed `MISSING_PIPE_TYPE`, but a type *was* declared → should be `UNKNOWN_PIPE_TYPE` (per the enum's own docstring + the sibling `union_tag_invalid` branch that already buckets a typo'd type there). **Already caught by Louis independently and fixed** before the review returned → split `_categorize_typeless_pipe_error`: no-type→`MISSING_PIPE_TYPE`, retired-tag→`UNKNOWN_PIPE_TYPE`; test asserts the new type *and* that it is not also `MISSING_PIPE_TYPE`.
-  - **F2 (minor) — renderer drift.** `pipe_ops.add_type_specific_fields` never emitted `signature_for` for a signature, while `pipe_cmd._add_type_specific_fields` does — silent loss of the hint through `pipe_ops.pipe_spec_to_toml` (pre-existing; that fn has no in-repo prod caller, only tests). **Fixed** — added the mirroring `PipeSignatureSpec` branch so the two renderers stay faithful copies; new `test_signature_toml_preserves_signature_for_hint` guards it.
-  - No other correctness issues; reviewer confirmed the shared-helper design and the two before-validators are sound faithful mirrors.
-- [x] **Gated cross-repo follow-up recorded:** the MTHDS JSON Schema copies in `mthds`, `vscode-pipelex`, `mthds-ui` now drift — the signature arm no longer carries a `type` property (an explicit `type = "PipeSignature"` fails those schemas too). Propagate via the `mthds-schema-sync` skill from the workspace root, **gated on the released pipelex version** — NOT on this branch. Flagged in the CHANGELOG `[Unreleased]` entry.
-- [x] Hand back to the user for review / merge decision (do not push unprompted). **Phase 3 complete — the whole feature has landed. Awaiting Louis' merge call. Nothing pushed.**
-
----
-
-## Invariants to preserve (regression guardrails — do not break)
-
-- Reconciliation keys off `is_signature` class identity (`library_crate_factory.py:170-201`): concrete beats signature, contracts must match, two matching signatures tie-break deterministically. Untouched by this change — add a regression test, don't refactor.
-- Strict validation still refuses bundles that contain a signature; `--allow-signatures` still dry-runs signatures as mocks (`validate_bundle.py`, `cli/commands/validate/_validate_core.py`). Keyed off the pending-signatures set / `is_signature`. Untouched.
-- `PipeSignature` stays a valid **internal** discriminator value (the before-validator injects it); it is only rejected as a **user-written** value. Don't remove it from `valid_pipe_type_tags()` without confirming the injected value still passes `validate_pipe_type`.
-
----
-
-## Cold-start snapshot (updated at each checkpoint)
-
-> Keep this current so a fresh session can resume with zero re-investigation. Template to fill at each checkpoint:
->
-> - **Phase reached / last green SHA:** …
-> - **What changed and where the seam lives:** …
-> - **What is verified (tests/gates run):** …
-> - **Open threads / review findings deferred:** …
-> - **Exact next action:** …
-
-- **Phase reached / last green SHA:** **Phase 3 complete** — the breaking cleanup is done, the feature is fully landed (code + tests + docs green). Baseline = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 = `e864b82486f00502206c6aa11b609b5256392e30`. Phase-2 = `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28`. **Phase-3 commit SHA = `843673324`** (amended once to fold the cold-review F1/F2 fixes). Baseline still `04434f785`; nothing pushed.
-- **What changed and where the seam lives (Phase 3, breaking):**
-  - **Rejection is single-source.** `normalize_typeless_signature_section` (`pipe_blueprint.py`) now raises `explicit_signature_tag_migration_message(pipe_code)` when a raw dict names `type = "PipeSignature"`. Both `PipelexBundleBlueprint.validate_pipe_keys` and `PipelexBundleSpec.validate_pipe_keys` inherit it. `parse_pipe_spec` (single-pipe) rejects `pipe_type="PipeSignature"` with the same message-builder.
-  - **Serialization invariant (the subtle bit).** `PipeSignatureBlueprint.type` is now `Field(exclude=True)`. A signature never serializes its tag, so (a) `.mthds` export stays typeless and (b) the `bundle_elaborator.py:94` dump→revalidate round-trip yields a typeless section that `validate_pipe_keys` re-injects — the tag only appears in a raw section when a **user** wrote it, which is exactly what we reject. No false positives.
-  - **Schema.** `_normalize_type_on_pipe_definitions` deletes `type` from the signature arm (was: left optional). Explicit tag now fails the schema (extra property under `additionalProperties: false`). `derived/mthds_schema.json` regenerated.
-  - **Single-pipe authoring (Louis' decision: uniform typeless→signature).** `parse_pipe_spec(pipe_type: str | None)`; `pipe_cmd.py` allows absent `--type`; `PipeSignature` dropped from `pipe_type_to_spec_class`; both TOML renderers omit the `type` line for a signature.
-  - **Categorizer.** Migration error → `UNKNOWN_PIPE_TYPE` (a declared-but-invalid type; distinct from the typeless-only `MISSING_PIPE_TYPE`). Second marker `_EXPLICIT_SIGNATURE_TAG_MARKER`; pipe-code from the shared ``Pipe `<code>``` prefix.
-- **What is verified (tests/gates run):** `make agent-check` fully green (ruff/plxt/pyright-0/mypy-0/keyword-only; schema regenerated + `plxt-lint` clean over the migrated typeless fixtures). Targeted builder/language/signature/libraries/cli + pipeline/cli/e2e suites green. Full `make agent-test` green ("All tests passed").
-- **Invariants confirmed untouched:** reconciliation keys off `is_signature`; `PipeSignature` stays a valid **internal** discriminator (injected value still passes `validate_pipe_type` — `valid_pipe_type_tags()` still lists it); strict/`--allow-signatures` validation semantics unchanged.
-- **Open threads / review findings deferred (both in `wip/pipe-signature-not-a-type.md` → "Deferred follow-ups"):**
-  1. Categorizing the bare pydantic residual for a typeless section missing a *required* contract field (pre-existing general gap; safety invariant guarded by a test).
-  2. **New (Phase-3 finding):** spec-layer `PipeSpec.inputs` is **required**, unlike the optional blueprint `inputs` — so a no-inputs signature is authorable at the blueprint/`.mthds` level but not via the spec/single-pipe path. Pre-existing, orthogonal to the tag removal; fixing it (make spec `inputs` optional) touches every spec — deferred.
-- **Exact next action:** Checkpoint-3 cold `/code-review` fan-out on the Phase-3 commit diff (fresh Sonnet-5, no inherited context), triage findings, record the cross-repo schema-sync follow-up, hand back to Louis for merge decision. **This is the final phase — nothing pushed.**
+- **Spec + conformance sync (D6).** Grep `docs/specs/` (workspace root) for the `--inputs` surface (command-surface-map, protocol spec); add the extension rule + `--format toml` to the spec prose and matching conformance tests with the bidirectional `> Verified by:` ↔ `pytest.mark.spec` links. Gated on the conformance venv's pipelex pin reaching the release that carries this feature (same de-gate pattern as the Optionals track).
+- **Skills sweep.** `mthds-plugins` skills (`mthds-run`, `mthds-inputs`) document `inputs.json`; update after release (published plugin, separate repo).
+- **mthds-js check.** Verify `mthds-agent` passes `--inputs` through opaquely (no client-side `.json` assumption) — expected no-op.
+- **DATETIME native concept.** Add `DATETIME` to `NativeConceptCode`, then replace the Phase-1 datetime guard with real support. Own track.

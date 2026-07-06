@@ -32,7 +32,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 
 **Common options:**
 
-- `--inputs`, `-i` - Path to JSON input file
+- `--inputs`, `-i` - Path to a JSON or TOML inputs file (discriminated by file extension: `.toml` → TOML, everything else → JSON). Inline JSON (a value starting with `{`) stays JSON-only.
 - `--dry-run` - Dry-run without calling AI providers
 - `--mock-inputs` - Use mock inputs
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
@@ -42,6 +42,9 @@ pipelex-agent run method <NAME> [OPTIONS]
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
+
+!!! note "Stdin inputs stay JSON"
+    The agent CLI can also read inputs from stdin (a flat dict or a `working_memory` envelope). Stdin inputs are **JSON-only** — the extension-based TOML discrimination applies to `--inputs` file paths only. Like the main CLI, `run bundle <dir>` auto-detects `inputs.json` / `inputs.toml` when `--inputs` is omitted, erroring if both exist.
 
 ### Validate
 
@@ -75,7 +78,7 @@ For `bundle`, additional options are available:
 
 ### Inputs
 
-Generate example input JSON for a pipe, bundle, or method.
+Generate an example inputs template for a pipe, bundle, or method.
 
 ```bash
 pipelex-agent inputs pipe <PIPE_CODE> [OPTIONS]
@@ -86,8 +89,12 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 **Common options:**
 
 - `--library-dir`, `-L` - Additional library directory
+- `--format` - Template serialization: `json` (default) or `toml`
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
+
+!!! note "`inputs --format` is `json|toml`, not `markdown|json`"
+    Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
 
 ### Flat Commands
 
@@ -107,7 +114,7 @@ These commands do not have subcommands:
 Commands use different stdout formats depending on their purpose:
 
 - **Markdown or JSON**: `run`, `validate`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
-- **JSON**: `inputs` — structured JSON via `agent_success()`
+- **JSON or raw TOML**: `inputs` — structured JSON via `agent_success()` by default (`--format json`), or the raw TOML template printed directly to stdout with `--format toml`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output
 

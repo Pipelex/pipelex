@@ -138,6 +138,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors
     "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
+    "TomlError": "Fix the TOML syntax error (the message includes the line and column)",
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
     "ValidationError": "Check that spec fields match the expected schema for the given type",
     "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
@@ -160,6 +161,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
+    "TomlError": "input",
     "ArgumentError": "input",
     "ValidationError": "input",
     "ValueError": "input",

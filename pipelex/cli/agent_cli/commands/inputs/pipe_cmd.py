@@ -9,12 +9,13 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import inputs_core
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -29,14 +30,20 @@ def inputs_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    template_format: Annotated[
+        InputsTemplateFormat,
+        typer.Option("--format", help="Inputs template format: 'json' for the JSON result envelope (default), 'toml' for raw TOML on stdout"),
+    ] = InputsTemplateFormat.JSON,
 ) -> None:
-    """Generate example input JSON for a pipe by code and output JSON results.
+    """Generate an example inputs template for a pipe by code.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
+    success, JSON to stderr on error with exit code 1.
 
     Examples:
         pipelex-agent inputs pipe my_pipe
         pipelex-agent inputs pipe my_pipe -L ./my_pipes
+        pipelex-agent inputs pipe my_pipe --format toml
     """
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
@@ -67,7 +74,7 @@ def inputs_pipe_cmd(
 
     try:
         result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=None, library_dirs=library_dirs))
-        agent_success(result)
+        emit_inputs_result(result, template_format=template_format)
 
     except FileNotFoundError as exc:
         agent_error(f"File not found: {exc}", error_type="FileNotFoundError", cause=exc)
@@ -81,14 +88,7 @@ def inputs_pipe_cmd(
 
     except NoInputsRequiredError as exc:
         # Not really an error - just a pipe with no inputs
-        agent_success(
-            {
-                "success": True,
-                "pipe_code": pipe_code,
-                "inputs": {},
-                "message": str(exc),
-            }
-        )
+        emit_no_inputs_result(pipe_code, message=str(exc), template_format=template_format)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
