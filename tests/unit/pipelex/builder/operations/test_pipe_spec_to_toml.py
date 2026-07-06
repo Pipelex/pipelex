@@ -11,6 +11,35 @@ _BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC
 class TestPipeSpecToToml:
     """Comprehensive tests for pipe_spec_to_toml covering all pipe types."""
 
+    # -- PipeSignature (typeless) -----------------------------------------
+
+    def test_signature_toml_has_no_type_line(self) -> None:
+        """A signature renders as a typeless `[pipe.x]` section — no `type` line, since omitting the
+        type IS the signature — so it re-parses as a signature (an explicit `type = "PipeSignature"`
+        would now be rejected).
+        """
+        spec = parse_pipe_spec(
+            {"pipe_code": "summarize_doc", "description": "Summarize a doc.", "inputs": {"doc": "Document"}, "output": "Text"},
+            pipe_type=None,
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "[pipe.summarize_doc]" in toml
+        assert "type =" not in toml
+        assert 'description = "Summarize a doc."' in toml
+        assert 'output = "Text"' in toml
+
+    def test_signature_toml_preserves_signature_for_hint(self) -> None:
+        """The optional `signature_for` hint round-trips (guards against renderer drift with the
+        agent-CLI `_pipe_spec_to_toml`, which also emits it).
+        """
+        spec = parse_pipe_spec(
+            {"pipe_code": "x", "description": "d", "inputs": {"doc": "Text"}, "output": "Text", "signature_for": "PipeLLM"},
+            pipe_type=None,
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "type =" not in toml
+        assert 'signature_for = "PipeLLM"' in toml
+
     # -- PipeLLM ----------------------------------------------------------
 
     def test_llm_basic_structure(self) -> None:
