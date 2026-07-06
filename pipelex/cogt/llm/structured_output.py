@@ -1,6 +1,5 @@
+from enum import StrEnum
 from typing import TYPE_CHECKING
-
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from instructor import Mode as InstructorMode

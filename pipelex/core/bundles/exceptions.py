@@ -1,7 +1,8 @@
+from enum import StrEnum
+
 from pydantic import BaseModel
 
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.types import StrEnum
 
 
 class PipelexBundleBlueprintFixableErrorType(StrEnum):

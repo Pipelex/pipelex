@@ -11,9 +11,9 @@ raises ``NotImplementedError`` from every function.
 
 import csv
 from datetime import date
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
 import pytest
 from pydantic import model_validator
@@ -35,7 +35,6 @@ from pipelex.tools.tabular.exceptions import (
     CsvFlatnessError,
     CsvReadError,
 )
-from pipelex.types import Self, StrEnum
 
 # ---------------------------------------------------------------------------------------
 # Flat row models (CSV-legal: scalar fields only)

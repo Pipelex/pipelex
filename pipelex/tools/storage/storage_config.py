@@ -1,12 +1,12 @@
+from enum import StrEnum
 from string import Formatter
-from typing import ClassVar, Literal
+from typing import ClassVar, Literal, Self
 
 from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.storage.exceptions import StorageConfigError
-from pipelex.types import Self, StrEnum
 from pipelex.urls import URLs
 
 

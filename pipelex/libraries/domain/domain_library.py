@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import RootModel
 from typing_extensions import override
 
@@ -5,7 +7,6 @@ from pipelex.core.domains.domain import Domain
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
 from pipelex.libraries.domain.exceptions import DomainLibraryError
-from pipelex.types import Self
 
 DomainLibraryRoot = dict[str, Domain]
 

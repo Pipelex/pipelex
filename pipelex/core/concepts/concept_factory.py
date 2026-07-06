@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import NamedTuple, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -18,7 +19,6 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.types import StrEnum
 
 
 def _get_class_registry() -> ClassRegistryAbstract:

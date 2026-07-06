@@ -1,6 +1,7 @@
+from enum import StrEnum
+
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
-from pipelex.types import StrEnum
 
 EffortToLevelMap = dict[str, str]
 DISABLED_LEVEL = "disabled"

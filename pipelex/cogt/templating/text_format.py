@@ -1,4 +1,4 @@
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class TextFormat(StrEnum):

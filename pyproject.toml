@@ -49,6 +49,8 @@ dependencies = [
   "rich>=13.8.1",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
+  # Not stdlib tomllib: our error path reads TOMLDecodeError.{msg,doc,pos,lineno,colno},
+  # which tomli exposes on every supported Python but stdlib tomllib only gained in 3.14.
   "tomli>=2.3.0",
   "tomlkit>=0.13.2",
   # Capped: pipelex subclasses typer's TyperGroup and overrides make_context, so
@@ -60,7 +62,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-mthds = { path = "../mthds-python", editable = true }
+mthds = { git = "https://github.com/mthds-ai/mthds-python.git", rev = "2047818704b941246694c845fa026f4369a1d473" }
 
 [project.urls]
 Homepage = "https://pipelex.com"

@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
@@ -6,7 +8,6 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReference
-from pipelex.types import StrEnum
 
 
 class PipeFactoryErrorType(StrEnum):

@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Self
 
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
@@ -12,7 +12,6 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
-from pipelex.types import Self
 
 ConceptLibraryRoot = dict[str, Concept]
 

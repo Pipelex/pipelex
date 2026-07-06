@@ -9,13 +9,13 @@ wraps when ``instructor`` exhausts its retry loop.
 import json
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
+from enum import StrEnum
 from typing import Any, TypeAlias, cast
 
 import httpx
 from pydantic import BaseModel, Field
 
 from pipelex.cogt.inference.provider_name import ProviderName
-from pipelex.types import StrEnum
 
 # SDK exception class-name substrings that identify a network/transport failure
 # (no HTTP status reached us). Matched case-insensitively against

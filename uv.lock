@@ -2469,7 +2469,7 @@ wheels = [
 [[package]]
 name = "mthds"
 version = "0.8.0"
-source = { editable = "../mthds-python" }
+source = { git = "https://github.com/mthds-ai/mthds-python.git?rev=2047818704b941246694c845fa026f4369a1d473#2047818704b941246694c845fa026f4369a1d473" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
@@ -2477,23 +2477,6 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "httpx", specifier = ">=0.23.0,<1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
-    { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
-    { name = "pylint", marker = "extra == 'dev'", specifier = "==4.0.4" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.411" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0,<9.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.12.0,<4.0.0" },
-    { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.14.13" },
-    { name = "semantic-version", specifier = ">=2.10.0,<3.0.0" },
-    { name = "tomlkit", specifier = ">=0.12.0" },
-    { name = "typing-extensions", specifier = ">=4.0.0" },
-]
-provides-extras = ["dev"]
 
 [[package]]
 name = "multidict"
@@ -3418,7 +3401,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", editable = "../mthds-python" },
+    { name = "mthds", git = "https://github.com/mthds-ai/mthds-python.git?rev=2047818704b941246694c845fa026f4369a1d473" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },

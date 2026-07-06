@@ -1,8 +1,9 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
-from pipelex.types import StrEnum
 
 
 class SpecialDomain(StrEnum):

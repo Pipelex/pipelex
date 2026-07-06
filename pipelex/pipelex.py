@@ -2,7 +2,7 @@ import types
 import warnings
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -91,7 +91,6 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.types import Self
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:

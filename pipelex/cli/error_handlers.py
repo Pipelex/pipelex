@@ -1,4 +1,5 @@
 from contextvars import ContextVar
+from enum import StrEnum
 from pathlib import Path
 from typing import NoReturn
 
@@ -23,7 +24,6 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.types import RemoteConfigSource
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 

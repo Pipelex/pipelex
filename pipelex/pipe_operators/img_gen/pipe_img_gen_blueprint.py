@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 from typing_extensions import override
@@ -15,7 +15,6 @@ from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import Self
 
 
 class PipeImgGenBlueprint(PipeBlueprint):

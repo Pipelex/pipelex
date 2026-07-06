@@ -1,8 +1,7 @@
+from enum import StrEnum
 from typing import Any, Protocol
 
 from typing_extensions import override
-
-from pipelex.types import StrEnum
 
 PayloadType = dict[str, Any]
 

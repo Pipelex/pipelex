@@ -49,7 +49,7 @@ Fall back to the full suite when:
 
 - Changes span 3+ source areas from the mapping above
 - Changes touch `pyproject.toml`, `tests/conftest.py`, or `tests/helpers/`
-- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/hub.py`, `pipelex/types.py`
+- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/hub.py`
 - Changes touch `pipelex/system/configuration/` (config loading affects everything)
 - Refactors touching base exceptions or shared base classes
 - Preparing a release, a push, or a commit intended for remote (e.g. `/release`, `/commit-push`, `/ship`, or when the context makes it obvious the work is about to land)

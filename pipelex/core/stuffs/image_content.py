@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import Field, model_validator
 from rich.console import Group
 from rich.markdown import Markdown
@@ -13,7 +15,6 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
-from pipelex.types import Self
 
 
 class ImageContent(StuffContent):

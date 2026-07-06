@@ -1,6 +1,5 @@
+from enum import StrEnum
 from pathlib import Path
-
-from pipelex.types import StrEnum
 
 MTHDS_EXTENSION = ".mthds"
 

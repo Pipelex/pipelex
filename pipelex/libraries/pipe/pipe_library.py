@@ -1,4 +1,5 @@
 from itertools import groupby
+from typing import Self
 
 from pydantic import RootModel
 from rich import box
@@ -10,7 +11,6 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
-from pipelex.types import Self
 
 PipeLibraryRoot = dict[str, PipeAbstract]
 

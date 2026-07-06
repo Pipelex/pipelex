@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 
 from pydantic import Field
@@ -6,7 +7,6 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
-from pipelex.types import StrEnum
 
 
 class PipelexBackend(StrEnum):
