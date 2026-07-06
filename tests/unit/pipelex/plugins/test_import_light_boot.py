@@ -18,6 +18,7 @@ _GUARD_SCRIPT = textwrap.dedent(
         "anthropic",
         "mistralai",
         "google.genai",
+        "google.cloud.storage",
         "boto3",
         "aioboto3",
         "fal_client",
@@ -58,6 +59,10 @@ _GUARD_SCRIPT = textwrap.dedent(
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
     assert registrar.model_listers, "expected the built-in model listers to be registered import-light"
     assert registrar.orchestrators, "expected the built-in orchestrators to be registered"
+    # The built-in StoragePlugin registers all four methods without importing aioboto3 /
+    # google-cloud-storage: the s3/gcp SDK guards live inside the providers' I/O methods, so
+    # registration stays import-light even though those SDKs are BLOCKED above.
+    assert registrar.storage_providers, "expected the built-in storage providers to be registered import-light"
     print("import-light OK")
     """
 )

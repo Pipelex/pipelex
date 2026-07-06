@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Storage provider is now a plugin seam:** The storage backend (`local` / `in_memory` / `s3` / `gcp`) is selected at boot from a `StorageProviderRegistry` keyed by the open `storage_config.method` token, populated by the always-on built-in `StoragePlugin`. A third party can now ship a `pipelex-storage-<backend>` package that advertises itself under the `pipelex.plugins` entry-point group and is selected via `storage_config.method` — the same discovery/denylist machinery the inference and orchestrator seams use. `storage_config.method` is now an open `str`: an unknown method fails loud at boot with `UnknownStorageMethodError` (listing the registered methods), not at config parse. See the new `docs/under-the-hood/storage-provider-plugins.md`.
+
+### Changed
+
+- **Plugin API version bumped to 3 (Breaking):** `PLUGIN_API_VERSION` is now `3` (was `2`) to add the `add_storage_provider` registrar menu method. Plugin discovery version-checks with strict equality, so every external plugin must re-declare `targets_api = 3` — `pipelex-temporal` and `pipelex-mistralai-workflows` register no storage provider, so bumping their declared `targets_api` is the only change they need.
+
 ## [v0.37.0] - 2026-07-04
 
 ### Highlights
