@@ -333,9 +333,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.func_registry = func_registry or FuncRegistry()
         self.pipelex_hub.set_func_registry(func_registry=self.func_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
-        # Storage is selected from the config-driven StorageProviderRegistry, which needs the
-        # plugin registrar — built below at the plugin-discovery phase — so its resolution and
-        # hub-set happen there (after secrets is on the hub, so the GCP factory's secret read works).
+        # Storage is selected from the config-driven StorageProviderRegistry, built from the plugin
+        # registrar (constructed above, just before the telemetry factory). Its resolution and hub-set
+        # still happen later at the plugin-derived-registries block — after secrets is on the hub here,
+        # so the GCP factory's secret read works.
 
         # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
         stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET

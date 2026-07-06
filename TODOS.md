@@ -1,17 +1,19 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Storage vertical DONE — Phases 1–2 DONE + Checkpoints 1–2 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **Storage vertical DONE. Secrets vertical Phase 3 CODE DONE + gates green — Checkpoint 3 clean-room review IN FLIGHT.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
 Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
+- `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 — the Checkpoint-3 review target**)
+- `3940eb7a2` — docs: Phase 2 checkpoint bookkeeping — storage vertical done
 - `37a3b72f1` — fix: Phase-2 review triage (doc tense + stronger gcp secret-wiring assert)
-- `f08193e81` — test: storage-provider seam tests + docs (**Phase 2 — the review target**)
+- `f08193e81` — test: storage-provider seam tests + docs (**Phase 2**)
 - `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping
 - `58961848a` — fix: contract.py v3 comment (Checkpoint-1 review triage)
 - `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-**Cold-start (resume here):** The **storage vertical is complete** (mechanism + builtin plugin + boot wiring + tests + docs + changelog, all reviewed). **Next action = Phase 3** (Secrets vertical): mirror the storage seam for secrets — `secrets_providers` registrar dict + `add_secrets_provider`, `SecretsProviderRegistry`, `UnknownSecretsMethodError`, hub accessors, new `SecretsProviderConfig` (+ TOML wiring in `pipelex.toml` and `.pipelex/pipelex.toml`), `SecretsPlugin` (`_make_env_secrets_provider`), builtins registration + `"secrets"` unconditional, and the **W-A boot edit** (move the `build_registrar(config=get_config())` *call* up to after line 209 / before 212, select secrets from the registry there, delete the hardcoded `EnvSecretsProvider()` at 211-212). W-A is LOCKED (see § Locked decisions) — a build instruction, not an investigation. Checkpoint 3 gate = `agent-check` + `tb` (+ `pipelex plugins list` shows `secrets`). `PLUGIN_API_VERSION` is already 3 — **no second bump**. Key as-built deviations for both phases are under "Phase 1 — as-built" and "Phase 2 — as-built" below.
+**Cold-start (resume here):** The **storage vertical is complete** and **secrets Phase 3 code is committed** (`8a0b32668`) with all gates green (`agent-check`, `tb`, full `agent-test`) and manual smokes passing (`pipelex plugins list` shows `secrets`; default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`). **The Checkpoint-3 clean-room Sonnet `/code-review` was fanned out on `8a0b32668` but its outcome is NOT yet recorded below — resume by checking that review's findings and triaging them, THEN move to Phase 4** (Secrets tests + docs). Key Phase-3 as-built deviations (esp. the W-A boot-placement refinement) are under "Phase 3 — as-built" below. `PLUGIN_API_VERSION` is already 3 — **no second bump**.
 
 > ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
@@ -41,7 +43,7 @@ Promote the two dependency-injection seams that pass all plugin criteria — **s
 - **DX-2 — unconditional builtins.** `StoragePlugin` and `SecretsPlugin` join `CORE_UNCONDITIONAL_PLUGIN_NAMES` — required infra can't be disabled into a broken boot.
 - **DX-3 — external-provider config surface is a follow-up**, not built here (fixed typed sub-configs only in Phase scope).
 - **D1 / S1 — open method token.** `method` config fields accept an open `str`, validated at registry lookup (unknown → `UnknownStorageMethodError` / `UnknownSecretsMethodError`), not at parse.
-- **W-A (secrets boot ordering) — RESOLVED.** The `# needed for gateway check` comment at `pipelex.py:211` is stale; the gateway path is secrets-free. Move the pure `build_registrar(config=get_config())` call up (after line 209, before 212), select secrets from the registry there, delete the hardcoded `EnvSecretsProvider()`. Zero ordering risk. See secrets doc § The wrinkle.
+- **W-A (secrets boot ordering) — RESOLVED, refined in Phase 3.** The `# needed for gateway check` comment was stale; the gateway path is secrets-free, so the hardcoded `EnvSecretsProvider()` is gone and secrets is now config-selected from the registry. **Placement deviation (deliberate, see "Phase 3 — as-built"):** the plan's literal W-A said move the `build_registrar` call *above the gateway block* (after line 209 / before old 212). Phase 3 instead placed it *after* the gateway service/terms-check block and *just before the telemetry factory* (secrets' true first consumer). Both satisfy W-A's only hard constraint (secrets resolved before telemetry); the after-the-gate placement additionally preserves precondition-gate-first semantics (an unaccepted-terms / first-run boot fails fast before any discovery work) — a contract two `__new__`-based gateway-terms unit tests encode, which the above-the-gate placement broke.
 
 ## Sequencing
 
@@ -143,22 +145,30 @@ At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 ## Phase 3 — Secrets: mechanism + config + builtin plugin + boot wiring (W-A)
 *(Detail: `wip/plugins/secrets-provider-plugin.md` Phases 1–3. W-A is locked — this is a build instruction, not an investigation.)*
 
-- [ ] Registrar: `secrets_providers` dict + `add_secrets_provider(*, method, factory)` via `_add`; `SecretsProviderFactoryFn` alias. *(API already at 3 from Phase 1 — no second bump.)*
-- [ ] New `pipelex/plugins/secrets_provider_registry.py`: `SecretsProviderRegistry`.
-- [ ] New `UnknownSecretsMethodError` in `pipelex/plugins/exceptions.py`.
-- [ ] Hub: `set_/get_secrets_provider_registry` + module accessor.
-- [ ] New config `SecretsProviderConfig` (`pipelex/tools/secrets/secrets_config.py`), `method: str = Field(strict=False)`, **no class default** (default lives in TOML). Confirm placement with config owner (sibling of `storage_config` under `pipelex.*`).
-- [ ] `pipelex/pipelex.toml`: add `[pipelex.secrets_config]` with `method = "env"`; wire `secrets_config` into the owning config model. Add the same real-valued block to `.pipelex/pipelex.toml` override (never commented out). Run `make tb` after.
-- [ ] New `pipelex/plugins/secrets/secrets_plugin.py`: `SecretsPlugin` + `_make_env_secrets_provider(config)` → `EnvSecretsProvider()`.
-- [ ] `builtins.py`: register `SecretsPlugin()`; add `"secrets"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
-- [ ] **W-A boot edit** (`pipelex.py`): move `build_registrar(config=get_config())` (393-394) up to after line 209 / before 212; keep downstream registry constructions referencing `self._plugin_registrar`; optionally move the `boot_orchestrator` gate (401-403) up for fail-fast. Build + `set_secrets_provider_registry(...)` there.
-- [ ] **Delete lines 211-212** (stale `# needed for gateway check` + hardcoded `EnvSecretsProvider()`); replace with registry selection (explicit `setup(secrets_provider=...)` param still wins). Drop the now-unused `EnvSecretsProvider` import from `pipelex.py`.
+- [x] Registrar: `secrets_providers` dict + `add_secrets_provider(*, method, factory)` via `_add`; `SecretsProviderFactoryFn` alias. *(API already at 3 from Phase 1 — no second bump.)*
+- [x] New `pipelex/plugins/secrets_provider_registry.py`: `SecretsProviderRegistry`.
+- [x] New `UnknownSecretsMethodError` in `pipelex/plugins/exceptions.py`. *(Also added `DuplicateSecretsProviderError` — required by the `_add` `on_duplicate` contract, mirroring storage.)*
+- [x] Hub: `set_/get_secrets_provider_registry` + module accessor.
+- [x] New config `SecretsProviderConfig` (`pipelex/tools/secrets/secrets_config.py`), `method: str = Field(strict=False)`, **no class default**. Placed as sibling of `storage_config` under `pipelex.*` (single flat model, no `SecretsConfig` subclass needed — secrets has no is_fetch/is_upload analogue).
+- [x] `pipelex/pipelex.toml`: added `[pipelex.secrets_config] method = "env"`; wired `secrets_config: SecretsProviderConfig` into the `Pipelex` config model. Same real-valued block added to `.pipelex/pipelex.toml` override. `make tb` green.
+- [x] New `pipelex/plugins/secrets/secrets_plugin.py`: `SecretsPlugin` + `_make_env_secrets_provider(config)` → `EnvSecretsProvider()` (unused `config` param carries `# noqa: ARG001`, the plugins-dir convention for a callback-signature-conforming factory).
+- [x] `builtins.py`: registered `SecretsPlugin()` in `BUILTIN_PLUGINS`; added `"secrets"` to `CORE_UNCONDITIONAL_PLUGIN_NAMES`.
+- [x] **W-A boot edit** (`pipelex.py`): `build_registrar` + boot-orchestrator gate + secrets registry/selection now sit **just before the telemetry factory** (not above the gateway block — see as-built). Downstream registry constructions still reference the same `plugin_registrar`.
+- [x] **Deleted** the stale `# needed for gateway check` + hardcoded `EnvSecretsProvider()`; replaced with registry selection (explicit `setup(secrets_provider=...)` still wins). Dropped the now-unused `EnvSecretsProvider` import from `pipelex.py`.
 
-### ⛔ CHECKPOINT 3 — run the protocol above
-- [ ] Gates green (`agent-check` + `tb`; `pipelex plugins list` shows `secrets`; a run with default `method="env"`; `get_secret(...)` still resolves env vars).
-- [ ] Commit SHA recorded here: `__________`
-- [ ] Cold-start state updated.
-- [ ] Sonnet-5 clean-room `/code-review` on the commit; findings triaged (pay attention to the boot-order move — a reviewer with no context is the right check on it). Outcome: `__________`
+### Phase 3 — as-built (deviations & decisions, for cold start)
+
+- **W-A boot placement refined — after the precondition gate, not above the gateway block (the one real deviation).** The plan's literal W-A said move `build_registrar(config=get_config())` up to *before the gateway service block* (after line 209 / old line 212). Doing exactly that broke two unit tests — `tests/unit/pipelex/system/pipelex_service/test_gateway_terms_check.py::{test_first_run_raises_inference_setup_required, test_needs_inference_true_raises_when_terms_not_accepted}`. Those tests exercise the gateway terms/first-run gate in isolation via `Pipelex.__new__(Pipelex)` (skipping `__init__`, so no config/hub is set) and rely on `setup()` reaching the terms-check `raise` **before** touching `get_config()` / `self.pipelex_hub`. Moving `build_registrar(config=get_config())` above the gate made `setup()` call `get_config()` first → `RuntimeError: Config instance is not set`. **Resolution:** placed the whole plugin-discovery + boot-orchestrator gate + secrets-registry/selection block **after** the gateway service/terms-check block and **immediately before the telemetry factory** — telemetry (`make_telemetry_manager`) is the *true first consumer* of `secrets_provider`, which is W-A's only hard constraint. This is strictly better than the plan's literal placement: the terms/first-run precondition gate fails fast before any discovery work, and no `__new__` test needed changing for the gate. (The boot-orchestrator gate also moved to this spot — still far earlier than its original post-`models_manager.setup` position, so fail-fast is preserved.)
+- **`DuplicateSecretsProviderError` added** (not in the plan checklist) — required by the `_add` `on_duplicate` contract; mirrors `DuplicateStorageProviderError` / `DuplicateOrchestratorError`.
+- **`SecretsProviderConfig` is a single flat model**, not a base+subclass like storage's `StorageProviderConfig`/`StorageConfig`. Storage's subclass exists only to add `is_fetch_remote_content_enabled`/`is_upload_local_content_enabled`; secrets has no such extra fields, so a lone `SecretsProviderConfig(ConfigModel)` with just `method` is the clean-solid shape (no speculative base).
+- **Phase-1 escapee proactively found + fixed (same class as storage's).** `test_hub_slot_injection_precedence.py` boots a fake **empty** registrar (patched into `build_registrar`) and passed an explicit `storage_provider` but no `secrets_provider`; the new secrets selection path (`get_required(method="env")`) rejects the empty registry with `UnknownSecretsMethodError`. Fixed by injecting `EnvSecretsProvider()` in the four boots (+ docstring updated). Grep-verified this was the only `Pipelex.make` boot with a mocked empty/partial registrar (the plugins-dir tests call `build_registrar` directly; `test_storage_external_plugin` keeps the real `BUILTIN_PLUGINS`, so its `env` secrets provider is present). Caught here via the full `make agent-test` rather than escaping to a later checkpoint.
+- **The env factory ignores config.** `_make_env_secrets_provider(config)` returns a bare `EnvSecretsProvider()`; the `config` param exists only to conform to `SecretsProviderFactoryFn = Callable[[SecretsProviderConfig], ...]` (an SDK-backed external provider would read its own settings from it). Marked `# noqa: ARG001`, the established plugins-dir convention (see linkup/bedrock/azure_rest workers).
+
+### ⛔ CHECKPOINT 3 — review in flight
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**. Manual smokes: `pipelex plugins list` shows `secrets` (builtin, API 3, `secrets provider env`); default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`.
+- [x] Commit SHA recorded here: `8a0b32668`
+- [x] Cold-start state updated in this file.
+- [ ] Sonnet-5 clean-room `/code-review` **fanned out on `8a0b32668`** (fresh general-purpose agent, no context, pointed only at the commit; instructed to scrutinize the boot-order move). **Outcome: PENDING — triage on resume.**
 
 ---
 
