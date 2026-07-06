@@ -82,7 +82,7 @@ commands/
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
-| `pipe` | Converts a JSON pipe spec (typed) into raw TOML (stdout) |
+| `pipe` | Converts a JSON pipe spec into raw TOML (stdout). A spec with a `type` (via `--type` or a `type` key) is that concrete pipe; a **typeless** spec (no `type`) is a signature and renders a `[pipe.x]` section with no type line. An explicit `type = "PipeSignature"` is rejected with a migration error — `PipeSignature` is not a type. |
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
 | `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |

@@ -38,7 +38,6 @@ output = "Text"
 prompt = "Summarize $doc"
 
 [pipe.standalone_sig]
-type = "PipeSignature"
 description = "A standalone signature reached by nothing"
 inputs = {{ doc = "Doc" }}
 output = "Text"

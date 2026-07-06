@@ -111,6 +111,10 @@ class PipeValidationErrorType(StrEnum):
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
     UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
+    # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract
+    # (`description`, `inputs`, `output`). The author is describing an implementation without naming
+    # its type — the counterpart to UNKNOWN_PIPE_TYPE (a declared-but-invalid type).
+    MISSING_PIPE_TYPE = "missing_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
 
     # Presence-marker grammar misuse, detected at blueprint parse time: a presence marker

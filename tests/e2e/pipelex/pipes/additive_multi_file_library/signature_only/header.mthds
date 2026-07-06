@@ -3,7 +3,6 @@ description = "Research method headers"
 
 # Forward declaration ("header"): a PipeSignature is a contract only, no way of running.
 [pipe.find_key_findings]
-type        = "PipeSignature"
 description = "Find the key findings in a document (contract only)."
 inputs      = { doc = "Text" }
 output      = "KeyFinding"

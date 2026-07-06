@@ -14,6 +14,15 @@ from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validatio
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 
+# Distinctive fragments of the two type-tag errors raised by the `pipe` before-validators (via
+# `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and spec
+# layers). Kept in sync with those single-source messages. They map to DIFFERENT structured
+# categories — no-type-declared is `MISSING_PIPE_TYPE`, the retired-tag-declared is `UNKNOWN_PIPE_TYPE`
+# (a declared-but-invalid type) — and both name the pipe as ``Pipe `<code>``` so the pipe code is
+# recoverable from the message. See `_categorize_typeless_pipe_error`.
+_MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
+_EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
+
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
     """Extract variable names from error messages like 'Missing input variable(s): var1, var2.'"""
@@ -70,6 +79,49 @@ def _categorize_input_validation_error(
         )
 
     return None
+
+
+def _categorize_typeless_pipe_error(
+    message: str,
+    *,
+    domain: str | None,
+    source: str | None,
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize the two type-tag errors raised by the `pipe` before-validator.
+
+    They are distinct failure modes and get distinct `error_type`s:
+
+    - A `[pipe.x]` section with **no** `type` that declares more than the signature contract →
+      `MISSING_PIPE_TYPE` (the author is describing an implementation but named no type).
+    - A section that writes the retired explicit `type = "PipeSignature"` → `UNKNOWN_PIPE_TYPE` (a
+      `type` **was** declared, but it is no longer a valid pipe type — the same category as a typo'd
+      type; the message carries the specific migration guidance).
+
+    Both are raised on the aggregate `pipe` field, so their pydantic `loc` carries no pipe code —
+    recover it from the shared ``Pipe `<code>``` prefix so agent/API surfaces get a clean, located item.
+
+    Args:
+        message: The error message from the validation
+        domain: Domain code
+        source: Source file path
+
+    Returns:
+        Categorized error data, or None if not one of the two type-tag errors
+    """
+    if _MISSING_PIPE_TYPE_MARKER in message:
+        error_type = PipeValidationErrorType.MISSING_PIPE_TYPE
+    elif _EXPLICIT_SIGNATURE_TAG_MARKER in message:
+        error_type = PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+    else:
+        return None
+    pipe_code_match = re.search(r"Pipe `([^`]+)`", message)
+    return PipelexBundleBlueprintValidationErrorData(
+        error_type=error_type,
+        domain_code=domain,
+        source=source,
+        pipe_code=pipe_code_match.group(1) if pipe_code_match else None,
+        message=message,
+    )
 
 
 def _categorize_syntax_validation_error(
@@ -251,6 +303,17 @@ def categorize_blueprint_validation_error(
             pipe_code=pipe_code,
             message=message,
         )
+
+    # Type-tag errors from the before-validator (raised on the aggregate `pipe` field, so the
+    # pipe_code is recovered from the message rather than the bare `loc`): a typeless section
+    # declaring more than the contract → MISSING_PIPE_TYPE; the retired explicit tag → UNKNOWN_PIPE_TYPE.
+    missing_type_error = _categorize_typeless_pipe_error(
+        message=message,
+        domain=domain,
+        source=source,
+    )
+    if missing_type_error:
+        return missing_type_error
 
     # Try to categorize input validation errors (missing/unused inputs)
     input_error = _categorize_input_validation_error(
