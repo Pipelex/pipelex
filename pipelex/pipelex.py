@@ -56,6 +56,7 @@ from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
+from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
 from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -88,7 +89,6 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
-from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.types import Self
@@ -208,9 +208,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if boot_orchestrator is not None:
             get_config().plugins.boot_orchestrator = boot_orchestrator
 
-        # Initialize secrets provider early - needed for gateway check
-        secrets_provider = secrets_provider or EnvSecretsProvider()
-
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
         # Check if Pipelex Gateway is enabled
@@ -277,6 +274,38 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                         RemoteConfigStaleWarning,
                         stacklevel=2,
                     )
+
+        # --- Plugin discovery -----------------------------------------------------------------
+        # Build the plugin registrar from the fully-resolved config (pure and import-light:
+        # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
+        # Built here — after the gateway service/terms precondition gate above (so an unaccepted-terms or
+        # first-run boot fails fast before any discovery work) and before the telemetry factory below,
+        # which is the first consumer of the secrets provider. Secrets is now a config-selected plugin
+        # seam: the built-in SecretsPlugin's factory (and any external pipelex-secrets-<backend>) is
+        # looked up from the registrar-derived SecretsProviderRegistry just below. The other registries
+        # (inference, storage, …) are still built later at their own hub-set points, all referencing this
+        # same already-built registrar; the slot-claim thunks / teardown callbacks it also accumulates are
+        # applied at their ordered apply-points in later phases.
+        plugin_registrar = build_registrar(config=get_config())
+        self._plugin_registrar = plugin_registrar
+        # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
+        # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered
+        # plugin names — the same namespace the slot-claim gate uses (boot_orchestrator == plugin.name).
+        # When no plugin of that name registered (not installed, disabled, or a typo) nothing claims the
+        # hub slots, so without this guard the run would silently execute in-process instead of under the
+        # requested runtime. Checked here to fail fast, before the telemetry/model work.
+        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
+        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+
+        # Secrets provider precedence: explicit setup() param > config-selected registry factory.
+        # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
+        # Resolved here because the telemetry factory just below (and the model setup further down) consume it.
+        secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
+        self.pipelex_hub.set_secrets_provider_registry(secrets_provider_registry)
+        if secrets_provider is None:
+            secrets_config = get_config().pipelex.secrets_config
+            secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
 
         # Disable Pipelex telemetry when:
         # - inference is not needed (no live runs to track), OR
@@ -382,24 +411,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
         # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
         # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
-        # --- Plugin discovery -----------------------------------------------------------------
-        # Build the plugin registrar from the fully-resolved config (pure and import-light:
-        # registering the built-ins imports no backend SDK). Runs after the gateway/model setup
-        # checks and before the hub setup points below — the family worker factories look their
-        # backends up on the hub registries at run time. The slot-claim thunks, CLI commands and
-        # teardown callbacks the registrar also accumulates are applied at their ordered
-        # apply-points in a later phase (no orchestrator plugin contributes any of them yet).
-        plugin_registrar = build_registrar(config=get_config())
-        self._plugin_registrar = plugin_registrar
-        # Reject an unknown boot orchestrator before falling through to the core defaults. The
-        # requested name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched
-        # against registered plugin names — the same namespace the slot-claim gate uses
-        # (boot_orchestrator == plugin.name). When no plugin of that name registered (not installed,
-        # disabled, or a typo) nothing claims the hub slots, so without this guard the run would
-        # silently execute in-process instead of under the requested runtime.
-        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
-        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
-            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+        # --- Plugin-derived registries --------------------------------------------------------
+        # The plugin registrar was built earlier (with the boot-orchestrator gate checked and the
+        # config-selected secrets provider resolved) just before the telemetry factory. Turn its
+        # accumulated contributions into the hub registries here — after the gateway/model setup checks
+        # and before the hub setup points below — the family worker factories look their backends up on
+        # these at run time.
         self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
         self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))

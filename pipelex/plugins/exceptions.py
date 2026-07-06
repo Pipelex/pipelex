@@ -109,6 +109,20 @@ class DuplicateStorageProviderError(PluginError):
         super().__init__(message)
 
 
+class DuplicateSecretsProviderError(PluginError):
+    """Two plugins registered a secrets provider for the same method."""
+
+    def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
+        self.method = method
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Secrets provider for method '{method}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each method must have a single provider."
+        )
+        super().__init__(message)
+
+
 class DuplicateHttpErrorMapperError(PluginError):
     """Two plugins registered an HTTP-error mapper for the same exception type."""
 
@@ -200,5 +214,26 @@ class UnknownStorageMethodError(PluginError):
         message = (
             f"No storage provider is registered for method '{method}'. Registered methods: {available}. "
             "Check storage_config.method, or install/enable the plugin that provides that method."
+        )
+        super().__init__(message)
+
+
+class UnknownSecretsMethodError(PluginError):
+    """A configured secrets method has no registered provider factory.
+
+    ``secrets_config.method`` selects a secrets provider from the registry the built-in
+    ``SecretsPlugin`` (and any external ``pipelex-secrets-<backend>`` plugin) populates. When
+    the token names no registered factory — a typo, or an external provider plugin that is not
+    installed or was disabled via ``plugins.disabled`` — boot fails loud here rather than
+    starting with no secrets provider. The message lists the registered methods so the fix is obvious.
+    """
+
+    def __init__(self, *, method: str, registered_methods: list[str]):
+        self.method = method
+        self.registered_methods = registered_methods
+        available = ", ".join(sorted(registered_methods)) or "(none)"
+        message = (
+            f"No secrets provider is registered for method '{method}'. Registered methods: {available}. "
+            "Check secrets_config.method, or install/enable the plugin that provides that method."
         )
         super().__init__(message)

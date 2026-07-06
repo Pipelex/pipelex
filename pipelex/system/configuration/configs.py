@@ -13,6 +13,7 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
 from pipelex.types import Self, StrEnum
 
@@ -198,6 +199,7 @@ class PipelineExecutionConfig(ConfigModel):
 
 class Pipelex(ConfigModel):
     storage_config: StorageConfig
+    secrets_config: SecretsProviderConfig
     log_config: LogConfig
     aws_config: AwsConfig
 

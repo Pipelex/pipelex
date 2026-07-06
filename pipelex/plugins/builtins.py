@@ -15,6 +15,7 @@ from pipelex.plugins.openai.openai_plugin import OpenAIPlugin
 from pipelex.plugins.openrouter.openrouter_plugin import OpenRouterPlugin
 from pipelex.plugins.portkey.portkey_plugin import PortkeyPlugin
 from pipelex.plugins.pypdfium2.pypdfium2_plugin import Pypdfium2Plugin
+from pipelex.plugins.secrets.secrets_plugin import SecretsPlugin
 from pipelex.plugins.storage.storage_plugin import StoragePlugin
 
 # The plugins Pipelex ships with — discovered at boot ahead of any external
@@ -23,6 +24,7 @@ from pipelex.plugins.storage.storage_plugin import StoragePlugin
 BUILTIN_PLUGINS: list[PipelexPlugin] = [
     DirectOrchestratorPlugin(),
     StoragePlugin(),
+    SecretsPlugin(),
     OpenAIPlugin(),
     GatewayPlugin(),
     PortkeyPlugin(),
@@ -44,7 +46,8 @@ BUILTIN_PLUGINS: list[PipelexPlugin] = [
 # ``plugins.disabled`` is a configuration error, not a no-op. ``direct`` owns the
 # DIRECT orchestrator (you cannot boot without an in-process execution mode);
 # ``storage`` supplies every built-in storage backend (``storage_config.method`` must
-# resolve to a registered factory or boot fails loud); ``openai`` is the always-on default
-# inference driver (no optional SDK to avoid), so disabling it would only break the
-# out-of-the-box experience.
-CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"direct", "storage", "openai"})
+# resolve to a registered factory or boot fails loud); ``secrets`` supplies the built-in
+# ``env`` secrets backend (``secrets_config.method`` must likewise resolve or boot fails loud);
+# ``openai`` is the always-on default inference driver (no optional SDK to avoid), so disabling it
+# would only break the out-of-the-box experience.
+CORE_UNCONDITIONAL_PLUGIN_NAMES: frozenset[str] = frozenset({"direct", "storage", "secrets", "openai"})

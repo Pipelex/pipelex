@@ -11,12 +11,14 @@ from pipelex.plugins.exceptions import (
     DuplicateInferenceBackendError,
     DuplicateModelListerError,
     DuplicateOrchestratorError,
+    DuplicateSecretsProviderError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
 )
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
+from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
 from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 from pipelex.types import StrEnum
@@ -118,6 +120,7 @@ class PluginRegistrar:
         self.orchestrators: dict[OrchestrationMode, OrchestratorProtocol] = {}
         self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
         self.storage_providers: dict[str, StorageProviderFactoryFn] = {}
+        self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -130,6 +133,7 @@ class PluginRegistrar:
         self._orchestrator_sources: dict[OrchestrationMode, str] = {}
         self._bundle_validator_sources: dict[OrchestrationMode, str] = {}
         self._storage_provider_sources: dict[str, str] = {}
+        self._secrets_provider_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -214,6 +218,27 @@ class PluginRegistrar:
             value=factory,
             contribution=f"storage provider {method}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateStorageProviderError(
+                method=method, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_secrets_provider(self, *, method: str, factory: SecretsProviderFactoryFn) -> None:
+        """Contribute a factory for one secrets backend, keyed by an open ``method`` token.
+
+        The built-in ``SecretsPlugin`` registers the ``env`` method; an external
+        ``pipelex-secrets-<backend>`` plugin registers its own token (e.g. ``"vault"``). Boot reads
+        ``secrets_config.method`` and calls the looked-up factory to produce the one secrets provider
+        set on the hub. ``factory`` is invoked at that boot apply-point, never here — so a factory may
+        do heavy work (SDK import) while ``register`` stays import-light. Fail-loud on a duplicate
+        method, naming both plugins.
+        """
+        self._add(
+            store=self.secrets_providers,
+            sources=self._secrets_provider_sources,
+            key=method,
+            value=factory,
+            contribution=f"secrets provider {method}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateSecretsProviderError(
                 method=method, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
