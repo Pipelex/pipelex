@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **TOML pipeline inputs:** The `--inputs` file passed to `pipelex run` and `pipelex-agent run` (pipe/bundle/method) can now be TOML in addition to JSON, discriminated by file extension — a `.toml` suffix is parsed as TOML, every other value stays JSON. Both formats produce the same input dictionary; TOML's multi-line strings make text-heavy inputs much easier to author. `run bundle <dir>` auto-detects `inputs.toml` alongside `inputs.json` when `--inputs` is omitted, erroring if both exist. Inline JSON (`{...}`) and agent-CLI stdin inputs stay JSON-only. A bare TOML datetime/date/time literal is rejected with an explicit error (quote it as a string) — native datetime concept support is a separate track.
+- **`--format toml` for inputs-template generation:** `pipelex build inputs` and `pipelex-agent inputs` (pipe/bundle/method) accept `--format json|toml` (default `json`) to emit the generated inputs template as TOML. On the main CLI, `toml` defaults the output filename to `inputs.toml`; on the agent CLI, `toml` prints the raw TOML template to stdout (the no-inputs case prints a TOML comment line that loads back as an empty dict).
+
 ## [v0.37.0] - 2026-07-04
 
 ### Highlights

@@ -23,7 +23,44 @@ pipelex run bundle path/to/my_pipe.mthds --inputs results/inputs.json
 See more about the options of the CLI [here](../../tools/cli/index.md).
 
 !!! tip "Starting Point for Input Structure"
-    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
+    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in. Add `--format toml` to get a TOML template instead of JSON.
+
+## Input Files: JSON or TOML
+
+When you pass an inputs file to `--inputs` (or drop a default inputs file next to a bundle), Pipelex accepts **both JSON and TOML**, discriminated by the file extension — a `.toml` suffix is parsed as TOML, everything else as JSON. Both formats produce the same input dictionary, so every PipelineInputs shape below applies to either. TOML's multi-line strings make text-heavy inputs much easier to author.
+
+The JSON and TOML examples below are equivalent:
+
+**JSON:**
+```json
+{
+  "instructions": "Focus on payment terms.",
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
+    }
+  }
+}
+```
+
+**TOML:**
+```toml
+instructions = "Focus on payment terms."
+
+[invoice]
+concept = "accounting.Invoice"
+
+[invoice.content]
+invoice_number = "INV-001"
+amount = 1250.00
+```
+
+!!! warning "TOML datetimes are not supported yet"
+    A bare TOML datetime/date/time literal (e.g. `date = 2025-10-20`) is rejected with an explicit error — quote it as a string (`date = "2025-10-20"`) in the meantime.
+
+The rest of this guide shows inputs in JSON (and Python) form; translate any of them to TOML with the same structure. See the [run CLI reference](../../tools/cli/run.md#input-file-formats) for the extension rule and auto-detection behavior.
 
 ## Understanding PipelineInputs Format
 

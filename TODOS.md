@@ -1,6 +1,6 @@
 # TOML pipeline inputs — feature/Inputs
 
-Status: **CHECKPOINT 2 CLEARED (2026-07-06)** — Phases 1+2 committed (`9041c6986`), Phase 3 implemented and green (`make agent-check` + targeted CLI/core/builder unit, integration and e2e tests, including the new generate→dry-run e2e chain). Next up is Phase 4 (docs + changelog + full gates). This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
+Status: **CHECKPOINT 3 CLEARED (2026-07-06)** — all four phases done. Phases 1+2 committed (`9041c6986`), Phase 3 committed (`1fdfd26d0`), Phase 4 (docs + changelog) complete with full `make agent-check` + `make agent-test` green. Feature is ready for PR to dev — nothing pushed. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
 
 ## Goal
 
@@ -53,16 +53,16 @@ Accept pipeline inputs as TOML in addition to JSON, discriminated by file extens
 
 **CHECKPOINT 2 — CLEARED 2026-07-06.** Template generation done on both surfaces; `make agent-check` fully green; targeted CLI + core + builder unit/integration/e2e suites pass (incl. the generate→dry-run e2e chain and a manual raw-TOML smoke of the agent CLI). Committed at this boundary.
 
-### Phase 4 — Docs, changelog, final gates
+### Phase 4 — Docs, changelog, final gates — DONE
 
-- [ ] `docs/tools/cli/run.md`: rework the "Input JSON Format" section into an inputs-file-formats section (extension rule, TOML example with multi-line strings, datetime limitation, ambiguity rule for auto-detect).
-- [ ] `docs/building-methods/pipes/provide-inputs.md`: same PipelineInputs shapes shown in both JSON and TOML.
-- [ ] `docs/tools/cli/build/inputs.md`: `--format toml` + default filename behavior.
-- [ ] `docs/tools/cli/agent-cli.md` + `pipelex/cli/agent_cli/CLAUDE.md`: inputs `--format`, run `.toml` support, stdin-stays-JSON note.
-- [ ] `CHANGELOG.md` under `[Unreleased]`: Added — TOML inputs (extension-discriminated) + `--format toml` template generation; note the TOML-datetime limitation.
-- [ ] Full `make agent-check` + `make agent-test`.
+- [x] `docs/tools/cli/run.md`: reworked "Input JSON Format" → "Input File Formats" section (extension rule, JSON + TOML examples with multi-line strings, datetime-limitation warning, auto-detect/ambiguity note); all three `--inputs` option lines and the `run bundle` intro updated to mention JSON-or-TOML + inputs-file auto-detect.
+- [x] `docs/building-methods/pipes/provide-inputs.md`: new "Input Files: JSON or TOML" section (extension rule, equivalent JSON/TOML example, datetime-limitation warning, pointer to run CLI reference); `build inputs` tip mentions `--format toml`.
+- [x] `docs/tools/cli/build/inputs.md`: `--format json|toml` on all three subcommands, `--output` default-filename behavior (`inputs.json`/`inputs.toml`), `--format toml` example, TOML output + multiplicity examples; frontmatter/intro reworded.
+- [x] `docs/tools/cli/agent-cli.md`: `run --inputs` JSON-or-TOML + stdin-stays-JSON/auto-detect note; `inputs --format json|toml` deviation note; Output Contract updated for inputs' dual output. (`pipelex/cli/agent_cli/CLAUDE.md` was already updated in Phase 3.)
+- [x] `CHANGELOG.md` under `[Unreleased]`: Added — TOML inputs (extension-discriminated) + `--format toml` template generation; TOML-datetime limitation noted.
+- [x] Full `make agent-check` (pyright/mypy/ruff/plxt/keyword-only all green) + `make agent-test` (full suite green).
 
-**CHECKPOINT 3 (final)** — gates green, tracker updated with commit SHAs, ready for PR to dev.
+**CHECKPOINT 3 (final) — CLEARED 2026-07-06.** All phases done; gates fully green; docs + changelog landed. Phase 4 changes uncommitted at this boundary — commit, then open the PR to dev. Nothing pushed.
 
 ## Deferred — follow-up wave AFTER this ships in a pipelex release (NOT this branch)
 
