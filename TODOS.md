@@ -1,6 +1,6 @@
 # TOML pipeline inputs — feature/Inputs
 
-Status: **CHECKPOINT 3 CLEARED (2026-07-06)** — all four phases done. Phases 1+2 committed (`9041c6986`), Phase 3 committed (`1fdfd26d0`), Phase 4 (docs + changelog) complete with full `make agent-check` + `make agent-test` green. Feature is ready for PR to dev — nothing pushed. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
+Status: **CHECKPOINT 3 CLEARED (2026-07-06)** — all four phases done and committed. Phases 1+2 (`9041c6986`), Phase 3 (`1fdfd26d0`), Phase 4 docs + changelog (`5ebd9bef2`), with full `make agent-check` + `make agent-test` green. Feature is ready for PR to dev — nothing pushed. This tracker replaces the retired hello-plugin tracker (that track completed and merged to dev via PR #1015).
 
 ## Goal
 
