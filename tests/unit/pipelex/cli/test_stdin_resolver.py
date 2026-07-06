@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs, resolve_stdin_inputs
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestStdinResolver:
@@ -287,6 +291,63 @@ class TestStdinResolver:
         with pytest.raises(typer.Exit) as exc_info:
             parse_cli_inputs(inputs_arg="/nonexistent/path/to/file.json")
         assert exc_info.value.exit_code == 1
+
+    # -------------------------------------------------------------------------
+    # TOML inputs file tests (.toml suffix routes through the TOML parser)
+    # -------------------------------------------------------------------------
+
+    def test_inputs_toml_file_path(self, tmp_path: Path) -> None:
+        """--inputs with a .toml file path loads TOML, multi-line strings preserved."""
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text('[contract_text]\nconcept = "Text"\ncontent = """\nFirst line.\nSecond line.\n"""\n', encoding="utf-8")
+
+        result = parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert result == {"contract_text": {"concept": "Text", "content": "First line.\nSecond line.\n"}}
+
+    def test_inputs_toml_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid TOML in a .toml inputs file emits a TomlError envelope with input domain."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text("topic = \n", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "TomlError"
+        assert envelope["error_domain"] == "input"
+        assert "hint" in envelope
+
+    def test_inputs_toml_datetime_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A TOML datetime input emits the not-supported envelope with the quote-as-string hint."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text("deadline = 2026-07-06T12:00:00Z\n", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "InputsDatetimeNotSupportedError"
+        assert envelope["error_domain"] == "input"
+        assert "deadline" in envelope["message"]
+        assert "Quote the datetime as a string" in envelope["hint"]
+
+    def test_inputs_json_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid JSON in a .json inputs file emits a JSONDecodeError envelope (not a raw traceback)."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        json_file = tmp_path / "inputs.json"
+        json_file.write_text("{not valid json", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(json_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "JSONDecodeError"
 
     # -------------------------------------------------------------------------
     # auto_inputs_path precedence tests

@@ -11,7 +11,9 @@ from posthog import tag
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
+from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -35,9 +37,9 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.tools.misc.exceptions import JsonTypeError
+from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
-from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.tabular.csv_codec import assert_supported_table_suffix, csv_from_list_content, flat_field_names
 from pipelex.tools.tabular.exceptions import CsvError
@@ -149,7 +151,7 @@ async def _execute_run(
                 raise typer.Exit(1) from json_decode_exc
         else:
             try:
-                pipeline_inputs = load_json_dict_from_path(Path(inputs))
+                pipeline_inputs = load_inputs_dict_from_path(Path(inputs))
                 # Resolve relative url paths against the inputs file's parent directory
                 base_dir = Path(inputs).parent.resolve()
                 pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
@@ -158,10 +160,22 @@ async def _execute_run(
                 print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from file_not_found_exc
+            except json.JSONDecodeError as json_decode_exc:
+                print_traceback_if_requested(get_console())
+                typer.secho(f"Failed to parse input file '{inputs}': invalid JSON: {json_decode_exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from json_decode_exc
             except JsonTypeError as json_type_error_exc:
                 print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_type_error_exc
+            except TomlError as toml_error_exc:
+                print_traceback_if_requested(get_console())
+                typer.secho(f"Failed to parse input file: {toml_error_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from toml_error_exc
+            except InputsDatetimeNotSupportedError as datetime_exc:
+                print_traceback_if_requested(get_console())
+                typer.secho(f"Failed to load input file: {datetime_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from datetime_exc
 
     # Determine pipe run mode
     pipe_run_mode = PipeRunMode.DRY if dry_run else None

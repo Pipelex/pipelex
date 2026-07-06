@@ -10,13 +10,15 @@ from typing import Annotated, Any
 import typer
 from mthds.runners.types import RunnerType
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
+from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
@@ -114,9 +116,15 @@ def run_bundle_cmd(
                 )
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs file (used as low-priority fallback)
-        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-        auto_inputs_path = str(inputs_file) if inputs_file.is_file() else None
+        # Auto-detect inputs file, inputs.json or inputs.toml (used as low-priority fallback);
+        # skipped entirely when --inputs is given, so the ambiguity rule only bites on auto-detect
+        if inputs is None:
+            try:
+                auto_inputs_file = find_default_inputs_file(target_path)
+            except AmbiguousInputsFilesError as ambiguity_exc:
+                agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
+            if auto_inputs_file is not None:
+                auto_inputs_path = str(auto_inputs_file)
 
         # Add directory as library dir (prepend to user-supplied list)
         target_dir_str = str(target_path)

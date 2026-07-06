@@ -8,9 +8,10 @@ from pathlib import Path
 from typing import Any, cast
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.tools.misc.exceptions import JsonTypeError
-from pipelex.tools.misc.json_utils import load_json_dict_from_path
+from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
+from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
 MAIN_STUFF_KEY = "main_stuff"
@@ -169,14 +170,20 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             agent_error(f"Failed to parse inline JSON inputs: {exc}", error_type="JSONDecodeError", cause=exc)
     else:
         try:
-            loaded = load_json_dict_from_path(Path(inputs_arg))
+            loaded = load_inputs_dict_from_path(Path(inputs_arg))
             # Resolve relative url paths against the inputs file's parent directory
             base_dir = Path(inputs_arg).parent.resolve()
             return resolve_inputs_paths(loaded, base_dir=base_dir)
         except FileNotFoundError as exc:
             agent_error(f"Input file not found: {inputs_arg}", error_type="FileNotFoundError", cause=exc)
+        except json.JSONDecodeError as exc:
+            agent_error(f"Input file contains invalid JSON: {inputs_arg}: {exc}", error_type="JSONDecodeError", cause=exc)
         except JsonTypeError as exc:
             agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", error_type="JsonTypeError", cause=exc)
+        except TomlError as exc:
+            agent_error(exc.message, error_type="TomlError", cause=exc)
+        except InputsDatetimeNotSupportedError as exc:
+            agent_error(exc.message, error_type="InputsDatetimeNotSupportedError", cause=exc)
     return None
 
 
