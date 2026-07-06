@@ -128,7 +128,7 @@ The one breaking phase: reject the old tag, migrate every bundle, reword renderi
 
 ### ⛔ CHECKPOINT 3 — STOP (final)
 
-- [x] Commit the phase. Record SHA: `702f2eff5` (may be amended if the cold review lands fixes).
+- [x] Commit the phase. Record SHA: **`843673324`** (amended from `702f2eff5` to fold the two review fixes — F1 categorizer split + F2 renderer `signature_for`).
 - [x] Update the **Cold-start snapshot** below to the finished state.
 - [x] **Fan out** a fresh Sonnet-5 `/code-review` sub-agent on this commit's diff (fresh, no inherited context; 10 finder angles + empirical REPL checks of the round-trip and Draft-4 schema). Triage:
   - **Angles verified clean:** the explicit-tag round-trip false-positive (traced every dump→revalidate; only `bundle_elaborator.py:94` exists, and the `exclude=True` keeps it typeless) and the Draft-4 `oneOf` disambiguation (ran the real generated schema through `jsonschema.Draft4Validator`). No bug in either — corroborates our own checks.
@@ -136,7 +136,7 @@ The one breaking phase: reject the old tag, migrate every bundle, reword renderi
   - **F2 (minor) — renderer drift.** `pipe_ops.add_type_specific_fields` never emitted `signature_for` for a signature, while `pipe_cmd._add_type_specific_fields` does — silent loss of the hint through `pipe_ops.pipe_spec_to_toml` (pre-existing; that fn has no in-repo prod caller, only tests). **Fixed** — added the mirroring `PipeSignatureSpec` branch so the two renderers stay faithful copies; new `test_signature_toml_preserves_signature_for_hint` guards it.
   - No other correctness issues; reviewer confirmed the shared-helper design and the two before-validators are sound faithful mirrors.
 - [x] **Gated cross-repo follow-up recorded:** the MTHDS JSON Schema copies in `mthds`, `vscode-pipelex`, `mthds-ui` now drift — the signature arm no longer carries a `type` property (an explicit `type = "PipeSignature"` fails those schemas too). Propagate via the `mthds-schema-sync` skill from the workspace root, **gated on the released pipelex version** — NOT on this branch. Flagged in the CHANGELOG `[Unreleased]` entry.
-- [ ] Hand back to the user for review / merge decision (do not push unprompted).
+- [x] Hand back to the user for review / merge decision (do not push unprompted). **Phase 3 complete — the whole feature has landed. Awaiting Louis' merge call. Nothing pushed.**
 
 ---
 
@@ -158,7 +158,7 @@ The one breaking phase: reject the old tag, migrate every bundle, reword renderi
 > - **Open threads / review findings deferred:** …
 > - **Exact next action:** …
 
-- **Phase reached / last green SHA:** **Phase 3 complete** — the breaking cleanup is done, the feature is fully landed (code + tests + docs green). Baseline = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 = `e864b82486f00502206c6aa11b609b5256392e30`. Phase-2 = `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28`. Phase-3 commit SHA = _pending commit (recorded at Checkpoint 3 below)_.
+- **Phase reached / last green SHA:** **Phase 3 complete** — the breaking cleanup is done, the feature is fully landed (code + tests + docs green). Baseline = `04434f78586b328e080fd76b50bf46b00e0b6765`. Phase-1 = `e864b82486f00502206c6aa11b609b5256392e30`. Phase-2 = `b52b4e8df5a21c2d521d59bd1a08b1d65e028f28`. **Phase-3 commit SHA = `843673324`** (amended once to fold the cold-review F1/F2 fixes). Baseline still `04434f785`; nothing pushed.
 - **What changed and where the seam lives (Phase 3, breaking):**
   - **Rejection is single-source.** `normalize_typeless_signature_section` (`pipe_blueprint.py`) now raises `explicit_signature_tag_migration_message(pipe_code)` when a raw dict names `type = "PipeSignature"`. Both `PipelexBundleBlueprint.validate_pipe_keys` and `PipelexBundleSpec.validate_pipe_keys` inherit it. `parse_pipe_spec` (single-pipe) rejects `pipe_type="PipeSignature"` with the same message-builder.
   - **Serialization invariant (the subtle bit).** `PipeSignatureBlueprint.type` is now `Field(exclude=True)`. A signature never serializes its tag, so (a) `.mthds` export stays typeless and (b) the `bundle_elaborator.py:94` dump→revalidate round-trip yields a typeless section that `validate_pipe_keys` re-injects — the tag only appears in a raw section when a **user** wrote it, which is exactly what we reject. No false positives.
