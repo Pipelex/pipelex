@@ -1,0 +1,221 @@
+# Cognitive Tools (Cogt) Configuration
+
+The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), Image Generation, and OCR (Optical Character Recognition) capabilities.
+
+## Overview
+
+```toml
+[cogt]
+# Tier 1 transport retry attempts
+transport_max_retries = 2
+
+# Main Cogt configuration sections
+[cogt.inference_manager_config]
+[cogt.llm_config]
+[cogt.img_gen_config]
+[cogt.extract_config]
+```
+
+## Transport Retry
+
+`transport_max_retries` is a top-level `[cogt]` setting that controls how many times an inference SDK client retries a transient transport failure before giving up.
+
+```toml
+[cogt]
+transport_max_retries = 2
+```
+
+- `transport_max_retries` (int, `0`–`10`, default `2`): the number of retries attempted **on top of** the initial request when a transport-level failure occurs — a connection error, or an HTTP `408` / `409` / `429` / `5xx` response. A value of `2` therefore allows up to 3 attempts total. Retries honor a `Retry-After` response header when present.
+
+This is "Tier 1" of the retry model. It is wired uniformly into every inference SDK client factory — Anthropic, OpenAI / Azure OpenAI, the Pipelex Gateway clients, Mistral, and Google — as well as the raw-`httpx` Azure image-generation path, so the retry posture is a deliberate, uniform policy rather than a per-provider SDK default.
+
+It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
+
+## Inference Manager Configuration
+
+Controls automatic setup of various cognitive tools:
+
+```toml
+[cogt.inference_manager_config]
+is_auto_setup_preset_llm = true
+is_auto_setup_preset_img_gen = true
+is_auto_setup_preset_extract = true
+```
+
+## LLM Configuration
+
+Configuration for all Language Model interactions:
+
+```toml
+[cogt.llm_config]
+default_max_images = 100  # Maximum number of images in prompts
+is_structure_prompt_enabled = false
+schema_reask_max_attempts = 3  # instructor schema re-ask attempts, between 1 and 10
+```
+
+### LLM Job Parameters
+
+When configuring LLM jobs, you can set:
+
+- `temperature` (float, 0-1): Controls randomness in outputs
+- `max_tokens` (optional int): Maximum tokens in response
+- `seed` (optional int): For reproducible outputs
+
+## Image Generation Configuration
+
+Configuration for image generation capabilities:
+
+```toml
+[cogt.img_gen_config.img_gen_job_config]
+is_sync_mode = false
+
+# Default parameters for image generation
+[cogt.img_gen_config.img_gen_param_defaults]
+aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landscape_16_9, landscape_21_9, landscape_4_1, landscape_8_1,
+                         # portrait_3_4, portrait_2_3, portrait_9_16, portrait_9_21, portrait_1_4, portrait_1_8
+background = "auto"     # Options: transparent, opaque, auto
+# size is optional and has no default key: when unset, no size intent is sent and the provider's
+# default size applies (Gemini jobs omit image_size; OpenAI models use their fixed 1K-class preset
+# for the aspect ratio). Set it to a size tier ("1k", "2k", "4k") or an exact size like "2048x1152"
+# to apply a default size to every PipeImgGen that doesn't set its own. A tier default composes
+# with any aspect_ratio; an exact-size default implies its own ratio, so it is not applied to
+# pipes that explicitly set aspect_ratio (the pipe's ratio wins).
+quality = "low"        # Options: low, medium, high
+# nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
+guidance_scale = 3.5    # Controls adherence to prompt
+is_moderated = true    # Enable content moderation
+safety_tolerance = 5    # Safety level (1-6)
+is_raw = false         # Raw output mode
+output_format = "jpeg"  # Options: png, jpeg, webp
+seed = "auto"          # "auto" or specific integer
+```
+
+### ImageGen Job Parameters
+
+Image generation jobs support these parameters:
+
+- **Dimensions**:
+
+    - `aspect_ratio`: Predefined ratios for image dimensions
+    - `size` (optional): Portable size intent — a size tier (`"1k"`, `"2k"`, `"4k"`) or an exact pixel size like `"2048x1152"`. Unset means the provider's default size. See [PipeImgGen — Image size and portability](../../building-methods/pipes/pipe-operators/PipeImgGen.md#image-size-and-portability)
+    - `background`: Background handling mode
+
+- **Quality Control**:
+
+    - `quality`: Output quality level
+    - `nb_steps`: Number of generation steps
+    - `guidance_scale`: How closely to follow the prompt
+
+- **Safety**:
+
+    - `is_moderated`: Enable content moderation
+    - `safety_tolerance`: Safety check strictness (1-6)
+
+- **Output**:
+
+    - `is_raw`: Raw output mode
+    - `output_format`: Image format (PNG/JPG/WEBP)
+    - `seed`: For reproducible generation
+
+## OCR Configuration
+
+Configuration for Optical Character Recognition:
+
+```toml
+[cogt.extract_config]
+default_page_views_dpi = 72
+
+## Unified Backend Integration
+
+All cognitive tools (LLMs, OCR, and Image Generation) now use the same unified inference backend system:
+
+### Benefits of Unified System
+
+- **Consistent Configuration**: Same configuration patterns across all AI capabilities
+- **Unified Routing**: All models routed through the same routing profiles
+- **Shared Presets**: Presets for LLMs, OCR, and image generation in the same deck
+- **Single API Management**: Manage all AI provider credentials in one place
+
+### Backend Integration Details
+
+- **LLM Models**: `model_type = "llm"` for text generation and structured outputs
+- **OCR Models**: `model_type = "text_extractor"` for document processing
+- **Image Generation Models**: `model_type = "img_gen"` for image creation
+
+All model types support the same routing, aliasing, and preset systems.
+
+## Validation Rules
+
+### LLM Configuration
+- Temperature must be between 0 and 1
+- Max tokens must be positive
+- Schema re-ask attempts must be between 1 and 10
+- Seeds must be non-negative
+
+### ImageGen Configuration
+- Guidance scale must be positive
+- Safety tolerance must be between 1 and 6
+- Number of steps must be positive
+- Strict validation for enums (aspect ratio, background, quality, output format)
+
+## Best Practices
+
+1. **LLM Settings**:
+
+    - Start with lower temperatures (0.1-0.3) for consistent outputs
+    - Use streaming for better user experience
+    - Set appropriate retry limits based on your use case
+
+2. **ImageGen Settings**:
+
+    - Enable moderation for production use
+    - Use appropriate aspect ratios for your use case
+    - Balance quality and performance with step count
+
+3. **General**:
+
+     - Enable auto-setup for easier initialization
+     - Use platform preferences to ensure consistent model selection
+     - Configure OCR handles based on your accuracy needs
+
+## Example Complete Configuration
+
+```toml
+[cogt]
+transport_max_retries = 2
+
+[cogt.inference_manager_config]
+is_auto_setup_preset_llm = true
+is_auto_setup_preset_img_gen = true
+is_auto_setup_preset_extract = true
+
+[cogt.llm_config]
+default_max_images = 100
+is_structure_prompt_enabled = false
+schema_reask_max_attempts = 3
+
+[cogt.img_gen_config.img_gen_job_config]
+is_sync_mode = false
+
+[cogt.img_gen_config.img_gen_param_defaults]
+aspect_ratio = "square"
+background = "auto"
+quality = "low"
+# nb_steps = 1
+guidance_scale = 3.5
+is_moderated = true
+safety_tolerance = 5
+is_raw = false
+output_format = "jpeg"
+seed = "auto"
+
+[cogt.extract_config]
+default_page_views_dpi = 72
+```
+
+## Related Documentation
+
+- [PipeExtract Operator](../../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
+- [PipeImgGen Operator](../../building-methods/pipes/pipe-operators/PipeImgGen.md) - Generate images with AI models
+- [Document Extraction](../../features/document-extraction.md) - Overview of document extraction capabilities
+- [Image Generation](../../features/image-generation.md) - Overview of image generation capabilities
