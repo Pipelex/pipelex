@@ -2,9 +2,9 @@
 
 Status: **Phase 1 DONE + Checkpoint 1 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
-Commits on the branch (tip → base):
+Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
-- `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping ← **current HEAD**
+- `977c73811` — docs: this plan + Phase 1 checkpoint bookkeeping
 - `58961848a` — fix: contract.py v3 comment (Checkpoint-1 review triage)
 - `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code — the review target**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
