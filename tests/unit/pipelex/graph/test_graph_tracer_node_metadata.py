@@ -1,6 +1,6 @@
 """Unit tests for GraphTracer wiring of node-level pipe metadata."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import NodeKind
@@ -12,7 +12,7 @@ class TestGraphTracerNodeMetadata:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="meta-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="summarize",
@@ -40,7 +40,7 @@ class TestGraphTracerNodeMetadata:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="meta-default-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         node_id, _child = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="noop",

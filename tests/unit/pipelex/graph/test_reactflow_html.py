@@ -1,6 +1,6 @@
 """Unit tests for the ReactFlow HTML generator (mthds-ui standalone bundle via Jinja2)."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
@@ -18,7 +18,7 @@ class TestReactFlowHtml:
     def _empty_graphspec(self) -> GraphSpec:
         return GraphSpec(
             graph_id="test_graph",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             pipeline_ref=PipelineRef(),
             nodes=[],
             edges=[],
@@ -54,7 +54,7 @@ class TestReactFlowHtml:
         )
         graph = GraphSpec(
             graph_id="test_graph",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             pipeline_ref=PipelineRef(),
             nodes=[node],
             edges=[],

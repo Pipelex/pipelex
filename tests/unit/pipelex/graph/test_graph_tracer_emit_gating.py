@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import NodeKind
@@ -14,7 +14,7 @@ class TestGraphTracerEmitGating:
             pipe_code="some_pipe",
             pipe_type="PipeLLM",
             node_kind=NodeKind.OPERATOR,
-            started_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
         )
 
     def test_setup_stamps_emit_flags_onto_context(self) -> None:

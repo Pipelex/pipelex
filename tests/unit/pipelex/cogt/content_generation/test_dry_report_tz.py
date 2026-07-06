@@ -7,7 +7,7 @@ do construct aware datetimes (e.g. ``pipe_abstract.py``), so the dry path must
 not crash when one of those flows in.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pytest_mock import MockerFixture
@@ -24,7 +24,7 @@ class TestDryReportTimezone:
         "started_at",
         [
             pytest.param(datetime(2020, 1, 1, 10, 0, 0), id="naive"),
-            pytest.param(datetime(2020, 1, 1, 10, 0, 0, tzinfo=timezone.utc), id="aware_utc"),
+            pytest.param(datetime(2020, 1, 1, 10, 0, 0, tzinfo=UTC), id="aware_utc"),
             pytest.param(None, id="none_uses_default_factory"),
         ],
     )

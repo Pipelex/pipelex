@@ -7,7 +7,7 @@ costs-only / default mode the same fallback emits. This is what lets ``--no-grap
 and ``--no-costs`` drop it while both share one event-log transport.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from pytest_mock import MockerFixture
@@ -38,7 +38,7 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 
 
 def _make_llm_job(pipeline_run_id: str, trace_context: TraceContext | None) -> LLMJob:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,

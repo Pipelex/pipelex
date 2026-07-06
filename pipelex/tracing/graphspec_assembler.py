@@ -7,7 +7,7 @@ graphs from NDJSON event files.
 """
 
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pipelex import log
@@ -205,7 +205,7 @@ class _AssemblerState:
 
         return GraphSpec(
             graph_id=self._graph_id,
-            created_at=self._earliest_timestamp or datetime.now(timezone.utc),
+            created_at=self._earliest_timestamp or datetime.now(UTC),
             pipeline_ref=self._pipeline_ref,
             nodes=nodes,
             edges=all_edges,
@@ -342,7 +342,7 @@ class _AssemblerState:
         for node_data in self._nodes.values():
             if node_data.status == NodeStatus.RUNNING:
                 node_data.status = NodeStatus.CANCELED
-                node_data.ended_at = datetime.now(timezone.utc)
+                node_data.ended_at = datetime.now(UTC)
 
     # ------------------------------------------------------------------
     # Pass 2 edge generation
