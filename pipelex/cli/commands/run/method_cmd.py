@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.method_resolver import resolve_method_target
 
@@ -130,11 +131,7 @@ def run_method_cmd(
     effective_output_dir = output_dir or str(method_dir / "results")
 
     # Resolve --inputs relative to the method's directory
-    effective_inputs: str | None = inputs
-    if inputs and not inputs.startswith("{"):
-        inputs_path = Path(inputs)
-        if not inputs_path.is_absolute():
-            effective_inputs = str(method_dir / inputs_path)
+    effective_inputs = resolve_inputs_arg_against_dir(inputs, base_dir=method_dir)
 
     # Merge method library dirs with user-supplied -L dirs
     if library_dir:

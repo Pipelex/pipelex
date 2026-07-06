@@ -23,7 +23,44 @@ pipelex run bundle path/to/my_pipe.mthds --inputs results/inputs.json
 See more about the options of the CLI [here](../../tools/cli/index.md).
 
 !!! tip "Starting Point for Input Structure"
-    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
+    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in. Add `--format toml` to get a TOML template instead of JSON.
+
+## Input Files: JSON or TOML
+
+When you pass an inputs file to `--inputs` (or drop a default inputs file next to a bundle), Pipelex accepts **both JSON and TOML**, discriminated by the file extension — a `.toml` suffix is parsed as TOML, everything else as JSON. Both formats produce the same input dictionary, so every PipelineInputs shape below applies to either. TOML's multi-line strings make text-heavy inputs much easier to author.
+
+The JSON and TOML examples below are equivalent:
+
+**JSON:**
+```json
+{
+  "instructions": "Focus on payment terms.",
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
+    }
+  }
+}
+```
+
+**TOML:**
+```toml
+instructions = "Focus on payment terms."
+
+[invoice]
+concept = "accounting.Invoice"
+
+[invoice.content]
+invoice_number = "INV-001"
+amount = 1250.00
+```
+
+!!! warning "TOML datetimes are not supported yet"
+    A bare TOML datetime/date/time literal (e.g. `date = 2025-10-20`) is rejected with an explicit error — quote it as a string (`date = "2025-10-20"`) in the meantime.
+
+The rest of this guide shows inputs in JSON (and Python) form; translate any of them to TOML with the same structure. See the [run CLI reference](../../tools/cli/run.md#input-file-formats) for the extension rule and auto-detection behavior.
 
 ## Understanding PipelineInputs Format
 
@@ -67,9 +104,7 @@ The simplest case - just provide a string directly:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_text": "my text"
-  }
+  "my_text": "my text"
 }
 ```
 
@@ -89,9 +124,7 @@ Provide multiple text items as a list:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_texts": ["my text1", "my text2", "my text3"]
-  }
+  "my_texts": ["my text1", "my text2", "my text3"]
 }
 ```
 
@@ -204,11 +237,9 @@ Use the explicit format `{"concept": "...", "content": "..."}` when you need pre
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "text": {
-      "concept": "Text",
-      "content": "my text"
-    }
+  "text": {
+    "concept": "Text",
+    "content": "my text"
   }
 }
 ```
@@ -233,11 +264,9 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "documents": {
-      "concept": "Text",
-      "content": ["text1", "text2", "text3"]
-    }
+  "documents": {
+    "concept": "Text",
+    "content": ["text1", "text2", "text3"]
   }
 }
 ```
@@ -249,14 +278,12 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoice_data": {
-      "concept": "Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00,
-        "date": "2025-10-20"
-      }
+  "invoice_data": {
+    "concept": "Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00,
+      "date": "2025-10-20"
     }
   }
 }
@@ -299,20 +326,18 @@ This explicitly tells Pipelex to use the `Invoice` concept from the `accounting`
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoices": {
-      "concept": "Invoice",
-      "content": [
-        {
-          "invoice_number": "INV-001",
-          "amount": 1250.00
-        },
-        {
-          "invoice_number": "INV-002",
-          "amount": 890.00
-        }
-      ]
-    }
+  "invoices": {
+    "concept": "Invoice",
+    "content": [
+      {
+        "invoice_number": "INV-001",
+        "amount": 1250.00
+      },
+      {
+        "invoice_number": "INV-002",
+        "amount": 890.00
+      }
+    ]
   }
 }
 ```
@@ -326,15 +351,13 @@ Provide structured data as a dictionary:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "person": {
-      "concept": "PersonInfo",
-      "content": {
-        "arg1": "something",
-        "arg2": 1,
-        "arg3": {
-          "arg4": "something else"
-        }
+  "person": {
+    "concept": "PersonInfo",
+    "content": {
+      "arg1": "something",
+      "arg2": 1,
+      "arg3": {
+        "arg4": "something else"
       }
     }
   }
@@ -352,22 +375,20 @@ The system will:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "people": {
-      "concept": "PersonInfo",
-      "content": [
-        {
-          "arg1": "something",
-          "arg2": 1,
-          "arg3": {"arg4": "something else"}
-        },
-        {
-          "arg1": "something else",
-          "arg2": 2,
-          "arg3": {"arg4": "something else else"}
-        }
-      ]
-    }
+  "people": {
+    "concept": "PersonInfo",
+    "content": [
+      {
+        "arg1": "something",
+        "arg2": 1,
+        "arg3": {"arg4": "something else"}
+      },
+      {
+        "arg1": "something else",
+        "arg2": 2,
+        "arg3": {"arg4": "something else else"}
+      }
+    ]
   }
 }
 ```
@@ -533,22 +554,20 @@ inputs = {
 
 ```json
 {
-  "inputs": {
-    "text": "Analyze this contract for risks.",
-    "category": {
-      "concept": "Category",
-      "content": {
-        "name": "legal",
-        "priority": "high"
-      }
-    },
-    "options": ["option1", "option2", "option3"],
-    "invoice": {
-      "concept": "accounting.Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00
-      }
+  "text": "Analyze this contract for risks.",
+  "category": {
+    "concept": "Category",
+    "content": {
+      "name": "legal",
+      "priority": "high"
+    }
+  },
+  "options": ["option1", "option2", "option3"],
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
     }
   }
 }

@@ -10,7 +10,7 @@ from typing import Annotated, Any
 import typer
 from mthds.runners.types import RunnerType
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
@@ -93,7 +93,7 @@ def run_bundle_cmd(
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
-    auto_inputs_path: str | None = None
+    auto_inputs_dir: Path | None = None
     target_path = Path(path)
 
     if target_path.is_dir():
@@ -114,9 +114,10 @@ def run_bundle_cmd(
                 )
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs file (used as low-priority fallback)
-        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-        auto_inputs_path = str(inputs_file) if inputs_file.is_file() else None
+        # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
+        # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and
+        # stdin are ruled out, so an ambiguous dir can't pre-empt an explicit flag or piped stdin.
+        auto_inputs_dir = target_path
 
         # Add directory as library dir (prepend to user-supplied list)
         target_dir_str = str(target_path)
@@ -155,7 +156,7 @@ def run_bundle_cmd(
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_path=auto_inputs_path)
+    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
 
     runner_type: RunnerType = ctx.obj["runner"]
 

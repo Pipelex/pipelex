@@ -1,10 +1,10 @@
 ---
-description: "Generate example input JSON for any pipe — see the expected input structure based on the pipe's declared input types in .mthds files."
+description: "Generate an example inputs template (JSON or TOML) for any pipe — see the expected input structure based on the pipe's declared input types in .mthds files."
 ---
 
 # Build Inputs
 
-Generate example input JSON for a pipe, showing the expected input structure based on the pipe's input types.
+Generate an example inputs template for a pipe, showing the expected input structure based on the pipe's input types. The template is emitted as JSON by default, or as TOML with `--format toml`.
 
 ## Usage
 
@@ -21,7 +21,8 @@ pipelex build inputs pipe <PIPE_CODE> [OPTIONS]
 **Options:**
 
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to `results/`)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to `results/`, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ### From a bundle
 
@@ -37,7 +38,8 @@ pipelex build inputs bundle <PATH> [OPTIONS]
 
 - `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to bundle's directory)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to the bundle's directory, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ### From an installed method
 
@@ -53,7 +55,8 @@ pipelex build inputs method <NAME> [OPTIONS]
 
 - `--pipe` - Pipe code (overrides method's `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file
+- `--output`, `-o` - Path to save the generated inputs file (filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
 
 ## Examples
 
@@ -93,9 +96,19 @@ pipelex build inputs pipe my_domain.my_pipe -L ./my_library/
 pipelex build inputs bundle my_bundle.mthds --output custom_inputs.json
 ```
 
+**Generate a TOML template instead of JSON:**
+
+```bash
+pipelex build inputs bundle my_bundle.mthds --format toml
+```
+
+When `--format toml` is selected and no explicit `--output` is given, the default filename becomes `inputs.toml` (instead of `inputs.json`).
+
 ## Output Format
 
-The generated JSON file contains all inputs required by the pipe, with example values based on each input's concept type:
+The generated file contains all inputs required by the pipe, with example values based on each input's concept type. Both formats carry the same structure — [`pipelex run`](../run.md#input-file-formats) accepts either.
+
+**JSON (`--format json`, default):**
 
 ```json
 {
@@ -114,6 +127,22 @@ The generated JSON file contains all inputs required by the pipe, with example v
 }
 ```
 
+**TOML (`--format toml`):**
+
+```toml
+[text_input]
+concept = "native.Text"
+
+[text_input.content]
+text = "text_value"
+
+[document_input]
+concept = "native.Document"
+
+[document_input.content]
+url = "url_value"
+```
+
 ### Multiplicity Support
 
 When an input has multiplicity (accepts multiple items), the content is wrapped in a list:
@@ -129,6 +158,16 @@ When an input has multiplicity (accepts multiple items), the content is wrapped 
     ]
   }
 }
+```
+
+In TOML, the same list of items uses the array-of-tables syntax:
+
+```toml
+[documents]
+concept = "native.Document"
+
+[[documents.content]]
+url = "url_value"
 ```
 
 ## Use Cases
