@@ -94,12 +94,22 @@ class TestStoragePlugin:
         assert isinstance(provider, expected_type)
 
     def test_gcp_factory_reads_credentials_from_the_hub_secrets_provider(self, mocker: MockerFixture) -> None:
-        """The gcp factory resolves GCP_CREDENTIALS_FILE_PATH from the hub secrets provider at the apply-point."""
+        """The gcp factory resolves GCP_CREDENTIALS_FILE_PATH from the hub secrets provider and passes it through."""
         fake_secrets = _FakeSecretsProvider(credentials_path="/secrets/gcp-creds.json")
         mocker.patch("pipelex.plugins.storage.storage_plugin.get_secrets_provider", return_value=fake_secrets)
+        # Spy the constructor (wraps → the real provider is still built and returned) to assert the
+        # resolved secret value flows through as credentials_file_path, not just that it was requested.
+        gcp_ctor = mocker.patch("pipelex.plugins.storage.storage_plugin.GcpStorageProvider", wraps=GcpStorageProvider)
 
+        gcp_config = make_gcp_config()
         registry = _build_storage_registry()
-        provider = registry.get_required(method=StorageMethod.GCP)(StorageProviderConfig(method=StorageMethod.GCP, gcp=make_gcp_config()))
+        provider = registry.get_required(method=StorageMethod.GCP)(StorageProviderConfig(method=StorageMethod.GCP, gcp=gcp_config))
 
         assert isinstance(provider, GcpStorageProvider)
         assert fake_secrets.requested_secret_ids == ["GCP_CREDENTIALS_FILE_PATH"]
+        gcp_ctor.assert_called_once_with(
+            bucket_name=gcp_config.bucket_name,
+            project_id=gcp_config.project_id,
+            credentials_file_path=fake_secrets.credentials_path,
+            signed_urls_lifespan=gcp_config.signed_urls_lifespan,
+        )

@@ -17,7 +17,7 @@ The [inference-backend](inference-backend-plugins.md) and [orchestrator](orchest
 
 > Plugins register N provider factories into a registry keyed by an open `method` token. At boot, core reads `storage_config.method`, looks that token up in the registry, and calls the factory to produce the one provider set on the hub.
 
-This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism backs the secrets provider seam.
+This is deliberately **not** a hub slot (those are orchestrator-coupled, claimed only when `boot_orchestrator == plugin.name`). Storage selection has nothing to do with the orchestrator, so it gets its own registry and its own config key. The same mechanism is planned to back the secrets provider seam in a follow-up (secrets is not yet registry-selected).
 
 ---
 
