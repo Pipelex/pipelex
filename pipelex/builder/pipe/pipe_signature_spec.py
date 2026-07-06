@@ -45,14 +45,17 @@ class PipeSignatureSpec(PipeSpec):
     """
 
     # Internal `PipeSpecUnion` discriminator, never written by the author and never rendered as a
-    # "type" line (a signature is typeless). `SkipJsonSchema` keeps it out of the authoring schema.
-    type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    # "type" line (a signature is typeless). `SkipJsonSchema` keeps it out of the authoring schema;
+    # `exclude=True` keeps it out of `model_dump()` so a dump→revalidate round-trip stays typeless and
+    # re-injects the tag (mirrors `PipeSignatureBlueprint.type`) instead of tripping the migration error.
+    type: SkipJsonSchema[Literal["PipeSignature"]] = Field(default="PipeSignature", exclude=True)
     # Spec-layer authoring tag only: NOT propagated by `to_blueprint()`, which leaves the blueprint
     # (and runtime) at `pipe_category = None` because a signature is outside the executable taxonomy.
     # Retained per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; no longer
     # surfaced in `rendered_pretty` (a signature now renders as "Signature (contract only)", with no
-    # type/category line).
-    pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    # type/category line). `exclude=True` (like `type`) keeps it out of `model_dump()` so it is not a
+    # stray key on a round-trip.
+    pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = Field(default="PipeSignature", exclude=True)
     signature_for: PipeType | None = Field(
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",

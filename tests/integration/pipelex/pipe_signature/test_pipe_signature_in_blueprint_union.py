@@ -128,6 +128,30 @@ class TestPipeSignatureBlueprintUnion:
         assert "add the appropriate `type`" in message
         assert "remove `prompt`" in message
 
+    def test_teaching_error_advertises_signature_for(self) -> None:
+        """The stray-key teaching message names `signature_for` as an allowed contract key, and does not
+        leak the internal `source` key the allowlist also admits.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            PipelexBundleBlueprint.model_validate(
+                {
+                    "domain": "sig_union_demo",
+                    "pipe": {
+                        "summarize_doc": {
+                            "description": "Contract with a hint plus a stray implementation field.",
+                            "inputs": {"doc": "SigUnionDoc"},
+                            "output": "SigUnionSummary",
+                            "signature_for": "PipeLLM",
+                            "model": "gpt",
+                        },
+                    },
+                }
+            )
+        message = str(exc_info.value)
+        assert "has no `type` but declares `model`" in message
+        assert "`signature_for`" in message
+        assert "`source`" not in message
+
     def test_typeless_section_missing_required_contract_field_still_errors(self) -> None:
         """A typeless section whose keys are all contract-legal but that omits a REQUIRED contract
         field (here `output`) is normalized to a signature and then fails the signature's own

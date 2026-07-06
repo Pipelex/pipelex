@@ -101,6 +101,48 @@ class TestPipelexBundleSpecTypelessSignature:
         assert "has no `type` but declares `source`" in message
         assert "Extra inputs are not permitted" not in message
 
+    def test_stray_key_message_advertises_signature_for(self) -> None:
+        """The teaching message names `signature_for` as a valid contract key (it is allowed), and does
+        not leak the internal `source` / `pipe_code` keys the allowlists also admit.
+        """
+        with pytest.raises(ValidationError) as exc_info:
+            _bundle_with_pipe(
+                {
+                    "pipe_code": "summarize_doc",
+                    "description": "Produces a summary of a document.",
+                    "output": "Summary",
+                    "signature_for": "PipeLLM",
+                    "model": "gpt",
+                }
+            )
+        message = str(exc_info.value)
+        assert "has no `type` but declares `model`" in message
+        assert "`signature_for`" in message
+        assert "`source`" not in message
+        assert "`pipe_code`" not in message
+
+    def test_signature_spec_survives_model_dump_revalidate_round_trip(self) -> None:
+        """A bundle spec with a typeless signature must survive `model_dump()` → re-validate. The
+        internal `type` / `pipe_category` discriminators must not serialize, else re-validation trips
+        the explicit-tag migration error (`type`) or the stray-key teaching error (`pipe_category`).
+        """
+        bundle_spec = _bundle_with_pipe(
+            {
+                "pipe_code": "summarize_doc",
+                "description": "Produces a summary of a document.",
+                "inputs": {"doc": "Document"},
+                "output": "Summary",
+            }
+        )
+        dumped = bundle_spec.model_dump()
+        sig_section = dumped["pipe"]["summarize_doc"]
+        assert "type" not in sig_section
+        assert "pipe_category" not in sig_section
+
+        reloaded = PipelexBundleSpec.model_validate(dumped)
+        assert reloaded.pipe is not None
+        assert isinstance(reloaded.pipe["summarize_doc"], PipeSignatureSpec)
+
     def test_invalid_pipe_dict_key_rejected_at_spec_level(self) -> None:
         """A non-snake_case pipe dict key is rejected cleanly by the before-validator (mirrors the
         blueprint), instead of slipping through to fail later during `to_blueprint()`.

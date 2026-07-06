@@ -78,6 +78,37 @@ class TestParsePipeSpec:
                 pipe_type=None,
             )
 
+    @pytest.mark.parametrize("alias", ["output_concept", "output_type"])
+    def test_typeless_spec_accepts_output_alias(self, alias: str) -> None:
+        """Output aliases are canonicalized before the typeless-signature contract check, so a signature
+        authored with `output_concept` / `output_type` is accepted — parity with typed pipes.
+        """
+        result = parse_pipe_spec(
+            {"pipe_code": "x", "description": "d", "inputs": {"doc": "Document"}, alias: "Article"},
+            pipe_type=None,
+        )
+        assert isinstance(result, PipeSignatureSpec)
+        assert result.output == "Article"
+
+    def test_typeless_spec_accepts_dict_output(self) -> None:
+        """A dict-shaped output (`{"type": ...}`) is flattened before the contract check for a signature."""
+        result = parse_pipe_spec(
+            {"pipe_code": "x", "description": "d", "inputs": {"doc": "Document"}, "output": {"type": "Article"}},
+            pipe_type=None,
+        )
+        assert isinstance(result, PipeSignatureSpec)
+        assert result.output == "Article"
+
+    def test_typeless_spec_stray_impl_field_still_rejected_after_output_normalization(self) -> None:
+        """Output normalization must not weaken the teaching error: a genuine implementation field on a
+        typeless spec still raises, naming the field.
+        """
+        with pytest.raises(ValueError, match="has no `type` but declares `model`"):
+            parse_pipe_spec(
+                {"pipe_code": "x", "description": "d", "inputs": {"doc": "Document"}, "output": "Article", "model": "gpt"},
+                pipe_type=None,
+            )
+
     # -- pipe_code aliases ------------------------------------------------
 
     def test_canonical_pipe_code(self) -> None:

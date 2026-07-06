@@ -26,6 +26,12 @@ PIPE_SIGNATURE_TYPE_TAG = "PipeSignature"
 # reuses it augmented with its structural `pipe_code` field (see `SIGNATURE_ONLY_SPEC_KEYS`).
 SIGNATURE_ONLY_KEYS: frozenset[str] = frozenset({"description", "inputs", "output", "signature_for", "source"})
 
+# The contract keys advertised to authors in the typeless-signature teaching message, in display order.
+# Deliberately NOT derived from `SIGNATURE_ONLY_KEYS` / `SIGNATURE_ONLY_SPEC_KEYS`: those admit internal
+# keys never written by an author (`source`, and the spec layer's structural `pipe_code`) that must not
+# leak into a user-facing message. Kept here so the message can never drift from the advertisable set.
+_ADVERTISABLE_SIGNATURE_KEYS: tuple[str, ...] = ("description", "inputs", "output", "signature_for")
+
 
 def explicit_signature_tag_migration_message(pipe_code: Any) -> str:
     """The migration error for a section that still writes the retired `type = "PipeSignature"` tag.
@@ -69,9 +75,10 @@ def normalize_typeless_signature_section(pipe_code: Any, *, pipe_section: Any, a
     stray_keys = [key for key in typed_section if key not in allowed_keys]
     if stray_keys:
         stray = ", ".join(f"`{key}`" for key in stray_keys)
+        allowed = ", ".join(f"`{key}`" for key in _ADVERTISABLE_SIGNATURE_KEYS)
         msg = (
             f"Pipe `{pipe_code}` has no `type` but declares {stray}. "
-            "A pipe with no `type` may declare only `description`, `inputs`, and `output` — that is a "
+            f"A pipe with no `type` may declare only {allowed} — that is a "
             "signature (contract only). To implement it, add the appropriate `type` (`PipeLLM`, `PipeImgGen`, …). "
             f"To keep it a contract, remove {stray}."
         )

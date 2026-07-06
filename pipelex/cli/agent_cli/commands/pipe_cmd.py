@@ -282,7 +282,16 @@ def pipe_cmd(
     if pipe_type is not None:
         resolved_pipe_type = pipe_type
     elif "type" in spec_data:
-        resolved_pipe_type = spec_data.pop("type")
+        raw_pipe_type = spec_data.pop("type")
+        if raw_pipe_type is None:
+            # A signature is authored by OMITTING the `type` key — an explicit null is not the same as
+            # absent, and must not silently collapse to a typeless signature.
+            agent_error(
+                "A JSON `type` key cannot be null. Delete the `type` key — a pipe with no `type` and no "
+                "implementation is a signature (contract only).",
+                error_type="ArgumentError",
+            )
+        resolved_pipe_type = raw_pipe_type
     else:
         resolved_pipe_type = None
 
