@@ -42,7 +42,6 @@ class TestSecretsProviderRegistry:
         registrar.add_secrets_provider(method="vault", factory=_fake_factory)
 
         registry = SecretsProviderRegistry(registrar.secrets_providers)
-        assert registry.get_optional(method="vault") is _fake_factory
         assert registry.get_required(method="vault") is _fake_factory
         assert registry.has(method="vault")
         assert registry.methods == ["vault"]
@@ -74,10 +73,9 @@ class TestSecretsProviderRegistry:
         assert "vault" in message
 
     def test_empty_registry_misses_every_method(self) -> None:
-        """A registry with no factories misses every method — soft via get_optional/has, loud via get_required."""
+        """A registry with no factories misses every method — soft via has, loud via get_required."""
         registry = SecretsProviderRegistry({})
 
-        assert registry.get_optional(method="env") is None
         assert not registry.has(method="env")
         assert registry.methods == []
         with pytest.raises(UnknownSecretsMethodError):

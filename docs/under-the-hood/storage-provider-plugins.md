@@ -123,7 +123,7 @@ method = "azure"          # an out-of-tree provider — no built-in sub-config r
 Whether that token names an *installed* provider is validated at **registry lookup**, not at parse: an unknown method surfaces as `UnknownStorageMethodError` at boot, which is the right layer — it lists the registered methods so the fix is obvious.
 
 !!! note "External-provider config surface is a scoped follow-up"
-    `StorageProviderConfig` has fixed, typed per-method sub-models, so an out-of-tree `azure` provider has nowhere to read *its* structured config yet. The seam for built-in methods lands first; a generic passthrough sub-config for external providers is a captured follow-up (Decision D3), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file.
+    `StorageProviderConfig` has fixed, typed per-method sub-models, so an out-of-tree `azure` provider has nowhere to read *its* structured config yet. The seam for built-in methods lands first; a generic passthrough sub-config for external providers is a captured follow-up (Decision D3), not built speculatively. Until it lands, an external provider reads its own config from the environment or its own file. **One live gap:** `StorageProviderConfig.uri_format` (read by `GeneratedContentFactory._build_storage_key` on every content store) is only defined for the four built-in methods and raises `StorageConfigError` for any other token — so an external provider selects and boots cleanly but a *generated-content store* through it fails until D3 gives external methods a `uri_format`. External providers are therefore usable today for their own direct storage API, not yet as the backing store for generated content.
 
 ---
 

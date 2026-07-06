@@ -75,6 +75,13 @@ def _test_integration_mode() -> IntegrationMode:
 
 
 class TestStorageExternalPlugin:
+    def test_explicit_storage_provider_wins_over_config_selection(self) -> None:
+        """An explicit setup() param is the exact provider on the hub, ahead of registry selection."""
+        explicit = _FakeExternalStorageProvider()
+        Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False, storage_provider=explicit)
+
+        assert get_storage_provider() is explicit
+
     def test_external_storage_method_is_discovered_and_selected_onto_the_hub(self, mocker: MockerFixture) -> None:
         """A fake entry point + a config naming its token boots with that external provider on the hub."""
         # The entry point resolves to the plugin class (a zero-arg factory); discovery instantiates it.

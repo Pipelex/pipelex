@@ -22,9 +22,6 @@ class StorageProviderRegistry:
     def __init__(self, storage_providers: dict[str, StorageProviderFactoryFn]):
         self._storage_providers: dict[str, StorageProviderFactoryFn] = dict(storage_providers)
 
-    def get_optional(self, *, method: str) -> StorageProviderFactoryFn | None:
-        return self._storage_providers.get(method)
-
     def get_required(self, *, method: str) -> StorageProviderFactoryFn:
         factory = self._storage_providers.get(method)
         if factory is None:

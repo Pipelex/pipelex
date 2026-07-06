@@ -9,7 +9,11 @@
 
 ### Changed
 
-- **Plugin API version bumped to 3 (Breaking):** `PLUGIN_API_VERSION` is now `3` (was `2`) to add the `add_storage_provider` and `add_secrets_provider` registrar menu methods. Plugin discovery version-checks with strict equality, so every external plugin must re-declare `targets_api = 3` — `pipelex-temporal` and `pipelex-mistralai-workflows` register no storage or secrets provider, so bumping their declared `targets_api` is the only change they need.
+- **Plugin API version bumped to 3 (Breaking):** `PLUGIN_API_VERSION` is now `3` (was `2`) to add the `add_storage_provider` and `add_secrets_provider` registrar menu methods. Plugin discovery version-checks with strict equality, so every external plugin must re-declare `targets_api = 3`. `pipelex-mistralai-workflows` registers no storage or secrets provider and imports none of the removed symbols, so the `targets_api` bump is its only change. `pipelex-temporal` needs the `targets_api` bump **and** a code migration: its payload-codec factory imports the now-removed `make_storage_provider_from_config` (see Removed) and must switch to resolving the provider via the storage-provider registry (`get_storage_provider_registry().get_required(method=...)`).
+
+### Removed
+
+- **`make_storage_provider_from_config` (Breaking):** The module-level storage-provider factory (`pipelex/tools/storage/storage_provider_factory.py`) is removed — storage is now resolved through the config-selected `StorageProviderRegistry` at boot. Downstream code that imported this helper (notably `pipelex-temporal`'s payload-codec factory) must select through the registry instead.
 
 ## [v0.37.0] - 2026-07-04
 

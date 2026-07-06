@@ -23,9 +23,6 @@ class SecretsProviderRegistry:
     def __init__(self, secrets_providers: dict[str, SecretsProviderFactoryFn]):
         self._secrets_providers: dict[str, SecretsProviderFactoryFn] = dict(secrets_providers)
 
-    def get_optional(self, *, method: str) -> SecretsProviderFactoryFn | None:
-        return self._secrets_providers.get(method)
-
     def get_required(self, *, method: str) -> SecretsProviderFactoryFn:
         factory = self._secrets_providers.get(method)
         if factory is None:

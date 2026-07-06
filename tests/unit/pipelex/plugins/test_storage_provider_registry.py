@@ -42,7 +42,6 @@ class TestStorageProviderRegistry:
         registrar.add_storage_provider(method="azure", factory=_fake_factory)
 
         registry = StorageProviderRegistry(registrar.storage_providers)
-        assert registry.get_optional(method="azure") is _fake_factory
         assert registry.get_required(method="azure") is _fake_factory
         assert registry.has(method="azure")
         assert registry.methods == ["azure"]
@@ -74,10 +73,9 @@ class TestStorageProviderRegistry:
         assert "s3" in message
 
     def test_empty_registry_misses_every_method(self) -> None:
-        """A registry with no factories misses every method — soft via get_optional/has, loud via get_required."""
+        """A registry with no factories misses every method — soft via has, loud via get_required."""
         registry = StorageProviderRegistry({})
 
-        assert registry.get_optional(method="local") is None
         assert not registry.has(method="local")
         assert registry.methods == []
         with pytest.raises(UnknownStorageMethodError):
