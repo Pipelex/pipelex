@@ -38,9 +38,13 @@ def build_absence_html(absence_record: AbsenceRecord) -> str:
 
 
 def build_absence_markdown(absence_record: AbsenceRecord) -> str:
-    """A human-readable absence summary with the provenance chain, as markdown."""
+    """A human-readable absence summary with the provenance chain, as markdown.
+
+    Headings start at H2: the agent CLI embeds this document under its run markdown's
+    ``## Result`` section, and an H1 there would give the composed document two titles.
+    """
     md_lines = [
-        "# Output absent",
+        "## Output absent",
         "",
         "The run completed with no value for its declared output.",
         "",
@@ -52,7 +56,7 @@ def build_absence_markdown(absence_record: AbsenceRecord) -> str:
         md_lines.append(f"- **Produced by:** pipe `{absence_record.producing_pipe}`")
     chain = absence_record.provenance_chain()
     if len(chain) > 1:
-        md_lines.extend(["", "## Provenance", ""])
+        md_lines.extend(["", "### Provenance", ""])
         for chain_index, chained_record in enumerate(chain):
             producer_suffix = f" (pipe `{chained_record.producing_pipe}`)" if chained_record.producing_pipe else ""
             md_lines.append(f"{chain_index + 1}. `{chained_record.variable_name}` — {chained_record.kind}: {chained_record.reason}{producer_suffix}")
