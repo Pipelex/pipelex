@@ -17,8 +17,6 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdo
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
@@ -95,7 +93,7 @@ def run_bundle_cmd(
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
-    auto_inputs_path: str | None = None
+    auto_inputs_dir: Path | None = None
     target_path = Path(path)
 
     if target_path.is_dir():
@@ -116,15 +114,10 @@ def run_bundle_cmd(
                 )
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs file, inputs.json or inputs.toml (used as low-priority fallback);
-        # skipped entirely when --inputs is given, so the ambiguity rule only bites on auto-detect
-        if inputs is None:
-            try:
-                auto_inputs_file = find_default_inputs_file(target_path)
-            except AmbiguousInputsFilesError as ambiguity_exc:
-                agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
-            if auto_inputs_file is not None:
-                auto_inputs_path = str(auto_inputs_file)
+        # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
+        # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and
+        # stdin are ruled out, so an ambiguous dir can't pre-empt an explicit flag or piped stdin.
+        auto_inputs_dir = target_path
 
         # Add directory as library dir (prepend to user-supplied list)
         target_dir_str = str(target_path)
@@ -163,7 +156,7 @@ def run_bundle_cmd(
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_path=auto_inputs_path)
+    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
 
     runner_type: RunnerType = ctx.obj["runner"]
 

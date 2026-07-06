@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 from pipelex.cli.commands.run._inputs_file_loader import resolve_inputs_arg_against_dir  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestResolveInputsArgAgainstDir:
@@ -20,6 +17,13 @@ class TestResolveInputsArgAgainstDir:
         """An absolute file path is untouched."""
         absolute = str(tmp_path / "inputs.toml")
         assert resolve_inputs_arg_against_dir(absolute, base_dir=tmp_path / "elsewhere") == absolute
+
+    def test_tilde_is_expanded(self, tmp_path: Path) -> None:
+        """A `~`-prefixed path expands to the home dir, not joined under base_dir."""
+        result = resolve_inputs_arg_against_dir("~/inputs.toml", base_dir=tmp_path)
+        assert result == str(Path("~/inputs.toml").expanduser())
+        assert "~" not in (result or "")
+        assert not (result or "").startswith(str(tmp_path))
 
     def test_inline_json_passes_through(self, tmp_path: Path) -> None:
         """Inline JSON (a `{` prefix) is untouched."""

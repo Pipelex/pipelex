@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Any, cast
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
+from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, InputsDatetimeNotSupportedError
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
@@ -118,23 +118,30 @@ def parse_cli_inputs(
     inputs_arg: str | None,
     *,
     stdin_fallback: bool = True,
-    auto_inputs_path: str | None = None,
+    auto_inputs_dir: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Parse pipeline inputs from CLI --inputs argument, stdin, or auto-detected path.
+    """Parse pipeline inputs from CLI --inputs argument, stdin, or an auto-detected directory.
 
     Resolution order:
 
     1. If ``inputs_arg`` is provided: parse as inline JSON (starts with ``{``) or file path.
     2. If ``inputs_arg`` is None and ``stdin_fallback`` is True and stdin is not a TTY:
        read JSON from stdin and resolve envelope format if present.
-    3. If ``auto_inputs_path`` is provided: parse it as a file path (lowest priority fallback).
+    3. If ``auto_inputs_dir`` is provided: probe it for a default inputs file
+       (``inputs.json`` / ``inputs.toml``) and parse it (lowest-priority fallback).
     4. Otherwise return None (no inputs).
+
+    The auto-detect probe — including its ``inputs.json``/``inputs.toml`` ambiguity
+    rule — runs only here, in step 3, so it can never pre-empt higher-priority
+    ``--inputs`` or piped stdin: the ambiguity error is surfaced only when the
+    auto-detected file is the source actually being used.
 
     Args:
         inputs_arg: The ``--inputs`` CLI argument value, or None.
         stdin_fallback: Whether to attempt reading from stdin when ``inputs_arg`` is None.
-        auto_inputs_path: Auto-detected inputs file path (e.g. from a directory target).
-            Only used as a last-resort fallback when both ``inputs_arg`` and stdin are absent.
+        auto_inputs_dir: Directory to probe for a default inputs file (e.g. a
+            directory target). Only consulted as a last-resort fallback when both
+            ``inputs_arg`` and stdin are absent.
 
     Returns:
         Parsed inputs dict, or None if no inputs are available.
@@ -147,8 +154,13 @@ def parse_cli_inputs(
         if stdin_inputs is not None:
             return stdin_inputs
 
-    if auto_inputs_path is not None:
-        return _parse_inputs_arg(auto_inputs_path)
+    if auto_inputs_dir is not None:
+        try:
+            auto_inputs_file = find_default_inputs_file(auto_inputs_dir)
+        except AmbiguousInputsFilesError as ambiguity_exc:
+            agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
+        if auto_inputs_file is not None:
+            return _parse_inputs_arg(str(auto_inputs_file))
 
     return None
 

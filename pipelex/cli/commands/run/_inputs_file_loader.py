@@ -52,9 +52,11 @@ def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
 def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) -> str | None:
     """Resolve a relative ``--inputs`` file path against ``base_dir``.
 
-    Inline JSON (a ``{`` prefix), absolute paths, and None pass through
-    unchanged. Shared by the ``run method`` commands of both CLI surfaces so
-    the resolve-against-the-method-dir rule cannot drift.
+    Inline JSON (a ``{`` prefix) and None pass through unchanged. A file path
+    has ``~`` expanded first; if it is then absolute it is returned as-is,
+    otherwise it is joined onto ``base_dir``. Shared by the ``run method``
+    commands of both CLI surfaces so the resolve-against-the-method-dir rule
+    cannot drift.
 
     Args:
         inputs_arg: The raw ``--inputs`` CLI argument value, or None.
@@ -65,9 +67,12 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
     """
     if not inputs_arg or inputs_arg.startswith("{"):
         return inputs_arg
-    inputs_path = Path(inputs_arg)
+    # expanduser so a quoted/`=`-form `~/inputs.toml` resolves to the home dir, not a literal `~` component
+    # (matches the --save-csv handling in _run_core.py). Return the expanded path in both branches, since
+    # nothing downstream re-expands it.
+    inputs_path = Path(inputs_arg).expanduser()
     if inputs_path.is_absolute():
-        return inputs_arg
+        return str(inputs_path)
     return str(base_dir / inputs_path)
 
 

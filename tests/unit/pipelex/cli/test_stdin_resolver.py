@@ -350,11 +350,11 @@ class TestStdinResolver:
         assert envelope["error_type"] == "JSONDecodeError"
 
     # -------------------------------------------------------------------------
-    # auto_inputs_path precedence tests
+    # auto_inputs_dir precedence tests
     # -------------------------------------------------------------------------
 
     def test_stdin_beats_auto_detected_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin has data and auto_inputs_path is set, stdin wins."""
+        """When stdin has data and auto_inputs_dir is set, stdin wins."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -363,11 +363,11 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_stdin": True}
 
     def test_explicit_inputs_beats_stdin_and_auto(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When inputs_arg, stdin, and auto_inputs_path are all set, inputs_arg wins."""
+        """When inputs_arg, stdin, and auto_inputs_dir are all set, inputs_arg wins."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -378,12 +378,12 @@ class TestStdinResolver:
 
         result = parse_cli_inputs(
             inputs_arg='{"from_arg": true}',
-            auto_inputs_path=str(auto_file),
+            auto_inputs_dir=tmp_path,
         )
         assert result == {"from_arg": True}
 
     def test_empty_stdin_falls_back_to_auto_inputs_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin is non-TTY but empty and auto_inputs_path is set, auto path is used."""
+        """When stdin is non-TTY but empty and auto_inputs_dir is set, the auto-detected file is used."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -391,11 +391,11 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_auto": True}
 
     def test_auto_detected_path_used_when_no_stdin(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin is a TTY and auto_inputs_path is set, auto path is used."""
+        """When stdin is a TTY and auto_inputs_dir is set, the auto-detected file is used."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -403,5 +403,39 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: True  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_auto": True}
+
+    def test_stdin_beats_ambiguous_auto_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """Piped stdin outranks auto-detect, so an ambiguous dir (both files) does NOT raise."""
+        (tmp_path / "inputs.json").write_text('{"from_auto": true}')
+        (tmp_path / "inputs.toml").write_text("from_auto = true\n")
+
+        stdin_data = json.dumps({"from_stdin": True})
+        mock_stdin = io.StringIO(stdin_data)
+        mock_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
+        assert result == {"from_stdin": True}
+
+    def test_ambiguous_auto_dir_raises_when_no_stdin(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """With no stdin and both default files present, auto-detect is the active source and emits the ambiguity envelope."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        (tmp_path / "inputs.json").write_text('{"from_auto": true}')
+        (tmp_path / "inputs.toml").write_text("from_auto = true\n")
+
+        mock_stdin = io.StringIO("")
+        mock_stdin.isatty = lambda: True  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "AmbiguousInputsFilesError"
+        assert envelope["error_domain"] == "input"
+        assert "--inputs" in envelope["hint"]

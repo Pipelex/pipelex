@@ -75,6 +75,23 @@ class TestAgentRunBundleAutoInputs:
         assert "--inputs" in envelope["hint"]
         run_core_mock.assert_not_called()
 
+    def test_piped_stdin_preempts_ambiguous_auto_detect(
+        self, mocker: MockerFixture, bundle_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Piped stdin supplies inputs and outranks auto-detect, so an ambiguous dir does NOT error."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        run_core_mock = self._patch_run(mocker, {"answer": "42"})
+        (bundle_dir / "inputs.json").write_text('{"topic": "fromjson"}', encoding="utf-8")
+        (bundle_dir / "inputs.toml").write_text('topic = "fromtoml"\n', encoding="utf-8")
+        piped_stdin = io.StringIO('{"topic": "fromstdin"}')
+        piped_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", piped_stdin)
+
+        run_bundle_cmd(ctx=self._make_ctx(mocker), path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
+
+        capsys.readouterr()
+        assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "fromstdin"}
+
     @pytest.mark.usefixtures("tty_stdin")
     def test_explicit_inputs_bypasses_ambiguity(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """An explicit --inputs skips the probe entirely, even with both default files present."""
