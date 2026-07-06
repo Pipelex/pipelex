@@ -1,7 +1,8 @@
 from typing import Any
 
 import httpx
-from mistralai import Mistral, MistralError
+from mistralai.client import Mistral
+from mistralai.client.errors import MistralError
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError

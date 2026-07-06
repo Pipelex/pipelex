@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING
 
 import httpx
 import pytest
-from mistralai import Mistral, MistralError
+from mistralai.client import Mistral
+from mistralai.client.errors import MistralError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture

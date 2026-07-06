@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import pytest
-from mistralai.models import DocumentURLChunk, ImageURLChunk, SystemMessage, TextChunk, UsageInfo, UserMessage
+from mistralai.client.models import DocumentURLChunk, ImageURLChunk, SystemMessage, TextChunk, UsageInfo, UserMessage
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.usage.token_category import TokenCategory

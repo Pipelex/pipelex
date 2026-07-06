@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`mistralai` bumped to 2.x (`>=2.4.4`).** The Mistral provider (LLM + OCR/extract workers, factory, config) is migrated to the mistralai 2.x client layout (`mistralai.client.*`), making `pipelex[mistralai]` co-installable with the Mistral Workflows SDK (`mistralai-workflows`), which resolves mistralai 2.x. While the upstream `instructor` release lacks mistralai-2.x support, `instructor` is pinned to a git fork via `[tool.uv.sources]` — so this work must not be published until [567-labs/instructor#2298](https://github.com/567-labs/instructor/pull/2298) ships to PyPI. Local/editable use is unaffected.
+
 ## [v0.37.0] - 2026-07-04
 
 ### Highlights

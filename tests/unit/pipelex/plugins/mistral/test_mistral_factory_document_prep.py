@@ -13,7 +13,7 @@ from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttp
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from mistralai import Mistral
+    from mistralai.client import Mistral
     from pytest_mock import MockerFixture
 
 PNG_FILE_TYPE = FileType(extension="png", mime="image/png")

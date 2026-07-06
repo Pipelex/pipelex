@@ -91,7 +91,7 @@ google-genai = [
 ]
 huggingface = ["huggingface_hub>=1.5.0,<2.0.0"]
 linkup = ["linkup-sdk>=0.12.0"]
-mistralai = ["mistralai>=1.12.0"]
+mistralai = ["mistralai>=2.4.4"]
 dynamodb = ["boto3>=1.34.131"]
 s3 = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 docs = [
@@ -472,6 +472,11 @@ convention = "google"
 
 [tool.uv]
 required-version = ">=0.7.2"
+
+[tool.uv.sources]
+# Temporary: pin to fork that adds mistralai 2.x support. Revert to PyPI release once
+# https://github.com/567-labs/instructor/pull/2298 is merged and published.
+instructor = { git = "https://github.com/Ian321/instructor.git", rev = "4ea22d2396ca35514929f27faed866115e8b3583" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]

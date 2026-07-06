@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 
 import pytest
-from mistralai.models import OCRImageObject, OCRPageObject, OCRResponse, OCRUsageInfo
+from mistralai.client.models import OCRImageObject, OCRPageObject, OCRResponse, OCRUsageInfo
 
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
