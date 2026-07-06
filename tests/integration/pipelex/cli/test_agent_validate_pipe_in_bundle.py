@@ -32,7 +32,6 @@ output = "Text"
 prompt = "Extract text from $doc."
 
 [pipe.draft_pipe]
-type = "PipeSignature"
 description = "Unrelated draft signature, reached by nothing."
 inputs = { note = "SliceNote" }
 output = "SliceNote"
@@ -82,7 +81,6 @@ output = "CallerSummary"
 steps = [ { pipe = "summary_sig", result = "summary" } ]
 
 [pipe.summary_sig]
-type = "PipeSignature"
 description = "Signature placeholder for the summary step."
 inputs = { doc = "CallerDoc" }
 output = "CallerSummary"

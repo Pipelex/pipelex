@@ -31,7 +31,6 @@ output = "CliSummary"
 steps = [ { pipe = "summary_sig", result = "summary" } ]
 
 [pipe.summary_sig]
-type = "PipeSignature"
 description = "Signature placeholder for the summary step."
 inputs = { doc = "CliDoc" }
 output = "CliSummary"
@@ -45,7 +44,6 @@ CliDoc = "A document used in CLI signature tests."
 CliSummary = "A summary used in CLI signature tests."
 
 [pipe.orphan_sig]
-type = "PipeSignature"
 description = "Orphan signature with no caller."
 inputs = { doc = "CliDoc" }
 output = "CliSummary"

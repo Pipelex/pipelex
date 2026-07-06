@@ -27,7 +27,6 @@ output = "AgentSummary"
 steps = [ { pipe = "agent_sig", result = "summary" } ]
 
 [pipe.agent_sig]
-type = "PipeSignature"
 description = "Signature placeholder."
 inputs = { doc = "AgentDoc" }
 output = "AgentSummary"
