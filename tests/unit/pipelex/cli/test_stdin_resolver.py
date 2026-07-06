@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import io
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs, resolve_stdin_inputs
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestStdinResolver:
@@ -289,11 +293,68 @@ class TestStdinResolver:
         assert exc_info.value.exit_code == 1
 
     # -------------------------------------------------------------------------
-    # auto_inputs_path precedence tests
+    # TOML inputs file tests (.toml suffix routes through the TOML parser)
+    # -------------------------------------------------------------------------
+
+    def test_inputs_toml_file_path(self, tmp_path: Path) -> None:
+        """--inputs with a .toml file path loads TOML, multi-line strings preserved."""
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text('[contract_text]\nconcept = "Text"\ncontent = """\nFirst line.\nSecond line.\n"""\n', encoding="utf-8")
+
+        result = parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert result == {"contract_text": {"concept": "Text", "content": "First line.\nSecond line.\n"}}
+
+    def test_inputs_toml_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid TOML in a .toml inputs file emits a TomlError envelope with input domain."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text("topic = \n", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "TomlError"
+        assert envelope["error_domain"] == "input"
+        assert "hint" in envelope
+
+    def test_inputs_toml_datetime_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A TOML datetime input emits the not-supported envelope with the quote-as-string hint."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        toml_file = tmp_path / "inputs.toml"
+        toml_file.write_text("deadline = 2026-07-06T12:00:00Z\n", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(toml_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "InputsDatetimeNotSupportedError"
+        assert envelope["error_domain"] == "input"
+        assert "deadline" in envelope["message"]
+        assert "Quote the datetime as a string" in envelope["hint"]
+
+    def test_inputs_json_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid JSON in a .json inputs file emits a JSONDecodeError envelope (not a raw traceback)."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        json_file = tmp_path / "inputs.json"
+        json_file.write_text("{not valid json", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=str(json_file))
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "JSONDecodeError"
+
+    # -------------------------------------------------------------------------
+    # auto_inputs_dir precedence tests
     # -------------------------------------------------------------------------
 
     def test_stdin_beats_auto_detected_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin has data and auto_inputs_path is set, stdin wins."""
+        """When stdin has data and auto_inputs_dir is set, stdin wins."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -302,11 +363,11 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_stdin": True}
 
     def test_explicit_inputs_beats_stdin_and_auto(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When inputs_arg, stdin, and auto_inputs_path are all set, inputs_arg wins."""
+        """When inputs_arg, stdin, and auto_inputs_dir are all set, inputs_arg wins."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -317,12 +378,12 @@ class TestStdinResolver:
 
         result = parse_cli_inputs(
             inputs_arg='{"from_arg": true}',
-            auto_inputs_path=str(auto_file),
+            auto_inputs_dir=tmp_path,
         )
         assert result == {"from_arg": True}
 
     def test_empty_stdin_falls_back_to_auto_inputs_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin is non-TTY but empty and auto_inputs_path is set, auto path is used."""
+        """When stdin is non-TTY but empty and auto_inputs_dir is set, the auto-detected file is used."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -330,11 +391,11 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_auto": True}
 
     def test_auto_detected_path_used_when_no_stdin(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
-        """When stdin is a TTY and auto_inputs_path is set, auto path is used."""
+        """When stdin is a TTY and auto_inputs_dir is set, the auto-detected file is used."""
         auto_file = tmp_path / "inputs.json"
         auto_file.write_text('{"from_auto": true}')
 
@@ -342,5 +403,39 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: True  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
-        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
         assert result == {"from_auto": True}
+
+    def test_stdin_beats_ambiguous_auto_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """Piped stdin outranks auto-detect, so an ambiguous dir (both files) does NOT raise."""
+        (tmp_path / "inputs.json").write_text('{"from_auto": true}')
+        (tmp_path / "inputs.toml").write_text("from_auto = true\n")
+
+        stdin_data = json.dumps({"from_stdin": True})
+        mock_stdin = io.StringIO(stdin_data)
+        mock_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
+        assert result == {"from_stdin": True}
+
+    def test_ambiguous_auto_dir_raises_when_no_stdin(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """With no stdin and both default files present, auto-detect is the active source and emits the ambiguity envelope."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        (tmp_path / "inputs.json").write_text('{"from_auto": true}')
+        (tmp_path / "inputs.toml").write_text("from_auto = true\n")
+
+        mock_stdin = io.StringIO("")
+        mock_stdin.isatty = lambda: True  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "AmbiguousInputsFilesError"
+        assert envelope["error_domain"] == "input"
+        assert "--inputs" in envelope["hint"]

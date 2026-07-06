@@ -176,6 +176,17 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
         return "\n" + "\n".join(lines)
 
+    def build_inputs_template(self) -> dict[str, Any]:
+        """Build the inputs template dict: variable name -> example stuff representation.
+
+        Returns:
+            Dictionary mapping each input variable to its generated example value
+        """
+        template: dict[str, Any] = {}
+        for var_name, stuff_spec in self.root.items():
+            template[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+        return template
+
     def render_inputs(self, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
@@ -185,8 +196,4 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         Returns:
             Formatted JSON string with all inputs
         """
-        json_inputs: dict[str, Any] = {}
-        for var_name, stuff_spec in self.root.items():
-            json_inputs[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
-
-        return json.dumps(json_inputs, indent=indent, ensure_ascii=False)
+        return json.dumps(self.build_inputs_template(), indent=indent, ensure_ascii=False)

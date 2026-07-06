@@ -87,6 +87,8 @@ own page. Classes are grouped by subsystem.
 
 ## CLI
 
+- [`AmbiguousInputsFilesError`](ambiguous-inputs-files-error.md) — Ambiguous inputs files
+- [`InputsDatetimeNotSupportedError`](inputs-datetime-not-supported-error.md) — Inputs datetime not supported
 - [`PipelexCLIError`](pipelex-cli-error.md) — Pipelex CLI
 - [`ReadinessCheckError`](readiness-check-error.md) — Readiness check
 

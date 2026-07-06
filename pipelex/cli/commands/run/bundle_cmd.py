@@ -5,8 +5,10 @@ from typing import Annotated
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
+from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
@@ -145,11 +147,16 @@ def run_bundle_cmd(
                 raise typer.Exit(1)
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs if --inputs not explicitly provided
-        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-        if not inputs and inputs_file.is_file():
-            inputs = str(inputs_file)
-            typer.echo(f"Auto-detected inputs: {inputs}")
+        # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
+        if not inputs:
+            try:
+                inputs_file = find_default_inputs_file(target_path)
+            except AmbiguousInputsFilesError as ambiguity_exc:
+                typer.secho(f"Failed to run: {ambiguity_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from ambiguity_exc
+            if inputs_file is not None:
+                inputs = str(inputs_file)
+                typer.echo(f"Auto-detected inputs: {inputs}")
 
         # Add directory as library dir
         target_dir_str = str(target_path)

@@ -8,6 +8,7 @@ import typer
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_bundle_cmd(
@@ -29,16 +30,21 @@ def build_inputs_bundle_cmd(
     ] = None,
     output_path: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save the generated JSON file (defaults to bundle's directory)"),
+        typer.Option("--output", "-o", help="Path to save the generated inputs file (defaults to bundle's directory)"),
     ] = None,
+    template_format: Annotated[
+        InputsTemplateFormat,
+        typer.Option("--format", help="Format of the generated inputs template (json or toml)"),
+    ] = InputsTemplateFormat.JSON,
 ) -> None:
-    """Generate example input JSON from a bundle file or pipeline directory.
+    """Generate an example inputs template from a bundle file or pipeline directory.
 
     Examples:
         pipelex build inputs bundle my_bundle.mthds
         pipelex build inputs bundle pipeline_01/
         pipelex build inputs bundle my_bundle.mthds --pipe my_pipe
         pipelex build inputs bundle pipeline_01/ --output custom_inputs.json
+        pipelex build inputs bundle pipeline_01/ --format toml
     """
     target_path = Path(path)
     bundle_path: Path
@@ -95,4 +101,5 @@ def build_inputs_bundle_cmd(
         bundle_path=bundle_path,
         output_path=output_path_path,
         library_dir=library_dir,
+        template_format=template_format,
     )
