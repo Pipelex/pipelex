@@ -29,6 +29,11 @@ class TestResolveInputsArgAgainstDir:
         """Inline JSON (a `{` prefix) is untouched."""
         assert resolve_inputs_arg_against_dir('{"topic": "cats"}', base_dir=tmp_path) == '{"topic": "cats"}'
 
+    def test_uri_passes_through(self, tmp_path: Path) -> None:
+        """A URI-scheme string is preserved unchanged, not mangled into a broken local path under base_dir."""
+        assert resolve_inputs_arg_against_dir("https://example.com/inputs.json", base_dir=tmp_path) == "https://example.com/inputs.json"
+        assert resolve_inputs_arg_against_dir("s3://bucket/inputs.json", base_dir=tmp_path) == "s3://bucket/inputs.json"
+
     def test_none_passes_through(self, tmp_path: Path) -> None:
         """None (no --inputs given) is untouched."""
         assert resolve_inputs_arg_against_dir(None, base_dir=tmp_path) is None

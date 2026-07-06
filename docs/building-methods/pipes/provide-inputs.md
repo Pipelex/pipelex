@@ -104,9 +104,7 @@ The simplest case - just provide a string directly:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_text": "my text"
-  }
+  "my_text": "my text"
 }
 ```
 
@@ -126,9 +124,7 @@ Provide multiple text items as a list:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_texts": ["my text1", "my text2", "my text3"]
-  }
+  "my_texts": ["my text1", "my text2", "my text3"]
 }
 ```
 
@@ -241,11 +237,9 @@ Use the explicit format `{"concept": "...", "content": "..."}` when you need pre
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "text": {
-      "concept": "Text",
-      "content": "my text"
-    }
+  "text": {
+    "concept": "Text",
+    "content": "my text"
   }
 }
 ```
@@ -270,11 +264,9 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "documents": {
-      "concept": "Text",
-      "content": ["text1", "text2", "text3"]
-    }
+  "documents": {
+    "concept": "Text",
+    "content": ["text1", "text2", "text3"]
   }
 }
 ```
@@ -286,14 +278,12 @@ inputs = {
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoice_data": {
-      "concept": "Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00,
-        "date": "2025-10-20"
-      }
+  "invoice_data": {
+    "concept": "Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00,
+      "date": "2025-10-20"
     }
   }
 }
@@ -336,20 +326,18 @@ This explicitly tells Pipelex to use the `Invoice` concept from the `accounting`
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "invoices": {
-      "concept": "Invoice",
-      "content": [
-        {
-          "invoice_number": "INV-001",
-          "amount": 1250.00
-        },
-        {
-          "invoice_number": "INV-002",
-          "amount": 890.00
-        }
-      ]
-    }
+  "invoices": {
+    "concept": "Invoice",
+    "content": [
+      {
+        "invoice_number": "INV-001",
+        "amount": 1250.00
+      },
+      {
+        "invoice_number": "INV-002",
+        "amount": 890.00
+      }
+    ]
   }
 }
 ```
@@ -363,15 +351,13 @@ Provide structured data as a dictionary:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "person": {
-      "concept": "PersonInfo",
-      "content": {
-        "arg1": "something",
-        "arg2": 1,
-        "arg3": {
-          "arg4": "something else"
-        }
+  "person": {
+    "concept": "PersonInfo",
+    "content": {
+      "arg1": "something",
+      "arg2": 1,
+      "arg3": {
+        "arg4": "something else"
       }
     }
   }
@@ -389,22 +375,20 @@ The system will:
 **JSON Format:**
 ```json
 {
-  "inputs": {
-    "people": {
-      "concept": "PersonInfo",
-      "content": [
-        {
-          "arg1": "something",
-          "arg2": 1,
-          "arg3": {"arg4": "something else"}
-        },
-        {
-          "arg1": "something else",
-          "arg2": 2,
-          "arg3": {"arg4": "something else else"}
-        }
-      ]
-    }
+  "people": {
+    "concept": "PersonInfo",
+    "content": [
+      {
+        "arg1": "something",
+        "arg2": 1,
+        "arg3": {"arg4": "something else"}
+      },
+      {
+        "arg1": "something else",
+        "arg2": 2,
+        "arg3": {"arg4": "something else else"}
+      }
+    ]
   }
 }
 ```
@@ -570,22 +554,20 @@ inputs = {
 
 ```json
 {
-  "inputs": {
-    "text": "Analyze this contract for risks.",
-    "category": {
-      "concept": "Category",
-      "content": {
-        "name": "legal",
-        "priority": "high"
-      }
-    },
-    "options": ["option1", "option2", "option3"],
-    "invoice": {
-      "concept": "accounting.Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00
-      }
+  "text": "Analyze this contract for risks.",
+  "category": {
+    "concept": "Category",
+    "content": {
+      "name": "legal",
+      "priority": "high"
+    }
+  },
+  "options": ["option1", "option2", "option3"],
+  "invoice": {
+    "concept": "accounting.Invoice",
+    "content": {
+      "invoice_number": "INV-001",
+      "amount": 1250.00
     }
   }
 }

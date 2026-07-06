@@ -49,6 +49,14 @@ class TestInputsFileLoader:
 
         assert load_inputs_dict_from_path(inputs_file) == {"key": "value"}
 
+    @pytest.mark.parametrize("file_name", ["inputs.TOML", "inputs.Toml"])
+    def test_uppercase_toml_suffix_routes_to_toml(self, tmp_path: Path, file_name: str) -> None:
+        """The .toml suffix match is case-insensitive, so an uppercase suffix still parses as TOML."""
+        inputs_file = tmp_path / file_name
+        inputs_file.write_text('topic = "cats"\ncount = 3\n', encoding="utf-8")
+
+        assert load_inputs_dict_from_path(inputs_file) == {"topic": "cats", "count": 3}
+
     def test_toml_syntax_error_raises_toml_error(self, tmp_path: Path) -> None:
         """Invalid TOML surfaces a TomlError naming the file."""
         inputs_file = tmp_path / "inputs.toml"

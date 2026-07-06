@@ -41,7 +41,7 @@ def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
             datetime/date/time instance (no native concept support yet).
     """
     inputs_dict: dict[str, Any]
-    if path.suffix == TOML_SUFFIX:
+    if path.suffix.lower() == TOML_SUFFIX:
         inputs_dict = load_toml_from_path(path)
     else:
         inputs_dict = load_json_dict_from_path(path)
@@ -52,7 +52,8 @@ def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
 def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) -> str | None:
     """Resolve a relative ``--inputs`` file path against ``base_dir``.
 
-    Inline JSON (a ``{`` prefix) and None pass through unchanged. A file path
+    Inline JSON (a ``{`` prefix), URI-scheme strings (containing ``://``, e.g.
+    ``https://...``/``s3://...``) and None pass through unchanged. A file path
     has ``~`` expanded first; if it is then absolute it is returned as-is,
     otherwise it is joined onto ``base_dir``. Shared by the ``run method``
     commands of both CLI surfaces so the resolve-against-the-method-dir rule
@@ -65,7 +66,7 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
     Returns:
         The resolved ``--inputs`` value, same form as the input.
     """
-    if not inputs_arg or inputs_arg.startswith("{"):
+    if not inputs_arg or inputs_arg.startswith("{") or "://" in inputs_arg:
         return inputs_arg
     # expanduser so a quoted/`=`-form `~/inputs.toml` resolves to the home dir, not a literal `~` component
     # (matches the --save-csv handling in _run_core.py). Return the expanded path in both branches, since
