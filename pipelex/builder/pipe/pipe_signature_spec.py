@@ -44,12 +44,18 @@ class PipeSignatureSpec(PipeSpec):
           cannot be selected here.
     """
 
-    type: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
-    # Spec-layer display/authoring tag only: NOT propagated by `to_blueprint()`, which leaves the
-    # blueprint (and runtime) at `pipe_category = None` because a signature is outside the executable
-    # taxonomy. Kept per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; it only
-    # surfaces in `rendered_pretty` below.
-    pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = "PipeSignature"
+    # Internal `PipeSpecUnion` discriminator, never written by the author and never rendered as a
+    # "type" line (a signature is typeless). `SkipJsonSchema` keeps it out of the authoring schema;
+    # `exclude=True` keeps it out of `model_dump()` so a dump→revalidate round-trip stays typeless and
+    # re-injects the tag (mirrors `PipeSignatureBlueprint.type`) instead of tripping the migration error.
+    type: SkipJsonSchema[Literal["PipeSignature"]] = Field(default="PipeSignature", exclude=True)
+    # Spec-layer authoring tag only: NOT propagated by `to_blueprint()`, which leaves the blueprint
+    # (and runtime) at `pipe_category = None` because a signature is outside the executable taxonomy.
+    # Retained per the scope decision in wip/recursivity/signature-taxonomy-refactor.md; no longer
+    # surfaced in `rendered_pretty` (a signature now renders as "Signature (contract only)", with no
+    # type/category line). `exclude=True` (like `type`) keeps it out of `model_dump()` so it is not a
+    # stray key on a round-trip.
+    pipe_category: SkipJsonSchema[Literal["PipeSignature"]] = Field(default="PipeSignature", exclude=True)
     signature_for: PipeType | None = Field(
         default=None,
         description="Intended downstream pipe type when this signature is implemented (optional hint for agents).",
@@ -70,7 +76,7 @@ class PipeSignatureSpec(PipeSpec):
         if title:
             pipe_group.renderables.append(Text(title, style="bold"))
         pipe_group.renderables.append(Text.from_markup(f"Pipe Signature: [red]{escape(self.pipe_code)}[/red]\n", style="bold"))
-        pipe_group.renderables.append(Text.from_markup(f"Type: [bold magenta]{self.type}[/bold magenta] ({self.pipe_category})\n"))
+        pipe_group.renderables.append(Text.from_markup("[bold magenta]Signature[/bold magenta] (contract only)\n"))
         pipe_group.renderables.append(Text.from_markup(f"Description: [yellow italic]{escape(self.description)}[/yellow italic]\n"))
 
         if not self.inputs:

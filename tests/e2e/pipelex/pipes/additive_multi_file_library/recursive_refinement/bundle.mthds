@@ -16,7 +16,6 @@ key_findings = { type = "list", item_type = "text", description = "Bullet list o
 # `write_research_brief.mthds` file — `main_pipe` is a reference, not the implementation. This root
 # file is written once and never rewritten.
 [pipe.write_research_brief]
-type          = "PipeSignature"
 description   = "Read a source document and produce a concise research brief capturing its key findings."
 inputs        = { document = "Document" }
 output        = "ResearchBrief"

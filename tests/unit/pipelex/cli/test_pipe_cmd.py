@@ -9,11 +9,16 @@ and integration of parse_pipe_spec with the CLI output path.
 
 from __future__ import annotations
 
+import json
 from typing import Any, ClassVar
+
+import pytest
+import typer
 
 from pipelex.builder.operations.pipe_ops import parse_pipe_spec
 from pipelex.cli.agent_cli.commands.pipe_cmd import (
     _pipe_spec_to_toml,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    pipe_cmd,
 )
 
 
@@ -45,6 +50,29 @@ class TestCliPipeCmd:
         pipe_type = spec.pop("type")
         result = parse_pipe_spec(spec, pipe_type=pipe_type)
         assert result.pipe_code == "test"
+
+    def test_typeless_spec_renders_signature_without_type_line(self) -> None:
+        """No type resolved (typeless) → a signature; the CLI TOML omits the `type` line entirely."""
+        spec = parse_pipe_spec(
+            {"pipe_code": "summarize_doc", "description": "Summarize a doc.", "inputs": {"doc": "Document"}, "output": "Text"},
+            pipe_type=None,
+        )
+        toml = _pipe_spec_to_toml(spec)
+        assert "[pipe.summarize_doc]" in toml
+        assert "type =" not in toml
+
+    def test_explicit_null_type_rejected(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """An explicit `"type": null` in the JSON spec is rejected — a signature is authored by omitting
+        the `type` key, not by nulling it (teaching-consistent with the explicit-tag rejection). Present
+        null must not silently collapse to a typeless signature.
+        """
+        spec = json.dumps({"pipe_code": "summarize_doc", "description": "d", "inputs": {"doc": "Document"}, "output": "Text", "type": None})
+        with pytest.raises(typer.Exit):
+            pipe_cmd(spec=spec)
+        captured = capsys.readouterr()
+        combined = captured.err + captured.out
+        assert "ArgumentError" in combined
+        assert "type" in combined
 
     # -- CLI TOML serialization (uses format_toml_string) -----------------
 

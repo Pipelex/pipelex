@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -9,6 +9,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -124,14 +125,29 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("pipe", mode="before")
     @classmethod
-    def validate_pipe_keys(cls, pipe: dict[str, PipeBlueprintUnion] | None) -> dict[str, PipeBlueprintUnion] | None:
+    def validate_pipe_keys(cls, pipe: Any) -> Any:
+        """Validate pipe codes and normalize typeless sections before the discriminated union runs.
+
+        A `[pipe.x]` section with no `type` whose keys are exactly the signature contract
+        (`SIGNATURE_ONLY_KEYS`) is normalized by injecting the internal `PipeSignature`
+        discriminator, so the union routes it to `PipeSignatureBlueprint` — the author never writes
+        the tag. A typeless section that declares anything more is describing an implementation
+        without naming its type, which is a hard error. A section that already names a `type` (or is
+        an already-built blueprint instance rather than a raw dict) passes through untouched.
+        """
         if pipe is None:
             return None
-        for pipe_code in pipe:
-            if not is_pipe_code_valid(pipe_code=pipe_code):
+        if not isinstance(pipe, dict):
+            # Let the field type raise its own "should be a dict" error.
+            return pipe
+        typed_pipe = cast("dict[Any, Any]", pipe)
+        normalized: dict[Any, Any] = {}
+        for pipe_code, pipe_section in typed_pipe.items():
+            if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 raise ValueError(msg)
-        return pipe
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section)
+        return normalized
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":

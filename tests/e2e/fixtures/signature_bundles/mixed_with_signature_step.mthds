@@ -13,7 +13,6 @@ output      = "Text"
 prompt      = "Extract text from $doc."
 
 [pipe.summarize_extracted]
-type        = "PipeSignature"
 description = "Summarize extracted text (contract only)."
 inputs      = { extracted = "Text" }
 output      = "MixSummary"
