@@ -1,9 +1,10 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Storage vertical DONE. Secrets vertical Phases 3–4 DONE + Checkpoints 3–4 CLEARED.** Only Phase 5 (release gating / cross-repo bookkeeping) remains. Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **TRACK COMPLETE. All 5 phases DONE + all 5 Checkpoints CLEARED.** Both provider verticals (storage + secrets) shipped as config-selected plugin seams; Phase 5 (release gating / cross-repo bookkeeping) done and Checkpoint 5 (final whole-branch clean-room review) cleared with its triage applied. Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream) — the PR to the intended base is Louis's call. This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
 Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
+- `0bbc39474` — fix: Checkpoint-5 whole-branch review triage (**Phase 5 / Checkpoint 5 — the review-triage commit**)
 - `65603e912` — test: secrets-provider seam tests + docs (**Phase 4 — the review target**)
 - `fdf3e114b` — fix: Phase-3 review triage (kit-config sync + stale boot comment)
 - `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 code — the review target**)
@@ -15,7 +16,7 @@ Commits on the branch (newest substantive first; run `git log` for the exact tip
 - `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-**Cold-start (resume here):** The **storage vertical is complete** and the **entire secrets vertical is complete** — mechanism + config + builtin plugin + boot wiring (Phase 3 `8a0b32668` + `fdf3e114b`) AND tests + docs (Phase 4 `65603e912`), Checkpoints 3–4 cleared. All gates green (`agent-check`, `tb`, `check-config-sync`, full `agent-test`). **Next action = Phase 5** (release gating & final whole-branch review): it is documentation/bookkeeping only — record the cross-repo `targets_api=3` bump obligation for `pipelex-temporal` / `pipelex-mistralai-workflows` in the CHANGELOG (do NOT touch those repos here), confirm the branch is one clean commit sequence, then run **Checkpoint 5** (final whole-branch Sonnet clean-room `/code-review` over `git diff 04434f785..HEAD` as a last over-engineering sweep across both seams). `PLUGIN_API_VERSION` is already 3 — **no second bump**. Key Phase-4 as-built notes are under "Phase 4 — as-built" below.
+**Cold-start (resume here):** **The whole track is COMPLETE — nothing left to build.** Both provider verticals shipped (storage Phases 1–2, secrets Phases 3–4) and Phase 5 (release gating) + Checkpoint 5 (final whole-branch clean-room review + triage) are done. All gates green on the final tip: `agent-check`, `tb`, `check-config-sync`, full `agent-test`. The **only remaining action is Louis's**: open the PR `feature/More-plugins-2` → intended base, and (when the pipelex version carrying this lands) execute the cross-repo obligations recorded in the CHANGELOG — `pipelex-mistralai-workflows` bumps `targets_api` to 3 (bump-only); `pipelex-temporal` bumps `targets_api` to 3 **and** migrates its payload-codec factory off the removed `make_storage_provider_from_config` to `get_storage_provider_registry().get_required(...)`. Deferred design follow-ups (D3 external config passthrough incl. the external-method `uri_format` gap, first real external provider, cookbook example) are captured in `wip/plugins/`. `PLUGIN_API_VERSION` is 3.
 
 > ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
@@ -207,13 +208,22 @@ At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 
 ## Phase 5 — Release gating & cross-repo (documentation in this branch; execution is release-gated)
 
-- [ ] Record in the CHANGELOG / release notes: `pipelex-temporal` and `pipelex-mistralai-workflows` must bump `targets_api` to 3 when the pipelex version carrying this lands (they register no provider; the bump is the only change). Do NOT touch those repos here.
-- [ ] Confirm the whole branch is one clean sequence of per-phase commits; open the PR to the intended base.
+- [x] Record in the CHANGELOG / release notes the cross-repo `targets_api=3` obligation. **Corrected during Checkpoint-5 triage (F2):** the original wording ("they register no provider; the bump is the only change") was wrong for `pipelex-temporal`. `pipelex-mistralai-workflows` is bump-only, but `pipelex-temporal`'s payload-codec factory imports the now-removed `make_storage_provider_from_config`, so it needs the `targets_api` bump **and** a code migration to `get_storage_provider_registry().get_required(...)`. CHANGELOG now says this + carries a `### Removed` bullet for the deleted factory. Did NOT touch those repos here.
+- [x] Confirmed the whole branch is one clean per-phase commit sequence (feat/test → triage → bookkeeping per phase; `git log 04434f785..HEAD`). Opening the PR to the intended base is **left to Louis** (nothing pushed; no upstream).
 
-### ⛔ CHECKPOINT 5 (final) — run the protocol above, whole-branch scope
-- [ ] Full `make agent-test` + `make agent-check` + `make tb` all green on the final tip.
-- [ ] Final Sonnet-5 clean-room `/code-review` over the **whole-branch diff** (`git diff <branch-base>..HEAD`) — a last over-engineering sweep across both seams together. Findings triaged. Outcome: `__________`
-- [ ] This file updated to DONE with all SHAs; deferred follow-ups (DX-3 external config passthrough, first real external provider, cookbook example) captured under `wip/plugins/`.
+### ⛔ CHECKPOINT 5 (final) — CLEARED
+- [x] Gates green on the final tip: `make agent-check` (ruff/plxt/pyright 0 errors/mypy 2084 files/keyword-only), `make tb` (9 passed), `make check-config-sync` (passed), **full `make agent-test` (exit 0, "All tests passed")** — run both before the triage (tip `65603e912`+bookkeeping) and again after the triage commit `0bbc39474`.
+- [x] Final Sonnet-5 clean-room `/code-review` over the **whole-branch diff** (`git diff 04434f785..HEAD`) — fresh general-purpose agent, no inherited context, 10 finder angles + line-by-line + a test-quality pass. **Outcome: migration verified largely clean and faithful** (behavior-preserving factory→plugin split, correct secrets→hub→telemetry→storage→gcp-reads-secrets boot ordering, safe `StorageMethod`→`str` widening, conventions honored). 9 findings, all triaged in `0bbc39474`:
+  - **F2 [MED-HIGH] — FIXED (genuine, was actively misleading):** deleting `make_storage_provider_from_config` breaks `pipelex-temporal` at import (its codec factory calls it); CHANGELOG claimed a `targets_api` bump was temporal's only change. Corrected CHANGELOG + wip doc + added Removed bullet.
+  - **F6 [LOW] — FIXED (simplification):** removed dead `get_optional` from both registries (no production consumer; `get_required` doesn't delegate to it; only its own unit tests used it). This reverses Checkpoint-1's keep-decision, which rested on a factual misread — siblings expose `get_optional`+`has`, while storage/secrets hard-fail via `get_required`+`methods`, so `get_optional` was a vestigial mechanical copy, not a convention match.
+  - **F3 [MED] — FIXED:** added symmetric storage injection-precedence test (was tested for secrets only).
+  - **F5 [LOW] — FIXED:** parametrized `test_disabling_core_unconditional_plugin_raises` over `direct/storage/secrets/openai`.
+  - **F8 [LOW] — FIXED:** `contract.py` v3 comment no longer says `add_secrets_provider` is "in a follow-up commit" (it landed in Phase 3).
+  - **F9 [LOW] — FIXED:** `orchestrator-plugins.md` no longer claims `PLUGIN_API_VERSION` "is now 2".
+  - **F1 [HIGH per reviewer] — DEFERRED to D3 (design tradeoff, not a silent bug):** external storage method boots/selects cleanly but crashes on the first *generated-content* store because `uri_format` is defined only for the built-in methods (raises loudly on `case _:`). External config surface is explicitly the D3 follow-up; strengthened the D3 note + added a docs-page caveat. External providers are usable today for their own storage API, not yet as the generated-content backing store.
+  - **F7 [LOW] — KEPT:** `Field(strict=False)` on the `method` fields is cosmetically vestigial but removal risks a config-parse regression at enum-member call sites for zero benefit.
+  - **F4 [MED] — SKIPPED:** a `lazy_validate` negative-path factory test (trivial 3-line wiring; per-config validation already covered) — avoided test bloat.
+- [x] This file updated to DONE with all SHAs; deferred follow-ups (D3 external config passthrough incl. the `uri_format` gap, first real external provider, cookbook example) captured under `wip/plugins/`.
 
 ---
 
