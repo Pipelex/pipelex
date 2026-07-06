@@ -1,10 +1,11 @@
 # Master plan — Provider plugins: storage & secrets
 
-Status: **Storage vertical DONE. Secrets vertical Phase 3 CODE DONE + gates green — Checkpoint 3 clean-room review IN FLIGHT.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
+Status: **Storage vertical DONE. Secrets vertical Phase 3 DONE + Checkpoint 3 CLEARED.** Branch: `feature/More-plugins-2` (worktree `/Users/lchoquel/repos/Pipelex/_plugins`). **Nothing pushed** (no upstream). This file is the **conductor**; the granular per-seam procedures live in linked docs and should not be duplicated here.
 
 Commits on the branch (newest substantive first; run `git log` for the exact tip — later `docs(plugins)` bookkeeping commits may sit on top):
 
-- `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 — the Checkpoint-3 review target**)
+- `fdf3e114b` — fix: Phase-3 review triage (kit-config sync + stale boot comment)
+- `8a0b32668` — feat: secrets provider → config-selected plugin seam (**Phase 3 code — the review target**)
 - `3940eb7a2` — docs: Phase 2 checkpoint bookkeeping — storage vertical done
 - `37a3b72f1` — fix: Phase-2 review triage (doc tense + stronger gcp secret-wiring assert)
 - `f08193e81` — test: storage-provider seam tests + docs (**Phase 2**)
@@ -13,7 +14,7 @@ Commits on the branch (newest substantive first; run `git log` for the exact tip
 - `8268ff08f` — feat: storage provider → config-selected plugin seam (**Phase 1 code**)
 - `04434f785` — branch base (release v0.37.0 merge). Whole-branch diff for the final Checkpoint 5 = `git diff 04434f785..HEAD`.
 
-**Cold-start (resume here):** The **storage vertical is complete** and **secrets Phase 3 code is committed** (`8a0b32668`) with all gates green (`agent-check`, `tb`, full `agent-test`) and manual smokes passing (`pipelex plugins list` shows `secrets`; default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`). **The Checkpoint-3 clean-room Sonnet `/code-review` was fanned out on `8a0b32668` but its outcome is NOT yet recorded below — resume by checking that review's findings and triaging them, THEN move to Phase 4** (Secrets tests + docs). Key Phase-3 as-built deviations (esp. the W-A boot-placement refinement) are under "Phase 3 — as-built" below. `PLUGIN_API_VERSION` is already 3 — **no second bump**.
+**Cold-start (resume here):** The **storage vertical is complete** and the **secrets vertical mechanism + config + builtin plugin + boot wiring is complete** (Phase 3 code `8a0b32668` + review triage `fdf3e114b`, Checkpoint 3 cleared). All gates green (`agent-check`, `tb`, full `agent-test`, plus `check-config-sync` after the kit-config sync fix) and manual smokes pass (`pipelex plugins list` shows `secrets`; default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`). **Next action = Phase 4** (Secrets tests + docs): unit tests for `SecretsProviderRegistry` hit/miss + duplicate; boot test (default→`EnvSecretsProvider`, explicit `setup(secrets_provider=...)` overrides); external-plugin integration test (mirror `test_storage_external_plugin.py`); the storage↔secrets ordering guard; new `docs/under-the-hood/secrets-provider-plugins.md` + mkdocs nav; CHANGELOG `[Unreleased]`. Key Phase-3 as-built deviations (esp. the W-A boot-placement refinement) are under "Phase 3 — as-built" below. `PLUGIN_API_VERSION` is already 3 — **no second bump**.
 
 > ⚠️ **Phase-4 heads-up (learned in Phase 2):** the s3/gcp "MissingDependencyError when *selected*" phrasing in the plan is imprecise — the SDK guard is deferred to *use*, not *selection*. Expect the secrets detail doc to carry the same imprecision for SDK-backed secrets providers (Vault/AWS) and treat it the same way (pin *import-light registration*, not a select-time raise). See "Phase 2 — as-built".
 
@@ -164,11 +165,15 @@ At each `CHECKPOINT`, the agent **must stop** and do all three, in order:
 - **Phase-1 escapee proactively found + fixed (same class as storage's).** `test_hub_slot_injection_precedence.py` boots a fake **empty** registrar (patched into `build_registrar`) and passed an explicit `storage_provider` but no `secrets_provider`; the new secrets selection path (`get_required(method="env")`) rejects the empty registry with `UnknownSecretsMethodError`. Fixed by injecting `EnvSecretsProvider()` in the four boots (+ docstring updated). Grep-verified this was the only `Pipelex.make` boot with a mocked empty/partial registrar (the plugins-dir tests call `build_registrar` directly; `test_storage_external_plugin` keeps the real `BUILTIN_PLUGINS`, so its `env` secrets provider is present). Caught here via the full `make agent-test` rather than escaping to a later checkpoint.
 - **The env factory ignores config.** `_make_env_secrets_provider(config)` returns a bare `EnvSecretsProvider()`; the `config` param exists only to conform to `SecretsProviderFactoryFn = Callable[[SecretsProviderConfig], ...]` (an SDK-backed external provider would read its own settings from it). Marked `# noqa: ARG001`, the established plugins-dir convention (see linkup/bedrock/azure_rest workers).
 
-### ⛔ CHECKPOINT 3 — review in flight
-- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**. Manual smokes: `pipelex plugins list` shows `secrets` (builtin, API 3, `secrets provider env`); default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`.
-- [x] Commit SHA recorded here: `8a0b32668`
+### ⛔ CHECKPOINT 3 — CLEARED
+- [x] Gates green: `make agent-check` (ruff/plxt/pyright 0 errors/mypy/keyword-only), `make tb` (9 passed), **full `make agent-test` (exit 0, "All tests passed")**, `check-config-sync` PASSED (after the triage fix). Manual smokes: `pipelex plugins list` shows `secrets` (builtin, API 3, `secrets provider env`); default `method="env"`→`EnvSecretsProvider`; unknown token→`UnknownSecretsMethodError`.
+- [x] Commit SHAs: `8a0b32668` (Phase 3 code) + `fdf3e114b` (review triage).
 - [x] Cold-start state updated in this file.
-- [ ] Sonnet-5 clean-room `/code-review` **fanned out on `8a0b32668`** (fresh general-purpose agent, no context, pointed only at the commit; instructed to scrutinize the boot-order move). **Outcome: PENDING — triage on resume.**
+- [x] Sonnet clean-room `/code-review` fanned out on `8a0b32668` (fresh general-purpose agent, no context, pointed only at the commit); findings triaged. **Outcome:** reviewer confirmed **no correctness bug in the boot-order move** (traced every consumer: `build_registrar` is pure, runs after the gateway/terms gate and before the telemetry factory, its only pre-hub consumer; `UnknownBootOrchestratorError` moving earlier is a correct fail-fast improvement). 4 findings:
+  1. *High — kit-config drift:* `pipelex/kit/configs/pipelex.toml` (the `pipelex init` template) missing the new `[pipelex.secrets_config]` block ⇒ `make check-config-sync` fails (CI + `make check` gate; **not** in `agent-check`, which is why Checkpoint-3 gates missed it). → **FIXED** in `fdf3e114b` via `make up-kit-configs`. *(Reconciled against the `worker_scopes` "not in kit copies" false-positive memory: that gate compares kit-configs ↔ `.pipelex` only, not the base `pipelex.toml`; a net-new section in `.pipelex` genuinely diverges — real, not a false positive.)*
+  2. *Medium — stale comment:* the secrets-hub-set comment still said the registrar is "built below," but the reorder moved that build above it. → **FIXED** in `fdf3e114b` (reworded).
+  3. *Over-engineering flag (registry+plugin+config+exceptions for a one-impl seam)* → **kept, no change.** Reviewer explicitly called it "consistent architecture applied deliberately across provider verticals, not a bug" — it is the plan-mandated byte-for-byte mirror of the accepted storage vertical.
+  4. *Docs + dedicated tests missing* → **deferred to Phase 4 as planned** (Phase 3 = mechanism/boot; Phase 4 = tests + docs, exactly as storage split 1↔2).
 
 ---
 
