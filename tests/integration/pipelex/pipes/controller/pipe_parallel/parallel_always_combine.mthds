@@ -1,0 +1,87 @@
+domain      = "test_parallel_always_combine"
+description = "Fixtures for PipeParallel always-combine semantics"
+main_pipe   = "pac_terminal_parallel"
+
+[concept.PacDraft]
+description = "A draft text"
+refines     = "Text"
+
+[concept.PacToneResult]
+description = "Result of tone analysis"
+refines     = "Text"
+
+[concept.PacLengthResult]
+description = "Result of length analysis"
+refines     = "Text"
+
+[pipe.pac_terminal_parallel]
+type = "PipeParallel"
+description = "Add-each-only parallel combining its branch outputs into a Composite"
+inputs = { input_text = "Text" }
+output = "Composite"
+add_each_output = true
+branches = [
+  { pipe = "pac_analyze_tone", result = "tone_result" },
+  { pipe = "pac_analyze_length", result = "length_result" },
+]
+
+[pipe.pac_sequence_ending_in_parallel]
+type = "PipeSequence"
+description = "Sequence whose LAST step is an add-each-only parallel (stale-stamp regression)"
+inputs = { input_text = "Text" }
+output = "Composite"
+steps = [
+  { pipe = "pac_draft", result = "draft" },
+  { pipe = "pac_parallel_on_draft", result = "combo" },
+]
+
+[pipe.pac_parallel_on_draft]
+type = "PipeParallel"
+description = "Parallel analyzing the draft, exposing branch outputs and combining them"
+inputs = { draft = "PacDraft" }
+output = "Composite"
+add_each_output = true
+branches = [
+  { pipe = "pac_analyze_draft_tone", result = "tone_result" },
+  { pipe = "pac_analyze_draft_length", result = "length_result" },
+]
+
+[pipe.pac_draft]
+type        = "PipeLLM"
+description = "Write a short draft from the input text"
+inputs      = { input_text = "Text" }
+output      = "PacDraft"
+model       = "$testing-text"
+prompt      = "Write a one-sentence draft about: $input_text.text"
+
+[pipe.pac_analyze_tone]
+type        = "PipeLLM"
+description = "Analyze the tone of the text"
+inputs      = { input_text = "Text" }
+output      = "PacToneResult"
+model       = "$testing-text"
+prompt      = "Describe the tone of: $input_text.text"
+
+[pipe.pac_analyze_length]
+type        = "PipeLLM"
+description = "Analyze the length of the text"
+inputs      = { input_text = "Text" }
+output      = "PacLengthResult"
+model       = "$testing-text"
+prompt      = "Describe the length characteristics of: $input_text.text"
+
+[pipe.pac_analyze_draft_tone]
+type        = "PipeLLM"
+description = "Analyze the tone of the draft"
+inputs      = { draft = "PacDraft" }
+output      = "PacToneResult"
+model       = "$testing-text"
+prompt      = "Describe the tone of: $draft.text"
+
+[pipe.pac_analyze_draft_length]
+type        = "PipeLLM"
+description = "Analyze the length of the draft"
+inputs      = { draft = "PacDraft" }
+output      = "PacLengthResult"
+model       = "$testing-text"
+prompt      = "Describe the length characteristics of: $draft.text"

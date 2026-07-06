@@ -28,7 +28,7 @@ run time (e.g. LLMWorkerFactory.make_llm_worker)
   └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
 ```
 
-The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `NotImplementedError` ("… Is its plugin installed?").
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
 
 ---
 
@@ -43,7 +43,7 @@ class PipelexPlugin(Protocol):
     def register(self, registrar: PluginRegistrar) -> None: ...
 ```
 
-`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again at CLI-build to harvest plugin-contributed commands).
+`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again whenever the `pipelex plugins list` diagnostic command re-discovers plugins to print what each contributed).
 
 `targets_api` is checked against `PLUGIN_API_VERSION`. A mismatch fails loud with `PluginApiVersionMismatchError` — a single coarse integer gate, not semver-range matching.
 
@@ -241,6 +241,9 @@ The SPI is a documented, versioned **module/symbol list** gated by `PLUGIN_API_V
 
 ## Related
 
+- [Orchestrator Plugins](orchestrator-plugins.md) — the other per-call seam, riding the same discovery/denylist machinery
+- [Storage Provider Plugins](storage-provider-plugins.md) — the config-selected-singleton seam (storage backend by `storage_config.method`)
+- [Secrets Provider Plugins](secrets-provider-plugins.md) — the config-selected-singleton seam (secrets backend by `secrets_config.method`)
 - [Pipe Routing & Execution](pipe-routing-and-execution.md) — where worker construction sits in the run path
 - [Error Model](error-model.md) — how these errors render and dereference
 - [Architecture Overview](architecture-overview.md)

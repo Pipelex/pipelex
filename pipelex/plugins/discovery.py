@@ -25,8 +25,8 @@ def build_registrar(*, config: "PipelexConfig") -> PluginRegistrar:
     """Discover every plugin and let each register itself into a fresh registrar.
 
     A **pure function**: it touches no global state and constructs no client/SDK,
-    so it is safe to call more than once (D3 runs it at CLI-build to harvest
-    commands and again at boot). Iterates ``BUILTIN_PLUGINS`` first, then external
+    so it is safe to call more than once (it runs at boot and again in the
+    ``pipelex plugins list`` diagnostic command). Iterates ``BUILTIN_PLUGINS`` first, then external
     ``pipelex.plugins`` entry points; version-checks each; skips (and logs) any
     plugin named in ``config.plugins.disabled`` — externals are denylisted by their
     entry-point name *before* ``load()`` so a broken installed plugin can still be

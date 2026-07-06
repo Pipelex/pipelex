@@ -8,10 +8,13 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
-from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
 
+# Concrete, user-selectable pipe types only. `PipeSignature` is deliberately absent: a signature is
+# not a selectable type — it is the typeless case. The single-pipe authoring path (`parse_pipe_spec`)
+# routes a typeless spec to `PipeSignatureSpec` directly and rejects an explicit `type = "PipeSignature"`
+# with a migration error before ever consulting this map.
 pipe_type_to_spec_class: dict[str, type[PipeSpec]] = {
     "PipeFunc": PipeFuncSpec,
     "PipeImgGen": PipeImgGenSpec,
@@ -24,5 +27,4 @@ pipe_type_to_spec_class: dict[str, type[PipeSpec]] = {
     "PipeCondition": PipeConditionSpec,
     "PipeParallel": PipeParallelSpec,
     "PipeSequence": PipeSequenceSpec,
-    "PipeSignature": PipeSignatureSpec,
 }

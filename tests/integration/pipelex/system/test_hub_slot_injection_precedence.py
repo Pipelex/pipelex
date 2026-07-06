@@ -18,6 +18,8 @@ from pipelex.hub import get_content_generator, get_pipe_router
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.system.runtime import IntegrationMode, runtime_manager
+from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig
@@ -36,7 +38,13 @@ def _test_integration_mode() -> IntegrationMode:
 
 
 def _fake_registrar(mocker: MockerFixture) -> PluginRegistrar:
-    """A registrar with empty registries (boot stores them but doesn't consume them during setup)."""
+    """A registrar with empty registries (boot stores them but doesn't consume them during setup).
+
+    Storage and secrets are the exceptions: boot *does* select each provider from the registrar during
+    setup, so every boot below passes an explicit ``storage_provider`` and ``secrets_provider`` — each
+    wins ahead of the (empty) registry — keeping this suite focused on hub slots rather than
+    storage/secrets selection.
+    """
     registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False))))
     mocker.patch("pipelex.pipelex.build_registrar", return_value=registrar)
     return registrar
@@ -49,7 +57,12 @@ class TestHubSlotInjectionPrecedence:
         registrar = _fake_registrar(mocker)
         registrar.slot_claims[HubSlot.CONTENT_GENERATOR] = lambda: claimed
 
-        Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False)
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
 
         assert get_content_generator() is claimed
 
@@ -60,7 +73,13 @@ class TestHubSlotInjectionPrecedence:
         registrar = _fake_registrar(mocker)
         registrar.slot_claims[HubSlot.CONTENT_GENERATOR] = lambda: claimed
 
-        Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False, content_generator=explicit)  # pyright: ignore[reportArgumentType]
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            content_generator=explicit,  # pyright: ignore[reportArgumentType]
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
 
         assert get_content_generator() is explicit
 
@@ -73,7 +92,13 @@ class TestHubSlotInjectionPrecedence:
         # Claim PIPE_RUN too so boot does not build a default PipeRun from the sentinel router.
         registrar.slot_claims[HubSlot.PIPE_RUN] = lambda: mocker.sentinel.claimed_run
 
-        Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False, pipe_router=explicit_router)  # pyright: ignore[reportArgumentType]
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            pipe_router=explicit_router,  # pyright: ignore[reportArgumentType]
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
 
         assert get_pipe_router() is explicit_router
 
@@ -89,7 +114,12 @@ class TestHubSlotInjectionPrecedence:
             ]
         )
 
-        Pipelex.make(integration_mode=_test_integration_mode(), needs_inference=False)
+        Pipelex.make(
+            integration_mode=_test_integration_mode(),
+            needs_inference=False,
+            storage_provider=InMemoryStorageProvider(),
+            secrets_provider=EnvSecretsProvider(),
+        )
         Pipelex.teardown_if_needed()
 
         assert order == ["third", "second", "first"]

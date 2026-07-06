@@ -10,7 +10,7 @@ class TestPipeParallelBlueprint:
         blueprint = PipeParallelBlueprint(
             description="lorem ipsum",
             inputs={"data": "Text"},
-            output="Text",
+            output="Composite",
             branches=[
                 SubPipeBlueprint(pipe="process_a", result="result_a"),
                 SubPipeBlueprint(pipe="process_b", result="result_b"),
@@ -22,7 +22,7 @@ class TestPipeParallelBlueprint:
         blueprint = PipeParallelBlueprint(
             description="lorem ipsum",
             inputs={"data": "Text"},
-            output="Text",
+            output="Composite",
             branches=[
                 SubPipeBlueprint(pipe="step1", result="result1"),
                 SubPipeBlueprint(pipe="step2", result="result2"),
@@ -32,74 +32,57 @@ class TestPipeParallelBlueprint:
         )
         assert blueprint.pipe_dependencies == {"step1", "step2", "step3"}
 
-    def test_validate_combined_output_correct(self):
+    @pytest.mark.parametrize("output", ["Composite", "native.Composite", "MergedData", "some_domain.MergedData"])
+    def test_valid_outputs_accepted(self, output: str):
         blueprint = PipeParallelBlueprint(
             description="lorem ipsum",
             inputs={"data": "Text"},
-            output="Text",
+            output=output,
             branches=[SubPipeBlueprint(pipe="process", result="result")],
-            combined_output="Text",
         )
-        assert blueprint.combined_output == "Text"
+        assert blueprint.output == output
 
-        blueprint = PipeParallelBlueprint(
-            description="lorem ipsum",
-            inputs={"data": "Text"},
-            output="Text",
-            branches=[SubPipeBlueprint(pipe="process", result="result")],
-            combined_output="Number",
-        )
-        assert blueprint.combined_output == "Number"
-
-    def test_validate_combined_output_incorrect(self):
-        with pytest.raises(ValidationError) as exc_info:
+    @pytest.mark.parametrize("output", ["Text", "native.Text", "Image", "Number", "Dynamic", "Anything"])
+    def test_native_non_composite_output_rejected(self, output: str):
+        with pytest.raises(ValidationError, match="must be 'Composite' or a structured concept"):
             PipeParallelBlueprint(
                 description="lorem ipsum",
                 inputs={"data": "Text"},
-                output="Text",
+                output=output,
                 branches=[SubPipeBlueprint(pipe="process", result="result")],
-                combined_output="InvalidConcept!",
             )
-        assert "Combined output 'InvalidConcept!' is not a valid concept string or code" in str(exc_info.value)
 
-    def test_validate_output_options_correct(self):
-        blueprint = PipeParallelBlueprint(
-            description="lorem ipsum",
-            inputs={"data": "Text"},
-            output="Text",
-            branches=[SubPipeBlueprint(pipe="process", result="result")],
-            add_each_output=True,
-        )
-        assert blueprint.add_each_output is True
-
-        blueprint = PipeParallelBlueprint(
-            description="lorem ipsum",
-            inputs={"data": "Text"},
-            output="Text",
-            branches=[SubPipeBlueprint(pipe="process", result="result")],
-            combined_output="Text",
-        )
-        assert blueprint.combined_output == "Text"
-
-        blueprint = PipeParallelBlueprint(
-            description="lorem ipsum",
-            inputs={"data": "Text"},
-            output="Text",
-            branches=[SubPipeBlueprint(pipe="process", result="result")],
-            add_each_output=True,
-            combined_output="Text",
-        )
-        assert blueprint.add_each_output is True
-        assert blueprint.combined_output == "Text"
-
-    def test_validate_output_options_incorrect(self):
-        with pytest.raises(ValidationError) as exc_info:
+    @pytest.mark.parametrize("output", ["Composite[]", "MergedData[]", "MergedData[3]"])
+    def test_multiplicity_output_rejected(self, output: str):
+        with pytest.raises(ValidationError, match="must not declare a multiplicity"):
             PipeParallelBlueprint(
                 description="lorem ipsum",
                 inputs={"data": "Text"},
-                output="Text",
+                output=output,
                 branches=[SubPipeBlueprint(pipe="process", result="result")],
-                add_each_output=False,
-                combined_output=None,
             )
-        assert "PipeParallel requires either add_each_output to be True or combined_output to be set" in str(exc_info.value)
+
+    def test_add_each_output_defaults_to_false_and_is_valid_alone(self):
+        """The one-of-two (add_each_output/combined_output) validator is gone: a parallel
+        always combines into its declared output, so no extra flag is required.
+        """
+        blueprint = PipeParallelBlueprint(
+            description="lorem ipsum",
+            inputs={"data": "Text"},
+            output="Composite",
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
+        )
+        assert blueprint.add_each_output is False
+
+    def test_combined_output_field_is_gone(self):
+        """combined_output was deleted from the language: passing it must be rejected."""
+        with pytest.raises(ValidationError):
+            PipeParallelBlueprint.model_validate(
+                {
+                    "description": "lorem ipsum",
+                    "inputs": {"data": "Text"},
+                    "output": "Composite",
+                    "branches": [{"pipe": "process", "result": "result"}],
+                    "combined_output": "Composite",
+                }
+            )

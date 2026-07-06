@@ -178,7 +178,7 @@ class TestPipeParallelGraph:
         pipe_code: str,
         expectations_class: type[ParallelCombinedGraphExpectationsBase],
     ):
-        """Verify PipeParallel with combined_output generates correct graph structure.
+        """Verify PipeParallel with a combined output generates correct graph structure.
 
         Parametrized with:
         - pgc_analysis_then_summarize: 2-branch PipeParallel wrapped in PipeSequence with follow-up consumer
@@ -291,4 +291,4 @@ class TestPipeParallelGraph:
             title=f"Parallel Combined Graph Outputs ({pipe_code})",
         )
 
-        log.info(f"Structural validation passed: {pipe_code} combined_output graph is correct")
+        log.info(f"Structural validation passed: {pipe_code} combined-output graph is correct")

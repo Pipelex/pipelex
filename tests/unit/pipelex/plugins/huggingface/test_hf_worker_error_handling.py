@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import httpx
 import pytest
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
@@ -18,13 +19,14 @@ if TYPE_CHECKING:
 
 def _make_hf_http_error(status_code: int | None, message: str) -> HfHubHTTPError:
     """Create a minimal HfHubHTTPError for testing with optional status code."""
-    exc = HfHubHTTPError(message)
-    if status_code is not None:
-        # HfHubHTTPError stores the response on .response attribute
-        mock_response = type("MockResponse", (), {"status_code": status_code})()
-        exc.response = mock_response  # type: ignore[attr-defined]
-    else:
-        exc.response = None  # type: ignore[attr-defined]
+    response = httpx.Response(
+        status_code=status_code or 500,
+        request=httpx.Request("POST", "https://router.huggingface.co/test"),
+    )
+    exc = HfHubHTTPError(message, response=response)
+    if status_code is None:
+        # Simulate a network-level failure carrying no response metadata
+        exc.response = None  # type: ignore[assignment]  # pyright: ignore[reportAttributeAccessIssue]
     return exc
 
 

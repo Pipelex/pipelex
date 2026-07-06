@@ -11,7 +11,12 @@ if TYPE_CHECKING:
 # v2 added the optional ``add_http_error_mapper`` capability (a framework-agnostic
 # transport-fault → ``ErrorReport`` mapping a host runtime renders into its own
 # HTTP error response).
-PLUGIN_API_VERSION: int = 2
+#
+# v3 added ``add_storage_provider`` and ``add_secrets_provider`` — two config-selected,
+# process-global provider registries (``storage_config.method`` / ``secrets_config.method`` pick
+# the factory at boot). DX-1 batches both menu additions under this single bump so external plugins
+# re-declare ``targets_api`` only once.
+PLUGIN_API_VERSION: int = 3
 
 
 @runtime_checkable
@@ -25,7 +30,7 @@ class PipelexPlugin(Protocol):
     **Invariant — ``register`` is side-effect-free.** It may *only* call
     registrar menu methods: no hub access, no I/O, no SDK/client construction.
     This is what makes ``build_registrar`` safe to run more than once (it runs at
-    CLI-build to harvest commands *and* again at boot). Anything heavy — importing
+    boot *and* again in the ``pipelex plugins list`` diagnostic command). Anything heavy — importing
     a backend SDK, constructing a client, importing ``temporalio`` — happens lazily
     inside the ``make_worker`` closures and the hub-slot-claim thunks, never in
     ``register`` itself.

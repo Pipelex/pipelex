@@ -24,7 +24,7 @@ steps = [
 type = "PipeParallel"
 description = "Generate short and detailed summaries in parallel"
 inputs = { input_text = "Text" }
-output = "Text"
+output = "Composite"
 add_each_output = true
 branches = [
   { pipe = "summarize_short", result = "short_summary" },

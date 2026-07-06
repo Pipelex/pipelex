@@ -4,22 +4,68 @@
 
 ### Added
 
-- **Portable image size for image generation (`size` on `PipeImgGen`):** A single `size` field carries a portable size intent across providers — either a size tier (`"1k"`, `"2k"`, `"4k"`: "this pixel class at my chosen `aspect_ratio`", mapped to each provider's own grid or computed dimensions) or an exact pixel size like `"2048x1152"` (deterministic; setting `aspect_ratio` alongside an exact size is a validation error since the size implies the ratio). Unsatisfiable requests are hard validation errors at blueprint-load time (or at runtime for late-resolved aliases/presets), never warn-and-ignore: Gemini 3-class models accept `1k`/`2k`/`4k`, `gpt-image-2` accepts `1k`/`2k` and arbitrary exact sizes within OpenAI's constraints, Gemini 2.5 / Flash Lite / legacy GPT Image / Flux / SDXL / Qwen accept `1k` only. On tier-grid (Gemini) models an exact size runs only on an exact grid-cell match, with near-misses rejected naming the nearest valid cells. When `size` is unset no size intent is sent (Gemini jobs omit `image_size`; OpenAI models keep their fixed 1K-class preset for the chosen ratio) and the provider default applies. The MTHDS JSON Schema exposes the field as tier-enum-or-`WxH`-pattern, and an optional `size` default is supported in `[cogt.img_gen_config.img_gen_param_defaults]`.
-- **Static validation for Google image models:** Google image models now carry `rules` blocks in the backend deck (new geometry taxonomies `gemini_2_5`, `gemini_3_pro`, `gemini_3_flash`, `gemini_3_flash_lite`), so unsupported (aspect ratio × size) combinations on Gemini models are caught at blueprint-load time instead of only failing at the provider call. The Google img-gen factory is keyed by taxonomy instead of hardcoded model names (breaking: the `GoogleImageGenModel` name enum is removed — model handles are deck config, not code constants).
-- **Gemini image-to-image (img2img) support:** The Google img-gen worker now forwards input images to the Gemini API as inline parts alongside the text prompt, enabling image editing and multi-image composition with the Nano Banana models. All Google-backend image models declare image inputs (`nano-banana`, `nano-banana-pro`, `nano-banana-2`, `nano-banana-2-lite` — matching the same models' declarations on the OpenRouter backend and the Pipelex gateway); `nano-banana-2` (`gemini-3.1-flash-image-preview`) is supported by the dimensions factory (same 1K/2K/4K resolution grid as Nano Banana Pro, per Google's published tables); added `nano-banana-2-lite` (`gemini-3.1-flash-lite-image`, 1K only) to the Google backend. Every img-gen worker now validates input images against the model's declared capability at job start: a model without image inputs (no `"images"` in its `inputs`) rejects img2img jobs with a clean `ImgGenParameterError` before any provider call — enforced once in the worker base class, so direct-request workers (Google Gemini native, chat-completions image models) and args-factory workers all fail early and explicitly instead of forwarding an unsupported request to the provider.
-- **Banner aspect ratios (`landscape_4_1`, `landscape_8_1`, `portrait_1_4`, `portrait_1_8`):** New `AspectRatio` values for the extreme banner/strip formats introduced by the Gemini 3.1 image models, supported by `nano-banana-2` and `nano-banana-2-lite` with Google's published pixel grids. All other image-gen backends reject them with a clean parameter error. The Google dimension tables were restructured by model generation (Gemini 2.5 grid vs Gemini 3 grid) with per-model capability gating, so unsupported ratio/size combinations raise `ImgGenParameterError` instead of crashing.
+- **Storage provider is now a plugin seam:** The storage backend (`local` / `in_memory` / `s3` / `gcp`) is selected at boot from a `StorageProviderRegistry` keyed by the open `storage_config.method` token, populated by the always-on built-in `StoragePlugin`. A third party can now ship a `pipelex-storage-<backend>` package that advertises itself under the `pipelex.plugins` entry-point group and is selected via `storage_config.method` — the same discovery/denylist machinery the inference and orchestrator seams use. `storage_config.method` is now an open `str`: an unknown method fails loudly at boot with `UnknownStorageMethodError` (listing the registered methods), not at config parse. See the new `docs/under-the-hood/storage-provider-plugins.md`.
+- **Secrets provider is now a plugin seam:** The secrets backend (`env`) is selected at boot from a `SecretsProviderRegistry` keyed by the new open `secrets_config.method` token (default `"env"`), populated by the always-on built-in `SecretsPlugin`. A third party can now ship a `pipelex-secrets-<backend>` package (Vault, AWS Secrets Manager, …) that advertises itself under the `pipelex.plugins` entry-point group and is selected via `secrets_config.method` — the same mechanism the storage seam uses. Out-of-the-box behavior is unchanged: `env` stays the default. An unknown method fails loudly at boot with `UnknownSecretsMethodError` (listing the registered methods), not at config parse. See the new `docs/under-the-hood/secrets-provider-plugins.md`.
+- **TOML pipeline inputs:** The `--inputs` file passed to `pipelex run` and `pipelex-agent run` (pipe/bundle/method) can now be TOML in addition to JSON, discriminated by file extension — a `.toml` suffix is parsed as TOML, every other value stays JSON. Both formats produce the same input dictionary; TOML's multi-line strings make text-heavy inputs much easier to author. `run bundle <dir>` auto-detects `inputs.toml` alongside `inputs.json` when `--inputs` is omitted, erroring if both exist. Inline JSON (`{...}`) and agent-CLI stdin inputs stay JSON-only. A bare TOML datetime/date/time literal is rejected with an explicit error (quote it as a string) — native datetime concept support is a separate track.
+- **`--format toml` for inputs-template generation:** `pipelex build inputs` and `pipelex-agent inputs` (pipe/bundle/method) accept `--format json|toml` (default `json`) to emit the generated inputs template as TOML. On the main CLI, `toml` defaults the output filename to `inputs.toml`; on the agent CLI, `toml` prints the raw TOML template to stdout (the no-inputs case prints a TOML comment line that loads back as an empty dict).
 
 ### Changed
 
-- **Dry-run mock lists shrink from 3 to 2 items:** When a pipe input is declared as a list without a fixed size, the dry-run mock now fabricates 2 items instead of 3. Cuts dry-run work on list inputs without changing correctness.
-- **Repo lint validates `.mthds` files against the locally generated MTHDS schema:** `plxt lint` in this repo now uses `derived/mthds_schema.json` (regenerated automatically by the lint make targets) instead of the released schema bundled with plxt, so language-surface additions like `size` are lintable here before they propagate to a plxt release.
+- **Plugin API version bumped to 3 (Breaking):** `PLUGIN_API_VERSION` is now `3` (was `2`) to add the `add_storage_provider` and `add_secrets_provider` registrar menu methods. Plugin discovery version-checks with strict equality, so every external plugin must re-declare `targets_api = 3`. `pipelex-mistralai-workflows` registers no storage or secrets provider and imports none of the removed symbols, so the `targets_api` bump is its only change. `pipelex-temporal` needs the `targets_api` bump **and** a code migration: its payload-codec factory imports the now-removed `make_storage_provider_from_config` (see Removed) and must switch to resolving the provider via the storage-provider registry (`get_storage_provider_registry().get_required(method=...)`).
+- **`PipeSignature` is not a pipe type (Breaking):** A signature is now declared by **omitting** `type` — a `[pipe.x]` section with no `type` and nothing but the contract (`description`, `output`, optional `inputs`, optional `signature_for`) *is* a `PipeSignature`. Writing `type = "PipeSignature"` explicitly is rejected with a migration error ("`PipeSignature` is no longer a pipe type — delete the `type` line"), and a typeless section that declares any non-contract field is a hard error naming the field. The `pipelex-agent pipe` authoring command mirrors this: a typeless JSON spec (no `type`) renders a `[pipe.x]` section with no type line, and `--type PipeSignature` is rejected. **MTHDS JSON Schema shape change:** the signature arm no longer carries a `type` property (an explicit tag now fails schema validation), so the downstream schema copies (`mthds`, `vscode-pipelex`, `mthds-ui`) must be re-synced on the next release via the `mthds-schema-sync` skill.
+
+### Removed
+
+- **`make_storage_provider_from_config` (Breaking):** The module-level storage-provider factory (`pipelex/tools/storage/storage_provider_factory.py`) is removed — storage is now resolved through the config-selected `StorageProviderRegistry` at boot. Downstream code that imported this helper (notably `pipelex-temporal`'s payload-codec factory) must select through the registry instead.
+
+## [v0.37.0] - 2026-07-04
+
+### Highlights
+
+- **`PipeParallel` always combines — and every run has a main output** — A parallel now always combines its branch outputs into its declared `output` concept (with the new `native.Composite` concept as the ready-made combination vehicle), the `combined_output` field is deleted from the MTHDS language, and the main-stuff invariant is enforced end to end: every completed pipe run delivers a `main_stuff`, so downstream surfaces (delivery, graph tracing, telemetry, wire models) can rely on it unconditionally.
+- **Portable, statically validated image generation** — A new portable `size` parameter (`"1k"`/`"2k"`/`"4k"` tiers or exact pixel dimensions) carries the same size intent across providers, Gemini models gain image-to-image editing and extreme banner aspect ratios, and Google image models are now validated against declarative geometry rules at blueprint-load time — unsatisfiable requests fail fast instead of at the provider call.
+
+### Added
+
+- **Portable image size (`size`) for `PipeImgGen`:** New `size` parameter accepting portable tiers (`"1k"`, `"2k"`, `"4k"`) or exact pixel dimensions (e.g. `"2048x1152"`). A tier means "this pixel class at my chosen `aspect_ratio`", mapped to each provider's own grid; an exact size is deterministic (declaring `aspect_ratio` alongside it is a validation error). Unsatisfiable requests fail as hard validation errors at blueprint-load time, never warn-and-ignore. When `size` is unset, no size intent is sent and the provider default applies. The MTHDS JSON Schema exposes the field, and an optional `size` default is supported in `[cogt.img_gen_config.img_gen_param_defaults]`.
+- **`native.Composite` concept:** New native concept backed by `CompositeContent` — an untyped, named composition holding sub-contents as top-level fields, serving as the default combination vehicle for parallel branches. Supports the full content surface: `smart_dump`, kajson/transport round-trip, and markdown/HTML rendering.
+- **Gemini image-to-image (img2img) support:** The Google img-gen worker now forwards input images to the Gemini API as inline parts, enabling image editing and multi-image composition for the `nano-banana` models (including the new `nano-banana-2-lite`). Every img-gen worker now validates input images against the model's declared capability at job start, rejecting img2img on unsupported models with a clean `ImgGenParameterError` before any provider call.
+- **Banner aspect ratios:** Support for extreme banner formats (`landscape_4_1`, `landscape_8_1`, `portrait_1_4`, `portrait_1_8`) from Gemini 3.1 image models. All other image-gen backends reject them with a clean parameter error.
+- **Static validation for Google image models:** Google image models now use `rules` blocks (geometry taxonomies like `gemini_3_flash`) in the backend deck, catching unsupported aspect-ratio and size combinations at blueprint-load time. The Google img-gen factory is keyed by taxonomy instead of hardcoded model names (Breaking: the `GoogleImageGenModel` name enum is removed — model handles are deck config, not code constants).
+
+### Changed
+
+- **`PipeParallel` always combines (Breaking):** A `PipeParallel` controller now always combines its branch outputs into its declared `output` concept and stamps it as the main output. The declared `output` is strictly validated at author time and must be `Composite` or a structured concept whose fields and types match the branch `result` names. Combination replaces the removed `combined_output` field. Migration: pipes declaring both fields just drop the `combined_output` line; `add_each_output`-only pipes replace their placeholder `output` with `Composite` or a matching structured concept. `add_each_output` keeps its meaning and now defaults to `false`.
+- **Main-stuff invariant enforced (Breaking):** Every pipe run now guarantees a `main_stuff`; defensive "maybe there is no main stuff" branches are removed, wire models make the field required (`main_stuff_name: str` on `PipelexPipeRunOutput` and the `/execute` response extension), and `PipeOutput.optional_main_stuff` is replaced by `PipeOutput.main_stuff`.
+- **Orchestrator SPI delivery split (Breaking):** `OrchestratorProtocol.run` is now strictly the blocking arm (returning a completed `PipelexPipeRunOutput`). A new `OrchestratorProtocol.start` handles fire-and-forget, returning a `PipelexPipeDispatchAck` (IDs only). `PipelexPipeRunOutput.is_completed` is deleted — it is always a completed output now.
+- **`LLMWorkerInternalAbstract` folded (Breaking):** Removed and folded into `LLMWorkerAbstract`, which now owns the whole job lifecycle (capability checks, constraints, telemetry). Subclasses extend `LLMWorkerAbstract` directly and implement `_gen_text`/`_gen_object`, nothing else.
+- **Type preservation across transport:** `Composite` components (and their nested lists) now retain strict types across transport boundaries (`dump_for_transport` / hydration) via private class markers.
+- **`PipeParallel` honors `final_stuff_code`:** A requested final stuff code (e.g. from a `PipeBatch`) is now correctly stamped on the parallel's combined output.
+- **Docs — inference plugins:** Rewrote `using-inference-plugins.md` to demonstrate a genuine `pipelex.plugins` entry-point package instead of a legacy config workaround.
+- **Linting pipeline (repo-local):** in the pipelex repo itself, `plxt lint` now validates `.mthds` files against the locally generated schema (`derived/mthds_schema.json`) rather than the released schema bundled with `plxt`. This is a `.pipelex/plxt.toml` override for this repo only — the `plxt.toml` template distributed by `pipelex init config` is unchanged.
+- **Dry-run mocks:** Reduced the default dry-run mock list generation from 3 items to 2 to cut dry-run processing time.
+- Bumped `mthds` dependency from `>=0.6.0` to `>=0.7.0`.
 
 ### Fixed
 
-- **Img2img support check keyed on declared inputs:** `ImgGenParamSupport.check_job_params` now takes the full model spec and checks image-to-image support against the model's declared `inputs` (the universal capability field) instead of requiring an `input_images` rule. The rule is an args-factory formatting concern that Gemini-family models — whose request path never reads it — legitimately don't carry, so the old rules-keyed check wrongly reported the whole family as not supporting img2img.
-- **Google img-gen worker no longer hardcodes 1K:** The native Google worker and the gateway path now send the requested `image_size` to the Gemini API (omitted entirely when `size` is unset); previously the worker always sent `"1K"` regardless of intent, making 2K/4K generation unreachable.
-- **Unknown boot orchestrator now fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution. A typo or a missing orchestrator plugin (e.g. `--orchestrator temporal` without the Temporal plugin installed) is reported rather than quietly running the job on the wrong runtime. The requested name is matched against registered plugin names, the same namespace the boot gate uses.
-- **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), mirroring `teardown`. Previously a failed boot could poison a subsequent boot in the same process — surfacing as a "LogConfig is already set" error or a stale, half-populated class registry.
+- **`PipeCondition` pass-through failure:** A `continue` outcome with no pre-existing main stuff now fails loudly and actionably at the pipe level instead of crashing downstream surfaces.
+- **Stale main stuff in parallels:** A pipeline ending in an `add_each_output`-only `PipeParallel` no longer silently reports the previous step's output as its main result.
+- **`add_each_output` optional in the builder spec:** `PipeParallelSpec` now defaults `add_each_output` to `false` like the blueprint does, so a generated always-combine spec with just `branches` and `output` no longer fails validation before `to_blueprint()`.
+- **Google img-gen size handling:** The native Google worker and gateway path now send the requested `image_size` to the Gemini API instead of hardcoding `"1K"`, making 2K/4K generation reachable.
+- **Img2img support checks:** The capability check now keys off the model's declared `inputs` rather than requiring an `input_images` rule, which had falsely reported Gemini models as unsupported.
+- **Routing profile optional routes:** `optional_routes` declared in `routing_profiles.toml` are no longer silently dropped by the factory.
+- **Unknown boot orchestrator fails loud:** Requesting a boot orchestrator no installed plugin provides — via `--orchestrator <name>` or `Pipelex.make(boot_orchestrator=...)` — now raises `UnknownBootOrchestratorError` at boot instead of silently falling back to in-process execution.
+- **Failed boot no longer leaks process-global state:** A `Pipelex.make` that raises during setup now releases the process-global singletons a partial boot acquired (config, logging, the kajson class registry, template registries), so a failed boot no longer poisons a subsequent boot in the same process.
+- **HuggingFace streaming errors:** The provider error-body reader now safely tolerates unread `httpx` streaming responses without crashing with `httpx.ResponseNotRead`.
+
+### Removed
+
+- **`combined_output` field (Breaking):** Removed from the MTHDS language for `PipeParallel`; pipes now declare their combination target directly in the `output` field.
+- **Legacy external plugin setter (Breaking):** Removed `set_llm_worker_from_external_plugin` from the inference manager, fully replaced by the `pipelex.plugins` entry point.
+
+### Security
+
+- **Transformers vulnerability:** Bumped `transformers` past CVE-2026-4372 (GHSA-29pf-2h5f-8g72) to resolve a high-severity RCE. To unblock this, the `huggingface` extra now requires `huggingface_hub>=1.5.0,<2.0.0` (Breaking).
 
 ## [v0.36.0] - 2026-06-30
 
@@ -136,7 +182,7 @@
 - **Mistral chat requests now send the system message before the user message**: `make_simple_messages` previously appended it after the user message, contradicting its own docstring and the OpenAI-typed sibling.
 - **String concept values in bundle specs are constructible again**: a bare string in the `ConceptSpec | str` union now validates (no longer crashing the `mode="before"` validator) and passes through to the blueprint as the concept's description instead of into `structure`, where the loader rejected it.
 - **LocalObserver JSONL records always carry the true lifecycle event name**: a payload's own `event_type` key can no longer overwrite the event name in the written record, which had broken event-type filtering for JSONL consumers.
-- **Tests under `tests/**/build/`are no longer silently skipped**: pytest's default`norecursedirs`includes`build`, so the whole `tests/unit/pipelex/cli/commands/build/`tree was never collected; the config now overrides`norecursedirs`and sets`testpaths = ["tests"]`.
+- **Tests under `tests/**/build/` are no longer silently skipped**: pytest's default `norecursedirs` includes `build`, so the whole `tests/unit/pipelex/cli/commands/build/` tree was never collected; the config now overrides `norecursedirs` and sets `testpaths = ["tests"]`.
 - **`Anything`-output option numbering is now deterministic**: the output renderer sorts a `PipeCondition`'s possible outputs by pipe code instead of iterating a set, so `output_option_N` / `schema_option_N` numbering is stable across runs.
 - **Documentation examples**: Updated code snippets in `docs/under-the-hood/` to match the new keyword-only signatures.
 - **Test mock assertions**: Migrated mock assertions from `.call_args.args` to `.call_args.kwargs` to reflect keyword-only calls.
@@ -959,7 +1005,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0] - 2026-02-25
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1262,7 +1308,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b3] - 2026-02-11
 
-**Highlights:**
+### Highlights
 
 - **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
 - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
@@ -1334,7 +1380,7 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.18.0b2] - 2026-01-20
 
-**Highlights:**
+### Highlights
 
 - **Pipelex Gateway** — The deprecated `pipelex_inference` backend is now replaced by `pipelex_gateway`, featuring remote model configuration fetching so you always have access to the latest models without updating Pipelex.
 
@@ -1550,7 +1596,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.17.0] - 2025-11-27
 
-**Highlights:** - Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
+### Highlights
+
+- Previously, in the pipelex config files (`.toml` files in the `.pipelex/` directory, such as `.pipelex/pipelex.toml`, but also the routing profiles files, backends, etc.), when an array was overridden, the new array was concatenated to the old array. Now, the new array overrides the old array.
 
 ### Fixed
 
@@ -1569,7 +1617,9 @@ This release hardens Pipelex at its edges. The headliners: a full **error-handli
 
 ## [v0.16.0] - 2025-11-25
 
-**Highlights:** - Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
+### Highlights
+
+- Library manager now supports multiple libraries. You can now have multiple libraries in your project, each with its own set of concepts, pipes, and stuffs.
 You can run the same pipe at the same times as much as you want, with different inputs.
 Side effets: Unit tests now run in 30s.
 
@@ -1680,7 +1730,9 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.15.0] - 2025-11-07
 
-**Highlights:** This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
+### Highlights
+
+This release dramatically simplifies onboarding with interactive CLI setup, comprehensive documentation relaunch, and intelligent model fallbacks, making Pipelex more accessible and resilient than ever.
 
 ### Added
 
@@ -1787,7 +1839,7 @@ Side effets: Unit tests now run in 30s.
 
 ## [v0.13.0] - 2025-10-21
 
-### Highlights - Simplifying pipeline execution and improving developer experience
+### Highlights
 
 This release focuses on making Pipelex more accessible and easier to use, with major improvements to the CLI, simplified syntax for multiplicity, and a complete documentation overhaul:
 
@@ -1832,7 +1884,9 @@ This release focuses on making Pipelex more accessible and easier to use, with m
 
 ## [v0.12.0] - 2025-10-15
 
-### Highlights - Moving fast and breaking things
+### Highlights
+
+Moving fast and breaking things:
 
 - Added the new builder pipeline system for auto-generating Pipelex bundles from user briefs
   - it's a pipeline to generate pipelines, and it works!
@@ -2076,9 +2130,9 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 ## [v0.10.0] - 2025-09-17
 
-### Highlight: New Inference Backend Configuration System
+### Highlights
 
-We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
+**New Inference Backend Configuration System** — We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
 - **Get started in seconds** with [Pipelex Inference](configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
@@ -2131,7 +2185,7 @@ For complete details, see the [Inference Backend Configuration](configuration/co
 
 ## [v0.9.5] - 2025-09-12
 
-### Highlight
+### Highlights
 
 - Pinned `instructor` to version `<1.10.0` to avoid errors with `mypy`
 
@@ -2425,9 +2479,9 @@ Simplified input memory:
 
 ## [v0.5.0] - 2025-07-01
 
-### Highlight: Vibe Coding an AI workflow becomes a reality
+### Highlights
 
-**Create AI workflows from natural language without writing code** - The combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
+**Vibe Coding an AI workflow becomes a reality** — Create AI workflows from natural language without writing code: the combination of Pipelex's declarative language, comprehensive Cursor rules, and robust validation tools enables AI assistants to autonomously iterate on pipelines until all errors are resolved and workflows are ready to run.
 
 ### Added
 
@@ -2584,7 +2638,9 @@ Simplified input memory:
 
 ## [v0.4.0] - 2025-06-16
 
-### Highlight: Complete documentation overhaul
+### Highlights
+
+Complete documentation overhaul:
 
 - **MkDocs** setup for static web docs generation
   - **Material** for MkDocs theme, custom styling and navigation

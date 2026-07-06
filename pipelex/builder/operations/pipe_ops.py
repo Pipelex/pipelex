@@ -11,6 +11,7 @@ import tomlkit
 from pydantic import ValidationError
 from tomlkit.items import Table
 
+from pipelex.builder.bundle_spec import SIGNATURE_ONLY_SPEC_KEYS
 from pipelex.builder.pipe.exceptions import PipeSpecError
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
@@ -22,9 +23,15 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_signature_spec import PipeSignatureSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.pipe.pipe_structure_spec import PipeStructureSpec
+from pipelex.core.pipes.pipe_blueprint import (
+    PIPE_SIGNATURE_TYPE_TAG,
+    explicit_signature_tag_migration_message,
+    normalize_typeless_signature_section,
+)
 
 # Aliases that agents may use instead of "pipe_code". First found is promoted when canonical key is absent; extras are dropped.
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
@@ -86,23 +93,96 @@ def _normalize_prompt_aliases(data: dict[str, Any]) -> None:
                 data.pop(alias)
 
 
-def parse_pipe_spec(spec_data: Any, *, pipe_type: str) -> PipeSpec:
+def _normalize_output(data: dict[str, Any]) -> Any | None:
+    """Canonicalize output authoring aliases in-place: promote ``output_concept`` / ``output_type`` →
+    ``output``, and flatten a dict-shaped ``output`` to its concept string.
+
+    Returns the displaced original ``output`` value when an alias overrode an existing ``output`` (so a
+    typed caller can retry with the alias then fall back to the original), else ``None``. Runs for both
+    the typeless-signature and typed paths so the same authoring conveniences apply to signatures.
+    """
+    # Accept output aliases (e.g. "output_concept", "output_type") for "output".
+    # When both "output" and an alias coexist, try the alias value first (agents often put
+    # the correct concept name in the alias), falling back to the original "output" value.
+    output_fallback: Any | None = None
+    for output_alias in _OUTPUT_ALIASES:
+        if output_alias not in data:
+            continue
+        alias_value = data.pop(output_alias)
+        if "output" not in data:
+            data["output"] = alias_value
+        else:
+            output_fallback = data["output"]
+            data["output"] = alias_value
+        # First alias wins — drop any remaining aliases without using them.
+        for remaining_alias in _OUTPUT_ALIASES:
+            data.pop(remaining_alias, None)
+        break
+
+    # Accept output as dict → extract the concept string
+    # Agents sometimes structure the output like inputs (as a dict).
+    # Handle {"type": "ConceptName"} and single-item dicts like {"result": "Text"}.
+    if "output" in data and isinstance(data["output"], dict):
+        output_dict: dict[str, Any] = data["output"]
+        if "concept_ref" in output_dict:
+            data["output"] = output_dict["concept_ref"]
+        elif "type" in output_dict:
+            data["output"] = output_dict["type"]
+        elif len(output_dict) == 1:
+            data["output"] = next(iter(output_dict.values()))
+    return output_fallback
+
+
+def parse_pipe_spec(spec_data: Any, *, pipe_type: str | None) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
 
     Args:
         spec_data: Raw data for the pipe spec (untrusted JSON-like input).
-        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
+        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence"), or ``None`` when the caller
+            supplied no type. A typeless spec is a signature when it declares only the contract
+            (``description``, ``inputs``, ``output``, ``signature_for``), else a teaching error. An
+            explicit ``"PipeSignature"`` is rejected with the migration error — a signature has no type.
 
     Returns:
         Validated PipeSpec instance of the correct type.
 
     Raises:
-        ValueError: If the pipe type is invalid.
+        ValueError: If the pipe type is invalid, or the retired ``"PipeSignature"`` tag is passed, or a
+            typeless spec declares more than the contract.
         PipeSpecError: If the top-level value is not a mapping, ``steps`` /
             ``branches`` is not a list, or an entry within them is not a mapping.
             Carries the INPUT error domain.
         ValidationError: If Pydantic validation of the assembled spec fails.
     """
+    # Validate the top-level shape first so a non-mapping caller input (scalar / list / None) surfaces
+    # as a typed, INPUT-domain PipeSpecError instead of a bare TypeError / ValueError, and so the
+    # typeless-signature routing below can operate on a dict.
+    if not isinstance(spec_data, dict):
+        msg = f"Pipe spec must be a mapping, got {type(spec_data).__name__}"
+        raise PipeSpecError(msg)
+    # Work on a copy to avoid mutating the caller's dict.
+    spec_data = dict(cast("dict[str, Any]", spec_data))
+
+    # Canonicalize pipe_code aliases up front so the typeless-signature routing and the migration
+    # message both see the real pipe code.
+    _normalize_pipe_code_aliases(spec_data)
+
+    # Canonicalize output authoring aliases (output_concept/output_type, dict output) up front so both
+    # the typeless-signature path and every typed pipe see a canonical `output` — a signature keeps the
+    # same authoring conveniences as typed pipes. The typed path reuses the returned fallback for its
+    # retry-then-fall-back below; the typeless path takes the canonical value directly.
+    output_fallback = _normalize_output(spec_data)
+
+    # A signature is typeless. Reject the retired explicit `type = "PipeSignature"` tag, and route a
+    # typeless contract-only spec to `PipeSignatureSpec` via the shared normalizer (which injects the
+    # internal tag, or raises the same teaching error as the bundle layer for a stray field). This
+    # mirrors `PipelexBundleSpec.validate_pipe_keys` for the single-pipe authoring surface.
+    if pipe_type == PIPE_SIGNATURE_TYPE_TAG:
+        raise ValueError(explicit_signature_tag_migration_message(spec_data.get("pipe_code")))
+    if pipe_type is None:
+        normalized = normalize_typeless_signature_section(spec_data.get("pipe_code"), pipe_section=spec_data, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS)
+        return PipeSignatureSpec.model_validate(normalized)
+
     if pipe_type not in pipe_type_to_spec_class:
         valid_types = list(pipe_type_to_spec_class.keys())
         msg = f"Invalid pipe type '{pipe_type}'. Must be one of: {valid_types}"
@@ -110,22 +190,8 @@ def parse_pipe_spec(spec_data: Any, *, pipe_type: str) -> PipeSpec:
 
     spec_class = pipe_type_to_spec_class[pipe_type]
 
-    # Validate the top-level shape before iterating so a non-mapping caller input
-    # (scalar / list / None) surfaces as a typed, INPUT-domain PipeSpecError
-    # instead of a bare TypeError / ValueError from ``dict(...)`` below.
-    if not isinstance(spec_data, dict):
-        msg = f"Pipe spec must be a mapping, got {type(spec_data).__name__}"
-        raise PipeSpecError(msg)
-    spec_data = cast("dict[str, Any]", spec_data)
-
-    # Work on a copy to avoid mutating the caller's dict
-    spec_data = dict(spec_data)
-
-    # Add type to spec_data if not present
+    # Add type to spec_data
     spec_data["type"] = pipe_type
-
-    # Accept common aliases for "pipe_code" at the top level
-    _normalize_pipe_code_aliases(spec_data)
 
     # Accept common aliases for "prompt" (e.g. "prompt_template")
     _normalize_prompt_aliases(spec_data)
@@ -148,38 +214,8 @@ def parse_pipe_spec(spec_data: Any, *, pipe_type: str) -> PipeSpec:
         else:
             spec_data.pop("expression")
 
-    # Accept output aliases (e.g. "output_concept", "output_type") for "output".
-    # When both "output" and an alias coexist, try the alias value first (agents often put
-    # the correct concept name in the alias), falling back to the original "output" value.
-    output_fallback: Any | None = None
-    for output_alias in _OUTPUT_ALIASES:
-        if output_alias not in spec_data:
-            continue
-        alias_value = spec_data.pop(output_alias)
-        if "output" not in spec_data:
-            spec_data["output"] = alias_value
-        else:
-            output_fallback = spec_data["output"]
-            spec_data["output"] = alias_value
-        # First alias wins — drop any remaining aliases without using them.
-        for remaining_alias in _OUTPUT_ALIASES:
-            spec_data.pop(remaining_alias, None)
-        break
-
-    # Accept output as dict → extract the concept string
-    # Agents sometimes structure the output like inputs (as a dict).
-    # Handle {"type": "ConceptName"} and single-item dicts like {"result": "Text"}.
-    if "output" in spec_data and isinstance(spec_data["output"], dict):
-        output_dict: dict[str, Any] = spec_data["output"]
-        if "concept_ref" in output_dict:
-            spec_data["output"] = output_dict["concept_ref"]
-        elif "type" in output_dict:
-            spec_data["output"] = output_dict["type"]
-        elif len(output_dict) == 1:
-            spec_data["output"] = next(iter(output_dict.values()))
-
-    # When an output alias conflicted with an existing "output", try the alias value first
-    # and fall back to the original value if validation fails.
+    # When an output alias conflicted with an existing "output" (see `_normalize_output` above), try the
+    # alias value first and fall back to the original value if validation fails.
     if output_fallback is not None:
         try:
             return spec_class.model_validate(spec_data)
@@ -245,8 +281,6 @@ def add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: Table) -> None:
 
     elif isinstance(pipe_spec, PipeParallelSpec):
         pipe_table.add("add_each_output", pipe_spec.add_each_output)
-        if pipe_spec.combined_output:
-            pipe_table.add("combined_output", pipe_spec.combined_output)
         branches_array = tomlkit.array()
         for branch in pipe_spec.branches:
             branch_inline = tomlkit.inline_table()
@@ -299,6 +333,12 @@ def add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: Table) -> None:
     elif isinstance(pipe_spec, PipeFuncSpec):
         pipe_table.add("function_name", pipe_spec.function_name)
 
+    elif isinstance(pipe_spec, PipeSignatureSpec):
+        # A signature is typeless, but the optional `signature_for` hint still round-trips. Mirrors
+        # `pipe_cmd._add_type_specific_fields` so the two TOML renderers stay faithful copies.
+        if pipe_spec.signature_for is not None:
+            pipe_table.add("signature_for", pipe_spec.signature_for)
+
 
 def pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     """Convert a PipeSpec to TOML string format.
@@ -312,8 +352,10 @@ def pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     doc = tomlkit.document()
     pipe_item_table = tomlkit.table()
 
-    # Add type
-    pipe_item_table.add("type", pipe_spec.type)
+    # Add type — a signature is typeless (no type line; omitting the type IS the signature); every
+    # concrete pipe names its type.
+    if not isinstance(pipe_spec, PipeSignatureSpec):
+        pipe_item_table.add("type", pipe_spec.type)
 
     # Add description
     pipe_item_table.add("description", pipe_spec.description)

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import ConfigDict, Field, ValidationError, field_validator, model_validator
 from rich.console import Group
@@ -13,12 +13,22 @@ from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS, normalize_typeless_signature_section
+from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+
+# The spec layer's typeless-signature allowlist is the shared blueprint contract set adapted to the
+# spec's actual field surface: drop `source` (a blueprint-only field — `PipeSpec` has no `source` and
+# forbids extras, so a typeless section carrying it must hit the teaching error, not be injected and
+# then rejected with a raw pydantic message) and add the structural `pipe_code` field (the blueprint
+# uses the dict key; the spec section carries it explicitly). Any other key on a typeless section
+# still triggers the teaching error.
+SIGNATURE_ONLY_SPEC_KEYS: frozenset[str] = (SIGNATURE_ONLY_KEYS - {"source"}) | {"pipe_code"}
 
 
 class PipelexBundleSpec(StructuredContent):
@@ -71,6 +81,34 @@ class PipelexBundleSpec(StructuredContent):
             msg = f"Error when trying to validate pipelex bundle spec: domain '{domain_code}' is not a valid domain code: {exc}"
             raise ValueError(msg) from exc
         return domain_code
+
+    @field_validator("pipe", mode="before")
+    @classmethod
+    def validate_pipe_keys(cls, pipe: Any) -> Any:
+        """Validate pipe codes and normalize typeless sections before the discriminated union runs.
+
+        Full mirror of `PipelexBundleBlueprint.validate_pipe_keys`: each dict key (the pipe code) is
+        rejected up front if not snake_case, then each section is normalized. A spec `[pipe.x]`
+        section with no `type` whose keys are exactly the signature contract
+        (`SIGNATURE_ONLY_SPEC_KEYS`) has the internal `PipeSignature` discriminator injected, so the
+        union routes it to `PipeSignatureSpec` — the author never writes the tag. A typeless section
+        that declares anything more is describing an implementation without naming its type, which is
+        a hard error. A section that already names a `type` (or is an already-built spec instance
+        rather than a raw dict) passes through untouched.
+        """
+        if pipe is None:
+            return None
+        if not isinstance(pipe, dict):
+            # Let the field type raise its own "should be a dict" error.
+            return pipe
+        typed_pipe = cast("dict[Any, Any]", pipe)
+        normalized: dict[Any, Any] = {}
+        for pipe_code, pipe_section in typed_pipe.items():
+            if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
+                msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
+                raise ValueError(msg)
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS)
+        return normalized
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleSpec":
