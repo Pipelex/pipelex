@@ -14,13 +14,12 @@ def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
 
     The single cycle-guarded ``__cause__`` walk shared across the error-reporting
     paths — classification recovery (``find_inference_error_category_in_chain``),
-    report extraction and message synthesis (``_find_error_report_dict`` /
-    ``_message_from_exc``), and the inline fail-safe guard
-    (``_carries_temporal_failure``). The ``id()`` set makes a cyclic ``__cause__``
-    chain terminate instead of spinning forever. That guard runs *on the error
-    path*, so getting it wrong would turn the failure being reported into the very
-    hang the reporting exists to surface — centralizing it here means it is
-    written, and audited, once.
+    the is-self cycle check in ``_enrich_error_report_from_cause``, LLM-error
+    formatting (``PipeLLM._format_llm_error``), and the agent-CLI source-location
+    extraction. The ``id()`` set makes a cyclic ``__cause__`` chain terminate
+    instead of spinning forever. That walk runs *on the error path*, so getting it
+    wrong would turn the failure being reported into a hang — centralizing it here
+    means it is written, and audited, once.
     """
     node: BaseException | None = exc
     seen: set[int] = set()

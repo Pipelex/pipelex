@@ -20,7 +20,7 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from mistralai.client.types import OptionalNullable
 
 
-class MistralLLMWorker(LLMWorkerInternalAbstract):
+class MistralLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         mistral_factory: MistralFactory,
@@ -42,7 +42,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        LLMWorkerInternalAbstract.__init__(
+        LLMWorkerAbstract.__init__(
             self,
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,

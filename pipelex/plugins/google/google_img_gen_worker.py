@@ -88,16 +88,17 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         """Generate a single image using Google Gemini Image API."""
         prompt_text = img_gen_job.img_gen_prompt.positive_text
-        aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(img_gen_job.job_params.aspect_ratio)
-        width, height = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
-            model=self.inference_model.name,
+        resolved = GoogleImgGenFactory.resolve_image_config(
+            GoogleImgGenFactory.img_gen_taxonomy(self.inference_model),
             aspect_ratio=img_gen_job.job_params.aspect_ratio,
-            size="1K",
+            size=img_gen_job.job_params.size,
+            model_name=self.inference_model.name,
         )
 
-        # Build image config for aspect ratio
+        # Build image config for aspect ratio and size (image_size None = provider default)
         image_config = genai_types.ImageConfig(
-            aspect_ratio=aspect_ratio_str,
+            aspect_ratio=resolved.aspect_ratio,
+            image_size=resolved.image_size,
         )
 
         # Build generation config with image output
@@ -107,11 +108,21 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             # seed=img_gen_job.job_params.seed,
         )
 
+        # Build contents: the text prompt, plus input images for image-to-image editing
+        contents: genai_types.ContentListUnion
+        if input_images := img_gen_job.img_gen_prompt.input_images:
+            image_tasks = [GoogleFactory.prepare_image_part(prompt_image) for prompt_image in input_images]
+            image_parts = await asyncio.gather(*image_tasks)
+            parts = [genai_types.Part.from_text(text=prompt_text), *image_parts]
+            contents = genai_types.Content(parts=parts, role="user")
+        else:
+            contents = prompt_text
+
         # Generate content using async client
         try:
             response = await self.genai_async_client.models.generate_content(
                 model=self.inference_model.model_id,
-                contents=prompt_text,
+                contents=contents,
                 config=generation_config,
             )
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
@@ -182,7 +193,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     )
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
-                    size=ImageSize(width=width, height=height),
+                    size=ImageSize(width=resolved.width, height=resolved.height),
                     mime_type=mime_type,
                 )
 

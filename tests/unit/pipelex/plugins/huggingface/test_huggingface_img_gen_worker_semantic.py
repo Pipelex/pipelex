@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+import httpx
 import pytest
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
@@ -16,13 +17,11 @@ from pipelex.plugins.huggingface.huggingface_img_gen_worker import HuggingFaceIm
 
 
 def _make_hf_http_error(status_code: int, message: str = "error") -> HfHubHTTPError:
-    import requests  # noqa: PLC0415
-
-    response = requests.Response()
-    response.status_code = status_code
-    exc = HfHubHTTPError(message=message)
-    exc.response = response  # type: ignore[attr-defined]
-    return exc
+    response = httpx.Response(
+        status_code=status_code,
+        request=httpx.Request("POST", "https://router.huggingface.co/test"),
+    )
+    return HfHubHTTPError(message=message, response=response)
 
 
 def _make_worker(mocker: MockerFixture) -> HuggingFaceImgGenWorker:

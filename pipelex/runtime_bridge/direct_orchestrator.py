@@ -20,8 +20,7 @@ from pipelex.runtime_bridge.serialization import PIPE_DISPATCH_ERRORS, serialize
 if TYPE_CHECKING:
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
-    from pipelex.runtime_bridge.delivery_mode import DeliveryMode
-    from pipelex.runtime_bridge.payloads import PipelexPipeRunOutput
+    from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
 
 
 class DirectOrchestrator:
@@ -32,7 +31,7 @@ class DirectOrchestrator:
     # rather than running blocking and falsely acking.
     supports_fire_and_forget = False
 
-    async def run(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None, delivery: DeliveryMode) -> PipelexPipeRunOutput:  # noqa: ARG002 — delivery accepted for protocol uniformity; in-process always blocks
+    async def execute(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:
         # DIRECT mode forces in-process execution even inside a Temporal-enabled
         # worker. Scope the in-process router as the active router for the WHOLE
         # run so nested controller sub-pipes — which dispatch through
@@ -53,3 +52,10 @@ class DirectOrchestrator:
             pipe_output=pipe_output,
             workflow_id=None,
         )
+
+    async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:  # noqa: ARG002 — protocol signature; unreachable behind the supports_fire_and_forget gate
+        msg = (
+            f"DIRECT orchestrator cannot fire-and-forget pipe '{pipe_job.pipe.code}': in-process execution has no genuine async path. "
+            "Callers must check `supports_fire_and_forget` before dispatching a fire-and-forget job."
+        )
+        raise PipelexBridgeDispatchError(msg)

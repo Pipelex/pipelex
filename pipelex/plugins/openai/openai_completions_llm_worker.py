@@ -22,7 +22,7 @@ from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 
 
-class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
+class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         openai_completions_factory: OpenAICompletionsFactory,
@@ -44,7 +44,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        LLMWorkerInternalAbstract.__init__(
+        LLMWorkerAbstract.__init__(
             self,
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,

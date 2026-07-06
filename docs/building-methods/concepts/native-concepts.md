@@ -35,6 +35,7 @@ Here are all the native concepts you can use out of the box:
 | `JSON` | A JSON object | `JSONContent` |
 | `Html` | HTML content with inner HTML and CSS class | `HtmlContent` |
 | `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
+| `Composite` | A named composition of contents | `CompositeContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
 ## Native Concept Structures
@@ -198,6 +199,19 @@ class SearchResultContent(StuffContent):
 - `sources`: A list of `DocumentContent` source citations (each with `url`, `title`, and `snippet`)
 
 **Use for:** Web search results, research findings, information retrieval with citations.
+
+### CompositeContent
+
+An untyped named composition of contents. Produced by `PipeParallel` when its output is `Composite`:
+
+```python
+class CompositeContent(StuffContent):
+    model_config = ConfigDict(extra="allow")
+```
+
+Each named sub-content is a top-level field of the composite — there is no wrapper key, so the serialized shape matches what a bespoke structured concept with the same field names would produce.
+
+**Use for:** Combining parallel branch results without declaring a bespoke concept.
 
 ### Anything
 

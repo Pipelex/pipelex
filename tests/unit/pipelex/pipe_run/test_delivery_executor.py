@@ -6,6 +6,11 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -13,8 +18,22 @@ from pipelex.pipe_run.delivery_assignment import (
     WebhookTarget,
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
-from pipelex.pipe_run.exceptions import StorageDeliveryError, WebhookDeliveryError
+from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.tools.network.exceptions import SsrfBlockedError
+
+
+def _make_main_stuff() -> Stuff:
+    return Stuff(
+        stuff_code="main-code",
+        stuff_name="main_stuff",
+        concept=Concept(
+            code="Text",
+            domain_code="native",
+            description="Plain text",
+            structure_class_name="TextContent",
+        ),
+        content=TextContent(text="Hello delivery!"),
+    )
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -28,7 +47,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
-        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -45,6 +64,10 @@ class TestDeliveryExecutor:
         mock_storage.store.assert_called()
         stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
         assert any("test-user/plr-123/working_memory.json" in key for key in stored_keys)
+        # A completed run always delivers a main stuff, so the main_stuff artifact files are always written.
+        assert any("test-user/plr-123/main_stuff.json" in key for key in stored_keys)
+        assert any("test-user/plr-123/main_stuff.md" in key for key in stored_keys)
+        assert any("test-user/plr-123/main_stuff.html" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()
@@ -142,7 +165,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {}
-        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -156,6 +179,25 @@ class TestDeliveryExecutor:
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
             )
+
+    async def test_generate_result_files_raises_without_main_stuff_typed(self, mocker: MockerFixture) -> None:
+        """A completed run always delivers a main stuff — a typed working memory without one is a contract violation, not an empty envelope."""
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory = WorkingMemory()
+        mock_output.graph_spec = None
+
+        with pytest.raises(WorkingMemoryStuffNotFoundError):
+            await DeliveryExecutor().generate_result_files(mock_output)
+
+    async def test_generate_result_files_raises_without_main_stuff_raw(self, mocker: MockerFixture) -> None:
+        """Same contract on the raw (cross-process) path: a raw working memory without a main stuff fails loudly."""
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = {"root": {}, "aliases": {}}
+        mock_output.graph_spec = None
+
+        with pytest.raises(PipeJobError):
+            await DeliveryExecutor().generate_result_files(mock_output)
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
@@ -298,7 +340,7 @@ class TestDeliveryExecutor:
                     "content": [page],
                 }
             },
-            "aliases": {},
+            "aliases": {"main_stuff": "cv_pages"},
         }
         mock_output.graph_spec = None
 
@@ -426,7 +468,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
-        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()

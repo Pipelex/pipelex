@@ -1,9 +1,8 @@
 """Import-light guard (codex C12): discovering and registering the built-in plugins must
 not import any backend SDK (whether an optional extra like anthropic/linkup or a heavy core
-dep like openai/portkey_ai/pypdfium2 — each plugin must defer its import into make_worker) nor
-``temporalio`` (which ships only with the external ``pipelex-temporal`` plugin — core discovery
-must never pull the Temporal SDK). Enforced in a subprocess whose meta-path finder raises on those
-SDKs, which is deterministic where an in-process sys.modules check is not.
+dep like openai/portkey_ai/pypdfium2) — each plugin must defer its import into make_worker.
+Enforced in a subprocess whose meta-path finder raises on those SDKs, which is deterministic
+where an in-process sys.modules check is not.
 """
 
 import subprocess  # noqa: S404
@@ -28,7 +27,6 @@ _GUARD_SCRIPT = textwrap.dedent(
         "openai",
         "portkey_ai",
         "pypdfium2",
-        "temporalio",
         # No web framework either: the F3 HTTP-error-mapper seam is framework-agnostic
         # (it carries the core ``ErrorReport`` type). A host runtime owns FastAPI/Starlette;
         # discovery/registration in core must never pull one in.
@@ -53,11 +51,9 @@ _GUARD_SCRIPT = textwrap.dedent(
     # whose load() could legitimately import an optional SDK.
     discovery._external_entry_points = lambda: []
 
-    # Temporal ships externally (pipelex-temporal); core's built-ins claim no hub slots. temporalio
-    # stays in the BLOCKED set above: core discovery must never pull the Temporal SDK, and
-    # temporal.is_enabled=True must not change that (no core built-in reads it). The slot-claim
-    # import-light guarantee for the Temporal thunks is pinned in the pipelex-temporal suite.
-    config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]), temporal=SimpleNamespace(is_enabled=True))
+    # Core's built-ins claim no hub slots; building the registrar must register them all
+    # import-light, pulling none of the BLOCKED backend SDKs into sys.modules.
+    config = SimpleNamespace(plugins=SimpleNamespace(disabled=[]))
     registrar = discovery.build_registrar(config=config)
     assert registrar.inference_backends, "expected the built-in LLM backends to be registered"
     assert registrar.model_listers, "expected the built-in model listers to be registered import-light"

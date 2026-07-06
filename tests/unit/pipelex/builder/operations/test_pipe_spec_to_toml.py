@@ -323,7 +323,7 @@ class TestPipeSpecToToml:
                 "pipe_code": "my_par",
                 "description": "Parallel branches",
                 "inputs": {"doc": "Document"},
-                "output": "Text",
+                "output": "Composite",
                 "add_each_output": True,
                 "branches": [
                     {"pipe_code": "branch_a", "result": "result_a"},
@@ -337,24 +337,7 @@ class TestPipeSpecToToml:
         assert "add_each_output = true" in toml
         assert "branch_a" in toml
         assert "branch_b" in toml
-
-    def test_parallel_combined_output_in_toml(self) -> None:
-        spec = parse_pipe_spec(
-            {
-                "pipe_code": "my_par",
-                "description": "Parallel with combined output",
-                "inputs": {"doc": "Document"},
-                "output": "Text",
-                "add_each_output": False,
-                "combined_output": "MergedResult",
-                "branches": [
-                    {"pipe_code": "branch_a", "result": "result_a"},
-                ],
-            },
-            pipe_type="PipeParallel",
-        )
-        toml = pipe_spec_to_toml(spec)
-        assert 'combined_output = "MergedResult"' in toml
+        assert "combined_output" not in toml
 
     # -- PipeCondition ----------------------------------------------------
 

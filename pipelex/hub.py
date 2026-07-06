@@ -1,5 +1,5 @@
 import sys
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -56,6 +56,15 @@ if TYPE_CHECKING:
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
+def _never_in_isolated_execution() -> bool:
+    """Core default isolated-execution probe: the in-process orchestrator has no replay/activity
+    split, so an emission is never inside an isolated sub-execution. A boot-orchestrator plugin
+    whose runtime has such a split (a Temporal worker) replaces this by claiming
+    ``HubSlot.ISOLATED_EXECUTION_PROBE``.
+    """
+    return False
+
+
 class PipelexHub:
     """PipelexHub serves as a central dependency manager to break cyclic imports between components.
     It provides access to core providers and factories through a singleton instance,
@@ -96,6 +105,11 @@ class PipelexHub:
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
         self._pipe_run: PipeRunProtocol | None = None
+        # Ambient probe claimed by a boot-orchestrator plugin (ISOLATED_EXECUTION_PROBE): True when
+        # the current call runs inside an isolated sub-execution (a Temporal activity) whose emissions
+        # must bypass the parent run's registered buffer. Core default never isolated (see
+        # _never_in_isolated_execution); consumed by ReportingManager to route usage emissions.
+        self._isolated_execution_probe: Callable[[], bool] = _never_in_isolated_execution
 
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
@@ -229,6 +243,9 @@ class PipelexHub:
 
     def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
         self._pipe_run = pipe_run
+
+    def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
+        self._isolated_execution_probe = probe
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -386,6 +403,15 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._pipe_run
 
+    def is_in_isolated_execution(self) -> bool:
+        """True when the current call runs inside an isolated sub-execution whose side-effecting
+        emissions must not be written into the parent run's registered (replay-deterministic) buffer.
+
+        Delegates to the boot-orchestrator's claimed probe (a Temporal worker reports True while a
+        call executes inside an activity); the core default is always False.
+        """
+        return self._isolated_execution_probe()
+
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
             msg = "PipelineManager is not initialized"
@@ -532,6 +558,11 @@ def get_extract_worker(
 
 def get_report_delegate() -> ReportingProtocol:
     return get_pipelex_hub().get_report_delegate()
+
+
+def is_in_isolated_execution() -> bool:
+    """Module-level accessor — see :meth:`PipelexHub.is_in_isolated_execution`."""
+    return get_pipelex_hub().is_in_isolated_execution()
 
 
 _content_generator_override: ContextVar[ContentGeneratorProtocol | None] = ContextVar("content_generator_override", default=None)
@@ -720,7 +751,7 @@ def set_pipe_router(pipe_router: "PipeRouterProtocol") -> None:
     """Override the active pipe router for the current async context.
 
     Used by host runtimes that want controllers to dispatch sub-pipes
-    through their own router (e.g. Mistral-native mode swaps in a router
+    through their own router (e.g. Mistral Workflows mode swaps in a router
     that turns sub-pipe calls into child workflows / activities). The
     override is contextvar-scoped, so concurrent runs on the same hub
     don't leak into each other. Pass ``None`` via

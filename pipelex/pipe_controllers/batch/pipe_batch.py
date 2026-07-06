@@ -19,6 +19,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.async_utils import gather_bounded
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
@@ -28,7 +29,7 @@ if TYPE_CHECKING:
     from pipelex.libraries.library_crate import LibraryCrate
 
 # When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
-# the Temporal track — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
+# durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
 LARGE_BATCH_ADVISORY_THRESHOLD = 100
 
 
@@ -146,7 +147,7 @@ class PipeBatch(PipeController):
             log.warning(
                 f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
                 f"(max_concurrency={max_concurrency_setting}) is a basic backpressure effort, not durable execution — "
-                f"for a workload this size, consider running on Temporal for durable, rate-limited execution."
+                f"for a workload this size, consider a durable execution backend for rate-limited, resumable runs: {URLs.durable_execution}"
             )
 
         async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:

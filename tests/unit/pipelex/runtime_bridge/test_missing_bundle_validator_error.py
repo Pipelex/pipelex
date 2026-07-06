@@ -13,7 +13,7 @@ from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 
 class TestMissingBundleValidatorError:
-    @pytest.mark.parametrize("mode", ["temporal", "mistralai-workflows", "acme"])
+    @pytest.mark.parametrize("mode", ["temporal", "mistral-workflows", "acme"])
     def test_unregistered_mode_carries_generic_plugin_hint(self, mode: str) -> None:
         error = MissingBundleValidatorError(mode=mode)
 

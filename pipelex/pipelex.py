@@ -50,6 +50,7 @@ from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -391,6 +392,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # apply-points in a later phase (no orchestrator plugin contributes any of them yet).
         plugin_registrar = build_registrar(config=get_config())
         self._plugin_registrar = plugin_registrar
+        # Reject an unknown boot orchestrator before falling through to the core defaults. The
+        # requested name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched
+        # against registered plugin names — the same namespace the slot-claim gate uses
+        # (boot_orchestrator == plugin.name). When no plugin of that name registered (not installed,
+        # disabled, or a typo) nothing claims the hub slots, so without this guard the run would
+        # silently execute in-process instead of under the requested runtime.
+        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
+        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
         self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
         self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
@@ -455,6 +465,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         task_manager_factory = plugin_registrar.slot_claims.get(HubSlot.TASK_MANAGER)
         if task_manager_factory is not None:
             task_manager_factory()
+
+        # --- Isolated-execution probe ----------------------------------------------------------
+        # Claimed only by a boot-orchestrator plugin whose runtime has a replay/activity split (e.g. a
+        # Temporal worker): the thunk resolves the ambient predicate that reports whether the current
+        # call runs inside an isolated sub-execution (an activity). ReportingManager consults it to
+        # route an activity-side usage emission to the per-process log instead of the workflow's
+        # registered buffer (audit H1). Unclaimed (any in-process boot), the fresh hub's default
+        # reports "never isolated", so no wiring is needed here.
+        isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
+        if isolated_execution_probe_factory is not None:
+            self.pipelex_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
 
         # --- Pipe Router -----------------------------------------------------------------------
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
@@ -629,6 +650,20 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if needs_inference:
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
+            # A failed boot must release the process-global singletons it acquired, not just the
+            # singleton registration — otherwise they leak and poison the next boot in the same
+            # process. setup() establishes these progressively (logging + hub config in __init__, the
+            # KajsonManager class registry, the template registries) and may mutate config (e.g.
+            # plugins.boot_orchestrator); failing partway skips teardown(), the normal release point.
+            # We release the same process-global state teardown() does, but via its class-level entry
+            # points so it is safe on a half-built instance (full teardown() would touch managers a
+            # partial setup never assigned). Without this the next boot raises "LogConfig is already
+            # set" and serves a stale, half-populated class registry (the KajsonManager singleton
+            # ignores a fresh registry once created).
+            pipelex_instance.pipelex_hub.reset_config()
+            KajsonManager.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
             # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]

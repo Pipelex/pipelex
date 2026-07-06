@@ -234,7 +234,7 @@ is_sync_mode = false
 [cogt.img_gen_config.img_gen_param_defaults]
 nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
-aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_3_2", "landscape_16_9", "landscape_21_9", "landscape_4_1", "landscape_8_1", "portrait_3_4", "portrait_2_3", "portrait_9_16", "portrait_9_21", "portrait_1_4", "portrait_1_8"
 guidance_scale = 2.5
 background = "auto"
 is_moderated = true
@@ -341,7 +341,7 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing config (event log for distributed tracing across Temporal workers)
+# Tracing config (event log for distributed tracing across workers)
 ####################################################################################################
 
 [pipelex.tracing_config]
@@ -352,10 +352,6 @@ backend = "ndjson"
 traces_dir = ".pipelex/traces"
 
 [pipelex.tracing_config.dynamodb]
-table_name = ""
-region = ""
-
-[pipelex.tracing_config.temporal_dynamodb]
 table_name = ""
 region = ""
 

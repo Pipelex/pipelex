@@ -43,10 +43,8 @@ class _StubSchema(BaseModel):
 class _StubLLMWorker(LLMWorkerAbstract):
     """LLM worker whose abstract impl always raises the supplied error."""
 
-    def __init__(self, model_handle: str, provider_name: str, error: Exception) -> None:
-        LLMWorkerAbstract.__init__(self, reporting_delegate=None)
-        self._model_handle = model_handle
-        self._provider_name = provider_name
+    def __init__(self, inference_model: Any, error: Exception) -> None:
+        LLMWorkerAbstract.__init__(self, inference_model=inference_model, reporting_delegate=None)
         self._error = error
 
     @property
@@ -58,14 +56,6 @@ class _StubLLMWorker(LLMWorkerAbstract):
     @override
     def is_vision_supported(self) -> bool:
         return True
-
-    @override
-    def _get_request_model_name(self) -> str:
-        return self._model_handle
-
-    @override
-    def _get_provider_name(self) -> str:
-        return self._provider_name
 
     @override
     async def _gen_text(self, llm_job: Any) -> str:
@@ -121,9 +111,11 @@ class _StubSearchWorker(SearchWorkerAbstract):
 
 
 def _make_llm_job(mocker: MockerFixture) -> Any:
-    """LLM job with telemetry disabled so the OTel span is skipped."""
+    """LLM job with telemetry disabled so the OTel span is skipped, and a prompt that no-ops the capability checks."""
     job = mocker.MagicMock()
     job.job_metadata.otel_context = None
+    job.llm_prompt.user_images = []
+    job.llm_prompt.user_documents = []
     return job
 
 
@@ -136,9 +128,20 @@ def _make_extract_job(mocker: MockerFixture) -> Any:
     return job
 
 
-def _make_inference_model() -> SimpleNamespace:
+def _make_inference_model(backend_name: str = WORKER_PROVIDER) -> SimpleNamespace:
     """Stub inference model exposing the fields the workers read."""
-    return SimpleNamespace(name=WORKER_MODEL, backend_name=WORKER_PROVIDER, tag="stub-tag", desc="stub-desc")
+    return SimpleNamespace(
+        name=WORKER_MODEL,
+        backend_name=backend_name,
+        model_id=WORKER_MODEL,
+        tag="stub-tag",
+        desc="stub-desc",
+        max_tokens=None,
+        max_prompt_images=None,
+        listed_constraints=[],
+        valued_constraints={},
+        is_img2img_supported=True,
+    )
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -149,7 +152,7 @@ class TestWorkerErrorEnrichment:
     async def test_llm_worker_enriches_error(self, mocker: MockerFixture, use_object: bool) -> None:
         """gen_text / gen_object stamp the worker's model and provider onto a bare LLMCompletionError."""
         error = LLMCompletionError("LLM worker failed", error_category=InferenceErrorCategory.TRANSIENT)
-        worker = _StubLLMWorker(model_handle=WORKER_MODEL, provider_name=WORKER_PROVIDER, error=error)
+        worker = _StubLLMWorker(inference_model=_make_inference_model(), error=error)
         job = _make_llm_job(mocker)
         invocation = worker.gen_object(llm_job=job, schema=_StubSchema) if use_object else worker.gen_text(llm_job=job)
 
@@ -164,7 +167,7 @@ class TestWorkerErrorEnrichment:
         """An inner error that already set model_handle keeps its value; only the missing provider is filled."""
         inner_model = "preset-only-model"
         error = LLMModelNotFoundError("model not found", model_handle=inner_model)
-        worker = _StubLLMWorker(model_handle=WORKER_MODEL, provider_name=WORKER_PROVIDER, error=error)
+        worker = _StubLLMWorker(inference_model=_make_inference_model(), error=error)
 
         with pytest.raises(LLMModelNotFoundError) as exc_info:
             await worker.gen_text(llm_job=_make_llm_job(mocker))
@@ -176,7 +179,7 @@ class TestWorkerErrorEnrichment:
     async def test_llm_worker_skips_unknown_provider(self, mocker: MockerFixture) -> None:
         """A worker that does not know its provider ('unknown' default) leaves provider unset."""
         error = LLMCompletionError("LLM worker failed", error_category=InferenceErrorCategory.TRANSIENT)
-        worker = _StubLLMWorker(model_handle=WORKER_MODEL, provider_name="unknown", error=error)
+        worker = _StubLLMWorker(inference_model=_make_inference_model(backend_name="unknown"), error=error)
 
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker.gen_text(llm_job=_make_llm_job(mocker))
@@ -194,7 +197,7 @@ class TestWorkerErrorEnrichment:
     )
     async def test_llm_worker_closes_span_on_failure(self, mocker: MockerFixture, raised_error: Exception) -> None:
         """gen_text always closes the OTel span on failure — for a CogtError and for an unexpected non-CogtError alike."""
-        worker = _StubLLMWorker(model_handle=WORKER_MODEL, provider_name=WORKER_PROVIDER, error=raised_error)
+        worker = _StubLLMWorker(inference_model=_make_inference_model(), error=raised_error)
         fake_span = mocker.MagicMock()
         fake_span.is_recording.return_value = True
         mocker.patch.object(worker, "_start_otel_span_llm", return_value=fake_span)

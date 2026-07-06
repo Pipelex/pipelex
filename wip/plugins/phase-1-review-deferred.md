@@ -1,6 +1,0 @@
-# Phase 1 plugin-system review — deferred items
-
-Items surfaced during the `/code-review` pass on the Phase 1 staged diff that are design tradeoffs (not bugs) and were intentionally NOT changed. Left here for later triage.
-
-- `llm_worker_factory.make_llm_worker` computes `ModelHandle.make_for_inference_model(...)` to do the registry lookup by `model_handle.sdk`, and each vendor `_make_*_worker` closure recomputes it internally. The pre-migration `match` arms computed it once. The recompute is a trivial 3-field pydantic construction, off any hot loop (one per worker creation), so the cost is negligible — but if a later phase threads `model_handle` through the `MakeWorkerFn` signature for other reasons, this redundancy disappears for free. Not worth a seam-signature change on its own.
-- `PluginDiscovery.targets_api` is recorded from `plugin.targets_api` on the disabled-plugin path (discovery.py) but from the literal `PLUGIN_API_VERSION` on the registered path (via `begin_plugin`). They are equal for any registered plugin (the version-mismatch check gates registration), so this is a stylistic asymmetry with no behavioral effect. Could be unified to always record `plugin.targets_api` if a future API allows a registered plugin to declare a value other than the supported one.

@@ -396,7 +396,7 @@ class TestMermaidflow:
             "status": NodeStatus.SUCCEEDED,
             "node_io": NodeIOSpec(
                 inputs=[],
-                outputs=[IOSpec(name="combined_output", concept="MergedText", digest="combined_digest_001")],
+                outputs=[IOSpec(name="combined_result", concept="MergedText", digest="combined_digest_001")],
             ),
         }
         branch_a = {
@@ -470,5 +470,5 @@ class TestMermaidflow:
         assert subgraph_end_idx is not None, "Controller subgraph end not found"
 
         subgraph_content = "\n".join(lines[subgraph_start_idx : subgraph_end_idx + 1])
-        assert "combined_output" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
+        assert "combined_result" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
         assert ":::stuff" in subgraph_content, "Combined output stuff should have :::stuff class styling"

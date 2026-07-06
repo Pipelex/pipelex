@@ -1,12 +1,13 @@
 """Unit tests for ``iter_cause_chain`` — the centralized, cycle-guarded ``__cause__`` walk.
 
-This primitive is load-bearing on the error-reporting path: ``_carries_temporal_failure``,
-``find_inference_error_category_in_chain``, ``_find_error_report_dict``, ``_message_from_exc``
-and the is-self cycle check in ``_enrich_error_report_from_cause`` all delegate to it. A walk
-that started at ``exc.__cause__`` instead of ``exc`` would silently break the predicates that
-inspect the seed node, while the indirect coverage (``test_message_from_exc``) stayed green.
-These tests pin the two contract properties that nothing else exercises: the seed is yielded
-first, and every node is visited exactly once even on a cyclic chain.
+This primitive is load-bearing on the error-reporting path:
+``find_inference_error_category_in_chain``, the is-self cycle check in
+``_enrich_error_report_from_cause``, ``PipeLLM._format_llm_error`` and the agent-CLI
+source-location extraction all delegate to it. A walk that started at ``exc.__cause__``
+instead of ``exc`` would silently break the predicates that inspect the seed node, while
+that indirect coverage stayed green. These tests pin the two contract properties that
+nothing else exercises: the seed is yielded first, and every node is visited exactly once
+even on a cyclic chain.
 """
 
 from pipelex.base_exceptions import iter_cause_chain

@@ -62,6 +62,7 @@ class HubSlot(StrEnum):
     PIPE_ROUTER = "pipe_router"
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
+    ISOLATED_EXECUTION_PROBE = "isolated_execution_probe"
 
 
 class PluginOrigin(StrEnum):
@@ -73,6 +74,10 @@ class PluginStatus(StrEnum):
     REGISTERED = "registered"
     DISABLED = "disabled"
     BROKEN = "broken"
+
+    @property
+    def is_registered(self) -> bool:
+        return self is PluginStatus.REGISTERED
 
 
 class PluginDiscovery(BaseModel):
@@ -222,6 +227,9 @@ class PluginRegistrar:
     def claim_task_manager(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.TASK_MANAGER, factory=factory)
 
+    def claim_isolated_execution_probe(self, factory: Callable[[], Any]) -> None:
+        self._claim(slot=HubSlot.ISOLATED_EXECUTION_PROBE, factory=factory)
+
     def add_teardown(self, callback: Callable[[], None]) -> None:
         self.teardown_callbacks.append(callback)
         self._active.contributions.append("teardown callback")
@@ -229,6 +237,17 @@ class PluginRegistrar:
     # ------------------------------------------------------------------ #
     # Read accessors (for host runtimes consuming plugin contributions)
     # ------------------------------------------------------------------ #
+
+    @property
+    def registered_plugin_names(self) -> set[str]:
+        """Names of plugins that discovered and registered successfully.
+
+        The authoritative namespace the ``plugins.boot_orchestrator`` gate matches against: a
+        boot-orchestrator plugin claims its hub slots iff ``boot_orchestrator == its own name``.
+        Disabled/broken discoveries are excluded — they never run ``register`` and so never claim a
+        slot, making them invalid boot-orchestrator targets.
+        """
+        return {discovery.name for discovery in self.discoveries if discovery.status.is_registered}
 
     def get_http_error_mappers(self) -> dict[type[Exception], HttpErrorMapperFn]:
         """Resolve every contributed exc-type provider into a ``{exc_type: mapper}`` dict.

@@ -28,7 +28,7 @@ run time (e.g. LLMWorkerFactory.make_llm_worker)
   └─ worker = make_worker(inference_model=…, backend=…, sdk_clients=…, reporting_delegate=…)
 ```
 
-The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `NotImplementedError` ("… Is its plugin installed?").
+The worker factories (`LLMWorkerFactory`, `ImgGenWorkerFactory`, `ExtractWorkerFactory`, `SearchWorkerFactory`) hold **no** `match` over SDK strings. They build a `ModelHandle`, resolve the `InferenceBackend` config, look up the backend's `make_worker` by `(family, sdk)`, and call it. A lookup miss raises a friendly `InferenceBackendNotFoundError` ("… Is its plugin installed and enabled?").
 
 ---
 
@@ -43,7 +43,7 @@ class PipelexPlugin(Protocol):
     def register(self, registrar: PluginRegistrar) -> None: ...
 ```
 
-`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again at CLI-build to harvest plugin-contributed commands).
+`register` is the **only** method core calls, and it is **side-effect-free**: it may call the registrar's menu methods and nothing else — no hub access, no I/O, no client/SDK construction. This is what makes `build_registrar` safe to run more than once (it runs at boot, and again whenever the `pipelex plugins list` diagnostic command re-discovers plugins to print what each contributed).
 
 `targets_api` is checked against `PLUGIN_API_VERSION`. A mismatch fails loud with `PluginApiVersionMismatchError` — a single coarse integer gate, not semver-range matching.
 

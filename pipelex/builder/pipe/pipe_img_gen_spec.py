@@ -7,6 +7,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenSize
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 
@@ -31,6 +32,13 @@ class PipeImgGenSpec(PipeSpec):
         description="Model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
     )
     prompt: str = Field(description="A finalized image generation prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
+    size: ImgGenSize | None = Field(
+        default=None,
+        description=(
+            "Image size intent: a portable tier ('1k', '2k', '4k'; '0.5k' is reserved and not yet supported by any model) "
+            "or exact pixels like '2048x1152' (an exact size implies the aspect ratio). Omit to use the provider default."
+        ),
+    )
 
     @field_validator("model", mode="before")
     @classmethod
@@ -66,6 +74,7 @@ class PipeImgGenSpec(PipeSpec):
             output=base_blueprint.output,
             prompt=self.prompt,
             model=self.model,
+            size=self.size,
             aspect_ratio=None,
             background=None,
             output_format=None,

@@ -140,3 +140,30 @@ class BrokenPluginError(PluginError):
         self.reason = reason
         message = f"Plugin '{plugin_name}' failed to register: {reason}"
         super().__init__(message)
+
+
+class UnknownBootOrchestratorError(PluginError):
+    """An explicit boot orchestrator was requested, but no plugin of that name is registered.
+
+    ``plugins.boot_orchestrator`` (set via the CLI ``--orchestrator`` flag or
+    ``Pipelex.setup(boot_orchestrator=...)``) names the *plugin* this process should boot under:
+    a boot-orchestrator plugin claims the process-global hub slots iff
+    ``plugins.boot_orchestrator == its own name``. When no discovered, registered plugin carries
+    that name — the plugin is not installed, was disabled via ``plugins.disabled``, or the name is
+    a typo — nothing claims the slots and execution would silently fall back to the in-process core
+    defaults. We fail loud at boot instead. The message names no specific plugin, so core stays
+    decoupled from its plugins.
+    """
+
+    # The message describes the caller's own input (the requested orchestrator name) and is fully
+    # actionable; keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, requested: str):
+        self.requested = requested
+        message = (
+            f"Boot orchestrator '{requested}' was requested, but no plugin named '{requested}' is registered "
+            "(its plugin may not be installed, may be disabled via plugins.disabled, or the name may be a typo). "
+            "Core provides only in-process execution; booting under a distributed orchestrator requires installing its plugin."
+        )
+        super().__init__(message)

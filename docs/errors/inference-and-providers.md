@@ -110,6 +110,7 @@ own page. Classes are grouped by subsystem.
 - [`PortkeyCredentialsError`](portkey-credentials-error.md) — Portkey credentials
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
+- [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
 - [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 - [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 

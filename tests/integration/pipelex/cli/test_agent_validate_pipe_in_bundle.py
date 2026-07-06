@@ -59,9 +59,8 @@ prompt = "Summarize $doc"
 type = "PipeParallel"
 description = "Parallel referencing an unloaded cross-package branch."
 inputs = { doc = "XpkgDoc" }
-output = "Text"
+output = "Composite"
 add_each_output = true
-combined_output = "Text"
 branches = [
   { pipe = "ext->otherpkg.missing_pipe", result = "branch_result" },
 ]
