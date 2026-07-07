@@ -29,6 +29,22 @@ def _blueprint_error_data(
     )
 
 
+def _strip_namespace_error_data(
+    *,
+    pipe_code: str | None,
+    stripped_pipe_code: str | None,
+    source: str | None = "main.mthds",
+) -> PipelexBundleBlueprintValidationErrorData:
+    return PipelexBundleBlueprintValidationErrorData(
+        error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+        domain_code="greetings",
+        source=source,
+        pipe_code=pipe_code,
+        stripped_pipe_code=stripped_pipe_code,
+        message="Pipe code 'greetings.hello' is not a valid pipe code. Must be in snake_case.",
+    )
+
+
 class TestBlueprintFixPlanner:
     def test_native_redeclaration_yields_strip_fix(self) -> None:
         """An enriched native-redeclaration error yields a SAFE delete_key of the concept."""
@@ -77,3 +93,42 @@ class TestBlueprintFixPlanner:
         """A blueprint error with no error_type (uncategorized residual) yields no fix."""
         fix = plan_fix_for_blueprint_validation_error(_blueprint_error_data(error_type=None))
         assert fix is None
+
+    def test_dotted_declaration_yields_position_preserving_rename(self) -> None:
+        """A strippable dotted declaration (pipe_code + stripped) yields a rename_table_key op."""
+        error_data = _strip_namespace_error_data(pipe_code="greetings.hello", stripped_pipe_code="hello")
+        fix = plan_fix_for_blueprint_validation_error(error_data)
+        assert fix is not None
+        assert fix.fix_code == "strip-namespace"
+        assert fix.safety == FixSafety.SAFE
+        assert len(fix.ops) == 1
+        op = fix.ops[0]
+        assert op.kind == FixOpKind.RENAME_TABLE_KEY
+        assert op.table_path == ["pipe"]
+        assert op.key == "greetings.hello"
+        assert op.new_key == "hello"
+
+    def test_dotted_main_pipe_yields_root_set_key(self) -> None:
+        """A strippable main_pipe strip (no pipe_code) yields a set_key of main_pipe at the root."""
+        error_data = _strip_namespace_error_data(pipe_code=None, stripped_pipe_code="hello")
+        fix = plan_fix_for_blueprint_validation_error(error_data)
+        assert fix is not None
+        assert fix.fix_code == "strip-namespace"
+        assert len(fix.ops) == 1
+        op = fix.ops[0]
+        assert op.kind == FixOpKind.SET_KEY
+        assert op.table_path == []
+        assert op.key == "main_pipe"
+        assert op.value == "hello"
+
+    def test_unstrippable_syntax_error_yields_none(self) -> None:
+        """An INVALID_PIPE_CODE_SYNTAX error without ``stripped_pipe_code`` is not fixable."""
+        error_data = _strip_namespace_error_data(pipe_code="Bad-Code", stripped_pipe_code=None)
+        assert plan_fix_for_blueprint_validation_error(error_data) is None
+
+    def test_strip_namespace_source_is_threaded(self) -> None:
+        """The blueprint error's ``source`` rides the strip-namespace fix."""
+        error_data = _strip_namespace_error_data(pipe_code="greetings.hello", stripped_pipe_code="hello", source="sibling.mthds")
+        fix = plan_fix_for_blueprint_validation_error(error_data)
+        assert fix is not None
+        assert fix.source == "sibling.mthds"

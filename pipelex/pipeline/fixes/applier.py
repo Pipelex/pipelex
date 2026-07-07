@@ -26,6 +26,8 @@ import tomlkit
 from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
+from tomlkit.container import Container
+from tomlkit.items import Item, Table
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
@@ -74,6 +76,18 @@ def _resolve_table(toml_doc: TOMLDocument, *, table_path: list[str]) -> dict[str
             return None
         node = cast("dict[str, Any]", candidate)
     return node
+
+
+def _container_of(node: dict[str, Any]) -> Container:
+    """The tomlkit ``Container`` backing a resolved table node.
+
+    A ``Table`` delegates key operations to its ``.value`` container; the root ``TOMLDocument`` is
+    itself a ``Container``. Only ``rename_table_key`` needs this — it reaches for the container's
+    position-preserving rename primitive, which ``Table``'s dict-facade does not expose.
+    """
+    if isinstance(node, Table):
+        return node.value
+    return cast("Container", node)
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
@@ -170,7 +184,28 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             del parent_table[table_key]
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
         case FixOpKind.RENAME_TABLE_KEY:
-            # Position-preserving rename is phase-1 work (needed only by the strip-namespace
-            # rule, which is gated on those mechanics landing clean). No spike planner emits it.
-            msg = f"rename_table_key op on '{table_path_str}' is not supported yet"
-            raise PipelexUnexpectedError(msg)
+            if fix_op.key is None or fix_op.new_key is None:
+                msg = f"rename_table_key op on '{table_path_str}' requires both key and new_key — planner bug"
+                raise PipelexUnexpectedError(msg)
+            parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            if parent_table is None or fix_op.key not in parent_table:
+                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
+            if fix_op.new_key in parent_table:
+                # Collision: the bare name is already taken by a separate declaration — renaming
+                # would clobber it. The raise-site guard suppresses this case, but the applier
+                # stays defensive (a stale fix from a prior loop iteration could reach here).
+                return FixOpApplication(
+                    op=fix_op,
+                    outcome=FixOpOutcome.SKIPPED,
+                    detail=f"cannot rename to '{fix_op.new_key}': already present in table '{table_path_str}'",
+                )
+            container = _container_of(parent_table)
+            # tomlkit exposes no public position-preserving rename; ``Container._replace`` is its
+            # own internal primitive (what ``__setitem__`` uses to re-home an existing key). It
+            # swaps the key in ``_body`` in place and re-renders the table header, so the renamed
+            # table keeps its position among siblings and its comments — a ``del`` + re-add would
+            # append it to the bottom of the parent (the old fixer's reordering bug). The golden
+            # byte-compare tests are the CI tripwire if a tomlkit bump ever changes this.
+            renamed_item = cast("Item", container[fix_op.key])
+            container._replace(fix_op.key, fix_op.new_key, renamed_item)  # pyright: ignore[reportPrivateUsage]
+            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)

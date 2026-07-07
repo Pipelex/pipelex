@@ -38,8 +38,12 @@ class FixBundleResult(BaseModel):
 
 
 def _fix_fingerprint(fix: SuggestedFix) -> str:
-    """Stable identity of a fix attempt: fix_code + source + each op's (kind, path, key, value)."""
-    op_parts = [f"{op.kind}:{'.'.join(op.table_path)}:{op.key}:{op.value!r}" for op in fix.ops]
+    """Stable identity of a fix attempt: fix_code + source + each op's (kind, path, key, value, new_key).
+
+    ``new_key`` participates so two ``rename_table_key`` ops that differ only in their target name
+    are distinct fingerprints (they would otherwise collide and trip the no-progress bail).
+    """
+    op_parts = [f"{op.kind}:{'.'.join(op.table_path)}:{op.key}:{op.value!r}:{op.new_key}" for op in fix.ops]
     return f"{fix.fix_code}|{fix.source}|{'|'.join(op_parts)}"
 
 

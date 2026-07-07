@@ -12,6 +12,7 @@ from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix, Tom
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
 STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
+STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
 
 
 def plan_fix_for_pipe_validation_error(error_data: PipesAndConceptValidationErrorData) -> SuggestedFix | None:
@@ -127,6 +128,8 @@ def plan_fix_for_blueprint_validation_error(error_data: PipelexBundleBlueprintVa
         return None
     if error_data.error_type.is_native_concept_redeclaration:
         return _plan_strip_native_concept_redecl(error_data)
+    if error_data.error_type.is_invalid_pipe_code_syntax:
+        return _plan_strip_namespace(error_data)
     return None
 
 
@@ -148,6 +151,50 @@ def _plan_strip_native_concept_redecl(error_data: PipelexBundleBlueprintValidati
                 kind=FixOpKind.DELETE_KEY,
                 table_path=["concept"],
                 key=error_data.concept_code,
+            ),
+        ],
+    )
+
+
+def _plan_strip_namespace(error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
+    """``strip-namespace``: a same-domain over-qualified pipe code carrying the enriched
+    ``stripped_pipe_code`` becomes either a position-preserving ``rename_table_key`` of the
+    ``[pipe]`` declaration key (when ``pipe_code`` holds the offending dotted key) or a root
+    ``set_key`` of ``main_pipe`` (when it does not — a ``main_pipe`` value is not a table key).
+
+    Only the declaration key and ``main_pipe`` are ever stripped: internal references
+    (``steps[].pipe``, ``branches[].pipe``, …) keep resolving because a same-domain *qualified*
+    ref resolves to the bare pipe, so they need no rewrite. Un-strippable syntax errors carry no
+    ``stripped_pipe_code`` and are suppressed here structurally.
+    """
+    if error_data.stripped_pipe_code is None:
+        return None
+    if error_data.pipe_code is not None:
+        return SuggestedFix(
+            fix_code=STRIP_NAMESPACE_FIX_CODE,
+            description=f"Strip the same-domain prefix from pipe '{error_data.pipe_code}' (rename to '{error_data.stripped_pipe_code}')",
+            safety=FixSafety.SAFE,
+            source=error_data.source,
+            ops=[
+                FixOp(
+                    kind=FixOpKind.RENAME_TABLE_KEY,
+                    table_path=["pipe"],
+                    key=error_data.pipe_code,
+                    new_key=error_data.stripped_pipe_code,
+                ),
+            ],
+        )
+    return SuggestedFix(
+        fix_code=STRIP_NAMESPACE_FIX_CODE,
+        description=f"Strip the same-domain prefix from main_pipe (set to '{error_data.stripped_pipe_code}')",
+        safety=FixSafety.SAFE,
+        source=error_data.source,
+        ops=[
+            FixOp(
+                kind=FixOpKind.SET_KEY,
+                table_path=[],
+                key="main_pipe",
+                value=error_data.stripped_pipe_code,
             ),
         ],
     )

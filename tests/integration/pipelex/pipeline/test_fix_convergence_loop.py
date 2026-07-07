@@ -126,6 +126,26 @@ output = "Greeting"
 prompt = "Greet $name $count times"
 """
 
+_STRIP_NAMESPACE_MTHDS = """domain = "nsfix_loop"
+main_pipe = "nsfix_loop.run_seq"
+
+# Over-qualified declaration key with the bundle's own domain (invalid); the qualified step ref
+# below stays put (it still resolves to the bare pipe), so only the declaration and main_pipe strip.
+[pipe."nsfix_loop.hello"]
+type = "PipeLLM"
+description = "Say hello."
+output = "Text"
+prompt = "Say hello"
+
+[pipe.run_seq]
+type = "PipeSequence"
+description = "Run it."
+output = "Text"
+steps = [
+  { pipe = "nsfix_loop.hello", result = "greeting" },
+]
+"""
+
 _CROSS_RULE_CASCADE_MTHDS = """domain = "crossfix_loop"
 main_pipe = "list_ideas"
 
@@ -265,6 +285,36 @@ class TestFixConvergenceLoop:
         assert "Number" not in concept
         # The real, non-native concept survives untouched.
         assert concept["Greeting"] == "A greeting message."
+
+    async def test_strip_namespace_converges_leaving_qualified_refs(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A same-domain over-qualified declaration key and main_pipe are stripped in one iteration.
+
+        Both syntax errors surface in the same validation pass (independent field validators), so
+        the rename and the main_pipe set_key apply together. The qualified ``steps[].pipe`` reference
+        is intentionally left in place — a same-domain qualified ref resolves to the bare pipe, so no
+        reference rewrite is needed for validity (the array-of-tables addressing gap never opens).
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "strip_ns.mthds"
+        bundle_path.write_text(_STRIP_NAMESPACE_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is True
+        assert result.iterations == 1
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace", "strip-namespace"]
+        assert result.bail_reason is None
+        parsed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
+        pipes = cast("dict[str, Any]", parsed["pipe"])
+        assert "hello" in pipes
+        assert "nsfix_loop.hello" not in pipes
+        assert parsed["main_pipe"] == "run_seq"
+        # The qualified step reference survives untouched (it resolves to the renamed bare pipe).
+        assert pipes["run_seq"]["steps"][0]["pipe"] == "nsfix_loop.hello"
 
     async def test_already_valid_bundle_is_a_no_op(
         self,

@@ -350,8 +350,32 @@ class TestBuildValidationErrorItems:
         assert suggested_fix.source == "main.mthds"
         assert [(op.kind, op.table_path, op.key) for op in suggested_fix.ops] == [(FixOpKind.DELETE_KEY, ["concept"], "Text")]
 
+    def test_blueprint_strip_namespace_rides_a_rename_fix(self) -> None:
+        """An enriched same-domain dotted declaration carries a strip-namespace rename through the builder."""
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+                    domain_code="greetings",
+                    source="main.mthds",
+                    pipe_code="greetings.hello",
+                    stripped_pipe_code="hello",
+                    message="Pipe code 'greetings.hello' is not a valid pipe code. Must be in snake_case.",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "strip-namespace"
+        assert [(op.kind, op.table_path, op.key, op.new_key) for op in suggested_fix.ops] == [
+            (FixOpKind.RENAME_TABLE_KEY, ["pipe"], "greetings.hello", "hello"),
+        ]
+
     def test_non_fixable_blueprint_error_has_no_suggested_fix(self) -> None:
-        """A blueprint error that is not a native redeclaration keeps ``suggested_fix`` unset."""
+        """An un-enriched INVALID_PIPE_CODE_SYNTAX (no ``stripped_pipe_code``) keeps ``suggested_fix`` unset."""
         items = build_validation_error_items(
             blueprint_errors=[
                 PipelexBundleBlueprintValidationErrorData(

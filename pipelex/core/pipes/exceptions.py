@@ -241,6 +241,41 @@ class PipeValidationErrorType(StrEnum):
             ):
                 return False
 
+    @property
+    def is_invalid_pipe_code_syntax(self) -> bool:
+        """True for the invalid-pipe-code-syntax error the fix planner strips when it is enriched.
+
+        Gates entry to ``strip-namespace``; the planner still requires the ``stripped_pipe_code``
+        enrichment, so un-strippable syntax errors (malformed codes, cross-package dotted refs)
+        fall through as ``None`` even though they share this ``error_type``.
+        """
+        match self:
+            case PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
 
 class PipeValidationError(ValueError):
     def __init__(
