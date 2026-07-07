@@ -71,18 +71,18 @@ No new generation machinery: the leaner scalar-native generation form is explici
 
 ## Phase 4 — Docs, schema, changelog, wrap
 
-- [ ] **Settle the boolean-alias micro-decision** (D9 parked it here): does the lowercase `boolean` structure-field type gain a friendlier alias (`yes_no`)? **Leaning NO** — field types are lowercase programmer primitives (`text`, `number`, `boolean`) and an alias is a two-spellings drift magnet; the concept-level brand is `YesNo`. If NO: nothing to do. If YES: field-type enum value + generator arms + schema diff + docs, and the schema-regen step below stops being a no-op.
-- [ ] `docs/building-methods/concepts/native-concepts.md`: table row for `YesNo` + a `YesNoContent` section (mirror `NumberContent`'s at `:101`).
-- [ ] `docs/building-methods/pipes/pipe-output.md`: add a `main_stuff_as_yes_no` entry (the doc enumerates every other `main_stuff_as_*` accessor around `:151`; the new one would otherwise be silently missing).
-- [ ] Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` — **verify no diff** (see §0; a diff means something unexpected leaked in).
-- [ ] **MTHDS spec entry** (in-scope per `README.md`, cross-repo): draft the native-concepts additions in the `mthds/` sibling repo (`docs/language/concepts.md`, `docs/spec/mthds-format.md`) on a side branch — the merge vehicle is the release wave, same pattern as the other cross-repo commits.
-- [ ] `CHANGELOG.md` under `[Unreleased]`: added native `YesNo` concept (one-line pitch: typed yes/no answers for LLM judgments, `output = "YesNo"`) + envelope input support; breaking — `YesNo` is now a reserved native code (a bundle declaring `[concept.YesNo]` errors).
-- [ ] Track bookkeeping: update `wip/inputs/README.md` (YesNo step → done, next = Datetime plan or Smart Inputs plan) and this plan's checkpoint states.
-- [ ] Full gates: `make agent-check` + `make agent-test`.
+- [x] **Settled the boolean-alias micro-decision** (D9 parked it here): **NO alias.** The lowercase `boolean` structure-field type keeps one spelling; a friendlier `yes_no` alias would be a two-spellings drift magnet, and the concept-level brand is `YesNo`. Consequence: nothing to do at the field-type/schema level — the schema-regen step stays a no-op as predicted.
+- [x] `docs/building-methods/concepts/native-concepts.md`: added the `YesNo` table row + a `YesNoContent` section (bool field, `yes`/`no` rendering, `output = "YesNo"` PipeLLM example, `main_stuff_as_yes_no.yes_no` reader), mirroring `NumberContent`.
+- [x] `docs/building-methods/pipes/pipe-output.md`: added the `main_stuff_as_yes_no` accessor entry alongside the other `main_stuff_as_*` accessors.
+- [x] Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` runs inside `make agent-check` — **no diff**, confirming §0's prediction that the generator doesn't enumerate native codes.
+- [x] **MTHDS spec entry** (cross-repo): added the `YesNo` native-concept rows + field listing to the `mthds/` sibling repo (`docs/language/concepts.md`, `docs/spec/mthds-format.md`) on side branch `feature/native-yes-no-concept` (commit `0f55a58`, not pushed — merge vehicle is the release wave). The mthds repo was restored to `dev` afterward.
+- [x] `CHANGELOG.md` under a fresh `[Unreleased]` section (v0.38.0 was the prior top entry): added native `YesNo` concept — typed yes/no answers for LLM judgments (`output = "YesNo"`) + envelope input support; breaking — `YesNo` is now a reserved native code.
+- [x] Track bookkeeping: updated `wip/inputs/README.md` (YesNo → done, next = Datetime plan) and this plan's checkpoint states.
+- [x] Full gates: `make agent-check` + `make agent-test`.
 
 ### CHECKPOINT 3 — track complete, hand off to the next train car
 
-State: _not reached._ (Update with: final commits, gate results, the alias decision, anything deferred.)
+State: **reached 2026-07-07.** (See the checkpoint procedure below for the final gate/review/commit record.)
 
 ## Deferred to the release-wave sweep / follow-ups (NOT this plan's scope — listed so nothing is lost)
 
@@ -98,5 +98,5 @@ Follow-up off the critical path (shared with Date): **LLM-output ergonomics for 
 - Renderings: **SETTLED `yes`/`no`** for plain/markdown/html (reads naturally when injected into downstream prompts; D9's wording); `rendered_json` keeps the raw `{"yes_no": true}`.
 - Field description wording (the LLM generation contract): **SETTLED** "Whether the answer is yes (true) or no (false)."
 - Native concept description (factory arm): **SETTLED** "The answer to a yes/no question" (D9's own phrasing).
-- `boolean` structure-field-type alias: **leaning NO alias** (one way to spell a thing). Settle in Phase 4 — flag to Louis if in doubt.
+- `boolean` structure-field-type alias: **SETTLED — NO alias** (one way to spell a thing; the concept-level brand is `YesNo`, the field-type primitive stays `boolean`). Keeps the schema-regen a no-op.
 - Envelope string forms (`"content": "yes"`): **rejected** — no cross-kind coercion, consistent with Smart Inputs D5 and Datetime DT5. Not open; recorded so nobody reopens it casually.

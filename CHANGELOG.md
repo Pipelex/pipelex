@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Native `YesNo` concept (typed yes/no answers):** A new built-in native concept `YesNo` (content class `YesNoContent`, a single required `bool`) for the yes/no judgments LLM pipelines produce constantly ("does this contract contain a penalty clause?"). `output = "YesNo"` on a `PipeLLM` makes the model return a typed boolean instead of free text answering "yes"/"no", read from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`; it renders as `yes`/`no` when injected into a downstream prompt. As a pipeline input, the envelope form `{"concept": "YesNo", "content": true}` (JSON or TOML) is shaped into a `YesNoContent`, and a concept that `refines = "YesNo"` keeps its own generated subclass. Breaking: `YesNo` is now a reserved native concept code — a bundle declaring `[concept.YesNo]` errors.
+
 ## [v0.38.0] - 2026-07-06
 
 ### Highlights

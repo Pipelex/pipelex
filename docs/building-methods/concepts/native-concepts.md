@@ -30,6 +30,7 @@ Here are all the native concepts you can use out of the box:
 | `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
+| `YesNo` | The answer to a yes/no question | `YesNoContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
@@ -108,6 +109,30 @@ class NumberContent(StuffContent):
 ```
 
 **Use for:** Counts, calculations, metrics, scores.
+
+### YesNoContent
+
+Represents the answer to a yes/no question — a single boolean verdict:
+
+```python
+class YesNoContent(StuffContent):
+    yes_no: bool
+```
+
+Renders as `yes` or `no` when injected into a prompt. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
+
+```toml
+[pipe.judge_is_urgent]
+type = "PipeLLM"
+description = "Decide whether a message is urgent"
+inputs = { message = "Text" }
+output = "YesNo"
+prompt = "Is the following message urgent? Answer yes or no.\n\n$message"
+```
+
+Read the verdict from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`.
+
+**Use for:** Yes/no judgments, boolean classifications, presence/absence checks, pass/fail verdicts.
 
 ### TextAndImagesContent
 
