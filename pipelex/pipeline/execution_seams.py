@@ -195,8 +195,12 @@ async def prepare_pipe_job(
         if isinstance(inputs, WorkingMemory):
             working_memory = inputs
         else:
+            # Thread the pipe's declared inputs so each value is shaped top-down against the
+            # signature (Smart Inputs). `pipe.inputs` is the method-boundary contract — the same
+            # source the Optionals pass reads below — not the aggregated `needed_inputs()`.
             working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
                 pipeline_inputs=inputs,
+                input_specs=pipe.inputs,
                 search_domain_codes=search_domain_codes,
             )
 

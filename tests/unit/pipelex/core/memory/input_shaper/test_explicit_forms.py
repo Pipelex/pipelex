@@ -5,21 +5,21 @@ from pipelex.core.memory.exceptions import ExplicitConceptIncompatibleError
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.memory.input_shaper.data import Invoice, Question, Weird, build_input_specs
+from tests.unit.pipelex.core.memory.input_shaper.data import Question, ShaperInvoice, ShaperWeird, build_input_specs
 
 
 class TestInputShaperExplicitForms:
     def test_envelope_structured_compatible(self) -> None:
         """D6: the {concept, content} envelope still works and is now compat-checked against the signature."""
-        input_specs = build_input_specs([("invoice", "shaper_test.Invoice", None)])
-        provided = {"concept": "shaper_test.Invoice", "content": {"invoice_number": "INV-001", "amount": 1250.0}}
+        input_specs = build_input_specs([("invoice", "shaper_test.ShaperInvoice", None)])
+        provided = {"concept": "shaper_test.ShaperInvoice", "content": {"invoice_number": "INV-001", "amount": 1250.0}}
 
         working_memory = InputShaper.shape({"invoice": provided}, input_specs=input_specs)
 
         stuff = working_memory.root["invoice"]
         pretty_print(stuff, title="envelope structured")
-        assert stuff.concept.concept_ref == "shaper_test.Invoice"
-        assert stuff.content == Invoice(invoice_number="INV-001", amount=1250.0)
+        assert stuff.concept.concept_ref == "shaper_test.ShaperInvoice"
+        assert stuff.content == ShaperInvoice(invoice_number="INV-001", amount=1250.0)
 
     def test_envelope_refining_concept_wins(self) -> None:
         """D6: when the envelope names a concept that refines the declared one, the more specific concept wins."""
@@ -36,15 +36,15 @@ class TestInputShaperExplicitForms:
 
     def test_prebuilt_stuff_content_object(self) -> None:
         """D6: a directly-provided StuffContent keeps today's behavior, plus the compat check."""
-        input_specs = build_input_specs([("invoice", "shaper_test.Invoice", None)])
-        provided = Invoice(invoice_number="INV-002", amount=99.0)
+        input_specs = build_input_specs([("invoice", "shaper_test.ShaperInvoice", None)])
+        provided = ShaperInvoice(invoice_number="INV-002", amount=99.0)
 
         working_memory = InputShaper.shape({"invoice": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
 
         stuff = working_memory.root["invoice"]
         pretty_print(stuff, title="prebuilt object")
-        assert stuff.concept.concept_ref == "shaper_test.Invoice"
-        assert stuff.content == Invoice(invoice_number="INV-002", amount=99.0)
+        assert stuff.concept.concept_ref == "shaper_test.ShaperInvoice"
+        assert stuff.content == ShaperInvoice(invoice_number="INV-002", amount=99.0)
 
     def test_list_of_prebuilt_stuff_content_items(self) -> None:
         """D6: a bare list of already-built StuffContent items (Case 1.4) shapes element-wise, no regression.
@@ -77,12 +77,12 @@ class TestInputShaperExplicitForms:
         envelope: the inner content dict carries the real field values.
         """
         log.info("Testing the {concept, content} collision rule")
-        input_specs = build_input_specs([("weird", "shaper_test.Weird", None)])
-        provided = {"concept": "shaper_test.Weird", "content": {"concept": "x", "content": "y"}}
+        input_specs = build_input_specs([("weird", "shaper_test.ShaperWeird", None)])
+        provided = {"concept": "shaper_test.ShaperWeird", "content": {"concept": "x", "content": "y"}}
 
         working_memory = InputShaper.shape({"weird": provided}, input_specs=input_specs)
 
         stuff = working_memory.root["weird"]
         pretty_print(stuff, title="collision rule")
-        assert stuff.concept.concept_ref == "shaper_test.Weird"
-        assert stuff.content == Weird(concept="x", content="y")
+        assert stuff.concept.concept_ref == "shaper_test.ShaperWeird"
+        assert stuff.content == ShaperWeird(concept="x", content="y")

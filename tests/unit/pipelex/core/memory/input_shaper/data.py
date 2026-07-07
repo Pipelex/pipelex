@@ -45,16 +45,21 @@ class Exhibit(DocumentContent):
     """Refines native Document."""
 
 
-class Invoice(StructuredContent):
+# Structured test concepts carry a `Shaper`-prefixed name so their registration in the by-name
+# global class registry can never be shadowed by an identically-named StructuredContent from another
+# test suite (e.g. an integration test's `Person`/`Invoice`). The concept code matches the class name
+# (the bottom-up factory maps a prebuilt StuffContent to its concept by class name), so both are
+# prefixed; the `shaper_test.<Code>` refs used in the tests are `shaper_test.Shaper<Name>`.
+class ShaperInvoice(StructuredContent):
     invoice_number: str = Field(description="The invoice number")
     amount: float = Field(description="The invoice amount")
 
 
-class Person(StructuredContent):
+class ShaperPerson(StructuredContent):
     name: str = Field(description="The person's name")
 
 
-class Weird(StructuredContent):
+class ShaperWeird(StructuredContent):
     """A pathological structure whose fields are literally `concept` and `content` (collision-rule test)."""
 
     concept: str = Field(description="A field named concept")
@@ -73,9 +78,9 @@ CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
     ("Deadline", "Deadline", "native.Date"),
     ("Photo", "Photo", "native.Image"),
     ("Exhibit", "Exhibit", "native.Document"),
-    ("Invoice", "Invoice", None),
-    ("Person", "Person", None),
-    ("Weird", "Weird", None),
+    ("ShaperInvoice", "ShaperInvoice", None),
+    ("ShaperPerson", "ShaperPerson", None),
+    ("ShaperWeird", "ShaperWeird", None),
 ]
 
 CONCEPT_REFS: list[str] = [f"{SHAPER_TEST_DOMAIN}.{concept_code}" for concept_code, _, _ in CONCEPT_DEFS]

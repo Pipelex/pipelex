@@ -14,10 +14,10 @@ from pipelex.core.stuffs.yes_no_content import YesNoContent
 from tests.unit.pipelex.core.memory.input_shaper.data import (
     Deadline,
     Exhibit,
-    Invoice,
     Photo,
     Priority,
     Question,
+    ShaperInvoice,
     Verdict,
     build_input_specs,
 )
@@ -44,10 +44,10 @@ SCALAR_ARM_CASES: list[tuple[str, str, Any, str, StuffContent]] = [
     # D5 Structured: a bare dict validated by pydantic against the declared structure class.
     (
         "structured-dict",
-        "shaper_test.Invoice",
+        "shaper_test.ShaperInvoice",
         {"invoice_number": "INV-001", "amount": 1250.0},
-        "shaper_test.Invoice",
-        Invoice(invoice_number="INV-001", amount=1250.0),
+        "shaper_test.ShaperInvoice",
+        ShaperInvoice(invoice_number="INV-001", amount=1250.0),
     ),
     # D5 Dynamic/Anything/out-of-matrix natives: bottom-up passthrough (today's behavior).
     ("dynamic-str-bottom-up", "native.Dynamic", "hi", "native.Text", TextContent(text="hi")),

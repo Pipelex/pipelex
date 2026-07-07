@@ -8,7 +8,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.memory.input_shaper.data import Person, Question, build_input_specs
+from tests.unit.pipelex.core.memory.input_shaper.data import Question, ShaperPerson, build_input_specs
 
 # (test_name, concept_ref, multiplicity, provided_value, expected_concept_ref, expected_list_content)
 MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, ListContent[StuffContent]]] = [
@@ -67,11 +67,11 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
     # A list of dicts shapes element-wise into a structured list, no envelope.
     (
         "variable-list-of-dicts",
-        "shaper_test.Person",
+        "shaper_test.ShaperPerson",
         True,
         [{"name": "Alice"}, {"name": "Bob"}],
-        "shaper_test.Person",
-        ListContent(items=[Person(name="Alice"), Person(name="Bob")]),
+        "shaper_test.ShaperPerson",
+        ListContent(items=[ShaperPerson(name="Alice"), ShaperPerson(name="Bob")]),
     ),
 ]
 
