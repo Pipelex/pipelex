@@ -77,15 +77,15 @@ State: **LANDED 2026-07-07.** DT8 shipped (not dropped). `type = "date"` → `da
 
 ## Phase 5 — Docs, changelog, wrap
 
-- [ ] `docs/building-methods/concepts/native-concepts.md`: table row for `Date` + a fields note in the commonly-used-fields section (`date`, optional `time`), mirroring Number's entry style.
-- [ ] Inputs docs: minimal edit noting TOML date/datetime literals are now native `Date` inputs and time-only literals are the remaining unsupported case (`docs/building-methods/pipes/provide-inputs.md` gets its full rewrite in the Smart Inputs phase — keep this surgical).
-- [ ] `CHANGELOG.md` under `[Unreleased]`: added native `Date` concept (one-line pitch + TOML literal support); breaking — `Date` is now a reserved native code (a bundle declaring `[concept.Date]` errors); breaking/renamed — datetime-inputs rejection narrowed to time-only (new error name); DT8 entries if Phase 4 shipped.
-- [ ] Track bookkeeping: update `wip/inputs/README.md` (Datetime step → done, remaining = YesNo plan / Smart Inputs) and this plan's checkpoint states.
-- [ ] Full gates: `make agent-check` + `make agent-test`.
+- [x] `docs/building-methods/concepts/native-concepts.md`: `Date` table row + a `DateContent` section (date + optional time, fidelity note, `output = "Date"` example, `main_stuff_as_date` reader), mirroring Number/YesNo.
+- [x] Inputs docs: `provide-inputs.md` warning box flipped to a tip — TOML date/datetime literals are native `Date` inputs, bare time-of-day is the remaining unsupported case (kept surgical; full rewrite rides Smart Inputs).
+- [x] `CHANGELOG.md` under `[Unreleased]`: added native `Date` concept (pitch + TOML literal support + reserved-code breaking note); breaking `### Changed` for the narrowed inputs rejection (`InputsTimeOnlyNotSupportedError`); DT8 breaking entry already landed in Phase 4.
+- [x] Track bookkeeping: `wip/inputs/README.md` (Datetime step → done, next = Smart Inputs) and this plan's checkpoint states updated.
+- [x] Full gates: `make agent-check` + `make agent-test`.
 
 ### CHECKPOINT 4 — track complete, hand off to the next train car
 
-State: _not reached._ (Update with: final commits, gate results, anything deferred.)
+State: **track complete 2026-07-07.** The native `Date` concept ships end to end on `feature/Smart-inputs` (Phases 1–4, commits `0b6d201bb` → `6dd17e452`, plus this Phase 5 docs/wrap commit). All gates green. Deferred (in `wip/inputs/`): the scalar-envelope arm asymmetry and the loader-vs-factory date-split duplication (both design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the release-wave cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, conformance, skills, cookbook `type = "date"` regen). Next train car: the Smart Inputs step (`smart-inputs-design.md`).
 
 ## Deferred to the release-wave sweep (NOT this plan's scope — listed so nothing is lost)
 
