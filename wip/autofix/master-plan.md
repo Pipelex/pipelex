@@ -21,9 +21,11 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 ### 1. Spike — prove the chain end-to-end — **DONE (PR #1027)**
 
-One rule through all layers, no CLI command, driven by tests. Exit criteria met: chain proven, format preservation demonstrated by golden tests, design doc updated with findings. Reviewer's guide: [`TODOS.md`](../../TODOS.md) at the worktree root.
+One rule through all layers, no CLI command, driven by tests. Exit criteria met: chain proven, format preservation demonstrated by golden tests, design doc updated with findings. Reviewer's guide: [spike-reviewers-guide.md](spike-reviewers-guide.md).
 
 ### 2. Wave-1 rule breadth — stress the abstraction *(NEXT)*
+
+Detailed implementation plan with progress checkboxes: [`TODOS.md`](../../TODOS.md) at the worktree root.
 
 Add the remaining wave-1 rules, in this order (each is a different fix *shape*, which is the point):
 
