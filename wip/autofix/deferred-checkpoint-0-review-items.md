@@ -12,6 +12,14 @@ The spike's convergence loop refuses to apply source-less fixes when `library_di
 
 Phase 1 must thread the declaring file into the enriched errors — either set `file_path` at the raise sites (the pipe/library layer knows the source file) or carry a domain qualifier the loop can check against the target file's `domain` key. Until then, `fix` only fixes single-file bundles. This matches the master plan's "hardened loop (multi-file targeting)" Phase 1 item.
 
+## 1b. `_fix_fingerprint` must include `new_key` when rename ops land (Phase 1)
+
+gstack pre-landing review finding, deferred. The no-progress fingerprint in `fix_loop.py` hashes each op as `kind:path:key:value` and omits `new_key` — two `rename_table_key` ops differing only in `new_key` would collide and trigger a false no-progress bail. Zero impact today (no planner emits rename ops; the applier raises for them). Add `new_key` to the fingerprint in the same Phase 1 change that implements position-preserving rename.
+
+## 1c. Ship-wave changelog must mention the additive wire field
+
+Once released, `suggested_fix` surfaces in `/validate` API payloads (additive, `exclude_none`). The master-plan step 3 changelog entry should call out the new optional field so API consumers know about it.
+
 ## 2. Conformance fixture regeneration (cross-repo sync wave)
 
 `conformance/validate-error-qa/generated/invalid_inadequate_output_multiplicity.json` pins the exact JSON body of an `INADEQUATE_OUTPUT_MULTIPLICITY` error from a live `pipelex-api`. Once this enrichment (`suggested_fix` on `ValidationErrorItem`, `expected_output_ref`) reaches the runner API via a pipelex release + pin bump, that fixture needs regeneration. Belongs to the already-tracked cross-repo schema-sync step (master plan) — nothing to do in this repo now.
