@@ -42,6 +42,7 @@ Several gaps were deferred *specifically* to be resolved when Smart Inputs unifi
 - `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md` — structure-field-codegen tradeoffs surfaced by the Date `/review`; not Smart-Inputs-specific but worth a decision when temporal handling is next touched.
 - `refines-hint-native-list-drift.md` — a spec-layer authoring hint list omits newer natives; real fix = derive it from `NativeConceptCode` in the release-wave sweep.
 - `input-shaper-multiplicity-gaps.md` — the Phase-1 `InputShaper`'s explicit arm skips list-where-singular + `[N]` count checks, and the `Dynamic`/`Anything` arm skips multiplicity peeling (empty-list diverges from D2); resolve when wiring the shaper (D7).
+- `bare-file-path-cli-resolution-gap.md` — bare Image/Document path strings aren't resolved against the inputs-file dir (the CLI resolver only rewrites `"url"` keys); flagged by the PR #1030 bots, **already scheduled as Phase 3's first task (D3)** — answer + resolve the two open threads when it lands.
 
 ## Then: one release cut, one downstream cross-repo wave
 
