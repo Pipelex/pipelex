@@ -156,6 +156,19 @@ class TestStuffContentFactory:
         with pytest.raises(StuffContentFactoryError):
             StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="20260707")
 
+    @pytest.mark.parametrize(
+        "date_string",
+        [
+            "20260707T154000",  # compact/basic datetime — fromisoformat accepts it, but it is not extended ISO
+            "2026-W27-2",  # ISO week-date — fromisoformat silently normalizes it to a calendar date
+            "20260707",  # compact/basic date (regression-lock: was already rejected by the all-digit guard)
+        ],
+    )
+    def test_make_content_from_value_date_rejects_non_extended_iso(self, date_string: str):
+        """Only extended-calendar ISO (YYYY-MM-DD[...]) is accepted; compact/basic and week-date forms are rejected (strict, no loose forms)."""
+        with pytest.raises(StuffContentFactoryError):
+            StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=date_string)
+
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""
         result = StuffContentFactory.make_stuff_content_from_concept_required(

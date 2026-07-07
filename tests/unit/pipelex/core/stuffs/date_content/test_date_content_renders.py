@@ -25,7 +25,10 @@ class TestDateContentRenders:
 
     def test_construction_date_and_offset_time(self):
         content = DateContent(date=TestData.SAMPLE_DATE, time=TestData.SAMPLE_TIME_OFFSET)
+        assert content.date == TestData.SAMPLE_DATE
         assert content.time is not None
+        # `time.__eq__` compares hour/minute/second/microsecond AND tzinfo/offset, so this pins the full value.
+        assert content.time == TestData.SAMPLE_TIME_OFFSET
         assert content.time.utcoffset() == datetime.timedelta(hours=2)
 
     def test_parses_iso_date_string(self):
@@ -68,6 +71,40 @@ class TestDateContentRenders:
         """An all-digit string on the time field is an epoch, never an ISO time (which carries ':') — reject it (DT6)."""
         with pytest.raises(ValidationError):
             DateContent.model_validate({"date": "2026-07-07", "time": "56400"})
+
+    @pytest.mark.parametrize(
+        "date_string",
+        [
+            "2026-07-07T00:00:00",  # midnight datetime string — pydantic would silently truncate to date-only
+            "2026-07-07T00:00:00+00:00",  # midnight with offset — time and offset silently dropped
+            "2026-07-07 00:00:00",  # space-separated midnight
+            "2026-07-07T12:30:00",  # non-midnight — pydantic already rejects; locked as a regression guard
+        ],
+    )
+    def test_rejects_datetime_string_on_date_field(self, date_string: str):
+        """A datetime-shaped string on the date field drops its time (silently at midnight) — reject it (DT3)."""
+        with pytest.raises(ValidationError):
+            DateContent.model_validate({"date": date_string})
+
+    @pytest.mark.parametrize(
+        "epoch_string",
+        ["-86400", "86400.0", "0.0", "-0", "8.64e4", "-8.64e4"],
+    )
+    def test_rejects_signed_or_decimal_epoch_string_on_date_field(self, epoch_string: str):
+        """A signed/decimal/exponent numeric string is still an epoch, never an ISO date — reject it (DT6).
+
+        The unsigned all-digit case is covered by test_rejects_numeric_string_epoch; these day-aligned
+        epochs slipped past the old `.isdigit()` guard because a sign/decimal/exponent is not a digit.
+        """
+        with pytest.raises(ValidationError):
+            DateContent.model_validate({"date": epoch_string})
+
+    def test_accepts_naive_iso_time_string(self):
+        """A naive ISO time string on the time field must still be accepted (the DT3 date-field guard must not over-reject)."""
+        content = DateContent.model_validate({"date": "2026-07-07", "time": "15:40:00"})
+        assert content.time is not None
+        assert content.time == TestData.SAMPLE_TIME_NAIVE
+        assert content.time.tzinfo is None
 
     def test_rendered_plain_date_only(self):
         content = DateContent(date=TestData.SAMPLE_DATE)

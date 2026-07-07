@@ -41,6 +41,7 @@ Several gaps were deferred *specifically* to be resolved when Smart Inputs unifi
 - `case1-bare-date-arm-gap.md` — a top-level array of date literals errors instead of building `ListContent[DateContent]`; ties to D2 (multiplicity) + D10 (protocol widening for scalar sequences).
 - `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md` — structure-field-codegen tradeoffs surfaced by the Date `/review`; not Smart-Inputs-specific but worth a decision when temporal handling is next touched.
 - `refines-hint-native-list-drift.md` — a spec-layer authoring hint list omits newer natives; real fix = derive it from `NativeConceptCode` in the release-wave sweep.
+- `input-shaper-multiplicity-gaps.md` — the Phase-1 `InputShaper`'s explicit arm skips list-where-singular + `[N]` count checks, and the `Dynamic`/`Anything` arm skips multiplicity peeling (empty-list diverges from D2); resolve when wiring the shaper (D7).
 
 ## Then: one release cut, one downstream cross-repo wave
 
@@ -64,4 +65,4 @@ Follow-ups off the critical path: the shared **YesNo/Date LLM-output ergonomics*
 
 - `yesno-pr-reviewers-guide.md` — the former repo-root `TODOS.md`, the YesNo PR reading guide. Historical (YesNo + Date both landed); kept for the PR narrative.
 
-**Deferred design notes:** `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `case1-bare-date-arm-gap.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `refines-hint-native-list-drift.md` (triage list above).
+**Deferred design notes:** `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `case1-bare-date-arm-gap.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `refines-hint-native-list-drift.md`, `input-shaper-multiplicity-gaps.md` (triage list above).

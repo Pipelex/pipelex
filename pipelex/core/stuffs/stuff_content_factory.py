@@ -1,4 +1,5 @@
 import datetime
+import re
 from typing import Any
 
 from pipelex.core.concepts.concept import Concept
@@ -39,11 +40,14 @@ class StuffContentFactory:
 
     @classmethod
     def _parse_iso_temporal(cls, value: str) -> tuple[datetime.date, datetime.time | None]:
-        """Parse a strict ISO 8601 date or datetime, date-first so a bare date never fabricates a midnight time."""
-        # Reject an all-digit string up front: date.fromisoformat also accepts the basic "YYYYMMDD" form, which
-        # would let an epoch-looking string slip past DateContent's own no-epoch-seconds guard (kept consistent).
-        if value.strip().isdigit():
-            msg = f"Date input '{value}' is not an ISO 8601 date or datetime — an all-digit string is never a date (no epoch-seconds)."
+        """Parse a strict *extended* ISO 8601 date or datetime, date-first so a bare date never fabricates a midnight time."""
+        # Require the date component to be extended-calendar YYYY-MM-DD (optionally followed by a T/space time
+        # part, which fromisoformat then validates precisely). date.fromisoformat / datetime.fromisoformat (3.11+)
+        # also accept the basic "YYYYMMDD" / "YYYYMMDDTHHMMSS" forms and ISO week-dates ("2026-W27-2"), which would
+        # silently normalize a non-extended input into a DateContent — and let an all-digit epoch string slip past
+        # DateContent's own no-epoch-seconds guard. Pin extended-only (also subsumes the old all-digit reject).
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}([Tt ].*)?", value.strip()):
+            msg = f"Date input '{value}' is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00')."
             raise StuffContentFactoryError(msg)
         try:
             return datetime.date.fromisoformat(value), None
