@@ -1,3 +1,4 @@
+from datetime import date, datetime, timedelta, timezone
 from typing import cast
 
 import pytest
@@ -412,6 +413,41 @@ class TypeMappingTest(StructuredContent):
         assert "from datetime import datetime" in result
         assert 'recorded_at: datetime = Field(..., description="Record timestamp")' in result
         assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["recorded_at"]["format"] == "date-time"
+
+    def test_date_field_with_default_round_trips(self):
+        """A `type = "date"` field with a date default generates code that evaluates.
+
+        `repr(date(...))` is module-qualified (`datetime.date(...)`), but the generated code imports
+        the bare `date` class, so the default must be emitted un-prefixed or the class body raises at eval.
+        """
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(
+                description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, default_value=date(2026, 7, 7)
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["issued_on"].default == date(2026, 7, 7)
+
+    def test_datetime_field_with_offset_default_round_trips(self):
+        """A `type = "datetime"` field with an offset-aware datetime default evaluates and keeps the offset."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(
+                description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, default_value=offset_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
 
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""

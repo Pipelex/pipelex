@@ -156,7 +156,7 @@ output = "Date"
 prompt = "Extract the scheduled departure from this ticket: @ticket"
 ```
 
-As a pipeline input, TOML date and datetime literals map to `Date` directly (`departure = 2026-07-07T15:40:00+02:00`); read it from a Python caller via `pipe_output.main_stuff_as_date`.
+As a pipeline input, a top-level TOML date or datetime literal maps to `Date` directly (`departure = 2026-07-07T15:40:00+02:00`); read it from a Python caller via `pipe_output.main_stuff_as_date`.
 
 **Use for:** Issue dates, due dates, dates of birth, departures, effective/termination dates — any date found on a document. For a date value without any date attached (a bare time of day), degrade to `Text`.
 

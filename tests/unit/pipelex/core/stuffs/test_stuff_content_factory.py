@@ -131,6 +131,7 @@ class TestStuffContentFactory:
         result = StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="2026-07-07T15:40:00+02:00")
 
         assert isinstance(result, DateContent)
+        assert result.date == datetime.date(2026, 7, 7)
         assert result.time is not None
         assert result.time.utcoffset() == datetime.timedelta(hours=2)
 

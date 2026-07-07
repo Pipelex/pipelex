@@ -206,6 +206,14 @@ class StructureGenerator:
         """Format default value for Python code, ensuring strings use double quotes."""
         if isinstance(value, str):
             return self._escape_string_for_python(value)
+        # `repr()` module-qualifies temporal values ("datetime.datetime(...)"/"datetime.date(...)"),
+        # but the generated code imports the bare classes ("from datetime import date/datetime"), so
+        # the qualified form raises AttributeError at eval. Rebuild via fromisoformat() — a lossless,
+        # offset-preserving round-trip that uses those imported bare names. (datetime is a date subclass.)
+        if isinstance(value, datetime):
+            return f'datetime.fromisoformat("{value.isoformat()}")'
+        if isinstance(value, date):
+            return f'date.fromisoformat("{value.isoformat()}")'
         return repr(value)
 
     def _format_class_docstring(self, docstring: str, *, indent: str = "    ") -> str:

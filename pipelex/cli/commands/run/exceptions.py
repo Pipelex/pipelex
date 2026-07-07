@@ -15,7 +15,9 @@ class InputsTimeOnlyNotSupportedError(PipelexError):
     error_domain = ErrorDomain.INPUT
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail='A time of day alone has no date to attach to. Include the date (e.g. "2026-07-06T12:00:00"), or quote the value as a string',
+        # The example is an unquoted TOML datetime literal (which maps to Date); quoting it would make it
+        # a string (Text), i.e. the "or quote as a string" fallback — the opposite of "include the date".
+        detail="A time of day alone has no date to attach to. Include the date (e.g. 2026-07-06T12:00:00), or quote the value as a string",
     )
     # The message describes a fault in the caller's own inputs file — caller-facing copy.
     _authors_caller_facing_message = True
