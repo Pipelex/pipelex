@@ -15,7 +15,7 @@ Worktree `_autofix` on branch `feature/Autofix` (treat this directory as the rep
 
 - **TDD**: red tests first at each layer (enrichment → planner → applier → loop), then implement.
 - **Structural suppression, not sniffing**: fixability comes from presence of enrichment fields set only at the raise sites that know the correct value — the planner requires the field and never re-derives or message-matches.
-- **In-place mutation, never rebuild** in the applier; golden byte-compare tests are the regression net for format preservation.
+- **In-place mutation, never rebuild** in the applier; golden byte-compare tests are the regression net for format preservation. *(Superseded from Phase A′ on: the applier stops owning canonical formatting and hands the serialized doc to `pipelex_tools.format_mthds`; goldens become the formatter's canonical output.)*
 - **No changelog entry in this step** — the ship wave (master-plan step 6) owns it, including the additive `suggested_fix` API wire-field note (deferred item 1c).
 - **Review-finding triage**: real defects get fixed in the phase; design tradeoffs get recorded as deferred items in `wip/autofix/`, not reflexively applied.
 
@@ -84,7 +84,7 @@ Trigger: `MISSING_INPUT_VARIABLE` / `EXTRANEOUS_INPUT_VARIABLE` / `INPUT_STUFF_S
 - [x] Convergence tests: drifted controller inputs fixed in one iteration; **natural cross-rule cascade** pinned (inputs are validated before outputs, so the input error masks the output error — round 1 `sync-controller-inputs`, round 2 `match-sequence-output`).
 - [x] Wire test: `sync-controller-inputs` rides `ValidationErrorItem` through the shared builder.
 
-### 🛑 CHECKPOINT A — hard stop before Phase B
+### 🛑 CHECKPOINT A — hard stop before Phase A′
 
 - [x] **Verify**: `make agent-check` green; **full** `make agent-test` green (not just targeted tests).
 - [x] **Record for cold start**: A tasks checked off, A.1 prerequisite-guard verdict and A.2 no-table decision recorded in "Decisions taken"; `SuggestedFix`/`FixOp` shape findings folded into the design doc (`TomlValue` widening, inline-table canonicalization).
@@ -92,6 +92,32 @@ Trigger: `MISSING_INPUT_VARIABLE` / `EXTRANEOUS_INPUT_VARIABLE` / `INPUT_STUFF_S
   - **Fixed (confirmed correctness defects):** (1) the inline-table canonicalizer crashed on supported dotted input keys (`"cv.name"` → `KeyAlreadyPresent`) and on nested inline-table values (whole-pipe inline form → `UnexpectedCharError`) — rebuilt to render via tomlkit natively + outer-brace-padding splice; pinned by two new applier regression tests. (2) `declared_inputs` was missing from `PipeValidationError.desc()` (asymmetry with `expected_inputs`) — added. (3) stale hardcoded line-numbers/counts in this file — removed.
   - **Design question raised by Louis** ("use plxt's Python lib to format?"): assessed NO — `pipelex-tools`/`plxt` is a dev-only dep (Rust binary, no Python API) and `plxt format` is whole-file; shelling out from the runtime fix loop would add a runtime toolchain dep and break the surgical "untouched lines stay byte-identical" contract. plxt stays the canonical-style oracle at golden-generation time; the runtime applier delegates rendering to tomlkit. Written up in the design doc.
   - **Deferred/reviewed (no over-engineering):** enum-match classifier duplication (house style, keep), trivia-preservation dup with `toml_sync`, per-`table_path` batch canonicalization (perf), `_*_for_fix` micro-duplication, two op-shapes early-warning, `FixOp.value` wire-schema forward note — all in `wip/autofix/deferred-checkpoint-a-review-items.md`.
+
+## Phase A′ — adopt `format_mthds` as the canonical-output backend (do this cold-start)
+
+**Decision (Louis, 2026-07-07): ADOPT.** Replace the applier's hand-rolled inline-table canonicalization with a single in-process `pipelex_tools.format_mthds` pass, and add `pipelex-tools-py` as a **core runtime dep**. This deletes the fragile formatting code (the crash-prone `_canonical_inline_table` string/native builders and the trivia transplant), guarantees zero drift from the toolchain's canonical style, and makes the applier crash-proof on any valid TOML. Two calls settled here: **(a)** core runtime dep, not an optional extra; **(b)** the applier's output philosophy shifts from "surgical byte-preservation of untouched lines" to "canonical whole-file MTHDS" — correct for a fix tool, and a no-op on already-formatted files (the norm: MTHDS is formatted on save + CI-enforced).
+
+**Why before Phase B:** it deletes applier code that B (delete-shaped blueprint fix) and C (position-preserving rename) would otherwise extend; C's `RENAME_TABLE_KEY` gets simpler on a format-pass backend (no need to hand-preserve position formatting).
+
+**Facts (verified 2026-07-07):**
+
+- `pipelex-tools-py` (PyPI, import `pipelex_tools`) is a PyO3 **in-process** extension built from `../vscode-pipelex/crates/pipelex-py` — **distinct** from the `pipelex-tools` CLI-binary dev-dep already in `pyproject.toml`. Same `taplo` engine as the `plxt` CLI, fully offline (embedded MTHDS schema), ships PEP 561 stubs. Already a runtime dep of `pipelex-api` (precedent for a Python host calling it in a request path).
+- `format_mthds(content: str, *, options=None) -> {"formatted": str, "changed": bool, "diagnostics": [Diagnostic]}`. Never raises on bad content (returns input unchanged + blocking `kind:"syntax"` diagnostics); raises `ValueError` only for a bad *option* value. Whole-document canonical reformat (aligns entries within a table, normalizes inline-table/array spacing) — matches what the extension writes on save.
+- Our current goldens are already `format_mthds`-idempotent (`changed=False`, byte-identical, 0 diagnostics on all three), so migration is low-risk: `format_mthds(apply(fixture))` equals today's golden as long as the semantic edit is right.
+
+**Tasks:**
+
+- [ ] Add `pipelex-tools-py>=<pin>` to `[project.dependencies]` in `pyproject.toml` (via `uv`). Confirm `import pipelex_tools; pipelex_tools.format_mthds("a=1")` works in the pipelex venv. It's a compiled abi3 wheel — verify the CI/runner/worker platforms have published wheels (Ubuntu/macOS/Windows are).
+- [ ] Integration point = `fix_loop.py`: after `apply_fix_ops` mutates the tomlkit DOM, serialize (`tomlkit.dumps`) → `format_mthds(dumped)["formatted"]` → that is the written text (and the text re-validated next iteration). Surface `diagnostics` defensively: any `kind:"syntax"` entry means the applier produced malformed TOML → that's a planner/applier bug, raise `PipelexUnexpectedError` (never silently write). `changed` is informational.
+- [ ] Delete from `applier.py`: `_canonical_inline_table`, `_canonicalize_mutated_inline_table`, and the inline-table-building dict branch of `_as_tomlkit_value` (a plain dict value on the whole-mapping `SET_KEY` is fine — `format_mthds` canonicalizes it). `apply_fix_ops` stops canonicalizing; keep the SET/DELETE/DELETE_TABLE semantics and the guarded-skip contract intact.
+- [ ] Regenerate goldens from the new pipeline (apply → `format_mthds`) and byte-compare. Expect ~no change (already idempotent). The F1 dotted-key and F2 whole-pipe-inline regression tests stay — they now pass by construction (the real parser can't crash on valid TOML).
+- [ ] Update `suggested-fixes-design.md` (supersede the CHECKPOINT-1 canonicalization bullets with the `format_mthds` backend) and tick the now-moot deferred items in `deferred-checkpoint-a-review-items.md` (per-`table_path` batch canonicalization and the `toml_sync` trivia duplication both dissolve — no hand-rolled formatting left). Update the working-convention bullet at the top of this file.
+
+### 🛑 CHECKPOINT A′ — hard stop before Phase B
+
+- [ ] **Verify**: `make agent-check` green; **full** `make agent-test` green.
+- [ ] **Record for cold start**: decisions + outcomes in this file and the design doc; commit (don't push).
+- [ ] **Review fan-out**: Sonnet-5 sub-agent running `/code-review` on the Phase A′ diff only (`git diff <checkpoint-A-sha>..HEAD`), no inherited context — diff pointer only. Triage, fix real defects, defer tradeoffs to `wip/autofix/`, commit.
 
 ## Phase B — `strip-native-concept-redecl` (first blueprint-channel + first delete-shaped fix in production)
 
