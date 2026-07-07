@@ -7,7 +7,8 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_path_resolver import is_relative_local_path, resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.tools.uri.uri_resolver import is_relative_local_path
 
 
 class _IsRelativeLocalPathCases:

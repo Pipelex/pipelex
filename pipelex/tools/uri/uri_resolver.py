@@ -55,6 +55,32 @@ def describe_uri(uri: str) -> str:
     return resolved_uri.kind.desc
 
 
+def is_relative_local_path(uri: str) -> bool:
+    """Check whether *uri* is a relative local file path.
+
+    Uses :func:`resolve_uri` to classify the URI.  Returns ``True`` only when
+    the URI resolves to a :class:`ResolvedLocalPath` **and** the path is not
+    absolute.
+
+    Args:
+        uri: The URI string to check.
+
+    Returns:
+        ``True`` if *uri* is a relative local path, ``False`` otherwise.
+    """
+    resolved = resolve_uri(uri)
+    if not isinstance(resolved, ResolvedLocalPath):
+        return False
+    if "://" in resolved.path:
+        # An unrecognized scheme (``s3://``, ``gs://``, …) slips through ``resolve_uri`` as a
+        # ResolvedLocalPath but is NOT a local file path; do not treat it as relative
+        # (that would let a caller mangle ``s3://bucket/x`` into ``<base_dir>/s3:/bucket/x`` and
+        # defeat the downstream remote-url guards). Mirrors the same ``"://"`` stopgap in the CSV
+        # input hook; both go away once ``resolve_uri`` classifies schemes (tools/uri follow-up).
+        return False
+    return not Path(resolved.path).is_absolute()
+
+
 def resolve_uri(uri: str) -> ResolvedUri:
     """Resolve a URI string to its typed representation.
 

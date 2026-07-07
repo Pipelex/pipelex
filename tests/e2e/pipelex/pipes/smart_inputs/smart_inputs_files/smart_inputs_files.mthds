@@ -1,0 +1,35 @@
+domain      = "smart_inputs_files_demo"
+description = "Bare file-path and CSV inputs shaped top-down against the declared signature (Smart Inputs, Phase 3)"
+main_pipe   = "review_case"
+
+[concept.Photo]
+description = "A photo attached to the case"
+refines     = "Image"
+
+[concept.Exhibit]
+description = "A supporting exhibit document"
+refines     = "Document"
+
+[concept.Person]
+description = "A person involved in the case"
+
+[concept.Person.structure]
+name = { type = "text", description = "The person's name", required = true }
+job  = { type = "text", description = "The person's job", required = true }
+
+[pipe.review_case]
+type = "PipeLLM"
+description = "Review a case given a photo, exhibit documents and the people involved"
+inputs = { photo = "Photo", exhibits = "Exhibit[]", people = "Person[]" }
+output = "Text"
+prompt = """
+Photo: $photo
+
+Exhibits:
+$exhibits
+
+People involved:
+@people
+
+Write a one-line review of the case.
+"""

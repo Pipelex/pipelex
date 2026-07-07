@@ -169,6 +169,7 @@ async def prepare_pipe_job(
     dynamic_output_concept_ref: str | None = None,
     request_id: str | None = None,
     is_mock_usage: bool = False,
+    inputs_base_dir: Path | None = None,
 ) -> PipeJob:
     """Build a :class:`PipeJob` for ``pipe`` against an already-open library.
 
@@ -202,6 +203,7 @@ async def prepare_pipe_job(
                 pipeline_inputs=inputs,
                 input_specs=pipe.inputs,
                 search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
             )
 
     # If mock inputs is enabled, generate mock data for missing required inputs.

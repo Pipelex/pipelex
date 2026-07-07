@@ -9,37 +9,12 @@ relative local paths.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import is_relative_local_path
 
-
-def is_relative_local_path(uri: str) -> bool:
-    """Check whether *uri* is a relative local file path.
-
-    Uses :func:`resolve_uri` to classify the URI.  Returns ``True`` only when
-    the URI resolves to a :class:`ResolvedLocalPath` **and** the path is not
-    absolute.
-
-    Args:
-        uri: The URI string to check.
-
-    Returns:
-        ``True`` if *uri* is a relative local path, ``False`` otherwise.
-    """
-    resolved = resolve_uri(uri)
-    if not isinstance(resolved, ResolvedLocalPath):
-        return False
-    if "://" in resolved.path:
-        # An unrecognized scheme (``s3://``, ``gs://``, …) slips through ``resolve_uri`` as a
-        # ResolvedLocalPath but is NOT a local file path; do not rewrite it relative to base_dir
-        # (that would mangle ``s3://bucket/x`` into ``<base_dir>/s3:/bucket/x`` and defeat the
-        # downstream remote-url guards). Mirrors the same ``"://"`` stopgap in the CSV input hook;
-        # both go away once ``resolve_uri`` classifies schemes (tools/uri follow-up).
-        return False
-    return not Path(resolved.path).is_absolute()
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def resolve_url_in_value(value: Any, *, base_dir: Path) -> Any:
