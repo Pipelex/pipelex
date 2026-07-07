@@ -115,9 +115,12 @@ Trigger: `MISSING_INPUT_VARIABLE` / `EXTRANEOUS_INPUT_VARIABLE` / `INPUT_STUFF_S
 
 ### 🛑 CHECKPOINT A′ — hard stop before Phase B
 
-- [ ] **Verify**: `make agent-check` green; **full** `make agent-test` green.
-- [ ] **Record for cold start**: decisions + outcomes in this file and the design doc; commit (don't push).
-- [ ] **Review fan-out**: Sonnet-5 sub-agent running `/code-review` on the Phase A′ diff only (`git diff <checkpoint-A-sha>..HEAD`), no inherited context — diff pointer only. Triage, fix real defects, defer tradeoffs to `wip/autofix/`, commit.
+- [x] **Verify**: `make agent-check` green; **full** `make agent-test` green (2026-07-07).
+- [x] **Record for cold start**: decisions + outcomes in this file and the design doc (CHECKPOINT 1′ section); committed `e598cc6b6` (not pushed).
+- [x] **Review fan-out** (done 2026-07-07): Sonnet-5 `/code-review` sub-agent on the Phase A′ diff (`git diff 446fb1e00..HEAD`), no inherited context. Triage:
+  - **Fixed:** (1) `applier.py` module docstring still promised byte-level preservation of untouched content — corrected to separate the in-memory `apply_fix_ops` (preserves untouched content) from `serialize_and_format` (whole-file canonical reflow, *not* a surgical diff). (2) The `PipelexUnexpectedError` syntax-diagnostic guard had no test — added `test_serialize_and_format_raises_on_syntax_diagnostic` (mocks a syntax diagnostic, asserts the loud raise + message). (3) The raised message dropped the diagnostic's position — added `_render_syntax_diagnostic` to keep `message (line L:C)`. (4) Stale renamed-test refs in `deferred-checkpoint-a-review-items.md`.
+  - **Upstream-lib gotcha found + worked around:** `pipelex_tools`' stub lists `Diagnostic`/`Range`/`FormatResult`/`LintResult` in `__all__`, but they are **type-only** (not runtime exports) — `from pipelex_tools import Diagnostic` type-checks but `ImportError`s at runtime. Worked around with a `TYPE_CHECKING`-guarded import + quoted annotation. **Candidate upstream fix** (`pipelex-tools-py` is ours): either export the TypedDicts at runtime or drop them from `__all__`.
+  - **No action (recorded decision):** reviewer's finding 5 (core runtime dep for a not-yet-wired feature) is exactly the A′ dep decision, with `pipelex-api` precedent — already documented.
 
 ## Phase B — `strip-native-concept-redecl` (first blueprint-channel + first delete-shaped fix in production)
 

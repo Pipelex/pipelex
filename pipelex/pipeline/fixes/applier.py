@@ -1,21 +1,26 @@
-"""Style-preserving fix applier — applies ``FixOp`` patch ops to a tomlkit DOM in place.
+"""Fix applier — applies ``FixOp`` patch ops to a tomlkit DOM, then renders canonical MTHDS.
 
-In-place mutation, never container rebuilds: tomlkit keeps the comments, ordering, and
-table style of untouched content (and of the patched line itself) by construction.
+Two clearly-separated steps, because they preserve different things — do not conflate them:
 
-Guarded application: an op only applies when its target table path exists in the DOM.
-This protects against errors raised on elaborated/synthetic constructs (a synthesized
-sequence has no TOML to patch) and against ops targeting a different file than the one
-being patched — a skipped op is reported, never raised.
+- ``apply_fix_ops`` mutates the tomlkit DOM **in place**, never rebuilding containers, so at the
+  DOM level tomlkit keeps the comments, ordering, and table style of untouched content (and of
+  the patched line itself) by construction. A caller that wants the mutated-but-unformatted DOM
+  stops here.
+- ``serialize_and_format`` then serializes the whole DOM and hands it to the MTHDS formatter
+  (``pipelex_tools.format_mthds``) for the one canonical style. This is a **whole-file** reflow:
+  the returned text is canonical MTHDS, not a surgical diff — spacing and column alignment of
+  *untouched* tables is normalized too (a no-op on already-formatted files, which is the norm,
+  since MTHDS is formatted on save + CI-enforced). This is the intended output philosophy for a
+  file-rewriting fix tool; it is emphatically not byte-level preservation of untouched lines.
 
-Canonical formatting is not this module's job: the applier mutates, and ``serialize_and_format``
-hands the serialized document to the MTHDS formatter (``pipelex_tools.format_mthds``) for the
-one canonical style, so an incremental edit that leaves non-canonical inline-table spacing is
-reflowed at write time rather than hand-corrected here.
+Guarded application: an op only applies when its target table path exists in the DOM. This
+protects against errors raised on elaborated/synthetic constructs (a synthesized sequence has no
+TOML to patch) and against ops targeting a different file than the one being patched — a skipped
+op is reported, never raised.
 """
 
 from enum import StrEnum
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import tomlkit
 from pipelex_tools import format_mthds
@@ -24,6 +29,11 @@ from tomlkit import TOMLDocument
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
+
+if TYPE_CHECKING:
+    # ``Diagnostic`` is a type-only TypedDict from the stub — declared in ``__all__`` but not a
+    # runtime export of the compiled module, so it must not be imported at runtime.
+    from pipelex_tools import Diagnostic
 
 
 class FixOpOutcome(StrEnum):
@@ -96,10 +106,20 @@ def serialize_and_format(toml_doc: TOMLDocument) -> str:
     result = format_mthds(dumped)
     syntax_diagnostics = [diagnostic for diagnostic in result["diagnostics"] if diagnostic["kind"] == "syntax"]
     if syntax_diagnostics:
-        reported = "; ".join(diagnostic["message"] for diagnostic in syntax_diagnostics)
+        reported = "; ".join(_render_syntax_diagnostic(diagnostic) for diagnostic in syntax_diagnostics)
         msg = f"fix applier produced malformed TOML (formatter reported: {reported}) — planner/applier bug"
         raise PipelexUnexpectedError(msg)
     return result["formatted"]
+
+
+def _render_syntax_diagnostic(diagnostic: "Diagnostic") -> str:
+    """One formatter syntax diagnostic as ``message (line L:C)``, keeping the position it carries
+    so a planner/applier bug is debuggable from the raised message alone.
+    """
+    diagnostic_range = diagnostic["range"]
+    if diagnostic_range is None:
+        return diagnostic["message"]
+    return f"{diagnostic['message']} (line {diagnostic_range['start_line']}:{diagnostic_range['start_col']})"
 
 
 def apply_fix_ops(toml_doc: TOMLDocument, *, ops: list[FixOp]) -> list[FixOpApplication]:

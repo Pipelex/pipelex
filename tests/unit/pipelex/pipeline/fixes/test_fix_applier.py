@@ -10,8 +10,11 @@ pinned alongside on the raw DOM.
 
 from pathlib import Path
 
+import pytest
 import tomlkit
+from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
 from pipelex.suggested_fix import FixOp, FixOpKind
 
@@ -105,3 +108,30 @@ class TestFixApplier:
         reloaded = tomlkit.loads(serialize_and_format(toml_doc)).unwrap()["pipe"]["list_ideas"]
         assert reloaded["output"] == "Idea[]"
         assert reloaded["inputs"] == {"topic": "Text"}
+
+    def test_serialize_and_format_raises_on_syntax_diagnostic(self, mocker: MockerFixture) -> None:
+        """A syntax diagnostic from the formatter means the applier emitted malformed TOML: raise
+        loudly (never write it out), keeping the diagnostic's message and position for debugging.
+        """
+        mocker.patch(
+            "pipelex.pipeline.fixes.applier.format_mthds",
+            return_value={
+                "formatted": "broken",
+                "changed": False,
+                "diagnostics": [
+                    {
+                        "kind": "syntax",
+                        "severity": "error",
+                        "message": "expected value",
+                        "location": None,
+                        "range": {"start_offset": 0, "end_offset": 1, "start_line": 3, "start_col": 5, "end_line": 3, "end_col": 6},
+                    }
+                ],
+            },
+        )
+        with pytest.raises(PipelexUnexpectedError) as exc_info:
+            serialize_and_format(tomlkit.loads("a = 1\n"))
+        message = str(exc_info.value)
+        assert "malformed TOML" in message
+        assert "expected value" in message
+        assert "line 3:5" in message
