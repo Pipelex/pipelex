@@ -131,7 +131,7 @@ Harden the loop (fingerprint bail, multi-file targeting), add `sync-controller-i
 
 ### Phase 2 — CLI + docs + changelog
 
-`pipelex-agent fix bundle` + `pipelex fix` commands, two-stream output, docs page (`docs/`), CHANGELOG entry ([Unreleased]). Update the `mthds-fix` skill guidance is wave-2 territory (plugins repo), but note the hand-off.
+`pipelex-agent fix bundle` + `pipelex fix` commands, two-stream output, docs page (`docs/`), CHANGELOG entry ([Unreleased]). Update the `mthds-fix` skill guidance is wave-2 territory (plugins repo), but note the hand-off. Sequencing inside this phase is deliberate — agent command first, human CLI (`pipelex fix` + the `💡 Suggested fix` line in `validate`) last and gated on rule breadth + the apply command existing; see the master plan's "Sequencing doctrine".
 
 **CHECKPOINT 2**: wave 1 shippable. `make agent-check` + `make agent-test` green. Record the hand-off list for wave 2.
 
