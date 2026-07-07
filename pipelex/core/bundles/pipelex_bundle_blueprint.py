@@ -4,6 +4,7 @@ from typing import Annotated, Any, cast
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from pipelex.core.bundles.exceptions import NativeConceptRedeclarationError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -110,7 +111,9 @@ class PipelexBundleBlueprint(BaseModel):
                     f"Native concepts are: {', '.join(native_concept_codes)}. "
                     f"See {URLs.native_concepts_docs}"
                 )
-                raise ValueError(msg)
+                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
+                # blueprint categorizer recovers the offending code structurally for the fix planner.
+                raise NativeConceptRedeclarationError(msg, concept_code=concept_code)
         return concept
 
     @field_validator("main_pipe", mode="before")

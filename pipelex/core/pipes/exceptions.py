@@ -137,6 +137,11 @@ class PipeValidationErrorType(StrEnum):
     # assertion can never fire.
     OPTIONAL_FORCE_REDUNDANT = "optional_force_redundant"
 
+    # Blueprint parse-time concept error: a bundle declares a concept whose code collides with a
+    # native Pipelex concept (`Text`, `Number`, …). Structurally suppressible — set only at the
+    # single `validate_concept_keys` raise site — so the fix planner keys on it safely.
+    NATIVE_CONCEPT_REDECLARATION = "native_concept_redeclaration"
+
     # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
     # merged library (a referenced concept or dependency pipe does not resolve).
     UNRESOLVED_CONCEPT = "unresolved_concept"
@@ -170,6 +175,7 @@ class PipeValidationErrorType(StrEnum):
                 | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
                 | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
                 | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
                 | PipeValidationErrorType.UNRESOLVED_CONCEPT
                 | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
                 | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
@@ -186,6 +192,37 @@ class PipeValidationErrorType(StrEnum):
                 PipeValidationErrorType.MISSING_INPUT_VARIABLE
                 | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
                 | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_native_concept_redeclaration(self) -> bool:
+        """True for the blueprint-channel native-concept redeclaration the fix planner strips."""
+        match self:
+            case PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
                 | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                 | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX

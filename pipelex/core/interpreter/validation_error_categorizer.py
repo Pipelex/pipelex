@@ -5,6 +5,7 @@ from pydantic_core import ErrorDetails
 
 from pipelex import log
 from pipelex.core.bundles.exceptions import (
+    NativeConceptRedeclarationError,
     PipelexBundleBlueprintValidationErrorData,
 )
 from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
@@ -22,6 +23,25 @@ PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 # recoverable from the message. See `_categorize_typeless_pipe_error`.
 _MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
 _EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
+
+
+def _extract_wrapped_native_concept_redeclaration_error(error: ErrorDetails) -> NativeConceptRedeclarationError | None:
+    """Extract a ``NativeConceptRedeclarationError`` wrapped by pydantic, or ``None``.
+
+    ``validate_concept_keys`` raises it (a ``ValueError`` subclass) from a ``mode="before"``
+    field validator, so pydantic reports a ``value_error`` and keeps the original in
+    ``ctx["error"]`` — the same wrapping ``extract_wrapped_pipe_validation_error`` unwraps for
+    pipe errors. Structural, never message-matched: the offending ``concept_code`` rides the
+    exception itself.
+    """
+    if error["type"] != "value_error":
+        return None
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        original_error = ctx.get("error")
+        if isinstance(original_error, NativeConceptRedeclarationError):
+            return original_error
+    return None
 
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
@@ -274,6 +294,21 @@ def categorize_blueprint_validation_error(
             pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
             message=wrapped_pipe_error.explanation or str(wrapped_pipe_error),
             variable_names=wrapped_pipe_error.variable_names,
+        )
+
+    # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``
+    # carrying the offending code (which the pydantic ``loc`` — ``("concept",)`` — cannot). Recover
+    # it structurally so the fix planner can strip exactly that concept key.
+    wrapped_native_redeclaration = _extract_wrapped_native_concept_redeclaration_error(error)
+    if wrapped_native_redeclaration is not None:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION,
+            domain_code=domain,
+            source=source,
+            concept_code=wrapped_native_redeclaration.concept_code,
+            # The exception's own clean message, not the pydantic ``msg`` (which carries a
+            # "Value error, " prefix) — same choice as the wrapped-pipe-error path above.
+            message=str(wrapped_native_redeclaration),
         )
 
     error_scope = get_error_scope(loc)

@@ -128,27 +128,27 @@ Trigger: blueprint-level error for a redeclared native concept. Fix: `delete_key
 
 ### B.1 — Typed error for the redeclaration
 
-- [ ] RED: tests pinning that a native-concept redeclaration yields blueprint error data with a dedicated `error_type` and the offending `concept_code` as structured fields (all authoring forms).
-- [ ] Replace the bare `ValueError` at `pipelex_bundle_blueprint.py:107-113` with a typed exception carrying `concept_code`, and teach the blueprint categorizer to unwrap it structurally (pydantic `ctx["error"]` unwrap, the pattern already used for wrapped `PipeValidationError`s at `validation_error_categorizer.py:268`) — no message matching.
-- [ ] Pick the enum home for the new error-type value: check the declared type of `PipelexBundleBlueprintValidationErrorData.error_type` (`pipelex/core/bundles/exceptions.py`) and decide widen-vs-new-enum. Don't resurrect the deleted `PipelexBundleBlueprintFixableErrorType` stub as-is; smallest correct surface wins. Record the decision.
+- [x] RED: tests pinning that a native-concept redeclaration yields blueprint error data with a dedicated `error_type` and the offending `concept_code` as structured fields (all authoring forms). `tests/integration/pipelex/pipeline/test_native_concept_redecl_enrichment.py` — table, table+structure, string shorthand, dotted; plus a negative that an invalid-syntax concept code is NOT a redeclaration.
+- [x] Replaced the bare `ValueError` in `validate_concept_keys` with `NativeConceptRedeclarationError(ValueError)` carrying `concept_code` (in `core/bundles/exceptions.py`); the blueprint categorizer unwraps it structurally via `_extract_wrapped_native_concept_redeclaration_error` (the exact `ctx["error"]` pattern of `extract_wrapped_pipe_validation_error`), placed **before** the scope dispatch so it wins over the un-enriched concept-scope path. The other bare `ValueError` (invalid concept-code *syntax*) stays untyped → uncategorized → unfixable. No message matching.
+- [x] **Enum home decision: widen the shared `PipeValidationErrorType`** (its field is `PipelexBundleBlueprintValidationErrorData.error_type: PipeValidationErrorType | None`, and the enum is already the de-facto MTHDS validation-error-type enum — holds `UNRESOLVED_CONCEPT`). Added `NATIVE_CONCEPT_REDECLARATION`; did not resurrect `PipelexBundleBlueprintFixableErrorType`. Field type + wire projection unchanged. Added the value to the two exhaustive `@property` match/case methods and a new single-case `is_native_concept_redeclaration` property (house style).
 
 ### B.2 — Blueprint-channel planner + wiring
 
-- [ ] RED: planner unit tests — redeclaration error data → SAFE `strip-native-concept-redecl` fix with one `delete_key` op (`table_path=["concept"], key=<Code>`); suppression: missing `concept_code` → `None`; non-redeclaration blueprint errors → `None`.
-- [ ] New `plan_fix_for_blueprint_validation_error(...)` in `planner.py`; wire it into the blueprint loop of `build_validation_error_items` (`validation_errors.py:82-94`).
-- [ ] Populate `SuggestedFix.source` from the blueprint error's `source` — then verify the loop's source/file check accepts it single-file and (under `library_dirs`) targets only the declaring file. First live exercise of that guard; pin with a test.
+- [x] RED: planner unit tests (`tests/unit/pipelex/pipeline/fixes/test_blueprint_fix_planner.py`) — redeclaration error data → SAFE `strip-native-concept-redecl` fix with one `delete_key` op (`table_path=["concept"], key=<Code>`); suppression: missing `concept_code` → `None`; non-redeclaration / uncategorized (`error_type=None`) blueprint errors → `None`; source threaded (and `None`-safe).
+- [x] New `plan_fix_for_blueprint_validation_error(...)` + `_plan_strip_native_concept_redecl(...)` in `planner.py`; wired into the blueprint loop of `build_validation_error_items` (`suggested_fix=plan_fix_for_blueprint_validation_error(blueprint_error)`).
+- [x] `SuggestedFix.source` populated from the blueprint error's `source`. **First live exercise of the loop's source/file guard with a populated source**: accepted single-file (convergence test) and under `library_dirs` when source == the file being fixed (`test_sourceful_blueprint_fix_applies_under_library_dirs`, the positive complement to the pre-existing source-less-dropped test).
 
 ### B.3 — Applier + loop
 
-- [ ] RED: golden fixtures for every authoring form — `[concept.Text]` table (incl. one with a `[concept.Text.structure]` sub-table), `Text = "..."` under `[concept]`, dotted `concept.Text = "..."` — with surrounding comments; idempotence.
-- [ ] Convergence test: bundle redeclaring more than one native concept converges error-by-error across iterations (the `mode="before"` validator raises one at a time).
-- [ ] Wire test: blueprint-channel `ValidationErrorItem` carries the fix through the shared builder.
+- [x] Golden fixtures for every authoring form — `native_redecl_table.mthds` (`[concept.Text]` + `[concept.Text.structure]`), `native_redecl_inline.mthds` (`Text = "..."` under `[concept]`), `native_redecl_dotted.mthds` (dotted `concept.Number = "..."`) — each with a surviving commented sibling concept; idempotence + guarded-skip in `test_fix_applier_native_concept.py`. **The applier needed no new code** — `DELETE_KEY` on `["concept"]` covers all three forms (tomlkit represents them all as a `concept` table keyed by the code; deleting a table drops its `structure` sub-table too). `format_mthds` keeps dotted keys dotted, so a dotted fixture is genuinely format-stable.
+- [x] Convergence test (`test_native_redeclarations_converge_error_by_error`): a bundle redeclaring two native concepts strips one per iteration (2 iterations), surviving concept untouched — same cascade shape as the pipe channel.
+- [x] Wire test: blueprint-channel `ValidationErrorItem` carries the strip fix through the shared builder (`test_blueprint_native_redeclaration_rides_a_strip_fix`), plus a non-fixable-blueprint-error negative.
 
 ### 🛑 CHECKPOINT B — hard stop before Phase C
 
-- [ ] **Verify**: `make agent-check` green; full `make agent-test` green.
-- [ ] **Record for cold start**: update this file (B decisions: enum home, source-guard behavior observed); fold blueprint-channel findings into the design doc. Commit.
-- [ ] **Review fan-out**: Sonnet-5 sub-agent running `/code-review` on the Phase B diff only (`git diff <checkpoint-A-sha>..HEAD`), no inherited context — diff pointer only. Triage, fix, defer, commit.
+- [x] **Verify**: `make agent-check` green; full `make agent-test` green (2026-07-07).
+- [x] **Record for cold start**: B decisions (enum home, source-guard behavior) recorded here and in "Decisions taken"; blueprint-channel findings folded into the design doc (new "CHECKPOINT B" section). Committed.
+- [ ] **Review fan-out**: Sonnet-5 sub-agent running `/code-review` on the Phase B diff only, no inherited context — diff pointer only. Triage, fix, defer, commit.
 
 ## Phase C — `strip-namespace` (STRETCH — gated on rename mechanics; dropping it is a valid outcome)
 
@@ -189,7 +189,8 @@ Trigger: `INVALID_PIPE_CODE_SYNTAX` from same-domain dotted pipe codes. Fix: pos
 - A.2 no-`inputs`-table op shape: **single `set_key` of the whole mapping on `["pipe", <code>]`**; `TomlValue` widened to allow a flat scalar dict, applier writes it as a canonical inline table. Companion decision: error data carries `declared_inputs` alongside `expected_inputs` so the planner can diff without file access.
 - A.3 applier shape finding (**superseded by A′**): mutated inline tables were re-emitted with canonical spacing in the applier; block tables in-place.
 - A′ canonical-output backend: **adopt `pipelex_tools.format_mthds`** as the single source of canonical style (core runtime dep `pipelex-tools-py`, the in-process library — distinct from the `plxt` CLI dev-dep). Applier is pure DOM mutation; `serialize_and_format` runs one `format_mthds` pass per write, raising `PipelexUnexpectedError` on any `kind="syntax"` diagnostic. Output philosophy is now **canonical whole-file MTHDS** (no-op on already-formatted files). Kept a minimal `inline_table()` builder for the whole-mapping create case (plain-dict assign → detached block table, which `format_mthds` won't reflow to inline). All four goldens byte-stable. `pipelex-tools-py` is ours → upstream fixes are on the table if a limitation surfaces.
-- B.1 error-type enum home: _pending_
+- B.1 error-type enum home: **widen the shared `PipeValidationErrorType`** with `NATIVE_CONCEPT_REDECLARATION` (it is already the de-facto MTHDS validation-error-type enum — holds `UNRESOLVED_CONCEPT`; field type `PipeValidationErrorType | None` and wire projection unchanged). Not a new enum, not the deleted `PipelexBundleBlueprintFixableErrorType` stub. Typed exception = `NativeConceptRedeclarationError(ValueError)` carrying `concept_code`; categorizer unwraps it structurally via `ctx["error"]` (mirrors `extract_wrapped_pipe_validation_error`), before the scope dispatch.
+- B.2/B.3 blueprint channel: applier needed **no new code** — `DELETE_KEY` on `["concept"]` covers table / string-shorthand / dotted forms (all one `concept` table keyed by code; deleting a table drops its `structure` sub-table). First fix with a populated `SuggestedFix.source`; loop's source/file guard exercised live (single-file + `library_dirs` positive). `SuggestedFix`/`FixOp` absorbed the delete-shaped fix and the whole blueprint channel **unchanged**. Known minor artifact: a standalone comment sitting directly on a deleted `[concept.X]` table reflows onto the successor (tomlkit trivia; comments on untouched content are preserved).
 - C.1 GO/NO-GO on strip-namespace (+ op-shape extension if GO): _pending_
 
 ## Out of scope for step 2 (already tracked elsewhere)

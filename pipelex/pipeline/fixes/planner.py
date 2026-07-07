@@ -5,11 +5,13 @@ The planner runs inside report assembly (``build_validation_error_items``), so e
 of the validation report — CLI, API, MCP — sees fixes with zero extra plumbing.
 """
 
+from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix, TomlScalar
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
+STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 
 
 def plan_fix_for_pipe_validation_error(error_data: PipesAndConceptValidationErrorData) -> SuggestedFix | None:
@@ -111,4 +113,41 @@ def _plan_sync_controller_inputs(error_data: PipesAndConceptValidationErrorData)
         safety=FixSafety.SAFE,
         source=error_data.source,
         ops=ops,
+    )
+
+
+def plan_fix_for_blueprint_validation_error(error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
+    """Derive a suggested fix from one blueprint-validation error data, or ``None`` when not fixable.
+
+    The blueprint channel carries an optional ``error_type``; only errors whose enrichment is
+    present (set at the raise site that knows the correct value) become fixes, so uncategorized
+    residuals and unrelated blueprint errors are suppressed structurally.
+    """
+    if error_data.error_type is None:
+        return None
+    if error_data.error_type.is_native_concept_redeclaration:
+        return _plan_strip_native_concept_redecl(error_data)
+    return None
+
+
+def _plan_strip_native_concept_redecl(error_data: PipelexBundleBlueprintValidationErrorData) -> SuggestedFix | None:
+    """``strip-native-concept-redecl``: a native-concept redeclaration carrying the enriched
+    ``concept_code`` becomes a ``delete_key`` of that key under ``["concept"]`` — the one op that
+    covers every authoring form (``[concept.X]`` table, ``X = "…"`` shorthand, dotted
+    ``concept.X``) since tomlkit represents them all as a ``concept`` table keyed by the code.
+    """
+    if error_data.concept_code is None:
+        return None
+    return SuggestedFix(
+        fix_code=STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE,
+        description=f"Remove the redeclaration of native concept '{error_data.concept_code}'",
+        safety=FixSafety.SAFE,
+        source=error_data.source,
+        ops=[
+            FixOp(
+                kind=FixOpKind.DELETE_KEY,
+                table_path=["concept"],
+                key=error_data.concept_code,
+            ),
+        ],
     )

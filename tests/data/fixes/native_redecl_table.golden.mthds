@@ -1,0 +1,13 @@
+domain    = "nativefix_table"
+main_pipe = "make_report"
+
+# A real, non-native concept — must survive the fix untouched.
+[concept.Report]
+description = "A report."
+
+[pipe.make_report]
+type        = "PipeLLM"
+description = "Make a report."
+inputs      = { topic = "Text" }
+output      = "Report"
+prompt      = "Write a report about $topic"

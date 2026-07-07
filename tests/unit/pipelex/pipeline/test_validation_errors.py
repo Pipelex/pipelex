@@ -324,6 +324,49 @@ class TestBuildValidationErrorItems:
             (FixOpKind.DELETE_KEY, "note"),
         ]
 
+    def test_blueprint_native_redeclaration_rides_a_strip_fix(self) -> None:
+        """An enriched native-concept redeclaration blueprint error carries the strip fix through the builder.
+
+        First blueprint-channel fix: the builder's blueprint loop now runs the planner too, and the
+        fix carries a populated ``source`` (blueprint error data has one, unlike the pipe raise sites).
+        """
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION,
+                    domain_code="nativefix",
+                    source="main.mthds",
+                    concept_code="Text",
+                    message="Cannot declare a concept named 'Text' because it is natively available in Pipelex.",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "strip-native-concept-redecl"
+        assert suggested_fix.source == "main.mthds"
+        assert [(op.kind, op.table_path, op.key) for op in suggested_fix.ops] == [(FixOpKind.DELETE_KEY, ["concept"], "Text")]
+
+    def test_non_fixable_blueprint_error_has_no_suggested_fix(self) -> None:
+        """A blueprint error that is not a native redeclaration keeps ``suggested_fix`` unset."""
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+                    domain_code="nativefix",
+                    source="main.mthds",
+                    message="Invalid pipe code syntax",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        assert items[0].suggested_fix is None
+
     def test_non_fixable_pipe_validation_error_has_no_suggested_fix(self) -> None:
         """A pipe-validation item with no enriched data keeps suggested_fix unset (wire unchanged)."""
         items = _build_items(_all_category_error())

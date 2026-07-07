@@ -108,6 +108,24 @@ steps = [
 ]
 """
 
+_NATIVE_REDECL_MULTI_MTHDS = """domain = "nativefix_converge"
+main_pipe = "greet"
+
+[concept]
+Greeting = "A greeting message."
+# Both redeclare native concepts (illegal). The mode="before" validator raises on the first
+# offending code per pass, so they converge one strip per iteration.
+Text = "Redeclared native Text."
+Number = "Redeclared native Number."
+
+[pipe.greet]
+type = "PipeLLM"
+description = "Greet someone a number of times."
+inputs = { name = "Text", count = "Number" }
+output = "Greeting"
+prompt = "Greet $name $count times"
+"""
+
 _CROSS_RULE_CASCADE_MTHDS = """domain = "crossfix_loop"
 main_pipe = "list_ideas"
 
@@ -216,6 +234,37 @@ class TestFixConvergenceLoop:
         list_ideas = _pipes(bundle_path)["list_ideas"]
         assert list_ideas["inputs"] == {"topic": "Text"}
         assert list_ideas["output"] == "Idea[]"
+
+    async def test_native_redeclarations_converge_error_by_error(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A bundle redeclaring two native concepts strips one per iteration until valid.
+
+        The ``mode="before"`` concept validator raises on the first offending code, so the
+        blueprint-channel ``strip-native-concept-redecl`` fix converges error-by-error — the same
+        cascade shape as the pipe channel, now proven on the blueprint channel end-to-end.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "native_redecl.mthds"
+        bundle_path.write_text(_NATIVE_REDECL_MULTI_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path)
+
+        assert result.is_valid is True
+        assert result.iterations == 2
+        assert [fix.fix_code for fix in result.fixes_applied] == [
+            "strip-native-concept-redecl",
+            "strip-native-concept-redecl",
+        ]
+        assert result.bail_reason is None
+        parsed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
+        concept = cast("dict[str, Any]", parsed["concept"])
+        assert "Text" not in concept
+        assert "Number" not in concept
+        # The real, non-native concept survives untouched.
+        assert concept["Greeting"] == "A greeting message."
 
     async def test_already_valid_bundle_is_a_no_op(
         self,
