@@ -273,9 +273,9 @@ class TestFixConvergenceLoop:
         assert [fix.fix_code for fix in result.fixes_applied] == ["sync-controller-inputs"]
         assert result.remaining_errors == []
         assert result.bail_reason is None
-        fixed_text = bundle_path.read_text(encoding="utf-8")
-        assert 'inputs = { text = "Text", style = "Text" }' in fixed_text
-        assert 'note = "Text"' not in fixed_text
+        make_summary = _pipes(bundle_path)["make_summary"]
+        assert make_summary["inputs"] == {"text": "Text", "style": "Text"}
+        assert "note" not in make_summary["inputs"]
 
     async def test_cross_rule_cascade_inputs_then_output(
         self,

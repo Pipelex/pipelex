@@ -114,6 +114,27 @@ steps = [
 ]
 """
 
+_FLEXIBLE_NEED_PRESERVED_MTHDS = """
+domain = "inputsfix_flex"
+main_pipe = "make_summary"
+
+[pipe.summarize]
+type = "PipeLLM"
+description = "Needs a flexible input plus a concrete one."
+inputs = { data = "Anything", other = "Text" }
+output = "Text"
+prompt = "Use $data and $other"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Narrows the flexible need to a concrete concept while drifting the other input."
+inputs = { data = "Text", other = "Number" }
+output = "Text"
+steps = [
+  { pipe = "summarize", result = "summary" },
+]
+"""
+
 _OPTIONAL_MARKER_MTHDS = """
 domain = "inputsfix_optional"
 main_pipe = "check_doc"
@@ -308,6 +329,22 @@ class TestControllerInputsEnrichment:
         error_data = await _error_data_for([_MULTIPLICITY_MISMATCH_MTHDS], error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH)
         assert error_data.pipe_code == "make_summary"
         assert error_data.expected_inputs == {"text": "Text"}
+
+    async def test_flexible_need_preserves_declared_concrete_input(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A concrete input narrowing a flexible (Anything/Dynamic) need is preserved, not widened.
+
+        The validator accepts a concrete declaration against a flexible need (its concept/multiplicity
+        check is skipped for Dynamic/Anything), so the fix renderer must mirror that carve-out: when a
+        co-occurring drift on another input raises the enriched error, the narrowed concrete input must
+        survive in ``expected_inputs`` instead of being rewritten back to the flexible ``Anything``.
+        """
+        load_empty_library()
+        error_data = await _error_data_for([_FLEXIBLE_NEED_PRESERVED_MTHDS], error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH)
+        assert error_data.pipe_code == "make_summary"
+        assert error_data.expected_inputs == {"data": "Text", "other": "Text"}
 
     async def test_declared_optional_marker_preserved_in_expected_inputs(
         self,

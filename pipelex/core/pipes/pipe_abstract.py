@@ -264,11 +264,15 @@ class PipeAbstract(ABC, BaseModel):
         """Render the full needed-inputs mapping a fix would write, or ``None`` for operators.
 
         Controller-gated: only a controller's ``needed_inputs()`` is a trustworthy ground truth
-        for its declared ``inputs`` table (operators re-emit their own declaration). For a
-        variable whose declared spec already matches the needed spec on concept + multiplicity,
-        the author's declared representation is preserved (keeping their presence marker —
-        presence is deliberately not part of the drift contract); refs are derived from the
-        needed spec only for variables being added or whose concept/multiplicity changes.
+        for its declared ``inputs`` table (operators re-emit their own declaration). The
+        author's declared representation is preserved (keeping their presence marker — presence
+        is deliberately not part of the drift contract) whenever the validator would accept it:
+        either its concept + multiplicity already match the needed spec, or the needed spec is a
+        flexible type (``Dynamic``/``Anything``), which the validator accepts against any concrete
+        declaration. This mirrors the flexible-type carve-out in ``generic_validate_inputs_with_library``
+        so a co-occurring drift on another input never rewrites a valid concrete declaration back
+        to ``Dynamic``/``Anything``. Refs are derived from the needed spec only for variables being
+        added or whose concept/multiplicity genuinely changes against a non-flexible need.
         """
         if not self.is_controller:
             return None
@@ -276,10 +280,9 @@ class PipeAbstract(ABC, BaseModel):
         for named_stuff_spec in needed_inputs.named_stuff_specs:
             var_name = named_stuff_spec.variable_name
             declared_stuff_spec = self.inputs.root.get(var_name)
-            if (
-                declared_stuff_spec is not None
-                and declared_stuff_spec.concept == named_stuff_spec.concept
-                and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity
+            if declared_stuff_spec is not None and (
+                named_stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+                or (declared_stuff_spec.concept == named_stuff_spec.concept and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity)
             ):
                 spec_to_render: StuffSpec = declared_stuff_spec
             else:
