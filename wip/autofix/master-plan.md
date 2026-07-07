@@ -8,7 +8,7 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Step 1 (spike) is DONE** — PR #1027 vs dev, merge-ready. The full chain is proven on one rule (`match-sequence-output`): enriched typed error → planner → tomlkit applier → convergence loop, all TDD, golden format-preservation tests pinning tomlkit's in-place style preservation. The `suggested_fix` payload already rides `pipelex-agent validate bundle --format json` and the `/validate` API 422 body, because the planner hooks into the one shared `build_validation_error_items` builder. Checkpoint findings are recorded in the design doc; deliberate deferrals in [deferred-checkpoint-0-review-items.md](deferred-checkpoint-0-review-items.md).
 
-**Step 2 (wave-1 rule breadth) is DONE** — on the stacked branch `feature/Autofix-step2` (draft PR #1031). All three wave-1 rules landed, each a deliberately different fix *shape*: `sync-controller-inputs` (multi-op in-place table sync, Phase A), `strip-native-concept-redecl` (delete-shaped, first blueprint channel, Phase B), and the stretch `strip-namespace` (position-preserving rename, Phase C — **GO, shipped**). Mid-step, Phase A′ swapped the applier's hand-rolled canonicalization for the in-process `pipelex_tools.format_mthds` backend (core runtime dep). **Abstraction verdict (CHECKPOINT 1): `SuggestedFix`/`FixOp` survived all four shapes with no structural change** — the only wire-level edit was widening `TomlValue` (the type of `FixOp.value`) to admit a flat scalar dict; the feared array-of-tables `table_path` extension was never needed. Full verdict + carried-forward warts in the design doc's "Step-2 exit — abstraction verdict" section; per-checkpoint deferrals in `deferred-checkpoint-{a,a-prime,b,c}-review-items.md`. **Next: step 3** (hardened loop / real multi-file targeting), which may already have partial groundwork from Phase B's `SuggestedFix.source` threading.
+**Step 2 (wave-1 rule breadth) is DONE** — on the stacked branch `feature/Autofix-step2` (PR #1031). All three wave-1 rules landed, each a deliberately different fix *shape*: `sync-controller-inputs` (multi-op in-place table sync, Phase A), `strip-native-concept-redecl` (delete-shaped, first blueprint channel, Phase B), and the stretch `strip-namespace` (position-preserving rename, Phase C — **GO, shipped**). Mid-step, Phase A′ swapped the applier's hand-rolled canonicalization for the in-process `pipelex_tools.format_mthds` backend (core runtime dep). **Abstraction verdict (CHECKPOINT 1): `SuggestedFix`/`FixOp` survived all four shapes with no structural change** — the only wire-level edit was widening `TomlValue` (the type of `FixOp.value`) to admit a flat scalar dict; the feared array-of-tables `table_path` extension was never needed. Full verdict + carried-forward warts in the design doc's "Step-2 exit — abstraction verdict" section; per-checkpoint deferrals in `deferred-checkpoint-{a,a-prime,b,c,d}-review-items.md`. Reviewer's guide: [step2-reviewers-guide.md](step2-reviewers-guide.md) (archived from the worktree-root `TODOS.md`). **Next: step 3** (hardened loop / real multi-file targeting), which may already have partial groundwork from Phase B's `SuggestedFix.source` threading.
 
 ## Sequencing doctrine (decided 2026-07-07)
 
@@ -25,9 +25,9 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 One rule through all layers, no CLI command, driven by tests. Exit criteria met: chain proven, format preservation demonstrated by golden tests, design doc updated with findings. Reviewer's guide: [spike-reviewers-guide.md](spike-reviewers-guide.md).
 
-### 2. Wave-1 rule breadth — stress the abstraction — **DONE (draft PR #1031)**
+### 2. Wave-1 rule breadth — stress the abstraction — **DONE (PR #1031)**
 
-Detailed implementation plan with progress checkboxes: [`TODOS.md`](../../TODOS.md) at the worktree root.
+Detailed implementation plan with progress checkboxes: was `TODOS.md` at the worktree root, now archived as [step2-reviewers-guide.md](step2-reviewers-guide.md).
 
 Add the remaining wave-1 rules, in this order (each is a different fix *shape*, which is the point):
 
