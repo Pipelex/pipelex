@@ -76,7 +76,7 @@ class TestBracketNotationInControllers:
         blueprint = PipeConditionBlueprint(
             description="Route based on category",
             inputs={"items": "Category[]"},
-            output="Result",
+            output="Result?",
             expression="items",
             outcomes={"A": "pipe_a"},
             default_outcome=SpecialOutcome.CONTINUE,

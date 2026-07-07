@@ -207,6 +207,10 @@ class UnknownStorageMethodError(PluginError):
     starting with no storage. The message lists the registered methods so the fix is obvious.
     """
 
+    # The message describes the caller's own input (the configured storage method) and lists the
+    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
         self.registered_methods = registered_methods
@@ -227,6 +231,10 @@ class UnknownSecretsMethodError(PluginError):
     installed or was disabled via ``plugins.disabled`` — boot fails loud here rather than
     starting with no secrets provider. The message lists the registered methods so the fix is obvious.
     """
+
+    # The message describes the caller's own input (the configured secrets method) and lists the
+    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method

@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff import Stuff
@@ -88,7 +89,9 @@ class TestSerializeCompletedOutput:
         assert resolve_main_stuff_root_key(pipe_output=pipe_output) == MAIN_STUFF_NAME
 
     def test_missing_main_stuff_raises(self) -> None:
-        """A completed run always delivers a main stuff — serializing one without it is a contract violation."""
+        """A completed run always resolves its declared output — a working memory with neither a
+        value nor a recorded absence at this boundary is a contract violation.
+        """
         pipe_output = PipeOutput(
             working_memory=WorkingMemory(),
             pipeline_run_id="run-broken",
@@ -96,3 +99,28 @@ class TestSerializeCompletedOutput:
 
         with pytest.raises(PipeJobError):
             serialize_completed_output(pipe_output=pipe_output, workflow_id=None)
+
+    def test_absent_main_output_resolves_declared_slot_name(self) -> None:
+        """A run whose main output resolved absent is a success: main_stuff_name names the
+        declared output slot and the serialized output_dict carries the absence records —
+        consumers branch on the record, never on transport.
+        """
+        memory = WorkingMemory()
+        record = AbsenceRecord(
+            variable_name="summary",
+            kind=AbsenceKind.SKIPPED,
+            reason="skipped because input 'analysis' is absent",
+            producing_pipe="summarize",
+        )
+        memory.record_new_main_absence(record)
+        pipe_output = PipeOutput(working_memory=memory, pipeline_run_id="run-absent")
+
+        assert resolve_main_stuff_root_key(pipe_output=pipe_output) == "summary"
+
+        dto = serialize_completed_output(pipe_output=pipe_output, workflow_id=None)
+        assert dto.main_stuff_name == "summary"
+        serialized_record = dto.output_dict["absences"]["summary"]
+        assert serialized_record["kind"] == "skipped"
+        assert serialized_record["producing_pipe"] == "summarize"
+        # The positional main-stuff key marks the absence as the run's resolved main result.
+        assert dto.output_dict["absences"][MAIN_STUFF_NAME]["variable_name"] == "summary"

@@ -6,7 +6,7 @@ hard-coded in each ``extract_*_metadata`` function, so serialized payloads
 round-trip unchanged.
 """
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class ProviderName(StrEnum):

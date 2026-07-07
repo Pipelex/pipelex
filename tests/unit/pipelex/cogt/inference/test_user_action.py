@@ -6,11 +6,12 @@ CLI can render consistent advice and agent JSON can be typed.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
-from pipelex.types import StrEnum
 
 
 class TestUserAction:

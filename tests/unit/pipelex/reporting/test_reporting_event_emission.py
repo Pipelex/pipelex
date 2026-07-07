@@ -5,7 +5,7 @@ UsageReportEvent with per-context isolation for concurrent workflows.
 """
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from botocore.exceptions import ClientError
@@ -39,7 +39,7 @@ def _make_test_llm_job(
     trace_context: TraceContext | None = None,
 ) -> LLMJob:
     """Create a minimal LLMJob for testing event emission."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,

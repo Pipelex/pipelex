@@ -9,12 +9,12 @@ import random
 import types
 import typing
 import uuid
+from enum import StrEnum
 from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.types import StrEnum
 
 
 class ConceptRepresentationFormat(StrEnum):

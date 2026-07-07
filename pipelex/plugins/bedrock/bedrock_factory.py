@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -6,7 +8,6 @@ from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtoco
 from pipelex.plugins.bedrock.bedrock_exceptions import BedrockFactoryError
 from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockMessage
 from pipelex.plugins.model_handle import ModelHandle
-from pipelex.types import StrEnum
 
 
 class BedrockSdkVariant(StrEnum):

@@ -211,6 +211,17 @@ class TestStdinResolver:
         result = parse_cli_inputs(inputs_arg=str(json_file))
         assert result == {"key": "value"}
 
+    def test_inputs_tilde_path_is_expanded(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A quoted / `=`-form `~/inputs.json` (tilde not shell-expanded) resolves to the home dir.
+
+        The loader expands `~` itself so `--inputs "~/inputs.json"` opens the real file instead of
+        failing with a not-found error on a literal `~` path — matching the `run method` path.
+        """
+        monkeypatch.setenv("HOME", str(tmp_path))
+        (tmp_path / "inputs.json").write_text('{"tilde": "expanded"}')
+        result = parse_cli_inputs(inputs_arg="~/inputs.json", stdin_fallback=False)
+        assert result == {"tilde": "expanded"}
+
     def test_inputs_wins_over_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When --inputs is provided, stdin is ignored."""
         monkeypatch.setattr("sys.stdin", io.StringIO('{"from_stdin": true}'))

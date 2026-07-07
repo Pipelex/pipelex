@@ -51,15 +51,18 @@ async def run_pipeline_core_api(
     # extension-open RunResult — they ride model_extra, never named by the SDK.
     extensions: dict[str, Any] = response.model_extra or {}
 
-    # Extract the main stuff content from the working memory. A completed run always delivers
-    # a main stuff — a response without one under the announced key is a runner contract violation.
+    # Extract the main stuff content from the working memory. A completed run always resolves its
+    # declared output: a value or a recorded absence — but the mthds SDK wire models do not carry
+    # the absences ledger yet (root + aliases only, extra=forbid), so the resolved-as-absent arm on
+    # this API path is gated on the cross-repo mthds protocol bump. Until then a response with no
+    # main stuff under the announced key is reported as a runner contract violation.
     raw_main_stuff_name = extensions.get("main_stuff_name")
     main_stuff_name = raw_main_stuff_name if isinstance(raw_main_stuff_name, str) else MAIN_STUFF_NAME
     main_stuff = pipe_output.working_memory.root.get(main_stuff_name)
     if main_stuff is None:
         msg = (
             f"Completed run '{response.pipeline_run_id}' response has no main stuff under key '{main_stuff_name}' — "
-            "a completed run always delivers a main stuff."
+            "a completed run always resolves its declared output."
         )
         raise PipeExecutionError(msg)
 

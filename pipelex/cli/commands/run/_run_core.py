@@ -24,6 +24,8 @@ from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_json, build_absence_markdown
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -151,9 +153,12 @@ async def _execute_run(
                 raise typer.Exit(1) from json_decode_exc
         else:
             try:
-                pipeline_inputs = load_inputs_dict_from_path(Path(inputs))
+                # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+                # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+                inputs_path = Path(inputs).expanduser()
+                pipeline_inputs = load_inputs_dict_from_path(inputs_path)
                 # Resolve relative url paths against the inputs file's parent directory
-                base_dir = Path(inputs).parent.resolve()
+                base_dir = inputs_path.parent.resolve()
                 pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
@@ -212,10 +217,17 @@ async def _execute_run(
         typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
-    # Pretty print main_stuff unless disabled or in dry run mode
+    # Pretty print the resolved main result unless disabled or in dry run mode. A completed run
+    # always resolves its declared output: a value or a recorded absence.
+    main_resolved = pipe_output.working_memory.resolve_main_stuff()
     if not no_pretty_print and not dry_run:
-        title = f"Final output of pipe [red]{pipe_code}[/red]"
-        pipe_output.main_stuff.pretty_print_stuff(title=title)
+        if isinstance(main_resolved, AbsenceRecord):
+            get_console().print(
+                f"Final output of pipe [red]{pipe_code}[/red] resolved absent: {main_resolved.reason}",
+            )
+        else:
+            title = f"Final output of pipe [red]{pipe_code}[/red]"
+            main_resolved.pretty_print_stuff(title=title)
 
     # Determine if we need an output directory
     output_path: Path | None = None
@@ -246,33 +258,45 @@ async def _execute_run(
             elif "reactflow" in output_type and "reactflow" not in saved_graphs:
                 saved_graphs.append("reactflow")
 
-    # Save main_stuff files if enabled
+    # Save main_stuff files if enabled. An absent main output saves the explicit absence
+    # artifact (json + md, no interactive viewer — nothing to view), never value renders.
     saved_main_stuff_formats: list[str] = []
     if save_main_stuff and output_path:
-        main_stuff = pipe_output.working_memory.get_main_stuff()
-        main_stuff_json = await main_stuff.content.rendered_json_async()
-        main_stuff_json_path = output_path / "main_stuff.json"
-        main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
-        log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
-        saved_main_stuff_formats.append("json")
+        if isinstance(main_resolved, AbsenceRecord):
+            absence_json_path = output_path / "main_stuff.json"
+            absence_json_path.write_text(build_absence_json(main_resolved), encoding="utf-8")
+            log.verbose(f"Main stuff absence JSON saved to: {absence_json_path}")
+            saved_main_stuff_formats.append("json")
 
-        main_stuff_md = await main_stuff.content.rendered_markdown_async()
-        main_stuff_md_path = output_path / "main_stuff.md"
-        main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
-        log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
-        saved_main_stuff_formats.append("md")
+            absence_md_path = output_path / "main_stuff.md"
+            absence_md_path.write_text(build_absence_markdown(main_resolved), encoding="utf-8")
+            log.verbose(f"Main stuff absence Markdown saved to: {absence_md_path}")
+            saved_main_stuff_formats.append("md")
+        else:
+            main_stuff = main_resolved
+            main_stuff_json = await main_stuff.content.rendered_json_async()
+            main_stuff_json_path = output_path / "main_stuff.json"
+            main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
+            log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
+            saved_main_stuff_formats.append("json")
 
-        main_stuff_html = await main_stuff.content.rendered_html_async()
-        main_stuff_html_path = output_path / "main_stuff.html"
-        main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
-        log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
-        saved_main_stuff_formats.append("html")
+            main_stuff_md = await main_stuff.content.rendered_markdown_async()
+            main_stuff_md_path = output_path / "main_stuff.md"
+            main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
+            log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
+            saved_main_stuff_formats.append("md")
 
-        main_stuff_viewer = await render_stuff_viewer(main_stuff)
-        main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
-        main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
-        log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
-        saved_main_stuff_formats.append("html_viewer")
+            main_stuff_html = await main_stuff.content.rendered_html_async()
+            main_stuff_html_path = output_path / "main_stuff.html"
+            main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
+            log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
+            saved_main_stuff_formats.append("html")
+
+            main_stuff_viewer = await render_stuff_viewer(main_stuff)
+            main_stuff_viewer_path = output_path / "main_stuff_viewer.html"
+            main_stuff_viewer_path.write_text(main_stuff_viewer, encoding="utf-8")
+            log.verbose(f"Main stuff HTML viewer saved to: {main_stuff_viewer_path}")
+            saved_main_stuff_formats.append("html_viewer")
 
     # Save working memory to JSON if enabled
     working_memory_output_path: str | None = None
@@ -290,7 +314,15 @@ async def _execute_run(
     # the codec rejects a non-flat row concept with a clear CsvFlatnessError.
     if save_csv is not None:
         # The path string and its suffix were already validated up front (fail-fast, before the run).
-        csv_main_stuff = pipe_output.working_memory.get_main_stuff()
+        if isinstance(main_resolved, AbsenceRecord):
+            typer.secho(
+                f"Failed to --save-csv: the main output resolved absent ({main_resolved.reason}). "
+                "CSV output requires the pipe to produce a flat list (e.g. 'PersonSummary[]').",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+        csv_main_stuff = main_resolved
         csv_content = csv_main_stuff.content
         if not isinstance(csv_content, ListContent):
             typer.secho(

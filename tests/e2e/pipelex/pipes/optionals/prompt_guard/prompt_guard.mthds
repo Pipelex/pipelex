@@ -1,0 +1,17 @@
+domain      = "opt_prompt_guard"
+description = "PipeLLM whose prompt guards a declared-optional input (dry-run keyless)"
+main_pipe   = "opg_draft_note"
+
+[pipe.opg_draft_note]
+type = "PipeLLM"
+description = "Drafts a note; the optional style hint is guarded via the optional sigil and an if-defined block"
+inputs = { topic = "Text", style_hint = "Text?" }
+output = "Text"
+prompt = """
+Write one short sentence about $topic.
+
+@?style_hint
+{% if style_hint is defined %}
+Follow the style hint above.
+{% endif %}
+"""

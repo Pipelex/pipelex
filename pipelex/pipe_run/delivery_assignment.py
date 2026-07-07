@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import StrEnum
 
 
 class DeliveryStatus(StrEnum):

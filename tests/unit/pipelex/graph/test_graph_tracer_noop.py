@@ -1,6 +1,6 @@
 """Unit tests for GraphTracerNoOp."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer_protocol import GraphTracerNoOp
 from pipelex.graph.graphspec import EdgeKind, NodeKind
@@ -30,7 +30,7 @@ class TestGraphTracerNoOp:
         tracer = GraphTracerNoOp()
         context = tracer.setup(graph_id="noop-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(timezone.utc)
+        started_at = datetime.now(UTC)
         node_id, child_ctx = tracer.on_pipe_start(
             trace_context=context,
             pipe_code="test_pipe",

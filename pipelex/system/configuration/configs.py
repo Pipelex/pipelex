@@ -1,4 +1,5 @@
-from typing import Annotated, Literal
+from enum import StrEnum
+from typing import Annotated, Literal, Self
 
 import shortuuid
 from pydantic import Field, field_validator, model_validator
@@ -15,7 +16,6 @@ from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
-from pipelex.types import Self, StrEnum
 
 
 class ConfigPaths:

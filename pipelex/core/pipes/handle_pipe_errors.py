@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 
 from pydantic import ValidationError
@@ -5,7 +6,6 @@ from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
-from pipelex.types import StrEnum
 
 
 class ModelScope(StrEnum):

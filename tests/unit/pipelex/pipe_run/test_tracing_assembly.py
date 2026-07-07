@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -32,7 +32,7 @@ def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
     return UsageReportEvent(
         pipeline_run_id=pipeline_run_id,
         workflow_id="direct",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         sequence=0,
         node_id=node_id,
         tokens_usage=tokens_usage,

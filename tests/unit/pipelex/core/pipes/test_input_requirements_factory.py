@@ -5,6 +5,7 @@ import pytest
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory, InputStuffSpecsFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
@@ -102,6 +103,28 @@ class TestMakeInputRequirementsFromString:
         result = InputStuffSpecsFactory.make_from_string(domain_code="native", stuff_spec_str="native.Text[3]")
         assert result.concept.concept_ref == "native.Text"
         assert result.multiplicity == 3
+
+    @pytest.mark.parametrize(
+        ("stuff_spec_str", "expected_presence", "expected_multiplicity"),
+        [
+            ("native.Text", PresenceMarker.PLAIN, None),
+            ("native.Text?", PresenceMarker.OPTIONAL, None),
+            ("native.Text!", PresenceMarker.FORCE, None),
+        ],
+    )
+    def test_presence_markers(
+        self,
+        stuff_spec_str: str,
+        expected_presence: PresenceMarker,
+        expected_multiplicity: int | bool | None,
+        load_empty_library: Callable[[], None],
+    ):
+        """Test parsing presence markers on input stuff spec strings."""
+        load_empty_library()
+        result = InputStuffSpecsFactory.make_from_string(domain_code="native", stuff_spec_str=stuff_spec_str)
+        assert result.concept.concept_ref == "native.Text"
+        assert result.multiplicity == expected_multiplicity
+        assert result.presence == expected_presence
 
     def test_concept_not_found_raises_error(self, load_empty_library: Callable[[], None]):
         load_empty_library()

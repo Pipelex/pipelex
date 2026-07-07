@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json as json_module
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

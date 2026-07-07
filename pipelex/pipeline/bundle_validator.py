@@ -27,6 +27,7 @@ activity later (D5).
 """
 
 import time
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from polyfactory.exceptions import FactoryException
@@ -60,7 +61,6 @@ from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol

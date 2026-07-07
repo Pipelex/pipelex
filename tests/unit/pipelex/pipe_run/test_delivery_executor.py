@@ -7,6 +7,7 @@ from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff import Stuff
@@ -47,7 +48,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
-        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -165,7 +166,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {}
-        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -181,7 +182,9 @@ class TestDeliveryExecutor:
             )
 
     async def test_generate_result_files_raises_without_main_stuff_typed(self, mocker: MockerFixture) -> None:
-        """A completed run always delivers a main stuff — a typed working memory without one is a contract violation, not an empty envelope."""
+        """A completed run always resolves its declared output — a typed working memory with neither
+        a main stuff nor a recorded absence is a contract violation, not an empty envelope.
+        """
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory = WorkingMemory()
@@ -191,13 +194,72 @@ class TestDeliveryExecutor:
             await DeliveryExecutor().generate_result_files(mock_output)
 
     async def test_generate_result_files_raises_without_main_stuff_raw(self, mocker: MockerFixture) -> None:
-        """Same contract on the raw (cross-process) path: a raw working memory without a main stuff fails loudly."""
+        """Same contract on the raw (cross-process) path: neither a raw main stuff nor a recorded absence fails loudly."""
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = {"root": {}, "aliases": {}}
         mock_output.graph_spec = None
 
         with pytest.raises(PipeJobError):
             await DeliveryExecutor().generate_result_files(mock_output)
+
+    async def test_generate_result_files_absent_main_typed(self, mocker: MockerFixture) -> None:
+        """An absent main output is a first-class success: the typed arm delivers an explicit
+        absence artifact (main_stuff.json/md/html) instead of raising.
+        """
+        working_memory = WorkingMemory()
+        working_memory.record_new_main_absence(
+            AbsenceRecord(
+                variable_name="penalty_summary",
+                kind=AbsenceKind.DECLARED_ABSENT,
+                reason="no penalty clause found in this contract",
+                producing_pipe="check_penalty_clause",
+            ),
+        )
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory = working_memory
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "working_memory.json" in files
+        json_text = files["main_stuff.json"].data.decode("utf-8")
+        assert '"absent": true' in json_text
+        assert "no penalty clause found in this contract" in json_text
+        assert "check_penalty_clause" in json_text
+        md_text = files["main_stuff.md"].data.decode("utf-8")
+        assert "absent" in md_text.lower()
+        assert "no penalty clause found in this contract" in md_text
+        assert "main_stuff.html" in files
+
+    async def test_generate_result_files_absent_main_raw(self, mocker: MockerFixture) -> None:
+        """Same on the raw (cross-process) path: a recorded main absence in the raw ledger delivers
+        the absence artifact instead of the contract-violation error.
+        """
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = {
+            "root": {},
+            "aliases": {},
+            "absences": {
+                "main_stuff": {
+                    "variable_name": "penalty_summary",
+                    "kind": "skipped",
+                    "reason": "skipped because input 'penalty_clause' is absent",
+                    "producing_pipe": "summarize_penalty",
+                    "upstream": None,
+                },
+            },
+        }
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        json_text = files["main_stuff.json"].data.decode("utf-8")
+        assert '"absent": true' in json_text
+        assert "skipped because input 'penalty_clause' is absent" in json_text
+        md_text = files["main_stuff.md"].data.decode("utf-8")
+        assert "summarize_penalty" in md_text
+        assert "main_stuff.html" in files
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
@@ -468,7 +530,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
-        mock_output.working_memory.get_main_stuff.return_value = _make_main_stuff()
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()

@@ -1,11 +1,10 @@
-from typing import Annotated, Union
+from typing import Annotated, Self, Union
 
 from pydantic import BeforeValidator, Field, model_validator
 
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import Self
 
 
 class ImgGenSettingValueError(ValueError):

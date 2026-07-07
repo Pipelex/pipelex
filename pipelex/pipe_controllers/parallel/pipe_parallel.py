@@ -9,19 +9,29 @@ from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
+from pipelex.core.pipes.pipe_abstract import CompanionSlot
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import IOSpec
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_optional_pipe, get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.pipe_controllers.absence_taint import (
+    ForceConsumptionInfo,
+    LiftableStepInfo,
+    ParallelTaintAnalysis,
+    SlotTaint,
+    is_plural_step_result,
+    scan_taint_triggers,
+)
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunError
@@ -98,10 +108,14 @@ class PipeParallel(PipeController):
                 )
                 for input_name, stuff_spec in pipe_needed_inputs.items:
                     if input_name != sub_pipe.batch_params.input_item_stuff_name:
-                        needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                        needed_inputs.add_stuff_spec(
+                            input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                        )
             else:
                 for input_name, stuff_spec in pipe_needed_inputs.items:
-                    needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                    needed_inputs.add_stuff_spec(
+                        input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                    )
         return needed_inputs
 
     @override
@@ -209,6 +223,139 @@ class PipeParallel(PipeController):
 
         self._validate_branch_output_types(structure_class=structure_class)
 
+        # D11 static rule: a REQUIRED field cannot be fed by a maybe-absent branch — absorption
+        # (field-level None) only exists for non-required fields. The runtime guard in
+        # `_run_branches_and_combine` is the belt-and-suspenders for this check.
+        branch_taints = self.analyze_branch_taint().branch_taints
+        for sub_pipe in self.parallel_sub_pipes:
+            result_name = sub_pipe.output_name
+            if not result_name:
+                continue
+            branch_taint = branch_taints.get(result_name)
+            if branch_taint is None:
+                continue
+            field_info = structure_class.model_fields.get(result_name)
+            if field_info is not None and field_info.is_required():
+                msg = (
+                    f"PipeParallel '{self.code}': branch '{sub_pipe.pipe_code}' may resolve absent "
+                    f"({branch_taint.describe()}), but field '{result_name}' of output "
+                    f"'{self.output.concept.concept_ref}' is required. Make the field optional "
+                    f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
+                )
+                raise PipeValidationError(
+                    message=msg,
+                    error_type=PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD,
+                    domain_code=self.domain_code,
+                    pipe_code=self.code,
+                    provided_concept_code=self.output.concept.concept_ref,
+                    variable_names=[result_name],
+                )
+
+    def analyze_branch_taint(self) -> ParallelTaintAnalysis:
+        """Static taint over the branches (D6): which branch results are maybe-absent.
+
+        Within the parallel's frame, the maybe-absent slots are exactly its own `?`-declared
+        inputs (a tainted slot declared plain at the parallel's boundary lifts the whole
+        parallel — the enclosing controller's concern, not this walk's). A branch is
+        maybe-absent when it is liftable (a plain input fed by an optional input of the
+        parallel) or when its pipe declares an optional output; a plural branch result is
+        never maybe-absent (D4: compaction / empty list).
+        """
+        optional_input_taints: dict[str, SlotTaint] = {}
+        for input_name, stuff_spec in self.inputs.root.items():
+            if stuff_spec.presence.is_optional and not stuff_spec.is_multiple():
+                optional_input_taints[input_name] = SlotTaint(
+                    source=f"optional input '{input_name}' of pipe '{self.code}'",
+                    origin_slot_name=input_name,
+                )
+
+        branch_taints: dict[str, SlotTaint] = {}
+        liftable_steps: list[LiftableStepInfo] = []
+        force_consumptions: list[ForceConsumptionInfo] = []
+        for sub_pipe in self.parallel_sub_pipes:
+            branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
+            if branch_pipe is None:
+                continue
+            trigger_scan = scan_taint_triggers(branch_pipe, slot_taints=optional_input_taints)
+            for asserting_name in trigger_scan.asserting_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=branch_pipe.pipe_ref, variable_name=asserting_name, is_asserting=True
+                    )
+                )
+            for redundant_name in trigger_scan.redundant_force_names:
+                force_consumptions.append(
+                    ForceConsumptionInfo(
+                        within_pipe_ref=self.pipe_ref, pipe_ref=branch_pipe.pipe_ref, variable_name=redundant_name, is_asserting=False
+                    )
+                )
+            if trigger_scan.trigger_names and trigger_scan.trigger_taint is not None:
+                liftable_steps.append(
+                    LiftableStepInfo(
+                        within_pipe_ref=self.pipe_ref,
+                        pipe_ref=branch_pipe.pipe_ref,
+                        trigger_variable_names=trigger_scan.trigger_names,
+                        absence_source=trigger_scan.trigger_taint.source,
+                    ),
+                )
+            if not sub_pipe.output_name:
+                continue
+            if is_plural_step_result(
+                branch_pipe, step_output_multiplicity=sub_pipe.output_multiplicity, has_batch_params=sub_pipe.batch_params is not None
+            ):
+                continue
+            if trigger_scan.trigger_names and trigger_scan.trigger_taint is not None:
+                branch_taints[sub_pipe.output_name] = SlotTaint(
+                    source=trigger_scan.trigger_taint.source,
+                    origin_slot_name=trigger_scan.trigger_taint.origin_slot_name,
+                    chain=(
+                        *trigger_scan.trigger_taint.chain,
+                        (
+                            f"branch '{branch_pipe.code}' may be skipped when '{trigger_scan.trigger_names[0]}' is absent"
+                            f" → result '{sub_pipe.output_name}'"
+                        ),
+                    ),
+                )
+            elif branch_pipe.output.presence.is_optional:
+                branch_taints[sub_pipe.output_name] = SlotTaint(
+                    source=f"optional output of branch pipe '{branch_pipe.code}' (result '{sub_pipe.output_name}')",
+                    origin_slot_name=sub_pipe.output_name,
+                )
+        return ParallelTaintAnalysis(
+            branch_taints=branch_taints,
+            liftable_steps=tuple(liftable_steps),
+            force_consumptions=tuple(force_consumptions),
+        )
+
+    @override
+    def lifted_companion_slots(self) -> list[CompanionSlot]:
+        """When an `add_each_output` parallel is lifted, every branch result slot it would have
+        written must be resolved too: a recorded absence for singular results, an empty list for
+        plural ones (D4).
+        """
+        if not self.add_each_output:
+            return []
+        companion_slots: list[CompanionSlot] = []
+        for sub_pipe in self.parallel_sub_pipes:
+            if not sub_pipe.output_name:
+                continue
+            branch_pipe = get_optional_pipe(pipe_code=sub_pipe.pipe_code)
+            if branch_pipe is None:
+                continue
+            companion_slots.append(
+                CompanionSlot(
+                    slot_name=sub_pipe.output_name,
+                    concept=branch_pipe.output.concept,
+                    is_plural=is_plural_step_result(
+                        branch_pipe,
+                        step_output_multiplicity=sub_pipe.output_multiplicity,
+                        has_batch_params=sub_pipe.batch_params is not None,
+                    ),
+                    producing_pipe_code=branch_pipe.code,
+                ),
+            )
+        return companion_slots
+
     # Note: builtins.type because the `type: Literal["PipeParallel"]` field shadows the
     # builtin in this class body, where signature annotations are evaluated.
     def _validate_branch_output_types(self, *, structure_class: builtins.type[StuffContent]) -> None:
@@ -310,21 +457,54 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
+        structure_class = self.output.concept.get_structure_class()
+        seen_output_names: set[str] = set()
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}
 
         for output_index, pipe_output in enumerate(pipe_outputs):
-            output_stuff = pipe_output.main_stuff
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' output name not specified"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            if sub_pipe_output_name in output_stuffs:
+            if sub_pipe_output_name in seen_output_names:
                 # TODO: check that at the blueprint / factory level
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            seen_output_names.add(sub_pipe_output_name)
+            branch_resolved = pipe_output.working_memory.resolve_main_stuff()
+            if isinstance(branch_resolved, AbsenceRecord):
+                # Combine under absence (D11): a required structured field cannot be fed a hole —
+                # typed error (statically unreachable once Step D's taint pass lands). Otherwise the
+                # absent component is omitted from the combine — a non-required structured field
+                # absorbs it as field-level None — and a ledger note keeps observability.
+                if not issubclass(structure_class, CompositeContent):
+                    field_info = structure_class.model_fields.get(sub_pipe_output_name)
+                    if field_info is not None and field_info.is_required():
+                        sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
+                        msg = (
+                            f"PipeParallel '{self.code}': branch '{sub_pipe_code}' resolved absent "
+                            f"({branch_resolved.reason}), but field '{sub_pipe_output_name}' of output "
+                            f"'{self.output.concept.concept_ref}' is required. Make the field optional "
+                            f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
+                        )
+                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                if self.add_each_output:
+                    # Branch results are parent slots only under add_each_output — same gate as the
+                    # present arm below and as lifted_companion_slots(). Writing the record without
+                    # the gate would clobber an unrelated same-named parent value.
+                    branch_record = (
+                        branch_resolved
+                        if branch_resolved.variable_name == sub_pipe_output_name
+                        else branch_resolved.model_copy(update={"variable_name": sub_pipe_output_name})
+                    )
+                    # Resolution, not a note: a stale value under the result name must not outrank it.
+                    working_memory.record_resolved_absence(branch_record)
+                log.verbose(f"PipeParallel '{self.code}': branch result '{sub_pipe_output_name}' is absent, omitted from the combine")
+                continue
+            output_stuff = branch_resolved
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
             output_stuffs[sub_pipe_output_name] = output_stuff
@@ -332,7 +512,7 @@ class PipeParallel(PipeController):
             log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
         # Always combine the branch outputs into the declared output concept and stamp it as main stuff:
-        # a pipe run always delivers a main stuff.
+        # a pipe run always resolves its declared output — the combine is the parallel's value arm.
         combined_output_stuff = StuffFactory.combine_stuffs(
             concept=self.output.concept,
             stuff_contents=output_stuff_contents,

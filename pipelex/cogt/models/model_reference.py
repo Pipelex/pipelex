@@ -15,13 +15,13 @@ direct model handles. Existing configs using preset/waterfall names must add
 explicit prefixes.
 """
 
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, model_serializer
 from typing_extensions import override
 
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
-from pipelex.types import StrEnum
 
 # Sigil prefixes for each reference kind
 SIGIL_PRESET = "$"

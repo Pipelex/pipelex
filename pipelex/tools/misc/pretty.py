@@ -1,5 +1,6 @@
 import shutil
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from io import StringIO
 from typing import Any, ClassVar
 
@@ -20,7 +21,6 @@ from rich.text import Text, TextType
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.terminal_utils import BOLD_FONT, RESET_FONT, TerminalColor, print_to_stderr
 from pipelex.tools.typing.pydantic_utils import make_truncated_wrapper
-from pipelex.types import StrEnum
 
 TEXT_COLOR = TerminalColor.WHITE
 TITLE_COLOR = TerminalColor.CYAN

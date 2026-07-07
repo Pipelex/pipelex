@@ -22,6 +22,7 @@ import sys
 import traceback
 from collections.abc import Callable
 from contextvars import ContextVar
+from enum import StrEnum
 from typing import Any, NoReturn, cast
 
 import typer
@@ -30,7 +31,6 @@ from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.tools.misc.json_utils import clean_json_dumps
-from pipelex.types import StrEnum
 
 # Module-level capture for setup-time warnings (currently used by RemoteConfigStaleWarning).
 # The agent CLI factory writes here when it catches a stale-cache warning during ``Pipelex.make``

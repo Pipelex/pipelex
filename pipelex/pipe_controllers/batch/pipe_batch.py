@@ -6,10 +6,12 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.config import get_config
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import get_pipe_router, get_required_pipe
@@ -24,7 +26,6 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
 
@@ -212,9 +213,14 @@ class PipeBatch(PipeController):
         branch_output_stuff_codes: list[str] = []
 
         for pipe_output in pipe_outputs:
-            branch_output_stuff = pipe_output.main_stuff
-            output_items.append(branch_output_stuff.content)
-            branch_output_stuff_codes.append(branch_output_stuff.stuff_code)
+            branch_resolved = pipe_output.working_memory.resolve_main_stuff()
+            if isinstance(branch_resolved, AbsenceRecord):
+                # Compaction (D4): an absent branch result cannot occupy a list slot — it is
+                # dropped, so the aggregated output holds only the found items (compactMap).
+                log.verbose(f"PipeBatch '{self.code}': dropping absent branch result ({branch_resolved.reason})")
+                continue
+            output_items.append(branch_resolved.content)
+            branch_output_stuff_codes.append(branch_resolved.stuff_code)
 
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
@@ -275,11 +281,14 @@ class PipeBatch(PipeController):
             library_crate=library_crate,
         )
         # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
-        main_stuff = pipe_output.main_stuff
-        content = main_stuff.content
-        if isinstance(content, ListContent):
-            list_content = cast("ListContent[StuffContent]", content)
-            stamp_mock_main_coordination(list_content.items)
+        # Tri-state read for robustness: the batch's own aggregated output is always stamped by the
+        # live arm today, but this site must never crash on a resolved-as-absent main.
+        main_resolved = pipe_output.working_memory.resolve_main_stuff()
+        if isinstance(main_resolved, Stuff):
+            content = main_resolved.content
+            if isinstance(content, ListContent):
+                list_content = cast("ListContent[StuffContent]", content)
+                stamp_mock_main_coordination(list_content.items)
         return pipe_output
 
     @override

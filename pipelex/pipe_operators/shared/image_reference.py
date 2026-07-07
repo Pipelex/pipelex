@@ -4,10 +4,10 @@ These models describe how images are referenced in templates and guide
 the image resolution process at runtime.
 """
 
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 from typing_extensions import override
-
-from pipelex.types import StrEnum
 
 
 class ImageReferenceKind(StrEnum):

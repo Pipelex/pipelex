@@ -4,7 +4,7 @@ Validates that generate_graph_outputs and save_graph_outputs_to_dir produce
 the expected output files (GraphSpec JSON, Mermaid MMD, Mermaid HTML, ReactFlow HTML).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,7 +14,7 @@ from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outpu
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeIOSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef, TimingSpec
 from tests.unit.pipelex.graph.conftest import make_graph_config
 
-_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
 
 
 def _make_sequence_graphspec() -> GraphSpec:

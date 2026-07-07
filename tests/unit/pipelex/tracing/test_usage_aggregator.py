@@ -1,6 +1,6 @@
 """Tests for UsageAggregator."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
@@ -11,7 +11,7 @@ from pipelex.pipeline.job_metadata import JobCategory, JobMetadata, UnitJobId
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
-_TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+_TIMESTAMP = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
 _PIPELINE_RUN_ID = "run_001"
 _WORKFLOW_ID = "wf_abc"
 

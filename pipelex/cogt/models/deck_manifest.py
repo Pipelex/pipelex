@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -23,7 +24,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.types import StrEnum
 
 MANIFEST_FILENAME = ".kit_manifest.json"
 

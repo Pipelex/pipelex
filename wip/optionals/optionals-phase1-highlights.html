@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optionals phase 1 — what we built and why it's solid</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1c2230;
+    --muted: #5b6474;
+    --card: #f6f8fb;
+    --border: #dfe4ec;
+    --accent: #3556c7;
+    --accent-soft: #e8edfb;
+    --ok: #1e7d46;
+    --ok-soft: #e2f3e9;
+    --warn: #a3670a;
+    --warn-soft: #fdf1dc;
+    --err: #b3372f;
+    --err-soft: #fbe7e5;
+    --code-bg: #f0f2f7;
+    --diff-add: #e2f3e9;
+    --diff-del: #fbe7e5;
+    --diff-add-fg: #145c33;
+    --diff-del-fg: #8a2a24;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181f;
+      --fg: #e4e8ef;
+      --muted: #9aa4b5;
+      --card: #1c222c;
+      --border: #313a48;
+      --accent: #7d9bf0;
+      --accent-soft: #232d45;
+      --ok: #52c07e;
+      --ok-soft: #17301f;
+      --warn: #dfa447;
+      --warn-soft: #33270f;
+      --err: #e5766c;
+      --err-soft: #381c19;
+      --code-bg: #10141a;
+      --diff-add: #17301f;
+      --diff-del: #381c19;
+      --diff-add-fg: #7fd4a2;
+      --diff-del-fg: #eb9d96;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0 1.25rem 4rem;
+    background: var(--bg); color: var(--fg);
+    font: 16px/1.6 -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+  h1 { font-size: 1.9rem; line-height: 1.25; margin: 2.5rem 0 0.4rem; }
+  h2 { font-size: 1.35rem; margin: 3rem 0 0.8rem; padding-top: 0.6rem; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 1.6rem 0 0.5rem; }
+  p { margin: 0.6rem 0; }
+  .sub { color: var(--muted); margin-top: 0; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 0.85em; }
+  code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.8rem 1rem; overflow-x: auto; line-height: 1.5;
+  }
+  pre code { background: none; padding: 0; }
+  .tldr {
+    background: var(--accent-soft); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 1rem 1.3rem; margin: 1.5rem 0;
+  }
+  .tldr h2 { border: none; margin: 0 0 0.5rem; padding: 0; font-size: 1.1rem; color: var(--accent); }
+  .tldr ul { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+  .tldr li { margin: 0.25rem 0; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 1rem 1.3rem; margin: 1rem 0;
+  }
+  .pill {
+    display: inline-block; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em;
+    padding: 0.15em 0.6em; border-radius: 999px; vertical-align: 0.12em; text-transform: uppercase;
+  }
+  .pill.ok   { background: var(--ok-soft);   color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.err  { background: var(--err-soft);  color: var(--err); }
+  .pill.info { background: var(--accent-soft); color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.5rem 0.7rem; border: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--card); }
+  .tablewrap { overflow-x: auto; }
+  figure { margin: 1.4rem 0; text-align: center; }
+  figure svg { max-width: 100%; height: auto; }
+  figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.4rem; }
+  details {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.6rem 1rem; margin: 0.8rem 0; background: var(--card);
+  }
+  details > summary { cursor: pointer; font-weight: 600; }
+  details[open] > summary { margin-bottom: 0.6rem; }
+  .diff { white-space: pre; }
+  .diff .add { display: block; background: var(--diff-add); color: var(--diff-add-fg); }
+  .diff .del { display: block; background: var(--diff-del); color: var(--diff-del-fg); }
+  .diff .ctx { display: block; color: var(--muted); }
+  /* CSS tabs */
+  .tabs { margin: 1.2rem 0; }
+  .tabs input[type="radio"] { display: none; }
+  .tabs label {
+    display: inline-block; padding: 0.45rem 1rem; cursor: pointer;
+    border: 1px solid var(--border); border-bottom: none;
+    border-radius: 8px 8px 0 0; background: var(--card); color: var(--muted);
+    font-weight: 600; font-size: 0.92rem; margin-right: 0.25rem;
+  }
+  .tabs .panel {
+    display: none; border: 1px solid var(--border); border-radius: 0 8px 8px 8px;
+    padding: 0.4rem 1.2rem 1rem; background: var(--bg);
+  }
+  #tab-cond:checked ~ label[for="tab-cond"],
+  #tab-par:checked  ~ label[for="tab-par"],
+  #tab-batch:checked ~ label[for="tab-batch"] { background: var(--bg); color: var(--fg); border-bottom: 1px solid var(--bg); position: relative; top: 1px; }
+  #tab-cond:checked  ~ .panel-cond,
+  #tab-par:checked   ~ .panel-par,
+  #tab-batch:checked ~ .panel-batch { display: block; }
+  .footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  .kbd { font-weight: 700; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>Optionals phase 1 — <code>?</code> and <code>!</code> land in MTHDS</h1>
+<p class="sub">Presence markers, an absence ledger with provenance, implicit lifting, and a static safety net — for co-developers reviewing <a href="https://github.com/Pipelex/pipelex/pull/1021">PR&nbsp;#1021</a>.</p>
+
+<div class="tldr">
+  <h2>TL;DR</h2>
+  <p>MTHDS methods can now say <em>"this slot may hold nothing"</em> — and both the validator and the runtime take that seriously. One PR (<a href="https://github.com/Pipelex/pipelex/pull/1021">Pipelex/pipelex#1021</a> → <code>dev</code>) delivers the whole of phase 1:</p>
+  <ul>
+    <li><strong>Grammar:</strong> <code>"PenaltyClause?"</code> (optional) and <code>"PenaltyClause!"</code> (force) on pipe inputs/outputs, beside the existing <code>[]</code> multiplicity.</li>
+    <li><strong>Runtime trichotomy:</strong> a pipe fed a recorded absence on a <em>plain</em> input is <strong>skipped</strong> (Swift-style <code>a?.b.c</code> chaining); a <code>?</code> input <strong>absorbs</strong> (the pipe runs both arms); a <code>!</code> input <strong>fails loudly</strong> with the full provenance chain.</li>
+    <li><strong>Absence is data, not a crash:</strong> a ledger records <em>why</em> each slot is empty (who skipped, what was never provided, which <code>continue</code> fired), and that record survives serialization, the API wire, CLI artifacts, and graph rendering.</li>
+    <li><strong>Static safety theorem:</strong> validation proves at author time that <em>every possible absence reaches an explicit sink</em> — no more "my workflow silently produced nothing".</li>
+    <li><strong>Breaking, on purpose:</strong> <code>PipeCondition</code>'s <code>continue</code> no longer passes a value through — it resolves the declared output as absent, killing the language's last invisible optional.</li>
+  </ul>
+  <p>Status: dev is merged in, CI is green, all review-bot findings are triaged (one real P1 caught &amp; fixed), and the PR awaits merge. Conformance coverage and protocol-spec sections are written but ride separate branches in the <code>conformance</code> and workspace-root repos (no PRs yet — they de-gate only once both conformance arms run an optionals-speaking pipelex).</p>
+</div>
+
+<h2>Why we did this</h2>
+<p>MTHDS had no way to say "no value here, and that's fine". That gap leaked everywhere:</p>
+<ul>
+  <li><strong>Empty-string hacks.</strong> Authors returned <code>""</code> or fabricated placeholder objects when an extraction found nothing — downstream pipes couldn't tell "empty" from "absent".</li>
+  <li><strong>Hallucination pressure.</strong> An LLM pipe <em>required</em> to produce a <code>PenaltyClause</code> from a contract that has none will invent one. The type system was actively encouraging hallucination.</li>
+  <li><strong>The invisible optional.</strong> <code>PipeCondition</code>'s <code>continue</code> outcome quietly passed the <em>previous</em> main stuff through — a no-output path the type system couldn't see, which crashed delivery, tracing, and telemetry in creative ways.</li>
+</ul>
+
+<h2>The language: two markers, strict rules</h2>
+<pre><code>[pipe.extract_penalty]
+type = "PipeLLM"
+description = "Find the penalty clause, if any"
+inputs = { contract = "Contract" }
+output = "PenaltyClause?"          # ← may resolve absent: no clause found is a SUCCESS
+
+[pipe.assess_penalty]
+type = "PipeLLM"
+description = "Assess severity — handles both arms"
+inputs = { clause = "PenaltyClause?" }   # ← absorbs: runs even when clause is absent
+prompt = """
+Assess the contract risk.
+@?clause                            # ← guarded block: rendered only when present
+"""
+
+[pipe.compute_fine]
+type = "PipeLLM"
+description = "Force-unwrap: we KNOW it's there by now"
+inputs = { clause = "PenaltyClause!" }   # ← asserts presence; absence = typed error
+</code></pre>
+<p>Grammar misuse is rejected at parse time with a typed error (<code>optional_marker_invalid</code>): markers never combine with multiplicity (<code>X[]?</code> is illegal — an absent plural is just the empty list <code>[]</code>), <code>!</code> is inputs-only, and markers are banned on concept definitions, <code>refines</code>, structure fields, and package refs.</p>
+
+<h2>The runtime: one gate, three arms</h2>
+<figure>
+<svg viewBox="0 0 760 300" role="img" aria-label="Trichotomy diagram: an input slot fed a recorded absence takes one of three arms depending on the declared marker">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+    <!-- source -->
+    <rect x="20" y="115" width="215" height="70" rx="10" fill="var(--card)" stroke="var(--border)"/>
+    <text x="127" y="143" text-anchor="middle" fill="var(--fg)" font-weight="bold">input slot holds a</text>
+    <text x="127" y="163" text-anchor="middle" fill="var(--fg)" font-weight="bold">recorded ABSENCE</text>
+    <!-- arrows -->
+    <g stroke="var(--muted)" fill="none" marker-end="url(#arr)" color="var(--muted)">
+      <path d="M235 135 C 300 90, 330 60, 390 55"/>
+      <path d="M235 150 C 300 150, 330 150, 390 150"/>
+      <path d="M235 165 C 300 210, 330 240, 390 245"/>
+    </g>
+    <text x="305" y="80" fill="var(--muted)">declared plain</text>
+    <text x="305" y="142" fill="var(--muted)">declared ?</text>
+    <text x="305" y="235" fill="var(--muted)">declared !</text>
+    <!-- SKIP arm -->
+    <rect x="395" y="25" width="340" height="62" rx="10" fill="var(--warn-soft)" stroke="var(--warn)"/>
+    <text x="415" y="50" fill="var(--warn)" font-weight="bold">SKIP (implicit lifting)</text>
+    <text x="415" y="70" fill="var(--fg)">pipe doesn't run; its output records absent,</text>
+    <text x="415" y="84" fill="var(--fg)" font-size="12">chaining provenance back to the origin</text>
+    <!-- RUN arm -->
+    <rect x="395" y="120" width="340" height="62" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="415" y="145" fill="var(--ok)" font-weight="bold">RUN (absorb)</text>
+    <text x="415" y="165" fill="var(--fg)">pipe runs; guarded templates take the</text>
+    <text x="415" y="179" fill="var(--fg)" font-size="12">absent arm (@?var, {% if var %})</text>
+    <!-- FAIL arm -->
+    <rect x="395" y="215" width="340" height="62" rx="10" fill="var(--err-soft)" stroke="var(--err)"/>
+    <text x="415" y="240" fill="var(--err)" font-weight="bold">FAIL (force)</text>
+    <text x="415" y="260" fill="var(--fg)">typed OptionalValueAbsentError naming the</text>
+    <text x="415" y="274" fill="var(--fg)" font-size="12">variable, both pipes, and the original reason</text>
+  </g>
+</svg>
+<figcaption>The trichotomy. Write <code>?</code> once where absence enters; every plain consumer downstream short-circuits automatically.</figcaption>
+</figure>
+
+<p>The skip arm is the headline: it makes absence <em>compose</em>. You don't annotate the whole chain — the chain lifts itself, and every skipped pipe's output records an absence that points back at the origin:</p>
+
+<figure>
+<svg viewBox="0 0 780 150" role="img" aria-label="Lift chain: source absent, steps A and B skip, step C declares its input optional and absorbs">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+    <rect x="10" y="45" width="130" height="60" rx="10" fill="var(--err-soft)" stroke="var(--err)"/>
+    <text x="75" y="70" text-anchor="middle" fill="var(--fg)" font-weight="bold">source?</text>
+    <text x="75" y="90" text-anchor="middle" fill="var(--err)" font-size="12">not provided</text>
+
+    <g stroke="var(--muted)" fill="none" marker-end="url(#arr2)" color="var(--muted)">
+      <line x1="140" y1="75" x2="185" y2="75"/>
+      <line x1="330" y1="75" x2="375" y2="75"/>
+      <line x1="520" y1="75" x2="565" y2="75"/>
+    </g>
+
+    <rect x="190" y="45" width="140" height="60" rx="10" fill="var(--warn-soft)" stroke="var(--warn)" stroke-dasharray="6 4"/>
+    <text x="260" y="70" text-anchor="middle" fill="var(--fg)" font-weight="bold">pipe A</text>
+    <text x="260" y="90" text-anchor="middle" fill="var(--warn)" font-size="12">SKIPPED</text>
+
+    <rect x="380" y="45" width="140" height="60" rx="10" fill="var(--warn-soft)" stroke="var(--warn)" stroke-dasharray="6 4"/>
+    <text x="450" y="70" text-anchor="middle" fill="var(--fg)" font-weight="bold">pipe B</text>
+    <text x="450" y="90" text-anchor="middle" fill="var(--warn)" font-size="12">SKIPPED</text>
+
+    <rect x="570" y="45" width="195" height="60" rx="10" fill="var(--ok-soft)" stroke="var(--ok)"/>
+    <text x="667" y="70" text-anchor="middle" fill="var(--fg)" font-weight="bold">pipe C (b_out?)</text>
+    <text x="667" y="90" text-anchor="middle" fill="var(--ok)" font-size="12">RUNS — absorbs, delivers</text>
+
+    <text x="390" y="132" text-anchor="middle" fill="var(--muted)" font-size="12">each skip records an AbsenceRecord whose `upstream` chains to the previous one — provenance for free</text>
+  </g>
+</svg>
+<figcaption>A lift chain: like Swift's <code>a?.b.c</code>, the <code>?</code> at the boundary is written once; C is the explicit sink.</figcaption>
+</figure>
+
+<h3>Absence is a first-class record, never a null</h3>
+<p>There is no null <code>Stuff</code>. A slot with no value has an <code>AbsenceRecord</code> in the working memory's ledger: variable name, producing pipe, kind (<span class="pill warn">skipped</span> <span class="pill info">declared-absent</span> <span class="pill err">not-provided</span>), a human reason, and an <code>upstream</code> chain. Post-run reads use a tri-state accessor (<code>resolve_stuff</code> → value <em>or</em> record). A slot with <strong>neither</strong> a value <strong>nor</strong> a record is still a hard error: never-produced is a bug, not an absence.</p>
+
+<h2>The static safety net</h2>
+<p>The runtime story would be scary without the compile-time story. Validation now proves the <strong>absence safety theorem</strong>: a taint pass walks every controller's dataflow, computes per-slot presence (<em>guaranteed</em> vs <em>maybe-absent</em>), and rejects any flow where an absence could escape without an explicit sink.</p>
+
+<div class="tablewrap">
+<table>
+  <tr><th>Check</th><th>Severity</th><th>What it catches</th></tr>
+  <tr><td><code>optional_marker_invalid</code></td><td><span class="pill err">error</span></td><td>Grammar misuse: <code>X[]?</code>, <code>!</code> on outputs, markers on concepts/refines/fields.</td></tr>
+  <tr><td><code>optional_not_handled</code></td><td><span class="pill err">error</span></td><td>A maybe-absent slot ends a sequence (or feeds a condition) without the controller declaring a <code>?</code> output. Message names the origin, the propagation path, and three fixes.</td></tr>
+  <tr><td><code>optional_output_required</code></td><td><span class="pill err">error</span></td><td>A <code>continue</code>-reachable <code>PipeCondition</code> with a plain output — <code>continue</code> resolves the output absent, so a plain output would hide the no-output path. <strong>Breaking.</strong></td></tr>
+  <tr><td><code>optional_branch_required_field</code></td><td><span class="pill err">error</span></td><td>A required structure field of a <code>PipeParallel</code> output fed by a maybe-absent branch.</td></tr>
+  <tr><td><code>optional_input_unguarded</code></td><td><span class="pill err">error</span></td><td>A template reference to a <code>?</code> input without a guard (<code>@?var</code>, <code>{% if var %}</code>, inline <code>is defined</code>). Covers PipeLLM, PipeCompose, PipeCondition, PipeSearch, PipeImgGen templates.</td></tr>
+  <tr><td><code>optional_force_redundant</code></td><td><span class="pill warn">warning</span></td><td>A <code>!</code> whose slot is guaranteed present in <em>every</em> analyzed flow — dead assertion. Rides the new advisory <code>warnings</code> array (never flips <code>is_valid</code>), aggregated across flows so a <code>!</code> that matters anywhere is never flagged.</td></tr>
+</table>
+</div>
+
+<p>The valid report also gains a <code>liftable_pipes</code> inventory: every pipe that <em>may</em> be skipped, with its trigger slots and absence source. That's what makes implicit lifting acceptable — authors see "may be skipped when X is absent" at <code>/validate</code> time, not by surprise in production.</p>
+
+<h2>Controllers under absence</h2>
+<div class="tabs">
+  <input type="radio" name="ctrl" id="tab-cond" checked>
+  <input type="radio" name="ctrl" id="tab-par">
+  <input type="radio" name="ctrl" id="tab-batch">
+  <label for="tab-cond">PipeCondition</label>
+  <label for="tab-par">PipeParallel</label>
+  <label for="tab-batch">PipeBatch</label>
+
+  <div class="panel panel-cond">
+    <h3><code>continue</code> now means "no output" — honestly <span class="pill err">breaking</span></h3>
+    <p>Before: <code>continue</code> passed the current main stuff through, or errored when there was none — an untyped, invisible optional. Now: it records a <em>declared-absent</em> output (reason = the evaluated expression) and returns success, memory otherwise unchanged. The static rule forces such a condition to declare <code>output = "X?"</code>, so downstream code knows.</p>
+    <p><strong>Migration:</strong> the previous value stays in memory under its own name — consume it explicitly by that name (declared <code>?</code> where it may be absent). The ergonomic replacement for pass-through is the phase-2 coalescing operator (<code>??</code>).</p>
+    <p>Dry-run parity: an all-special-outcomes condition records the same absence — <em>except</em> a fail-only condition (every outcome maps to <code>fail</code>), which raises in dry run too, since every live path can only raise.</p>
+  </div>
+
+  <div class="panel panel-par">
+    <h3>Combine absorbs absence — by declared shape</h3>
+    <ul>
+      <li><strong><code>Composite</code> output:</strong> the absent component is simply omitted (a ledger note keeps observability).</li>
+      <li><strong>Structured output, non-required field:</strong> the absence becomes the <em>field default</em> (<code>None</code> unless the author declared another default — per-field coalescing avant la lettre).</li>
+      <li><strong>Structured output, required field:</strong> a typed runtime error naming the branch, the field, and the fixes — but this shape is already rejected statically by <code>optional_branch_required_field</code>, so the runtime guard is a belt-and-suspenders backstop.</li>
+    </ul>
+  </div>
+
+  <div class="panel panel-batch">
+    <h3>Batch compacts</h3>
+    <p>Absent branch results are dropped from the aggregated list. Batching a "keep or skip" condition over N items yields only the kept results — a list cannot hold a hole, so compaction is the only lossless behavior. The empty list <code>[]</code> is the whole absence story for plurals: a lifted pipe with a plural output writes a real empty <code>ListContent</code> (plus a ledger note), and taint stops there.</p>
+  </div>
+</div>
+
+<h2>First-class on every surface</h2>
+<p>A run whose declared <code>?</code> output resolves absent is a <strong>success</strong> everywhere — no surface treats it as an error or crashes on it:</p>
+<ul>
+  <li><strong>Wire:</strong> <code>main_stuff_name</code> still names the declared slot; consumers branch on the absence record carried in the serialized memory (<code>absences</code>), never on transport. The ledger round-trips cross-process — a recorded absence no longer degrades to a hard miss after an API/worker hop.</li>
+  <li><strong>Contracts:</strong> <code>PipeInputContract</code>/<code>PipeOutputContract</code> gain <code>optional: bool</code>, so tooling can see optionality without parsing the grammar.</li>
+  <li><strong>CLI:</strong> <code>pipelex run</code> prints an explicit absence document; <code>--save-main-stuff</code> writes a <code>main_stuff.json</code> carrying <code>"absent": true</code> plus the provenance chain (and a markdown twin). The agent CLI returns the absence document as its result payload.</li>
+  <li><strong>Graphs:</strong> nodes gain a <span class="pill warn">skipped</span> status with a <code>skip_reason</code>, and data edges fed by <code>?</code> outputs carry <code>optional: true</code> — "why did my workflow produce nothing?" is now answerable from the execution graph.</li>
+  <li><strong>Telemetry:</strong> OTel/Langfuse capture absence documents for both inputs and outputs.</li>
+</ul>
+
+<figure>
+<svg viewBox="0 0 700 170" role="img" aria-label="Execution graph fragment showing a skipped node and an optional data edge">
+  <defs>
+    <marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+  <g font-family="ui-monospace, Menlo, monospace" font-size="13">
+    <rect x="15" y="55" width="150" height="60" rx="10" fill="var(--card)" stroke="var(--ok)"/>
+    <text x="90" y="80" text-anchor="middle" fill="var(--fg)" font-weight="bold">extract_penalty</text>
+    <text x="90" y="100" text-anchor="middle" fill="var(--ok)" font-size="12">success</text>
+
+    <g color="var(--muted)">
+      <line x1="165" y1="85" x2="255" y2="85" stroke="var(--muted)" stroke-dasharray="5 5" marker-end="url(#arr3)"/>
+      <text x="210" y="72" text-anchor="middle" fill="var(--muted)" font-size="11">optional: true</text>
+    </g>
+
+    <rect x="260" y="55" width="150" height="60" rx="10" fill="var(--warn-soft)" stroke="var(--warn)" stroke-dasharray="6 4"/>
+    <text x="335" y="80" text-anchor="middle" fill="var(--fg)" font-weight="bold">compute_fine</text>
+    <text x="335" y="100" text-anchor="middle" fill="var(--warn)" font-size="12">skipped</text>
+    <text x="335" y="135" text-anchor="middle" fill="var(--muted)" font-size="11">skip_reason: "input 'clause' is absent"</text>
+
+    <g color="var(--muted)">
+      <line x1="410" y1="85" x2="500" y2="85" stroke="var(--muted)" marker-end="url(#arr3)"/>
+    </g>
+
+    <rect x="505" y="55" width="175" height="60" rx="10" fill="var(--card)" stroke="var(--ok)"/>
+    <text x="592" y="80" text-anchor="middle" fill="var(--fg)" font-weight="bold">summarize (b_out?)</text>
+    <text x="592" y="100" text-anchor="middle" fill="var(--ok)" font-size="12">success</text>
+  </g>
+</svg>
+<figcaption>Graph rendering of the same story: dashed optional edge, dashed skipped node with its reason.</figcaption>
+</figure>
+
+<h2>The critical changes, as minimal diffs</h2>
+
+<details open>
+<summary>1 — The lift gate (<code>pipe_abstract.py</code>): the trichotomy in four lines</summary>
+<pre class="diff"><code><span class="ctx">  presence_scan = await self.validate_before_run(...)   # raises for `!` (force) and for hard misses</span>
+<span class="add">+ if presence_scan.liftable:</span>
+<span class="add">+     # Implicit lifting (D3): a plain input fed a recorded absence skips the pipe;</span>
+<span class="add">+     # its output is recorded absent with provenance chaining to the input's record.</span>
+<span class="add">+     pipe_output = self._make_lifted_output(..., pipe_run_params=pipe_run_params)</span>
+<span class="ctx">  else:</span>
+<span class="ctx">      pipe_output = await self.live_run_pipe(...)  # or dry — unchanged</span></code></pre>
+<p>Inside <code>_make_lifted_output</code>, plurality is resolved with the exact rule the run path uses (declared multiplicity + invocation-level override), so a plural lift writes the real empty list downstream consumers were promised — singulars record the absence:</p>
+<pre class="diff"><code><span class="add">+ multiplicity_resolution = output_multiplicity_to_apply(</span>
+<span class="add">+     base_multiplicity=self.output.multiplicity,</span>
+<span class="add">+     override_multiplicity=pipe_run_params.output_multiplicity,</span>
+<span class="add">+ )</span>
+<span class="add">+ if multiplicity_resolution.is_multiple_outputs_enabled:</span>
+<span class="add">+     working_memory.set_new_main_stuff(empty_list_stuff, name=output_name)  # [] IS the plural absence</span>
+<span class="add">+     working_memory.record_absence(skip_record)          # observability note beside the value</span>
+<span class="add">+ else:</span>
+<span class="add">+     working_memory.record_new_main_absence(skip_record)  # the slot's resolution</span></code></pre>
+</details>
+
+<details>
+<summary>2 — The ledger's two write modes (<code>working_memory.py</code>): NOTE vs RESOLUTION</summary>
+<p>This invariant pair is what keeps values and records from fighting. <code>set_stuff</code> pops any record under the written name (value supersedes record); the resolution write is its exact mirror.</p>
+<pre class="diff"><code><span class="add">+ def record_absence(self, record):            # NOTE: a value under the name is kept and wins</span>
+<span class="add">+     self.absences[record.variable_name] = record</span>
+<span class="add">+</span>
+<span class="add">+ def record_resolved_absence(self, record):   # RESOLUTION: mirror of set_stuff's invariant —</span>
+<span class="add">+     self.remove_stuff(name=record.variable_name)    # a stale value must not outrank</span>
+<span class="add">+     self.remove_alias(alias=record.variable_name)   # the fresh absence</span>
+<span class="add">+     self.record_absence(record)</span></code></pre>
+</details>
+
+<details>
+<summary>3 — <code>continue</code> resolves the output absent (<code>pipe_condition.py</code>) <span class="pill err">breaking</span></summary>
+<pre class="diff"><code><span class="del">- # 'continue': deliver the current main stuff by passing it through</span>
+<span class="del">- # (raise PipeRunError when there is no main stuff to pass through)</span>
+<span class="add">+ # 'continue': the declared output resolves absent — memory otherwise unchanged</span>
+<span class="add">+ record = AbsenceRecord(</span>
+<span class="add">+     variable_name=output_name or MAIN_STUFF_NAME,</span>
+<span class="add">+     kind=AbsenceKind.DECLARED_ABSENT,</span>
+<span class="add">+     reason=f"expression '{evaluated_expression}' resolved to 'continue'",</span>
+<span class="add">+     producing_pipe=self.code,</span>
+<span class="add">+ )</span>
+<span class="add">+ working_memory.record_new_main_absence(record)</span></code></pre>
+<p>Paired with the static rule: a <code>continue</code>-reachable condition <em>must</em> declare <code>output = "X?"</code> (<code>optional_output_required</code>), so the no-output path is visible in the types.</p>
+</details>
+
+<details>
+<summary>4 — Parallel combine under absence (<code>pipe_parallel.py</code>), incl. the P1 the bots caught</summary>
+<pre class="diff"><code><span class="ctx">  branch_resolved = pipe_output.working_memory.resolve_main_stuff()   # tri-state, never raises on absence</span>
+<span class="add">+ if isinstance(branch_resolved, AbsenceRecord):</span>
+<span class="add">+     if not issubclass(structure_class, CompositeContent):</span>
+<span class="add">+         field_info = structure_class.model_fields.get(sub_pipe_output_name)</span>
+<span class="add">+         if field_info is not None and field_info.is_required():</span>
+<span class="add">+             raise PipeRunError(...)          # required field fed a hole — statically unreachable backstop</span>
+<span class="add">+     if self.add_each_output:                 # ← review round 1: parent slots exist ONLY under</span>
+<span class="add">+         working_memory.record_resolved_absence(branch_record)   #   add_each_output, same as present branches</span>
+<span class="add">+     continue                                 # omitted from the combine; non-required field → field default</span></code></pre>
+<p>The <code>if self.add_each_output</code> gate is the fix for the one P1 of the review round: without it, an absent branch wrote a resolved absence into the <em>parent</em> memory even when branch results aren't parent slots — deleting an unrelated same-named value. Present branches always had the gate; now both arms publish under the same rule.</p>
+</details>
+
+<details>
+<summary>Bonus — the load-bearing one-liner: <code>StuffArtefact.__bool__</code></summary>
+<p>The guard idiom the lint recommends (<code>{% if var %}</code>, which <code>@?var</code> expands to) crashed on a <em>present</em> singular value: Jinja2's truth test fell through to the artefact's list-only <code>__len__</code> and raised <code>TypeError</code>. Found by our own new contract fixture failing its dry run.</p>
+<pre class="diff"><code><span class="add">+ def __bool__(self) -&gt; bool:</span>
+<span class="add">+     if isinstance(self._content, ListContent):</span>
+<span class="add">+         return bool(self._content.items)   # empty list is falsy (D4)</span>
+<span class="add">+     return True                            # a present singular is truthy</span></code></pre>
+</details>
+
+<h2>Why you can trust it</h2>
+<ul>
+  <li><strong>One commit per checkpoint, six checkpoints (A–F).</strong> Each ran the full gate set (<code>make agent-check</code> + full <code>make agent-test</code>) plus a <em>context-free</em> cold code review of the step diff by a fresh reviewer with no access to the plan or rationale. Findings were triaged every time: correctness fixed in-step, design tradeoffs recorded as deferred docs, over-engineering simplified.</li>
+  <li><strong>TDD throughout:</strong> red tests first for every step — lift chains with provenance assertions, force-failure UX (the message must name the variable, both pipes, and the reason), plural normalization, hydration round-trips, end-to-end absent-main-output runs over every surface.</li>
+  <li><strong>Review round 1 on the PR:</strong> 13 bot findings (greptile, cubic, Codex), each adversarially verified before acting — 9 confirmed and fixed (headline: the parallel parent-memory clobber P1), 1 dead-code deletion, 1 refuted with evidence, 1 already-deliberate design decision. All threads answered with commit citations; CI fully green.</li>
+  <li><strong>Ground-truth fixtures:</strong> every conformance fixture's expectations were generated by running it against the real build before being written down — no guessed error categories.</li>
+</ul>
+
+<h2>What's deliberately NOT in phase 1</h2>
+<div class="card">
+<ul>
+  <li><strong>Coalescing <code>??</code></strong> — the ergonomic replacement for <code>continue</code> pass-through. Phase 2. (Non-required parallel fields absorbing as their <em>declared default</em> is a small preview of it.)</li>
+  <li><strong>The LLM maybe-wrapper</strong> — making <code>?</code> on operator outputs change the LLM contract ("return nothing rather than invent"). Phase 2; over-claiming <code>?</code> today is deliberately legal as evolution room, and deliberately not linted.</li>
+  <li><strong>Cross-repo wave</strong> — mthds wire models carrying the <code>absences</code> ledger (which unblocks the hosted-API absent arm), mthds-ui rendering skipped nodes/optional edges, pipelex-api surfacing <code>warnings</code> + <code>optional</code> contract flags. Gated behind other in-flight work; no PRs yet.</li>
+  <li><strong>Conformance de-gating</strong> — the suite's optionals coverage is written and validated live against this branch, but stays probe-skipped (<code>OPTIONALS_PENDING_FEATURE</code>) until <em>both</em> conformance arms run an optionals-speaking pipelex (the HTTP arm pins the released <code>pipelex==0.37.0</code>).</li>
+</ul>
+</div>
+
+<h2>Links</h2>
+<ul>
+  <li><a href="https://github.com/Pipelex/pipelex/pull/1021">Pipelex/pipelex#1021</a> — the phase-1 PR (feature/Optionals → dev). Everything above lands there.</li>
+  <li>Conformance coverage and protocol-spec sections are committed on side branches of the <code>conformance</code> and workspace-root repos — PRs will follow once their merge vehicles are chosen.</li>
+</ul>
+
+<p class="footer">Optionals phase 1 · feature/Optionals · generated 2026-07-05 · lives in <code>wip/optionals/</code> (work-in-progress notes, not release docs)</p>
+
+</main>
+</body>
+</html>

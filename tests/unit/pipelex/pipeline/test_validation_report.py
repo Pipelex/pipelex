@@ -9,6 +9,7 @@ projection from the dry-run status map, and ``is_runnable = not pending_signatur
 Pure unit test (no Pipelex boot): blueprints from the interpreter, hand-built status map.
 """
 
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.pipeline.bundle_validator import DryRunOutput, DryRunStatus
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, PipeIOContract, PipeOutputContract
@@ -82,3 +83,28 @@ class TestBuildValidationReport:
         assert report.bundle_blueprint is blueprints[0]
         assert report.is_runnable is True
         assert report.validated_pipes == []
+        # The advisory channel defaults empty and never affects the verdict.
+        assert report.warnings == []
+
+    def test_warnings_ride_the_report_without_flipping_the_verdict(self) -> None:
+        """Warnings share the error item shape but the report stays the valid arm (is_valid True)."""
+        blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=_MAIN_PIPE_MTHDS)]
+        warning_item = ValidationErrorItem(
+            category=ValidationErrorCategory.PIPE_VALIDATION,
+            error_type="optional_force_redundant",
+            pipe_code="do_it",
+            domain_code="beta",
+            variable_names=["doc"],
+            message="Input 'doc' of pipe 'beta.do_it' is declared '!' but is guaranteed present in every analyzed flow.",
+        )
+
+        report = build_validation_report(
+            blueprints=blueprints,
+            pipe_io_contracts={},
+            dry_run_result={},
+            pending_signatures=[],
+            warnings=[warning_item],
+        )
+
+        assert report.is_valid is True
+        assert report.warnings == [warning_item]

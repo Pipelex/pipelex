@@ -26,6 +26,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 
 from pipelex import log
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -216,6 +217,37 @@ async def prepare_pipe_job(
             mock_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=missing_inputs)
             for name, stuff in mock_memory.root.items():
                 working_memory.add_new_stuff(name=name, stuff=stuff)
+
+    # Optional method inputs (D5): each declared-optional input the caller omitted starts as a
+    # recorded not-provided absence instead of a bare missing key. Runs after mock filling so the
+    # dry-run sweep stays all-present (D6) — a mocked optional slot gets no record. The marker is
+    # read from the pipe's OWN declared inputs — the method-boundary contract — not from
+    # ``needed_inputs()``, whose aggregation carries a controller's children markers.
+    omitted_optional_specs = [
+        named_stuff_spec
+        for named_stuff_spec in pipe.inputs.named_stuff_specs
+        if named_stuff_spec.presence.is_optional
+        and (
+            working_memory is None
+            or (
+                working_memory.get_optional_stuff(named_stuff_spec.variable_name) is None
+                # A slot already resolved as a recorded absence was NOT omitted — re-recording
+                # would downgrade its provenance to a fresh not-provided.
+                and working_memory.get_optional_absence(named_stuff_spec.variable_name) is None
+            )
+        )
+    ]
+    if omitted_optional_specs:
+        if working_memory is None:
+            working_memory = WorkingMemoryFactory.make_empty()
+        for named_stuff_spec in omitted_optional_specs:
+            working_memory.record_absence(
+                AbsenceRecord(
+                    variable_name=named_stuff_spec.variable_name,
+                    kind=AbsenceKind.NOT_PROVIDED,
+                    reason=f"optional input '{named_stuff_spec.variable_name}' was not provided by the caller",
+                )
+            )
 
     # Normalize data URLs to pipelex-storage:// URIs if configured.
     if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:

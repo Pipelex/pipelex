@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from enum import StrEnum
 from pathlib import Path
 
 from rich.markup import escape
@@ -11,7 +12,6 @@ from rich.table import Table
 
 from pipelex.hub import get_console
 from pipelex.tools.misc.toml_sync import TomlSyncResult, sync_toml_values
-from pipelex.types import StrEnum
 
 # Config file paths
 MAIN_CONFIG_PATH = Path("pipelex/pipelex.toml")

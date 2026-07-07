@@ -8,7 +8,7 @@ into ``RemoteConfigFetcher``).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -63,9 +63,9 @@ class TestRemoteConfigCache:
     def test_write_then_read_roundtrip(self) -> None:
         payload = _valid_remote_config_payload()
 
-        before_store = datetime.now(tz=timezone.utc)
+        before_store = datetime.now(tz=UTC)
         RemoteConfigCache.store(payload)
-        after_store = datetime.now(tz=timezone.utc)
+        after_store = datetime.now(tz=UTC)
 
         loaded = RemoteConfigCache.load()
 
@@ -104,7 +104,7 @@ class TestRemoteConfigCache:
             json.dumps(
                 {
                     "schema_version": CACHE_SCHEMA_VERSION + 99,
-                    "cached_at": datetime.now(tz=timezone.utc).isoformat(),
+                    "cached_at": datetime.now(tz=UTC).isoformat(),
                     "raw_config": _valid_remote_config_payload(),
                 }
             ),

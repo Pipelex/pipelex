@@ -17,7 +17,7 @@ import re
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN
+from pipelex.core.pipes.variable_multiplicity import MULTIPLICITY_PATTERN
 from pipelex.core.qualified_ref import QualifiedRef
 
 
@@ -30,6 +30,10 @@ def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:
     ``[]`` to ``True`` and ``[1]`` to ``int 1``, and Python evaluates ``True == 1`` as true. Keeping
     the suffix as text also means a ``[0]`` spec compares as a literal rather than raising.
 
+    The presence marker (``"?"`` / ``"!"``) is likewise preserved verbatim, so ``Brief`` and
+    ``Brief?`` denote different contracts (D5: method-boundary signatures are explicit about
+    optionality, so a header and its definition must agree on the marker).
+
     The concept part is canonicalized so equivalent spellings collapse to one identity:
 
     - native (``Text`` or ``native.Text``) -> the bare native code (``Text``);
@@ -41,12 +45,13 @@ def _canonical_concept_spec(spec: str, *, domain_code: str) -> str:
     cannot appear in a blueprint's ``inputs``/``output`` but is handled defensively) is returned
     verbatim — it is already unambiguous.
     """
-    match = re.match(MUTLIPLICITY_PATTERN, spec)
+    match = re.match(MULTIPLICITY_PATTERN, spec)
     if match is None:
         return spec
     concept_ref_or_code = match.group(1)
     bracket_content = match.group(2)  # None -> no brackets; "" -> "[]"; digits -> "[N]"
-    suffix = "" if bracket_content is None else f"[{bracket_content}]"
+    marker_symbol = match.group(3) or ""  # None -> no marker; "?" / "!" kept verbatim
+    suffix = ("" if bracket_content is None else f"[{bracket_content}]") + marker_symbol
 
     if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code):
         return f"{QualifiedRef.parse(concept_ref_or_code).local_code}{suffix}"

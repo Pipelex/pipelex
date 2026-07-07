@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import NamedTuple, cast
 
 from typing_extensions import override
@@ -223,7 +223,7 @@ class ReportingManager(ReportingProtocol):
             pipeline_run_id=context.pipeline_run_id,
             workflow_id=context.workflow_id,
             writer_id=context.event_log.writer_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,
             tokens_usage=tokens_usage,
@@ -299,7 +299,7 @@ class ReportingManager(ReportingProtocol):
             pipeline_run_id=inference_job.job_metadata.pipeline_run_id,
             workflow_id=workflow_id,
             writer_id=process_event_log.writer_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,
             tokens_usage=tokens_usage,

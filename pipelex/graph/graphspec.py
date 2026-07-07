@@ -4,13 +4,14 @@ This module defines the canonical, versioned data model for Pipelex run graphs.
 GraphSpec is renderer-agnostic and designed for JSON serialization.
 """
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from enum import StrEnum
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import Self, StrEnum
 
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200
@@ -198,6 +199,20 @@ class IOSpec(BaseModel):
         return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
 
 
+def output_digest_is_optional(output_specs: Sequence[IOSpec], *, digest: str) -> bool:
+    """Whether a producer registered ``digest`` as a declared-optional (`?`) output.
+
+    The optional marker rides the output IOSpec's ``extra`` dict (set at the pipe-run
+    epilogue from the pipe's declared output presence). One helper for both graph builders
+    (in-process GraphTracer and the event-replay assembler) so the optional-edge computation
+    cannot drift between them.
+    """
+    for output_spec in output_specs:
+        if output_spec.digest == digest:
+            return bool(output_spec.extra.get("optional"))
+    return False
+
+
 class NodeIOSpec(BaseModel):
     """Input/output specification for a node."""
 
@@ -241,6 +256,8 @@ class NodeSpec(BaseModel):
     description: str | None = None
     domain_code: str | None = None
     status: NodeStatus = Field(strict=False)
+    # Why a `skipped` node was lifted (names the absent input); None for every other status.
+    skip_reason: str | None = None
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(
         default_factory=NodeIOSpec,
@@ -262,6 +279,8 @@ class EdgeSpec(BaseModel):
     source: str
     target: str
     kind: EdgeKind = Field(strict=False)
+    # A data edge fed by a declared-optional (`?`) output: the value may be absent in other runs.
+    optional: bool = False
     label: str | None = None
     # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
     source_stuff_digest: str | None = None

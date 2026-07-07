@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydantic import BaseModel, Field
@@ -21,7 +22,6 @@ from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
 from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig

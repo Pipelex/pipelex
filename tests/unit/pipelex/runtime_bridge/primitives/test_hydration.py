@@ -4,6 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
@@ -215,4 +216,43 @@ class TestHydrateWorkingMemory:
         }
 
         with pytest.raises(PipeJobError, match="invalid_stuff"):
+            hydrate_working_memory(raw)
+
+    def test_hydrate_round_trips_absence_ledger(self) -> None:
+        """The absence ledger survives the dump_for_transport → hydrate round-trip: a recorded
+        absence must not degrade to a hard miss after cross-process transit.
+        """
+        working_memory = WorkingMemory()
+        working_memory.root["kept"] = _make_text_stuff("kept", "still here")
+        origin = AbsenceRecord(
+            variable_name="source",
+            kind=AbsenceKind.NOT_PROVIDED,
+            reason="optional input 'source' was not provided by the caller",
+        )
+        chained = AbsenceRecord(
+            variable_name="analysis",
+            kind=AbsenceKind.SKIPPED,
+            reason="skipped because input 'source' is absent",
+            producing_pipe="analyze",
+            upstream=origin,
+        )
+        working_memory.record_absence(origin)
+        working_memory.record_resolved_absence(chained)
+
+        hydrated = hydrate_working_memory(working_memory.dump_for_transport())
+
+        assert hydrated.absences["source"] == origin
+        assert hydrated.absences["analysis"] == chained
+        assert hydrated.absences["analysis"].upstream == origin
+        assert hydrated.root["kept"].content == TextContent(text="still here")
+
+    def test_hydrate_raises_on_malformed_absence_record(self) -> None:
+        """A malformed ledger entry fails hydration loudly — never a silently dropped record."""
+        raw: dict[str, Any] = {
+            "root": {},
+            "aliases": {},
+            "absences": {"broken": {"kind": "not_a_kind"}},
+        }
+
+        with pytest.raises(PipeJobError, match="broken"):
             hydrate_working_memory(raw)

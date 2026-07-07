@@ -9,7 +9,7 @@ avoids a layering inversion as more cogt callers acquire a need for provenance m
 
 from __future__ import annotations
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class RemoteConfigSource(StrEnum):

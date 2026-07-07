@@ -8,7 +8,7 @@ activity event log instead of dropping silently.
 
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -53,7 +53,7 @@ def _make_llm_job(
     nb_input_tokens: int = 100,
     nb_output_tokens: int = 50,
 ) -> LLMJob:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,

@@ -98,7 +98,7 @@ def login_cmd() -> None:
         console.print("[bold red]Login timed out.[/bold red]")
         console.print(f"[dim]No response received within {LOGIN_TIMEOUT_SECONDS}s.[/dim]")
         console.print("[dim]You can try again with: pipelex login[/dim]")
-        console.print(f"[dim]Or visit {URLs.app} to generate your API key manually.[/dim]\n")
+        console.print(f"[dim]Or visit {URLs.app_cli_auth} to generate your API key manually.[/dim]\n")
         raise SystemExit(1)
 
 

@@ -1,0 +1,27 @@
+domain      = "opt_guarded_condition"
+description = "PipeCondition whose expression guards a declared-optional input"
+main_pipe   = "ogc_route_on_flag"
+
+[pipe.ogc_make_flagged_note]
+type          = "PipeFunc"
+description   = "Branch taken when the flag is present"
+output        = "Text"
+function_name = "ogc_make_flagged_note"
+
+[pipe.ogc_make_plain_note]
+type          = "PipeFunc"
+description   = "Branch taken when the flag is absent"
+output        = "Text"
+function_name = "ogc_make_plain_note"
+
+[pipe.ogc_route_on_flag]
+type                = "PipeCondition"
+description         = "Routes on presence of the optional flag (guarded expression)"
+inputs              = { flag = "Text?" }
+output              = "Text"
+expression_template = "{{ 'with_flag' if flag is defined else 'no_flag' }}"
+default_outcome     = "ogc_make_plain_note"
+
+[pipe.ogc_route_on_flag.outcomes]
+with_flag = "ogc_make_flagged_note"
+no_flag   = "ogc_make_plain_note"

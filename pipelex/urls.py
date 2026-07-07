@@ -2,7 +2,6 @@ class URLs:
     logo_white_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-wot-1119x352.png"
     logo_black_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png"
     homepage = "https://pipelex.com"
-    app = "https://app.pipelex.com/"
     durable_execution = "https://go.pipelex.com/durable-execution"
     repository = "https://github.com/Pipelex/pipelex"
     documentation = "https://docs.pipelex.com/"

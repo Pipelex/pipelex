@@ -74,6 +74,20 @@ class TestCliPipeCmd:
         assert "ArgumentError" in combined
         assert "type" in combined
 
+    def test_non_string_type_rejected_with_actionable_error(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A non-string JSON `type` (e.g. a list/dict — unhashable) must surface as an actionable
+        ArgumentError naming the valid types, never a cryptic internal `TypeError: unhashable type`
+        leaking from the membership test inside parse_pipe_spec.
+        """
+        spec = json.dumps({"pipe_code": "x", "description": "d", "inputs": {"doc": "Document"}, "output": "Text", "type": ["PipeCompose"]})
+        with pytest.raises(typer.Exit):
+            pipe_cmd(spec=spec)
+        captured = capsys.readouterr()
+        combined = captured.err + captured.out
+        assert "ArgumentError" in combined
+        assert "TypeError" not in combined
+        assert "Invalid pipe type" in combined
+
     # -- CLI TOML serialization (uses format_toml_string) -----------------
 
     def test_llm_model_appears_in_toml(self) -> None:
