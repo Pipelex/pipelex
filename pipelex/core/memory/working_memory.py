@@ -14,6 +14,7 @@ from pipelex.core.memory.exceptions import (
     WorkingMemoryTypeError,
 )
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -489,6 +490,10 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """Get stuff content as YesNoContent if applicable."""
         return self.get_stuff(name=name).as_yes_no
 
+    def get_stuff_as_date(self, name: str) -> DateContent:
+        """Get stuff content as DateContent if applicable."""
+        return self.get_stuff(name=name).as_date
+
     def get_stuff_as_html(self, name: str) -> HtmlContent:
         """Get stuff content as HtmlContent if applicable."""
         return self.get_stuff(name=name).as_html
@@ -539,6 +544,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def main_stuff_as_yes_no(self) -> YesNoContent:
         """Get main stuff content as YesNoContent if applicable."""
         return self.get_stuff_as_yes_no(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_date(self) -> DateContent:
+        """Get main stuff content as DateContent if applicable."""
+        return self.get_stuff_as_date(name=MAIN_STUFF_NAME)
 
     @property
     def main_stuff_as_html(self) -> HtmlContent:

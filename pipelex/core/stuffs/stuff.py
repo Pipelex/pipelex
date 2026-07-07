@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -96,6 +97,10 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     @property
     def is_yes_no(self) -> bool:
         return isinstance(self.content, YesNoContent)
+
+    @property
+    def is_date(self) -> bool:
+        return isinstance(self.content, DateContent)
 
     def content_as(self, content_type: type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
@@ -228,6 +233,11 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     def as_yes_no(self) -> YesNoContent:
         """Get content as YesNoContent if applicable."""
         return self.content_as(content_type=YesNoContent)
+
+    @property
+    def as_date(self) -> DateContent:
+        """Get content as DateContent if applicable."""
+        return self.content_as(content_type=DateContent)
 
     @property
     def as_html(self) -> HtmlContent:
