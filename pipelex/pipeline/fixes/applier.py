@@ -26,8 +26,8 @@ import tomlkit
 from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
-from tomlkit.container import Container
-from tomlkit.items import Item, Table
+from tomlkit.container import Container, OutOfOrderTableProxy
+from tomlkit.items import AbstractTable, Item
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
@@ -78,16 +78,45 @@ def _resolve_table(toml_doc: TOMLDocument, *, table_path: list[str]) -> dict[str
     return node
 
 
-def _container_of(node: dict[str, Any]) -> Container:
-    """The tomlkit ``Container`` backing a resolved table node.
+def _rename_key_in_place(parent_table: dict[str, Any], *, key: str, new_key: str) -> None:
+    """Rename ``key`` to ``new_key`` in a resolved table node, preserving position and comments.
 
-    A ``Table`` delegates key operations to its ``.value`` container; the root ``TOMLDocument`` is
-    itself a ``Container``. Only ``rename_table_key`` needs this — it reaches for the container's
-    position-preserving rename primitive, which ``Table``'s dict-facade does not expose.
+    tomlkit exposes no public position-preserving rename; ``Container._replace`` is its own
+    internal primitive (what ``__setitem__`` uses to re-home an existing key). It swaps the key in
+    ``_body`` in place and re-renders the table header, so the renamed table keeps its position
+    among siblings and its comments — a ``del`` + re-add would append it to the bottom of the
+    parent (the old fixer's reordering bug). The golden byte-compare tests are the CI tripwire if
+    a tomlkit bump ever changes this.
+
+    ``_resolve_table`` hands back one of three dict-like shapes, each with its own route to the
+    ``Container`` that owns the key:
+
+    - ``OutOfOrderTableProxy`` — ``[pipe.*]`` sections interleaved with other tables: the keys
+      live in the proxy's underlying sub-tables, so rename inside the one holding ``key``;
+    - ``AbstractTable`` — a regular ``Table`` or an inline ``pipe = {...}``: its ``.value``;
+    - the root ``TOMLDocument``, itself a ``Container``.
     """
-    if isinstance(node, Table):
-        return node.value
-    return cast("Container", node)
+    if isinstance(parent_table, OutOfOrderTableProxy):
+        for sub_table in parent_table._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
+            if key in sub_table:
+                _replace_key_in_container(sub_table.value, key=key, new_key=new_key)
+                return
+        # The caller checked ``key in parent_table``, and the proxy's dict-facade is built from
+        # exactly these sub-tables — reaching here means the facade and sub-tables disagree.
+        msg = f"key '{key}' not found in any sub-table of the out-of-order table during rename — applier bug"
+        raise PipelexUnexpectedError(msg)
+    if isinstance(parent_table, AbstractTable):
+        _replace_key_in_container(parent_table.value, key=key, new_key=new_key)
+        return
+    if isinstance(parent_table, Container):
+        _replace_key_in_container(parent_table, key=key, new_key=new_key)
+        return
+    msg = f"cannot rename key in unsupported tomlkit node type '{type(parent_table).__name__}' — applier bug"
+    raise PipelexUnexpectedError(msg)
+
+
+def _replace_key_in_container(container: Container, *, key: str, new_key: str) -> None:
+    container._replace(key, new_key, cast("Item", container[key]))  # pyright: ignore[reportPrivateUsage]
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
@@ -199,13 +228,5 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
                     outcome=FixOpOutcome.SKIPPED,
                     detail=f"cannot rename to '{fix_op.new_key}': already present in table '{table_path_str}'",
                 )
-            container = _container_of(parent_table)
-            # tomlkit exposes no public position-preserving rename; ``Container._replace`` is its
-            # own internal primitive (what ``__setitem__`` uses to re-home an existing key). It
-            # swaps the key in ``_body`` in place and re-renders the table header, so the renamed
-            # table keeps its position among siblings and its comments — a ``del`` + re-add would
-            # append it to the bottom of the parent (the old fixer's reordering bug). The golden
-            # byte-compare tests are the CI tripwire if a tomlkit bump ever changes this.
-            renamed_item = cast("Item", container[fix_op.key])
-            container._replace(fix_op.key, fix_op.new_key, renamed_item)  # pyright: ignore[reportPrivateUsage]
+            _rename_key_in_place(parent_table, key=fix_op.key, new_key=fix_op.new_key)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)

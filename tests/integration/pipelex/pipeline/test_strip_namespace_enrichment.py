@@ -70,6 +70,27 @@ output = "Text"
 prompt = "Dotted"
 """
 
+# Retarget hazard: ``main_pipe`` names the DOTTED declaration while a bare one also exists. The
+# declaration rename is collision-blocked, so stripping ``main_pipe`` would silently retarget it
+# from the dotted declaration the author referenced to the unrelated bare pipe — the categorizer
+# drops the ``main_pipe`` enrichment too (document-level gate).
+_MAIN_PIPE_RETARGET_MTHDS = """
+domain = "nsfix_ret"
+main_pipe = "nsfix_ret.hello"
+
+[pipe.hello]
+type = "PipeLLM"
+description = "Bare hello."
+output = "Text"
+prompt = "Bare"
+
+[pipe."nsfix_ret.hello"]
+type = "PipeLLM"
+description = "Dotted hello."
+output = "Text"
+prompt = "Dotted"
+"""
+
 # Cross-package prefix (not the bundle's own domain) → never stripped (would break a real qualified ref).
 _CROSS_DOMAIN_MTHDS = """
 domain = "nsfix_cross"
@@ -140,6 +161,17 @@ class TestStripNamespaceEnrichment:
         assert len(strippable) == 1
         assert strippable[0].pipe_code is None
         assert strippable[0].stripped_pipe_code == "hello"
+
+    async def test_main_pipe_strip_suppressed_when_it_would_retarget(self, load_empty_library: Callable[[], str]) -> None:
+        """``main_pipe`` naming a dotted declaration that coexists with its bare form: both the
+        declaration error and the ``main_pipe`` error stay un-enriched — stripping ``main_pipe``
+        would retarget it to the unrelated bare pipe.
+        """
+        load_empty_library()
+        errors = await _syntax_errors(_MAIN_PIPE_RETARGET_MTHDS)
+        main_pipe_errors = [error for error in errors if error.pipe_code is None]
+        assert main_pipe_errors, "expected the main_pipe INVALID_PIPE_CODE_SYNTAX error"
+        assert all(error.stripped_pipe_code is None for error in errors)
 
     @pytest.mark.parametrize(
         "mthds_content",

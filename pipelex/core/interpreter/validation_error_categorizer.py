@@ -16,6 +16,7 @@ from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validatio
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
+PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
 
 # Distinctive fragments of the two type-tag errors raised by the `pipe` before-validators (via
 # `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and spec
@@ -63,6 +64,26 @@ def _extract_wrapped_invalid_pipe_code_syntax_error(error: ErrorDetails) -> Inva
         if isinstance(original_error, InvalidPipeCodeSyntaxError):
             return original_error
     return None
+
+
+def _main_pipe_strip_would_retarget(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
+    """Whether stripping ``main_pipe`` would silently retarget it to a different declaration.
+
+    The ``main_pipe`` raise site runs before the ``pipe`` field validates, so it cannot see the
+    declarations — this categorizer can (it holds the raw bundle dict), making it the document-level
+    gate the raise site cannot be. When BOTH the offending dotted code and its bare form exist as
+    declaration keys, the dotted declaration's own rename is collision-blocked, and stripping
+    ``main_pipe`` would flip it from the dotted declaration the author referenced to the unrelated
+    bare one — so the enrichment is suppressed and the ambiguity left to a human.
+
+    When the dotted code is NOT itself a declaration key, ``main_pipe`` is an over-qualified
+    *reference* (a same-domain qualified ref resolves to the bare pipe), so stripping stays safe.
+    """
+    raw_pipe = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD)
+    if not isinstance(raw_pipe, dict):
+        return False
+    pipe_keys = {key for key in cast("dict[Any, Any]", raw_pipe) if isinstance(key, str)}
+    return offending_code in pipe_keys and stripped_code in pipe_keys
 
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
@@ -339,15 +360,26 @@ def categorize_blueprint_validation_error(
     # a declaration-key rename, ``None`` for a ``main_pipe`` value strip (loc's first element names
     # the field). The bare ``ValueError`` path (malformed codes, cross-package refs) still falls
     # through to the message-matching ``_categorize_syntax_validation_error`` → unfixable.
+    #
+    # The ``main_pipe`` raise site cannot collision-gate (the ``pipe`` field validates after it),
+    # so that gate lives here, on the raw bundle dict: a strip that would retarget ``main_pipe``
+    # to a different declaration keeps its category but loses the enrichment → no fix is planned.
     wrapped_invalid_pipe_code = _extract_wrapped_invalid_pipe_code_syntax_error(error)
     if wrapped_invalid_pipe_code is not None:
         is_main_pipe = bool(loc) and loc[0] == PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD
+        stripped_pipe_code: str | None = wrapped_invalid_pipe_code.stripped_code
+        if is_main_pipe and _main_pipe_strip_would_retarget(
+            offending_code=wrapped_invalid_pipe_code.offending_code,
+            stripped_code=wrapped_invalid_pipe_code.stripped_code,
+            blueprint_dict=blueprint_dict,
+        ):
+            stripped_pipe_code = None
         return PipelexBundleBlueprintValidationErrorData(
             error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
             domain_code=domain,
             source=source,
             pipe_code=None if is_main_pipe else wrapped_invalid_pipe_code.offending_code,
-            stripped_pipe_code=wrapped_invalid_pipe_code.stripped_code,
+            stripped_pipe_code=stripped_pipe_code,
             message=str(wrapped_invalid_pipe_code),
         )
 

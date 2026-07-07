@@ -146,6 +146,48 @@ steps = [
 ]
 """
 
+# Cross-file collision pair: the target's dotted declaration would strip to a bare code already
+# declared by a sibling bundle — the rename must not be applied. Same domain it would be a
+# duplicate declaration; another domain it would be a bare-code ambiguity
+# (``PipeLibrary.get_optional_pipe`` raises on a bare code declared by two domains). Either way
+# the loop could never repair the state it would write.
+_XFILE_TARGET_MTHDS = """domain = "nsfix_xfile"
+
+[pipe."nsfix_xfile.hola"]
+type = "PipeLLM"
+description = "Say hola."
+output = "Text"
+prompt = "Say hola"
+"""
+
+_XFILE_SIBLING_SAME_DOMAIN_MTHDS = """domain = "nsfix_xfile"
+
+[pipe.hola]
+type = "PipeLLM"
+description = "Bare hola, declared in a sibling bundle of the same domain."
+output = "Text"
+prompt = "Say hola"
+"""
+
+_XFILE_SIBLING_OTHER_DOMAIN_MTHDS = """domain = "nsfix_xfile_other"
+
+[pipe.hola]
+type = "PipeLLM"
+description = "Bare hola in another domain."
+output = "Text"
+prompt = "Say hola"
+"""
+
+# A sibling declaring an unrelated pipe code: must NOT block the rename (no over-dropping).
+_XFILE_SIBLING_UNRELATED_MTHDS = """domain = "nsfix_xfile_other"
+
+[pipe.adios]
+type = "PipeLLM"
+description = "Unrelated sibling pipe."
+output = "Text"
+prompt = "Say adios"
+"""
+
 _CROSS_RULE_CASCADE_MTHDS = """domain = "crossfix_loop"
 main_pipe = "list_ideas"
 
@@ -315,6 +357,58 @@ class TestFixConvergenceLoop:
         assert parsed["main_pipe"] == "run_seq"
         # The qualified step reference survives untouched (it resolves to the renamed bare pipe).
         assert pipes["run_seq"]["steps"][0]["pipe"] == "nsfix_loop.hello"
+
+    @pytest.mark.parametrize(
+        "sibling_mthds",
+        [_XFILE_SIBLING_SAME_DOMAIN_MTHDS, _XFILE_SIBLING_OTHER_DOMAIN_MTHDS],
+    )
+    async def test_strip_namespace_bails_on_cross_file_collision(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+        sibling_mthds: str,
+    ) -> None:
+        """A rename whose bare code is declared by ANY sibling bundle is never applied.
+
+        The raise-site collision gate only sees the target file, so the loop's cross-file guard
+        must drop the fix — same domain (duplicate declaration) and other domain (bare-code
+        ambiguity) alike. The loop bails loudly with the collision reason and the target file's
+        bytes are untouched — no unrepairable state is ever written.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "target.mthds"
+        bundle_path.write_text(_XFILE_TARGET_MTHDS, encoding="utf-8")
+        (tmp_path / "sibling.mthds").write_text(sibling_mthds, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[tmp_path])
+
+        assert result.is_valid is False
+        assert result.fixes_applied == []
+        assert result.bail_reason is not None
+        assert "cross-file collision" in result.bail_reason
+        assert "'hola'" in result.bail_reason
+        assert result.remaining_errors
+        assert bundle_path.read_text(encoding="utf-8") == _XFILE_TARGET_MTHDS
+
+    async def test_strip_namespace_proceeds_past_unrelated_sibling(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A sibling declaring only unrelated pipe codes does not block the rename (no over-dropping)."""
+        load_empty_library()
+        bundle_path = tmp_path / "target.mthds"
+        bundle_path.write_text(_XFILE_TARGET_MTHDS, encoding="utf-8")
+        (tmp_path / "sibling.mthds").write_text(_XFILE_SIBLING_UNRELATED_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[tmp_path])
+
+        assert result.is_valid is True
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace"]
+        assert result.bail_reason is None
+        pipes = _pipes(bundle_path)
+        assert "hola" in pipes
+        assert "nsfix_xfile.hola" not in pipes
 
     async def test_already_valid_bundle_is_a_no_op(
         self,

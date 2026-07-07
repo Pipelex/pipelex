@@ -52,6 +52,33 @@ output = "Text"
 prompt = "Dotted"
 """
 
+# ``[pipe.*]`` sections interleaved with a ``[concept.*]`` section (a legal, common layout:
+# concepts declared next to the pipes that use them) — tomlkit resolves ``doc["pipe"]`` to an
+# ``OutOfOrderTableProxy`` instead of a ``Table``.
+_INTERLEAVED_MTHDS = """domain = "inter"
+
+[pipe."inter.hello"]
+type = "PipeLLM"
+description = "Dotted hello."
+output = "Text"
+prompt = "Dotted"
+
+[concept.Greeting]
+description = "A greeting."
+
+[pipe.other]
+type = "PipeLLM"
+description = "Other."
+output = "Text"
+prompt = "Other"
+"""
+
+# The whole ``pipe`` section as one inline table — tomlkit resolves ``doc["pipe"]`` to an
+# ``InlineTable`` instead of a ``Table``.
+_INLINE_MTHDS = """domain = "inl"
+pipe = { "inl.hello" = { type = "PipeLLM", description = "Dotted.", output = "Text", prompt = "Dotted" } }
+"""
+
 
 class TestFixApplierStripNamespace:
     def test_strip_matches_golden_bytes(self) -> None:
@@ -101,3 +128,35 @@ class TestFixApplierStripNamespace:
         toml_doc = tomlkit.loads(_COLLISION_MTHDS)
         applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="coll.ghost", new_key="ghost")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+
+    def test_rename_applies_on_interleaved_pipe_sections(self) -> None:
+        """Interleaved ``[pipe.*]``/``[concept.*]`` sections (an ``OutOfOrderTableProxy``) rename in place."""
+        toml_doc = tomlkit.loads(_INTERLEAVED_MTHDS)
+        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        dumped = _dumps(toml_doc)
+        assert '[pipe."inter.hello"]' not in dumped
+        assert "[pipe.hello]" in dumped
+        # Position: the renamed pipe stays before the concept section, which stays before [pipe.other].
+        assert dumped.index("[pipe.hello]") < dumped.index("[concept.Greeting]") < dumped.index("[pipe.other]")
+        # The whole document still formats cleanly (no malformed TOML out of the proxy rename).
+        assert "[pipe.hello]" in serialize_and_format(toml_doc)
+
+    def test_rename_skips_on_collision_across_interleaved_sections(self) -> None:
+        """A collision with a bare key living in a *different* ``[pipe.*]`` section is still a skip."""
+        interleaved_collision = _INTERLEAVED_MTHDS.replace("[pipe.other]", "[pipe.hello]")
+        toml_doc = tomlkit.loads(interleaved_collision)
+        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+        dumped = _dumps(toml_doc)
+        assert '[pipe."inter.hello"]' in dumped
+
+    def test_rename_applies_on_inline_pipe_table(self) -> None:
+        """An inline ``pipe = {...}`` section (an ``InlineTable``) renames in place."""
+        toml_doc = tomlkit.loads(_INLINE_MTHDS)
+        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inl.hello", new_key="hello")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        dumped = _dumps(toml_doc)
+        assert '"inl.hello"' not in dumped
+        assert "hello" in dumped
+        assert "hello" in serialize_and_format(toml_doc)

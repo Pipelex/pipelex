@@ -9,16 +9,19 @@ skips) ends the loop with a ``bail_reason`` instead of spinning.
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.base_exceptions import ValidationErrorItem
+from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.suggested_fix import SuggestedFix
-from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
+from pipelex.suggested_fix import FixOp, FixOpKind, SuggestedFix
+from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit
 
 
 class FixBundleResult(BaseModel):
@@ -80,6 +83,64 @@ def _applicable_safe_fixes(items: list[ValidationErrorItem], *, mthds_file_path:
     return fixes
 
 
+def _sibling_pipe_codes(*, mthds_file_path: Path, library_dirs: Sequence[Path]) -> set[str]:
+    """Pipe declaration keys of every OTHER bundle under ``library_dirs``, across ALL domains.
+
+    Cross-domain on purpose: a bare pipe code must resolve unambiguously across the loaded
+    library — ``PipeLibrary.get_optional_pipe`` raises on a bare code declared by two domains —
+    so a rename target colliding with a same-named declaration in ANY sibling bundle would leave
+    the library unloadable. Computed once per fix run: the loop only mutates the target file, so
+    sibling declarations are stable across iterations. A sibling that fails to parse (or has no
+    pipes) contributes nothing here — its own problems surface through validation, not this scan.
+    """
+    sibling_codes: set[str] = set()
+    target_path = mthds_file_path.resolve()
+    for sibling_path in get_pipelex_mthds_files_from_dirs(dirs=set(library_dirs)):
+        if sibling_path.resolve() == target_path:
+            continue
+        try:
+            sibling_doc = load_toml_from_path(sibling_path)
+        except TomlError:
+            continue
+        pipe_section = sibling_doc.get("pipe")
+        if not isinstance(pipe_section, dict):
+            continue
+        sibling_codes.update(key for key in cast("dict[Any, Any]", pipe_section) if isinstance(key, str))
+    return sibling_codes
+
+
+def _is_cross_file_colliding_rename(fix_op: FixOp, *, sibling_pipe_codes: set[str]) -> bool:
+    match fix_op.kind:
+        case FixOpKind.RENAME_TABLE_KEY:
+            return fix_op.table_path == ["pipe"] and fix_op.new_key is not None and fix_op.new_key in sibling_pipe_codes
+        case FixOpKind.SET_KEY | FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE:
+            return False
+
+
+def _split_cross_file_rename_collisions(
+    fixes: list[SuggestedFix],
+    *,
+    sibling_pipe_codes: set[str],
+) -> tuple[list[SuggestedFix], list[str]]:
+    """Split ``fixes`` into (kept, colliding new_keys of the dropped ones).
+
+    The raise-site collision gate only sees the one file being validated; in a multi-file run a
+    bare pipe of the same name may live in a sibling bundle, where renaming a ``[pipe]`` key to it
+    would create a duplicate (same domain) or a bare-code ambiguity (another domain) that the loop
+    can never repair. Dropped fixes simply leave their error unfixed (still reported in
+    ``remaining_errors``).
+    """
+    kept: list[SuggestedFix] = []
+    colliding_new_keys: list[str] = []
+    for fix in fixes:
+        colliding_ops = [fix_op for fix_op in fix.ops if _is_cross_file_colliding_rename(fix_op, sibling_pipe_codes=sibling_pipe_codes)]
+        if colliding_ops:
+            colliding_new_keys.extend(fix_op.new_key for fix_op in colliding_ops if fix_op.new_key is not None)
+        else:
+            kept.append(fix)
+    return kept, colliding_new_keys
+
+
 async def fix_bundle_file(
     mthds_file_path: Path,
     *,
@@ -97,6 +158,9 @@ async def fix_bundle_file(
     fixes_applied: list[SuggestedFix] = []
     apply_rounds = 0
     last_error_items: list[ValidationErrorItem] = []
+    sibling_pipe_codes: set[str] = (
+        _sibling_pipe_codes(mthds_file_path=mthds_file_path, library_dirs=library_dirs) if library_dirs is not None else set()
+    )
 
     for _ in range(max_iterations):
         try:
@@ -108,6 +172,21 @@ async def fix_bundle_file(
         safe_fixes = _applicable_safe_fixes(last_error_items, mthds_file_path=mthds_file_path, is_single_file=library_dirs is None)
         if not safe_fixes:
             return FixBundleResult(is_valid=False, iterations=apply_rounds, fixes_applied=fixes_applied, remaining_errors=last_error_items)
+
+        if sibling_pipe_codes:
+            safe_fixes, colliding_new_keys = _split_cross_file_rename_collisions(safe_fixes, sibling_pipe_codes=sibling_pipe_codes)
+            if not safe_fixes:
+                colliding = ", ".join(f"'{new_key}'" for new_key in sorted(set(colliding_new_keys)))
+                bail_reason = (
+                    f"cross-file collision: every remaining fix would rename a pipe to a code ({colliding}) already declared in a sibling bundle"
+                )
+                return FixBundleResult(
+                    is_valid=False,
+                    iterations=apply_rounds,
+                    fixes_applied=fixes_applied,
+                    remaining_errors=last_error_items,
+                    bail_reason=bail_reason,
+                )
 
         new_fixes = [fix for fix in safe_fixes if _fix_fingerprint(fix) not in seen_fingerprints]
         if not new_fixes:
