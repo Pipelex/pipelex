@@ -1,8 +1,24 @@
-# Datetime track — implementation plan for the native `Date` concept
+# Datetime track — the native `Date` concept (as-built)
 
-Status: **plan written 2026-07-07, implementation not started**. Design: `datetime-design.md` (**approved**, decisions DT1–DT8). Branch `feature/Smart-inputs`, worktree `_smart`, based on main at v0.38.0. Track order (`README.md`): YesNo → **Datetime (this plan)** → Smart Inputs, one release wave.
+Status: **COMPLETE 2026-07-07.** All phases shipped on `feature/Smart-inputs` (commits `0b6d201bb` → `2d7b3d503`), gates green. Design: `datetime-design.md` (approved, DT1–DT8). Based on main at v0.38.0. Track order (`README.md`): YesNo → **Datetime (this doc)** → Smart Inputs, one release wave. This doc is now the as-built record and the PR reviewer's guide; the phase-by-phase log and checkpoint states below capture exactly what landed and why.
 
-How to use this doc: work the phases in order, check boxes as you go, and at each CHECKPOINT update the "state" line under it (what landed, commit hashes, open questions) so the next session cold-starts from here.
+## As-built summary — for PR reviewers
+
+**What shipped:** one new native concept `Date` — *"A calendar date, optionally with a time of day — as precise as its source states."* Content class `DateContent(date: datetime.date, time: datetime.time | None)`: a required calendar date plus an *optional* time (its UTC offset kept verbatim on the `time`'s tzinfo). The whole point is document-fidelity: an LLM producing a `Date` states the time only when the source does — no fabricated midnights — and the output's precision *is* the document's. See `datetime-design.md` §2 for the one-vs-three-concepts rationale.
+
+**Where to look, by concern (all one commit per phase):**
+
+- **Concept core** (`0b6d201bb`): `pipelex/core/stuffs/date_content.py` (the class + a `field_validator` that closes pydantic's lax temporal coercions — see the guard note below), `NativeConceptCode.DATE` wired into the four exhaustive enum matches + factory + registry, Number/YesNo-style accessors (`Stuff.is_date`/`as_date`, `WorkingMemory`/`PipeOutput.main_stuff_as_date`), a `datetime.time` arm in `html_rendering.py`. Tests pin the render matrix, the kajson + transport-hydration round-trips (offset preserved — the distributed-decode safety net), and `refines = "Date"`.
+- **Inputs** (`3ca1068f9`): the inputs-file loader converts a **top-level** TOML date/datetime literal to a `DateContent` (it then rides the existing case-1.3 seam as a bare content instance — no mthds-python protocol change); a bare *time-of-day* anywhere is rejected (`InputsTimeOnlyNotSupportedError`, renamed from the wholesale `InputsDatetimeNotSupportedError`); nested date/datetime are left for the factory/pydantic. `StuffContentFactory` / `StuffFactory` gain Date arms (envelope + bare object + strict-ISO string, parsed **date-first** so a date-only string never fabricates a time). `DateContent.rendered_pretty` is overridden (the base crashed on real date objects). e2e bundle under `tests/e2e/pipelex/pipes/date/`.
+- **LLM output** (`b735ebce8`): a test pins that `output = "Date"` takes the object path with `DateContent`'s schema (both field descriptions) — no new generation machinery (DT7 defers ergonomics to the shared YesNo/Date follow-up).
+- **DT8 — the severable field-type fix** (`6dd17e452`): structure-field `type = "date"` used to generate `datetime.datetime` (forcing a fabricated time on every extracted date); now `date` → `datetime.date` and a new `type = "datetime"` → `datetime.datetime`. Mirrored across the blueprint layer (`concept_structure_blueprint.py`, `generator.py`) **and** the spec/authoring layer (`concept_spec.py`); default-value validation splits (a `date` field rejects a datetime default). Docs + breaking changelog entry.
+- **Docs/wrap** (`2d7b3d503`): `native-concepts.md`, `provide-inputs.md`, CHANGELOG, bookkeeping.
+
+**The one guard worth understanding** (`date_content.py` `_reject_lax_temporal`): pydantic's lax mode would silently corrupt data against the concept's own fidelity contract — a bare `int`/`float` or an **all-digit string** read as epoch seconds, and a `datetime` on the `date` field silently truncated (dropping its time + offset). The validator rejects all three (raising `ValueError` so pydantic wraps it into a `ValidationError` the input path catches). The factory's ISO parser rejects all-digit strings too, for consistency.
+
+**Deferred (nothing lost):** `wip/inputs/scalar-envelope-arm-asymmetry.md` and `wip/inputs/loader-vs-factory-date-split-duplication.md` (design tradeoffs to resolve when Smart Inputs unifies the input paths); the shared YesNo/Date LLM-output-ergonomics follow-up; and the per-release cross-repo sweep (schema copies, MTHDS spec tables, mthds-python/mthds-js mirrors, conformance, skills, cookbook `type = "date"` regen). See "Deferred to the release-wave sweep" at the bottom.
+
+How the log below reads: each phase is checked off, and each CHECKPOINT's "state" line records what landed, the commit, decisions taken, and anything that fought back.
 
 ## 0. Cold-start context — read this first
 
