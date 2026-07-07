@@ -64,7 +64,7 @@ State: **reached 2026-07-07.** All Phase 2 tasks landed and `make agent-check` i
 
 ## Phase 3 — LLM output verification
 
-- [ ] Locate how `output = "Number"` (or the Date plan's Phase 3 equivalent) is covered in PipeLLM tests and mirror for `YesNo`: assert the object path is selected (not the Text path) and the schema handed to content generation is `YesNoContent`'s with the field description present.
+- [x] New `tests/integration/pipelex/pipes/operator/pipe_llm/test_pipe_llm_yes_no_output_path.py`: a DRY-mode PipeLLM with `output = NativeConceptCode.YES_NO` is run through the router while `content_generator.make_object` is spied. Asserts the **object path** is selected (`make_object` called once — the text path calls `make_llm_text` instead), the `object_class` handed down is exactly `YesNoContent`, that class's `model_json_schema()` carries the field description (the LLM-facing contract), and the produced verdict `is_yes_no`. Markerless (pure DRY — the leaf mock short-circuits inside `make_object`, no provider called), booted on `load_empty_library` (native concepts only, no bundle). This pins the dispatch: if someone made `YesNo` Text-compatible, the object path would not be taken and the test fails loudly.
 - [ ] Optional, non-gating: one live-gateway smoke of a judgment pipe (`output = "YesNo"`) — manual, not CI.
 
 No new generation machinery: the leaner scalar-native generation form is explicitly deferred to the shared YesNo/Date LLM-output-ergonomics follow-up (D9, off the critical path).
