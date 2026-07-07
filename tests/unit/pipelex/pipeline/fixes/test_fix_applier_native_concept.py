@@ -65,6 +65,32 @@ class TestFixApplierNativeConcept:
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert _dumps(toml_doc) == once
 
+    def test_leading_comment_on_deleted_table_reflows_onto_successor(self) -> None:
+        """Known artifact (pinned): a standalone comment sitting directly above a deleted
+        ``[concept.X]`` table reflows onto the next element (tomlkit trivia behavior;
+        ``format_mthds`` does not reposition it). The guarantee is that comments on *untouched*
+        content survive — a comment sitting on the deleted concept is the only thing that can
+        dangle. Pinned so the behavior is explicit rather than a silent surprise; see
+        ``wip/autofix/deferred-checkpoint-b-review-items.md``.
+        """
+        source = (
+            "[concept.Report]\n"
+            'description = "A report."\n'
+            "\n"
+            "# describes the redeclared concept below\n"
+            "[concept.Text]\n"
+            'description = "Redeclared native Text."\n'
+            "\n"
+            "[pipe.make_report]\n"
+            'type = "PipeLLM"\n'
+        )
+        toml_doc = tomlkit.loads(source)
+        apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Text")])
+        dumped = _dumps(toml_doc)
+        assert "[concept.Text]" not in dumped
+        # The comment reflowed onto the successor table — it no longer annotates the deleted concept.
+        assert "# describes the redeclared concept below\n[pipe.make_report]" in dumped
+
     def test_delete_missing_concept_is_skipped(self) -> None:
         """Stripping a concept absent from the document is reported as skipped, not raised."""
         toml_doc = tomlkit.loads((_DATA / "native_redecl_inline.mthds").read_text(encoding="utf-8"))

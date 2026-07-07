@@ -148,7 +148,9 @@ Trigger: blueprint-level error for a redeclared native concept. Fix: `delete_key
 
 - [x] **Verify**: `make agent-check` green; full `make agent-test` green (2026-07-07).
 - [x] **Record for cold start**: B decisions (enum home, source-guard behavior) recorded here and in "Decisions taken"; blueprint-channel findings folded into the design doc (new "CHECKPOINT B" section). Committed.
-- [ ] **Review fan-out**: Sonnet-5 sub-agent running `/code-review` on the Phase B diff only, no inherited context — diff pointer only. Triage, fix, defer, commit.
+- [x] **Review fan-out** (done 2026-07-07): Sonnet-5 `/code-review` sub-agent on the Phase B diff (`git diff 8e0fe1158..HEAD`), no inherited context. Review came back essentially clean (it read every file, traced raise→unwrap→planner→applier→loop, ran `make agent-check` + broad targeted suites green). Triage:
+  - **Finding 1 — comment reflow on table delete** (already a known artifact, disclosed in the design doc + this file): not a defect, and fixing the tomlkit trivia repositioning is out-of-scope cosmetic work for a fix whose output the author reviews. **Action taken:** turned the reviewer's "undertested" note into a pinned characterization test (`test_leading_comment_on_deleted_table_reflows_onto_successor`) and recorded the item in `wip/autofix/deferred-checkpoint-b-review-items.md`. Did **not** reflexively apply a fix.
+  - **Finding 2 — `_extract_wrapped_native_concept_redeclaration_error` shares the shape of `extract_wrapped_pipe_validation_error`**: reviewer judged it "not a real problem." **No action** (two readable call sites don't justify a generic helper — same house-style call as Checkpoint A); recorded in the deferred doc.
 
 ## Phase C — `strip-namespace` (STRETCH — gated on rename mechanics; dropping it is a valid outcome)
 
