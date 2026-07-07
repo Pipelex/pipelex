@@ -257,6 +257,8 @@ class PipeValidationError(ValueError):
             msg += f" • expected_output_ref='{self.expected_output_ref}'"
         if self.expected_inputs:
             msg += f" • expected_inputs='{self.expected_inputs}'"
+        if self.declared_inputs:
+            msg += f" • declared_inputs='{self.declared_inputs}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

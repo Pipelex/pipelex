@@ -75,19 +75,19 @@ def _canonical_inline_table(mapping: Mapping[str, Any]) -> InlineTable:
     """Build an inline table with the canonical ``{ key = value, ... }`` spacing.
 
     tomlkit's incremental inline-table edits leave non-canonical whitespace behind (double
-    separators after a delete, no brace padding on fresh tables), which a later ``plxt format``
-    would churn. Assembling the canonical text and parsing it yields the exact spacing the
-    formatter emits.
+    separators after a delete, no brace padding on a fresh table), which a later ``plxt format``
+    would churn. Reassigning each entry into a fresh inline table lets tomlkit render every key
+    and value itself — quoting dotted or otherwise non-bare keys, nesting inline-table values,
+    preserving each value's own string style — so the only canonical gap left is the outer brace
+    padding, spliced onto the guaranteed-outermost braces (never touching nested content).
     """
-    if not mapping:
+    native = tomlkit.inline_table()
+    for item_key, item_value in list(mapping.items()):
+        native[item_key] = item_value
+    body = native.as_string()[1:-1].strip()
+    if not body:
         return cast("InlineTable", tomlkit.value("{}"))
-    inner = ", ".join(f"{item_key} = {_scalar_as_toml_text(item_value)}" for item_key, item_value in mapping.items())
-    return cast("InlineTable", tomlkit.value("{ " + inner + " }"))
-
-
-def _scalar_as_toml_text(value: Any) -> str:
-    """One typed funnel over tomlkit's weakly-typed ``item(...).as_string()``."""
-    return cast("str", tomlkit.item(value).as_string())  # pyright: ignore[reportUnknownMemberType]
+    return cast("InlineTable", tomlkit.value("{ " + body + " }"))
 
 
 def _canonicalize_mutated_inline_table(toml_doc: TOMLDocument, *, table_path: list[str], mutated_table: dict[str, Any]) -> None:

@@ -90,3 +90,16 @@ class TestFixApplier:
         dumped = _dumps(toml_doc)
         assert "[pipe.gen_ideas]" not in dumped
         assert "[pipe.list_ideas]" in dumped
+
+    def test_set_output_on_whole_pipe_inline_table_stays_canonical(self) -> None:
+        """A pipe authored as a single-line inline table is a valid, rarer form. Setting its
+        output re-canonicalizes that whole inline table — this must not crash on the nested
+        inputs table nor corrupt it into multi-line block form.
+        """
+        source = '[pipe]\nlist_ideas = { type = "PipeSequence", inputs = { topic = "Text" }, output = "Idea" }\n'
+        toml_doc = tomlkit.loads(source)
+        applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        reloaded = tomlkit.loads(_dumps(toml_doc)).unwrap()["pipe"]["list_ideas"]
+        assert reloaded["output"] == "Idea[]"
+        assert reloaded["inputs"] == {"topic": "Text"}
