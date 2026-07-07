@@ -249,6 +249,7 @@ class StuffFactory:
         Case 2: Dict with 'concept' AND 'content' keys (can be plain dict or DictStuff instance)
             2.1/2.1b: {"concept": "Text"/"native.Text", "content": str} → TextContent with Text concept
             2.1c: {"concept": "domain.Concept", "content": str} → TextContent with that concept (if compatible)
+            2.1d: {"concept": "YesNo"/"domain.Concept", "content": bool} → YesNoContent (if YesNo-compatible)
             2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent[TextContent]
             2.3: {"concept": "...", "content": StuffContent} → Use the StuffContent
             2.4: {"concept": "...", "content": list[StuffContent]} → ListContent[StuffContent]
@@ -464,6 +465,24 @@ class StuffFactory:
                 f"but the concept of name '{concept_ref}' is not found in the library"
             )
             raise StuffFactoryError(msg) from exc
+
+        # Case 2.1d: content is a bool → YesNoContent for a YesNo-compatible concept.
+        # Checked BEFORE the str/int-ish arms (bool is a subclass of int) so a boolean never falls through to
+        # the final "unexpected type" error. No string coercion: "yes"/"no" strings take the str path and fail there.
+        if isinstance(content, bool):
+            yes_no_concept = get_native_concept(native_concept=NativeConceptCode.YES_NO)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=yes_no_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
+            msg = (
+                f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.YesNo' (the content is a boolean)"
+            )
+            raise StuffFactoryError(msg)
 
         # Case 2.1: content is a string
         if isinstance(content, str):

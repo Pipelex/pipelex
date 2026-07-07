@@ -16,6 +16,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.urls import URLs
 
 
@@ -34,6 +35,10 @@ class AnotherConcept(StructuredContent):
 
     name: str = Field(description="Name field")
     value: int = Field(description="Value field")
+
+
+class UrgencyFlag(YesNoContent):
+    """A structure refining native YesNo — mirrors the subclass the refinement machinery generates for `refines = "YesNo"`."""
 
 
 TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stuff]] = [
@@ -477,6 +482,77 @@ TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stu
             ),
         ),
     ),
+    # Case 2.11: Envelope with bool content under native YesNo (true)
+    (
+        "case-2.11-yes-no-native-bool-true",
+        {"concept": "YesNo", "content": True},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
+            content=YesNoContent(yes_no=True),
+        ),
+    ),
+    # Case 2.12: Envelope with bool content under native YesNo (false, native prefix)
+    (
+        "case-2.12-yes-no-native-bool-false",
+        {"concept": "native.YesNo", "content": False},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
+            content=YesNoContent(yes_no=False),
+        ),
+    ),
+    # Case 2.13: Envelope with bool content under a concept refining YesNo — keeps its own concept ref, content is the refining subclass
+    (
+        "case-2.13-yes-no-refining-concept-bool",
+        {"concept": "test_domain.UrgencyFlag", "content": False},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_code="stuff_code",
+            stuff_name="stuff_name",
+            concept=ConceptFactory.make(
+                domain_code="test_domain",
+                concept_code="UrgencyFlag",
+                description="Test concept for unit tests",
+                structure_class_name="UrgencyFlag",
+                refines="native.YesNo",
+            ),
+            content=UrgencyFlag(yes_no=False),
+        ),
+    ),
+    # Case 2.14: Envelope with the explicit dict form for YesNo still works
+    (
+        "case-2.14-yes-no-dict-form",
+        {"concept": "YesNo", "content": {"yes_no": True}},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
+            content=YesNoContent(yes_no=True),
+        ),
+    ),
+    # Case 1.3-yes-no: Direct YesNoContent instance (no concept key) infers native YesNo from the class name
+    (
+        "case-1.3-yes-no-content-instance",
+        YesNoContent(yes_no=True),
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.YES_NO),
+            content=YesNoContent(yes_no=True),
+        ),
+    ),
 ]
 
 
@@ -682,6 +758,26 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
         "stuff_name",
         "stuff_code",
         ["test_domain"],
+        Exception,
+        "not compatible",
+    ),
+    # Bool content under a concept that is not YesNo-compatible - should fail, naming native.YesNo
+    (
+        "error-bool-for-non-yes-no-concept",
+        {"concept": "test_domain.MyConcept", "content": True},
+        "stuff_name",
+        "stuff_code",
+        ["test_domain"],
+        Exception,
+        "native.YesNo",
+    ),
+    # String content under a YesNo concept - no string coercion, so it fails (YesNo is not Text-compatible)
+    (
+        "error-string-for-yes-no-concept",
+        {"concept": "YesNo", "content": "yes"},
+        "stuff_name",
+        "stuff_code",
+        None,
         Exception,
         "not compatible",
     ),

@@ -4,18 +4,23 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.hub import get_class_registry
 
 
 class StuffContentFactory:
     @classmethod
-    def make_content_from_value(cls, stuff_content_subclass: type[StuffContent], *, value: dict[str, Any] | str) -> StuffContent:
+    def make_content_from_value(cls, stuff_content_subclass: type[StuffContent], *, value: dict[str, Any] | str | bool) -> StuffContent:
+        # bool must be handled ahead of any future int handling (bool is a subclass of int) and before model_validate,
+        # which rejects a bare bool. Covers native YesNoContent and the subclasses generated for concepts refining YesNo.
+        if isinstance(value, bool) and issubclass(stuff_content_subclass, YesNoContent):
+            return stuff_content_subclass(yes_no=value)
         if isinstance(value, str) and stuff_content_subclass == TextContent:
             return TextContent(text=value)
         return stuff_content_subclass.model_validate(obj=value)
 
     @classmethod
-    def make_stuff_content_from_concept_required(cls, concept: Concept, *, value: dict[str, Any] | str) -> StuffContent:
+    def make_stuff_content_from_concept_required(cls, concept: Concept, *, value: dict[str, Any] | str | bool) -> StuffContent:
         """Create StuffContent from concept code, requiring the concept to be linked to a class in the registry.
         Raises StuffContentFactoryError if no registry class is found.
         """

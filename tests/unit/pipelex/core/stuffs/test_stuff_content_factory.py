@@ -10,6 +10,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class TestCases:
@@ -75,6 +76,24 @@ class TestStuffContentFactory:
         assert isinstance(result, MockStructuredContent)
         assert result.title == "Test Title"
         assert result.description == "Test Description"
+
+    def test_make_content_from_value_yes_no_bool(self):
+        """A bool value builds YesNoContent directly (not via model_validate, which rejects a bare bool)."""
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=YesNoContent, value=True)
+
+        assert isinstance(result, YesNoContent)
+        assert result.yes_no is True
+
+    def test_make_content_from_value_yes_no_refining_subclass_bool(self):
+        """A bool value builds a YesNo-refining subclass directly (the issubclass arm covers generated refinement classes)."""
+
+        class MockUrgencyFlag(YesNoContent):
+            pass
+
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=MockUrgencyFlag, value=False)
+
+        assert isinstance(result, MockUrgencyFlag)
+        assert result.yes_no is False
 
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""
