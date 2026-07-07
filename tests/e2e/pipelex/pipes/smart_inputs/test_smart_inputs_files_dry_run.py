@@ -104,6 +104,13 @@ class TestSmartInputsFilesDryRun:
         assert isinstance(photo_stuff.content, ImageContent)
         assert photo_stuff.content.url == str(_FIXTURE_DIR / "photo.jpg")
 
+        exhibits_stuff = working_memory.get_stuff("exhibits")
+        assert exhibits_stuff.concept.concept_ref == "smart_inputs_files_demo.Exhibit"
+        exhibits_content: StuffContent = exhibits_stuff.content
+        assert isinstance(exhibits_content, ListContent)
+        exhibit_urls = [item.url for item in cast("ListContent[StuffContent]", exhibits_content).items if isinstance(item, DocumentContent)]
+        assert exhibit_urls == [str(_FIXTURE_DIR / "a.pdf")]
+
         people_stuff = working_memory.get_stuff("people")
         assert people_stuff.concept.concept_ref == "smart_inputs_files_demo.Person"
         people_content: StuffContent = people_stuff.content

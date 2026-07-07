@@ -48,7 +48,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_native_concept
-from pipelex.tools.uri.uri_resolver import is_relative_local_path
+from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 
 class InputKind(StrEnum):
@@ -317,10 +317,13 @@ class InputShaper:
 
     @classmethod
     def _resolve_local_path(cls, url: str, *, inputs_base_dir: Path | None) -> str:
-        """Resolve a bare relative local path against the inputs file's directory (D3)."""
-        if inputs_base_dir is not None and is_relative_local_path(url):
-            return str(inputs_base_dir / url)
-        return url
+        """Resolve a bare local path against the inputs file's directory (D3).
+
+        A leading ``~`` expands to the user's home first (so ``~/photo.jpg`` is an absolute home
+        path, never joined onto ``inputs_base_dir``); a still-relative path then resolves against the
+        base dir. Shared with the CLI's url-key walk via ``resolve_local_path_reference``.
+        """
+        return resolve_local_path_reference(url, base_dir=inputs_base_dir)
 
     @classmethod
     def _shape_list(

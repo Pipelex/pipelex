@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.tools.uri.uri_resolver import is_relative_local_path
+from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -34,8 +34,10 @@ def resolve_url_in_value(value: Any, *, base_dir: Path) -> Any:
         value_dict = cast("dict[str, Any]", value)
         result: dict[str, Any] = {}
         for key, val in value_dict.items():
-            if key == "url" and isinstance(val, str) and is_relative_local_path(val):
-                result[key] = str(base_dir / val)
+            if key == "url" and isinstance(val, str):
+                # Expand a leading `~`, then resolve a still-relative path against base_dir; an
+                # absolute/remote/scheme url is returned unchanged (as the else-branch did before).
+                result[key] = resolve_local_path_reference(val, base_dir=base_dir)
             else:
                 result[key] = resolve_url_in_value(val, base_dir=base_dir)
         return result

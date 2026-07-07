@@ -87,3 +87,21 @@ class TestInputShaperFilePaths:
         photo_stuff = working_memory.get_stuff("photo")
         assert isinstance(photo_stuff.content, Photo)
         assert photo_stuff.content.url == "photo.jpg"
+
+    def test_bare_tilde_path_expands_to_home_not_base_dir(self, tmp_path: Path):
+        """A ~-prefixed path is home-anchored: it expands to the home dir, never joined onto base_dir."""
+        input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
+        working_memory = InputShaper.shape({"photo": "~/photo.jpg"}, input_specs=input_specs, inputs_base_dir=tmp_path)
+
+        photo_stuff = working_memory.get_stuff("photo")
+        assert isinstance(photo_stuff.content, Photo)
+        assert photo_stuff.content.url == str(Path("~/photo.jpg").expanduser())
+
+    def test_bare_tilde_path_expands_without_base_dir(self):
+        """No base_dir: a ~-prefixed path still expands to home (~ is home-anchored, not CWD-relative)."""
+        input_specs = build_input_specs([("photo", "shaper_test.Photo", None)])
+        working_memory = InputShaper.shape({"photo": "~/photo.jpg"}, input_specs=input_specs)
+
+        photo_stuff = working_memory.get_stuff("photo")
+        assert isinstance(photo_stuff.content, Photo)
+        assert photo_stuff.content.url == str(Path("~/photo.jpg").expanduser())

@@ -81,6 +81,30 @@ def is_relative_local_path(uri: str) -> bool:
     return not Path(resolved.path).is_absolute()
 
 
+def resolve_local_path_reference(uri: str, *, base_dir: Path | None) -> str:
+    """Expand a leading ``~`` to the user's home, then resolve a still-relative local path against
+    *base_dir* (D3).
+
+    ``~/photo.jpg`` → ``<home>/photo.jpg`` (absolute — never joined onto *base_dir*); a genuine
+    relative local path → ``<base_dir>/<path>`` when *base_dir* is given, else unchanged (the CWD
+    contract); an absolute path or any remote/scheme URI → unchanged. Mirrors the CLI's expanduser of
+    the inputs-file arg itself (``_inputs_file_loader``/``_run_core``/``stdin_resolver``), extended to
+    the file-ish input *values* — the shaper's file/CSV arms and the CLI's url-key walk share it.
+
+    Args:
+        uri: The path/URL reference to resolve (a bare input value or a ``{"url": ...}`` value).
+        base_dir: Directory that a still-relative local path resolves against; ``None`` leaves a
+            relative path untouched (in-process / inline-JSON callers keep the CWD contract).
+
+    Returns:
+        The resolved reference string.
+    """
+    expanded = str(Path(uri).expanduser()) if uri.startswith("~") else uri
+    if base_dir is not None and is_relative_local_path(expanded):
+        return str(base_dir / expanded)
+    return expanded
+
+
 def resolve_uri(uri: str) -> ResolvedUri:
     """Resolve a URI string to its typed representation.
 

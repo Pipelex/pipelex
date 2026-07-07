@@ -43,6 +43,7 @@ Several gaps were deferred *specifically* to be resolved when Smart Inputs unifi
 - `refines-hint-native-list-drift.md` — a spec-layer authoring hint list omits newer natives; real fix = derive it from `NativeConceptCode` in the release-wave sweep.
 - `input-shaper-multiplicity-gaps.md` — the Phase-1 `InputShaper`'s explicit arm skips list-where-singular + `[N]` count checks, and the `Dynamic`/`Anything` arm skips multiplicity peeling (empty-list diverges from D2); resolve when wiring the shaper (D7).
 - `bare-file-path-cli-resolution-gap.md` — bare Image/Document path strings aren't resolved against the inputs-file dir (the CLI resolver only rewrites `"url"` keys); flagged by the PR #1030 bots, **already scheduled as Phase 3's first task (D3)** — answer + resolve the two open threads when it lands.
+- `uri-scheme-classification-stopgap.md` — the duplicated `"://"` scheme stopgap (`is_relative_local_path` + the CSV local-only guard) that compensates for `resolve_uri` dumping unknown schemes into `ResolvedLocalPath`; no live bug, tested; real fix = make `resolve_uri` classify unknown schemes. Flagged by the PR #1032 bots.
 
 ## Then: one release cut, one downstream cross-repo wave
 
@@ -66,4 +67,4 @@ Follow-ups off the critical path: the shared **YesNo/Date LLM-output ergonomics*
 
 - `yesno-pr-reviewers-guide.md` — the former repo-root `TODOS.md`, the YesNo PR reading guide. Historical (YesNo + Date both landed); kept for the PR narrative.
 
-**Deferred design notes:** `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `case1-bare-date-arm-gap.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `refines-hint-native-list-drift.md`, `input-shaper-multiplicity-gaps.md` (triage list above).
+**Deferred design notes:** `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `case1-bare-date-arm-gap.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `refines-hint-native-list-drift.md`, `input-shaper-multiplicity-gaps.md`, `uri-scheme-classification-stopgap.md` (triage list above).

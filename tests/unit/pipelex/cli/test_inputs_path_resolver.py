@@ -232,6 +232,11 @@ class TestInputsPathResolver:
         assert resolve_url_in_value(42, base_dir=Path("/base")) == 42
         assert resolve_url_in_value(None, base_dir=Path("/base")) is None
 
+    def test_resolve_url_in_value_tilde_expands_to_home(self) -> None:
+        """A ~-prefixed url is home-anchored: it expands to home, never joined onto base_dir."""
+        resolved = resolve_url_in_value({"url": "~/photo.jpg"}, base_dir=Path("/base"))
+        assert resolved == {"url": str(Path("~/photo.jpg").expanduser())}
+
     # ---- resolve_inputs_paths ----
 
     @pytest.mark.parametrize(
