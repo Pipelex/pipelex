@@ -13,7 +13,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
+from pipelex.cli.commands.run.exceptions import InputsTimeOnlyNotSupportedError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -177,10 +177,10 @@ async def _execute_run(
                 print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse input file: {toml_error_exc.message}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from toml_error_exc
-            except InputsDatetimeNotSupportedError as datetime_exc:
+            except InputsTimeOnlyNotSupportedError as time_only_exc:
                 print_traceback_if_requested(get_console())
-                typer.secho(f"Failed to load input file: {datetime_exc.message}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from datetime_exc
+                typer.secho(f"Failed to load input file: {time_only_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from time_only_exc
 
     # Determine pipe run mode
     pipe_run_mode = PipeRunMode.DRY if dry_run else None

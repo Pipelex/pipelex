@@ -1,3 +1,5 @@
+from datetime import date, datetime
+
 import pytest
 from pydantic import ValidationError
 
@@ -56,6 +58,31 @@ class TestConceptStructureSpecValidation:
         error_str = str(exc_info.value)
         assert "concept_ref" in error_str
         assert "type is 'concept'" in error_str
+
+    def test_date_spec_accepts_date_rejects_datetime(self):
+        """A spec `date` field accepts a calendar date and rejects a datetime (mirrors the blueprint layer)."""
+        spec = ConceptStructureSpec(
+            the_field_name="issued_on", description="Issue date", type=ConceptStructureSpecFieldType.DATE, default_value=date(2026, 7, 7)
+        )
+        assert spec.to_blueprint().type == ConceptStructureBlueprintFieldType.DATE
+
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected date"):
+            ConceptStructureSpec(
+                the_field_name="issued_on",
+                description="Issue date",
+                type=ConceptStructureSpecFieldType.DATE,
+                default_value=datetime(2026, 7, 7, 15, 40),
+            )
+
+    def test_datetime_spec_type_and_to_blueprint(self):
+        """A spec `datetime` field accepts a timestamp default and maps to the blueprint DATETIME type."""
+        spec = ConceptStructureSpec(
+            the_field_name="recorded_at",
+            description="Record timestamp",
+            type=ConceptStructureSpecFieldType.DATETIME,
+            default_value=datetime(2026, 7, 7, 15, 40),
+        )
+        assert spec.to_blueprint().type == ConceptStructureBlueprintFieldType.DATETIME
 
     def test_to_blueprint_concept_type(self):
         """Test to_blueprint() conversion for CONCEPT type."""

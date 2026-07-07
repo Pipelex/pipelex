@@ -57,8 +57,8 @@ invoice_number = "INV-001"
 amount = 1250.00
 ```
 
-!!! warning "TOML datetimes are not supported yet"
-    A bare TOML datetime/date/time literal (e.g. `date = 2025-10-20`) is rejected with an explicit error — quote it as a string (`date = "2025-10-20"`) in the meantime.
+!!! tip "TOML date and datetime literals are native `Date` inputs"
+    A top-level TOML date or datetime literal (e.g. `hearing = 2026-09-01` or `departure = 2026-07-07T15:40:00+02:00`) maps directly to the native [`Date`](../concepts/native-concepts.md) concept — the offset is kept when stated. A bare *time-of-day* literal (`opening = 09:00:00`) is still rejected: a time alone has no date to attach to, so include the date or quote it as a string.
 
 The rest of this guide shows inputs in JSON (and Python) form; translate any of them to TOML with the same structure. See the [run CLI reference](../../tools/cli/run.md#input-file-formats) for the extension rule and auto-detection behavior.
 

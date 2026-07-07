@@ -21,6 +21,7 @@ own page. Classes are grouped by subsystem.
 - [`ConceptStringError`](concept-string-error.md) — Concept string
 - [`ConceptStructureGeneratorError`](concept-structure-generator-error.md) — Concept structure generator
 - [`ConceptStructureValidationError`](concept-structure-validation-error.md) — Concept structure validation
+- [`DateContentError`](date-content-error.md) — Date content
 - [`DomainCodeError`](domain-code-error.md) — Domain code
 - [`DomainFactoryError`](domain-factory-error.md) — Domain factory
 - [`InputStuffSpecNotFoundError`](input-stuff-spec-not-found-error.md) — Input stuff spec not found

@@ -1,5 +1,5 @@
 import html as html_module
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, cast
 
@@ -21,7 +21,7 @@ def render_value_html(value: Any) -> str:
     - int: renders as string
     - float: renders as string
     - Enum: renders the enum value
-    - datetime/date: renders in ISO format
+    - datetime/date/time: renders in ISO format
     - list/tuple: renders as <ul> list
     - dict: renders as <dl> definition list
     - Other: escapes string representation
@@ -54,6 +54,9 @@ def render_value_html(value: Any) -> str:
             return html_module.escape(value.isoformat())
 
         case date():
+            return html_module.escape(value.isoformat())
+
+        case time():
             return html_module.escape(value.isoformat())
 
         case list() | tuple():

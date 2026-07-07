@@ -331,21 +331,21 @@ class TestStdinResolver:
         assert envelope["error_domain"] == "input"
         assert "hint" in envelope
 
-    def test_inputs_toml_datetime_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """A TOML datetime input emits the not-supported envelope with the quote-as-string hint."""
+    def test_inputs_toml_time_only_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A bare TOML time-of-day input emits the time-only-not-supported envelope with the include-a-date hint."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         toml_file = tmp_path / "inputs.toml"
-        toml_file.write_text("deadline = 2026-07-06T12:00:00Z\n", encoding="utf-8")
+        toml_file.write_text("opening = 09:00:00\n", encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exc_info:
             parse_cli_inputs(inputs_arg=str(toml_file))
 
         assert exc_info.value.exit_code == 1
         envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "InputsDatetimeNotSupportedError"
+        assert envelope["error_type"] == "InputsTimeOnlyNotSupportedError"
         assert envelope["error_domain"] == "input"
-        assert "deadline" in envelope["message"]
-        assert "Quote the datetime as a string" in envelope["hint"]
+        assert "opening" in envelope["message"]
+        assert "no date to attach to" in envelope["hint"]
 
     def test_inputs_json_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Invalid JSON in a .json inputs file emits a JSONDecodeError envelope (not a raw traceback)."""

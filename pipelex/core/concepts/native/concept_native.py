@@ -5,6 +5,7 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -27,6 +28,7 @@ class NativeConceptCode(StrEnum):
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     YES_NO = "YesNo"
+    DATE = "Date"
     PAGE = "Page"
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
@@ -52,6 +54,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
@@ -91,6 +94,8 @@ class NativeConceptCode(StrEnum):
                 return NumberContent
             case NativeConceptCode.YES_NO:
                 return YesNoContent
+            case NativeConceptCode.DATE:
+                return DateContent
             case NativeConceptCode.PAGE:
                 return PageContent
             case NativeConceptCode.JSON:
@@ -151,6 +156,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
@@ -175,6 +181,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON

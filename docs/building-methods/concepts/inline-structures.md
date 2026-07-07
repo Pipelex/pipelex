@@ -115,13 +115,24 @@ tax_rate = { type = "number", description = "Tax rate as decimal", default_value
 
 ### date
 
-Date and datetime values. Pipelex handles date parsing automatically.
+A calendar date, no time of day. Generates a `datetime.date` field (JSON schema `format: date`). Use it for issue dates, due dates, dates of birth — anything you'd write as `2026-07-07`.
 
 ```toml
 [concept.Event.structure]
-event_date = { type = "date", description = "Event date and time" }
-created_at = { type = "date", description = "Creation timestamp" }
+event_date = { type = "date", description = "The date of the event" }
 ```
+
+### datetime
+
+A timestamp — a date *and* a time of day. Generates a `datetime.datetime` field (JSON schema `format: date-time`). Use it only when the time genuinely matters; a plain calendar date should be `date`, so the LLM is never forced to fabricate a time.
+
+```toml
+[concept.Event.structure]
+created_at = { type = "datetime", description = "Creation timestamp" }
+```
+
+!!! note "Field type vs the native `Date` concept"
+    A structure field's `date` / `datetime` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional time.
 
 ### list
 
@@ -266,6 +277,7 @@ Given the Invoice example from above, Pipelex generates:
 
 ```python
 # generated/finance__invoice.py
+from datetime import date
 from pydantic import Field
 from pipelex.core.stuffs.structured_content import StructuredContent
 from .finance__customer import Customer
@@ -275,7 +287,7 @@ class Invoice(StructuredContent):
     """A commercial document issued by a seller to a buyer"""
 
     invoice_number: str = Field(description="The unique invoice identifier")
-    issue_date: datetime = Field(..., description="The date the invoice was issued")
+    issue_date: date = Field(..., description="The date the invoice was issued")
     customer: Customer = Field(..., description="The customer for this invoice")
     line_items: list[LineItem] = Field(..., description="List of line items")
     total_amount: float = Field(..., description="The total invoice amount")
@@ -287,7 +299,7 @@ You can then import and use these classes with full type safety.
 
 **Inline structures are the recommended approach for most use cases.** They support:
 
-- ✅ All basic field types (text, integer, number, boolean, date, list, dict)
+- ✅ All basic field types (text, integer, number, boolean, date, datetime, list, dict)
 - ✅ Nested concepts and complex relationships
 - ✅ Choice fields (enums)
 - ✅ Required/optional fields with defaults

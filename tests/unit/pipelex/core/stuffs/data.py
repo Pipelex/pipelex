@@ -1,3 +1,4 @@
+import datetime
 from typing import ClassVar
 
 from markupsafe import escape
@@ -7,6 +8,7 @@ from pydantic import Field
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -39,6 +41,10 @@ class AnotherConcept(StructuredContent):
 
 class UrgencyFlag(YesNoContent):
     """A structure refining native YesNo — mirrors the subclass the refinement machinery generates for `refines = "YesNo"`."""
+
+
+class DueDate(DateContent):
+    """A structure refining native Date — mirrors the subclass the refinement machinery generates for `refines = "Date"`."""
 
 
 TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stuff]] = [
@@ -553,6 +559,103 @@ TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, str, Stu
             content=YesNoContent(yes_no=True),
         ),
     ),
+    # Case 2.1f: Envelope with an ISO date-only string under native Date
+    (
+        "case-2.15-date-native-iso-date-string",
+        {"concept": "Date", "content": "2026-07-07"},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 7, 7)),
+        ),
+    ),
+    # Case 2.1f: Envelope with an ISO offset-datetime string (native prefix) → offset preserved
+    (
+        "case-2.16-date-native-iso-datetime-offset",
+        {"concept": "native.Date", "content": "2026-07-07T15:40:00+02:00"},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 7, 7), time=datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2)))),
+        ),
+    ),
+    # Case 2.1e: Envelope with a bare date object under native Date
+    (
+        "case-2.17-date-native-date-object",
+        {"concept": "Date", "content": datetime.date(2026, 8, 6)},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 8, 6)),
+        ),
+    ),
+    # Case 2.1e: Envelope with a bare datetime object → split into date + time
+    (
+        "case-2.18-date-native-datetime-object",
+        {"concept": "Date", "content": datetime.datetime(2026, 7, 7, 9, 0)},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 7, 7), time=datetime.time(9, 0)),
+        ),
+    ),
+    # Case 2.1e: Envelope with a date object under a concept refining Date — keeps its own ref, content is the refining subclass
+    (
+        "case-2.19-date-refining-concept-date-object",
+        {"concept": "test_domain.DueDate", "content": datetime.date(2026, 8, 6)},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_code="stuff_code",
+            stuff_name="stuff_name",
+            concept=ConceptFactory.make(
+                domain_code="test_domain",
+                concept_code="DueDate",
+                description="Test concept for unit tests",
+                structure_class_name="DueDate",
+                refines="native.Date",
+            ),
+            content=DueDate(date=datetime.date(2026, 8, 6)),
+        ),
+    ),
+    # Case 2.5: Envelope with the explicit dict form for Date still works
+    (
+        "case-2.20-date-dict-form",
+        {"concept": "Date", "content": {"date": "2026-07-07", "time": "15:40:00"}},
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 7, 7), time=datetime.time(15, 40)),
+        ),
+    ),
+    # Case 1.3: Direct DateContent instance (no concept key) infers native Date from the class name
+    (
+        "case-1.3-date-content-instance",
+        DateContent(date=datetime.date(2026, 7, 7)),
+        "stuff_name",
+        "stuff_code",
+        Stuff(
+            stuff_name="stuff_name",
+            stuff_code="stuff_code",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DATE),
+            content=DateContent(date=datetime.date(2026, 7, 7)),
+        ),
+    ),
 ]
 
 
@@ -780,6 +883,26 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData | DictStuff, str | None, st
         None,
         Exception,
         "not compatible",
+    ),
+    # Date object under a concept that is not Date-compatible - should fail, naming native.Date
+    (
+        "error-date-object-for-non-date-concept",
+        {"concept": "test_domain.MyConcept", "content": datetime.date(2026, 7, 7)},
+        "stuff_name",
+        "stuff_code",
+        ["test_domain"],
+        Exception,
+        "native.Date",
+    ),
+    # Non-ISO string under a Date concept - strict ISO only, so it fails
+    (
+        "error-non-iso-string-for-date-concept",
+        {"concept": "Date", "content": "March 7, 2026"},
+        "stuff_name",
+        "stuff_code",
+        None,
+        Exception,
+        "ISO 8601",
     ),
 ]
 

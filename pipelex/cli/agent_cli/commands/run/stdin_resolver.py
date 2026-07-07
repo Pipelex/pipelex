@@ -10,7 +10,7 @@ from typing import Any, cast
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, InputsDatetimeNotSupportedError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, InputsTimeOnlyNotSupportedError
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
@@ -197,8 +197,8 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", error_type="JsonTypeError", cause=exc)
         except TomlError as exc:
             agent_error(exc.message, error_type="TomlError", cause=exc)
-        except InputsDatetimeNotSupportedError as exc:
-            agent_error(exc.message, error_type="InputsDatetimeNotSupportedError", cause=exc)
+        except InputsTimeOnlyNotSupportedError as exc:
+            agent_error(exc.message, error_type="InputsTimeOnlyNotSupportedError", cause=exc)
     return None
 
 
