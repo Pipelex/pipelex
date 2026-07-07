@@ -100,7 +100,9 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
                 raise PipelexUnexpectedError(msg)
             parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path[:-1])
             table_key = fix_op.table_path[-1]
-            if parent_table is None or table_key not in parent_table:
+            # The final segment must itself be a table — a scalar there is a drifted target
+            # (same guarded-skip contract _resolve_table enforces for every other segment).
+            if parent_table is None or not isinstance(parent_table.get(table_key), dict):
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             del parent_table[table_key]
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)

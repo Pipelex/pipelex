@@ -71,6 +71,16 @@ class TestFixApplier:
         applications = apply_fix_ops(toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
 
+    def test_delete_table_on_scalar_leaf_is_skipped(self) -> None:
+        """delete_table whose final segment names a scalar (a drifted target) is skipped, not deleted."""
+        toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
+        source_bytes = _dumps(toml_doc)
+        delete_op = FixOp(kind=FixOpKind.DELETE_TABLE, table_path=["pipe", "gen_ideas", "prompt"])
+        applications = apply_fix_ops(toml_doc, ops=[delete_op])
+        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
+        assert applications[0].detail is not None
+        assert _dumps(toml_doc) == source_bytes
+
     def test_delete_table_removes_whole_table(self) -> None:
         """delete_table removes the addressed table and its keys; sibling tables survive."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))

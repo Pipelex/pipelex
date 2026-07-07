@@ -1,6 +1,10 @@
 # Deferred items from Checkpoint 0 code review
 
-Items surfaced by the clean-context code review of the Phase 0 spike that are real but deliberately NOT addressed in the spike, per the no-over-engineering rule. Each belongs to an already-planned later step.
+Items surfaced by the clean-context code review of the Phase 0 spike (and the PR bot round) that are real but deliberately NOT addressed in the spike, per the no-over-engineering rule. Each belongs to an already-planned later step.
+
+## 0. `is_single_file` must derive from the RESOLVED library dirs (Phase 1, with multi-file targeting)
+
+Cubic finding, arbitrated VALID-but-DEFER. `fix_bundle_file` gates source-less fixes on `library_dirs is None`, which is wrong in both directions: an explicit `library_dirs=[]` is a documented "no libraries" value (`resolve_library_dirs` docstring) that IS single-file yet gets fixes dropped (safe-only over-filtering — reduced capability, never a wrong patch); and `library_dirs=None` can fall through to hub defaults or `PIPELEXPATH` and load OTHER files while the gate still calls it single-file. The band-aid one-liner (`not library_dirs`) would fix only the harmless direction. The correct fix — compute the gate from the resolved `effective_dirs` (`resolve_library_dirs(library_dirs)`) — is entangled with real multi-file targeting (item 1 below) and lands with it in Phase 1. No production caller passes `[]` today.
 
 ## 1. Real multi-file fix targeting (Phase 1)
 
