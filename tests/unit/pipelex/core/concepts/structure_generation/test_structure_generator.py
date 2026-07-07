@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -383,6 +385,34 @@ class TypeMappingTest(StructuredContent):
         assert result == expected_code
         assert issubclass(generated_class, StructuredContent)
 
+    def test_date_field_maps_to_calendar_date(self):
+        """`type = "date"` generates a `datetime.date` field (JSON schema `format: date`), no time."""
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'issued_on: date = Field(..., description="Issue date")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["issued_on"]["format"] == "date"
+
+    def test_datetime_field_maps_to_timestamp(self):
+        """`type = "datetime"` generates a `datetime.datetime` field (JSON schema `format: date-time`)."""
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'recorded_at: datetime = Field(..., description="Record timestamp")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["recorded_at"]["format"] == "date-time"
+
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
         structure_blueprint = {
@@ -698,7 +728,7 @@ If you want to customize this structure:
 To regenerate: pipelex build structures <target_directory>
 """
 
-from datetime import datetime
+from datetime import date
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
@@ -710,7 +740,7 @@ class PersonInfo(StructuredContent):
 
     name: str = Field(..., description="The name of the person")
     age: float = Field(..., description="The age of the person")
-    birthdate: datetime = Field(..., description="The birthdate of the person")
+    birthdate: date = Field(..., description="The birthdate of the person")
 '''
 
         assert result == expected_code

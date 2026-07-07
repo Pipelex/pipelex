@@ -1,6 +1,6 @@
 import ast
 import textwrap
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Any, List, Literal, Optional
 
@@ -373,6 +373,9 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
             case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import date")
+                return "date"
+            case ConceptStructureBlueprintFieldType.DATETIME:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
             case ConceptStructureBlueprintFieldType.CONCEPT:
@@ -401,6 +404,7 @@ class StructureGenerator:
                             | ConceptStructureBlueprintFieldType.INTEGER
                             | ConceptStructureBlueprintFieldType.BOOLEAN
                             | ConceptStructureBlueprintFieldType.DATE
+                            | ConceptStructureBlueprintFieldType.DATETIME
                             | ConceptStructureBlueprintFieldType.LIST
                         ):
                             # Create a temporary blueprint for the item type
@@ -567,6 +571,9 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
             case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import date")
+                return "date"
+            case ConceptStructureBlueprintFieldType.DATETIME:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
             case ConceptStructureBlueprintFieldType.CONCEPT:
@@ -624,6 +631,7 @@ class StructureGenerator:
         exec_globals: dict[str, Any] = {
             "__builtins__": __builtins__,
             # Provide these directly as they're used in generated code but not imported from pipelex
+            "date": date,
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,

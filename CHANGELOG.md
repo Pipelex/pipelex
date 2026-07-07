@@ -6,6 +6,10 @@
 
 - **Native `YesNo` concept (typed yes/no answers):** A new built-in native concept `YesNo` (content class `YesNoContent`, a single required `bool`) for the yes/no judgments LLM pipelines produce constantly ("does this contract contain a penalty clause?"). `output = "YesNo"` on a `PipeLLM` makes the model return a typed boolean instead of free text answering "yes"/"no", read from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`; it renders as `yes`/`no` when injected into a downstream prompt. As a pipeline input, the envelope form `{"concept": "YesNo", "content": true}` (JSON or TOML) is shaped into a `YesNoContent`, and a concept that `refines = "YesNo"` keeps its own generated subclass. Breaking: `YesNo` is now a reserved native concept code — a bundle declaring `[concept.YesNo]` errors.
 
+### Changed
+
+- **Structure-field `type = "date"` is now a calendar date, and a new `type = "datetime"` is the timestamp (Breaking):** A `date` structure field used to generate a `datetime.datetime` (JSON schema `format: date-time`), forcing the LLM to fabricate a time of day for every extracted date. It now generates a `datetime.date` (`format: date`) — the calendar date its name promises — and a new field type `datetime` generates the `datetime.datetime` for the rare field that genuinely wants a timestamp. Default-value validation follows: a `date` field rejects a datetime default (it would silently drop the time), a `datetime` field requires one. Extractions with `type = "date"` fields (invoice dates, dates of birth) improve for free; a field that truly needs the full-timestamp behavior must switch to `type = "datetime"`.
+
 ## [v0.38.0] - 2026-07-06
 
 ### Highlights
