@@ -15,6 +15,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class NativeConceptCode(StrEnum):
@@ -25,6 +26,7 @@ class NativeConceptCode(StrEnum):
     HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
+    YES_NO = "YesNo"
     PAGE = "Page"
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
@@ -49,6 +51,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
@@ -86,6 +89,8 @@ class NativeConceptCode(StrEnum):
                 return TextAndImagesContent
             case NativeConceptCode.NUMBER:
                 return NumberContent
+            case NativeConceptCode.YES_NO:
+                return YesNoContent
             case NativeConceptCode.PAGE:
                 return PageContent
             case NativeConceptCode.JSON:
@@ -145,6 +150,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
@@ -168,6 +174,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON

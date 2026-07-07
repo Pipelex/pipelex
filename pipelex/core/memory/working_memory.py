@@ -25,6 +25,7 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 
 MAIN_STUFF_NAME = "main_stuff"
@@ -484,6 +485,10 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """Get stuff content as NumberContent if applicable."""
         return self.get_stuff(name=name).as_number
 
+    def get_stuff_as_yes_no(self, name: str) -> YesNoContent:
+        """Get stuff content as YesNoContent if applicable."""
+        return self.get_stuff(name=name).as_yes_no
+
     def get_stuff_as_html(self, name: str) -> HtmlContent:
         """Get stuff content as HtmlContent if applicable."""
         return self.get_stuff(name=name).as_html
@@ -529,6 +534,11 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def main_stuff_as_number(self) -> NumberContent:
         """Get main stuff content as NumberContent if applicable."""
         return self.get_stuff_as_number(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_yes_no(self) -> YesNoContent:
+        """Get main stuff content as YesNoContent if applicable."""
+        return self.get_stuff_as_yes_no(name=MAIN_STUFF_NAME)
 
     @property
     def main_stuff_as_html(self) -> HtmlContent:

@@ -13,6 +13,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_types import AnyTokensUsage
@@ -77,6 +78,11 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     def main_stuff_as_number(self) -> NumberContent:
         """Get main stuff content as NumberContent if applicable."""
         return self.working_memory.main_stuff_as_number
+
+    @property
+    def main_stuff_as_yes_no(self) -> YesNoContent:
+        """Get main stuff content as YesNoContent if applicable."""
+        return self.working_memory.main_stuff_as_yes_no
 
     @property
     def main_stuff_as_html(self) -> HtmlContent:

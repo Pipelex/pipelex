@@ -10,6 +10,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_bridge.primitives.hydration import (
@@ -38,6 +39,16 @@ def _make_text_stuff(name: str, text: str) -> Stuff:
     )
 
 
+def _make_yes_no_concept() -> Concept:
+    """Build a native YesNo concept for testing."""
+    return Concept(
+        code="YesNo",
+        domain_code=SpecialDomain.NATIVE,
+        description="The answer to a yes/no question",
+        structure_class_name="YesNoContent",
+    )
+
+
 class TestHydrateWorkingMemory:
     @pytest.fixture(autouse=True)
     def _register_content_classes(self) -> None:
@@ -47,6 +58,8 @@ class TestHydrateWorkingMemory:
             registry.register_class(TextContent)
         if not registry.has_class(name="NumberContent"):
             registry.register_class(NumberContent)
+        if not registry.has_class(name="YesNoContent"):
+            registry.register_class(YesNoContent)
 
     def test_hydrate_with_native_text(self) -> None:
         """A raw dict containing TextContent stuff hydrates to typed TextContent."""
@@ -61,6 +74,45 @@ class TestHydrateWorkingMemory:
         assert isinstance(stuff.content, TextContent)
         assert stuff.content.text == "Hello, world!"
         assert stuff.stuff_name == "greeting"
+
+    def test_hydrate_with_yes_no(self) -> None:
+        """A YesNo stuff survives the dump/hydrate round-trip as typed YesNoContent.
+
+        Cheap insurance against the distributed decode failure mode: a content class that
+        fails payload decode inside a Temporal workflow retries forever (a hang, not an error).
+        """
+        working_memory = WorkingMemory()
+        working_memory.root["verdict"] = Stuff(
+            stuff_code="test",
+            stuff_name="verdict",
+            concept=_make_yes_no_concept(),
+            content=YesNoContent(yes_no=True),
+        )
+
+        raw = working_memory.dump_for_transport()
+        hydrated = hydrate_working_memory(raw)
+
+        stuff = hydrated.root["verdict"]
+        assert isinstance(stuff.content, YesNoContent)
+        assert stuff.content.yes_no is True
+
+    def test_hydrate_yes_no_in_list(self) -> None:
+        """A ListContent of YesNoContent survives the dump/hydrate round-trip."""
+        working_memory = WorkingMemory()
+        working_memory.root["verdicts"] = Stuff(
+            stuff_code="test",
+            stuff_name="verdicts",
+            concept=_make_yes_no_concept(),
+            content=ListContent(items=[YesNoContent(yes_no=True), YesNoContent(yes_no=False)]),
+        )
+
+        raw = working_memory.dump_for_transport()
+        hydrated = hydrate_working_memory(raw)
+
+        content = hydrated.root["verdicts"].content
+        assert isinstance(content, ListContent)
+        list_content = cast("ListContent[YesNoContent]", content)
+        assert [item.yes_no for item in list_content.items] == [True, False]
 
     def test_hydrate_empty(self) -> None:
         """An empty WorkingMemory raw dict hydrates to empty WorkingMemory."""

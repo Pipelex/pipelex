@@ -147,6 +147,13 @@ class ConceptFactory:
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.YES_NO:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="The answer to a yes/no question",
+                    structure_class_name=structure_class_name,
+                )
             case NativeConceptCode.PAGE:
                 return Concept(
                     code=native_concept_code,

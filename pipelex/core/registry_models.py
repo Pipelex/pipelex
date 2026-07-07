@@ -17,6 +17,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -92,6 +93,7 @@ class CoreRegistryModels(RegistryModels):
     STUFF: ClassVar[list[ModelType]] = [
         TextContent,
         NumberContent,
+        YesNoContent,
         ImageContent,
         Stuff,
         StuffContent,

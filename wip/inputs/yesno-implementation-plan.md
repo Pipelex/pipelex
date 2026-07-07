@@ -29,19 +29,23 @@ How to use this doc: work the phases in order, check boxes as you go, and at eac
 
 Tests first, then make them green:
 
-- [ ] **Tests** in `tests/unit/pipelex/core/stuffs/yes_no_content/` (mirror the `number_content/` module split): construction from `yes_no=True`/`False`; the render matrix — `rendered_plain`/`rendered_markdown`/`rendered_html` give `yes`/`no` (per the rendering micro-decision below), `rendered_json` gives `{"yes_no": true}`; `short_desc` (e.g. "a yes/no answer (yes)"); `smart_dump`; `model_json_schema()` contains the field description (the LLM-facing contract); pydantic does NOT accept an `int` where the bool is expected in strict construction paths (pin the `bool`-vs-`int` boundary).
-- [ ] **Transport round-trip test:** extend `tests/unit/pipelex/runtime_bridge/primitives/test_hydration.py` with a `YesNo` stuff (and one inside a `ListContent`) through `dump_for_transport` → `hydrate_working_memory` — cheap insurance against the Temporal hang-not-fail decode failure mode.
-- [ ] **`YesNoContent`** in new `pipelex/core/stuffs/yes_no_content.py`: `yes_no: bool` with `Field(description=...)` (wording micro-decision — it is what the LLM reads in the generation schema), `rendered_*` overrides + `short_desc` following the `NumberContent` template.
-- [ ] **Enum + matches:** `YES_NO = "YesNo"` in `NativeConceptCode` + arms in `structure_class` (→ `YesNoContent`), `is_composite` (False group), `is_text_concept` (False group), `is_dynamic_concept` (False group). Let pyright surface any other exhaustive match over the enum.
-- [ ] **Factory arm** in `ConceptFactory.make_native_concept`: description per the micro-decision (proposed: "The answer to a yes/no question").
-- [ ] **Registry:** add `YesNoContent` to `CoreRegistryModels.STUFF`.
-- [ ] **Accessors** mirroring Number's: `Stuff.is_yes_no` + `Stuff.as_yes_no`, `WorkingMemory.get_stuff_as_yes_no` + `main_stuff_as_yes_no`, `PipeOutput.main_stuff_as_yes_no` — this is how a Python-API caller reads the verdict (`pipe_output.main_stuff_as_yes_no().yes_no`).
-- [ ] **Refinement sanity test:** a bundle declaring `[concept.IsUrgent]` with `refines = "YesNo"` validates, and the refining concept resolves `YesNoContent` as its structure class (the machinery is generic — this pins it).
-- [ ] `make tb` (boot + registry load), `make agent-check`, targeted pytest on the new test modules.
+- [x] **Tests** in `tests/unit/pipelex/core/stuffs/yes_no_content/` (mirror the `number_content/` module split): construction from `yes_no=True`/`False`; the render matrix — `rendered_plain`/`rendered_markdown`/`rendered_html` give `yes`/`no` (per the rendering micro-decision below), `rendered_json` gives `{"yes_no": true}`; `short_desc` (e.g. "a yes/no answer (yes)"); `smart_dump`; `model_json_schema()` contains the field description (the LLM-facing contract); pydantic does NOT accept an `int` where the bool is expected in strict construction paths (pin the `bool`-vs-`int` boundary).
+- [x] **Transport round-trip test:** extend `tests/unit/pipelex/runtime_bridge/primitives/test_hydration.py` with a `YesNo` stuff (and one inside a `ListContent`) through `dump_for_transport` → `hydrate_working_memory` — cheap insurance against the Temporal hang-not-fail decode failure mode.
+- [x] **`YesNoContent`** in new `pipelex/core/stuffs/yes_no_content.py`: `yes_no: bool` with `Field(description=...)` (wording micro-decision — it is what the LLM reads in the generation schema), `rendered_*` overrides + `short_desc` following the `NumberContent` template.
+- [x] **Enum + matches:** `YES_NO = "YesNo"` in `NativeConceptCode` + arms in `structure_class` (→ `YesNoContent`), `is_composite` (False group), `is_text_concept` (False group), `is_dynamic_concept` (False group). Let pyright surface any other exhaustive match over the enum.
+- [x] **Factory arm** in `ConceptFactory.make_native_concept`: description per the micro-decision (proposed: "The answer to a yes/no question").
+- [x] **Registry:** add `YesNoContent` to `CoreRegistryModels.STUFF`.
+- [x] **Accessors** mirroring Number's: `Stuff.is_yes_no` + `Stuff.as_yes_no`, `WorkingMemory.get_stuff_as_yes_no` + `main_stuff_as_yes_no`, `PipeOutput.main_stuff_as_yes_no` — this is how a Python-API caller reads the verdict (`pipe_output.main_stuff_as_yes_no().yes_no`).
+- [x] **Refinement sanity test:** a bundle declaring `[concept.IsUrgent]` with `refines = "YesNo"` validates, and the refining concept resolves `YesNoContent` as its structure class (the machinery is generic — this pins it).
+- [x] `make tb` (boot + registry load), `make agent-check`, targeted pytest on the new test modules.
 
 ### CHECKPOINT 1 — concept exists and boots
 
-State: _not reached._ (Update with: commits, the settled wording micro-decisions, anything that fought back.)
+State: **reached 2026-07-07.** All Phase 1 tasks landed and gates are green (`make tb`, `make agent-check` — ruff/plxt/pyright 0-errors/mypy Success/cko; targeted pytest on the new modules all pass). Schema regen ran inside `agent-check` (no unexpected diff — confirms §0: the generator doesn't enumerate native codes).
+
+Files touched: new `pipelex/core/stuffs/yes_no_content.py`; enum+matches in `concept_native.py`; factory arm in `concept_factory.py`; registry in `registry_models.py`; accessors in `stuff.py` / `working_memory.py` / `pipe_output.py`. Tests: new `tests/unit/pipelex/core/stuffs/yes_no_content/` (renders + smart_dump + test_data), new `tests/unit/pipelex/core/concepts/concept_factory/test_yes_no_refinement.py`, extended `test_hydration.py`.
+
+Settled micro-decisions: field name `yes_no: bool`; renders `yes`/`no` for plain/markdown/html, `rendered_json` → `{"yes_no": true}`; field description "Whether the answer is yes (true) or no (false)."; native concept description "The answer to a yes/no question"; `short_desc` = "a yes/no answer (yes)"/"(no)". Nothing fought back — the class-name→concept inference and refinement machinery are fully generic (no changes needed there). Boundary test pins `yes_no=2` → ValidationError (pydantic lax still accepts 0/1, which we don't over-assert).
 
 ## Phase 2 — Inputs: envelope viability
 
@@ -69,6 +73,7 @@ No new generation machinery: the leaner scalar-native generation form is explici
 
 - [ ] **Settle the boolean-alias micro-decision** (D9 parked it here): does the lowercase `boolean` structure-field type gain a friendlier alias (`yes_no`)? **Leaning NO** — field types are lowercase programmer primitives (`text`, `number`, `boolean`) and an alias is a two-spellings drift magnet; the concept-level brand is `YesNo`. If NO: nothing to do. If YES: field-type enum value + generator arms + schema diff + docs, and the schema-regen step below stops being a no-op.
 - [ ] `docs/building-methods/concepts/native-concepts.md`: table row for `YesNo` + a `YesNoContent` section (mirror `NumberContent`'s at `:101`).
+- [ ] `docs/building-methods/pipes/pipe-output.md`: add a `main_stuff_as_yes_no` entry (the doc enumerates every other `main_stuff_as_*` accessor around `:151`; the new one would otherwise be silently missing).
 - [ ] Schema regen: `.venv/bin/pipelex-dev generate-mthds-schema` — **verify no diff** (see §0; a diff means something unexpected leaked in).
 - [ ] **MTHDS spec entry** (in-scope per `README.md`, cross-repo): draft the native-concepts additions in the `mthds/` sibling repo (`docs/language/concepts.md`, `docs/spec/mthds-format.md`) on a side branch — the merge vehicle is the release wave, same pattern as the other cross-repo commits.
 - [ ] `CHANGELOG.md` under `[Unreleased]`: added native `YesNo` concept (one-line pitch: typed yes/no answers for LLM judgments, `output = "YesNo"`) + envelope input support; breaking — `YesNo` is now a reserved native code (a bundle declaring `[concept.YesNo]` errors).
@@ -89,9 +94,9 @@ Follow-up off the critical path (shared with Date): **LLM-output ergonomics for 
 
 ## Micro-decisions log
 
-- Content field name: **leaning `yes_no: bool`** (the `NumberContent.number` pattern — field named after the enum value). Alternatives considered: `answer`, `value`, `is_yes`. Settle in Phase 1.
-- Renderings: **leaning `yes`/`no`** for plain/markdown/html (reads naturally when injected into downstream prompts; D9's wording); `rendered_json` keeps the raw `{"yes_no": true}`. Settle in Phase 1.
-- Field description wording (the LLM generation contract): proposed "Whether the answer is yes (true) or no (false)." Settle in Phase 1.
-- Native concept description (factory arm): proposed "The answer to a yes/no question" (D9's own phrasing). Settle in Phase 1.
+- Content field name: **SETTLED `yes_no: bool`** (the `NumberContent.number` pattern — field named after the enum value). Alternatives considered: `answer`, `value`, `is_yes`.
+- Renderings: **SETTLED `yes`/`no`** for plain/markdown/html (reads naturally when injected into downstream prompts; D9's wording); `rendered_json` keeps the raw `{"yes_no": true}`.
+- Field description wording (the LLM generation contract): **SETTLED** "Whether the answer is yes (true) or no (false)."
+- Native concept description (factory arm): **SETTLED** "The answer to a yes/no question" (D9's own phrasing).
 - `boolean` structure-field-type alias: **leaning NO alias** (one way to spell a thing). Settle in Phase 4 — flag to Louis if in doubt.
 - Envelope string forms (`"content": "yes"`): **rejected** — no cross-kind coercion, consistent with Smart Inputs D5 and Datetime DT5. Not open; recorded so nobody reopens it casually.
