@@ -1,6 +1,28 @@
 # Datetime track — the native `Date` concept (as-built)
 
-Status: **COMPLETE 2026-07-07.** All phases shipped on `feature/Smart-inputs` (commits `0b6d201bb` → `2d7b3d503`), gates green. Design: `datetime-design.md` (approved, DT1–DT8). Based on main at v0.38.0. Track order (`README.md`): YesNo → **Datetime (this doc)** → Smart Inputs, one release wave. This doc is now the as-built record and the PR reviewer's guide; the phase-by-phase log and checkpoint states below capture exactly what landed and why.
+Status: **COMPLETE 2026-07-07.** All phases shipped, gates green. Design: `datetime-design.md` (approved, DT1–DT8). Based on main at v0.38.0. Track order (`README.md`): YesNo → **Datetime (this doc)** → Smart Inputs, one release wave. This doc is now the as-built record and the PR reviewer's guide; the phase-by-phase log and checkpoint states below capture exactly what landed and why.
+
+## ⏩ Session handoff — resume here (cold start)
+
+**Where the code lives.** The Date work is its own branch `feature/native-date` (NOT `feature/Smart-inputs`), tip **`c32c7595d`**. It is stacked: `feature/native-date` = the YesNo tip (`772c628c6`, = `origin/feature/Smart-inputs`) + the 6 Date phase commits (`0b6d201bb` → `2d7b3d503`) + the plan-doc rewrite (`dd3db9026`) + two bot-review fix commits (`978698b5c`, `c32c7595d`). Local `feature/Smart-inputs` was reset back to `origin` so it carries only YesNo. Everything is pushed.
+
+**The PR.** **#1029** "Add native Date concept", base **`feature/Smart-inputs`** (so the diff is Date-only), head `feature/native-date`. It is **stacked on the still-open YesNo PR #1028** (base `dev`, head `feature/Smart-inputs`, still OPEN). ➜ **When #1028 merges to `dev`, retarget #1029 to `dev`** (GitHub usually auto-retargets on base-branch merge; verify).
+
+**What's done.** All 5 phases + DT8 (checkpoints 1–4 below). Two bot-review rounds fully arbitrated and **all threads resolved (0 open)**:
+
+- Round 1 (on `978698b5c`): fixed two real DT8-adjacent generator bugs (`build inputs` emitted an unparseable `"date_date"` placeholder for a Date input; temporal `default_value` rendered as module-qualified `datetime.datetime(...)` → `AttributeError` at eval) + three tightenings; dismissed the impossible bare-scalar Case-1 claim (no dead branch), deferred the real list-array gap to `case1-bare-date-arm-gap.md`.
+- Round 2 (on `c32c7595d`): three test-oracle tightenings + one doc sigil fix (`@ticket` → `$ticket`, which the sigil validator rejects inline when the id is a declared input).
+
+**CI.** Green on `978698b5c` across py3.11–3.14 tests + typechecks + both bot *checks* (Greptile pass, cubic pass). `c32c7595d` (test-only + one doc line) pushed after; **re-verify its CI went green** on resume.
+
+**What remains (the goal loop's tail) — and the user's gate.** The user stood up a "check with me before starting the next review" gate. Two steps are left, both count as "a review":
+
+1. *(optional, low value)* Re-trigger the bots on `c32c7595d` by pinging `@greptileai` + `@cubic-dev-ai`. The round-2 changes are test-only + one doc line, so new findings are unlikely; the bots were already happy on `978698b5c`. **Ask the user whether to bother** before doing it.
+2. **Finalize:** fan out an **Opus 4.8** sub-agent to run gstack `/review @wip/inputs/datetime-implementation-plan.md`, then mark the PR ready. **This has never been run.** Per the gate, **confirm with the user before dispatching it.**
+
+**Constraints to carry into any sub-agent:** clean solid software, no over-engineering, don't guard impossible scenarios; on any doubt, defer as a new `.md` under `wip/inputs/`. For `/code-review` fan-outs specifically: pointer-only context (a commit SHA / diff / working-tree files), never the plan or rationale.
+
+**Deferred notes (open):** `wip/inputs/case1-bare-date-arm-gap.md`, `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`; shared YesNo/Date LLM-output ergonomics; the release-wave cross-repo sweep (see the bottom section).
 
 ## As-built summary — for PR reviewers
 
