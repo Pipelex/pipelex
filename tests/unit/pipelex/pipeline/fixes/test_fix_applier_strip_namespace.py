@@ -9,6 +9,7 @@ idempotence are guarded skips, never raises.
 """
 
 from pathlib import Path
+from typing import Any, cast
 
 import tomlkit
 
@@ -65,6 +66,31 @@ prompt = "Dotted"
 
 [concept.Greeting]
 description = "A greeting."
+
+[pipe.other]
+type = "PipeLLM"
+description = "Other."
+output = "Text"
+prompt = "Other"
+"""
+
+# The offending pipe's header ``[pipe."inter.hello"]`` and its own block ``.inputs`` sub-table land
+# in *different* out-of-order chunks (split by the intervening ``[concept.*]``), so the dotted key
+# ``inter.hello`` appears in TWO of the proxy's underlying sub-tables — the shape the first-match
+# rename used to orphan.
+_INTERLEAVED_NESTED_MTHDS = """domain = "inter"
+
+[pipe."inter.hello"]
+type = "PipeLLM"
+description = "Dotted hello."
+output = "Text"
+prompt = "Ask about $doc."
+
+[concept.Greeting]
+description = "A greeting."
+
+[pipe."inter.hello".inputs]
+doc = "Text"
 
 [pipe.other]
 type = "PipeLLM"
@@ -150,6 +176,30 @@ class TestFixApplierStripNamespace:
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         dumped = _dumps(toml_doc)
         assert '[pipe."inter.hello"]' in dumped
+
+    def test_rename_carries_nested_subtable_across_interleaved_chunks(self) -> None:
+        """A dotted pipe whose header and block ``.inputs`` land in *different* out-of-order chunks
+        renames in both — the pipe keeps its nested content and no phantom dotted key survives.
+
+        Regression: the first-match rename renamed only the header chunk, orphaning the ``.inputs``
+        sub-table under the still-invalid ``inter.hello`` key while reporting the op as APPLIED.
+        """
+        toml_doc = tomlkit.loads(_INTERLEAVED_NESTED_MTHDS)
+        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        # Pre-format dump: the dotted key is gone everywhere and BOTH the header and the nested
+        # sub-table now sit under the bare name.
+        dumped = _dumps(toml_doc)
+        assert '"inter.hello"' not in dumped
+        assert "[pipe.hello]" in dumped
+        assert "[pipe.hello.inputs]" in dumped
+        # Semantic check on the re-parsed, formatted output: the renamed pipe kept its header fields
+        # and its inputs, under exactly the two bare keys.
+        pipe_section = cast("dict[str, Any]", tomlkit.loads(serialize_and_format(toml_doc))["pipe"])
+        assert "inter.hello" not in pipe_section
+        assert set(pipe_section.keys()) == {"hello", "other"}
+        assert pipe_section["hello"]["description"] == "Dotted hello."
+        assert pipe_section["hello"]["inputs"]["doc"] == "Text"
 
     def test_rename_applies_on_inline_pipe_table(self) -> None:
         """An inline ``pipe = {...}`` section (an ``InlineTable``) renames in place."""

@@ -92,19 +92,27 @@ def _rename_key_in_place(parent_table: dict[str, Any], *, key: str, new_key: str
     ``Container`` that owns the key:
 
     - ``OutOfOrderTableProxy`` — ``[pipe.*]`` sections interleaved with other tables: the keys
-      live in the proxy's underlying sub-tables, so rename inside the one holding ``key``;
+      live in the proxy's underlying sub-tables, so rename inside **every** one holding ``key``;
     - ``AbstractTable`` — a regular ``Table`` or an inline ``pipe = {...}``: its ``.value``;
     - the root ``TOMLDocument``, itself a ``Container``.
     """
     if isinstance(parent_table, OutOfOrderTableProxy):
+        # The same dotted key can appear in MORE THAN ONE sub-table: a pipe whose header
+        # ``[pipe."d.x"]`` and whose block ``[pipe."d.x".inputs]`` land in different out-of-order
+        # chunks (split by an intervening ``[concept]`` etc.) both carry the key ``d.x``. Renaming
+        # only the first would leave the other chunk under the old dotted name — orphaning the
+        # pipe's nested content in a phantom, still-invalid key. Rename in every chunk holding it.
+        renamed_in_any = False
         for sub_table in parent_table._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
             if key in sub_table:
                 _replace_key_in_container(sub_table.value, key=key, new_key=new_key)
-                return
-        # The caller checked ``key in parent_table``, and the proxy's dict-facade is built from
-        # exactly these sub-tables — reaching here means the facade and sub-tables disagree.
-        msg = f"key '{key}' not found in any sub-table of the out-of-order table during rename — applier bug"
-        raise PipelexUnexpectedError(msg)
+                renamed_in_any = True
+        if not renamed_in_any:
+            # The caller checked ``key in parent_table``, and the proxy's dict-facade is built from
+            # exactly these sub-tables — reaching here means the facade and sub-tables disagree.
+            msg = f"key '{key}' not found in any sub-table of the out-of-order table during rename — applier bug"
+            raise PipelexUnexpectedError(msg)
+        return
     if isinstance(parent_table, AbstractTable):
         _replace_key_in_container(parent_table.value, key=key, new_key=new_key)
         return
