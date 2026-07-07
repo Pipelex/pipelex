@@ -11,7 +11,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES, UrgencyFlag
+from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES, DueDate, UrgencyFlag
 
 
 @pytest.fixture(scope="class")
@@ -23,9 +23,10 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
         base_class=StructuredContent,
         is_include_imported=False,
     )
-    # UrgencyFlag refines YesNo (a StuffContent, not a StructuredContent), so register it explicitly —
-    # this mirrors the subclass the refinement machinery registers for a `refines = "YesNo"` concept.
+    # UrgencyFlag/DueDate refine YesNo/Date (StuffContent, not StructuredContent), so register them explicitly —
+    # this mirrors the subclass the refinement machinery registers for a `refines = "YesNo"`/`refines = "Date"` concept.
     get_class_registry().register_class(class_type=UrgencyFlag)
+    get_class_registry().register_class(class_type=DueDate)
 
     # Create and register the test concept
     concept_library = get_concept_library()
@@ -69,11 +70,27 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     )
     concept_library.add_new_concept(concept=concept_urgency_flag)
 
+    # Create a concept that refines native.Date (for the date-envelope refining case)
+    concept_due_date = ConceptFactory.make(
+        domain_code="test_domain",
+        concept_code="DueDate",
+        description="Test concept for unit tests",
+        structure_class_name="DueDate",
+        refines="native.Date",
+    )
+    concept_library.add_new_concept(concept=concept_due_date)
+
     yield concept
 
     # Cleanup after test
     concept_library.remove_concepts_by_concept_refs(
-        concept_refs=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept", "test_domain.UrgencyFlag"]
+        concept_refs=[
+            "test_domain.MyConcept",
+            "test_domain.MyConceptNotNativeText",
+            "test_domain.AnotherConcept",
+            "test_domain.UrgencyFlag",
+            "test_domain.DueDate",
+        ]
     )
 
 

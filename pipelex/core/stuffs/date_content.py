@@ -3,10 +3,12 @@ import json
 from typing import Any
 
 from pydantic import Field, field_validator
+from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import DateContentError
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class DateContent(StuffContent):
@@ -85,3 +87,9 @@ class DateContent(StuffContent):
     @override
     def rendered_json(self) -> str:
         return json.dumps({"date": self.date.isoformat(), "time": self.time.isoformat() if self.time is not None else None})
+
+    @override
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        # The base renders smart_dump() (real date/time objects, which stdlib json can't serialize);
+        # render the ISO two-field JSON instead so pretty_print of a Date does not crash.
+        return JSON(self.rendered_json())

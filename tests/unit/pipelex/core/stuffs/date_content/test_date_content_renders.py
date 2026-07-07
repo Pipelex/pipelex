@@ -119,6 +119,14 @@ class TestDateContentRenders:
         with pytest.raises(DateContentError):
             content.to_datetime()
 
+    def test_rendered_pretty_does_not_crash(self):
+        """The base rendered_pretty feeds smart_dump()'s real date objects to stdlib json and crashes;
+        DateContent overrides it to render the ISO form. Guard against a regression to the base path.
+        """
+        from pipelex.tools.misc.pretty import pretty_print  # noqa: PLC0415 — local import keeps the render dep test-local
+
+        pretty_print(DateContent(date=TestData.SAMPLE_DATE, time=TestData.SAMPLE_TIME_OFFSET))
+
     def test_model_json_schema_carries_field_descriptions(self):
         """Both field descriptions are the contract handed to the LLM in the generation schema."""
         schema = DateContent.model_json_schema()
