@@ -449,6 +449,38 @@ class TypeMappingTest(StructuredContent):
         assert "datetime.datetime(" not in result
         assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
 
+    def test_list_of_date_field_maps_to_list_of_calendar_date(self):
+        """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "deadlines": ConceptStructureBlueprint(
+                description="Deadlines", type=ConceptStructureBlueprintFieldType.LIST, item_type="date", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'deadlines: List[date] = Field(..., description="Deadlines")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
+    def test_list_of_datetime_field_maps_to_list_of_timestamp(self):
+        """`type = "list", item_type = "datetime"` generates a `List[datetime]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps", type=ConceptStructureBlueprintFieldType.LIST, item_type="datetime", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'logged_at: List[datetime] = Field(..., description="Log timestamps")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
         structure_blueprint = {

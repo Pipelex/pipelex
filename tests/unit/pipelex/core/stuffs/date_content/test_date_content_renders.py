@@ -59,6 +59,16 @@ class TestDateContentRenders:
         with pytest.raises(ValidationError):
             DateContent.model_validate({"date": datetime.datetime(2026, 7, 7, 0, 0, tzinfo=TestData.OFFSET_PLUS_2)})
 
+    def test_rejects_datetime_on_time_field(self):
+        """The guard runs on both fields: a datetime on the time field must be rejected too, not lax-coerced."""
+        with pytest.raises(ValidationError):
+            DateContent.model_validate({"date": "2026-07-07", "time": datetime.datetime(2026, 7, 7, 15, 40, tzinfo=TestData.OFFSET_PLUS_2)})
+
+    def test_rejects_numeric_string_on_time_field(self):
+        """An all-digit string on the time field is an epoch, never an ISO time (which carries ':') — reject it (DT6)."""
+        with pytest.raises(ValidationError):
+            DateContent.model_validate({"date": "2026-07-07", "time": "56400"})
+
     def test_rendered_plain_date_only(self):
         content = DateContent(date=TestData.SAMPLE_DATE)
         assert content.rendered_plain() == TestData.EXPECTED_ISO_DATE_ONLY

@@ -313,7 +313,7 @@ class ConceptRepresentationGenerator:
             return False
         elif actual_type is datetime.datetime:
             # ISO example that DateContent (and a `type = "datetime"` structure field) accepts,
-            # so the `build inputs` -> `run` round-trip holds (checked before date: datetime is a date subclass).
+            # so the `build inputs` -> `run` round-trip holds.
             return "2026-01-01T12:00:00"
         elif actual_type is datetime.date:
             return "2026-01-01"
