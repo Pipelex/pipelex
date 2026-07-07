@@ -146,6 +146,37 @@ class PipeValidationErrorType(StrEnum):
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
     @property
+    def is_controller_input_drift(self) -> bool:
+        """True for the input-drift trio the fix planner can act on when enriched."""
+        match self:
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+            ):
+                return True
+            case (
+                PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
     def is_inadequate_output(self) -> bool:
         """True for the output-mismatch pair the fix planner can act on when enriched."""
         match self:
@@ -185,6 +216,8 @@ class PipeValidationError(ValueError):
         required_concept_codes: list[str] | None = None,
         provided_concept_code: str | None = None,
         expected_output_ref: str | None = None,
+        expected_inputs: dict[str, str] | None = None,
+        declared_inputs: dict[str, str] | None = None,
         file_path: str | None = None,
         explanation: str | None = None,
     ):
@@ -199,6 +232,13 @@ class PipeValidationError(ValueError):
         # value at detection time — the semantic fact the fix planner translates into a
         # suggested fix.
         self.expected_output_ref = expected_output_ref
+        # The full inputs mapping the pipe should declare (variable name → bundle-representation
+        # ref), set only at the controller input-drift raise sites where ``needed_inputs()`` is
+        # in hand — the semantic fact the fix planner translates into a sync-controller-inputs fix.
+        # ``declared_inputs`` is the pipe's current declaration rendered the same way, so the
+        # planner (pure, no file access) can emit a minimal diff instead of a table rewrite.
+        self.expected_inputs = expected_inputs
+        self.declared_inputs = declared_inputs
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
@@ -215,6 +255,8 @@ class PipeValidationError(ValueError):
             msg += f" • provided_concept_code='{self.provided_concept_code}'"
         if self.expected_output_ref:
             msg += f" • expected_output_ref='{self.expected_output_ref}'"
+        if self.expected_inputs:
+            msg += f" • expected_inputs='{self.expected_inputs}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

@@ -53,9 +53,9 @@ At each checkpoint, after committing the phase, spawn a **Sonnet-5 sub-agent** t
 
 ## Phase 0 — pre-flight
 
-- [ ] **Branch logistics.** PR #1027 is open and merge-ready *from `feature/Autofix`* — pushing new commits there would append to the reviewed PR. Create a stacked branch for step 2 (e.g. `feature/Autofix-step2` off `feature/Autofix`), or rebase onto `dev` if #1027 has merged by the time work starts. The docs-archival commit (this plan + the `TODOS.md` → `wip/autofix/spike-reviewers-guide.md` move) belongs on the step-2 branch.
-- [ ] Commit this plan + the archival move as the first step-2 commit; record the phase-base SHA here for the checkpoint diffs: `________`.
-- [ ] Sanity: `make agent-check` and `make agent-test` green at base (should be — CI was green on the spike tip).
+- [x] **Branch logistics.** PR #1027 still open from `feature/Autofix` → created stacked branch `feature/Autofix-step2` off it. Note: the docs-archival commit had already been pushed to `origin/feature/Autofix` (docs-only, harmless on the reviewed PR); step-2 code commits go on the stacked branch only.
+- [x] Plan + archival move committed as `5e62bd43c` (phase-base SHA for checkpoint diffs).
+- [x] Sanity: `make agent-check` and `make agent-test` green at base (verified 2026-07-07).
 
 ## Phase A — `sync-controller-inputs` (first multi-op, in-place table-sync shape)
 
@@ -63,26 +63,26 @@ Trigger: `MISSING_INPUT_VARIABLE` / `EXTRANEOUS_INPUT_VARIABLE` / `INPUT_STUFF_S
 
 ### A.1 — Enrichment: `expected_inputs` on the typed error
 
-- [ ] RED: integration tests (new `tests/integration/pipelex/pipeline/test_controller_inputs_enrichment.py`, mirroring `test_sequence_output_enrichment.py`) — controller pipe with a missing input / an extraneous input / a concept-or-multiplicity mismatch each produce a full `expected_inputs` mapping on the error data; operator-raised variants (PipeLLM prompt-var, PipeStructure mismatch, `required_variables()` on an operator) produce `None`.
-- [ ] Add `expected_inputs: dict[str, str] | None` to `PipeValidationError` (`pipelex/core/pipes/exceptions.py`) — variable name → bundle-representation ref, the exact strings the fix would write. Internal, error-data only (the wire gets only `suggested_fix`), like `expected_output_ref`.
-- [ ] Populate at the `generic_validate_inputs_with_library` raise sites, **gated on `self.is_controller`**. Ref rendering must follow the spike's rules (bare code when same-domain or native, qualified otherwise) — factor/reuse the rendering the spike built for `expected_output_ref` rather than duplicating it.
-- [ ] **Optionals-marker guard**: for a variable whose declared spec already matches the needed spec on concept + multiplicity, emit the *author's* declared representation (preserving their `?`/`!`); derive markers only for variables being added or whose concept/multiplicity changes.
-- [ ] Thread `expected_inputs` through `categorize_pipe_validation_with_libraries_error` (both call paths — direct and pydantic-unwrapped) into `PipesAndConceptValidationErrorData`.
-- [ ] **Prerequisite-clean guard — investigate, then implement at the right layer.** The design says: suppress the fix when co-errors (`UNRESOLVED_PIPE_DEPENDENCY`, `UNRESOLVED_CONCEPT`) make `needed_inputs()` untrustworthy. Open question: since validation aborts at the first `PipeValidationError`, can such co-errors even co-occur in one report, or does `needed_inputs()` recursion (`get_required_pipe`) fail earlier? Decide whether the guard lives at the enrichment site (don't set `expected_inputs` unless the derivation is trustworthy) or in the planner (scan sibling items) — prefer the enrichment site if it suffices (consistent with structural suppression). Record the verdict below and pin it with a test either way.
+- [x] RED: integration tests (`tests/integration/pipelex/pipeline/test_controller_inputs_enrichment.py`) — controller missing/extraneous/mismatch each carry the full mapping; cross-domain qualified ref pinned; PipeCondition missing-expression-var and unresolved-dep suppression pinned. Note: PipeLLM prompt-var missing/extraneous surface on the **blueprint channel** (static validation, message-reconstructed lookalikes) — pinned as such, they never reach the pipe-validation planner.
+- [x] `expected_inputs: dict[str, str] | None` on `PipeValidationError` + error data. Also added `declared_inputs` (same rendering) — see A.2 decision.
+- [x] Populated at the three `generic_validate_inputs_with_library` raise sites where `the_needed_inputs` is in hand (`:290`, `:329`, `:341`), via `_expected_inputs_for_fix` gated on `self.is_controller`. The `required_variables()` site (`:273`) is **not** enriched: for controllers it fires for condition-expression vars whose needed spec comes from the declared inputs themselves (unknowable — and `needed_inputs()` would raise `InputStuffSpecNotFoundError` there); for sequences it never fires. Ref rendering factored into `StuffSpec.to_bundle_representation(relative_to_domain=...)`, reused by the PipeSequence enrichment (duplication removed).
+- [x] **Optionals-marker guard**: declared spec matching needed on concept+multiplicity → author's declared rendering preserved (`?`/`!` kept); derived rendering only for added/changed variables. Pinned by `test_declared_optional_marker_preserved_in_expected_inputs`.
+- [x] Threaded through `categorize_pipe_validation_with_libraries_error` (single function covers both the direct and pydantic-unwrapped call paths).
+- [x] **Prerequisite-clean guard verdict: no guard code needed — validation ordering already guarantees it.** `validate_pipe_library_with_libraries` resolves every controller dependency first (raising `UNRESOLVED_PIPE_DEPENDENCY` immediately) and skips `validate_with_libraries()` for controllers with unresolved cross-package deps, so input-drift errors structurally cannot co-occur with unresolved-ref errors in one report and `needed_inputs()` is trustworthy wherever the input checks fire. Pinned by `test_unresolved_dependency_precludes_input_errors`.
 
 ### A.2 — Planner: multi-op fix
 
-- [ ] RED: planner unit tests (`tests/unit/pipelex/pipeline/fixes/test_fix_planner.py`) — each of the three error types with `expected_inputs` + `pipe_code` present → one SAFE `sync-controller-inputs` fix; suppression cases: no `expected_inputs` → `None`; operator variants → `None`; prerequisite cases per A.1's verdict.
-- [ ] Extend `plan_fix_for_pipe_validation_error`: emit `set_key` ops at `table_path=["pipe", <code>, "inputs"]` for added/changed variables and `delete_key` ops for extraneous ones — a *diff* against the declared inputs, not a table rewrite. Multiple ops per fix is the new shape; keep op order deterministic for stable fingerprints.
-- [ ] Decide + test the **no-`inputs`-table case** (pipe declares no inputs but needs some): nothing to preserve, so a single `set_key` on `["pipe", <code>]` with an inline-table value is acceptable — requires confirming `FixOp.value` (TomlValue) accepts a dict and the applier writes it as an inline table. Record the decision.
-- [ ] `description` wording: name the variables added/updated/removed (agents read this; keep it one line).
+- [x] RED: planner unit tests — the three error types (parametrized) → one SAFE `sync-controller-inputs` fix; suppression: no `expected_inputs` / no `declared_inputs` / no `pipe_code` / empty diff → `None`.
+- [x] **Decision: the error data also carries `declared_inputs`** (the current declaration rendered exactly like `expected_inputs`), so the planner stays pure (no file access) and diffs the two mappings: `set_key` per added/changed variable, `delete_key` per extraneous one, order deterministic (expected order for sets, declared order for deletes). An empty diff (two concepts rendering to the same relative ref) yields `None` — a no-op fix would spin the loop into its fingerprint bail.
+- [x] **No-`inputs`-table decision: single `set_key` on `["pipe", <code>]` with the whole mapping.** `TomlValue` widened to `TomlScalar | dict[str, TomlScalar]`; the applier writes dict values as a canonical inline table.
+- [x] `description` is one line naming the variables added/updated/removed.
 
 ### A.3 — Applier + loop
 
-- [ ] RED: golden byte-compare fixtures (`tests/data/fixes/`) covering: inline `inputs = {...}` form, block `[pipe.x.inputs]` form, comments on and around the table, add+update+delete in a single fix, idempotence (apply twice = same bytes). Remember the plxt format-stability workflow for fixtures.
-- [ ] Applier: confirm `set_key`/`delete_key` on both inline and block `inputs` tables behave in-place (they should — the spike's `_resolve_table` treats both as dicts); add any missing guard semantics surfaced by the goldens.
-- [ ] RED→GREEN: convergence-loop integration test (`tests/integration/pipelex/pipeline/test_fix_convergence_loop.py`) — a controller with drifted inputs fixed in one iteration; if a natural cross-rule cascade fixture exists (sequence-output fix surfacing an input sync), add it — don't force one.
-- [ ] Wire test: `suggested_fix` for this rule rides `ValidationErrorItem` through the shared builder (`tests/unit/pipelex/pipeline/test_validation_errors.py`).
+- [x] RED: golden byte-compare fixtures (`tests/data/fixes/controller_inputs_{inline,block,missing_table}.mthds` + goldens) covering inline form, block form with comments, add+update+delete in one fix, idempotence.
+- [x] **Applier finding (abstraction stress, resolved in-applier): tomlkit's incremental inline-table edits leave non-canonical whitespace** (double separator after a delete, no brace padding on fresh tables), which `plxt format` would churn — goldens could not be byte-stable. Resolution: the applier re-emits a *mutated inline table* with canonical `{ key = value, ... }` spacing (TOML forbids comments inside inline tables so nothing is lost; the line's trailing comment/indent is transplanted via trivia). Block tables stay strictly in-place. Fresh dict values are written as canonical inline tables.
+- [x] Convergence tests: drifted controller inputs fixed in one iteration; **natural cross-rule cascade** pinned (inputs are validated before outputs, so the input error masks the output error — round 1 `sync-controller-inputs`, round 2 `match-sequence-output`).
+- [x] Wire test: `sync-controller-inputs` rides `ValidationErrorItem` through the shared builder.
 
 ### 🛑 CHECKPOINT A — hard stop before Phase B
 
@@ -153,8 +153,9 @@ Trigger: `INVALID_PIPE_CODE_SYNTAX` from same-domain dotted pipe codes. Fix: pos
 
 ## Decisions taken during this step (fill at checkpoints)
 
-- A.1 prerequisite-guard layer: _pending_
-- A.2 no-`inputs`-table op shape: _pending_
+- A.1 prerequisite-guard layer: **no guard code** — validation ordering (deps resolved before any `validate_with_libraries`) makes co-occurrence impossible; pinned by test. The `required_variables()` raise site stays unenriched (condition-expression vars are unknowable).
+- A.2 no-`inputs`-table op shape: **single `set_key` of the whole mapping on `["pipe", <code>]`**; `TomlValue` widened to allow a flat scalar dict, applier writes it as a canonical inline table. Companion decision: error data carries `declared_inputs` alongside `expected_inputs` so the planner can diff without file access.
+- A.3 applier shape finding: mutated inline tables are re-emitted with canonical spacing (comment-safe by TOML grammar); block tables remain strictly in-place.
 - B.1 error-type enum home: _pending_
 - C.1 GO/NO-GO on strip-namespace (+ op-shape extension if GO): _pending_
 

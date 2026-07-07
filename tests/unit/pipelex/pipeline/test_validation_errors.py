@@ -17,6 +17,7 @@ from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidat
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.suggested_fix import FixOpKind
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
@@ -294,6 +295,34 @@ class TestBuildValidationErrorItems:
         assert suggested_fix.fix_code == "match-sequence-output"
         assert suggested_fix.ops[0].table_path == ["pipe", "list_ideas"]
         assert suggested_fix.ops[0].value == "Idea[]"
+
+    def test_input_drift_error_rides_a_sync_controller_inputs_fix(self) -> None:
+        """An enriched controller input-drift error data yields an item carrying the multi-op fix."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="make_summary",
+                    message="input drift",
+                    field_path="",
+                    expected_inputs={"text": "Text"},
+                    declared_inputs={"text": "Number", "note": "Text"},
+                ),
+            ],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "sync-controller-inputs"
+        assert suggested_fix.source == "main.mthds"
+        assert [(op.kind, op.key) for op in suggested_fix.ops] == [
+            (FixOpKind.SET_KEY, "text"),
+            (FixOpKind.DELETE_KEY, "note"),
+        ]
 
     def test_non_fixable_pipe_validation_error_has_no_suggested_fix(self) -> None:
         """A pipe-validation item with no enriched data keeps suggested_fix unset (wire unchanged)."""

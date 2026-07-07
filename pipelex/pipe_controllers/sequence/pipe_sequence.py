@@ -9,7 +9,8 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, is_multiplicity_compatible
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
@@ -79,19 +80,14 @@ class PipeSequence(PipeController):
             effective_last_step_output_multiplicity = last_step_pipe.output.multiplicity
 
         # The last step's effective output in bundle representation — what the sequence's declared
-        # output should be. This is the enriched semantic fact the fix planner needs: bare concept
-        # code when same-domain as the sequence or native, qualified `domain.Code` otherwise, with
-        # the effective multiplicity (sub-pipe override wins) and the presence marker.
-        last_step_output_concept = last_step_pipe.output.concept
-        if last_step_output_concept.domain_code == self.domain_code:
-            expected_concept_ref = last_step_output_concept.code
-        else:
-            expected_concept_ref = last_step_output_concept.simple_concept_ref
-        expected_output_ref = format_concept_with_multiplicity(
-            expected_concept_ref,
+        # output should be. This is the enriched semantic fact the fix planner needs, rendered the
+        # way an author in the sequence's domain would write it, with the effective multiplicity
+        # (sub-pipe override wins) and the presence marker.
+        expected_output_ref = StuffSpec(
+            concept=last_step_pipe.output.concept,
             multiplicity=effective_last_step_output_multiplicity,
             presence=last_step_pipe.output.presence,
-        )
+        ).to_bundle_representation(relative_to_domain=self.domain_code)
 
         # Check concept compatibility
         if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):

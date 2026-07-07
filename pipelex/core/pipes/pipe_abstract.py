@@ -260,6 +260,46 @@ class PipeAbstract(ABC, BaseModel):
     def generic_validate_output_static(self):
         self.validate_output_static()
 
+    def _expected_inputs_for_fix(self, needed_inputs: InputStuffSpecs) -> dict[str, str] | None:
+        """Render the full needed-inputs mapping a fix would write, or ``None`` for operators.
+
+        Controller-gated: only a controller's ``needed_inputs()`` is a trustworthy ground truth
+        for its declared ``inputs`` table (operators re-emit their own declaration). For a
+        variable whose declared spec already matches the needed spec on concept + multiplicity,
+        the author's declared representation is preserved (keeping their presence marker —
+        presence is deliberately not part of the drift contract); refs are derived from the
+        needed spec only for variables being added or whose concept/multiplicity changes.
+        """
+        if not self.is_controller:
+            return None
+        expected_inputs: dict[str, str] = {}
+        for named_stuff_spec in needed_inputs.named_stuff_specs:
+            var_name = named_stuff_spec.variable_name
+            declared_stuff_spec = self.inputs.root.get(var_name)
+            if (
+                declared_stuff_spec is not None
+                and declared_stuff_spec.concept == named_stuff_spec.concept
+                and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity
+            ):
+                spec_to_render: StuffSpec = declared_stuff_spec
+            else:
+                spec_to_render = named_stuff_spec
+            expected_inputs[var_name] = spec_to_render.to_bundle_representation(relative_to_domain=self.domain_code)
+        return expected_inputs
+
+    def _declared_inputs_for_fix(self) -> dict[str, str] | None:
+        """Render the currently declared inputs the same way, or ``None`` for operators.
+
+        Carried alongside ``expected_inputs`` so the fix planner (pure, no file access) can
+        emit a minimal diff against the declaration instead of a table rewrite.
+        """
+        if not self.is_controller:
+            return None
+        return {
+            var_name: declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+            for var_name, declared_stuff_spec in self.inputs.root.items()
+        }
+
     @final
     def generic_validate_inputs_with_library(self):
         # First validate required variables are in the inputs (using prefix-based matching)
@@ -293,6 +333,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[var_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
@@ -332,6 +374,8 @@ class PipeAbstract(ABC, BaseModel):
                         domain_code=self.domain_code,
                         pipe_code=self.code,
                         variable_names=[var_name],
+                        expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                        declared_inputs=self._declared_inputs_for_fix(),
                     )
 
         # Check that all declared inputs are actually needed
@@ -344,6 +388,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
         self.validate_inputs_with_library()

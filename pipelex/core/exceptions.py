@@ -66,3 +66,15 @@ class PipesAndConceptValidationErrorData(BaseModel):
         default=None,
         description="The output ref the pipe should declare (bundle representation), set when the validator knows the correct value",
     )
+
+    # === Enriched expected inputs mapping (for controller input-drift errors) ===
+    expected_inputs: dict[str, str] | None = Field(
+        default=None,
+        description="The full inputs mapping the pipe should declare (variable name → bundle-representation ref), "
+        "set when the validator knows the correct value",
+    )
+    declared_inputs: dict[str, str] | None = Field(
+        default=None,
+        description="The pipe's currently declared inputs mapping, rendered like expected_inputs, "
+        "so a fix planner can diff the two without file access",
+    )

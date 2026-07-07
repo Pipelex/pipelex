@@ -14,9 +14,11 @@ from typing import TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# A TOML-representable scalar value for a set_key op. Wave-1 fixes only ever write scalars
-# (output refs, input refs); container values would come with rules that need them.
+# A TOML-representable value for a set_key op: a scalar (output refs, input refs), or a flat
+# scalar mapping for fixes that create a whole table at once (written as an inline table —
+# e.g. a missing `inputs` mapping). Deeper nesting would come with rules that need it.
 TomlScalar: TypeAlias = str | int | float | bool
+TomlValue: TypeAlias = TomlScalar | dict[str, TomlScalar]
 
 
 class FixOpKind(StrEnum):
@@ -56,7 +58,7 @@ class FixOp(BaseModel):
     kind: FixOpKind = Field(strict=False)
     table_path: list[str]
     key: str | None = None
-    value: TomlScalar | None = None
+    value: TomlValue | None = None
     new_key: str | None = None
 
 

@@ -204,6 +204,8 @@ def categorize_pipe_validation_with_libraries_error(
         field_path=pipe_error.file_path or "",
         variable_names=pipe_error.variable_names,
         expected_output_ref=pipe_error.expected_output_ref,
+        expected_inputs=pipe_error.expected_inputs,
+        declared_inputs=pipe_error.declared_inputs,
     )
 
 
