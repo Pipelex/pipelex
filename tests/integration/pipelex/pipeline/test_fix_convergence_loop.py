@@ -7,10 +7,22 @@ next iteration — the loop is the design, not a fallback.
 
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
+import tomlkit
 
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
+
+
+def _pipes(bundle_path: Path) -> dict[str, Any]:
+    """The fixed file's ``[pipe]`` table as plain data — asserting on parsed values, not raw
+    whitespace, since the fix loop rewrites the whole file to canonical MTHDS (the formatter
+    column-aligns single-line tables, so a hardcoded ``output = "x"`` spacing is not stable).
+    """
+    parsed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
+    return cast("dict[str, Any]", parsed["pipe"])
+
 
 _SINGLE_PASS_MTHDS = """domain = "seqfix_loop_single"
 main_pipe = "list_ideas"
@@ -159,9 +171,10 @@ class TestFixConvergenceLoop:
         assert result.iterations == 2
         assert [fix.fix_code for fix in result.fixes_applied] == ["match-sequence-output", "match-sequence-output"]
         assert result.bail_reason is None
-        fixed_text = bundle_path.read_text(encoding="utf-8")
-        # Both sequences now declare the list output.
-        assert fixed_text.count('output = "Idea[]"') == 3  # gen_ideas + inner + outer
+        # Both sequences now declare the list output the last step yields.
+        pipes = _pipes(bundle_path)
+        assert pipes["inner"]["output"] == "Idea[]"
+        assert pipes["outer"]["output"] == "Idea[]"
 
     async def test_controller_inputs_drift_fixed_in_one_iteration(
         self,
@@ -200,9 +213,9 @@ class TestFixConvergenceLoop:
         assert result.iterations == 2
         assert [fix.fix_code for fix in result.fixes_applied] == ["sync-controller-inputs", "match-sequence-output"]
         assert result.bail_reason is None
-        fixed_text = bundle_path.read_text(encoding="utf-8")
-        assert 'inputs = { topic = "Text" }' in fixed_text
-        assert fixed_text.count('output = "Idea[]"') == 2
+        list_ideas = _pipes(bundle_path)["list_ideas"]
+        assert list_ideas["inputs"] == {"topic": "Text"}
+        assert list_ideas["output"] == "Idea[]"
 
     async def test_already_valid_bundle_is_a_no_op(
         self,

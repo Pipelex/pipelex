@@ -2,17 +2,17 @@
 
 The multi-op diff (set_key updates + adds, delete_key removals) mutates the ``inputs``
 table in place, in both its inline and block authoring forms; the no-table case creates
-the whole mapping as one inline table. Goldens are the plxt-canonical bytes: a mutated
-inline table is re-emitted with canonical ``{ key = value, ... }`` spacing (TOML forbids
-comments inside inline tables, so nothing is lost; the line's trailing comment survives),
-which keeps the fix output stable under ``plxt format``.
+the whole mapping as one inline table (kept attached to its pipe, not a detached block).
+Goldens are the MTHDS-formatter canonical bytes: the applier mutates, ``serialize_and_format``
+reflows inline-table spacing via ``pipelex_tools.format_mthds`` (the same engine ``plxt``
+runs on save), so the fix output is stable under the formatter.
 """
 
 from pathlib import Path
 
 import tomlkit
 
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
+from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
 from pipelex.suggested_fix import FixOp, FixOpKind
 
 _FIXES_DIR = Path("tests/data/fixes")
@@ -50,25 +50,25 @@ _MISSING_TABLE_OPS = [
 
 class TestFixApplierInputsSync:
     def test_inline_inputs_diff_matches_golden_bytes(self) -> None:
-        """Add + update + delete on an inline inputs table yields the canonical golden bytes."""
+        """Add + update + delete on an inline inputs table, then format, yields the golden bytes."""
         toml_doc = _load("controller_inputs_inline")
         applications = apply_fix_ops(toml_doc, ops=_INLINE_OPS)
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED] * 3
-        assert _dumps(toml_doc) == _golden("controller_inputs_inline")
+        assert serialize_and_format(toml_doc) == _golden("controller_inputs_inline")
 
     def test_block_inputs_diff_matches_golden_bytes(self) -> None:
         """Update + delete on a block [pipe.x.inputs] table preserves surrounding comments."""
         toml_doc = _load("controller_inputs_block")
         applications = apply_fix_ops(toml_doc, ops=_BLOCK_OPS)
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED] * 2
-        assert _dumps(toml_doc) == _golden("controller_inputs_block")
+        assert serialize_and_format(toml_doc) == _golden("controller_inputs_block")
 
     def test_missing_inputs_table_created_as_inline_table(self) -> None:
         """With no inputs declared, one set_key writes the whole mapping as an inline table."""
         toml_doc = _load("controller_inputs_missing_table")
         applications = apply_fix_ops(toml_doc, ops=_MISSING_TABLE_OPS)
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
-        assert _dumps(toml_doc) == _golden("controller_inputs_missing_table")
+        assert serialize_and_format(toml_doc) == _golden("controller_inputs_missing_table")
 
     def test_inline_diff_applied_twice_is_idempotent(self) -> None:
         """Re-applying the same diff yields the same bytes."""
@@ -91,18 +91,18 @@ class TestFixApplierInputsSync:
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == once
 
-    def test_dotted_input_key_survives_canonicalization(self) -> None:
-        """A quoted dotted input key (`"cv.name"`, a supported sub-attribute name) is re-emitted
-        quoted, not split into a nested table. Deleting an unrelated sibling must neither crash
-        (``KeyAlreadyPresent`` when a bare ``cv`` root exists) nor silently corrupt the file.
+    def test_dotted_input_key_survives_format(self) -> None:
+        """A quoted dotted input key (`"cv.name"`, a supported sub-attribute name) stays a flat
+        quoted entry through the format pass, not split into a nested table. Deleting an unrelated
+        sibling (with a bare ``cv`` root also present) must neither crash nor corrupt the file.
         """
         source = '[pipe.make_summary]\ntype = "PipeSequence"\ninputs = { "cv.name" = "Text", cv = "Curriculum", note = "Text" }\n'
         toml_doc = tomlkit.loads(source)
         applications = apply_fix_ops(toml_doc, ops=[FixOp(kind=FixOpKind.DELETE_KEY, table_path=_INPUTS_TABLE_PATH, key="note")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
-        dumped = _dumps(toml_doc)
-        assert '"cv.name" = "Text"' in dumped
-        assert "note" not in dumped
+        formatted = serialize_and_format(toml_doc)
+        assert '"cv.name" = "Text"' in formatted
+        assert "note" not in formatted
         # The dotted key stays a flat string entry, not a nested `cv = { name = ... }` table.
-        reloaded = tomlkit.loads(dumped).unwrap()
+        reloaded = tomlkit.loads(formatted).unwrap()
         assert reloaded["pipe"]["make_summary"]["inputs"] == {"cv.name": "Text", "cv": "Curriculum"}

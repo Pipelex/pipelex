@@ -1,16 +1,18 @@
 """Unit tests for the tomlkit fix applier — golden format-preservation tests.
 
 The applier mutates a tomlkit DOM in place (never rebuilds containers), so the comments,
-ordering, and table style of untouched content survive by construction. The golden
-byte-comparison is the regression net for that promise; idempotence and the guarded
-skip (a missing target path is reported, not raised) are pinned alongside.
+ordering, and table style of untouched content survive by construction; ``serialize_and_format``
+then hands the result to the MTHDS formatter for the one canonical style. The golden files are
+that canonical output, and the byte-comparison is the regression net for the whole apply → format
+pipeline; idempotence and the guarded skip (a missing target path is reported, not raised) are
+pinned alongside on the raw DOM.
 """
 
 from pathlib import Path
 
 import tomlkit
 
-from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops
+from pipelex.pipeline.fixes.applier import FixOpOutcome, apply_fix_ops, serialize_and_format
 from pipelex.suggested_fix import FixOp, FixOpKind
 
 _FIXTURE_PATH = Path("tests/data/fixes/sequence_wrong_output.mthds")
@@ -28,11 +30,11 @@ def _set_output_op(*, pipe_code: str = "list_ideas", value: str = "Idea[]") -> F
 
 class TestFixApplier:
     def test_set_key_matches_golden_bytes(self) -> None:
-        """Applying the set_key op yields output byte-equal to the golden file."""
+        """Applying the set_key op then formatting yields output byte-equal to the golden file."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
-        assert _dumps(toml_doc) == _GOLDEN_PATH.read_text(encoding="utf-8")
+        assert serialize_and_format(toml_doc) == _GOLDEN_PATH.read_text(encoding="utf-8")
 
     def test_apply_twice_is_idempotent(self) -> None:
         """Applying the same op twice yields the same bytes as applying it once."""
@@ -91,15 +93,15 @@ class TestFixApplier:
         assert "[pipe.gen_ideas]" not in dumped
         assert "[pipe.list_ideas]" in dumped
 
-    def test_set_output_on_whole_pipe_inline_table_stays_canonical(self) -> None:
+    def test_set_output_on_whole_pipe_inline_table_survives_format(self) -> None:
         """A pipe authored as a single-line inline table is a valid, rarer form. Setting its
-        output re-canonicalizes that whole inline table — this must not crash on the nested
-        inputs table nor corrupt it into multi-line block form.
+        output mutates that nested inline table in place; the format pass must reflow it without
+        crashing on the nested inputs table nor corrupting it into multi-line block form.
         """
         source = '[pipe]\nlist_ideas = { type = "PipeSequence", inputs = { topic = "Text" }, output = "Idea" }\n'
         toml_doc = tomlkit.loads(source)
         applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
-        reloaded = tomlkit.loads(_dumps(toml_doc)).unwrap()["pipe"]["list_ideas"]
+        reloaded = tomlkit.loads(serialize_and_format(toml_doc)).unwrap()["pipe"]["list_ideas"]
         assert reloaded["output"] == "Idea[]"
         assert reloaded["inputs"] == {"topic": "Text"}

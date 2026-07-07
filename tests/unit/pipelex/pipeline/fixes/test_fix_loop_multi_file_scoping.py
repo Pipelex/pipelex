@@ -10,6 +10,7 @@ multi-file targeting (threading ``file_path`` from the raise sites) is Phase 1 w
 from pathlib import Path
 
 import pytest
+import tomlkit
 from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
@@ -92,4 +93,7 @@ class TestFixLoopMultiFileScoping:
         assert result.is_valid is True
         assert result.iterations == 1
         assert len(result.fixes_applied) == 1
-        assert 'output = "Idea[]"' in bundle_path.read_text(encoding="utf-8")
+        # Assert on the parsed value, not raw spacing: the fix loop rewrites the whole file to
+        # canonical MTHDS, and the formatter column-aligns this single-line table.
+        fixed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
+        assert fixed["pipe"]["list_ideas"]["output"] == "Idea[]"

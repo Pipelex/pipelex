@@ -36,6 +36,7 @@ dependencies = [
   "opentelemetry-semantic-conventions",
   "opentelemetry-sdk",
   "pillow>=12.1.1",
+  "pipelex-tools-py==0.1.1",
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",

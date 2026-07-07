@@ -14,11 +14,11 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.fixes.applier import apply_fix_ops
+from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.suggested_fix import SuggestedFix
-from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
+from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 
 
 class FixBundleResult(BaseModel):
@@ -129,7 +129,7 @@ async def fix_bundle_file(
                 any_op_applied = True
         apply_rounds += 1
         if any_op_applied:
-            save_toml_to_path(toml_doc, path=mthds_file_path)
+            mthds_file_path.write_text(serialize_and_format(toml_doc), encoding="utf-8")
 
     # max_iterations apply rounds done — the final verdict comes from one last validation.
     try:

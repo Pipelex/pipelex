@@ -11,13 +11,13 @@ Clean-context multi-angle review of the `sync-controller-inputs` diff (`git diff
 
 Several angles flagged that `is_controller_input_drift` and `is_inadequate_output` each hand-enumerate the whole `PipeValidationErrorType` set, so a new member must be classified in every `is_*` property. This is the sanctioned house style (`.claude/rules/python-standards.md`: no `case _:`, so pyright's exhaustiveness check *forces* a decision on every new member) — a `{error_type: fix_code}` mapping would trade that compile-time guarantee for silence. Keeping the idiom is the correct call, not a deferral. Revisit the ergonomics only if wave-2 rules push the classifier count high enough that the per-member edit cost outweighs the guard — a real refactor with its own design, not a spike edit.
 
-## 2. Trivia-preservation is solved twice (low-value consolidation, defer)
+## 2. Trivia-preservation is solved twice (DISSOLVED by Phase A′)
 
-`applier._canonicalize_mutated_inline_table` transplants four trivia fields; `tools/misc/toml_sync.set_nested_value` swaps the whole trivia object. Same "preserve tomlkit trivia across an in-place replacement" idea, two techniques, two modules. Consolidating into a shared helper is a cross-module refactor touching code outside the fix pipeline; the drift risk (a future tomlkit trivia-model change) is low. Defer until a concrete tomlkit bump forces a look at both.
+~~`applier._canonicalize_mutated_inline_table` transplants four trivia fields; `tools/misc/toml_sync.set_nested_value` swaps the whole trivia object.~~ **Moot as of Phase A′:** `_canonicalize_mutated_inline_table` is deleted — the applier no longer preserves inline-table trivia at all, because it no longer re-emits inline tables. `format_mthds` owns canonical spacing, and block-table comments survive by tomlkit's in-place mutation. The only remaining trivia handling is `toml_sync`'s, outside the fix pipeline. Nothing to consolidate.
 
-## 3. Per-`table_path` batch canonicalization (perf, defer)
+## 3. Per-`table_path` batch canonicalization (DISSOLVED by Phase A′)
 
-`_canonicalize_mutated_inline_table` runs after every `SET_KEY`/`DELETE_KEY`. When one fix emits several ops against the same inline `inputs` table, each op re-canonicalizes the whole table — `O(N·K)` where `O(N+K)` (canonicalize each distinct `table_path` once, after all its ops land) would do. Negligible for real `inputs` tables (a handful of vars), and the per-op form is correct and idempotent (pinned by the multi-op golden test). Batching adds touched-path tracking to `apply_fix_ops`; not worth it until a rule produces many ops on one large table.
+~~`_canonicalize_mutated_inline_table` runs after every `SET_KEY`/`DELETE_KEY`, re-canonicalizing the whole table per op.~~ **Moot as of Phase A′:** there is no per-op canonicalization left in the applier — `apply_fix_ops` is pure DOM mutation, and canonical formatting happens exactly once per file write (`serialize_and_format` → one `format_mthds` pass). The `O(N·K)` concern is gone.
 
 ## 4. Micro-duplication in the `_*_for_fix` helpers (accept)
 

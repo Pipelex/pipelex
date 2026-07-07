@@ -7,16 +7,20 @@ Guarded application: an op only applies when its target table path exists in the
 This protects against errors raised on elaborated/synthetic constructs (a synthesized
 sequence has no TOML to patch) and against ops targeting a different file than the one
 being patched — a skipped op is reported, never raised.
+
+Canonical formatting is not this module's job: the applier mutates, and ``serialize_and_format``
+hands the serialized document to the MTHDS formatter (``pipelex_tools.format_mthds``) for the
+one canonical style, so an incremental edit that leaves non-canonical inline-table spacing is
+reflowed at write time rather than hand-corrected here.
 """
 
-from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any, cast
 
 import tomlkit
+from pipelex_tools import format_mthds
 from pydantic import BaseModel, ConfigDict, Field
 from tomlkit import TOMLDocument
-from tomlkit.items import InlineTable
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.suggested_fix import FixOp, FixOpKind, TomlValue
@@ -63,52 +67,39 @@ def _resolve_table(toml_doc: TOMLDocument, *, table_path: list[str]) -> dict[str
 
 
 def _as_tomlkit_value(value: TomlValue | None) -> Any:
-    """Convert a mapping value to a canonical inline table (`inputs = { ... }`, the dominant
-    authoring form); scalars pass through, tomlkit wraps them itself on assignment.
+    """Convert a mapping value to an inline table (`inputs = { ... }`, the dominant authoring
+    form), so a freshly-created mapping stays attached to its pipe rather than being emitted as
+    a detached ``[pipe.x.inputs]`` block table at the end of the file (what a plain dict assign
+    yields). tomlkit owns key quoting and per-value rendering; canonical spacing is the
+    formatter's job in ``serialize_and_format``. Scalars pass through — tomlkit wraps them on
+    assignment.
     """
     if isinstance(value, dict):
-        return _canonical_inline_table(value)
+        inline = tomlkit.inline_table()
+        for item_key, item_value in value.items():
+            inline[item_key] = item_value
+        return inline
     return value
 
 
-def _canonical_inline_table(mapping: Mapping[str, Any]) -> InlineTable:
-    """Build an inline table with the canonical ``{ key = value, ... }`` spacing.
+def serialize_and_format(toml_doc: TOMLDocument) -> str:
+    """Serialize the mutated DOM and return its canonical MTHDS text.
 
-    tomlkit's incremental inline-table edits leave non-canonical whitespace behind (double
-    separators after a delete, no brace padding on a fresh table), which a later ``plxt format``
-    would churn. Reassigning each entry into a fresh inline table lets tomlkit render every key
-    and value itself — quoting dotted or otherwise non-bare keys, nesting inline-table values,
-    preserving each value's own string style — so the only canonical gap left is the outer brace
-    padding, spliced onto the guaranteed-outermost braces (never touching nested content).
+    The applier mutates in place and leaves formatting alone; the single source of canonical
+    style is ``pipelex_tools.format_mthds`` (the same ``taplo``/MTHDS engine the ``plxt`` CLI
+    runs on save), which reflows inline-table and array spacing to the canonical form and is a
+    no-op on already-canonical files (the norm — MTHDS is formatted on save + CI-enforced). A
+    ``kind="syntax"`` diagnostic means the applier emitted malformed TOML — a planner/applier
+    bug, never something to write out — so it is raised, not swallowed.
     """
-    native = tomlkit.inline_table()
-    for item_key, item_value in list(mapping.items()):
-        native[item_key] = item_value
-    body = native.as_string()[1:-1].strip()
-    if not body:
-        return cast("InlineTable", tomlkit.value("{}"))
-    return cast("InlineTable", tomlkit.value("{ " + body + " }"))
-
-
-def _canonicalize_mutated_inline_table(toml_doc: TOMLDocument, *, table_path: list[str], mutated_table: dict[str, Any]) -> None:
-    """Re-emit a just-mutated inline table with canonical spacing, keeping its trailing comment.
-
-    TOML forbids comments inside inline tables, so rebuilding one loses nothing; the line's
-    trailing comment and indent live on the item's trivia and are transplanted onto the
-    canonical replacement. Block tables are left untouched — their comments live between
-    lines and in-place mutation already preserves them.
-    """
-    if not isinstance(mutated_table, InlineTable):
-        return
-    parent_table = _resolve_table(toml_doc, table_path=table_path[:-1])
-    if parent_table is None:
-        return
-    canonical = _canonical_inline_table(mutated_table)
-    canonical.trivia.indent = mutated_table.trivia.indent
-    canonical.trivia.comment_ws = mutated_table.trivia.comment_ws
-    canonical.trivia.comment = mutated_table.trivia.comment
-    canonical.trivia.trail = mutated_table.trivia.trail
-    parent_table[table_path[-1]] = canonical
+    dumped: str = tomlkit.dumps(toml_doc)  # pyright: ignore[reportUnknownMemberType]
+    result = format_mthds(dumped)
+    syntax_diagnostics = [diagnostic for diagnostic in result["diagnostics"] if diagnostic["kind"] == "syntax"]
+    if syntax_diagnostics:
+        reported = "; ".join(diagnostic["message"] for diagnostic in syntax_diagnostics)
+        msg = f"fix applier produced malformed TOML (formatter reported: {reported}) — planner/applier bug"
+        raise PipelexUnexpectedError(msg)
+    return result["formatted"]
 
 
 def apply_fix_ops(toml_doc: TOMLDocument, *, ops: list[FixOp]) -> list[FixOpApplication]:
@@ -134,7 +125,6 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if target_table is None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
-            _canonicalize_mutated_inline_table(toml_doc, table_path=fix_op.table_path, mutated_table=target_table)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
         case FixOpKind.DELETE_KEY:
             if fix_op.key is None:
@@ -146,7 +136,6 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if fix_op.key not in target_table:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
             del target_table[fix_op.key]
-            _canonicalize_mutated_inline_table(toml_doc, table_path=fix_op.table_path, mutated_table=target_table)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
         case FixOpKind.DELETE_TABLE:
             if not fix_op.table_path:
