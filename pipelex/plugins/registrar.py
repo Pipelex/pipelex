@@ -63,6 +63,7 @@ class HubSlot(StrEnum):
     """A process-global capability slot a boot-orchestrator plugin may claim."""
 
     CONTENT_GENERATOR = "content_generator"
+    PIPE_FUNC_EXECUTOR = "pipe_func_executor"
     PIPE_ROUTER = "pipe_router"
     PIPE_RUN = "pipe_run"
     TASK_MANAGER = "task_manager"
@@ -267,6 +268,9 @@ class PluginRegistrar:
 
     def claim_content_generator(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.CONTENT_GENERATOR, factory=factory)
+
+    def claim_pipe_func_executor(self, factory: Callable[[], Any]) -> None:
+        self._claim(slot=HubSlot.PIPE_FUNC_EXECUTOR, factory=factory)
 
     def claim_pipe_router(self, factory: Callable[[], Any]) -> None:
         self._claim(slot=HubSlot.PIPE_ROUTER, factory=factory)

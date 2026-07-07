@@ -462,6 +462,14 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded, or empty list if already loaded
         """
+        # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
+        # workflow, which never populates _blueprints). This lets get_crate() hand the crate — with
+        # its python_sources — to the sandbox executor. The blueprint-derived path (load_libraries ->
+        # load_from_blueprints) leaves _blueprints populated and rebuilds from it instead, so it must
+        # NOT be shadowed by a cached crate here.
+        if library_id not in self._blueprints:
+            self._crate_cache[library_id] = crate
+
         # Fingerprint idempotency: skip if this crate was already loaded into this library
         fingerprint = crate.fingerprint
         loaded_set = self._loaded_fingerprints.setdefault(library_id, set())

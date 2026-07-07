@@ -1,5 +1,3 @@
-import asyncio
-import inspect
 from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
 from pydantic import field_validator
@@ -16,8 +14,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
+from pipelex.hub import get_class_registry, get_pipe_func_executor
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -193,16 +190,19 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         output_name: str | None = None,
     ) -> PipeFuncOutput:
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
-        function = func_registry.get_required_function(self.function_name)
 
         try:
-            if inspect.iscoroutinefunction(function):
-                func_output_object = await function(working_memory=working_memory)
-            else:
-                func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
+            execution_result = await get_pipe_func_executor().run_pipe_func(
+                job_metadata=job_metadata,
+                pipe_code=self.code,
+                function_name=self.function_name,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+            )
         except Exception as exc:
-            # PipeFunc invokes an arbitrary user-registered function whose failure surface is not enumerable;
-            # any failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
+            # PipeFunc runs arbitrary user code — in-process, or (in hosted mode) inside a sandbox
+            # reached through a Temporal activity — whose failure surface is not enumerable; any
+            # failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
             # Build informative error message with actual input values from working memory
             inputs_lines: list[str] = []
             for input_name in self.inputs.root:
@@ -222,17 +222,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        the_content: StuffContent
-        if isinstance(func_output_object, StuffContent):
-            the_content = func_output_object
-        elif isinstance(func_output_object, list):
-            func_result_list = cast("list[StuffContent]", func_output_object)
-            the_content = ListContent(items=func_result_list)
-        elif isinstance(func_output_object, str):
-            the_content = TextContent(text=func_output_object)
-        else:
-            msg = f"Function '{self.function_name}' must return a StuffContent or a list, got {type(func_output_object)}"
-            raise TypeError(msg)
+        the_content = execution_result.content
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
@@ -248,11 +238,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         # Capture execution data for the graph tracer. PipeFunc has no prompts or
         # models to record, but the sidepanel should still show *what* function ran
         # and what kind of content it returned — useful for debugging and for
-        # distinguishing multiple PipeFunc nodes in a graph.
+        # distinguishing multiple PipeFunc nodes in a graph. In hosted mode the module/qualname
+        # ride back on the execution result (the operator no longer holds the callable).
         execution_data_dict: dict[str, Any] = {
             "function_name": self.function_name,
-            "function_module": getattr(function, "__module__", None),
-            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "function_module": execution_result.function_module,
+            "function_qualname": execution_result.function_qualname or self.function_name,
             "output_content_type": type(the_content).__name__,
         }
         self._register_execution_data(job_metadata, execution_data=execution_data_dict)
@@ -327,6 +318,10 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     async def _validate_before_run(
         self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the function is not registered in this process, so its return type
+            # cannot be inspected here. The sandbox validates the real function when it registers it.
+            return
         function = func_registry.get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
         # TODO: this should not happend ever. The correct way to do this would be to have a unit test making sure

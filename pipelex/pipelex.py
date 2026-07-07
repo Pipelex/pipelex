@@ -43,6 +43,8 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
+from pipelex.pipe_operators.func.in_process_pipe_func_executor import InProcessPipeFuncExecutor
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -187,6 +189,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManagerAbstract | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -442,6 +445,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
         self.pipelex_hub.set_content_generator(content_generator)
 
+        # Same injection precedence as CONTENT_GENERATOR: explicit param > plugin slot-claim > core
+        # default. The Temporal worker claims PIPE_FUNC_EXECUTOR to inject the sandbox-dispatching
+        # executor; every other boot gets the in-process one, which runs the customer function here.
+        if pipe_func_executor is None:
+            pipe_func_executor = self._resolve_hub_slot(
+                slot=HubSlot.PIPE_FUNC_EXECUTOR,
+                default=InProcessPipeFuncExecutor,
+            )
+        self.pipelex_hub.set_pipe_func_executor(pipe_func_executor)
+
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
@@ -587,6 +600,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManager | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -625,6 +639,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             models_manager: Custom model configuration manager
             inference_manager: Custom inference routing manager
             content_generator: Custom content generation implementation
+            pipe_func_executor: Custom PipeFunc execution seam. Defaults to the in-process executor;
+                the Temporal worker claims this slot to dispatch PipeFunc runs to a sandbox activity.
             pipeline_manager: Custom pipeline management
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
@@ -663,6 +679,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 models_manager=models_manager,
                 inference_manager=inference_manager,
                 content_generator=content_generator,
+                pipe_func_executor=pipe_func_executor,
                 pipeline_manager=pipeline_manager,
                 pipe_router=pipe_router,
                 reporting_delegate=reporting_delegate,

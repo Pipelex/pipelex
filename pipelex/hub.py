@@ -29,6 +29,7 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.sdk_client_manager import SdkClientManager
@@ -96,6 +97,7 @@ class PipelexHub:
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
+        self._pipe_func_executor: PipeFuncExecutorProtocol | None = None
         # Keyless boot (``Pipelex.make(needs_inference=False)``) forces every run to DRY (eng
         # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
         # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
@@ -230,6 +232,9 @@ class PipelexHub:
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
+
+    def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
+        self._pipe_func_executor = pipe_func_executor
 
     def set_dry_run_forced(self, is_forced: bool) -> None:
         self._is_dry_run_forced = is_forced
@@ -386,6 +391,12 @@ class PipelexHub:
             msg = "ContentGenerator is not initialized"
             raise RuntimeError(msg)
         return self._content_generator
+
+    def get_required_pipe_func_executor(self) -> PipeFuncExecutorProtocol:
+        if self._pipe_func_executor is None:
+            msg = "PipeFuncExecutor is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor
 
     # pipelex
 
@@ -632,6 +643,34 @@ def get_content_generator() -> ContentGeneratorProtocol:
     if override is not None:
         return override
     return get_pipelex_hub().get_required_content_generator()
+
+
+_pipe_func_executor_override: ContextVar[PipeFuncExecutorProtocol | None] = ContextVar("pipe_func_executor_override", default=None)
+
+
+@contextmanager
+def scoped_pipe_func_executor(pipe_func_executor: PipeFuncExecutorProtocol) -> Generator[None, None, None]:
+    """Set ``pipe_func_executor`` as the active executor for the scope, then restore the prior value on exit.
+
+    The PipeFunc counterpart of :func:`scoped_content_generator`: an in-process run nested inside a
+    Temporal activity (e.g. the sandbox entrypoint replaying the pipe, or the dry-validate activity)
+    wraps itself in this scope with an in-process executor so its PipeFunc steps run locally instead
+    of recursively dispatching another ``act_pipe_func``. ContextVar-scoped so concurrent runs never
+    cross-contaminate.
+    """
+    prev = _pipe_func_executor_override.get()
+    _pipe_func_executor_override.set(pipe_func_executor)
+    try:
+        yield
+    finally:
+        _pipe_func_executor_override.set(prev)
+
+
+def get_pipe_func_executor() -> PipeFuncExecutorProtocol:
+    override = _pipe_func_executor_override.get()
+    if override is not None:
+        return override
+    return get_pipelex_hub().get_required_pipe_func_executor()
 
 
 # pipelex
