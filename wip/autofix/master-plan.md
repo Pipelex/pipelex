@@ -41,10 +41,10 @@ Exit (**CHECKPOINT 1**) — **met:** all wave-1 rules green with planner suppres
 
 Replaces the spike's conservative scoping guard (source-less fixes are simply dropped under `library_dirs`). Deferred items 0 and 1 from checkpoint 0:
 
-- Thread the declaring file into enriched errors — set `file_path` at the raise sites (or carry a domain qualifier the loop checks against the target file's `domain` key), so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
+- Thread the declaring file into enriched errors — set `file_path` or better yet `source` at the raise sites, so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
 - Derive `is_single_file` from the **resolved** effective dirs (`resolve_library_dirs`), fixing both wrong directions of the current raw-arg check (`[]` is documented single-file but treated as multi; `None` can fall through to hub defaults/`PIPELEXPATH` and load other files while being treated as single).
 
-Can start in parallel with step 2 once its shape is clear, but ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
+Ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
 
 ### 4. Agent apply surface — `pipelex-agent fix bundle`
 
