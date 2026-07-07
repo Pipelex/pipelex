@@ -145,6 +145,34 @@ class PipeValidationErrorType(StrEnum):
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
 
+    @property
+    def is_inadequate_output(self) -> bool:
+        """True for the output-mismatch pair the fix planner can act on when enriched."""
+        match self:
+            case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
 
 class PipeValidationError(ValueError):
     def __init__(
@@ -156,6 +184,7 @@ class PipeValidationError(ValueError):
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,
         provided_concept_code: str | None = None,
+        expected_output_ref: str | None = None,
         file_path: str | None = None,
         explanation: str | None = None,
     ):
@@ -165,6 +194,11 @@ class PipeValidationError(ValueError):
         self.variable_names = variable_names
         self.required_concept_codes = required_concept_codes
         self.provided_concept_code = provided_concept_code
+        # The output ref the pipe should declare (full bundle representation: concept +
+        # multiplicity + presence marker), set only where the validator knows the correct
+        # value at detection time — the semantic fact the fix planner translates into a
+        # suggested fix.
+        self.expected_output_ref = expected_output_ref
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
@@ -179,6 +213,8 @@ class PipeValidationError(ValueError):
             msg += f" • required_concept_codes='{self.required_concept_codes}'"
         if self.provided_concept_code:
             msg += f" • provided_concept_code='{self.provided_concept_code}'"
+        if self.expected_output_ref:
+            msg += f" • expected_output_ref='{self.expected_output_ref}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

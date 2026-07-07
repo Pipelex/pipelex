@@ -1,0 +1,17 @@
+# Deferred items from Checkpoint 0 code review
+
+Items surfaced by the clean-context code review of the Phase 0 spike that are real but deliberately NOT addressed in the spike, per the no-over-engineering rule. Each belongs to an already-planned later step.
+
+## 1. Real multi-file fix targeting (Phase 1)
+
+The spike's convergence loop refuses to apply source-less fixes when `library_dirs` is set (`_applicable_safe_fixes` in `pipelex/pipeline/fixes/fix_loop.py`) — a safe no-op, not a solution. The review found the underlying gap: `SuggestedFix.source` is populated from `PipeValidationError.file_path`, and **no raise site in the codebase ever sets `file_path`**, so the source-based file check is dead code today. The scoping guard prevents the corruption scenario (same `pipe_code` in two domains → fix patches the wrong file's table), but multi-file bundles get no fixes at all.
+
+Phase 1 must thread the declaring file into the enriched errors — either set `file_path` at the raise sites (the pipe/library layer knows the source file) or carry a domain qualifier the loop can check against the target file's `domain` key. Until then, `fix` only fixes single-file bundles. This matches the master plan's "hardened loop (multi-file targeting)" Phase 1 item.
+
+## 2. Conformance fixture regeneration (cross-repo sync wave)
+
+`conformance/validate-error-qa/generated/invalid_inadequate_output_multiplicity.json` pins the exact JSON body of an `INADEQUATE_OUTPUT_MULTIPLICITY` error from a live `pipelex-api`. Once this enrichment (`suggested_fix` on `ValidationErrorItem`, `expected_output_ref`) reaches the runner API via a pipelex release + pin bump, that fixture needs regeneration. Belongs to the already-tracked cross-repo schema-sync step (master plan) — nothing to do in this repo now.
+
+## 3. Accepted as-is: unconditional `expected_output_ref` computation
+
+`PipeSequence.validate_output_with_library` now computes `expected_output_ref` before the compatibility checks, so it also runs on the happy path. Reviewed and accepted: the cost is one string format + attribute reads on a validation (not execution) path, and computing it lazily would re-duplicate the code the change deduplicated. Not deferred work — recorded so a later reviewer knows it was a deliberate call.

@@ -9,7 +9,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
+from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
@@ -67,11 +67,31 @@ class PipeSequence(PipeController):
         The output of the pipe sequence should match the output of the last step,
         both in terms of concept compatibility and multiplicity.
         """
-        last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
+        last_sub_pipe = self.sequential_sub_pipes[-1]
+        last_step_pipe_code = last_sub_pipe.pipe_code
         # Skip output validation if the last step is an unresolved cross-package ref
         if QualifiedRef.has_cross_package_prefix(last_step_pipe_code) and get_optional_pipe(pipe_code=last_step_pipe_code) is None:
             return
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
+
+        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
+        if not effective_last_step_output_multiplicity:
+            effective_last_step_output_multiplicity = last_step_pipe.output.multiplicity
+
+        # The last step's effective output in bundle representation — what the sequence's declared
+        # output should be. This is the enriched semantic fact the fix planner needs: bare concept
+        # code when same-domain as the sequence or native, qualified `domain.Code` otherwise, with
+        # the effective multiplicity (sub-pipe override wins) and the presence marker.
+        last_step_output_concept = last_step_pipe.output.concept
+        if last_step_output_concept.domain_code == self.domain_code:
+            expected_concept_ref = last_step_output_concept.code
+        else:
+            expected_concept_ref = last_step_output_concept.simple_concept_ref
+        expected_output_ref = format_concept_with_multiplicity(
+            expected_concept_ref,
+            multiplicity=effective_last_step_output_multiplicity,
+            presence=last_step_pipe.output.presence,
+        )
 
         # Check concept compatibility
         if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):
@@ -87,12 +107,8 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
+                expected_output_ref=expected_output_ref,
             )
-
-        last_sub_pipe = self.sequential_sub_pipes[-1]
-        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
-        if not effective_last_step_output_multiplicity:
-            effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
 
         # Check multiplicity compatibility
         if not is_multiplicity_compatible(
@@ -112,6 +128,7 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
+                expected_output_ref=expected_output_ref,
             )
 
         # The absence-taint boundary check (D6): a maybe-absent slot ending the sequence must be

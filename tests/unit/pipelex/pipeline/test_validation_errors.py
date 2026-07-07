@@ -271,6 +271,37 @@ class TestBuildValidationErrorItems:
         assert problem_document["validation_errors"] == cli_dicts
         assert json.dumps(problem_document["validation_errors"], sort_keys=True) == json.dumps(cli_dicts, sort_keys=True)
 
+    def test_enriched_pipe_validation_error_rides_a_suggested_fix(self) -> None:
+        """An enriched output-mismatch error data yields an item carrying the planner's suggested_fix."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="list_ideas",
+                    message="output mismatch",
+                    field_path="",
+                    expected_output_ref="Idea[]",
+                ),
+            ],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "match-sequence-output"
+        assert suggested_fix.ops[0].table_path == ["pipe", "list_ideas"]
+        assert suggested_fix.ops[0].value == "Idea[]"
+
+    def test_non_fixable_pipe_validation_error_has_no_suggested_fix(self) -> None:
+        """A pipe-validation item with no enriched data keeps suggested_fix unset (wire unchanged)."""
+        items = _build_items(_all_category_error())
+        assert all(item.suggested_fix is None for item in items)
+        for item in items:
+            assert "suggested_fix" not in item.model_dump(mode="json", exclude_none=True)
+
     def test_instantiation_errors_are_projected_as_pipe_validation(self) -> None:
         """Pipe/concept *instantiation* errors reach the wire too (not silently dropped).
 

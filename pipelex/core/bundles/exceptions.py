@@ -1,12 +1,6 @@
-from enum import StrEnum
-
 from pydantic import BaseModel
 
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-
-
-class PipelexBundleBlueprintFixableErrorType(StrEnum):
-    """Types of validation errors in Pipelex bundle blueprints that the build agent can address."""
 
 
 class PipelexBundleBlueprintValidationErrorData(BaseModel):

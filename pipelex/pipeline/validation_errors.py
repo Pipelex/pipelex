@@ -18,6 +18,7 @@ is no import cycle.
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
+from pipelex.pipeline.fixes.planner import plan_fix_for_pipe_validation_error
 
 
 def build_validation_error_items(
@@ -119,6 +120,7 @@ def build_validation_error_items(
                 field_name=pipe_error.field_name,
                 variable_names=pipe_error.variable_names or None,
                 message=pipe_error.message,
+                suggested_fix=plan_fix_for_pipe_validation_error(pipe_error),
             )
         )
 

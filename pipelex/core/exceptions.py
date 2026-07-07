@@ -60,3 +60,9 @@ class PipesAndConceptValidationErrorData(BaseModel):
 
     # === Variable names for input/output errors ===
     variable_names: list[str] | None = Field(default=None, description="Variable names (for input errors)")
+
+    # === Enriched expected value (for output-mismatch errors) ===
+    expected_output_ref: str | None = Field(
+        default=None,
+        description="The output ref the pipe should declare (bundle representation), set when the validator knows the correct value",
+    )
