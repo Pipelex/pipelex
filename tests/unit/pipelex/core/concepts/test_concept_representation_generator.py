@@ -151,6 +151,8 @@ class TestGenerateFieldValueBasicTypes:
         result = generator.generate_field_value(datetime.date, field_name="issued_on")
         assert isinstance(result, str)
         assert datetime.date.fromisoformat(result) is not None
+        # Extended ISO (YYYY-MM-DD), not the compact all-digit form DateContent rejects.
+        assert "-" in result, f"Expected extended ISO date (YYYY-MM-DD), got: {result}"
 
     def test_datetime_field_is_valid_iso_datetime(self) -> None:
         """A datetime.datetime field generates a real ISO datetime, not a placeholder."""
@@ -158,6 +160,8 @@ class TestGenerateFieldValueBasicTypes:
         result = generator.generate_field_value(datetime.datetime, field_name="recorded_at")
         assert isinstance(result, str)
         assert datetime.datetime.fromisoformat(result) is not None
+        # A real datetime carries the time component — a date-only string would also parse here.
+        assert "T" in result, f"Expected an ISO datetime with a time component, got: {result}"
 
     def test_time_field_is_valid_iso_time(self) -> None:
         """A datetime.time field generates a real ISO time, not a placeholder."""
@@ -660,6 +664,9 @@ class TestDateContentRepresentation:
         content = result["content"]
         assert isinstance(content, dict)
         assert "date" in content
+        # include_optional=False omits the optional `time`: the build-inputs template must never
+        # fabricate a time (the Date concept's source-precision contract).
+        assert "time" not in content
         # The emitted example must be a real ISO date the DateContent accepts (round-trip).
         rebuilt = DateContent.model_validate(content)
         assert isinstance(rebuilt.date, datetime.date)

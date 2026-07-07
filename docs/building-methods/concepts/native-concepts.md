@@ -153,7 +153,7 @@ type = "PipeLLM"
 description = "Extract the scheduled departure from a ticket"
 inputs = { ticket = "Ticket" }
 output = "Date"
-prompt = "Extract the scheduled departure from this ticket: @ticket"
+prompt = "Extract the scheduled departure from this ticket: $ticket"
 ```
 
 As a pipeline input, a top-level TOML date or datetime literal maps to `Date` directly (`departure = 2026-07-07T15:40:00+02:00`); read it from a Python caller via `pipe_output.main_stuff_as_date`.
