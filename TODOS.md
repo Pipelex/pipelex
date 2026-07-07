@@ -156,7 +156,7 @@ Trigger: `INVALID_PIPE_CODE_SYNTAX` from same-domain dotted pipe codes. Fix: pos
 
 ### C.1 — Rename-mechanics spike (timeboxed, go/no-go)
 
-- [ ] Timeboxed spike: can tomlkit rename a table key **position-preserving** (no `del`+re-add reordering, comments intact)? Investigate container-body manipulation; prove with a throwaway golden test.
+- [ ] Timeboxed spike: can tomlkit rename a table key **position-preserving** (no `del`+re-add reordering, comments intact)? Investigate container-body manipulation; prove with a throwaway golden test. **Note:** Phase A′'s `format_mthds` pass does NOT reorder tables, so it won't rescue a reordering rename — but since `pipelex-tools-py` is ours, an upstream rename / canonical-ordering primitive is an alternative to solving it in tomlkit (deferred exploration, item 2 in `wip/autofix/deferred-checkpoint-a-prime-review-items.md`).
 - [ ] Confront the **array-of-tables addressing gap**: `steps[].pipe` / `branches[].pipe` rewrites need to address items inside arrays — decide the `FixOp` extension (index path segments vs a dedicated op) or conclude the shape can't express it cleanly.
 - [ ] **GO/NO-GO decision** recorded in the design doc and the master plan (step 2 exit requires it either way). NO-GO → skip to CHECKPOINT C with the verdict; the rule stays out of wave 1 rather than shipping a reordering bug or a contorted op shape.
 
