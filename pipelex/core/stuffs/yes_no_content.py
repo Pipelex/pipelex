@@ -7,7 +7,10 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class YesNoContent(StuffContent):
-    yes_no: bool = Field(description="Whether the answer is yes (true) or no (false).")
+    # strict=True keeps the concept a genuine boolean: pydantic's default lax mode would coerce
+    # "yes"/"true"/"1"/0/1 into a bool on the dict-content path (model_validate), silently bypassing
+    # the no-cross-kind-coercion contract the scalar envelope arm enforces. Only a real bool is accepted.
+    yes_no: bool = Field(description="Whether the answer is yes (true) or no (false).", strict=True)
 
     @property
     @override

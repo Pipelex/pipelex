@@ -21,7 +21,22 @@ class TestYesNoContentRenders:
     def test_rejects_non_bool_int(self):
         """An arbitrary int (not 0/1) must not coerce into the bool field."""
         with pytest.raises(ValidationError):
-            YesNoContent(yes_no=2)  # pyright: ignore[reportArgumentType]
+            YesNoContent.model_validate({"yes_no": 2})
+
+    def test_rejects_coercible_string(self):
+        """A yes/no-ish string must not coerce into the bool field (strict validation).
+
+        Without strict validation pydantic would silently turn ``"yes"`` into ``True`` on the
+        dict-content path (``{"concept": "YesNo", "content": {"yes_no": "yes"}}``), bypassing the
+        no-cross-kind-coercion contract the scalar envelope arm enforces.
+        """
+        with pytest.raises(ValidationError):
+            YesNoContent.model_validate({"yes_no": "yes"})
+
+    def test_rejects_coercible_int(self):
+        """The ints 0/1 must not coerce into the bool field (strict validation)."""
+        with pytest.raises(ValidationError):
+            YesNoContent.model_validate({"yes_no": 1})
 
     def test_rendered_plain_true(self):
         content = YesNoContent(yes_no=TestData.SAMPLE_TRUE)
