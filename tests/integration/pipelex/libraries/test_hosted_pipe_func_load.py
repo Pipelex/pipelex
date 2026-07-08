@@ -40,12 +40,14 @@ def sandbox_hosted_mode() -> Generator[None, None, None]:
     """Select a non-``direct`` execution mode for the duration of a test, then restore it.
 
     Flipping config (not monkeypatching the helper) exercises the genuine
-    is_pipe_func_sandbox_hosted() read at every call site (loader + validators) together — any
-    non-``direct`` mode is sandbox-hosted, so ``local_sandbox`` stands in for the general case.
+    is_pipe_func_sandbox_hosted() read at every call site (loader + validators) together: any
+    non-``direct`` mode is sandbox-hosted. The concrete sandbox modes live in the out-of-tree closed
+    plugin, so this open-core test uses a neutral ``"sandbox"`` token — it only flips the hosted flag
+    (the executor already on the hub is never re-resolved here), so no registered mode is needed.
     """
     pipe_func_config = get_config().pipelex.pipe_func_config
     previous = pipe_func_config.execution_mode
-    pipe_func_config.execution_mode = "local_sandbox"
+    pipe_func_config.execution_mode = "sandbox"
     try:
         yield
     finally:
