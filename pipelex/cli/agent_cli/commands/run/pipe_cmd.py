@@ -110,7 +110,8 @@ def run_pipe_cmd(
             library_dir = [*export_dirs, *library_dir]
 
     # Load inputs: --inputs flag takes priority, then stdin fallback
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
+    parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
+    pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
     runner_type: RunnerType = ctx.obj["runner"]
 
@@ -161,6 +162,7 @@ def run_pipe_cmd(
                         graph=graph,
                         costs=costs,
                         with_memory=with_memory,
+                        inputs_base_dir=parsed_inputs.inputs_base_dir,
                     )
                 )
                 agent_success_formatted(

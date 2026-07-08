@@ -30,6 +30,8 @@ Here are all the native concepts you can use out of the box:
 | `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
+| `YesNo` | The answer to a yes/no question | `YesNoContent` |
+| `Date` | A calendar date, optionally with a time of day | `DateContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
@@ -108,6 +110,55 @@ class NumberContent(StuffContent):
 ```
 
 **Use for:** Counts, calculations, metrics, scores.
+
+### YesNoContent
+
+Represents the answer to a yes/no question — a single boolean verdict:
+
+```python
+class YesNoContent(StuffContent):
+    yes_no: bool
+```
+
+Renders as `yes` or `no` when injected into a prompt. Especially handy as a `PipeLLM` output for judgments — `output = "YesNo"` makes the model return a typed boolean instead of free text answering "yes"/"no":
+
+```toml
+[pipe.judge_is_urgent]
+type = "PipeLLM"
+description = "Decide whether a message is urgent"
+inputs = { message = "Text" }
+output = "YesNo"
+prompt = "Is the following message urgent? Answer yes or no.\n\n$message"
+```
+
+Read the verdict from a Python caller via `pipe_output.main_stuff_as_yes_no.yes_no`.
+
+**Use for:** Yes/no judgments, boolean classifications, presence/absence checks, pass/fail verdicts.
+
+### DateContent
+
+Represents a calendar date, as precise as its source states — a required `date` plus an optional time of day:
+
+```python
+class DateContent(StuffContent):
+    date: datetime.date
+    time: datetime.time | None = None
+```
+
+The time is present only when the source states one — the concept never invents a time, so an LLM extracting "delivery by March 15" produces a date with no time, while a ticket's "7 Jul 2026, 15:40" keeps the time (and its UTC offset, when stated). It renders as ISO 8601 truncated to the stated precision (`2026-07-07`, or `2026-07-07T15:40:00+02:00`) when injected into a prompt. As a `PipeLLM` output, `output = "Date"` makes the model return the two-field structure:
+
+```toml
+[pipe.extract_departure]
+type = "PipeLLM"
+description = "Extract the scheduled departure from a ticket"
+inputs = { ticket = "Ticket" }
+output = "Date"
+prompt = "Extract the scheduled departure from this ticket: $ticket"
+```
+
+As a pipeline input, a top-level TOML date or datetime literal maps to `Date` directly (`departure = 2026-07-07T15:40:00+02:00`); read it from a Python caller via `pipe_output.main_stuff_as_date`.
+
+**Use for:** Issue dates, due dates, dates of birth, departures, effective/termination dates — any date found on a document. For a date value without any date attached (a bare time of day), degrade to `Text`.
 
 ### TextAndImagesContent
 

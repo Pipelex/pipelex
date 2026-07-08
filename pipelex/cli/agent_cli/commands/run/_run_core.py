@@ -32,6 +32,7 @@ async def run_pipeline_core(
     graph: bool = False,
     costs: bool = True,
     with_memory: bool = False,
+    inputs_base_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -47,6 +48,8 @@ async def run_pipeline_core(
         costs: Whether to emit usage (cost) tracing events. Default True.
         with_memory: Whether to include full working memory in output (True) or
             return compact concept JSON only (False, default).
+        inputs_base_dir: Directory bare relative file paths in ``inputs`` resolve against (Smart
+            Inputs D3) — the inputs file's parent when file-loaded, else ``None``.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -67,6 +70,7 @@ async def run_pipeline_core(
         pipe_run_mode=pipe_run_mode,
         execution_config=execution_config,
         library_dirs=library_dirs,
+        inputs_base_dir=inputs_base_dir,
     )
     response = await runner.execute(
         pipe_code=pipe_code,

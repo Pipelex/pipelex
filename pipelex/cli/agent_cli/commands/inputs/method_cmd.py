@@ -37,6 +37,10 @@ def inputs_method_cmd(
         InputsTemplateFormat,
         typer.Option("--format", help="Inputs template format: 'json' for the JSON result envelope (default), 'toml' for raw TOML on stdout"),
     ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
     """Generate an example inputs template for an installed method.
 
@@ -48,6 +52,7 @@ def inputs_method_cmd(
         pipelex-agent inputs method my-method
         pipelex-agent inputs method my-method --pipe custom_pipe
         pipelex-agent inputs method my-method --format toml
+        pipelex-agent inputs method my-method --explicit
     """
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
@@ -66,8 +71,8 @@ def inputs_method_cmd(
     make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs_paths))
-        emit_inputs_result(result, template_format=template_format)
+        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs_paths, explicit=explicit))
+        emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)

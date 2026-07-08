@@ -1,8 +1,8 @@
 import ast
 import textwrap
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
@@ -206,6 +206,29 @@ class StructureGenerator:
         """Format default value for Python code, ensuring strings use double quotes."""
         if isinstance(value, str):
             return self._escape_string_for_python(value)
+        # `repr()` module-qualifies temporal values ("datetime.datetime(...)"/"datetime.date(...)"),
+        # but the generated code imports the bare classes ("from datetime import date/datetime"), so
+        # the qualified form raises AttributeError at eval. Rebuild via fromisoformat() — a lossless,
+        # offset-preserving round-trip that uses those imported bare names. (datetime is a date subclass.)
+        if isinstance(value, datetime):
+            return f'datetime.fromisoformat("{value.isoformat()}")'
+        if isinstance(value, date):
+            return f'date.fromisoformat("{value.isoformat()}")'
+        if isinstance(value, list):
+            value_list = cast("list[Any]", value)
+            formatted_items = [self._format_default_value(item) for item in value_list]
+            return f"[{', '.join(formatted_items)}]"
+        if isinstance(value, tuple):
+            value_tuple = cast("tuple[Any, ...]", value)
+            formatted_items = [self._format_default_value(item) for item in value_tuple]
+            trailing_comma = "," if len(formatted_items) == 1 else ""
+            return f"({', '.join(formatted_items)}{trailing_comma})"
+        if isinstance(value, dict):
+            value_dict = cast("dict[Any, Any]", value)
+            formatted_items = [
+                f"{self._format_default_value(dict_key)}: {self._format_default_value(dict_value)}" for dict_key, dict_value in value_dict.items()
+            ]
+            return f"{{{', '.join(formatted_items)}}}"
         return repr(value)
 
     def _format_class_docstring(self, docstring: str, *, indent: str = "    ") -> str:
@@ -373,6 +396,9 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
             case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import date")
+                return "date"
+            case ConceptStructureBlueprintFieldType.DATETIME:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
             case ConceptStructureBlueprintFieldType.CONCEPT:
@@ -401,6 +427,7 @@ class StructureGenerator:
                             | ConceptStructureBlueprintFieldType.INTEGER
                             | ConceptStructureBlueprintFieldType.BOOLEAN
                             | ConceptStructureBlueprintFieldType.DATE
+                            | ConceptStructureBlueprintFieldType.DATETIME
                             | ConceptStructureBlueprintFieldType.LIST
                         ):
                             # Create a temporary blueprint for the item type
@@ -567,6 +594,9 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.BOOLEAN:
                 return "bool"
             case ConceptStructureBlueprintFieldType.DATE:
+                self.imports.add("from datetime import date")
+                return "date"
+            case ConceptStructureBlueprintFieldType.DATETIME:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
             case ConceptStructureBlueprintFieldType.CONCEPT:
@@ -624,6 +654,7 @@ class StructureGenerator:
         exec_globals: dict[str, Any] = {
             "__builtins__": __builtins__,
             # Provide these directly as they're used in generated code but not imported from pipelex
+            "date": date,
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,
