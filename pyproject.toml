@@ -71,6 +71,7 @@ Changelog = "https://docs.pipelex.com/changelog/"
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.78.0"]
 bedrock = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
+daytona = ["daytona>=0.194.0"]
 docling = [
   "docling>=2.94.0",
   "lxml>=6.1.0",
