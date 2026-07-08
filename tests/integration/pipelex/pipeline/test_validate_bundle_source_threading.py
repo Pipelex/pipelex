@@ -329,3 +329,26 @@ class TestValidateBundleSourceThreading:
         assert items, "expected a pipe-channel INADEQUATE_OUTPUT_MULTIPLICITY item"
         for item in items:
             assert item.source is None
+
+    async def test_pipe_channel_error_preserves_logical_source(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A pipe-channel error on an in-memory bundle keeps its logical URI source verbatim.
+
+        The backfill reads the source from the library manager's pipe-source map. A logical
+        source like ``api://bundle-0.mthds`` (passed via ``mthds_sources``) must survive the
+        round-trip unchanged — never mangled to ``api:/bundle-0.mthds`` by a ``Path`` coercion —
+        so API/MCP clients can map the diagnostic and its suggested fix back to the submitted
+        bundle.
+        """
+        load_empty_library()
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[_ENTRY_SEQ_MISMATCH_MTHDS], mthds_sources=["api://bundle-0.mthds"])
+
+        items = _pipe_channel_items(exc_info.value, error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY)
+        assert items, "expected a pipe-channel INADEQUATE_OUTPUT_MULTIPLICITY item"
+        for item in items:
+            assert item.source == "api://bundle-0.mthds"
+            assert item.suggested_fix is not None
+            assert item.suggested_fix.source == "api://bundle-0.mthds"

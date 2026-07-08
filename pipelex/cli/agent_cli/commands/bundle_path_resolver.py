@@ -23,6 +23,9 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> tuple[
     files load (and, being user-passed, fall inside the fix write scope). No file / multiple
     ambiguous files / not-a-``.mthds`` path exit 2 via ``agent_error`` (no verdict produced).
 
+    Both ``path`` and each ``library_dir`` entry have ``~`` expanded before resolution, so
+    home-relative inputs behave like every other CLI path argument.
+
     Args:
         path: The user's ``path`` argument (a ``.mthds`` file or a bundle directory).
         library_dir: The ``-L/--library-dir`` values as passed, or ``None``.
@@ -31,7 +34,10 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> tuple[
         ``(bundle_path, library_dir)`` — the resolved bundle file path, and the possibly
         directory-augmented library dirs (``None`` when none apply).
     """
-    target_path = Path(path)
+    # Expand ``~`` up front so home-relative inputs resolve like every other CLI path arg. Library
+    # dirs are expanded first so the directory-mode membership check below compares like-for-like.
+    library_dir = [str(Path(lib_dir).expanduser()) for lib_dir in library_dir] if library_dir else None
+    target_path = Path(path).expanduser()
 
     if target_path.is_dir():
         bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
@@ -59,7 +65,7 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> tuple[
         return bundle_path, library_dir
 
     if is_pipelex_file(target_path):
-        return path, library_dir
+        return str(target_path), library_dir
 
     agent_error(
         f"'{path}' is not a .mthds file or directory. "

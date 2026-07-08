@@ -98,7 +98,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
+        self._pipe_source_map: dict[str, str] = {}  # pipe_ref (domain.pipe_code) -> source identifier (fs path or logical URI)
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
@@ -232,14 +232,15 @@ class LibraryManager(LibraryManagerAbstract):
         return self._libraries[library_id]
 
     @override
-    def get_pipe_source(self, pipe_code: str) -> Path | None:
-        """Get the source file path for a pipe.
+    def get_pipe_source(self, pipe_code: str) -> str | None:
+        """Get the source identifier for a pipe.
 
         Args:
             pipe_code: The pipe code or pipe_ref (domain.code) to look up.
 
         Returns:
-            Path to the .mthds file the pipe was loaded from, or None if unknown.
+            The source the pipe was loaded from — a filesystem path or a logical URI
+            (e.g. ``api://bundle-0.mthds``), preserved verbatim — or None if unknown.
         """
         # Direct lookup by pipe_ref
         result = self._pipe_source_map.get(pipe_code)
@@ -504,7 +505,7 @@ class LibraryManager(LibraryManagerAbstract):
             # Track source file for this pipe (used by get_pipe_source)
             source = crate.source_map.get(pipe_ref)
             if source:
-                self._pipe_source_map[pipe_ref] = Path(source)
+                self._pipe_source_map[pipe_ref] = source
 
         library.pipe_library.add_pipes(pipes=all_pipes)
 

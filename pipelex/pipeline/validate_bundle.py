@@ -108,9 +108,9 @@ def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
         return
     if pipe_error.domain_code is None or pipe_error.pipe_code is None:
         return
-    source_path = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
-    if source_path is not None:
-        pipe_error.file_path = str(source_path)
+    source = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
+    if source is not None:
+        pipe_error.file_path = source
 
 
 @contextmanager
