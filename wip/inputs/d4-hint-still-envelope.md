@@ -19,3 +19,7 @@ Making the hint light would mean the **shaper** producing the light form. The li
 3. **Show both.** Hint renders the light form as the primary "provide this" and mentions the envelope escape hatch. More words, most helpful.
 
 Recommendation: **option 1 (leave it) unless a Phase-5 doc pass or user feedback shows the envelope hint actively confuses.** The light template is the teaching surface; the error hint is a fallback and being explicit there is defensible.
+
+## Phase-5 triage (Smart Inputs, 2026-07-08) — DECIDED: leave it (option 1)
+
+Settled on **option 1**. The envelope form the hint shows is always valid input and unambiguous — the most explicit "here is a shape that will work" you can hand someone who just failed to provide a value; it is a fallback surface, not the teaching surface (the light template is). Option 2 (make the hint light) still carries the layer/cycle cost described above — the delighten transform lives in `input_renderer`, which imports `input_shaper`, so having the shaper render a light hint means moving that transform to a shared home or duplicating it, a real refactor unjustified by a fallback string. Nothing in the shipped docs pass leans on the hint being light, and no evidence it confuses. Reopen only if user feedback shows the envelope hint actively misleads now that bare is the blessed default.

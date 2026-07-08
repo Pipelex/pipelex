@@ -1,7 +1,11 @@
 import pytest
 
 from pipelex import log, pretty_print
-from pipelex.core.memory.exceptions import ExplicitConceptIncompatibleError
+from pipelex.core.memory.exceptions import (
+    ExplicitConceptIncompatibleError,
+    ListWhereSingularError,
+    MultiplicityCountMismatchError,
+)
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -69,6 +73,38 @@ class TestInputShaperExplicitForms:
 
         with pytest.raises(ExplicitConceptIncompatibleError, match="not compatible"):
             InputShaper.shape({"priorities": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
+
+    def test_explicit_list_into_singular_raises(self) -> None:
+        """D2: an explicit ListContent (or envelope-with-list) must not fill a singular-declared slot.
+
+        Without the reconcile in `_shape_explicit`, this list would be *silently* stored into the
+        singular slot (the D6 compat check alone never looks at multiplicity).
+        """
+        input_specs = build_input_specs([("question", "shaper_test.Question", None)])
+        provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
+
+        with pytest.raises(ListWhereSingularError, match="declares a single"):
+            InputShaper.shape({"question": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
+
+    def test_explicit_list_wrong_fixed_count_raises(self) -> None:
+        """D2: an explicit ListContent whose length differs from a declared [N] count is a D4 error."""
+        input_specs = build_input_specs([("questions", "shaper_test.Question", 2)])
+        provided: ListContent[Question] = ListContent(items=[Question(text="only-one")])
+
+        with pytest.raises(MultiplicityCountMismatchError, match="exactly 2 items"):
+            InputShaper.shape({"questions": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
+
+    def test_explicit_list_into_list_slot_ok(self) -> None:
+        """D2/D6: an explicit ListContent whose length matches a declared list slot shapes cleanly."""
+        input_specs = build_input_specs([("questions", "shaper_test.Question", True)])
+        provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
+
+        working_memory = InputShaper.shape({"questions": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
+
+        stuff = working_memory.root["questions"]
+        pretty_print(stuff, title="explicit list into list slot")
+        assert stuff.concept.concept_ref == "shaper_test.Question"
+        assert stuff.content == ListContent(items=[Question(text="a"), Question(text="b")])
 
     def test_envelope_collision_rule_nested_escape_hatch(self) -> None:
         """D6: a dict with exactly {concept, content} is ALWAYS an envelope, even for a structure with those fields.
