@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import shortuuid
 from mthds.protocol.pipeline_inputs import PipelineInputs
 from polyfactory.exceptions import FactoryException
@@ -7,6 +9,7 @@ from pipelex import log
 from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
+from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec, TypedNamedStuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -69,18 +72,40 @@ class WorkingMemoryFactory(BaseModel):
         cls,
         pipeline_inputs: PipelineInputs,
         *,
+        input_specs: InputStuffSpecs | None = None,
         search_domain_codes: list[str] | None = None,
+        inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
 
+        When ``input_specs`` is provided (the entry pipe's declared inputs), each value is
+        interpreted **top-down against its declared concept** by the :class:`InputShaper` (Smart
+        Inputs): a bare string becomes the declared concept, a bare number/dict/list is shaped to
+        it, the ``{concept, content}`` envelope is compat-checked, and an undeclared name is a hard
+        error (D8). When ``input_specs`` is ``None`` (no signature available), each value is shaped
+        **bottom-up** from its own shape alone — today's behavior, unchanged.
+
         Args:
             pipeline_inputs: Dictionary in the format from API serialization
+            input_specs: The entry pipe's declared inputs; ``None`` disables signature-driven shaping
             search_domain_codes: List of domain codes to search for concepts
+            inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3);
+                the inputs file's parent when inputs were file-loaded by a CLI. ``None`` for API/SDK
+                and in-process callers (they pass absolute urls / storage uris). Only consulted by
+                the shaper's file-ish / CSV arms.
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
 
         """
+        if input_specs is not None:
+            return InputShaper.shape(
+                pipeline_inputs,
+                input_specs=input_specs,
+                search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
+            )
+
         working_memory = cls.make_empty()
 
         for stuff_key, stuff_content_or_data in pipeline_inputs.items():

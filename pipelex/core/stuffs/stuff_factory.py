@@ -144,6 +144,20 @@ class StuffFactory:
         name: str | None,
         code: str | None,
     ) -> Stuff | None:
+        """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
+        list_content = cls.try_make_csv_list_content(concept, content=content, name=name)
+        if list_content is None:
+            return None
+        return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
+
+    @classmethod
+    def try_make_csv_list_content(
+        cls,
+        concept: Concept,
+        *,
+        content: dict[str, Any],
+        name: str | None,
+    ) -> ListContent[StuffContent] | None:
         """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
 
         Detection is gated to the explicit wrapper shape — ``content`` must be *exactly*
@@ -151,10 +165,14 @@ class StuffFactory:
         becomes one instance of the concept's structure class, so one CSV yields one
         ``ListContent`` (the concept names the *row* type). Returns ``None`` for an ordinary
         record dict — no ``url`` key, sibling keys alongside ``url``, a non-tabular suffix, or a
-        native concept — so the caller falls through to normal Case 2.5 dict handling. The
-        single-key gate keeps a real record that merely *has* a ``url`` field (e.g.
-        ``{"label": "Home", "url": "report.csv"}``) from being silently reduced to a table with
-        its sibling keys dropped.
+        native concept — so the caller falls through to normal dict handling. The single-key gate
+        keeps a real record that merely *has* a ``url`` field (e.g. ``{"label": "Home", "url":
+        "report.csv"}``) from being silently reduced to a table with its sibling keys dropped.
+
+        Shared by the bottom-up factory (Case 2.5 envelope) and the top-down ``InputShaper``
+        (a bare tabular path / bare ``{"url": ...}`` under a declared structured list, Smart Inputs
+        D11). The shaper resolves a relative path against the inputs-file dir before calling in, so
+        this method's own gates operate on an already-resolved url.
 
         v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
         ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
@@ -223,8 +241,7 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
-        list_content = list_content_from_csv(Path(resolved.path), row_model=row_model)
-        return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
+        return list_content_from_csv(Path(resolved.path), row_model=row_model)
 
     @classmethod
     def make_stuff_from_stuff_content_or_data(

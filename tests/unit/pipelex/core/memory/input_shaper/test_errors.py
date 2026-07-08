@@ -35,7 +35,7 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
     ("count-mismatch-list-too-few", "shaper_test.Question", 2, ["a"], MultiplicityCountMismatchError, "exactly 2"),
     ("count-mismatch-single-for-two", "shaper_test.Question", 2, "solo", MultiplicityCountMismatchError, "exactly 2"),
     # D4 structure validation — a missing required field surfaces as a shaping error.
-    ("structure-missing-field", "shaper_test.Invoice", None, {"invoice_number": "INV-1"}, StructureValidationError, "could not be built"),
+    ("structure-missing-field", "shaper_test.ShaperInvoice", None, {"invoice_number": "INV-1"}, StructureValidationError, "could not be built"),
     # D4 a non-ISO date string is the right kind but an invalid value.
     ("non-iso-date", "shaper_test.Deadline", None, "March 7, 2026", StructureValidationError, "ISO 8601"),
     # D6 an explicit envelope naming an incompatible concept.

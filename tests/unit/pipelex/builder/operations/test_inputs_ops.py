@@ -30,7 +30,9 @@ class TestBuildInputsForPipe:
             "set_current_library": mocker.patch(f"{MODULE}.set_current_library"),
             "resolve_library_dirs": mocker.patch(f"{MODULE}.resolve_library_dirs", return_value=([], "defaults")),
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
-            "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
+            "get_required_pipe": mocker.patch(
+                f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main", inputs=SimpleNamespace(root={}))
+            ),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
         }
 
@@ -143,9 +145,10 @@ class TestBuildInputsForPipe:
         result = asyncio.run(build_inputs_for_pipe(pipe_code="my_pipe"))
 
         the_pipe = ops_mocks["get_required_pipe"].return_value
-        ops_mocks["render_inputs"].assert_called_once_with(the_pipe, indent=2)
+        ops_mocks["render_inputs"].assert_called_once_with(the_pipe, indent=2, explicit=False)
         assert result == {
             "success": True,
             "pipe_code": "my_pipe",
             "inputs": {"topic": "your topic"},
+            "concept_comments": {},
         }
