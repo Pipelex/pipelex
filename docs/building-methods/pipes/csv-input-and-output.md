@@ -44,6 +44,17 @@ Reference the file from `inputs.json` with a `url` whose path ends in a tabular 
 }
 ```
 
+!!! tip "When the input is a declared list, just give the path"
+    If the pipe declares the input as a structured list (`people = "Person[]"`), you can skip the envelope entirely and provide the tabular path directly — Pipelex reads it against the declared row concept. Both forms below are equivalent, and a relative path resolves against the inputs file's directory (see [Providing Inputs](provide-inputs.md)):
+
+    ```json
+    { "people": "people.csv" }
+    ```
+
+    ```json
+    { "people": { "url": "people.csv" } }
+    ```
+
 Given a `people.csv`:
 
 ```csv

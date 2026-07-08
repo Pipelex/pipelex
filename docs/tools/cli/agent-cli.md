@@ -81,7 +81,7 @@ For `bundle`, additional options are available:
 
 ### Inputs
 
-Generate an example inputs template for a pipe, bundle, or method.
+Generate an example inputs template for a pipe, bundle, or method. By default the template is the **light** signature-driven shape (bare values matching the pipe's declared concepts), which is exactly what `run` accepts; `--explicit` emits the ceremonial `{concept, content}` envelope form instead.
 
 ```bash
 pipelex-agent inputs pipe <PIPE_CODE> [OPTIONS]
@@ -93,11 +93,15 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 
 - `--library-dir`, `-L` - Additional library directory
 - `--format` - Template serialization: `json` (default) or `toml`
+- `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
 For `bundle` and `method`, use `--pipe` to target a specific pipe.
 
 !!! note "`inputs --format` is `json|toml`, not `markdown|json`"
     Unlike `run`/`validate`, the `inputs` command's `--format` selects the **template serialization**, not a presentation style. `json` (the default) emits the structured JSON success envelope; `toml` prints the raw TOML template straight to stdout (a pipe with no inputs prints a TOML comment line, which loads back as an empty dict). This mirrors the raw-TOML output of the `concept` and `pipe` commands. `inputs` has no `--error-format` — its errors stay JSON.
+
+!!! note "`--explicit` and concept hints"
+    The light `--format toml` template carries the declared concept for each key as a `# concept: ...` comment; the light `--format json` template (the default) cannot (JSON has no comments), so pass `--explicit` when you want the concept written out inline. The JSON success envelope shape (`success` / `pipe_code` / `inputs`) is unchanged — only the `inputs` payload flips between the light values and the envelope form.
 
 ### Flat Commands
 

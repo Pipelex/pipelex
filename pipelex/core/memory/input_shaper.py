@@ -40,6 +40,7 @@ from pipelex.core.memory.exceptions import (
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -221,6 +222,19 @@ class InputShaper:
         return InputKind.DYNAMIC
 
     @classmethod
+    def _peel_multiplicity(cls, multiplicity: VariableMultiplicity | None) -> tuple[bool, int | None]:
+        """Peel a declared multiplicity into ``(is_list, fixed_count)`` (D2).
+
+        ``VariableMultiplicity`` is ``None | bool | int``; parsing only ever yields ``None`` (single),
+        ``True`` (``X[]`` variable list), or an ``int N>=1`` (``X[N]`` fixed count). A genuine int is a
+        fixed-count list, ``True`` a variable list, ``None`` singular. ``bool`` is a subclass of ``int``,
+        so the int check must exclude it explicitly.
+        """
+        fixed_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
+        is_list = multiplicity is True or fixed_count is not None
+        return is_list, fixed_count
+
+    @classmethod
     def _shape_with_multiplicity(
         cls,
         value: Any,
@@ -232,13 +246,7 @@ class InputShaper:
         inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Peel the declared multiplicity (D2), then build the item content(s)."""
-        multiplicity = stuff_spec.multiplicity
-        # VariableMultiplicity is None | bool | int; parsing only ever yields None (single), True
-        # (X[]), or int N>=1 (X[N]). Peel it once into (is_list, fixed_count): a genuine int N is a
-        # fixed-count list, True a variable list, None singular. bool is a subclass of int, so the
-        # int check must exclude it explicitly.
-        fixed_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
-        is_list = multiplicity is True or fixed_count is not None
+        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
 
         # (D11) A declared structured LIST input accepts a table reference — a bare tabular path
         # string or the exact {"url": <tabular path>} wrapper — read row-wise into the declared
@@ -494,7 +502,44 @@ class InputShaper:
                 provided_concept_ref=stuff.concept.concept_ref,
                 expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
             )
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            # Match the bare-value Dynamic path: the signature cannot guide list-vs-single shape here.
+            return stuff
+        cls._reconcile_explicit_multiplicity(stuff, stuff_spec=stuff_spec, variable_name=variable_name)
         return stuff
+
+    @classmethod
+    def _reconcile_explicit_multiplicity(cls, stuff: Stuff, *, stuff_spec: StuffSpec, variable_name: str) -> None:
+        """Enforce the unambiguous D2 shape rules on an explicit form (D6 governs only its concept).
+
+        An explicit form whose built content is a ``ListContent`` must not fill a singular slot, and must
+        match a declared fixed count — the same list-vs-singular and ``[N]``-count rules the bare-value
+        path enforces in ``_shape_with_multiplicity``. Without this, a caller handing an explicit
+        ``ListContent`` (or an envelope whose ``content`` is a list) to a singular-declared input would
+        have it *silently* stored into the singular slot. The singular-under-``[]`` auto-wrap question is
+        deliberately left to the caller's literal form (see ``wip/inputs/input-shaper-multiplicity-gaps.md``):
+        an explicit singular is taken as given, not auto-wrapped.
+        """
+        content = stuff.content
+        if not isinstance(content, ListContent):
+            return
+        list_content = cast("ListContent[StuffContent]", content)
+        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
+        if not is_list:
+            raise ListWhereSingularError.make(
+                variable_name=variable_name,
+                declared_concept_ref=stuff_spec.concept.concept_ref,
+                provided_description=f"a list of {len(list_content.items)} item(s)",
+                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+            )
+        if fixed_count is not None and len(list_content.items) != fixed_count:
+            raise MultiplicityCountMismatchError.make(
+                variable_name=variable_name,
+                declared_concept_ref=stuff_spec.concept.concept_ref,
+                expected_count=fixed_count,
+                provided_count=len(list_content.items),
+                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+            )
 
     @classmethod
     def _is_explicit(cls, value: Any) -> bool:
