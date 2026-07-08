@@ -1,10 +1,15 @@
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+
+# Runaway-code guard: how long a single PipeFunc may run inside the box before it is killed. Lives
+# on the request (not a worker-wide setting) so it can vary per run — e.g. by the user's plan. 5s
+# default; the caller may raise it for a higher tier.
+DEFAULT_SANDBOX_TIMEOUT_SECONDS = 5.0
 
 
 class SandboxRunRequest(BaseModel):
@@ -23,6 +28,11 @@ class SandboxRunRequest(BaseModel):
     function_name: str
     job_metadata: JobMetadata
     pipe_run_params: PipeRunParams
+    timeout_seconds: float = Field(
+        default=DEFAULT_SANDBOX_TIMEOUT_SECONDS,
+        gt=0,
+        description="Max wall-clock seconds the PipeFunc may run in the box before it is killed (plan-dependent).",
+    )
 
 
 class SandboxRunResult(BaseModel):

@@ -44,13 +44,21 @@ async def _run(request: SandboxRunRequest) -> SandboxRunResult:
         msg = f"Sandbox rehydration produced no working memory for pipe '{request.pipe_code}'"
         raise SandboxExecutionError(msg)
 
-    execution_result = await InProcessPipeFuncExecutor().run_pipe_func(
-        job_metadata=request.job_metadata,
-        pipe_code=request.pipe_code,
-        function_name=request.function_name,
-        working_memory=working_memory,
-        pipe_run_params=request.pipe_run_params,
-    )
+    # Runaway-code guard: kill the PipeFunc if it runs past the request's (plan-dependent) timeout.
+    try:
+        execution_result = await asyncio.wait_for(
+            InProcessPipeFuncExecutor().run_pipe_func(
+                job_metadata=request.job_metadata,
+                pipe_code=request.pipe_code,
+                function_name=request.function_name,
+                working_memory=working_memory,
+                pipe_run_params=request.pipe_run_params,
+            ),
+            timeout=request.timeout_seconds,
+        )
+    except TimeoutError as exc:
+        msg = f"PipeFunc '{request.function_name}' exceeded its {request.timeout_seconds}s sandbox timeout"
+        raise SandboxExecutionError(msg) from exc
 
     # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
     pipe = get_library_manager().get_library(library_id=_SANDBOX_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)

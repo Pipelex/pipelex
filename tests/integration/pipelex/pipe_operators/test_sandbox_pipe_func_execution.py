@@ -11,7 +11,9 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_library_manager, get_pipe_router, scoped_pipe_func_executor, set_current_library
+from pipelex.pipe_operators.func.sandbox.exceptions import SandboxExecutionError
 from pipelex.pipe_operators.func.sandbox.local_subprocess_sandbox_client import LocalSubprocessSandboxClient
+from pipelex.pipe_operators.func.sandbox.sandbox_bridge import build_sandbox_request
 from pipelex.pipe_operators.func.sandbox.sandbox_pipe_func_executor import SandboxPipeFuncExecutor
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -41,6 +43,33 @@ from pipelex.system.registries.func_registry import pipe_func
 async def shout_it(working_memory: WorkingMemory) -> TextContent:
     message = working_memory.get_stuff_as_str("message")
     return TextContent(text=message.upper() + " (from the sandbox)")
+"""
+
+SLOW_MTHDS = """\
+domain = "slow_demo"
+description = "Slow PipeFunc demo"
+
+[pipe.slow]
+type = "PipeFunc"
+description = "Sleeps well past any timeout"
+inputs = { message = "Text" }
+output = "Text"
+function_name = "slow_it"
+"""
+
+# Runs longer than any sane timeout — used to prove the sandbox kills runaway code.
+SLOW_FUNC_PY = """\
+import asyncio
+
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func(name="slow_it")
+async def slow_it(working_memory: WorkingMemory) -> TextContent:
+    await asyncio.sleep(30)
+    return TextContent(text="never reached")
 """
 
 
@@ -103,5 +132,38 @@ class TestSandboxPipeFuncExecution:
                 assert pipe_output.main_stuff_as_text.text == "HELLO WORLD (from the sandbox)"
                 # Still never registered locally — the code only ran in the subprocess.
                 assert func_registry.get_function(function_name) is None
+            finally:
+                library_manager.teardown(library_id=library_id)
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    async def test_pipe_func_is_killed_on_timeout(self, job_metadata: JobMetadata):
+        # A PipeFunc that runs past its request timeout is killed and surfaces a SandboxExecutionError.
+        library_manager = get_library_manager()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            library_dir = Path(tmp_dir)
+            (library_dir / "slow.mthds").write_text(SLOW_MTHDS, encoding="utf-8")
+            (library_dir / "slow_func.py").write_text(SLOW_FUNC_PY, encoding="utf-8")
+
+            library_id, _ = library_manager.open_library()
+            set_current_library(library_id=library_id)
+            try:
+                library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+                message_stuff = StuffFactory.make_stuff(
+                    name="message",
+                    concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+                    content=TextContent(text="hello"),
+                )
+                working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=message_stuff)
+                request = build_sandbox_request(
+                    job_metadata=job_metadata,
+                    pipe_code="slow",
+                    function_name="slow_it",
+                    working_memory=working_memory,
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(),
+                    timeout_seconds=1.0,
+                )
+                assert request.timeout_seconds == 1.0
+                with pytest.raises(SandboxExecutionError, match="timeout"):
+                    await LocalSubprocessSandboxClient().run(request=request)
             finally:
                 library_manager.teardown(library_id=library_id)

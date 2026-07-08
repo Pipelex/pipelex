@@ -13,6 +13,10 @@ _ENTRYPOINT_MODULE = "pipelex.pipe_operators.func.sandbox.sandbox_entrypoint"
 _REMOTE_DIR = "/tmp/pipelex_sandbox"  # noqa: S108 — path inside the isolated box, not this host
 _REMOTE_REQUEST = f"{_REMOTE_DIR}/request.json"
 _REMOTE_RESULT = f"{_REMOTE_DIR}/result.json"
+# Headroom added to the request's PipeFunc timeout for the box-level hard kill: covers pipelex boot
+# + upload/download so the entrypoint's own (cooperative) timeout fires first for async code, while
+# this still hard-kills CPU-bound runaway code that asyncio.wait_for cannot interrupt.
+_BOX_EXEC_BUFFER_SECONDS = 30
 
 
 class DaytonaSandboxClient(SandboxClientProtocol):
@@ -138,9 +142,11 @@ class DaytonaSandboxClient(SandboxClientProtocol):
                 msg = f"Bootstrap pip install in the Daytona box failed with code {install.exit_code}:\n{detail}"
                 raise SandboxProvisioningError(msg)
         await sandbox.fs.upload_file(request.model_dump_json().encode("utf-8"), _REMOTE_REQUEST)
+        # Box-level hard kill = the request's PipeFunc timeout + boot/transfer headroom.
+        box_exec_timeout = int(request.timeout_seconds) + _BOX_EXEC_BUFFER_SECONDS
         response = await sandbox.process.exec(
             self._build_command(request_remote=_REMOTE_REQUEST, result_remote=_REMOTE_RESULT),
-            timeout=self._exec_timeout,
+            timeout=box_exec_timeout,
         )
         if response.exit_code != 0:
             detail = (response.result or "").strip()

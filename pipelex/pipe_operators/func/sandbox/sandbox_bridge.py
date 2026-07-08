@@ -2,7 +2,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.hub import get_current_library, get_library_manager
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult
 from pipelex.pipe_operators.func.sandbox.exceptions import SandboxExecutionError
-from pipelex.pipe_operators.func.sandbox.sandbox_transport import SandboxRunRequest, SandboxRunResult
+from pipelex.pipe_operators.func.sandbox.sandbox_transport import DEFAULT_SANDBOX_TIMEOUT_SECONDS, SandboxRunRequest, SandboxRunResult
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
@@ -15,6 +15,7 @@ def build_sandbox_request(
     function_name: str,
     working_memory: WorkingMemory,
     pipe_run_params: PipeRunParams,
+    timeout_seconds: float = DEFAULT_SANDBOX_TIMEOUT_SECONDS,
 ) -> SandboxRunRequest:
     """Package one PipeFunc call for a sandbox: the current library's crate (with sources) + the transported inputs.
 
@@ -40,6 +41,7 @@ def build_sandbox_request(
         function_name=function_name,
         job_metadata=job_metadata,
         pipe_run_params=pipe_run_params,
+        timeout_seconds=timeout_seconds,
     )
 
 
