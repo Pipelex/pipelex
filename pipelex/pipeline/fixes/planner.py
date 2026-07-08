@@ -14,6 +14,18 @@ SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
 STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE = "strip-native-concept-redecl"
 STRIP_NAMESPACE_FIX_CODE = "strip-namespace"
 
+# Every fix-rule code the planner can emit — the validation set for user-facing rule filters
+# (``--select`` / ``--ignore``). A new rule constant above must be added here; the CLI rejects
+# codes outside this set loudly (a typo'd filter selects *behavior*, so lenient-ignore is wrong).
+KNOWN_FIX_CODES: frozenset[str] = frozenset(
+    {
+        MATCH_SEQUENCE_OUTPUT_FIX_CODE,
+        SYNC_CONTROLLER_INPUTS_FIX_CODE,
+        STRIP_NATIVE_CONCEPT_REDECL_FIX_CODE,
+        STRIP_NAMESPACE_FIX_CODE,
+    }
+)
+
 
 def plan_fix_for_pipe_validation_error(error_data: PipesAndConceptValidationErrorData) -> SuggestedFix | None:
     """Derive a suggested fix from one pipe-validation error data, or ``None`` when not fixable.

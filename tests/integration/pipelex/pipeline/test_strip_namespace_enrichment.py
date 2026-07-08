@@ -91,6 +91,35 @@ output = "Text"
 prompt = "Dotted"
 """
 
+# Typo'd tail: ``main_pipe`` is dotted but NEITHER the dotted code NOR its bare tail exists as a
+# declaration key. Stripping would rewrite ``main_pipe`` to a pipe that does not exist — the fix
+# advertised as SAFE would mutate the file and leave a different unfixable error — so the
+# enrichment must be suppressed (checkpoint-C item 1, first disjunct-pair failure).
+_MAIN_PIPE_TYPO_TAIL_MTHDS = """
+domain = "nsfix_typo"
+main_pipe = "nsfix_typo.helo"
+
+[pipe.hello]
+type = "PipeLLM"
+description = "Say hello."
+output = "Text"
+prompt = "Say hello"
+"""
+
+# Convergent happy path: ``main_pipe`` names a dotted DECLARATION and no bare form exists. The
+# declaration's own strip-namespace rename will materialize the bare target, so stripping
+# ``main_pipe`` stays safe — the two fixes converge in one round.
+_MAIN_PIPE_DOTTED_DECL_MTHDS = """
+domain = "nsfix_conv"
+main_pipe = "nsfix_conv.hello"
+
+[pipe."nsfix_conv.hello"]
+type = "PipeLLM"
+description = "Say hello."
+output = "Text"
+prompt = "Say hello"
+"""
+
 # Cross-package prefix (not the bundle's own domain) → never stripped (would break a real qualified ref).
 _CROSS_DOMAIN_MTHDS = """
 domain = "nsfix_cross"
@@ -172,6 +201,27 @@ class TestStripNamespaceEnrichment:
         main_pipe_errors = [error for error in errors if error.pipe_code is None]
         assert main_pipe_errors, "expected the main_pipe INVALID_PIPE_CODE_SYNTAX error"
         assert all(error.stripped_pipe_code is None for error in errors)
+
+    async def test_main_pipe_strip_suppressed_for_typoed_tail(self, load_empty_library: Callable[[], str]) -> None:
+        """``main_pipe`` dotted with a typo'd tail (neither the dotted code nor the bare tail is a
+        declaration key): the enrichment must be suppressed — stripping would rewrite ``main_pipe``
+        to a pipe that does not exist, mutating the file for nothing.
+        """
+        load_empty_library()
+        errors = await _syntax_errors(_MAIN_PIPE_TYPO_TAIL_MTHDS)
+        main_pipe_errors = [error for error in errors if error.pipe_code is None]
+        assert main_pipe_errors, "expected the main_pipe INVALID_PIPE_CODE_SYNTAX error"
+        assert all(error.stripped_pipe_code is None for error in main_pipe_errors)
+
+    async def test_main_pipe_strip_enriched_when_dotted_declaration_will_rename(self, load_empty_library: Callable[[], str]) -> None:
+        """``main_pipe`` naming a dotted declaration with NO bare form: still enriched — the
+        declaration's paired rename materializes the bare target, so the strip converges.
+        """
+        load_empty_library()
+        errors = await _syntax_errors(_MAIN_PIPE_DOTTED_DECL_MTHDS)
+        main_pipe_errors = [error for error in errors if error.pipe_code is None]
+        assert main_pipe_errors, "expected the main_pipe INVALID_PIPE_CODE_SYNTAX error"
+        assert [error.stripped_pipe_code for error in main_pipe_errors] == ["hello"]
 
     @pytest.mark.parametrize(
         "mthds_content",

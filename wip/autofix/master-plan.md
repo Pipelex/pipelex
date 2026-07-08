@@ -8,7 +8,9 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Step 1 (spike) is DONE** — PR #1027 vs dev, merge-ready. The full chain is proven on one rule (`match-sequence-output`): enriched typed error → planner → tomlkit applier → convergence loop, all TDD, golden format-preservation tests pinning tomlkit's in-place style preservation. The `suggested_fix` payload already rides `pipelex-agent validate bundle --format json` and the `/validate` API 422 body, because the planner hooks into the one shared `build_validation_error_items` builder. Checkpoint findings are recorded in the design doc; deliberate deferrals in [deferred-checkpoint-0-review-items.md](deferred-checkpoint-0-review-items.md).
 
-**Step 2 (wave-1 rule breadth) is DONE** — on the stacked branch `feature/Autofix-step2` (PR #1031). All three wave-1 rules landed, each a deliberately different fix *shape*: `sync-controller-inputs` (multi-op in-place table sync, Phase A), `strip-native-concept-redecl` (delete-shaped, first blueprint channel, Phase B), and the stretch `strip-namespace` (position-preserving rename, Phase C — **GO, shipped**). Mid-step, Phase A′ swapped the applier's hand-rolled canonicalization for the in-process `pipelex_tools.format_mthds` backend (core runtime dep). **Abstraction verdict (CHECKPOINT 1): `SuggestedFix`/`FixOp` survived all four shapes with no structural change** — the only wire-level edit was widening `TomlValue` (the type of `FixOp.value`) to admit a flat scalar dict; the feared array-of-tables `table_path` extension was never needed. Full verdict + carried-forward warts in the design doc's "Step-2 exit — abstraction verdict" section; per-checkpoint deferrals in `deferred-checkpoint-{a,a-prime,b,c,d}-review-items.md`. Reviewer's guide: [step2-reviewers-guide.md](step2-reviewers-guide.md) (archived from the worktree-root `TODOS.md`). **Next: step 3** (hardened loop / real multi-file targeting), which may already have partial groundwork from Phase B's `SuggestedFix.source` threading.
+**Step 2 (wave-1 rule breadth) is DONE** — on the stacked branch `feature/Autofix-step2` (PR #1031). All three wave-1 rules landed, each a deliberately different fix *shape*: `sync-controller-inputs` (multi-op in-place table sync, Phase A), `strip-native-concept-redecl` (delete-shaped, first blueprint channel, Phase B), and the stretch `strip-namespace` (position-preserving rename, Phase C — **GO, shipped**). Mid-step, Phase A′ swapped the applier's hand-rolled canonicalization for the in-process `pipelex_tools.format_mthds` backend (core runtime dep). **Abstraction verdict (CHECKPOINT 1): `SuggestedFix`/`FixOp` survived all four shapes with no structural change** — the only wire-level edit was widening `TomlValue` (the type of `FixOp.value`) to admit a flat scalar dict; the feared array-of-tables `table_path` extension was never needed. Full verdict + carried-forward warts in the design doc's "Step-2 exit — abstraction verdict" section; per-checkpoint deferrals in `deferred-checkpoint-{a,a-prime,b,c,d}-review-items.md`. Reviewer's guide: [step2-reviewers-guide.md](step2-reviewers-guide.md) (archived from the worktree-root `TODOS.md`).
+
+**Step 3 (hardened loop) is DONE and Step 4 (agent apply surface) is CODE COMPLETE** — on `feature/Autofix-step4-Agnt-Apply`. Step 3's CHECKPOINT 1 review is complete and its confirmed findings were fixed: signature-only sibling headers are ignored by the cross-file collision scan, input-drift source threading is pinned, collision-map rebuilds are behaviorally pinned, and `files_written` first-write ordering is pinned. Step 4 now adds `pipelex-agent fix bundle`, the CLI-free fix renderer, structured `FixBundleError` output, command/unit/integration/e2e tests, agent CLI docs, and a CHANGELOG entry. **Next: CHECKPOINT 2 review** on the step-4 diff; `make agent-check` and the focused touched-test slice are green, but full `make agent-test` was not rerun in this pass.
 
 ## Sequencing doctrine (decided 2026-07-07)
 
@@ -39,14 +41,18 @@ Exit (**CHECKPOINT 1**) — **met:** all wave-1 rules green with planner suppres
 
 ### 3. Hardened loop — real multi-file targeting
 
+Detailed design + working plan (shared with step 4): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md), on the stacked branch `feature/Autofix-step4-Agnt-Apply`.
+
 Replaces the spike's conservative scoping guard (source-less fixes are simply dropped under `library_dirs`). Deferred items 0 and 1 from checkpoint 0:
 
-- Thread the declaring file into enriched errors — set `file_path` at the raise sites (or carry a domain qualifier the loop checks against the target file's `domain` key), so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
+- Thread the declaring file into enriched errors — set `file_path` or better yet `source` at the raise sites, so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
 - Derive `is_single_file` from the **resolved** effective dirs (`resolve_library_dirs`), fixing both wrong directions of the current raw-arg check (`[]` is documented single-file but treated as multi; `None` can fall through to hub defaults/`PIPELEXPATH` and load other files while being treated as single).
 
-Can start in parallel with step 2 once its shape is clear, but ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
+Ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
 
 ### 4. Agent apply surface — `pipelex-agent fix bundle`
+
+Detailed design + working plan (shared with step 3): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md).
 
 Thin command over `fix_bundle_file`: two-stream output per the workspace output conventions (`--format`/`--error-format`, JSON contract carrying `FixBundleResult` — is_valid, iterations, fixes_applied, remaining_errors, bail_reason; markdown rendering for the agent as presentation). e2e CLI snapshot tests. This is the milestone where an agent can run validate → fix → re-validate entirely from the CLI. Exit: command shipped on the agent CLI, snapshots green.
 
