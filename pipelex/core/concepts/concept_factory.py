@@ -147,6 +147,20 @@ class ConceptFactory:
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.YES_NO:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="The answer to a yes/no question",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.DATE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A calendar date, optionally with a time of day — as precise as its source states.",
+                    structure_class_name=structure_class_name,
+                )
             case NativeConceptCode.PAGE:
                 return Concept(
                     code=native_concept_code,

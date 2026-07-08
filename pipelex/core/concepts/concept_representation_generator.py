@@ -4,6 +4,7 @@ This module provides recursive generation of example representations for concept
 It supports two output formats: JSON (dict) and Python (class instantiation strings).
 """
 
+import datetime
 import inspect
 import random
 import types
@@ -310,6 +311,14 @@ class ConceptRepresentationGenerator:
             return 0.0
         elif actual_type is bool:
             return False
+        elif actual_type is datetime.datetime:
+            # ISO example that DateContent (and a `type = "datetime"` structure field) accepts,
+            # so the `build inputs` -> `run` round-trip holds.
+            return "2026-01-01T12:00:00"
+        elif actual_type is datetime.date:
+            return "2026-01-01"
+        elif actual_type is datetime.time:
+            return "12:00:00"
         else:
             # Handle union types like int | float (used by NumberContent)
             origin = get_origin(actual_type)

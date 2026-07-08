@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -20,6 +21,7 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.pretty import PrettyPrintable, PrettyRenderable
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
@@ -91,6 +93,14 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     @property
     def is_number(self) -> bool:
         return isinstance(self.content, NumberContent)
+
+    @property
+    def is_yes_no(self) -> bool:
+        return isinstance(self.content, YesNoContent)
+
+    @property
+    def is_date(self) -> bool:
+        return isinstance(self.content, DateContent)
 
     def content_as(self, content_type: type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
@@ -218,6 +228,16 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     def as_number(self) -> NumberContent:
         """Get content as NumberContent if applicable."""
         return self.content_as(content_type=NumberContent)
+
+    @property
+    def as_yes_no(self) -> YesNoContent:
+        """Get content as YesNoContent if applicable."""
+        return self.content_as(content_type=YesNoContent)
+
+    @property
+    def as_date(self) -> DateContent:
+        """Get content as DateContent if applicable."""
+        return self.content_as(content_type=DateContent)
 
     @property
     def as_html(self) -> HtmlContent:

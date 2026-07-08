@@ -34,6 +34,10 @@ def inputs_pipe_cmd(
         InputsTemplateFormat,
         typer.Option("--format", help="Inputs template format: 'json' for the JSON result envelope (default), 'toml' for raw TOML on stdout"),
     ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
     """Generate an example inputs template for a pipe by code.
 
@@ -44,6 +48,7 @@ def inputs_pipe_cmd(
         pipelex-agent inputs pipe my_pipe
         pipelex-agent inputs pipe my_pipe -L ./my_pipes
         pipelex-agent inputs pipe my_pipe --format toml
+        pipelex-agent inputs pipe my_pipe --explicit
     """
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
@@ -73,8 +78,8 @@ def inputs_pipe_cmd(
     make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=None, library_dirs=library_dirs))
-        emit_inputs_result(result, template_format=template_format)
+        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=None, library_dirs=library_dirs, explicit=explicit))
+        emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
         agent_error(f"File not found: {exc}", error_type="FileNotFoundError", cause=exc)

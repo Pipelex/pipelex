@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from typing import Any, Self
 
@@ -42,6 +42,7 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    DATETIME = "datetime"
     CONCEPT = "concept"
 
 
@@ -60,8 +61,6 @@ class ConceptStructureBlueprint(BaseModel):
     choices: list[str] | None = Field(default=None)
     default_value: Any | None = None
     required: bool = Field(default=False)
-
-    # TODO: date translator for default_value
 
     @field_validator("concept_ref", mode="before")
     @classmethod
@@ -125,6 +124,7 @@ class ConceptStructureBlueprint(BaseModel):
                 | ConceptStructureBlueprintFieldType.BOOLEAN
                 | ConceptStructureBlueprintFieldType.NUMBER
                 | ConceptStructureBlueprintFieldType.DATE
+                | ConceptStructureBlueprintFieldType.DATETIME
                 | None
             ):
                 pass
@@ -178,8 +178,13 @@ class ConceptStructureBlueprint(BaseModel):
                 if not isinstance(self.default_value, dict):
                     self._raise_type_mismatch_error("dict", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.DATE:
-                if not isinstance(self.default_value, datetime):
+                # A calendar date, not a datetime: datetime is a subclass of date, so reject it explicitly
+                # (a datetime default would carry a time the `date` field silently drops).
+                if not isinstance(self.default_value, date) or isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", actual_type_name=type(self.default_value).__name__)
+            case ConceptStructureBlueprintFieldType.DATETIME:
+                if not isinstance(self.default_value, datetime):
+                    self._raise_type_mismatch_error("datetime", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 # This case is here for exhaustiveness

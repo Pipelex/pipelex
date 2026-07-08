@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -58,6 +59,7 @@ async def pipeline_run_setup(
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
+    inputs_base_dir: Path | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -129,6 +131,11 @@ async def pipeline_run_setup(
         ``ErrorReport`` back to its originating request). Threaded onto
         :class:`pipelex.pipeline.job_metadata.JobMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
+    inputs_base_dir:
+        Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart
+        Inputs D3) — the inputs file's parent when a CLI file-loaded the inputs. ``None`` for
+        API/SDK callers (they pass absolute urls / storage uris). Only the shaper's file-ish /
+        CSV arms consult it.
 
     Returns:
     -------
@@ -278,6 +285,7 @@ async def pipeline_run_setup(
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             request_id=request_id,
+            inputs_base_dir=inputs_base_dir,
         )
 
         properties = {

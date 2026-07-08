@@ -1,3 +1,4 @@
+import datetime
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlsplit, urlunsplit
@@ -143,6 +144,20 @@ class StuffFactory:
         name: str | None,
         code: str | None,
     ) -> Stuff | None:
+        """Wrap :meth:`try_make_csv_list_content` into a ``Stuff`` (Case 2.5 envelope path)."""
+        list_content = cls.try_make_csv_list_content(concept, content=content, name=name)
+        if list_content is None:
+            return None
+        return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
+
+    @classmethod
+    def try_make_csv_list_content(
+        cls,
+        concept: Concept,
+        *,
+        content: dict[str, Any],
+        name: str | None,
+    ) -> ListContent[StuffContent] | None:
         """Build a ``ListContent[row-concept]`` from a ``{"url": "...csv"}`` input reference.
 
         Detection is gated to the explicit wrapper shape — ``content`` must be *exactly*
@@ -150,10 +165,14 @@ class StuffFactory:
         becomes one instance of the concept's structure class, so one CSV yields one
         ``ListContent`` (the concept names the *row* type). Returns ``None`` for an ordinary
         record dict — no ``url`` key, sibling keys alongside ``url``, a non-tabular suffix, or a
-        native concept — so the caller falls through to normal Case 2.5 dict handling. The
-        single-key gate keeps a real record that merely *has* a ``url`` field (e.g.
-        ``{"label": "Home", "url": "report.csv"}``) from being silently reduced to a table with
-        its sibling keys dropped.
+        native concept — so the caller falls through to normal dict handling. The single-key gate
+        keeps a real record that merely *has* a ``url`` field (e.g. ``{"label": "Home", "url":
+        "report.csv"}``) from being silently reduced to a table with its sibling keys dropped.
+
+        Shared by the bottom-up factory (Case 2.5 envelope) and the top-down ``InputShaper``
+        (a bare tabular path / bare ``{"url": ...}`` under a declared structured list, Smart Inputs
+        D11). The shaper resolves a relative path against the inputs-file dir before calling in, so
+        this method's own gates operate on an already-resolved url.
 
         v1 reads LOCAL paths only: a tabular-suffixed remote ``url`` (``http(s)``/``s3``/``gs``/
         ``pipelex-storage``) is rejected with a clear ``CsvError`` rather than opened as a local path.
@@ -222,8 +241,7 @@ class StuffFactory:
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise CsvError(msg) from exc
-        list_content = list_content_from_csv(Path(resolved.path), row_model=row_model)
-        return cls.make_stuff(concept=concept, content=list_content, name=name, code=code)
+        return list_content_from_csv(Path(resolved.path), row_model=row_model)
 
     @classmethod
     def make_stuff_from_stuff_content_or_data(
@@ -249,6 +267,9 @@ class StuffFactory:
         Case 2: Dict with 'concept' AND 'content' keys (can be plain dict or DictStuff instance)
             2.1/2.1b: {"concept": "Text"/"native.Text", "content": str} → TextContent with Text concept
             2.1c: {"concept": "domain.Concept", "content": str} → TextContent with that concept (if compatible)
+            2.1d: {"concept": "YesNo"/"domain.Concept", "content": bool} → YesNoContent (if YesNo-compatible)
+            2.1e: {"concept": "Date"/"domain.Concept", "content": date/datetime obj} → DateContent (if Date-compatible)
+            2.1f: {"concept": "Date"/"domain.Concept", "content": ISO str} → DateContent (if Date-compatible, checked after Text)
             2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent[TextContent]
             2.3: {"concept": "...", "content": StuffContent} → Use the StuffContent
             2.4: {"concept": "...", "content": list[StuffContent]} → ListContent[StuffContent]
@@ -465,6 +486,24 @@ class StuffFactory:
             )
             raise StuffFactoryError(msg) from exc
 
+        # Case 2.1d: content is a bool → YesNoContent for a YesNo-compatible concept.
+        # Checked BEFORE the str/int-ish arms (bool is a subclass of int) so a boolean never falls through to
+        # the final "unexpected type" error. No string coercion: "yes"/"no" strings take the str path and fail there.
+        if isinstance(content, bool):
+            yes_no_concept = get_native_concept(native_concept=NativeConceptCode.YES_NO)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=yes_no_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
+            msg = (
+                f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.YesNo' (the content is a boolean)"
+            )
+            raise StuffFactoryError(msg)
+
         # Case 2.1: content is a string
         if isinstance(content, str):
             # Check if concept is strictly compatible with Text (refinement = strict compatibility)
@@ -476,9 +515,37 @@ class StuffFactory:
                     name=name,
                     code=code,
                 )
+            # Case 2.1f: a strict-ISO date/datetime string under a Date-compatible concept builds a DateContent
+            # (routed through the concept resolver so a refining subclass is honored, like the YesNo arm).
+            date_concept = get_native_concept(native_concept=NativeConceptCode.DATE)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text'"
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text' or 'native.Date'"
+            )
+            raise StuffFactoryError(msg)
+
+        # Case 2.1e: content is a bare date/datetime object (a TOML temporal literal used as envelope content)
+        # → DateContent for a Date-compatible concept. isinstance(date) covers datetime (its subclass); a bare
+        # time never reaches here — the inputs loader rejects it, and a time is not a date anyway.
+        if isinstance(content, datetime.date):
+            date_concept = get_native_concept(native_concept=NativeConceptCode.DATE)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
+            msg = (
+                f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Date' (the content is a date/datetime)"
             )
             raise StuffFactoryError(msg)
 

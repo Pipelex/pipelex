@@ -23,6 +23,7 @@ from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
+from pipelex.cli.agent_cli.commands.run.stdin_resolver import ParsedCliInputs
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.tools.log.log_levels import LogLevel
@@ -47,7 +48,7 @@ class TestRunErrorChain:
         mocker.patch(f"{RUN_PIPE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{RUN_PIPE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{RUN_PIPE_MODULE}.resolve_pipe_from_exports", return_value=[])
-        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=None)
+        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None))
 
         transient_error = LLMCompletionError(WORKER_ERROR_MESSAGE, error_category=InferenceErrorCategory.TRANSIENT)
         # model_handle / backend_name are declared on CogtError; a real worker fills them at
