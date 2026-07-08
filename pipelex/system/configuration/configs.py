@@ -12,6 +12,7 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
@@ -58,17 +59,6 @@ class KitConfig(ConfigModel):
 
 class PipeRunConfig(ConfigModel):
     pipe_stack_limit: int
-
-
-class PipeFuncConfig(ConfigModel):
-    # When true, this process treats PipeFunc as sandbox-hosted: it carries the customer's PipeFunc
-    # code without ever importing or executing it. Library loading captures the customer .py source
-    # as text (onto the crate) instead of registering it in the func_registry, and the PipeFunc
-    # validators skip the func_registry lookup + return-type checks — the real function is registered
-    # and validated inside the sandbox, not here. Local/direct execution leaves this false, which is
-    # byte-identical to the pre-existing behavior. This is a hosted-deploy flag, not a client
-    # preference, so it is intentionally absent from the .pipelex/ override file.
-    is_sandbox_hosted: bool
 
 
 class DryRunConfig(ConfigModel):

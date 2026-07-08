@@ -37,18 +37,19 @@ async def make_note_in_sandbox(working_memory: WorkingMemory) -> TextContent:
 
 @pytest.fixture
 def sandbox_hosted_mode() -> Generator[None, None, None]:
-    """Flip the real config flag for the duration of a test, then restore it.
+    """Select a non-``direct`` execution mode for the duration of a test, then restore it.
 
     Flipping config (not monkeypatching the helper) exercises the genuine
-    is_pipe_func_sandbox_hosted() read at every call site (loader + validators) together.
+    is_pipe_func_sandbox_hosted() read at every call site (loader + validators) together — any
+    non-``direct`` mode is sandbox-hosted, so ``local_sandbox`` stands in for the general case.
     """
     pipe_func_config = get_config().pipelex.pipe_func_config
-    previous = pipe_func_config.is_sandbox_hosted
-    pipe_func_config.is_sandbox_hosted = True
+    previous = pipe_func_config.execution_mode
+    pipe_func_config.execution_mode = "local_sandbox"
     try:
         yield
     finally:
-        pipe_func_config.is_sandbox_hosted = previous
+        pipe_func_config.execution_mode = previous
 
 
 class TestHostedPipeFuncLoad:

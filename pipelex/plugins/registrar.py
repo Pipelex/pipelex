@@ -12,6 +12,7 @@ from pipelex.plugins.exceptions import (
     DuplicateInferenceBackendError,
     DuplicateModelListerError,
     DuplicateOrchestratorError,
+    DuplicatePipeFuncExecutorError,
     DuplicateSecretsProviderError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
@@ -19,6 +20,7 @@ from pipelex.plugins.exceptions import (
 from pipelex.plugins.inference_backend_registry import InferenceFamily, MakeWorkerFn
 from pipelex.plugins.model_lister_registry import ListModelsFn
 from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
+from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorFactoryFn
 from pipelex.plugins.secrets_provider_registry import SecretsProviderFactoryFn
 from pipelex.plugins.storage_provider_registry import StorageProviderFactoryFn
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
@@ -122,6 +124,7 @@ class PluginRegistrar:
         self.bundle_validators: dict[OrchestrationMode, BundleValidatorProtocol] = {}
         self.storage_providers: dict[str, StorageProviderFactoryFn] = {}
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
+        self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -135,6 +138,7 @@ class PluginRegistrar:
         self._bundle_validator_sources: dict[OrchestrationMode, str] = {}
         self._storage_provider_sources: dict[str, str] = {}
         self._secrets_provider_sources: dict[str, str] = {}
+        self._pipe_func_executor_sources: dict[str, str] = {}
         self._slot_sources: dict[HubSlot, str] = {}
         # Reassigned per plugin by build_registrar; the floating default keeps the
         # menu methods safe to call outside a registration loop (e.g. a focused unit test).
@@ -241,6 +245,28 @@ class PluginRegistrar:
             contribution=f"secrets provider {method}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateSecretsProviderError(
                 method=method, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
+        """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.
+
+        The built-in ``PipeFuncPlugin`` registers ``direct`` (in-process) and ``local_sandbox`` (local
+        subprocess); an external sandbox plugin (``pipelex-daytona-sandbox``) registers its own token
+        (e.g. ``"daytona"``). Boot reads ``pipe_func_config.execution_mode`` and calls the looked-up
+        factory to produce the one PipeFunc executor set on the hub. ``factory`` is invoked at that boot
+        apply-point, never here — so a factory may do heavy work (SDK import, config self-load) while
+        ``register`` stays import-light. This is the PipeFunc-execution axis, orthogonal to the
+        orchestration axis. Fail-loud on a duplicate mode, naming both plugins.
+        """
+        self._add(
+            store=self.pipe_func_executors,
+            sources=self._pipe_func_executor_sources,
+            key=mode,
+            value=factory,
+            contribution=f"pipe_func executor {mode}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicatePipeFuncExecutorError(
+                mode=mode, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )
 

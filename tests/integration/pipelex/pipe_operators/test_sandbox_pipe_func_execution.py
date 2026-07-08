@@ -76,12 +76,12 @@ async def slow_it(working_memory: WorkingMemory) -> TextContent:
 @pytest.fixture
 def sandbox_hosted_mode() -> Generator[None, None, None]:
     pipe_func_config = get_config().pipelex.pipe_func_config
-    previous = pipe_func_config.is_sandbox_hosted
-    pipe_func_config.is_sandbox_hosted = True
+    previous = pipe_func_config.execution_mode
+    pipe_func_config.execution_mode = "local_sandbox"
     try:
         yield
     finally:
-        pipe_func_config.is_sandbox_hosted = previous
+        pipe_func_config.execution_mode = previous
 
 
 @pytest.mark.asyncio(loop_scope="class")

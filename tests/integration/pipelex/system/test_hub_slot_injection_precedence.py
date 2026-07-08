@@ -16,7 +16,9 @@ from pytest_mock import MockerFixture
 
 from pipelex.hub import get_content_generator, get_pipe_router
 from pipelex.pipelex import Pipelex
-from pipelex.plugins.registrar import HubSlot, PluginRegistrar
+from pipelex.plugins.contract import PLUGIN_API_VERSION
+from pipelex.plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
+from pipelex.plugins.registrar import HubSlot, PluginOrigin, PluginRegistrar
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
@@ -40,12 +42,15 @@ def _test_integration_mode() -> IntegrationMode:
 def _fake_registrar(mocker: MockerFixture) -> PluginRegistrar:
     """A registrar with empty registries (boot stores them but doesn't consume them during setup).
 
-    Storage and secrets are the exceptions: boot *does* select each provider from the registrar during
-    setup, so every boot below passes an explicit ``storage_provider`` and ``secrets_provider`` — each
-    wins ahead of the (empty) registry — keeping this suite focused on hub slots rather than
-    storage/secrets selection.
+    Storage, secrets, and pipe_func are the exceptions: boot *does* select each from the registrar
+    during setup. Every boot below passes an explicit ``storage_provider`` and ``secrets_provider``
+    (each wins ahead of the empty registry), and the built-in ``PipeFuncPlugin`` is registered here so
+    the default ``direct`` execution mode resolves — keeping this suite focused on hub slots rather
+    than provider/executor selection.
     """
     registrar = PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(temporal=SimpleNamespace(is_enabled=False))))
+    registrar.begin_plugin(name="pipe_func", origin=PluginOrigin.BUILTIN, targets_api=PLUGIN_API_VERSION)
+    PipeFuncPlugin().register(registrar)
     mocker.patch("pipelex.pipelex.build_registrar", return_value=registrar)
     return registrar
 

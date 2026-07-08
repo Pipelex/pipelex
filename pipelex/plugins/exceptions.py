@@ -123,6 +123,20 @@ class DuplicateSecretsProviderError(PluginError):
         super().__init__(message)
 
 
+class DuplicatePipeFuncExecutorError(PluginError):
+    """Two plugins registered a PipeFunc executor for the same execution mode."""
+
+    def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
+        self.mode = mode
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"PipeFunc executor for execution mode '{mode}' is registered by both plugin "
+            f"'{first_plugin}' and plugin '{second_plugin}'. Each mode must have a single executor."
+        )
+        super().__init__(message)
+
+
 class DuplicateHttpErrorMapperError(PluginError):
     """Two plugins registered an HTTP-error mapper for the same exception type."""
 
@@ -218,6 +232,32 @@ class UnknownStorageMethodError(PluginError):
         message = (
             f"No storage provider is registered for method '{method}'. Registered methods: {available}. "
             "Check storage_config.method, or install/enable the plugin that provides that method."
+        )
+        super().__init__(message)
+
+
+class UnknownPipeFuncExecutionModeError(PluginError):
+    """A configured PipeFunc execution mode has no registered executor factory.
+
+    ``pipe_func_config.execution_mode`` selects a PipeFunc executor from the registry the built-in
+    ``PipeFuncPlugin`` (``direct`` + ``local_sandbox``) and any external sandbox plugin (e.g.
+    ``pipelex-daytona-sandbox`` → ``daytona``) populate. When the token names no registered factory —
+    a typo, or a sandbox-backend plugin that is not installed or was disabled via ``plugins.disabled`` —
+    boot fails loud here rather than starting with no PipeFunc executor. The message lists the
+    registered modes so the fix is obvious.
+    """
+
+    # The message describes the caller's own input (the configured execution mode) and lists the
+    # registered modes; it is fully actionable, so keep it verbatim under STRICT disclosure.
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, mode: str, registered_modes: list[str]):
+        self.mode = mode
+        self.registered_modes = registered_modes
+        available = ", ".join(sorted(registered_modes)) or "(none)"
+        message = (
+            f"No PipeFunc executor is registered for execution mode '{mode}'. Registered modes: {available}. "
+            "Check pipe_func_config.execution_mode, or install/enable the plugin that provides that mode."
         )
         super().__init__(message)
 

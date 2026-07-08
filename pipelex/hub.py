@@ -54,6 +54,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
     from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+    from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
     from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
     from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
     from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -94,6 +95,7 @@ class PipelexHub:
         self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._storage_provider_registry: StorageProviderRegistry | None = None
         self._secrets_provider_registry: SecretsProviderRegistry | None = None
+        self._pipe_func_executor_registry: PipeFuncExecutorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -223,6 +225,9 @@ class PipelexHub:
 
     def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
         self._secrets_provider_registry = secrets_provider_registry
+
+    def set_pipe_func_executor_registry(self, pipe_func_executor_registry: "PipeFuncExecutorRegistry"):
+        self._pipe_func_executor_registry = pipe_func_executor_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -379,6 +384,12 @@ class PipelexHub:
             msg = "SecretsProviderRegistry is not initialized"
             raise RuntimeError(msg)
         return self._secrets_provider_registry
+
+    def get_pipe_func_executor_registry(self) -> "PipeFuncExecutorRegistry":
+        if self._pipe_func_executor_registry is None:
+            msg = "PipeFuncExecutorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -577,6 +588,10 @@ def get_storage_provider_registry() -> "StorageProviderRegistry":
 
 def get_secrets_provider_registry() -> "SecretsProviderRegistry":
     return get_pipelex_hub().get_secrets_provider_registry()
+
+
+def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
+    return get_pipelex_hub().get_pipe_func_executor_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:

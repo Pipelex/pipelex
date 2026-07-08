@@ -290,10 +290,12 @@ pipe_stack_limit = 20
 ####################################################################################################
 
 [pipelex.pipe_func_config]
-# Sandbox-hosted PipeFunc execution. False = local/direct: customer functions are imported and run
-# in this process (unchanged behavior). True = hosted runner/worker: customer PipeFunc code is
-# carried as source text and executed only inside an isolated sandbox, never imported here.
-is_sandbox_hosted = false
+# PipeFunc execution mode, selected from the PipeFuncExecutorRegistry the plugins populate. "direct"
+# (core) imports and runs customer functions in this process (unchanged behavior). "local_sandbox"
+# (core) runs them in a local subprocess; "daytona" (out-of-tree pipelex-daytona-sandbox plugin) runs
+# them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
+# executes it only inside an isolated sandbox, never imported here.
+execution_mode = "direct"
 
 ####################################################################################################
 # Pipeline execution config
