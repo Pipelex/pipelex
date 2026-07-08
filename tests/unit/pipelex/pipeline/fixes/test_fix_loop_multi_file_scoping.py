@@ -59,6 +59,26 @@ output = "Text"
 prompt = "Write about $topic"
 """
 
+_DOTTED_SHARED_A_MTHDS = """domain = "rebuild_a"
+
+[pipe."rebuild_a.shared"]
+type = "PipeLLM"
+description = "A dotted declaration that strips to a bare shared code."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write about $topic"
+"""
+
+_DOTTED_SHARED_B_MTHDS = """domain = "rebuild_b"
+
+[pipe."rebuild_b.shared"]
+type = "PipeLLM"
+description = "Another dotted declaration that strips to the same bare shared code."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Write about $topic"
+"""
+
 
 def _seq_output_error_data(*, pipe_code: str, source: str | None) -> PipesAndConceptValidationErrorData:
     """One enriched output-mismatch error datum — plans a ``match-sequence-output`` fix."""
@@ -77,6 +97,21 @@ def _seq_output_error(*, pipe_code: str, source: str | None) -> ValidateBundleEr
     return ValidateBundleError(
         message="Pipe validation failed",
         pipe_validation_errors=[_seq_output_error_data(pipe_code=pipe_code, source=source)],
+    )
+
+
+def _strip_namespace_error(*, pipe_code: str, stripped_pipe_code: str, source: str) -> ValidateBundleError:
+    return ValidateBundleError(
+        message="Blueprint validation failed",
+        pipelex_bundle_blueprint_validation_errors=[
+            PipelexBundleBlueprintValidationErrorData(
+                error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+                source=source,
+                pipe_code=pipe_code,
+                stripped_pipe_code=stripped_pipe_code,
+                message=f"Pipe code '{pipe_code}' should be '{stripped_pipe_code}'",
+            ),
+        ],
     )
 
 
@@ -369,11 +404,53 @@ class TestFixLoopMultiFileScoping:
         assert result.is_valid is True
         assert result.iterations == 1
         assert [fix.fix_code for fix in result.fixes_applied] == ["match-sequence-output", "match-sequence-output"]
-        assert {Path(written) for written in result.files_written} == {bundle_path.resolve(), sibling_path.resolve()}
+        assert [Path(written) for written in result.files_written] == [bundle_path.resolve(), sibling_path.resolve()]
         fixed_entry = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
         fixed_sibling = tomlkit.loads(sibling_path.read_text(encoding="utf-8")).unwrap()
         assert fixed_entry["pipe"]["list_ideas"]["output"] == "Idea[]"
         assert fixed_sibling["pipe"]["sibling_pipe"]["output"] == "Idea[]"
+
+    async def test_collision_scan_rebuilds_after_each_written_round(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+    ) -> None:
+        """A rename from round one blocks a sibling rename proposed in round two.
+
+        If the cross-file map were cached before the loop, the second ``strip-namespace`` fix
+        would not see that round one already created ``[pipe.shared]`` in a sibling bundle.
+        """
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_MINIMAL_MTHDS, encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        first_path = libs_dir / "a_first.mthds"
+        first_path.write_text(_DOTTED_SHARED_A_MTHDS, encoding="utf-8")
+        second_path = libs_dir / "b_second.mthds"
+        second_path.write_text(_DOTTED_SHARED_B_MTHDS, encoding="utf-8")
+        validate_mock = mocker.patch(
+            "pipelex.pipeline.fixes.fix_loop.validate_bundle",
+            side_effect=[
+                _strip_namespace_error(pipe_code="rebuild_a.shared", stripped_pipe_code="shared", source=str(first_path)),
+                _strip_namespace_error(pipe_code="rebuild_b.shared", stripped_pipe_code="shared", source=str(second_path)),
+            ],
+        )
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[libs_dir], max_iterations=3)
+
+        assert result.is_valid is False
+        assert result.iterations == 1
+        assert validate_mock.await_count == 2
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace"]
+        assert [Path(written) for written in result.files_written] == [first_path.resolve()]
+        assert result.bail_reason is not None
+        assert "cross-file collision" in result.bail_reason
+        assert "'shared'" in result.bail_reason
+        fixed_first = tomlkit.loads(first_path.read_text(encoding="utf-8")).unwrap()
+        unchanged_second = tomlkit.loads(second_path.read_text(encoding="utf-8")).unwrap()
+        assert "shared" in fixed_first["pipe"]
+        assert "rebuild_a.shared" not in fixed_first["pipe"]
+        assert "rebuild_b.shared" in unchanged_second["pipe"]
 
     async def test_max_iterations_none_reads_the_config_default(
         self,

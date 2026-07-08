@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Agent bundle fixer:** Added `pipelex-agent fix bundle`, a deterministic in-place fixer over the shared validation fix loop. The command supports `--format`/`--error-format`, repeatable `--select`/`--ignore` fix-rule filters, `--allow-signatures`, `--max-iterations`, and the same bundle-file or directory resolution as `pipelex-agent validate bundle`. Successful fix results report `pending_signatures` and `is_runnable`; by default the command exits non-zero when a fixed bundle remains valid-but-not-runnable.
+
 ## [v0.38.0] - 2026-07-06
 
 ### Highlights

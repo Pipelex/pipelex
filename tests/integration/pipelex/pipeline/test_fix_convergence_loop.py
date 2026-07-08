@@ -178,6 +178,24 @@ output = "Text"
 prompt = "Say hola"
 """
 
+_XFILE_SIGNATURE_TARGET_MTHDS = """domain = "nsfix_xsig"
+
+[pipe."nsfix_xsig.hello"]
+type = "PipeLLM"
+description = "Concrete hello whose same-domain prefix should be stripped."
+inputs = { name = "Text" }
+output = "Text"
+prompt = "Say hello to $name"
+"""
+
+_XFILE_SIGNATURE_SIBLING_MTHDS = """domain = "nsfix_xsig"
+
+[pipe.hello]
+description = "Forward-declared hello signature."
+inputs = { name = "Text" }
+output = "Text"
+"""
+
 # Typo'd main_pipe tail: dotted, same-domain, valid snake tail — but NEITHER the dotted code nor
 # the bare tail exists as a declaration key. The categorizer suppresses the enrichment, so the
 # loop must apply nothing and leave the file byte-identical (checkpoint-C item 1, categorizer half).
@@ -411,6 +429,7 @@ class TestFixConvergenceLoop:
         assert [fix.fix_code for fix in result.fixes_applied] == ["match-sequence-output", "match-sequence-output"]
         assert result.bail_reason is None
         # Both sequences now declare the list output the last step yields.
+        assert [Path(written) for written in result.files_written] == [bundle_path.resolve()]
         pipes = _pipes(bundle_path)
         assert pipes["inner"]["output"] == "Idea[]"
         assert pipes["outer"]["output"] == "Idea[]"
@@ -669,6 +688,37 @@ class TestFixConvergenceLoop:
         assert "hola" in pipes
         assert "nsfix_xfile.hola" not in pipes
 
+    async def test_strip_namespace_proceeds_past_sibling_signature_header(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A sibling ``PipeSignature`` header is not a hard collision.
+
+        Additive multi-file loading allows a concrete definition to replace a matching signature.
+        The cross-file guard must therefore ignore typeless contract-only sections when deciding
+        whether a stripped concrete declaration would collide with a sibling file.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_SINGLE_PASS_MTHDS.replace('output = "Idea"\n', 'output = "Idea[]"\n'), encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        concrete_path = libs_dir / "concrete.mthds"
+        concrete_path.write_text(_XFILE_SIGNATURE_TARGET_MTHDS, encoding="utf-8")
+        (libs_dir / "signature.mthds").write_text(_XFILE_SIGNATURE_SIBLING_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[libs_dir])
+
+        assert result.is_valid is True
+        assert result.bail_reason is None
+        assert [fix.fix_code for fix in result.fixes_applied] == ["strip-namespace"]
+        assert [Path(written) for written in result.files_written] == [concrete_path.resolve()]
+        parsed = tomlkit.loads(concrete_path.read_text(encoding="utf-8")).unwrap()
+        pipes = cast("dict[str, Any]", parsed["pipe"])
+        assert "hello" in pipes
+        assert "nsfix_xsig.hello" not in pipes
+
     async def test_multi_file_cascade_fixes_each_declaring_file(
         self,
         tmp_path: Path,
@@ -693,7 +743,7 @@ class TestFixConvergenceLoop:
         assert result.is_valid is True
         assert [fix.fix_code for fix in result.fixes_applied] == ["match-sequence-output", "match-sequence-output"]
         assert result.bail_reason is None
-        assert {Path(written) for written in result.files_written} == {bundle_path.resolve(), sibling_path.resolve()}
+        assert [Path(written) for written in result.files_written] == [sibling_path.resolve(), bundle_path.resolve()]
         assert _pipes(bundle_path)["entry_seq"]["output"] == "Idea[]"
         assert _pipes(sibling_path)["sibling_seq"]["output"] == "Notion[]"
 

@@ -83,6 +83,31 @@ steps = [
 # pipe-channel error must carry the sibling's path — not the entry file's.
 _SIBLING_SEQ_MISMATCH_MTHDS = _ENTRY_SEQ_MISMATCH_MTHDS.replace("srcthread_entry", "srcthread_sibling")
 
+_ENTRY_INPUT_DRIFT_MTHDS = """domain = "srcthread_input_entry"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary of a text."
+
+[pipe.write_summary]
+type = "PipeLLM"
+description = "Summarize the text."
+inputs = { text = "Text", style = "Text" }
+output = "Summary"
+prompt = "Summarize $text in style $style"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Sequence with drifted inputs."
+inputs = { text = "Number", note = "Text" }
+output = "Summary"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]
+"""
+
+_SIBLING_INPUT_DRIFT_MTHDS = _ENTRY_INPUT_DRIFT_MTHDS.replace("srcthread_input_entry", "srcthread_input_sibling")
+
 _VALID_ENTRY_MTHDS = """domain = "srcthread_valid"
 main_pipe = "say_hi"
 
@@ -98,6 +123,19 @@ def _pipe_channel_items(exc: ValidateBundleError, *, error_type: PipeValidationE
     report = exc.to_error_report()
     assert report.validation_errors is not None
     return [item for item in report.validation_errors if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type == error_type]
+
+
+def _input_drift_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
+    report = exc.to_error_report()
+    assert report.validation_errors is not None
+    input_drift_types = {
+        PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+        PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+        PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
+    }
+    return [
+        item for item in report.validation_errors if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type in input_drift_types
+    ]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -224,6 +262,54 @@ class TestValidateBundleSourceThreading:
             assert item.source is not None, "sibling-declared pipe error must carry the sibling file as source"
             assert Path(item.source).resolve() == sibling_path.resolve()
             assert item.suggested_fix is not None
+            assert item.suggested_fix.source == item.source
+
+    async def test_input_drift_error_carries_entry_file_source(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A fixable input-drift pipe-channel error carries the entry file as ``source``."""
+        load_empty_library()
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_ENTRY_INPUT_DRIFT_MTHDS, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        items = _input_drift_items(exc_info.value)
+        assert items, "expected a pipe-channel controller-input-drift item"
+        for item in items:
+            assert item.source is not None
+            assert Path(item.source).resolve() == bundle_path.resolve()
+            assert item.suggested_fix is not None
+            assert item.suggested_fix.fix_code == "sync-controller-inputs"
+            assert item.suggested_fix.source == item.source
+
+    async def test_input_drift_error_carries_sibling_file_source(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A fixable input-drift error in a sibling library file names that sibling file."""
+        load_empty_library()
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_VALID_ENTRY_MTHDS, encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        sibling_path = libs_dir / "sibling.mthds"
+        sibling_path.write_text(_SIBLING_INPUT_DRIFT_MTHDS, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path, library_dirs=[libs_dir])
+
+        items = _input_drift_items(exc_info.value)
+        assert items, "expected a pipe-channel controller-input-drift item"
+        for item in items:
+            assert item.source is not None
+            assert Path(item.source).resolve() == sibling_path.resolve()
+            assert item.suggested_fix is not None
+            assert item.suggested_fix.fix_code == "sync-controller-inputs"
             assert item.suggested_fix.source == item.source
 
     async def test_pipe_channel_lookup_miss_leaves_source_absent(

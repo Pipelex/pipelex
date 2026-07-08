@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.config import get_config
+from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -57,6 +58,10 @@ class FixBundleResult(BaseModel):
     """Distinct files written, in first-write order across iterations (resolved paths)."""
     remaining_errors: list[ValidationErrorItem]
     """The last failed validation's structured errors; empty when ``is_valid``."""
+    pending_signatures: list[str] | None = None
+    """Qualified refs still declared as ``PipeSignature`` after a successful validation."""
+    is_runnable: bool | None = None
+    """Whether the fixed bundle has no pending ``PipeSignature`` placeholders."""
     bail_reason: str | None = None
     """Why the loop stopped early (no-progress repeat, out-of-scope targets, cross-file
     collision, max_iterations), if it did."""
@@ -145,15 +150,25 @@ def _partition_by_write_scope(
     return in_scope, out_of_scope_paths
 
 
+def _is_signature_pipe_section(pipe_section: Any) -> bool:
+    """Whether a raw ``[pipe.<code>]`` section is a typeless contract-only signature."""
+    if not isinstance(pipe_section, dict):
+        return False
+    typed_section = cast("dict[Any, Any]", pipe_section)
+    return "type" not in typed_section and all(key in SIGNATURE_ONLY_KEYS for key in typed_section)
+
+
 def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, set[str]]:
-    """Pipe declaration keys of every loaded bundle file, across ALL domains, keyed by resolved path.
+    """Concrete pipe declaration keys of every loaded bundle file, keyed by resolved path.
 
     Cross-domain on purpose: a bare pipe code must resolve unambiguously across the loaded
     library — ``PipeLibrary.get_optional_pipe`` raises on a bare code declared by two domains —
     so a rename target colliding with a same-named declaration in ANY other loaded file would
-    leave the library unloadable. Rebuilt each iteration: multiple files can now mutate per
-    round. A file that fails to parse contributes nothing here — its own problems surface
-    through validation, not this scan.
+    leave the library unloadable. Signature-only headers are excluded: a matching concrete
+    definition is allowed to replace a ``PipeSignature`` during crate merge, so treating the
+    header as a hard collision would block a valid fix. Rebuilt each iteration: multiple files
+    can now mutate per round. A file that fails to parse contributes nothing here — its own
+    problems surface through validation, not this scan.
     """
     all_paths: set[Path] = {entry_path}
     all_paths.update(mthds_path.resolve() for mthds_path in get_pipelex_mthds_files_from_dirs(dirs=set(effective_dirs)))
@@ -165,7 +180,11 @@ def _pipe_codes_by_file(*, entry_path: Path, effective_dirs: Sequence[Path]) -> 
             continue
         pipe_section = toml_doc.get("pipe")
         if isinstance(pipe_section, dict):
-            codes_by_file[mthds_path] = {key for key in cast("dict[Any, Any]", pipe_section) if isinstance(key, str)}
+            codes_by_file[mthds_path] = {
+                key
+                for key, section in cast("dict[Any, Any]", pipe_section).items()
+                if isinstance(key, str) and not _is_signature_pipe_section(section)
+            }
         else:
             codes_by_file[mthds_path] = set()
     return codes_by_file
@@ -260,6 +279,7 @@ async def fix_bundle_file(
     mthds_file_path: Path,
     *,
     library_dirs: Sequence[Path] | None = None,
+    allow_signatures: bool = False,
     max_iterations: int | None = None,
     select_codes: Sequence[str] | None = None,
     ignore_codes: Sequence[str] | None = None,
@@ -270,9 +290,11 @@ async def fix_bundle_file(
     structured errors; group the unseen ones by the file they target (declaring file via
     ``source``, entry file for source-less); apply each group to its file's tomlkit DOM
     (style-preserving) and write the changed files; re-validate. Only fixes with at least one
-    applied op count in ``fixes_applied``. ``max_iterations=None`` resolves to the
-    ``fix_loop_max_attempts`` builder config. ``select_codes`` / ``ignore_codes`` filter which
-    fix rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
+    applied op count in ``fixes_applied``. ``allow_signatures`` mirrors ``validate bundle``:
+    signature placeholders are tolerated for the exit gate only, while the success result still
+    reports ``pending_signatures`` and ``is_runnable``. ``max_iterations=None`` resolves to the
+    ``fix_loop_max_attempts`` builder config. ``select_codes`` / ``ignore_codes`` filter which fix
+    rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
     """
     if max_iterations is None:
         max_iterations = get_config().pipelex.builder_config.fix_loop_max_attempts
@@ -290,13 +312,20 @@ async def fix_bundle_file(
 
     for _ in range(max_iterations):
         try:
-            await validate_bundle(mthds_file_path=mthds_file_path, library_dirs=library_dirs)
+            validation_result = await validate_bundle(
+                mthds_file_path=mthds_file_path,
+                library_dirs=library_dirs,
+                allow_signatures=allow_signatures,
+            )
+            pending_signatures = validation_result.pending_signatures
             return FixBundleResult(
                 is_valid=True,
                 iterations=apply_rounds,
                 fixes_applied=fixes_applied,
                 files_written=files_written,
                 remaining_errors=[],
+                pending_signatures=pending_signatures,
+                is_runnable=not pending_signatures,
             )
         except ValidateBundleError as exc:
             last_error_items = _validation_error_items(exc)
@@ -378,13 +407,20 @@ async def fix_bundle_file(
 
     # max_iterations apply rounds done — the final verdict comes from one last validation.
     try:
-        await validate_bundle(mthds_file_path=mthds_file_path, library_dirs=library_dirs)
+        validation_result = await validate_bundle(
+            mthds_file_path=mthds_file_path,
+            library_dirs=library_dirs,
+            allow_signatures=allow_signatures,
+        )
+        pending_signatures = validation_result.pending_signatures
         return FixBundleResult(
             is_valid=True,
             iterations=apply_rounds,
             fixes_applied=fixes_applied,
             files_written=files_written,
             remaining_errors=[],
+            pending_signatures=pending_signatures,
+            is_runnable=not pending_signatures,
         )
     except ValidateBundleError as exc:
         return FixBundleResult(
