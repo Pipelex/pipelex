@@ -2,7 +2,7 @@ import ast
 import textwrap
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
@@ -214,6 +214,21 @@ class StructureGenerator:
             return f'datetime.fromisoformat("{value.isoformat()}")'
         if isinstance(value, date):
             return f'date.fromisoformat("{value.isoformat()}")'
+        if isinstance(value, list):
+            value_list = cast("list[Any]", value)
+            formatted_items = [self._format_default_value(item) for item in value_list]
+            return f"[{', '.join(formatted_items)}]"
+        if isinstance(value, tuple):
+            value_tuple = cast("tuple[Any, ...]", value)
+            formatted_items = [self._format_default_value(item) for item in value_tuple]
+            trailing_comma = "," if len(formatted_items) == 1 else ""
+            return f"({', '.join(formatted_items)}{trailing_comma})"
+        if isinstance(value, dict):
+            value_dict = cast("dict[Any, Any]", value)
+            formatted_items = [
+                f"{self._format_default_value(dict_key)}: {self._format_default_value(dict_value)}" for dict_key, dict_value in value_dict.items()
+            ]
+            return f"{{{', '.join(formatted_items)}}}"
         return repr(value)
 
     def _format_class_docstring(self, docstring: str, *, indent: str = "    ") -> str:

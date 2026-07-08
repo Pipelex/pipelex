@@ -481,6 +481,45 @@ class TypeMappingTest(StructuredContent):
         assert 'logged_at: List[datetime] = Field(..., description="Log timestamps")' in result
         assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
 
+    def test_list_of_datetime_field_with_default_round_trips(self):
+        """List defaults containing datetimes are recursively formatted with generated imports."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps",
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type="datetime",
+                default_value=[offset_default],
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["logged_at"].default == [offset_default]
+
+    def test_dict_of_date_field_with_default_round_trips(self):
+        """Dict defaults containing dates are recursively formatted with generated imports."""
+        date_default = date(2026, 7, 7)
+        structure_blueprint = {
+            "deadlines_by_name": ConceptStructureBlueprint(
+                description="Deadlines",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="str",
+                value_type="date",
+                default_value={"ship": date_default},
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDictDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["deadlines_by_name"].default == {"ship": date_default}
+
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
         structure_blueprint = {
