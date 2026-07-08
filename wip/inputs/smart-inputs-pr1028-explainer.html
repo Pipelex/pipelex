@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PR 1028 - Native YesNo, Native Date, and Smart Inputs</title>
+  <style>
+    :root {
+      --ink: #151923;
+      --muted: #5d6678;
+      --faint: #eef1f6;
+      --panel: #ffffff;
+      --panel-soft: #f8fafc;
+      --line: #d9dee8;
+      --blue: #2458d3;
+      --green: #147557;
+      --amber: #8a5a00;
+      --red: #b42318;
+      --code-bg: #101623;
+      --code-ink: #e8eefc;
+      --shadow: 0 12px 36px rgba(16, 24, 40, 0.09);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        linear-gradient(180deg, #f4f7fb 0%, #ffffff 42%),
+        #ffffff;
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        sans-serif;
+      line-height: 1.5;
+    }
+
+    a {
+      color: var(--blue);
+      text-decoration: none;
+      font-weight: 650;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .shell {
+      width: min(1180px, calc(100vw - 36px));
+      margin: 0 auto;
+    }
+
+    header {
+      padding: 44px 0 26px;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--green);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(2.1rem, 5vw, 4.7rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 820px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 1.15rem;
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 22px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.76);
+      color: #323b4c;
+      font-size: 0.88rem;
+      font-weight: 650;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 22px;
+      align-items: stretch;
+      margin: 22px 0 34px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .panel-pad {
+      padding: 22px;
+    }
+
+    .tldr {
+      border-left: 5px solid var(--green);
+    }
+
+    .tldr h2,
+    section h2 {
+      margin: 0 0 12px;
+      font-size: 1.36rem;
+      letter-spacing: 0;
+    }
+
+    .tldr p {
+      margin: 0;
+      font-size: 1.1rem;
+    }
+
+    .tldr strong {
+      color: var(--green);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      height: 100%;
+    }
+
+    .stat {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .stat b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    section {
+      margin: 36px 0;
+    }
+
+    .section-lead {
+      max-width: 820px;
+      margin: 0 0 16px;
+      color: var(--muted);
+    }
+
+    .before-after {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .before-after .side {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--panel);
+    }
+
+    .side h3 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 0;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #f9fafc;
+      font-size: 1.02rem;
+    }
+
+    .side.before h3 {
+      color: var(--red);
+    }
+
+    .side.after h3 {
+      color: var(--green);
+    }
+
+    .side-body {
+      padding: 16px;
+    }
+
+    .plain-list {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .plain-list li {
+      margin: 7px 0;
+    }
+
+    .value-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .value-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px;
+    }
+
+    .value-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .value-card p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .diagram-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .diagram-card h3 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .flow-svg {
+      width: 100%;
+      min-width: 540px;
+      height: auto;
+      display: block;
+    }
+
+    .mermaid {
+      margin: 0;
+      padding: 0;
+      color: var(--ink);
+      background: transparent;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.88rem;
+      white-space: pre;
+    }
+
+    pre {
+      margin: 12px 0 0;
+      overflow: auto;
+      border-radius: 8px;
+      background: var(--code-bg);
+      color: var(--code-ink);
+      font-size: 0.84rem;
+      line-height: 1.48;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    pre code {
+      display: block;
+      padding: 15px;
+    }
+
+    .diff .add {
+      color: #7ee2a8;
+    }
+
+    .diff .del {
+      color: #ff9b9b;
+    }
+
+    .diff .file {
+      color: #99b8ff;
+    }
+
+    .diff .ctx {
+      color: #b9c4d8;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    table {
+      width: 100%;
+      min-width: 760px;
+      border-collapse: collapse;
+      font-size: 0.94rem;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f7f9fc;
+      color: #333b4c;
+      font-size: 0.78rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #e8f2ff;
+      color: #1a4bb8;
+      font-size: 0.78rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .tag.green {
+      background: #e7f6ef;
+      color: var(--green);
+    }
+
+    .tag.amber {
+      background: #fff2d8;
+      color: var(--amber);
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      margin: 12px 0;
+      overflow: hidden;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 14px 16px;
+      background: #f8fafc;
+      font-weight: 760;
+    }
+
+    details > div {
+      padding: 0 16px 16px;
+    }
+
+    .callout {
+      border: 1px solid #c9ddff;
+      border-left: 5px solid var(--blue);
+      border-radius: 8px;
+      background: #f3f7ff;
+      padding: 16px;
+    }
+
+    .callout p {
+      margin: 0;
+    }
+
+    .link-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .link-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      padding: 14px;
+    }
+
+    .link-card span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    footer {
+      margin: 48px 0 34px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 900px) {
+      .hero-grid,
+      .before-after,
+      .value-grid,
+      .two-col,
+      .link-list {
+        grid-template-columns: 1fr;
+      }
+
+      .stats {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        width: min(100vw - 24px, 1180px);
+      }
+
+      header {
+        padding-top: 26px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-pad {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="shell">
+      <p class="eyebrow">PR 1028 explainer</p>
+      <h1>Smart Inputs: from protocol envelopes to plain business values.</h1>
+      <p class="subtitle">
+        Before this PR, users had to feed Pipelex inputs in Pipelex's internal shape. After this PR, they provide the values they already have, and the pipe signature turns those values into typed working memory.
+      </p>
+      <div class="meta">
+        <span class="pill">Branch: <code>feature/Smart-inputs</code></span>
+        <span class="pill">Base: <code>dev</code></span>
+        <span class="pill">Scope: native concepts + runner/CLI/API input seam</span>
+        <span class="pill">Generated: 2026-07-08</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <div class="hero-grid">
+      <section class="panel panel-pad tldr" aria-labelledby="tldr-title">
+        <h2 id="tldr-title">TL;DR</h2>
+        <p>
+          <strong>Before Smart Inputs:</strong> a caller had to know the ceremony: concept envelopes, content field names, file wrappers, and list shapes. <strong>After Smart Inputs:</strong> a caller gives Pipelex ordinary values like <code>"contract.pdf"</code>, <code>true</code>, <code>2026-07-07</code>, or rows from <code>people.csv</code>; Pipelex reads the declared signature, builds the right typed data, and fails loudly when the value cannot match the contract.
+        </p>
+      </section>
+
+      <aside class="stats" aria-label="PR scope stats">
+        <div class="stat">
+          <b>Plain</b>
+          <span>callers now provide business values, not Pipelex protocol envelopes</span>
+        </div>
+        <div class="stat">
+          <b>1</b>
+          <span>shared Smart Inputs seam across CLI, Python API, and hosted runner</span>
+        </div>
+        <div class="stat">
+          <b>Typed</b>
+          <span>values become declared concepts such as <code>Question</code>, <code>YesNo</code>, <code>Date</code>, <code>Document</code>, and structured rows</span>
+        </div>
+        <div class="stat">
+          <b>Safer</b>
+          <span>unknown names, bad scalar kinds, wrong list counts, nulls, and incompatible envelopes are typed errors</span>
+        </div>
+      </aside>
+    </div>
+
+    <section aria-labelledby="exec-before-after">
+      <h2 id="exec-before-after">Before / After For Executives</h2>
+      <p class="section-lead">
+        The business change is simple: users now fill in the values they actually have. Pipelex owns the typing, validation, file resolution, and exact rendering.
+      </p>
+
+      <div class="before-after">
+        <div class="side before">
+          <h3>Before <span class="tag amber">protocol-shaped</span></h3>
+          <div class="side-body">
+            <ul class="plain-list">
+              <li>Users had to understand Pipelex envelopes: <code>{"concept", "content"}</code>.</li>
+              <li>A yes/no judgment could come back as text that callers had to parse.</li>
+              <li>A calendar date could be forced into a datetime, quietly inventing midnight.</li>
+              <li>Input names not declared by the pipe could be ignored silently.</li>
+              <li>Generated templates did not look like the values accepted by <code>pipelex run</code>.</li>
+            </ul>
+            <pre><code>{
+  "question": {
+    "concept": "legal.Question",
+    "content": { "text": "Does this contract include a penalty clause?" }
+  },
+  "verdict": {
+    "concept": "YesNo",
+    "content": { "yes_no": true }
+  },
+  "signed_on": {
+    "concept": "Date",
+    "content": { "date": "2026-07-07" }
+  }
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="side after">
+          <h3>After JSON <span class="tag green">value-shaped</span></h3>
+          <div class="side-body">
+            <ul class="plain-list">
+              <li>Users provide plain values; the pipe signature supplies the meaning.</li>
+              <li><code>YesNo</code> is a real boolean concept with prompt rendering as <code>yes</code> or <code>no</code>.</li>
+              <li><code>Date</code> stores a date and only stores time when the source states one.</li>
+              <li>Unknown inputs, incompatible envelopes, nulls, wrong scalar kinds, and bad list counts fail with typed errors.</li>
+              <li>The generated light template is the template you can fill and run.</li>
+            </ul>
+            <pre><code>{
+  "question": "Does this contract include a penalty clause?",
+  "verdict": true,
+  "signed_on": "2026-07-07",
+  "contract": "contract.pdf"
+}</code></pre>
+          </div>
+        </div>
+
+        <div class="side after">
+          <h3>After TOML <span class="tag green">value-shaped</span></h3>
+          <div class="side-body">
+            <ul class="plain-list">
+              <li>Same Smart Inputs model as JSON.</li>
+              <li>TOML keeps the shape compact for editable input files.</li>
+              <li>Date literals can stay native TOML dates.</li>
+              <li>The file path stays a plain string.</li>
+            </ul>
+            <pre><code>question = "Does this contract include a penalty clause?"
+verdict = true
+signed_on = 2026-07-07
+contract = "contract.pdf"</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="what-built">
+      <h2 id="what-built">What We Built</h2>
+      <div class="value-grid">
+        <article class="value-card">
+          <h3>Native <code>YesNo</code></h3>
+          <p>
+            A built-in native concept backed by <code>YesNoContent</code>. It carries one strict boolean, renders as <code>yes</code>/<code>no</code>, and supports refinements like any other native concept.
+          </p>
+        </article>
+        <article class="value-card">
+          <h3>Native <code>Date</code></h3>
+          <p>
+            A built-in native concept backed by <code>DateContent</code>. It preserves source precision: date-only stays date-only; time and offset appear only when the source states them.
+          </p>
+        </article>
+        <article class="value-card">
+          <h3>Smart Inputs</h3>
+          <p>
+            A new <code>InputShaper</code> interprets caller input from the declared pipe signature, not from raw value shape alone. One seam covers CLI files, inline inputs, Python callers, and hosted runs.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <section aria-labelledby="architecture">
+      <h2 id="architecture">Architecture</h2>
+      <p class="section-lead">
+        The key decision: shaping is a runtime boundary concern, not a CLI feature. The CLI passes the inputs file base directory when it has one; the shared shaper decides how each value maps to the declared concept.
+      </p>
+
+      <div class="two-col">
+        <div class="diagram-card">
+          <h3>Smart Inputs flow (Mermaid)</h3>
+          <pre class="mermaid">flowchart LR
+  Caller["Caller input"]
+  Surface["CLI / Python API / hosted runner"]
+  Specs["Entry pipe input signature"]
+  Shaper["InputShaper"]
+  WM["WorkingMemory"]
+  Pipe["Pipe execution"]
+
+  Caller -- "plain values or explicit envelope" --&gt; Surface
+  Specs -- "declared concept, multiplicity, presence" --&gt; Shaper
+  Surface -- "PipelineInputs + optional inputs_base_dir" --&gt; Shaper
+  Shaper -- "typed Stuff / ListContent / errors" --&gt; WM
+  WM -- "rendered into prompts and operators" --&gt; Pipe</pre>
+        </div>
+
+        <div class="diagram-card">
+          <h3>Concept dispatch map (SVG)</h3>
+          <svg class="flow-svg" viewBox="0 0 900 420" role="img" aria-labelledby="svg-title svg-desc">
+            <title id="svg-title">Smart Inputs dispatch map</title>
+            <desc id="svg-desc">A signature dispatch map from declared concepts to expected caller shapes.</desc>
+            <defs>
+              <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L9,3 z" fill="#2458d3" />
+              </marker>
+            </defs>
+            <rect x="24" y="28" width="210" height="60" rx="8" fill="#f3f7ff" stroke="#b7c9f7" />
+            <text x="129" y="54" text-anchor="middle" font-size="17" font-weight="700" fill="#151923">Declared input</text>
+            <text x="129" y="76" text-anchor="middle" font-size="13" fill="#5d6678">from pipe signature</text>
+
+            <rect x="334" y="28" width="230" height="60" rx="8" fill="#eefaf4" stroke="#addcc8" />
+            <text x="449" y="54" text-anchor="middle" font-size="17" font-weight="700" fill="#151923">InputShaper</text>
+            <text x="449" y="76" text-anchor="middle" font-size="13" fill="#5d6678">one shared dispatch point</text>
+
+            <rect x="666" y="28" width="210" height="60" rx="8" fill="#fff8eb" stroke="#f0ce8d" />
+            <text x="771" y="54" text-anchor="middle" font-size="17" font-weight="700" fill="#151923">Typed Stuff</text>
+            <text x="771" y="76" text-anchor="middle" font-size="13" fill="#5d6678">or typed shaping error</text>
+
+            <line x1="234" y1="58" x2="334" y2="58" stroke="#2458d3" stroke-width="2.4" marker-end="url(#arrow)" />
+            <line x1="564" y1="58" x2="666" y2="58" stroke="#2458d3" stroke-width="2.4" marker-end="url(#arrow)" />
+
+            <g font-size="14" fill="#151923">
+              <rect x="60" y="142" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="155" y="170" text-anchor="middle">Text-refining</text>
+              <line x1="250" y1="164" x2="366" y2="164" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="366" y="142" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="461" y="170" text-anchor="middle">bare string</text>
+              <line x1="556" y1="164" x2="672" y2="164" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="672" y="142" width="168" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="756" y="170" text-anchor="middle">declared concept</text>
+
+              <rect x="60" y="205" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="155" y="233" text-anchor="middle">YesNo-refining</text>
+              <line x1="250" y1="227" x2="366" y2="227" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="366" y="205" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="461" y="233" text-anchor="middle">bare boolean</text>
+              <line x1="556" y1="227" x2="672" y2="227" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="672" y="205" width="168" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="756" y="233" text-anchor="middle">YesNoContent</text>
+
+              <rect x="60" y="268" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="155" y="296" text-anchor="middle">Date-refining</text>
+              <line x1="250" y1="290" x2="366" y2="290" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="366" y="268" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="461" y="296" text-anchor="middle">ISO date or TOML date</text>
+              <line x1="556" y1="290" x2="672" y2="290" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="672" y="268" width="168" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="756" y="296" text-anchor="middle">DateContent</text>
+
+              <rect x="60" y="331" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="155" y="359" text-anchor="middle">Document[] structure</text>
+              <line x1="250" y1="353" x2="366" y2="353" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="366" y="331" width="190" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="461" y="359" text-anchor="middle">path / CSV / list</text>
+              <line x1="556" y1="353" x2="672" y2="353" stroke="#2458d3" stroke-width="2" marker-end="url(#arrow)" />
+              <rect x="672" y="331" width="168" height="44" rx="8" fill="#ffffff" stroke="#d9dee8" />
+              <text x="756" y="359" text-anchor="middle">ListContent</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="developer-impact">
+      <h2 id="developer-impact">Developer Impact</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Area</th>
+              <th>What changed</th>
+              <th>Why co-developers should care</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="tag green">Native data</span></td>
+              <td><code>NativeConceptCode</code> now includes <code>YesNo</code> and <code>Date</code>, with corresponding content classes and rendering.</td>
+              <td>No more local string conventions for two common extraction/judgment outputs.</td>
+            </tr>
+            <tr>
+              <td><span class="tag green">Input shaping</span></td>
+              <td><code>InputShaper</code> maps bare values to the declared concept, checks envelopes, applies multiplicity rules, and raises typed errors.</td>
+              <td>Every surface gets the same behavior. A CLI fix is not stranded in the CLI.</td>
+            </tr>
+            <tr>
+              <td><span class="tag">Files and tables</span></td>
+              <td>Relative file-ish strings resolve against the inputs file directory; declared structured lists can accept a CSV path by signature.</td>
+              <td>Common user artifacts, like <code>contract.pdf</code> and <code>people.csv</code>, become first-class inputs without wrappers.</td>
+            </tr>
+            <tr>
+              <td><span class="tag">Templates</span></td>
+              <td><code>build inputs</code> and <code>pipelex-agent inputs</code> default to the light shape; <code>--explicit</code> keeps the old envelope.</td>
+              <td>Generated examples now teach the recommended model and round-trip into <code>run</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="tag amber">Breaking edge</span></td>
+              <td><code>YesNo</code> and <code>Date</code> are reserved native concept codes; unknown inputs and top-level nulls are hard errors.</td>
+              <td>Breakage is intentional: it removes silent wrong work and makes author mistakes visible at the boundary.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="runtime-story">
+      <h2 id="runtime-story">One Seam, All Surfaces</h2>
+      <p class="section-lead">
+        The implementation deliberately routes the behavior through working-memory construction. That keeps CLI, Python, agent CLI, and hosted runner behavior aligned.
+      </p>
+
+      <div class="callout">
+        <p>
+          The old bottom-up path remains when no signature is available. When a signature exists, Smart Inputs is opt-in by data: pass <code>input_specs</code> and the same <code>PipelineInputs</code> are shaped top-down.
+        </p>
+      </div>
+
+      <pre><code>caller values + entry pipe signature
+  -&gt; WorkingMemoryFactory.make_from_pipeline_inputs(..., input_specs=...)
+  -&gt; InputShaper.shape(...)
+  -&gt; WorkingMemory full of typed Stuff
+  -&gt; normal pipe execution</code></pre>
+    </section>
+
+    <section aria-labelledby="critical-diff">
+      <h2 id="critical-diff">Minimal Critical Diff</h2>
+      <p class="section-lead">
+        These are not exhaustive patches. They are the few lines that explain the architecture and product behavior.
+      </p>
+
+      <details open>
+        <summary>1. Native concepts become first-class</summary>
+        <div>
+          <pre class="diff"><code><span class="file">pipelex/core/concepts/native/concept_native.py</span>
+<span class="ctx"> class NativeConceptCode(StrEnum):</span>
+<span class="add">+    YES_NO = "YesNo"</span>
+<span class="add">+    DATE = "Date"</span>
+
+<span class="ctx">     def structure_class(self) -&gt; type[StuffContent]:</span>
+<span class="add">+        case NativeConceptCode.YES_NO:</span>
+<span class="add">+            return YesNoContent</span>
+<span class="add">+        case NativeConceptCode.DATE:</span>
+<span class="add">+            return DateContent</span></code></pre>
+        </div>
+      </details>
+
+      <details>
+        <summary>2. Date refuses fidelity loss</summary>
+        <div>
+          <pre class="diff"><code><span class="file">pipelex/core/stuffs/date_content.py</span>
+<span class="add">+class DateContent(StuffContent):</span>
+<span class="add">+    date: datetime.date</span>
+<span class="add">+    time: datetime.time | None = None</span>
+
+<span class="add">+    def to_datetime(self) -&gt; datetime.datetime:</span>
+<span class="add">+        if self.time is None:</span>
+<span class="add">+            msg = "This Date has no time of day, so it cannot be converted to a datetime without inventing one."</span>
+<span class="add">+            raise DateContentError(msg)</span>
+<span class="add">+        return datetime.datetime.combine(self.date, self.time)</span></code></pre>
+        </div>
+      </details>
+
+      <details>
+        <summary>3. The shared seam calls the shaper when the signature is available</summary>
+        <div>
+          <pre class="diff"><code><span class="file">pipelex/core/memory/working_memory_factory.py</span>
+<span class="ctx"> def make_from_pipeline_inputs(</span>
+<span class="ctx">     pipeline_inputs: PipelineInputs,</span>
+<span class="add">+    *,</span>
+<span class="add">+    input_specs: InputStuffSpecs | None = None,</span>
+<span class="add">+    inputs_base_dir: Path | None = None,</span>
+<span class="ctx"> ) -&gt; WorkingMemory:</span>
+<span class="add">+    if input_specs is not None:</span>
+<span class="add">+        return InputShaper.shape(</span>
+<span class="add">+            pipeline_inputs,</span>
+<span class="add">+            input_specs=input_specs,</span>
+<span class="add">+            search_domain_codes=search_domain_codes,</span>
+<span class="add">+            inputs_base_dir=inputs_base_dir,</span>
+<span class="add">+        )</span></code></pre>
+        </div>
+      </details>
+
+      <details>
+        <summary>4. Top-down dispatch replaces shape guessing</summary>
+        <div>
+          <pre class="diff"><code><span class="file">pipelex/core/memory/input_shaper.py</span>
+<span class="add">+input_kind = cls.resolve_input_kind(declared_concept)</span>
+<span class="add">+match input_kind:</span>
+<span class="add">+    case InputKind.TEXT:</span>
+<span class="add">+        return cls._make_content(concept, value={"text": value}, ...)</span>
+<span class="add">+    case InputKind.NUMBER:</span>
+<span class="add">+        if isinstance(value, bool) or not isinstance(value, (int, float)):</span>
+<span class="add">+            raise cls._wrong_kind(...)</span>
+<span class="add">+        return cls._make_content(concept, value={"number": value}, ...)</span>
+<span class="add">+    case InputKind.YES_NO:</span>
+<span class="add">+        return cls._make_content(concept, value=value, ...)</span>
+<span class="add">+    case InputKind.DATE:</span>
+<span class="add">+        return cls._make_content(concept, value=value, ...)</span>
+<span class="add">+    case InputKind.IMAGE | InputKind.DOCUMENT:</span>
+<span class="add">+        canonical = {"url": cls._resolve_local_path(value, inputs_base_dir=inputs_base_dir)}</span>
+<span class="add">+    case InputKind.STRUCTURED:</span>
+<span class="add">+        return cls._make_content(concept, value=value, ...)</span></code></pre>
+        </div>
+      </details>
+
+      <details>
+        <summary>5. Generated templates flip to the light shape</summary>
+        <div>
+          <pre class="diff"><code><span class="file">pipelex/core/pipes/inputs/input_renderer.py</span>
+<span class="del">-def build_inputs_template(the_pipe: PipeAbstract) -&gt; dict[str, Any]:</span>
+<span class="add">+def build_inputs_template(the_pipe: PipeAbstract, *, explicit: bool = False) -&gt; dict[str, Any]:</span>
+<span class="add">+    envelope_template = the_pipe.inputs.build_inputs_template()</span>
+<span class="add">+    if explicit:</span>
+<span class="add">+        return envelope_template</span>
+<span class="add">+    return _delighten_template(envelope_template, input_specs=the_pipe.inputs)</span>
+
+<span class="add">+def _delighten_entry(entry: dict[str, Any], *, kind: InputKind) -&gt; Any:</span>
+<span class="add">+    match kind:</span>
+<span class="add">+        case InputKind.DYNAMIC:</span>
+<span class="add">+            return entry</span>
+<span class="add">+        case InputKind.STRUCTURED:</span>
+<span class="add">+            return entry["content"]</span>
+<span class="add">+        case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.IMAGE | InputKind.DOCUMENT:</span>
+<span class="add">+            return _unwrap_scalar_content(entry["content"], envelope=entry)</span></code></pre>
+        </div>
+      </details>
+    </section>
+
+    <section aria-labelledby="quality">
+      <h2 id="quality">Quality Net</h2>
+      <p class="section-lead">
+        The PR is not just a parser shortcut. The test surface follows the feature across native content, shaping arms, CLI loading, template generation, runner wiring, and dry-run E2E behavior.
+      </p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Risk</th>
+              <th>Guard</th>
+              <th>Examples in this PR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>LLM returns "yes" text instead of typed output</td>
+              <td>Object output path verifies <code>YesNoContent</code> schema and result type.</td>
+              <td><code>test_pipe_llm_yes_no_output_path.py</code>, <code>test_yes_no_dry_run.py</code></td>
+            </tr>
+            <tr>
+              <td>Date-only value silently becomes midnight</td>
+              <td><code>DateContent</code> rejects datetime-on-date and raises if callers ask for datetime without a time.</td>
+              <td><code>test_date_content_renders.py</code>, <code>test_pipe_llm_date_output_path.py</code></td>
+            </tr>
+            <tr>
+              <td>Bare values shape to the wrong concept</td>
+              <td>Scalar arm tests assert declared concept retention for text, number, yes/no, date, image/document, and structured values.</td>
+              <td><code>test_scalar_arms.py</code>, <code>test_explicit_forms.py</code>, <code>test_errors.py</code></td>
+            </tr>
+            <tr>
+              <td>Generated template does not run</td>
+              <td>Light template round-trip tests generate inputs, feed them back into a run, and keep <code>--explicit</code> as a compatibility path.</td>
+              <td><code>test_input_renderer_light.py</code>, <code>test_input_renderer_light_golden.py</code>, <code>test_smart_inputs_light_roundtrip.py</code></td>
+            </tr>
+            <tr>
+              <td>File inputs work in one surface but not another</td>
+              <td><code>inputs_base_dir</code> is threaded through the runner and tested from CLI file loading into shaping.</td>
+              <td><code>test_file_paths.py</code>, <code>test_csv_by_signature.py</code>, <code>test_run_core_inputs_base_dir.py</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section aria-labelledby="migration">
+      <h2 id="migration">Migration Notes</h2>
+      <p class="section-lead">
+        These breaking changes are the cost of making wrong inputs visible instead of silently tolerated.
+      </p>
+      <ul class="plain-list">
+        <li><code>YesNo</code> and <code>Date</code> are now reserved native concept codes. Bundles declaring concepts with those exact codes now error.</li>
+        <li>Unknown input names are hard errors with the declared names listed.</li>
+        <li>Top-level <code>null</code> is rejected. Omit the key to express absence.</li>
+        <li>TOML date and datetime literals now map to <code>Date</code>; bare time-of-day values remain invalid.</li>
+        <li>Structure field <code>type = "date"</code> now means <code>datetime.date</code>. Use <code>type = "datetime"</code> for a timestamp.</li>
+        <li><code>build inputs</code> defaults to the light template. Use <code>--explicit</code> when you want the old envelope form.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="links">
+      <h2 id="links">Related PRs</h2>
+      <p class="section-lead">
+        All related PRs found for this work are in this repository. No cross-repo PR was required for the changelog scope covered here.
+      </p>
+      <div class="link-list">
+        <div class="link-card">
+          <a href="https://github.com/Pipelex/pipelex/pull/1028">#1028 - Native YesNo and Date concepts + Smart Inputs</a>
+          <span>Open umbrella PR against <code>dev</code>.</span>
+        </div>
+        <div class="link-card">
+          <a href="https://github.com/Pipelex/pipelex/pull/1029">#1029 - Add native Date concept</a>
+          <span>Merged into <code>feature/Smart-inputs</code>.</span>
+        </div>
+        <div class="link-card">
+          <a href="https://github.com/Pipelex/pipelex/pull/1030">#1030 - Smart Inputs Phase 2</a>
+          <span>Top-down shaping goes live on all surfaces.</span>
+        </div>
+        <div class="link-card">
+          <a href="https://github.com/Pipelex/pipelex/pull/1032">#1032 - Smart Inputs Phase 3 + 4</a>
+          <span>File-ish inputs, CSV-by-signature, and light templates.</span>
+        </div>
+        <div class="link-card">
+          <a href="https://github.com/Pipelex/pipelex/pull/1033">#1033 - Smart Inputs Phase 5</a>
+          <span>Light-model docs, changelog, and explicit-form multiplicity guard.</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>
+        Source basis: <code>CHANGELOG.md</code> lines 5-17, diff against <code>origin/dev</code>, and GitHub PR metadata queried on 2026-07-08.
+      </p>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <script>
+    if (window.mermaid) {
+      window.mermaid.initialize({ startOnLoad: true, securityLevel: "strict", theme: "default" });
+    }
+  </script>
+</body>
+</html>
