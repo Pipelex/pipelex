@@ -88,6 +88,20 @@ def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorIte
     )
 
 
+def _pending_signatures_from_validation_result(validation_result: Any) -> list[str]:
+    """Pending signatures reported by validation, defaulting to none for success-only mocks."""
+    pending_signatures = getattr(validation_result, "pending_signatures", None)
+    if not isinstance(pending_signatures, list):
+        return []
+    typed_pending_signatures = cast("list[Any]", pending_signatures)
+    validated_pending_signatures: list[str] = []
+    for pipe_ref in typed_pending_signatures:
+        if not isinstance(pipe_ref, str):
+            return []
+        validated_pending_signatures.append(pipe_ref)
+    return validated_pending_signatures
+
+
 def _fix_target_path(fix: SuggestedFix, *, entry_path: Path) -> Path:
     """The file this fix's ops address: its ``source`` when known, else the entry file."""
     if fix.source is None:
@@ -317,7 +331,7 @@ async def fix_bundle_file(
                 library_dirs=library_dirs,
                 allow_signatures=allow_signatures,
             )
-            pending_signatures = validation_result.pending_signatures
+            pending_signatures = _pending_signatures_from_validation_result(validation_result)
             return FixBundleResult(
                 is_valid=True,
                 iterations=apply_rounds,
@@ -412,7 +426,7 @@ async def fix_bundle_file(
             library_dirs=library_dirs,
             allow_signatures=allow_signatures,
         )
-        pending_signatures = validation_result.pending_signatures
+        pending_signatures = _pending_signatures_from_validation_result(validation_result)
         return FixBundleResult(
             is_valid=True,
             iterations=apply_rounds,
