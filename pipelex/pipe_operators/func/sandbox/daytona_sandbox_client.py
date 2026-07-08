@@ -35,6 +35,7 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         snapshot: str | None = None,
         block_network: bool = True,
         bootstrap_pip: str | None = None,
+        keep_sandbox: bool = False,
         create_timeout: float = 60.0,
         exec_timeout: int = 300,
     ) -> None:
@@ -46,11 +47,20 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         # deployments without a pipelex-preinstalled snapshot (decision 13's runtime-install fallback).
         # When set, egress MUST be open for pip, so network blocking is turned off for that box.
         self._bootstrap_pip = bootstrap_pip
+        # DEBUG ONLY: keep the box after the run (skip teardown, not ephemeral) so it stays visible in
+        # the Daytona dashboard for its run logs. Off by default — production always tears down.
+        self._keep_sandbox = keep_sandbox
         self._create_timeout = create_timeout
         self._exec_timeout = exec_timeout
 
     def _resolved_bootstrap_pip(self) -> str | None:
         return self._bootstrap_pip or get_optional_env("DAYTONA_BOOTSTRAP_PIP")
+
+    def _resolved_keep_sandbox(self) -> bool:
+        if self._keep_sandbox:
+            return True
+        value = get_optional_env("DAYTONA_KEEP_SANDBOX")
+        return value is not None and value.strip().lower() in {"1", "true", "yes", "on"}
 
     def _resolved_api_key(self) -> str:
         return self._api_key or get_required_env("DAYTONA_API_KEY")
@@ -61,8 +71,12 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         return self._snapshot or get_optional_env("DAYTONA_SNAPSHOT")
 
     def _build_command(self, *, request_remote: str, result_remote: str) -> str:
-        """The command run inside the box. Overridable so the transport can be tested with a stub."""
-        return f"python -m {_ENTRYPOINT_MODULE} {request_remote} {result_remote}"
+        """The command run inside the box. Overridable so the transport can be tested with a stub.
+
+        `2>&1` merges the entrypoint's stderr (pipelex boot + execution logs) into stdout so the
+        box's run log is captured in `response.result` and surfaced in the worker log.
+        """
+        return f"python -m {_ENTRYPOINT_MODULE} {request_remote} {result_remote} 2>&1"
 
     @override
     async def run(self, *, request: SandboxRunRequest) -> SandboxRunResult:
@@ -76,6 +90,7 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         bootstrap_pip = self._resolved_bootstrap_pip()
         # pip needs egress, so a bootstrap install forces the network open for that box.
         block_network = self._block_network and not bootstrap_pip
+        keep_sandbox = self._resolved_keep_sandbox()
         daytona = AsyncDaytona(DaytonaConfig(api_key=self._resolved_api_key()))
         try:
             sandbox = await self._provision(
@@ -83,7 +98,7 @@ class DaytonaSandboxClient(SandboxClientProtocol):
                 params=CreateSandboxFromSnapshotParams(
                     snapshot=self._resolved_snapshot(),
                     network_block_all=block_network,
-                    ephemeral=True,
+                    ephemeral=not keep_sandbox,
                 ),
             )
             snapshot_label = self._resolved_snapshot() or "default-image"
@@ -93,9 +108,13 @@ class DaytonaSandboxClient(SandboxClientProtocol):
             try:
                 return await self._run_in_box(sandbox=sandbox, request=request)
             finally:
-                # Guaranteed teardown on success, throw, or cancel (decision 3).
-                await daytona.delete(sandbox)
-                log.info(f"Daytona box {sandbox.id} torn down for pipe '{request.pipe_code}'")
+                # Guaranteed teardown on success, throw, or cancel (decision 3) — unless keep_sandbox
+                # is set (debug), where the box is left running for dashboard inspection.
+                if keep_sandbox:
+                    log.info(f"Daytona box {sandbox.id} KEPT for pipe '{request.pipe_code}' (DAYTONA_KEEP_SANDBOX set — delete it yourself)")
+                else:
+                    await daytona.delete(sandbox)
+                    log.info(f"Daytona box {sandbox.id} torn down for pipe '{request.pipe_code}'")
         finally:
             await daytona.close()
 
@@ -127,6 +146,12 @@ class DaytonaSandboxClient(SandboxClientProtocol):
             detail = (response.result or "").strip()
             msg = f"Daytona box for pipe '{request.pipe_code}' exited with code {response.exit_code}:\n{detail}"
             raise SandboxExecutionError(msg)
+
+        # Surface the box's run output (the entrypoint's stdout) so a run's in-box execution is
+        # visible in the worker log, not just its result.
+        run_output = (response.result or "").strip()
+        if run_output:
+            log.info(f"Daytona box {sandbox.id} run log for pipe '{request.pipe_code}':\n{run_output}")
 
         result_bytes = await sandbox.fs.download_file(_REMOTE_RESULT)
         if not result_bytes:
