@@ -333,6 +333,7 @@ def handle_validate_bundle_error(
     *,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
 ) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
@@ -342,6 +343,8 @@ def handle_validate_bundle_error(
         library_dirs: The ``-L/--library-dir`` values of the invocation, echoed into the
             actionable ``pipelex fix bundle`` footer so the suggested command reproduces the
             same write scope
+        allow_signatures: Whether the invocation accepted PipeSignature placeholders; when true,
+            the actionable fix command preserves the same leniency.
     """
     report = exc.to_error_report()
     items = list(report.validation_errors or [])
@@ -368,6 +371,8 @@ def handle_validate_bundle_error(
         command_parts = ["pipelex", "fix", "bundle", str(bundle_path)]
         for library_dir in library_dirs or []:
             command_parts.extend(["-L", str(library_dir)])
+        if allow_signatures:
+            command_parts.append("--allow-signatures")
         # shlex.join so a path with spaces stays one argument when the user copy-pastes the footer.
         fix_command = shlex.join(command_parts)
         console.print(

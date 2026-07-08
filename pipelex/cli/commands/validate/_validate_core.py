@@ -171,7 +171,7 @@ async def _validate_pipe_or_bundle(
             )
             raise typer.Exit(2) from exc
         except ValidateBundleError as bundle_error:
-            handle_validate_bundle_error(bundle_error, bundle_path=bundle_path, library_dirs=library_dirs)
+            handle_validate_bundle_error(bundle_error, bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
     elif pipe_code:
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()

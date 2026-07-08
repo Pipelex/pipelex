@@ -204,7 +204,7 @@ class TestErrorHandlersExtended:
         assert "❌ Bundle validation failed" in output
         assert "Bundle:" not in output
         assert "Blueprint Validation Errors:" in output
-        assert "validation failed" in output
+        assert "→ validation failed" in output
         assert "Pipe Validation Errors:" not in output
         assert "Dry Run Error:" not in output
         assert "💡 Tip:" in output

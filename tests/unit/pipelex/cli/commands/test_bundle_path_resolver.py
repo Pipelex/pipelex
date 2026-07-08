@@ -95,8 +95,8 @@ class TestHumanBundlePathResolver:
         assert "Failed to fix: no .mthds bundle file found" in capsys.readouterr().err
 
     def test_ambiguous_directory_exits_2_naming_the_candidates(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        (tmp_path / "a.mthds").write_text('domain = "a"\n', encoding="utf-8")
         (tmp_path / "b.mthds").write_text('domain = "b"\n', encoding="utf-8")
+        (tmp_path / "a.mthds").write_text('domain = "a"\n', encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exc_info:
             resolve_bundle_target(str(tmp_path), library_dir=None, command="fix", not_a_bundle_hint=_HINT)
@@ -104,9 +104,8 @@ class TestHumanBundlePathResolver:
         assert exc_info.value.exit_code == 2
         err = capsys.readouterr().err
         assert "multiple .mthds files found" in err
-        assert "a.mthds" in err
-        assert "b.mthds" in err
-        assert "pipelex fix bundle" in err
+        assert "(a.mthds, b.mthds)" in err
+        assert f"pipelex fix bundle {tmp_path / 'a.mthds'}" in err
 
     def test_not_a_bundle_path_exits_2_with_command_hint(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:

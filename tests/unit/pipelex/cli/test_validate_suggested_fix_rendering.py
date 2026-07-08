@@ -83,6 +83,19 @@ class TestValidateSuggestedFixRendering:
         output = console.export_text()
         assert "pipelex fix bundle methods/demo.mthds -L libs -L shared" in output
 
+    def test_footer_preserves_allow_signatures(self, console: Console) -> None:
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(
+                exc,
+                bundle_path=Path("methods/demo.mthds"),
+                allow_signatures=True,
+            )
+
+        output = console.export_text()
+        assert "pipelex fix bundle methods/demo.mthds --allow-signatures" in output
+
     def test_footer_shell_quotes_paths_with_spaces(self, console: Console) -> None:
         """A path with a space must stay one argument when the footer command is copy-pasted."""
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
