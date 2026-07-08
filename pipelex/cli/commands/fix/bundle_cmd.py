@@ -64,6 +64,13 @@ def fix_bundle_cmd(
         list[str] | None,
         typer.Option("--ignore", help="Skip the named fix rule code. Can be specified multiple times."),
     ] = None,
+    diff: Annotated[
+        bool,
+        typer.Option(
+            "--diff",
+            help="Preview: show the changes as a unified diff without writing any file. Exit codes keep the same verdict semantics.",
+        ),
+    ] = False,
 ) -> None:
     """Fix a bundle file (.mthds) or pipeline directory in place.
 
@@ -74,6 +81,7 @@ def fix_bundle_cmd(
         pipelex fix bundle my_bundle.mthds
         pipelex fix bundle pipeline_01/
         pipelex fix bundle my_bundle.mthds --select match-sequence-output
+        pipelex fix bundle my_bundle.mthds --diff
     """
     select_codes = tuple(select_codes_raw) if select_codes_raw else None
     ignore_codes = tuple(ignore_codes_raw) if ignore_codes_raw else None
@@ -94,4 +102,5 @@ def fix_bundle_cmd(
         max_iterations=max_iterations,
         select_codes=select_codes,
         ignore_codes=ignore_codes,
+        diff=diff,
     )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import difflib
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -9,6 +11,7 @@ from posthog import tag
 from rich.markup import escape
 
 from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview
 from pipelex.cli.error_handlers import (
     ErrorContext,
     display_validation_error_items,
@@ -29,6 +32,7 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox
     from pipelex.pipeline.fixes.fix_loop import FixBundleResult
     from pipelex.suggested_fix import SuggestedFix
 
@@ -45,34 +49,39 @@ def _print_applied_fixes(console: Console, *, fixes: list[SuggestedFix], bundle_
         console.print(line)
 
 
-def _print_work_done(console: Console, *, result: FixBundleResult, bundle_path: Path) -> None:
+def _print_work_done(console: Console, *, result: FixBundleResult, bundle_path: Path, preview: bool = False) -> None:
     """The applied fixes, files written, and iteration count of one fix run."""
-    console.print("[bold cyan]Applied fixes:[/bold cyan]")
+    console.print(f"[bold cyan]{'Fixes that would be applied:' if preview else 'Applied fixes:'}[/bold cyan]")
     _print_applied_fixes(console, fixes=result.fixes_applied, bundle_path=bundle_path)
     if result.files_written:
-        console.print("\n[bold cyan]Files written:[/bold cyan]")
+        console.print(f"\n[bold cyan]{'Files that would be written:' if preview else 'Files written:'}[/bold cyan]")
         for file_path in result.files_written:
             console.print(f"  - {escape(file_path)}")
     console.print(f"\n[bold cyan]Iterations:[/bold cyan] {result.iterations}")
 
 
-def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path: Path, allow_signatures: bool) -> None:
+def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path: Path, allow_signatures: bool, preview: bool = False) -> None:
     """Render a ``FixBundleResult`` for humans and exit per the 0/1 verdict policy.
 
     Valid (fixed or already valid) exits 0; valid-but-not-runnable without
     ``--allow-signatures`` and still-invalid exit 1. No-verdict outcomes never reach here —
-    they are handled by :func:`execute_fix`'s exception arms (exit 2).
+    they are handled by :func:`execute_fix`'s exception arms (exit 2). ``preview`` swaps the
+    labels to would-be phrasing (``--diff`` writes nothing) while keeping the same verdicts
+    and exit codes, so ``--diff`` answers "would it converge?".
     """
     if result.is_valid:
         console.print()
         if result.fixes_applied:
-            console.print("[bold green]✅ Bundle fixed — valid[/bold green]\n")
+            if preview:
+                console.print("[bold green]✅ Fix preview — these fixes would make the bundle valid[/bold green]\n")
+            else:
+                console.print("[bold green]✅ Bundle fixed — valid[/bold green]\n")
         else:
             console.print("[bold green]✅ Bundle already valid[/bold green]\n")
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]")
         if result.fixes_applied:
             console.print()
-            _print_work_done(console, result=result, bundle_path=bundle_path)
+            _print_work_done(console, result=result, bundle_path=bundle_path, preview=preview)
         console.print()
 
         if result.pending_signatures:
@@ -89,12 +98,15 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
         return
 
     console.print()
-    console.print("[bold red]❌ Bundle could not be fully fixed[/bold red]\n")
+    if preview:
+        console.print("[bold red]❌ Fix preview — the bundle would still be invalid[/bold red]\n")
+    else:
+        console.print("[bold red]❌ Bundle could not be fully fixed[/bold red]\n")
     console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
     # Partial progress is normal: name what WAS applied before the remaining errors.
     if result.fixes_applied:
-        _print_work_done(console, result=result, bundle_path=bundle_path)
+        _print_work_done(console, result=result, bundle_path=bundle_path, preview=preview)
         console.print()
 
     if result.bail_reason:
@@ -112,6 +124,82 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
     raise typer.Exit(1)
 
 
+def _remap_result_to_originals(result: FixBundleResult, *, sandbox: PreviewSandbox) -> FixBundleResult:
+    """Rebuild a sandbox-run result with every file path mapped back to the original it mirrors."""
+    return result.model_copy(
+        update={
+            "fixes_applied": [
+                fix.model_copy(update={"source": sandbox.to_original(fix.source)}) if fix.source is not None else fix for fix in result.fixes_applied
+            ],
+            "files_written": [sandbox.to_original(file_path) for file_path in result.files_written],
+            "remaining_errors": [
+                item.model_copy(update={"source": sandbox.to_original(item.source)}) if item.source is not None else item
+                for item in result.remaining_errors
+            ],
+        }
+    )
+
+
+def _print_preview_diffs(console: Console, *, result: FixBundleResult, sandbox: PreviewSandbox) -> None:
+    """Unified diff (original vs sandbox copy) per file the preview run wrote.
+
+    Must run while the sandbox still exists — it reads the mutated copies off disk.
+    """
+    console.print("\n[bold cyan]Preview (--diff): no files were written. Proposed changes:[/bold cyan]\n")
+    for written_path in result.files_written:
+        original_path = Path(sandbox.to_original(written_path))
+        original_lines = original_path.read_text(encoding="utf-8").splitlines()
+        updated_lines = Path(written_path).read_text(encoding="utf-8").splitlines()
+        diff_lines = difflib.unified_diff(
+            original_lines,
+            updated_lines,
+            fromfile=str(original_path),
+            tofile=f"{original_path} (fixed)",
+            lineterm="",
+        )
+        for diff_line in diff_lines:
+            if diff_line.startswith(("+++", "---")):
+                console.print(f"[bold]{escape(diff_line)}[/bold]")
+            elif diff_line.startswith("@@"):
+                console.print(f"[cyan]{escape(diff_line)}[/cyan]")
+            elif diff_line.startswith("+"):
+                console.print(f"[green]{escape(diff_line)}[/green]")
+            elif diff_line.startswith("-"):
+                console.print(f"[red]{escape(diff_line)}[/red]")
+            else:
+                console.print(escape(diff_line))
+        console.print()
+
+
+def _run_fix_preview(
+    console: Console,
+    *,
+    bundle_path: Path,
+    library_dirs: list[Path] | None,
+    allow_signatures: bool,
+    max_iterations: int | None,
+    select_codes: tuple[str, ...] | None,
+    ignore_codes: tuple[str, ...] | None,
+) -> None:
+    """Run the real loop against a temp-copy sandbox (D5.6), render diffs, keep the verdict."""
+    with tempfile.TemporaryDirectory(prefix="pipelex-fix-preview-") as sandbox_root:
+        sandbox = mirror_bundle_for_preview(bundle_path, library_dirs=library_dirs, sandbox_root=Path(sandbox_root))
+        result = asyncio.run(
+            fix_bundle_file(
+                sandbox.entry_path,
+                library_dirs=sandbox.library_dirs,
+                allow_signatures=allow_signatures,
+                max_iterations=max_iterations,
+                select_codes=select_codes,
+                ignore_codes=ignore_codes,
+            )
+        )
+        if result.files_written:
+            _print_preview_diffs(console, result=result, sandbox=sandbox)
+        display_result = _remap_result_to_originals(result, sandbox=sandbox)
+        _render_fix_result(console, result=display_result, bundle_path=bundle_path, allow_signatures=allow_signatures, preview=True)
+
+
 def execute_fix(
     bundle_path: Path,
     *,
@@ -120,6 +208,7 @@ def execute_fix(
     max_iterations: int | None = None,
     select_codes: tuple[str, ...] | None = None,
     ignore_codes: tuple[str, ...] | None = None,
+    diff: bool = False,
 ) -> None:
     """Synchronous entry point wrapping the fix loop with Pipelex setup/teardown.
 
@@ -127,7 +216,9 @@ def execute_fix(
     ``fix_bundle_file``, renders the verdict for humans, and tears down in ``finally``.
     Exit codes are presentation: 0 = valid, 1 = negative verdict (still invalid, or valid but
     not runnable without ``--allow-signatures``), 2 = no verdict (bad target, boot failure,
-    unexpected exception).
+    unexpected exception). ``diff`` previews instead of writing: the same loop runs against a
+    temp-copy sandbox and a unified diff is rendered per would-be-written file, with the same
+    verdict semantics.
     """
     make_pipelex_for_cli(context=ErrorContext.FIX, needs_inference=False, needs_model_specs=True)
 
@@ -136,6 +227,18 @@ def execute_fix(
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} bundle")
+
+            if diff:
+                _run_fix_preview(
+                    get_console(),
+                    bundle_path=bundle_path,
+                    library_dirs=library_dirs,
+                    allow_signatures=allow_signatures,
+                    max_iterations=max_iterations,
+                    select_codes=select_codes,
+                    ignore_codes=ignore_codes,
+                )
+                return
 
             result = asyncio.run(
                 fix_bundle_file(

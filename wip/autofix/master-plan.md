@@ -12,7 +12,7 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Steps 3 (hardened loop) and 4 (agent apply surface) are DONE** — merged together as PR #1035 (`feature/Autofix-step4-Agnt-Apply`). Step 3 replaced the spike's drop-everything scoping guard with real multi-file targeting (source backfill at the translate funnel, resolved-dirs single-file gate, write-scope policy, per-file apply with `files_written`); step 4 shipped `pipelex-agent fix bundle` with the CLI-free markdown renderer and full test coverage. The PR review triage fixed two confirmed bugs and deferred one inert finding to [pr-1035-review-notes.md](pr-1035-review-notes.md).
 
-**Step 5 (human CLI surfacing) is PLANNED** — detailed plan: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md), on branch `feature/Autofix-step5`.
+**Step 5 (human CLI surfacing) implementation is COMPLETE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). Step-5 exit (CHECKPOINT B review fan-out) pending.
 
 ## Sequencing doctrine (decided 2026-07-07)
 

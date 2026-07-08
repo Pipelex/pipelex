@@ -231,6 +231,48 @@ class TestFixBundleHumanFormat:
         assert exc_info.value.exit_code == 2
         assert "Failed to fix: boom" in capsys.readouterr().err
 
+    def test_diff_previews_changes_without_writing_and_labels_would_be(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+    ) -> None:
+        """--diff runs the loop against a sandbox copy: the diff and labels name the ORIGINAL path, the original is untouched."""
+        bundle_path = self._bundle_file(tmp_path)
+        original_content = bundle_path.read_text(encoding="utf-8")
+
+        def fake_loop(entry_path: Path, **_kwargs: object) -> FixBundleResult:
+            entry_path.write_text('domain = "fix_human_format"\nmain_pipe = "list_ideas"\n', encoding="utf-8")
+            return FixBundleResult(
+                is_valid=True,
+                iterations=1,
+                fixes_applied=[_applied_fix(str(entry_path))],
+                files_written=[str(entry_path.resolve())],
+                remaining_errors=[],
+                pending_signatures=[],
+                is_runnable=True,
+            )
+
+        mocker.patch(f"{FIX_CORE_MODULE}.make_pipelex_for_cli")
+        mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
+        mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
+        mocker.patch(f"{FIX_CORE_MODULE}.tag")
+        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
+
+        fix_bundle_cmd(path=str(bundle_path), diff=True)
+
+        assert bundle_path.read_text(encoding="utf-8") == original_content
+        output = console.export_text()
+        assert "Preview (--diff): no files were written." in output
+        assert f"--- {bundle_path.resolve()}" in output
+        assert f"+++ {bundle_path.resolve()} (fixed)" in output
+        assert '+main_pipe = "list_ideas"' in output
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+        assert "Fixes that would be applied:" in output
+        assert "Files that would be written:" in output
+        assert f"- {bundle_path.resolve()}" in output
+        assert "Files written:" not in output.replace("Files that would be written:", "")
+
     def test_select_and_ignore_are_mutually_exclusive(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             fix_bundle_cmd(

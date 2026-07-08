@@ -4,9 +4,9 @@ Deterministic auto-fixing of `.mthds` validation errors — fixes attached to va
 
 | Doc | What it is | Status |
 | --- | --- | --- |
-| [master-plan.md](master-plan.md) | Executive step ladder: spike → wave 1 → protocol/API/MCP/editor waves | **CURRENT — steps 1–4 DONE (steps 3+4 merged as PR #1035); step 5 planned** |
+| [master-plan.md](master-plan.md) | Executive step ladder: spike → wave 1 → protocol/API/MCP/editor waves | **CURRENT — steps 1–4 DONE (steps 3+4 merged as PR #1035); step 5 implementation complete, exit review pending** |
 | [suggested-fixes-design.md](suggested-fixes-design.md) | The live design: architecture, fix rules, phases | **CURRENT — steps 1 + 2 DONE; per-checkpoint findings + the step-2 abstraction verdict recorded inside** |
-| [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md) | Detailed design + working plan for step 5 (`pipelex fix bundle` + the `💡 Suggested fix:` line in `pipelex validate`) | **CURRENT — planned, implementation not started** |
+| [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md) | Detailed design + working plan for step 5 (`pipelex fix bundle` + the `💡 Suggested fix:` line in `pipelex validate`) | **CURRENT — all phases done incl. `--diff`; awaiting CHECKPOINT B exit review** |
 | [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md) | Detailed design + working plan for steps 3 (multi-file targeting) and 4 (`pipelex-agent fix bundle`) | **DONE — merged as PR #1035; review triage in [pr-1035-review-notes.md](pr-1035-review-notes.md)** |
 | [pr-1035-review-notes.md](pr-1035-review-notes.md) | PR #1035 review triage — one real-but-inert finding deferred (intra-round cross-file collision) | **CURRENT** |
 | `deferred-checkpoint-{0,a,a-prime,b,c,d}-review-items.md` | Real-but-deferred items from each checkpoint's code review (multi-file targeting, conformance fixture sync, upstream `pipelex-tools-py` follow-ups, rename convergence cap, …) | **CURRENT** |

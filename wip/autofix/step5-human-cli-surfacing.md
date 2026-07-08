@@ -2,9 +2,9 @@
 
 Detailed design and working plan for master-plan step 5 (human CLI surfacing: `pipelex fix bundle` + the `💡 Suggested fix:` line in `pipelex validate`), on branch `feature/Autofix-step5` (base: the PR #1035 squash `611644e82`, which landed steps 3 + 4). Map: [master-plan.md](master-plan.md). Architecture and per-checkpoint findings: [suggested-fixes-design.md](suggested-fixes-design.md). Steps 3 + 4 record: [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md).
 
-**Status: CHECKPOINT A CLEARED — Phases A + B done, committed; `--diff` decided GO (Phase C next).**
+**Status: ALL PHASES (A–D) DONE — `--diff` shipped (GO); awaiting CHECKPOINT B (exit review fan-out).**
 
-**NEXT ACTION (cold start): Phase C** — the `--diff` temp-copy sandbox (D5.6). Phases A + B landed exactly per the design below; decisions taken and deltas from plan:
+**NEXT ACTION (cold start): CHECKPOINT B** — fresh-context `/code-review` on the step-5 diff, triage, then flip the master plan to step 5 DONE and record the step-6 hand-off notes. Phases A + B landed exactly per the design below; decisions taken and deltas from plan:
 
 - **Shared human resolver** (`pipelex/cli/commands/bundle_path_resolver.py`): parameterized by `command` name + a per-command `not_a_bundle_hint` (validate's wording preserved verbatim); the `~`-expansion gap the agent side had fixed in PR #1035 triage **did** exist on the human side and is fixed in the helper (pinned by tests).
 - **Flag-and-fix, telemetry**: `execute_validate` double-suffixed its `CLI_COMMAND` tag ("validate bundle bundle") — it now tags `telemetry_command_label` verbatim.
@@ -120,16 +120,15 @@ If the temp-copy mechanics surface real complications (path remapping in rendere
 
 The step-5 exit criteria are functionally met: a human sees the suggestion in `validate` and applies it with `fix`, with output naming every change. Committed; status block updated. **GO on `--diff`** (see status block for the recorded sandbox-layout subtlety).
 
-### Phase C — `--diff` preview (cuttable per D5.6)
+### Phase C — `--diff` preview — DONE (GO)
 
-- [ ] Temp-copy sandbox + diff rendering; unit tests for the copy/remap helper; integration test: `--diff` on a fixable fixture prints a diff, originals byte-identical after the run; exit codes match the write-mode verdicts.
-- [ ] If CUT instead: record the deferral (rationale + the temp-copy sketch) in the step-5 deferred-items doc and strip the flag from D5.3's table.
+- [x] Temp-copy sandbox (`commands/fix/_diff_sandbox.py`: `mirror_bundle_for_preview` + `PreviewSandbox.to_original`) + diff rendering (`_print_preview_diffs`, would-be labels via `preview=True` in the result renderer, copy→original path remap for display); unit tests for the copy/remap helper (`test_diff_sandbox.py`) incl. the entry-inside-`-L`-dir layout subtlety; integration pins: `--diff` on a fixable bundle prints the diff with ORIGINAL paths, originals byte-identical, exit codes match the write-mode verdicts (0 would-converge / 1 would-still-be-invalid).
 
-### Phase D — docs, changelog, gates
+### Phase D — docs, changelog, gates — DONE
 
-- [ ] CHANGELOG `[Unreleased]`: `pipelex fix bundle` human command, `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, factory errors now rendered in human validate output, `--diff` if shipped.
-- [ ] Repo docs sweep: update any existing `docs/` page that enumerates human CLI commands or shows `pipelex validate` error output (the full autofix docs page stays in step 6 per the master plan).
-- [ ] `make agent-check` green; full `make agent-test` green.
+- [x] CHANGELOG `[Unreleased]`: `pipelex fix bundle` (+`--diff`), `💡 Suggested fix:` lines + actionable footer, item-routed human rendering changes (factory errors, parse-level message, pipe-error source), `~`-expansion fix, telemetry-label fix.
+- [x] Repo docs sweep: new `docs/tools/cli/fix.md` reference page (+ mkdocs nav); fix rows/links added to `docs/tools/cli/index.md`, `docs/tools/cli/validate.md` ("Suggested Fixes" section), `docs/features/cli.md` (human + agent tables — the agent `fix` row was missing since step 4).
+- [x] `make agent-check` green; full `make agent-test` green.
 
 ### Exit — CHECKPOINT B (step-5 exit)
 

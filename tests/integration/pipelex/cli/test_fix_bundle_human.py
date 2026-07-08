@@ -141,6 +141,73 @@ class TestFixBundleHuman:
         assert "❌ Bundle could not be fully fixed" in output
         assert _pipes(bundle_path)["list_ideas"]["output"] == "Idea"
 
+    def test_diff_preview_leaves_originals_untouched_and_prints_diff(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+
+        fix_bundle_cmd(path=str(bundle_path), diff=True)
+
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "Preview (--diff): no files were written." in output
+        assert f"--- {bundle_path.resolve()}" in output
+        assert '+output = "Idea[]"' in output
+        assert '-output = "Idea"' in output
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+
+    def test_diff_preview_on_unfixable_bundle_exits_one_originals_untouched(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_UNFIXABLE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path), diff=True)
+
+        assert exc_info.value.exit_code == 1
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "❌ Fix preview — the bundle would still be invalid" in output
+
+    def test_diff_preview_directory_mode_maps_paths_to_originals(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """Directory mode mirrors the dir; diffs and labels must name the ORIGINAL files, untouched."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_dir = tmp_path / "pipeline_01"
+        bundle_dir.mkdir()
+        bundle_path = bundle_dir / "only_one.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+
+        fix_bundle_cmd(path=str(bundle_dir), diff=True)
+
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert f"--- {bundle_path.resolve()}" in output
+        assert "pipelex-fix-preview-" not in output
+
     def test_directory_mode_auto_detects_and_fixes(
         self,
         tmp_path: Path,
