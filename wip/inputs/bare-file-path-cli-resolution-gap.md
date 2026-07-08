@@ -1,6 +1,14 @@
-# Deferred: bare Image/Document path strings are not resolved against the inputs-file dir
+# RESOLVED (Phase 3): bare Image/Document path strings now resolve against the inputs-file dir
 
-**Status:** deferred — no code change in Phase 2; the fix IS Phase 3's first task (D3). Surfaced by the PR #1030 bot review, 2026-07-07 ([Codex thread](https://github.com/Pipelex/pipelex/pull/1030#discussion_r3538032585), [cubic thread](https://github.com/Pipelex/pipelex/pull/1030#discussion_r3538053292) — the two unresolved threads on `execution_seams.py`).
+**Status:** **RESOLVED in Smart Inputs Phase 3 (2026-07-07).** The fix landed as the Phase-3 D3 arm — see `TODOS.md` Phase 3 + the "Phase 3" micro-decisions. Surfaced by the PR #1030 bot review, 2026-07-07 ([Codex thread](https://github.com/Pipelex/pipelex/pull/1030#discussion_r3538032585), [cubic thread](https://github.com/Pipelex/pipelex/pull/1030#discussion_r3538053292) — the two unresolved threads on `execution_seams.py`). **Both threads are now answerable + resolvable.**
+
+## How it was fixed (differs from the recommendation below)
+
+The chosen mechanism was **thread `inputs_base_dir` into the shaper**, NOT making the CLI resolver signature-aware (the recommendation in the section below). At implementation the signature-aware-CLI-resolver route proved worse on three counts: it would force pipe/library resolution BEFORE the runner call in `_run_core.py`, duplicate the shaper's concept-nature detection in the CLI, and fail to cover the CSV-relative-path case (splitting resolution across two places). Instead: the human CLI (`_run_core.py`) and agent CLI (`parse_cli_inputs` → `ParsedCliInputs` NamedTuple) capture the inputs file's parent dir and hand it to the runner ctor (`inputs_base_dir`); it threads through `pipeline_run_setup` → `prepare_pipe_job` → `make_from_pipeline_inputs` → `InputShaper.shape`, and the shaper's Image/Document arm (and CSV arm) resolve bare relative local paths against it via `is_relative_local_path` (promoted to `pipelex/tools/uri/uri_resolver.py`). API/SDK/in-process callers pass `inputs_base_dir=None` and keep absolute-url semantics. The bare form and the `{"url": …}` form now land on the same resolved result (pinned by the e2e).
+
+The original deferral rationale and the (rejected) recommendation are kept below for the historical record.
+
+---
 
 ## What the reviewers flagged (verified — the mechanism is real)
 

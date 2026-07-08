@@ -229,6 +229,30 @@ class TestRunCoreExecution:
         execute_kwargs = runner_class_mock.return_value.execute.call_args.kwargs
         assert execute_kwargs["inputs"] == {"topic": "dogs", "resolved": True}
 
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_file_inputs_thread_base_dir_to_runner(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """File-loaded inputs hand the file's parent dir to the runner as inputs_base_dir (D3)."""
+        inputs_file = tmp_path / "inputs.json"
+        inputs_file.write_text(json.dumps({"photo": "photo.jpg"}), encoding="utf-8")
+        pipe_output = self._make_pipe_output(mocker)
+        runner_class_mock = self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(inputs=str(inputs_file)))
+
+        ctor_kwargs = runner_class_mock.call_args.kwargs
+        assert ctor_kwargs["inputs_base_dir"] == tmp_path.resolve()
+
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_inline_json_inputs_have_no_base_dir(self, mocker: MockerFixture) -> None:
+        """Inline JSON inputs come from no file — the runner gets inputs_base_dir=None."""
+        pipe_output = self._make_pipe_output(mocker)
+        runner_class_mock = self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(inputs='{"topic": "cats"}'))
+
+        ctor_kwargs = runner_class_mock.call_args.kwargs
+        assert ctor_kwargs["inputs_base_dir"] is None
+
     @pytest.mark.usefixtures("console")
     def test_non_dict_input_file_exits(self, tmp_path: Path) -> None:
         """An input file holding a JSON list (not a dict) is rejected."""

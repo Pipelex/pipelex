@@ -17,6 +17,7 @@ See ``wip/inputs/smart-inputs-design.md`` (D1-D11) for the full rationale.
 import datetime
 import json
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, cast
 
 from mthds.protocol.pipeline_inputs import PipelineInputs, StuffContentOrData
@@ -39,6 +40,7 @@ from pipelex.core.memory.exceptions import (
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -47,6 +49,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_native_concept
+from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 
 class InputKind(StrEnum):
@@ -67,6 +70,15 @@ class InputKind(StrEnum):
     STRUCTURED = "structured"
     DYNAMIC = "dynamic"
 
+    @property
+    def is_structured(self) -> bool:
+        """Whether this kind dispatches values top-down against a structured (non-native) concept."""
+        match self:
+            case InputKind.STRUCTURED:
+                return True
+            case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.IMAGE | InputKind.DOCUMENT | InputKind.DYNAMIC:
+                return False
+
 
 class InputShaper:
     """Turn a caller's provided inputs into a ``WorkingMemory``, interpreted against the signature."""
@@ -78,6 +90,7 @@ class InputShaper:
         *,
         input_specs: InputStuffSpecs,
         search_domain_codes: list[str] | None = None,
+        inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Shape every provided input against its declared ``StuffSpec`` and return a WorkingMemory.
 
@@ -85,6 +98,11 @@ class InputShaper:
             pipeline_inputs: The caller-provided inputs (name -> value/envelope/object).
             input_specs: The entry pipe's declared inputs (name -> StuffSpec).
             search_domain_codes: Domain codes used to resolve envelope/object concepts.
+            inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3) —
+                the inputs file's parent when the inputs were loaded from a file (threaded from the
+                CLI). ``None`` (in-process / inline-JSON callers) leaves relative paths untouched
+                (the CWD contract). Only bare strings in the file-ish and CSV arms are resolved; the
+                ``{"url": ...}`` dict form is owned by the CLI's url-key walk.
 
         Raises:
             UnknownInputNameError: a provided name is not declared (D8).
@@ -99,6 +117,7 @@ class InputShaper:
                 stuff_spec=stuff_spec,
                 variable_name=variable_name,
                 search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
             )
             working_memory.add_new_stuff(name=variable_name, stuff=stuff)
         return working_memory
@@ -120,6 +139,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_domain_codes: list[str] | None,
+        inputs_base_dir: Path | None,
     ) -> Stuff:
         declared_concept = stuff_spec.concept
 
@@ -160,6 +180,7 @@ class InputShaper:
                     input_kind=input_kind,
                     variable_name=variable_name,
                     search_domain_codes=search_domain_codes,
+                    inputs_base_dir=inputs_base_dir,
                 )
                 return StuffFactory.make_stuff(concept=declared_concept, content=content, name=variable_name)
 
@@ -201,6 +222,19 @@ class InputShaper:
         return InputKind.DYNAMIC
 
     @classmethod
+    def _peel_multiplicity(cls, multiplicity: VariableMultiplicity | None) -> tuple[bool, int | None]:
+        """Peel a declared multiplicity into ``(is_list, fixed_count)`` (D2).
+
+        ``VariableMultiplicity`` is ``None | bool | int``; parsing only ever yields ``None`` (single),
+        ``True`` (``X[]`` variable list), or an ``int N>=1`` (``X[N]`` fixed count). A genuine int is a
+        fixed-count list, ``True`` a variable list, ``None`` singular. ``bool`` is a subclass of ``int``,
+        so the int check must exclude it explicitly.
+        """
+        fixed_count = multiplicity if isinstance(multiplicity, int) and not isinstance(multiplicity, bool) else None
+        is_list = multiplicity is True or fixed_count is not None
+        return is_list, fixed_count
+
+    @classmethod
     def _shape_with_multiplicity(
         cls,
         value: Any,
@@ -209,28 +243,36 @@ class InputShaper:
         input_kind: InputKind,
         variable_name: str,
         search_domain_codes: list[str] | None,
+        inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Peel the declared multiplicity (D2), then build the item content(s)."""
-        multiplicity = stuff_spec.multiplicity
-        # VariableMultiplicity is None | bool | int; parsing only ever yields None (single), True
-        # (X[]), or int N>=1 (X[N]). True -> variable list; a genuine int -> fixed list.
-        if multiplicity is True:
+        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
+
+        # (D11) A declared structured LIST input accepts a table reference — a bare tabular path
+        # string or the exact {"url": <tabular path>} wrapper — read row-wise into the declared
+        # concept, tried BEFORE element-wise shaping so the bare string is not misread as one item.
+        if is_list and input_kind.is_structured:
+            csv_list_content = cls._try_shape_csv(value, stuff_spec=stuff_spec, variable_name=variable_name, inputs_base_dir=inputs_base_dir)
+            if csv_list_content is not None:
+                if fixed_count is not None and len(csv_list_content.items) != fixed_count:
+                    raise MultiplicityCountMismatchError.make(
+                        variable_name=variable_name,
+                        declared_concept_ref=stuff_spec.concept.concept_ref,
+                        expected_count=fixed_count,
+                        provided_count=len(csv_list_content.items),
+                        expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+                    )
+                return csv_list_content
+
+        if is_list:
             return cls._shape_list(
                 value,
                 stuff_spec=stuff_spec,
                 input_kind=input_kind,
                 variable_name=variable_name,
-                fixed_count=None,
+                fixed_count=fixed_count,
                 search_domain_codes=search_domain_codes,
-            )
-        if isinstance(multiplicity, int) and not isinstance(multiplicity, bool):
-            return cls._shape_list(
-                value,
-                stuff_spec=stuff_spec,
-                input_kind=input_kind,
-                variable_name=variable_name,
-                fixed_count=multiplicity,
-                search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
             )
 
         # Singular (multiplicity is None). A list here is ambiguous — hard error (D2).
@@ -242,8 +284,54 @@ class InputShaper:
                 expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
             )
         return cls._build_item_content(
-            value, input_kind=input_kind, stuff_spec=stuff_spec, variable_name=variable_name, search_domain_codes=search_domain_codes
+            value,
+            input_kind=input_kind,
+            stuff_spec=stuff_spec,
+            variable_name=variable_name,
+            search_domain_codes=search_domain_codes,
+            inputs_base_dir=inputs_base_dir,
         )
+
+    @classmethod
+    def _try_shape_csv(
+        cls,
+        value: Any,
+        *,
+        stuff_spec: StuffSpec,
+        variable_name: str,
+        inputs_base_dir: Path | None,
+    ) -> ListContent[StuffContent] | None:
+        """Detect and read a table reference for a declared structured list input (D11).
+
+        Only a bare string or the exact single-key ``{"url": <str>}`` wrapper is a candidate; the
+        tabular-suffix / local-only gates live in ``StuffFactory.try_make_csv_list_content``, which
+        returns ``None`` for a non-tabular reference so the caller falls through to normal
+        element-wise shaping (a record dict with sibling keys stays a record). A bare relative
+        path resolves against ``inputs_base_dir`` first, like the file-ish arm (D3).
+        """
+        url: str
+        if isinstance(value, str):
+            url = value
+        elif isinstance(value, dict):
+            value_dict = cast("dict[Any, Any]", value)
+            url_candidate = value_dict.get("url")
+            if set(value_dict.keys()) != {"url"} or not isinstance(url_candidate, str):
+                return None
+            url = url_candidate
+        else:
+            return None
+        url = cls._resolve_local_path(url, inputs_base_dir=inputs_base_dir)
+        return StuffFactory.try_make_csv_list_content(stuff_spec.concept, content={"url": url}, name=variable_name)
+
+    @classmethod
+    def _resolve_local_path(cls, url: str, *, inputs_base_dir: Path | None) -> str:
+        """Resolve a bare local path against the inputs file's directory (D3).
+
+        A leading ``~`` expands to the user's home first (so ``~/photo.jpg`` is an absolute home
+        path, never joined onto ``inputs_base_dir``); a still-relative path then resolves against the
+        base dir. Shared with the CLI's url-key walk via ``resolve_local_path_reference``.
+        """
+        return resolve_local_path_reference(url, base_dir=inputs_base_dir)
 
     @classmethod
     def _shape_list(
@@ -255,6 +343,7 @@ class InputShaper:
         variable_name: str,
         fixed_count: int | None,
         search_domain_codes: list[str] | None,
+        inputs_base_dir: Path | None,
     ) -> ListContent[StuffContent]:
         """Shape a declared-multiple input element-wise into a ListContent (D2)."""
         # A single bare value auto-wraps into a one-item list; an empty list stays empty (legal).
@@ -269,7 +358,12 @@ class InputShaper:
             )
         items = [
             cls._build_item_content(
-                item_value, input_kind=input_kind, stuff_spec=stuff_spec, variable_name=variable_name, search_domain_codes=search_domain_codes
+                item_value,
+                input_kind=input_kind,
+                stuff_spec=stuff_spec,
+                variable_name=variable_name,
+                search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
             )
             for item_value in item_values
         ]
@@ -284,6 +378,7 @@ class InputShaper:
         stuff_spec: StuffSpec,
         variable_name: str,
         search_domain_codes: list[str] | None,
+        inputs_base_dir: Path | None,
     ) -> StuffContent:
         """Build one item's ``StuffContent`` from a value, dispatched on the declared kind (D5).
 
@@ -333,7 +428,9 @@ class InputShaper:
             case InputKind.IMAGE | InputKind.DOCUMENT:
                 canonical: dict[str, Any]
                 if isinstance(value, str):
-                    canonical = {"url": value}
+                    # (D3) A bare relative local path resolves against the inputs file's directory;
+                    # the {"url": ...} dict form is left to the CLI's signature-blind url-key walk.
+                    canonical = {"url": cls._resolve_local_path(value, inputs_base_dir=inputs_base_dir)}
                 elif isinstance(value, dict):
                     canonical = cast("dict[str, Any]", value)
                 else:
@@ -405,7 +502,44 @@ class InputShaper:
                 provided_concept_ref=stuff.concept.concept_ref,
                 expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
             )
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            # Match the bare-value Dynamic path: the signature cannot guide list-vs-single shape here.
+            return stuff
+        cls._reconcile_explicit_multiplicity(stuff, stuff_spec=stuff_spec, variable_name=variable_name)
         return stuff
+
+    @classmethod
+    def _reconcile_explicit_multiplicity(cls, stuff: Stuff, *, stuff_spec: StuffSpec, variable_name: str) -> None:
+        """Enforce the unambiguous D2 shape rules on an explicit form (D6 governs only its concept).
+
+        An explicit form whose built content is a ``ListContent`` must not fill a singular slot, and must
+        match a declared fixed count — the same list-vs-singular and ``[N]``-count rules the bare-value
+        path enforces in ``_shape_with_multiplicity``. Without this, a caller handing an explicit
+        ``ListContent`` (or an envelope whose ``content`` is a list) to a singular-declared input would
+        have it *silently* stored into the singular slot. The singular-under-``[]`` auto-wrap question is
+        deliberately left to the caller's literal form (see ``wip/inputs/input-shaper-multiplicity-gaps.md``):
+        an explicit singular is taken as given, not auto-wrapped.
+        """
+        content = stuff.content
+        if not isinstance(content, ListContent):
+            return
+        list_content = cast("ListContent[StuffContent]", content)
+        is_list, fixed_count = cls._peel_multiplicity(stuff_spec.multiplicity)
+        if not is_list:
+            raise ListWhereSingularError.make(
+                variable_name=variable_name,
+                declared_concept_ref=stuff_spec.concept.concept_ref,
+                provided_description=f"a list of {len(list_content.items)} item(s)",
+                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+            )
+        if fixed_count is not None and len(list_content.items) != fixed_count:
+            raise MultiplicityCountMismatchError.make(
+                variable_name=variable_name,
+                declared_concept_ref=stuff_spec.concept.concept_ref,
+                expected_count=fixed_count,
+                provided_count=len(list_content.items),
+                expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
+            )
 
     @classmethod
     def _is_explicit(cls, value: Any) -> bool:

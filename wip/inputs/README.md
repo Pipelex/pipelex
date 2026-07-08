@@ -1,69 +1,57 @@
 # Inputs track — roadmap and reading guide
 
-This folder holds the design work for the **Smart Inputs** feature and its two prerequisite native-concept tracks. **Start here on a cold session.**
+This folder holds the design and as-built records for the **Smart Inputs** feature and its two prerequisite native-concept tracks (`YesNo`, `Date`). **Start here on a cold session.**
 
-## Current state (2026-07-07)
+## Current state (2026-07-08)
 
-Branch `feature/Smart-inputs` (worktree `_smart`), tip `420c8269c`, **23 commits ahead of `origin/dev`**, based on main at v0.38.0 (includes TOML inputs #1022 + Optionals phase 1 #1021). The branch now carries **both** native-concept prerequisites:
+The whole inputs track is **code-complete** on `feature/Smart-inputs-phase5` (worktree `_smart`), tip `86f358f97`, based on main at v0.38.0 (includes TOML inputs #1022 + Optionals phase 1 #1021). The branch carries all three tracks; the per-phase branches (`feature/Smart-inputs-phase2/3/5`) are checkpoint snapshots.
 
-- **`YesNo` native concept — ✅ DONE & landed.** PR **#1028** (`feature/Smart-inputs` → `dev`) is still **OPEN**. Its title still reads "Add native YesNo concept" but the branch now also carries Date (see below) — retitle/redescribe #1028 before merging it to `dev`, or it will misrepresent the diff. As-built: `yesno-implementation-plan.md`.
-- **`Date` native concept — ✅ DONE & landed.** PR **#1029** (`feature/native-date` → `feature/Smart-inputs`) is **MERGED** into this branch. Went through two bot-review rounds + a gstack `/review` finalize (which fixed a stale CLI test and added coverage). As-built: `datetime-implementation-plan.md`.
+- **`YesNo` native concept — ✅ DONE.** As-built: `yesno-implementation-plan.md`.
+- **`Date` native concept — ✅ DONE.** PR **#1029** (`feature/native-date`) merged into the track. As-built: `datetime-implementation-plan.md`.
+- **Smart Inputs — signature-driven input shaping — ✅ DONE.** All phases 1–5 landed (design D1–D11). As-built: `smart-inputs-implementation-plan.md` (the archived phased plan + per-checkpoint state + micro-decisions log).
 
-Both concepts ship together in the one release wave. `feature/Smart-inputs` is the accumulation branch for the whole track.
+PR **#1028** (`feature/Smart-inputs` → `dev`) is the track PR — retitled to cover YesNo + Date + Smart Inputs. Its head still points at an earlier phase tip; **advance its head to the track tip (all phases) before merging**, or the diff will misrepresent what ships.
 
-## What remains: the Smart Inputs system itself
+## What shipped: Smart Inputs
 
-The two native concepts were prerequisites. The **actual Smart Inputs feature** — signature-driven input shaping, decisions **D1–D11** — is not started. Its design is **fully approved** (`smart-inputs-design.md`); no design decisions are open.
+Caller-provided inputs are now interpreted **top-down against the pipe's declared signature** instead of bottom-up from their shape alone. A bare string becomes the *declared* concept (a `legal.Question`, not a generic `native.Text`); a bare number/boolean/date satisfies a `Number`/`YesNo`/`Date`-refining input; a bare URL/path a declared `Image`/`Document` (relative paths resolved against the inputs-file dir); a plain object validates against a structured concept; a list shapes element-wise into `ListContent[declared]` (auto-wrap single, empty legal, `[N]` count-checked); a declared structured list accepts a `.csv` path by signature. The `{concept, content}` envelope stays as a compat-checked escape hatch. Unknown input names now error (D8, the one narrowing). `build inputs` / `pipelex-agent inputs` default to the **light** template, with `--explicit` for the envelope form (D11).
 
-### Next session's job: write `smart-inputs-implementation-plan.md`, then execute it
+The mechanism: one shaper (`pipelex/core/memory/input_shaper.py`, `InputShaper`) wired into the single seam `WorkingMemoryFactory.make_from_pipeline_inputs(input_specs=…)` that `prepare_pipe_job` feeds `pipe.inputs` — so all surfaces (validate / real-run / dry-run, CLI / Python API / hosted runner) shape through one place. Full rationale + per-phase history in `smart-inputs-implementation-plan.md`.
 
-Write a phased implementation plan that **mirrors the two precedent plan docs** (`yesno-implementation-plan.md`, `datetime-implementation-plan.md`): a cold-start code map, verified mechanism facts (re-checked against current code — line numbers have shifted since those plans were written), checkbox phases, per-checkpoint state lines, and a micro-decisions log. Then execute it (the /goal loop worked well for YesNo and Date). If a genuine design gap surfaces, raise it — do **not** relitigate D1–D11.
+## What remains: one release cut, one downstream cross-repo wave
 
-### Cold-start facts for writing that plan
+Shared across YesNo + Date + Smart Inputs, done **per-release, not per-feature**:
 
-Reference symbols, not line numbers (they shift; re-grep each before citing):
+- **D10 protocol widening** — `mthds/protocol/pipeline_inputs.py` `StuffContentOrData` widens to admit bare scalars / lists-of-dicts / empty lists ("any JSON value | StuffContent forms"), with the interpretation semantics spec'd MTHDS-side. Release-gated (Optionals/TOML-inputs de-gate pattern). Runtime already works; this is type-honesty for typed SDK/API callers.
+- **Downstream mirrors** — `mthds-python` + `mthds-js` `PipelineInputs` types, conformance rows, JSON-schema copies (`mthds-schema-sync` skill), MTHDS spec native-concept + inputs-format sections.
+- **Authoring-guidance surfaces** — `mthds-plugins` skills (`mthds-inputs`, `mthds-build`), `vscode-pipelex` completion lists, and the `ConceptSpec.refines` native-list hint (derive from `NativeConceptCode` — see `refines-hint-native-list-drift.md`).
+- **Off critical path** — LLM-assisted input adaptation (design §8, opt-in); the shared YesNo/Date scalar-native LLM-output ergonomics.
 
-- **The signature-blind chokepoint.** `StuffFactory.make_stuff_from_stuff_content_or_data` (`pipelex/core/stuffs/stuff_factory.py`) shapes each input value bottom-up from its *shape alone*, with no view of the declared concept. Today: a bare string silently becomes `native.Text` (there is no runtime concept check — `validate_before_run` is presence-only); a bare number / dict / list-of-dicts / empty list hard-errors. Smart Inputs makes this **top-down**: interpret each value against the pipe's declared `InputStuffSpecs`.
-- **The seam that must carry the signature down.** `prepare_pipe_job` (`pipelex/pipeline/execution_seams.py`) holds `pipe.inputs` but never passes it to the factory. The existing entrypoint to hook is `WorkingMemoryFactory.make_from_pipeline_inputs` (`pipelex/core/memory/working_memory_factory.py`) — D7 adds `make_from_pipeline_inputs(input_specs=...)` and shapes against `pipe.inputs` (the boundary contract, **not** `needed_inputs()`).
-- **The new module.** D7 puts the shaper in a new `pipelex/core/.../input_shaper.py` (`InputShaper`). It does not exist yet — it's the deliverable.
-- **The core mechanism = the D5 interpretation matrix.** Dispatch on the *declared concept's nature* (Text / Number / YesNo / Date / Image·Document file-ish / structured / list). Guardrails already decided: bool is excluded from the Number arm (Python `bool ⊑ int` trap); a bare string is a URL/path for Image/Document-refining concepts (D3); auto-wrap single→list + element-wise shaping + empty lists legal, `[N]` count-checked (D2); failure = a hard typed error rendering the expected template (D4, no bottom-up fallback).
-- **Explicit forms (D6).** The envelope form `{concept, content}` (exactly those two keys) and other explicit forms are **compat-checked** against the declaration; explicit wins when compatible. YesNo and Date already added their envelope arms to `stuff_factory.py` case 2 — Smart Inputs generalizes this.
-- **D8 typo detector.** Unknown input names become errors — the *only* place Smart Inputs narrows existing behavior (everything else widens).
-- **D10 protocol widening is release-gated.** Admitting bare scalars (number/bool/date) into `mthds/protocol/pipeline_inputs.py`'s `StuffContentOrData` lives in the external `mthds` package and rides the downstream release wave, like Optionals ([[project-optionals-design]] precedent). Core-scope Smart Inputs shapes *before* that seam where it can.
-- **Design source of truth:** `smart-inputs-design.md` — problem, shape-at-a-glance, D1–D11 with rationale, non-goals, and **§9 "Surfaces impacted (checklist for the future plan)"** — start the plan's phase breakdown from §9.
+## Deferred notes — Phase-5 triage outcomes (2026-07-08)
 
-### Deferred notes the Smart Inputs plan should triage
+Each deferred note was re-verified against the landed shaper and given an outcome:
 
-Several gaps were deferred *specifically* to be resolved when Smart Inputs unifies the input paths — fold them into the plan:
-
-- `scalar-envelope-arm-asymmetry.md` — Case 2 bool-arm preserves the refining subclass, str-arm flattens to Text; revisit when the shaper generalizes envelope handling.
-- `loader-vs-factory-date-split-duplication.md` — the date/datetime split written in both the loader and the factory; the shared shaper is where to unify it.
-- `case1-bare-date-arm-gap.md` — a top-level array of date literals errors instead of building `ListContent[DateContent]`; ties to D2 (multiplicity) + D10 (protocol widening for scalar sequences).
-- `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md` — structure-field-codegen tradeoffs surfaced by the Date `/review`; not Smart-Inputs-specific but worth a decision when temporal handling is next touched.
-- `refines-hint-native-list-drift.md` — a spec-layer authoring hint list omits newer natives; real fix = derive it from `NativeConceptCode` in the release-wave sweep.
-- `input-shaper-multiplicity-gaps.md` — the Phase-1 `InputShaper`'s explicit arm skips list-where-singular + `[N]` count checks, and the `Dynamic`/`Anything` arm skips multiplicity peeling (empty-list diverges from D2); resolve when wiring the shaper (D7).
-- `bare-file-path-cli-resolution-gap.md` — bare Image/Document path strings aren't resolved against the inputs-file dir (the CLI resolver only rewrites `"url"` keys); flagged by the PR #1030 bots, **already scheduled as Phase 3's first task (D3)** — answer + resolve the two open threads when it lands.
-
-## Then: one release cut, one downstream cross-repo wave
-
-Schema sync (`mthds-schema-sync` skill), MTHDS spec native-concept tables, `mthds-js`/`mthds-python` mirrors (incl. the D10 protocol widening), conformance rows, skills, editor completion lists — all shared across YesNo + Date + Smart Inputs, done **per-release, not per-feature**. YesNo's MTHDS spec rows are drafted on the sibling `mthds` repo branch `feature/native-yes-no-concept` (not pushed); Date's spec rows still to draft.
-
-Follow-ups off the critical path: the shared **YesNo/Date LLM-output ergonomics** (a leaner scalar-native generation form, cousin of the Optionals maybe-wrapper); LLM-assisted input adaptation (design doc §8).
+- **Resolved by the shaper** — `case1-bare-date-arm-gap.md` (a top-level date-literal array now builds `ListContent[DateContent]` on the signature path; pinned) and `bare-file-path-cli-resolution-gap.md` (Phase-3 D3: bare Image/Document paths resolve against the inputs-file dir).
+- **Partially closed** — `input-shaper-multiplicity-gaps.md`: the finalize review re-found Gap A as a *silent* behavior (an explicit `ListContent` stored into a singular slot), so the **unambiguous half of Gap A is now fixed** (`_shape_explicit` rejects list-into-singular and enforces the `[N]` count on explicit lists for shaped concepts, while preserving `native.Dynamic` bottom-up fallback; pinned by new `test_explicit_forms.py` cases). Gap A's auto-wrap sub-question and the broader Gap B (`DYNAMIC` multiplicity peeling for `Dynamic[]`/`Anything[N]`) stay deferred as the genuine tradeoffs.
+- **Re-deferred, reasoning refreshed** — `scalar-envelope-arm-asymmetry.md` (bare path now builds the refining subclass; only the *envelope* escape hatch keeps the base-`TextContent` asymmetry, and closing it means surgery on a shared bottom-up factory arm for near-zero gain); `loader-vs-factory-date-split-duplication.md` (the shaper did not collapse the CLI-format loader — different layers).
+- **Decided leave-it** — `d4-hint-still-envelope.md` (the D4 error hint keeps rendering the envelope shape; option 1, it is a valid unambiguous fallback and making it light is a layer/cycle refactor unjustified by a fallback string).
+- **Still out of scope (structure-field codegen / URI-tools / release-wave authoring)** — `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md` (both structure-field codegen, untouched by Smart Inputs), `uri-scheme-classification-stopgap.md` (a `tools/uri` `resolve_uri` refactor; no live bug, tested), `refines-hint-native-list-drift.md` (the release-wave authoring-guidance sweep).
 
 ## Documents
 
 **Design (source of truth for decisions):**
 
-- `smart-inputs-design.md` — the approved Smart Inputs design: problem, shape at a glance, decisions D1–D11 (D9 = the YesNo spin-off, D10 = protocol widening, D11 = template `--explicit` flag), non-goals, §9 surfaces checklist. **Read this before writing the plan.**
-- `datetime-design.md` — the approved Date-track design: one native `Date` concept (date + optional time, fidelity-first timezone policy), DT1–DT8.
+- `smart-inputs-design.md` — the approved Smart Inputs design: problem, shape at a glance, decisions D1–D11, non-goals, §9 surfaces checklist.
+- `datetime-design.md` — the approved Date-track design (DT1–DT8).
 
 **Implementation plans / as-built records:**
 
-- `yesno-implementation-plan.md` — YesNo phased plan + as-built (all phases done, landed). **A template for the Smart Inputs plan.**
-- `datetime-implementation-plan.md` — Date phased plan + as-built, incl. the bot rounds and the gstack `/review` finalize round. **The best template for the Smart Inputs plan** (richest cold-start + review history).
+- `smart-inputs-implementation-plan.md` — the Smart Inputs phased plan + as-built (all phases done): cold-start code map, verified mechanism facts, per-checkpoint state lines, micro-decisions log, and per-phase review rounds.
+- `yesno-implementation-plan.md` — YesNo phased plan + as-built.
+- `datetime-implementation-plan.md` — Date phased plan + as-built, incl. the bot rounds and the gstack `/review` finalize.
 
 **Archived:**
 
-- `yesno-pr-reviewers-guide.md` — the former repo-root `TODOS.md`, the YesNo PR reading guide. Historical (YesNo + Date both landed); kept for the PR narrative.
+- `yesno-pr-reviewers-guide.md` — the former YesNo PR reading guide. Historical.
 
-**Deferred design notes:** `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `case1-bare-date-arm-gap.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `refines-hint-native-list-drift.md`, `input-shaper-multiplicity-gaps.md` (triage list above).
+**Deferred design notes** (triage outcomes above): `case1-bare-date-arm-gap.md`, `bare-file-path-cli-resolution-gap.md`, `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `input-shaper-multiplicity-gaps.md`, `d4-hint-still-envelope.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `uri-scheme-classification-stopgap.md`, `refines-hint-native-list-drift.md`.

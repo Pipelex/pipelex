@@ -24,7 +24,7 @@ pipelex run bundle path/to/my_bundle.mthds --inputs inputs.json
 ```
 
 !!! tip "Preparing Inputs"
-    You can generate an input template with `pipelex build inputs bundle path/to/my_bundle.mthds`, which creates a `results/inputs.json` file with the required input structure.
+    You can generate an input template with `pipelex build inputs bundle path/to/my_bundle.mthds`, which writes an `inputs.json` next to the bundle (in the bundle's own directory) with the required input structure — the light, signature-driven values ready to fill in. See [Build Inputs](../../tools/cli/build/inputs.md).
 
 ### Using Python
 
@@ -39,11 +39,9 @@ runner = PipelexMTHDSProtocol(
     bundle_uri="path/to/my_bundle.mthds",
 )
 response = await runner.execute(
+    # Provide values directly — each is interpreted against the pipe's declared input signature.
     inputs={
-        "my_input": {
-            "concept": "Text",
-            "content": "Hello world",
-        },
+        "my_input": "Hello world",
     },
 )
 pipe_output = response.pipe_output
@@ -117,10 +115,7 @@ runner = PipelexMTHDSProtocol()
 response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
-        "description": {
-            "concept": "ProductDescription",
-            "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
-        },
+        "description": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
     },
 )
 pipe_output = response.pipe_output
@@ -136,10 +131,7 @@ runner = PipelexMTHDSProtocol(
 response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
-        "description": {
-            "concept": "ProductDescription",
-            "content": "...",
-        },
+        "description": "...",
     },
 )
 pipe_output = response.pipe_output
@@ -156,10 +148,7 @@ runner = PipelexMTHDSProtocol(
 response = await runner.execute(
     pipe_code="description_to_tagline",
     inputs={
-        "description": {
-            "concept": "ProductDescription",
-            "content": "...",
-        },
+        "description": "...",
     },
 )
 pipe_output = response.pipe_output
@@ -203,10 +192,7 @@ runner = PipelexMTHDSProtocol()
 response = await runner.execute(
     mthds_contents=[my_pipe_content],
     inputs={
-        "description": {
-            "concept": "ProductDescription",
-            "content": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
-        },
+        "description": "EcoClean Pro is a revolutionary biodegradable cleaning solution that removes 99.9% of germs while being completely safe for children and pets. Made from plant-based ingredients.",
     },
 )
 pipe_output = response.pipe_output

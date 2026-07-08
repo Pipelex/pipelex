@@ -156,7 +156,7 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 
 ## Input File Formats
 
-An inputs file is a dictionary whose keys are input variable names. Pipelex accepts **both JSON and TOML**, discriminated by the file extension:
+An inputs file is a dictionary whose keys are input variable names, and each value is interpreted **against the pipe's declared signature** — so you provide the values directly (a string, a number, an object) and Pipelex types them as the declared concept. See [Providing Inputs](../../building-methods/pipes/provide-inputs.md) for the full model, including the explicit `{concept, content}` escape hatch. Pipelex accepts **both JSON and TOML**, discriminated by the file extension:
 
 - A `.toml` suffix is parsed as TOML.
 - Every other value — `.json`, no extension, anything else — is parsed as JSON.
@@ -169,37 +169,37 @@ Both formats produce the same input dictionary for the value types they share, s
 
 ### JSON
 
+Provide each value directly — a string, a number, an object — and it is typed as the input's declared concept:
+
 ```json
 {
-  "input_variable": "simple string value",
-  "another_input": {
-    "concept": "domain_code.ConceptName",
-    "content": { "field": "value" }
-  }
+  "instructions": "simple string value",
+  "priority": 3,
+  "client": { "name": "Acme Corp", "country": "France" }
 }
 ```
+
+To override or disambiguate a concept, wrap a value in the explicit `{concept, content}` envelope (`{"concept": "domain_code.ConceptName", "content": {...}}`) — see [Providing Inputs](../../building-methods/pipes/provide-inputs.md#the-explicit-format-escape-hatch).
 
 ### TOML
 
 The same inputs in TOML. TOML's multi-line strings (`"""..."""`) make text-heavy inputs far more pleasant to author than escaped JSON:
 
 ```toml
-input_variable = "simple string value"
-
 instructions = """
 Focus on payment terms.
 Flag anything that looks unusual.
 """
 
-[another_input]
-concept = "domain_code.ConceptName"
+priority = 3
 
-[another_input.content]
-field = "value"
+[client]
+name = "Acme Corp"
+country = "France"
 ```
 
-!!! warning "TOML datetimes are not supported yet"
-    TOML parses bare datetime/date/time literals (e.g. `when = 2026-07-06`) into typed objects that have no JSON equivalent and no native concept yet, so the loader rejects them with an explicit error. Quote such values as strings (`when = "2026-07-06"`) in the meantime.
+!!! tip "TOML date and datetime literals are native `Date` inputs"
+    A top-level TOML date or datetime literal (e.g. `hearing = 2026-09-01` or `departure = 2026-07-07T15:40:00+02:00`) maps directly to the native [`Date`](../../building-methods/concepts/native-concepts.md) concept — the offset is kept when stated. A bare *time-of-day* literal (`opening = 09:00:00`) is still rejected: a time alone has no date to attach to, so include the date or quote it as a string.
 
 ### Auto-detection and ambiguity
 

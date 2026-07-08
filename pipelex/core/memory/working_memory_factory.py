@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import shortuuid
 from mthds.protocol.pipeline_inputs import PipelineInputs
 from polyfactory.exceptions import FactoryException
@@ -72,6 +74,7 @@ class WorkingMemoryFactory(BaseModel):
         *,
         input_specs: InputStuffSpecs | None = None,
         search_domain_codes: list[str] | None = None,
+        inputs_base_dir: Path | None = None,
     ) -> WorkingMemory:
         """Create a WorkingMemory from a pipeline inputs dictionary.
 
@@ -86,13 +89,22 @@ class WorkingMemoryFactory(BaseModel):
             pipeline_inputs: Dictionary in the format from API serialization
             input_specs: The entry pipe's declared inputs; ``None`` disables signature-driven shaping
             search_domain_codes: List of domain codes to search for concepts
+            inputs_base_dir: Directory that bare *relative local* file paths resolve against (D3);
+                the inputs file's parent when inputs were file-loaded by a CLI. ``None`` for API/SDK
+                and in-process callers (they pass absolute urls / storage uris). Only consulted by
+                the shaper's file-ish / CSV arms.
 
         Returns:
             WorkingMemory object reconstructed from the implicit format
 
         """
         if input_specs is not None:
-            return InputShaper.shape(pipeline_inputs, input_specs=input_specs, search_domain_codes=search_domain_codes)
+            return InputShaper.shape(
+                pipeline_inputs,
+                input_specs=input_specs,
+                search_domain_codes=search_domain_codes,
+                inputs_base_dir=inputs_base_dir,
+            )
 
         working_memory = cls.make_empty()
 

@@ -117,6 +117,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
         pipe_run: PipeRunProtocol | None = None,
+        inputs_base_dir: Path | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
@@ -127,6 +128,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         self.user_id = user_id
         self.execution_config = execution_config
         self._pipe_run = pipe_run
+        # Directory that bare relative local file paths in `inputs` resolve against (Smart Inputs
+        # D3). Set by a CLI to the inputs file's parent; None for API/SDK callers (absolute urls).
+        self.inputs_base_dir = inputs_base_dir
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
 
     @override
@@ -222,6 +226,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 is_mock_usage=self.is_mock_usage,
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
+                inputs_base_dir=self.inputs_base_dir,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)

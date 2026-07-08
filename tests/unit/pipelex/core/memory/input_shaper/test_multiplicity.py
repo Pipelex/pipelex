@@ -1,3 +1,4 @@
+import datetime
 from typing import Any
 
 import pytest
@@ -8,7 +9,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.memory.input_shaper.data import Question, ShaperPerson, build_input_specs
+from tests.unit.pipelex.core.memory.input_shaper.data import Deadline, Question, ShaperPerson, build_input_specs
 
 # (test_name, concept_ref, multiplicity, provided_value, expected_concept_ref, expected_list_content)
 MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, ListContent[StuffContent]]] = [
@@ -72,6 +73,17 @@ MULTIPLICITY_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, str, 
         [{"name": "Alice"}, {"name": "Bob"}],
         "shaper_test.ShaperPerson",
         ListContent(items=[ShaperPerson(name="Alice"), ShaperPerson(name="Bob")]),
+    ),
+    # A top-level list of bare date objects (e.g. a TOML `deadlines = [2026-01-01, 2026-02-02]` array
+    # the loader leaves untouched) shapes element-wise into ListContent[DateContent] under a declared
+    # Date-refining `[]` input — the case `case1-bare-date-arm-gap.md` deferred, now closed by the shaper.
+    (
+        "variable-list-of-date-objects",
+        "shaper_test.Deadline",
+        True,
+        [datetime.date(2026, 1, 1), datetime.date(2026, 2, 2)],
+        "shaper_test.Deadline",
+        ListContent(items=[Deadline(date=datetime.date(2026, 1, 1)), Deadline(date=datetime.date(2026, 2, 2))]),
     ),
 ]
 

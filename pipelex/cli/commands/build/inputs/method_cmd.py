@@ -36,6 +36,10 @@ def build_inputs_method_cmd(
         InputsTemplateFormat,
         typer.Option("--format", help="Format of the generated inputs template (json or toml)"),
     ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
     """Generate an example inputs template for an installed method.
 
@@ -44,6 +48,7 @@ def build_inputs_method_cmd(
         pipelex build inputs method my-method --pipe custom_pipe
         pipelex build inputs method my-method --output custom_inputs.json
         pipelex build inputs method my-method --format toml
+        pipelex build inputs method my-method --explicit
     """
     pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
@@ -73,4 +78,5 @@ def build_inputs_method_cmd(
         output_path=output_path_path,
         library_dir=effective_library_dir,
         template_format=template_format,
+        explicit=explicit,
     )

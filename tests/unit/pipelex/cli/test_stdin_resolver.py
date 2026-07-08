@@ -196,20 +196,54 @@ class TestStdinResolver:
         assert "bad_no_content" not in result
 
     # -------------------------------------------------------------------------
+    # parse_cli_inputs() base-dir contract (D3): the inputs file's parent travels
+    # with the parsed dict so the shaper can resolve bare relative file paths.
+    # -------------------------------------------------------------------------
+
+    def test_parse_file_inputs_carries_base_dir(self, tmp_path: Path) -> None:
+        """File-loaded inputs carry the file's parent directory as inputs_base_dir."""
+        json_file = tmp_path / "inputs.json"
+        json_file.write_text('{"photo": "photo.jpg"}', encoding="utf-8")
+        result = parse_cli_inputs(inputs_arg=str(json_file))
+        assert result.pipeline_inputs == {"photo": "photo.jpg"}
+        assert result.inputs_base_dir == tmp_path.resolve()
+
+    def test_parse_inline_json_has_no_base_dir(self) -> None:
+        """Inline JSON comes from no file — inputs_base_dir is None."""
+        result = parse_cli_inputs(inputs_arg='{"text": "hello"}')
+        assert result.pipeline_inputs == {"text": "hello"}
+        assert result.inputs_base_dir is None
+
+    def test_parse_stdin_inputs_have_no_base_dir(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Piped stdin comes from no file — inputs_base_dir is None."""
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"text": "from stdin"})))
+        result = parse_cli_inputs(inputs_arg=None)
+        assert result.pipeline_inputs == {"text": "from stdin"}
+        assert result.inputs_base_dir is None
+
+    def test_parse_auto_detected_inputs_carry_base_dir(self, tmp_path: Path) -> None:
+        """An auto-detected default inputs file carries its directory as inputs_base_dir."""
+        (tmp_path / "inputs.json").write_text('{"photo": "photo.jpg"}', encoding="utf-8")
+        # stdin_fallback=False so the auto-detect branch is reached deterministically (no stdin probe).
+        result = parse_cli_inputs(inputs_arg=None, stdin_fallback=False, auto_inputs_dir=tmp_path)
+        assert result.pipeline_inputs == {"photo": "photo.jpg"}
+        assert result.inputs_base_dir == tmp_path.resolve()
+
+    # -------------------------------------------------------------------------
     # parse_cli_inputs() tests
     # -------------------------------------------------------------------------
 
     def test_inputs_inline_json(self) -> None:
         """--inputs with inline JSON string is parsed correctly."""
         result = parse_cli_inputs(inputs_arg='{"text": "hello"}')
-        assert result == {"text": "hello"}
+        assert result.pipeline_inputs == {"text": "hello"}
 
     def test_inputs_file_path(self, tmp_path: Any) -> None:
         """--inputs with a file path loads JSON from the file."""
         json_file = tmp_path / "inputs.json"
         json_file.write_text('{"key": "value"}')
         result = parse_cli_inputs(inputs_arg=str(json_file))
-        assert result == {"key": "value"}
+        assert result.pipeline_inputs == {"key": "value"}
 
     def test_inputs_tilde_path_is_expanded(self, tmp_path: Any, monkeypatch: pytest.MonkeyPatch) -> None:
         """A quoted / `=`-form `~/inputs.json` (tilde not shell-expanded) resolves to the home dir.
@@ -220,13 +254,13 @@ class TestStdinResolver:
         monkeypatch.setenv("HOME", str(tmp_path))
         (tmp_path / "inputs.json").write_text('{"tilde": "expanded"}')
         result = parse_cli_inputs(inputs_arg="~/inputs.json", stdin_fallback=False)
-        assert result == {"tilde": "expanded"}
+        assert result.pipeline_inputs == {"tilde": "expanded"}
 
     def test_inputs_wins_over_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When --inputs is provided, stdin is ignored."""
         monkeypatch.setattr("sys.stdin", io.StringIO('{"from_stdin": true}'))
         result = parse_cli_inputs(inputs_arg='{"from_arg": true}')
-        assert result == {"from_arg": True}
+        assert result.pipeline_inputs == {"from_arg": True}
 
     def test_stdin_fallback_not_tty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When inputs_arg is None and stdin is not a TTY, reads from stdin."""
@@ -235,7 +269,7 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
         result = parse_cli_inputs(inputs_arg=None)
-        assert result == {"text": "from stdin"}
+        assert result.pipeline_inputs == {"text": "from stdin"}
 
     def test_stdin_tty_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When stdin is a TTY, returns None (no read attempted)."""
@@ -243,7 +277,7 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: True  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
         result = parse_cli_inputs(inputs_arg=None)
-        assert result is None
+        assert result.pipeline_inputs is None
 
     def test_stdin_fallback_disabled(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """When stdin_fallback=False, returns None even if stdin has data."""
@@ -251,7 +285,7 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
         result = parse_cli_inputs(inputs_arg=None, stdin_fallback=False)
-        assert result is None
+        assert result.pipeline_inputs is None
 
     def test_stdin_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Empty stdin returns None."""
@@ -259,7 +293,7 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
         result = parse_cli_inputs(inputs_arg=None)
-        assert result is None
+        assert result.pipeline_inputs is None
 
     def test_stdin_invalid_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Invalid JSON on stdin triggers agent_error (typer.Exit)."""
@@ -287,9 +321,9 @@ class TestStdinResolver:
         mock_stdin.isatty = lambda: False  # type: ignore[assignment]
         monkeypatch.setattr("sys.stdin", mock_stdin)
         result = parse_cli_inputs(inputs_arg=None)
-        assert result is not None
-        assert "contract_text" in result
-        assert result["contract_text"]["concept"] == "Text"
+        assert result.pipeline_inputs is not None
+        assert "contract_text" in result.pipeline_inputs
+        assert result.pipeline_inputs["contract_text"]["concept"] == "Text"
 
     def test_inputs_inline_invalid_json(self) -> None:
         """Invalid inline JSON in --inputs triggers agent_error."""
@@ -314,7 +348,7 @@ class TestStdinResolver:
 
         result = parse_cli_inputs(inputs_arg=str(toml_file))
 
-        assert result == {"contract_text": {"concept": "Text", "content": "First line.\nSecond line.\n"}}
+        assert result.pipeline_inputs == {"contract_text": {"concept": "Text", "content": "First line.\nSecond line.\n"}}
 
     def test_inputs_toml_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Invalid TOML in a .toml inputs file emits a TomlError envelope with input domain."""
@@ -375,7 +409,7 @@ class TestStdinResolver:
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
         result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
-        assert result == {"from_stdin": True}
+        assert result.pipeline_inputs == {"from_stdin": True}
 
     def test_explicit_inputs_beats_stdin_and_auto(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
         """When inputs_arg, stdin, and auto_inputs_dir are all set, inputs_arg wins."""
@@ -391,7 +425,7 @@ class TestStdinResolver:
             inputs_arg='{"from_arg": true}',
             auto_inputs_dir=tmp_path,
         )
-        assert result == {"from_arg": True}
+        assert result.pipeline_inputs == {"from_arg": True}
 
     def test_empty_stdin_falls_back_to_auto_inputs_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
         """When stdin is non-TTY but empty and auto_inputs_dir is set, the auto-detected file is used."""
@@ -403,7 +437,7 @@ class TestStdinResolver:
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
         result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
-        assert result == {"from_auto": True}
+        assert result.pipeline_inputs == {"from_auto": True}
 
     def test_auto_detected_path_used_when_no_stdin(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
         """When stdin is a TTY and auto_inputs_dir is set, the auto-detected file is used."""
@@ -415,7 +449,7 @@ class TestStdinResolver:
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
         result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
-        assert result == {"from_auto": True}
+        assert result.pipeline_inputs == {"from_auto": True}
 
     def test_stdin_beats_ambiguous_auto_dir(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
         """Piped stdin outranks auto-detect, so an ambiguous dir (both files) does NOT raise."""
@@ -428,7 +462,7 @@ class TestStdinResolver:
         monkeypatch.setattr("sys.stdin", mock_stdin)
 
         result = parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
-        assert result == {"from_stdin": True}
+        assert result.pipeline_inputs == {"from_stdin": True}
 
     def test_ambiguous_auto_dir_raises_when_no_stdin(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any, capsys: pytest.CaptureFixture[str]

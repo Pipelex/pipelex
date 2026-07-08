@@ -30,6 +30,10 @@ def build_inputs_pipe_cmd(
         InputsTemplateFormat,
         typer.Option("--format", help="Format of the generated inputs template (json or toml)"),
     ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
     """Generate an example inputs template for a pipe by code.
 
@@ -38,6 +42,7 @@ def build_inputs_pipe_cmd(
         pipelex build inputs pipe my_pipe -L ./my_library/
         pipelex build inputs pipe my_pipe --output custom_inputs.json
         pipelex build inputs pipe my_pipe --format toml
+        pipelex build inputs pipe my_pipe --explicit
     """
     output_path_path = Path(output_path) if output_path else None
 
@@ -47,4 +52,5 @@ def build_inputs_pipe_cmd(
         output_path=output_path_path,
         library_dir=library_dir,
         template_format=template_format,
+        explicit=explicit,
     )
