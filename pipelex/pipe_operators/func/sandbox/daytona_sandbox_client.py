@@ -86,12 +86,16 @@ class DaytonaSandboxClient(SandboxClientProtocol):
                     ephemeral=True,
                 ),
             )
+            snapshot_label = self._resolved_snapshot() or "default-image"
+            log.info(
+                f"Daytona box {sandbox.id} provisioned for pipe '{request.pipe_code}' (snapshot={snapshot_label}, network_blocked={block_network})"
+            )
             try:
                 return await self._run_in_box(sandbox=sandbox, request=request)
             finally:
                 # Guaranteed teardown on success, throw, or cancel (decision 3).
                 await daytona.delete(sandbox)
-                log.verbose(f"Daytona box torn down for pipe '{request.pipe_code}'")
+                log.info(f"Daytona box {sandbox.id} torn down for pipe '{request.pipe_code}'")
         finally:
             await daytona.close()
 
@@ -108,6 +112,7 @@ class DaytonaSandboxClient(SandboxClientProtocol):
     async def _run_in_box(self, *, sandbox: Any, request: SandboxRunRequest) -> SandboxRunResult:
         bootstrap_pip = self._resolved_bootstrap_pip()
         if bootstrap_pip:
+            log.info(f"Daytona box {sandbox.id}: bootstrap-installing '{bootstrap_pip}'")
             install = await sandbox.process.exec(f"pip install --quiet {bootstrap_pip}", timeout=self._exec_timeout)
             if install.exit_code != 0:
                 detail = (install.result or "").strip()
