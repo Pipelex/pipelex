@@ -15,13 +15,14 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
 
-class InProcessPipeFuncExecutor(PipeFuncExecutorProtocol):
-    """Default executor: resolve the function from the process-global registry and run it here.
+class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
+    """The ``direct`` execution mode: resolve the function from the process-global registry and run it here.
 
-    This is the pre-existing PipeFunc behavior, extracted verbatim from ``_live_run_operator_pipe``:
-    async vs sync dispatch, and str/list -> StuffContent coercion. It is used for local/direct runs
-    and inside the sandbox (where the real function IS registered). It is NOT used on the hosted
-    runner/worker, which injects the sandbox-dispatching executor instead.
+    The free, in-process, trusted mode core owns (mirrors ``DirectOrchestrator`` on the orchestration
+    axis). This is the pre-existing PipeFunc behavior, extracted verbatim from ``_live_run_operator_pipe``:
+    async vs sync dispatch, and str/list -> StuffContent coercion. It is used for local runs and inside
+    a sandbox box (where the real function IS registered); a sandbox-dispatching executor from the
+    out-of-tree plugin runs it out-of-process instead when ``execution_mode`` names a sandbox backend.
     """
 
     @override

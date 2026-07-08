@@ -1,4 +1,4 @@
-from pipelex.pipe_operators.func.in_process_pipe_func_executor import InProcessPipeFuncExecutor
+from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
@@ -7,7 +7,7 @@ from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 
 
 def _make_direct_pipe_func_executor(config: PipeFuncConfig) -> PipeFuncExecutorProtocol:  # noqa: ARG001 — stateless; the mode carries no config
-    return InProcessPipeFuncExecutor()
+    return DirectPipeFuncExecutor()
 
 
 class PipeFuncPlugin:

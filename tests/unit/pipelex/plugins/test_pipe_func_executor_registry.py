@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from pipelex.pipe_operators.func.in_process_pipe_func_executor import InProcessPipeFuncExecutor
+from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.exceptions import DuplicatePipeFuncExecutorError, UnknownPipeFuncExecutionModeError
 from pipelex.plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
@@ -34,7 +34,7 @@ def _make_registrar() -> PluginRegistrar:
 
 def _fake_factory(_config: PipeFuncConfig) -> PipeFuncExecutorProtocol:
     """Stand-in factory: identity is all the registry tests assert (never actually invoked here)."""
-    return InProcessPipeFuncExecutor()
+    return DirectPipeFuncExecutor()
 
 
 class TestPipeFuncExecutorRegistry:
@@ -109,4 +109,4 @@ class TestPipeFuncExecutorRegistry:
 
         pipe_func_config = cast("PipeFuncConfig", SimpleNamespace(execution_mode=DIRECT_PIPE_FUNC_EXECUTION_MODE))
         direct_executor = registry.get_required(mode=DIRECT_PIPE_FUNC_EXECUTION_MODE)(pipe_func_config)
-        assert isinstance(direct_executor, InProcessPipeFuncExecutor)
+        assert isinstance(direct_executor, DirectPipeFuncExecutor)
