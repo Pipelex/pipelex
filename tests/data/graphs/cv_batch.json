@@ -818,5 +818,8 @@
       "meta": {}
     }
   ],
-  "meta": {}
+  "meta": {
+    "format": "mthds",
+    "mode": "live"
+  }
 }

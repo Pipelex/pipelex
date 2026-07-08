@@ -173,6 +173,8 @@ class GraphSpec(BaseModel):
         return self.model_dump_json(by_alias=True, indent=2)
 ```
 
+`meta.format` is always `"mthds"` on newly emitted Pipelex graphs. `meta.mode` records provenance for renderers and shared tooling: Pipelex execution graphs emit `"dry"` for dry-run/mock execution and `"live"` for real execution. The shared renderer also accepts `"static"` for graphs produced by the static MTHDS graph builder.
+
 ### Node Types
 
 | NodeKind | Description |

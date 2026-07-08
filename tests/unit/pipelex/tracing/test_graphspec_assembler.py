@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind, NodeStatus
+from pipelex.graph.graphspec import EdgeKind, ErrorSpec, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -69,6 +69,13 @@ class TestGraphSpecAssembler:
         assert result.graph_id == _GRAPH_ID
         assert result.nodes == []
         assert result.edges == []
+        assert result.meta["mode"] == GraphSpecMode.LIVE
+
+    def test_explicit_mode(self) -> None:
+        """Assembler stamps the requested GraphSpec provenance mode."""
+        result = GraphSpecAssembler.assemble(events=[], graph_id=_GRAPH_ID, mode=GraphSpecMode.DRY)
+        assert result.meta["format"] == "mthds"
+        assert result.meta["mode"] == GraphSpecMode.DRY
 
     def test_registry_source_payloads_survive_assembly(self) -> None:
         """PipeStartEvent and PipeEndSuccessEvent registry payloads are copied unchanged."""

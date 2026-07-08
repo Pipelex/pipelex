@@ -17,7 +17,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.graph.graphspec import GraphSpec
+from pipelex.graph.graphspec import GraphSpec, GraphSpecMode
 from pipelex.hub import get_library_manager, scoped_content_generator, scoped_event_log, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
@@ -128,6 +128,7 @@ async def dry_run_pipe_in_process(pipe: PipeAbstract, *, library_id: str) -> Gra
         pipeline_run_id=pipeline_run_id,
         emit_graph_events=True,
         emit_usage_events=False,
+        mode=GraphSpecMode.DRY,
     )
     try:
         with scoped_event_log(event_log), scoped_pipe_router(pipe_router), scoped_content_generator(content_generator):
