@@ -106,6 +106,18 @@ class TestInputShaperExplicitForms:
         assert stuff.concept.concept_ref == "shaper_test.Question"
         assert stuff.content == ListContent(items=[Question(text="a"), Question(text="b")])
 
+    def test_explicit_list_content_into_dynamic_slot_ok(self) -> None:
+        """D5/D6: a Dynamic slot keeps bottom-up list behavior for prebuilt ListContent."""
+        input_specs = build_input_specs([("payload", "native.Dynamic", None)])
+        provided: ListContent[Question] = ListContent(items=[Question(text="a"), Question(text="b")])
+
+        working_memory = InputShaper.shape({"payload": provided}, input_specs=input_specs, search_domain_codes=["shaper_test"])
+
+        stuff = working_memory.root["payload"]
+        pretty_print(stuff, title="explicit list into Dynamic slot")
+        assert stuff.concept.concept_ref == "shaper_test.Question"
+        assert stuff.content == ListContent(items=[Question(text="a"), Question(text="b")])
+
     def test_envelope_collision_rule_nested_escape_hatch(self) -> None:
         """D6: a dict with exactly {concept, content} is ALWAYS an envelope, even for a structure with those fields.
 

@@ -44,3 +44,11 @@ The Phase-5 finalize doc-accuracy review independently re-found **Gap A** and fr
 
 - **Gap A's auto-wrap sub-question.** An *explicit singular* under a declared `[]`/`[N]` is still taken literally (stored as given), not auto-wrapped into a one-item list the way the bare-value path does. Whether an explicit form should auto-wrap or be literal is the open design question the note flags — left to the holistic D2-multiplicity pass. `_reconcile_explicit_multiplicity` only fires on `ListContent` content, so this direction is untouched.
 - **Gap B — the `DYNAMIC` arm skips multiplicity peeling.** `_shape_one`'s `InputKind.DYNAMIC` case still short-circuits to the bottom-up factory before `_shape_with_multiplicity`, so a declared `Dynamic[]`/`Anything[N]` doesn't peel multiplicity (empty-list diverges from D2's empty `ListContent`, no `[N]` check, no auto-wrap). D5 explicitly says Dynamic/Anything "fall back to today's bottom-up rules," and declaring Dynamic *with* a multiplicity is unusual; the empty-list case raises a clean error, not silent corruption. Re-deferred as a documented decision to the holistic D2-multiplicity pass (which must also settle the auto-wrap question above).
+
+## PR #1033 follow-up (2026-07-08) — Dynamic explicit-list regression CLOSED; broader Gap B still deferred
+
+The Phase-5 reconcile introduced a narrower regression: a singular `native.Dynamic` input still accepted a raw Python list through the bottom-up `InputKind.DYNAMIC` path, but rejected an already-built `ListContent` because `_shape_explicit` ran the new list-into-singular guard after the D6 compat check. That over-applied D2 to a slot where D5 says the signature cannot guide shape.
+
+`InputShaper._shape_explicit` now returns immediately after compatibility when the declared concept is exactly `native.Dynamic`, matching the bare-value Dynamic fallback. Pinned by `test_explicit_list_content_into_dynamic_slot_ok`.
+
+This does **not** resolve the broader Gap B above: declared `Dynamic[]`/`Anything[N]` still do not peel multiplicity, and the empty-list/count/auto-wrap semantics remain deferred to the holistic D2 pass.

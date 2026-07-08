@@ -23,4 +23,4 @@ Pinned by `tests/unit/pipelex/core/memory/input_shaper/test_multiplicity.py::Tes
 
 ## Residual (unchanged, out of the shaper's scope)
 
-The *no-signature* bottom-up path (`InputShaper.shape(input_specs=None)` → `StuffFactory` directly) still has no Case-1.4 date arm, so a `list[datetime.date]` reaching the factory without a signature still errors cleanly. That is correct: Smart Inputs shapes only when a signature is present, and the signature is what makes a date array interpretable. The broader protocol widening for sequences of scalars (design D10) rides the release wave regardless.
+The *no-signature* bottom-up path (`WorkingMemoryFactory.make_from_pipeline_inputs(..., input_specs=None)` → `StuffFactory` directly) still has no Case-1.4 date arm, so a `list[datetime.date]` reaching the factory without a signature still errors cleanly. That is correct: Smart Inputs shapes only when a signature is present, and the signature is what makes a date array interpretable. The broader protocol widening for sequences of scalars (design D10) rides the release wave regardless.

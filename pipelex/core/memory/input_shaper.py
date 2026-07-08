@@ -502,6 +502,9 @@ class InputShaper:
                 provided_concept_ref=stuff.concept.concept_ref,
                 expected_shape=cls._render_expected_shape(stuff_spec=stuff_spec),
             )
+        if NativeConceptCode.is_dynamic_concept(concept_code=declared_concept.code):
+            # Match the bare-value Dynamic path: the signature cannot guide list-vs-single shape here.
+            return stuff
         cls._reconcile_explicit_multiplicity(stuff, stuff_spec=stuff_spec, variable_name=variable_name)
         return stuff
 

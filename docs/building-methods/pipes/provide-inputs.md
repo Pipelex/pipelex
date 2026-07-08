@@ -61,7 +61,7 @@ Match the value to the input's declared concept. The declared concept is applied
 | `Text` | a string | `"What are the fees?"` |
 | `Number` | a number (not a boolean) | `42` or `3.14` |
 | `YesNo` | a boolean | `true` / `false` |
-| `Date` | an ISO date/datetime string (or a TOML date literal) | `"2026-09-01"` |
+| `Date` | an extended ISO 8601 date/datetime string (or a TOML date literal) | `"2026-09-01"` |
 | `Image` / `Document` | a URL or file path | `"photo.jpg"`, `"https://…/a.pdf"` |
 | a structured concept | an object | `{"name": "Alice", "age": 30}` |
 
@@ -118,7 +118,9 @@ The columns map to the concept's fields. See [CSV Input & Output](csv-input-and-
 
 ## Files and relative paths
 
-For `Image`/`Document` inputs and tabular references, a **relative** path is resolved against the **inputs file's** directory (a leading `~` expands to your home directory; absolute paths, `http(s)://`, and storage URIs are used as-is). So an `inputs.json` sitting next to a `contracts/` folder can say `"contract": "contracts/nda.pdf"` and it resolves correctly regardless of where you launch the command.
+For `Image`/`Document` inputs, a **relative** path is resolved against the **inputs file's** directory (a leading `~` expands to your home directory; absolute paths, `http(s)://`, and storage URIs are used as-is). So an `inputs.json` sitting next to a `contracts/` folder can say `"contract": "contracts/nda.pdf"` and it resolves correctly regardless of where you launch the command.
+
+Tabular references use the same relative-path resolution, but v1 reads local tabular files only. A `.csv` path must resolve to a local file; download remote or storage-hosted tables before referencing them.
 
 Callers that don't load from a file — the Python API and the hosted client — should pass absolute URLs or storage URIs, since there is no inputs-file directory to resolve against.
 
