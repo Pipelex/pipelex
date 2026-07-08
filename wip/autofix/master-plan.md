@@ -12,7 +12,7 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Steps 3 (hardened loop) and 4 (agent apply surface) are DONE** — merged together as PR #1035 (`feature/Autofix-step4-Agnt-Apply`). Step 3 replaced the spike's drop-everything scoping guard with real multi-file targeting (source backfill at the translate funnel, resolved-dirs single-file gate, write-scope policy, per-file apply with `files_written`); step 4 shipped `pipelex-agent fix bundle` with the CLI-free markdown renderer and full test coverage. The PR review triage fixed two confirmed bugs and deferred one inert finding to [pr-1035-review-notes.md](pr-1035-review-notes.md).
 
-**Step 5 (human CLI surfacing) implementation is COMPLETE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). Step-5 exit (CHECKPOINT B review fan-out) pending.
+**Step 5 (human CLI surfacing) is DONE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). The CHECKPOINT B exit review fixed five confirmed bugs on the branch and deferred five tradeoffs — triage in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md). The branch is PR-ready; **step 6 (release train) is next**, and its CHANGELOG must still name the additive `suggested_fix` wire field in `/validate` payloads (deferred item 1c) plus regenerate the conformance fixture (deferred item 2).
 
 ## Sequencing doctrine (decided 2026-07-07)
 
@@ -58,9 +58,9 @@ Detailed design + working plan (shared with step 3): [step3-step4-hardened-loop-
 
 Thin command over `fix_bundle_file`: two-stream output per the workspace output conventions (`--format`/`--error-format`, JSON contract carrying `FixBundleResult` — is_valid, iterations, fixes_applied, remaining_errors, bail_reason; markdown rendering for the agent as presentation). e2e CLI snapshot tests. This is the milestone where an agent can run validate → fix → re-validate entirely from the CLI. Exit: command shipped on the agent CLI, snapshots green.
 
-### 5. Human CLI surfacing — gated on steps 2 + 4
+### 5. Human CLI surfacing — gated on steps 2 + 4 — **DONE (branch `feature/Autofix-step5`, PR-ready)**
 
-Detailed implementation plan with progress checkboxes: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md).
+Detailed implementation plan with progress checkboxes: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). Checkpoint B triage: [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md).
 
 Both gates from the sequencing doctrine are now met. Two pieces, landed together for symmetry:
 

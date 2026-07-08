@@ -89,10 +89,17 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
             if allow_signatures:
                 console.print(f"[dim]Pending PipeSignature placeholder(s): {escape(pending)}[/dim]\n")
             else:
-                # Mirrors the validate/agent-fix runnability gate: valid is not runnable.
-                console.print(
-                    f"[bold red]Bundle is valid but NOT yet runnable — unimplemented PipeSignature placeholder(s): {escape(pending)}[/bold red]"
-                )
+                # Mirrors the validate/agent-fix runnability gate: valid is not runnable. Under
+                # --diff nothing was written, so the phrasing stays conditional (would-be).
+                if preview:
+                    console.print(
+                        f"[bold red]Fix preview — the bundle would be valid but still NOT runnable: "
+                        f"unimplemented PipeSignature placeholder(s): {escape(pending)}[/bold red]"
+                    )
+                else:
+                    console.print(
+                        f"[bold red]Bundle is valid but NOT yet runnable — unimplemented PipeSignature placeholder(s): {escape(pending)}[/bold red]"
+                    )
                 console.print("[bold green]💡 Tip:[/bold green] Implement them, or re-run with --allow-signatures to accept placeholders.\n")
                 raise typer.Exit(1)
         return
@@ -116,9 +123,19 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
         console.print("[bold cyan]Remaining errors:[/bold cyan]\n")
         display_validation_error_items(console, items=result.remaining_errors)
 
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Review the remaining errors above — they have no deterministic safe fix, so they need a manual edit."
-    )
+    # A remaining error can still carry a 💡 suggested-fix line — dropped by --select/--ignore,
+    # left outside the write scope, or unconverged when the loop bailed. Claiming "no safe fix"
+    # there contradicts the line just printed, so only say it when nothing fixable remains.
+    if any(item.suggested_fix is not None for item in result.remaining_errors):
+        console.print(
+            "[bold green]💡 Tip:[/bold green] Some remaining errors above still show a suggested fix that was not applied — "
+            "they were skipped by --select/--ignore, fell outside the write scope, or the loop stopped early (see the reason above). "
+            "Adjust those flags (or pass -L) and re-run, or fix the rest manually."
+        )
+    else:
+        console.print(
+            "[bold green]💡 Tip:[/bold green] Review the remaining errors above — they have no deterministic safe fix, so they need a manual edit."
+        )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1)

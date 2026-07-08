@@ -2,9 +2,13 @@
 
 Detailed design and working plan for master-plan step 5 (human CLI surfacing: `pipelex fix bundle` + the `💡 Suggested fix:` line in `pipelex validate`), on branch `feature/Autofix-step5` (base: the PR #1035 squash `611644e82`, which landed steps 3 + 4). Map: [master-plan.md](master-plan.md). Architecture and per-checkpoint findings: [suggested-fixes-design.md](suggested-fixes-design.md). Steps 3 + 4 record: [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md).
 
-**Status: ALL PHASES (A–D) DONE — `--diff` shipped (GO); awaiting CHECKPOINT B (exit review fan-out).**
+**Status: STEP 5 COMPLETE — all phases (A–D) done, `--diff` shipped (GO), CHECKPOINT B exit review cleared.**
 
-**NEXT ACTION (cold start): CHECKPOINT B** — fresh-context `/code-review` on the step-5 diff, triage, then flip the master plan to step 5 DONE and record the step-6 hand-off notes. Phases A + B landed exactly per the design below; decisions taken and deltas from plan:
+**NEXT ACTION (cold start): step 6 (release train)** — see the [master plan](master-plan.md). This branch is ready to open as a PR. Step-6 hand-off notes are at the bottom of this doc ("Step-6 hand-off").
+
+**CHECKPOINT B outcome:** the workflow-backed `/code-review` (high effort) ran, but its verify stage collapsed — all 13 verifier agents died on an Anthropic session limit, so the 19 finder candidates were never adjudicated by the workflow. They were triaged by hand against the code instead. Full triage is in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md). Five confirmed bugs were fixed on this branch (mkdocs nav orphan; validate footer not shell-safe; `fix`'s still-invalid tip contradicting its own suggested-fix lines; `--diff` PipeSignature wording asserting the file is valid; `--diff` crash + mislabel + real-run divergence on a missing `-L` dir). Five items were deferred (validate footer over-count; `--diff` `-L` dedup; two cross-CLI duplications; a currently-unreachable dry-run drop) and one was rejected (the `is_dry_run` property is house-preferred over inline enum equality). Gates green (`make agent-check` 0 errors) and the targeted CLI suites + e2e pass after the fixes.
+
+Phases A + B landed exactly per the design below; decisions taken and deltas from plan:
 
 - **Shared human resolver** (`pipelex/cli/commands/bundle_path_resolver.py`): parameterized by `command` name + a per-command `not_a_bundle_hint` (validate's wording preserved verbatim); the `~`-expansion gap the agent side had fixed in PR #1035 triage **did** exist on the human side and is fixed in the helper (pinned by tests).
 - **Flag-and-fix, telemetry**: `execute_validate` double-suffixed its `CLI_COMMAND` tag ("validate bundle bundle") — it now tags `telemetry_command_label` verbatim.
@@ -130,9 +134,15 @@ The step-5 exit criteria are functionally met: a human sees the suggestion in `v
 - [x] Repo docs sweep: new `docs/tools/cli/fix.md` reference page (+ mkdocs nav); fix rows/links added to `docs/tools/cli/index.md`, `docs/tools/cli/validate.md` ("Suggested Fixes" section), `docs/features/cli.md` (human + agent tables — the agent `fix` row was missing since step 4).
 - [x] `make agent-check` green; full `make agent-test` green.
 
-### Exit — CHECKPOINT B (step-5 exit)
+### Exit — CHECKPOINT B (step-5 exit) — DONE
 
-House pattern: fresh-context `/code-review` fan-out on the step-5 diff; fix confirmed bugs, defer real tradeoffs to `deferred-checkpoint-e-review-items.md` (next free letter). Update this doc's status block, the master plan (step 5 → DONE), and the wip README. Record the step-6 hand-off notes: the CHANGELOG entry must also mention the additive `suggested_fix` wire field in `/validate` API payloads (deferred item 1c) and the conformance fixture regen (deferred item 2) — both are step-6 release-train items this step must not silently absorb.
+House pattern followed: `/code-review` fan-out on the step-5 diff (workflow-backed, high effort). Its verify stage collapsed on a session limit (13/13 verifiers errored), so the 19 finder candidates were triaged by hand against the code — full record in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md).
+
+- **Fixed on this branch (confirmed bugs):** mkdocs nav orphan (`fix.md` was in the llmstxt page-map, not the site `nav:`); the validate footer built its `pipelex fix bundle` command without shell quoting (breaks on paths with spaces → `shlex.join`); `fix`'s still-invalid tip claimed "no deterministic safe fix" even when remaining errors still carried a 💡 suggested-fix line (`--select`/`--ignore`/out-of-scope/bail) → tip now conditional; `--diff` printed "Bundle is valid but NOT yet runnable" non-conditionally though nothing was written → preview-aware wording; `--diff` crashed + mislabeled + diverged from the real run on a missing `-L` dir → the sandbox now mirrors a missing dir as an empty copy (matching the loader's skip).
+- **Deferred (real, but tradeoffs / niche / DRY):** validate footer over-counts fixable errors vs the loop's applicability gates; `--diff` `-L` dirs aren't deduped by resolved path; `resolve_bundle_target` and `_reject_invalid_rule_filters` are duplicated across the human and agent CLIs; a currently-unreachable dry-run-message drop in `fix`'s still-invalid arm. See the deferred doc for the recommendations.
+- **Rejected:** the finder's suggestion to inline `item.category == DRY_RUN` instead of the `is_dry_run` property — the property is the house-preferred form (exhaustive-match on the enum).
+
+Gates: `make agent-check` 0 errors; targeted CLI unit + integration suites and the fix-bundle e2e pass after the fixes.
 
 ## Test map (new / extended)
 
@@ -148,3 +158,14 @@ House pattern: fresh-context `/code-review` fan-out on the step-5 diff; fix conf
 - Golden `.mthds` fixtures are processed by `plxt format` during `make agent-check` — write, format, then derive goldens; fresh worktrees need `pipelex-dev generate-mthds-schema` before `plxt lint`.
 - A dotted `main_pipe = "domain.pipe"` is itself invalid (strip-namespace fires) — multi-file fixtures must use the bare form.
 - Known-inert collision gap in `_split_cross_file_collisions` (intra-round duplicate bare codes): documented in [pr-1035-review-notes.md](pr-1035-review-notes.md) — don't re-report it; revisit only if blueprint-parse error accumulation changes.
+
+## Step-6 hand-off
+
+Step 6 is the release train (see [master-plan.md](master-plan.md) step 6). Two things this step deliberately did **not** absorb — they belong to the release cut, not to step 5:
+
+- **The release CHANGELOG entry must name the additive `suggested_fix` wire field** now surfacing in `/validate` API payloads (deferred item 1c in the design doc). Step 5's `[Unreleased]` entries cover the human/agent CLI surfaces; the API wire-field mention is a release-train line.
+- **Regenerate the conformance fixture** that pins the `/validate` error body (deferred item 2, sibling `conformance/` repo), then bump the pipelex-api pin when the runner picks up the version.
+
+Carry-in from Checkpoint B (in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md)) — not release blockers, fold into wave 2 unless they surface sooner: the validate footer over-count (item A) and the `--diff` `-L` dedup (item B) are the two with user-visible edge cases; the cross-CLI resolver/filter duplications (items C, D) are the natural next shared-abstraction refactor.
+
+The branch is otherwise PR-ready: `feature/Autofix-step5` off `611644e82`, gates green.

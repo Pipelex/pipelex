@@ -1,3 +1,4 @@
+import shlex
 from contextvars import ContextVar
 from enum import StrEnum
 from pathlib import Path
@@ -364,9 +365,11 @@ def handle_validate_bundle_error(
     # generic tip (two stacked 💡 tips would be noise).
     fixable_count = sum(1 for item in items if item.suggested_fix is not None)
     if fixable_count and bundle_path is not None:
-        fix_command = f"pipelex fix bundle {bundle_path}"
+        command_parts = ["pipelex", "fix", "bundle", str(bundle_path)]
         for library_dir in library_dirs or []:
-            fix_command += f" -L {library_dir}"
+            command_parts.extend(["-L", str(library_dir)])
+        # shlex.join so a path with spaces stays one argument when the user copy-pastes the footer.
+        fix_command = shlex.join(command_parts)
         console.print(
             f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
         )

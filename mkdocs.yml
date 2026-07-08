@@ -493,6 +493,7 @@ nav:
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
+      - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md

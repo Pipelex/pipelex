@@ -66,6 +66,23 @@ class TestDiffSandbox:
         assert sandbox.to_original(str(sandbox.entry_path)) == str(entry.resolve())
         assert sandbox.to_original(str(sandbox.library_dirs[0] / "helper.mthds")) == str((libs_dir / "helper.mthds").resolve())
 
+    def test_missing_library_dir_mirrors_as_empty_copy_without_crashing(self, tmp_path: Path) -> None:
+        """A non-existent -L dir must not crash copytree: the real loader skips it, so the sandbox mirrors it as an empty dir."""
+        entry = tmp_path / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+        missing_dir = tmp_path / "typo_dir"
+
+        sandbox = mirror_bundle_for_preview(entry, library_dirs=[missing_dir], sandbox_root=self._sandbox_root(tmp_path))
+
+        assert sandbox.library_dirs is not None
+        # The missing dir is preserved 1:1 (so is_single_file matches the real run) as an empty copy.
+        copy_dir = sandbox.library_dirs[0]
+        assert copy_dir.is_dir()
+        assert list(copy_dir.iterdir()) == []
+        # The entry lives outside the missing dir, so it gets a standalone copy.
+        assert sandbox.entry_path.read_text(encoding="utf-8") == 'domain = "demo"\n'
+        assert sandbox.to_original(str(copy_dir / "would_be.mthds")) == str((missing_dir / "would_be.mthds").resolve())
+
     def test_paths_outside_the_sandbox_pass_through(self, tmp_path: Path) -> None:
         entry = tmp_path / "bundle.mthds"
         entry.write_text('domain = "demo"\n', encoding="utf-8")

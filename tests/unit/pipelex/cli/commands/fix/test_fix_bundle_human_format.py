@@ -46,6 +46,18 @@ def _remaining_item(source: str) -> ValidationErrorItem:
     )
 
 
+def _fixable_remaining_item(source: str) -> ValidationErrorItem:
+    """A remaining error that still carries a suggested fix — e.g. skipped by --select/--ignore or left out of write scope."""
+    return ValidationErrorItem(
+        category=ValidationErrorCategory.PIPE_VALIDATION,
+        error_type="INADEQUATE_OUTPUT_CONCEPT",
+        pipe_code="list_ideas",
+        message="output concept does not match the last step",
+        source=source,
+        suggested_fix=_applied_fix(source),
+    )
+
+
 class TestFixBundleHumanFormat:
     @pytest.fixture
     def console(self, mocker: MockerFixture) -> Console:
@@ -200,6 +212,70 @@ class TestFixBundleHumanFormat:
         assert "Pipe Validation Errors:" in output
         assert "concept 'MissingConcept' is not declared" in output
         assert "💡 Tip:" in output
+        # The remaining error has no suggested fix, so the manual-edit tip is correct here.
+        assert "no deterministic safe fix" in output
+
+    def test_still_invalid_with_a_suggested_fix_remaining_does_not_claim_no_safe_fix(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+    ) -> None:
+        """A remaining error still showing a 💡 suggested fix (skipped/out-of-scope) must not be told it has 'no deterministic safe fix'."""
+        bundle_path = self._bundle_file(tmp_path)
+        result = FixBundleResult(
+            is_valid=False,
+            iterations=0,
+            fixes_applied=[],
+            files_written=[],
+            remaining_errors=[_fixable_remaining_item(str(bundle_path))],
+        )
+        self._patch_command(mocker, result=result)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path))
+
+        assert exc_info.value.exit_code == 1
+        output = console.export_text()
+        assert "💡 Suggested fix:" in output
+        assert "no deterministic safe fix" not in output
+        assert "still show a suggested fix" in output
+
+    def test_diff_preview_pending_signatures_uses_conditional_phrasing(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+    ) -> None:
+        """--diff on a bundle that would converge to valid-but-not-runnable must not assert the on-disk bundle IS valid."""
+        bundle_path = self._bundle_file(tmp_path)
+
+        def fake_loop(entry_path: Path, **_kwargs: object) -> FixBundleResult:
+            entry_path.write_text('domain = "fix_human_format"\nmain_pipe = "list_ideas"\n', encoding="utf-8")
+            return FixBundleResult(
+                is_valid=True,
+                iterations=1,
+                fixes_applied=[_applied_fix(str(entry_path))],
+                files_written=[str(entry_path.resolve())],
+                remaining_errors=[],
+                pending_signatures=["fix_human_format.pending_pipe"],
+                is_runnable=False,
+            )
+
+        mocker.patch(f"{FIX_CORE_MODULE}.make_pipelex_for_cli")
+        mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
+        mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
+        mocker.patch(f"{FIX_CORE_MODULE}.tag")
+        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path), diff=True)
+
+        assert exc_info.value.exit_code == 1
+        output = console.export_text()
+        assert "would be valid but still NOT runnable" in output
+        assert "fix_human_format.pending_pipe" in output
+        assert "Bundle is valid but NOT yet runnable" not in output
 
     @pytest.mark.usefixtures("console")
     def test_file_not_found_exits_two(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:

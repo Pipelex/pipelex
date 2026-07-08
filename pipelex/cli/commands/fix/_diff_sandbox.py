@@ -71,7 +71,13 @@ def mirror_bundle_for_preview(
         for dir_index, library_dir in enumerate(library_dirs):
             original_root = Path(library_dir).resolve()
             copy_root = (sandbox_root / f"lib_{dir_index}").resolve()
-            shutil.copytree(original_root, copy_root)
+            if original_root.exists():
+                shutil.copytree(original_root, copy_root)
+            else:
+                # The real loader skips a missing -L dir (it contributes no files) while
+                # keeping it in effective_dirs; mirror that as an empty copy so copytree does
+                # not crash, is_single_file is preserved, and the preview verdict tracks the run.
+                copy_root.mkdir(parents=True, exist_ok=True)
             dir_mappings.append((copy_root, original_root))
             remapped_dirs.append(copy_root)
             if entry_copy is None and entry_resolved.is_relative_to(original_root):

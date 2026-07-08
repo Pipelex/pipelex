@@ -208,6 +208,29 @@ class TestFixBundleHuman:
         assert f"--- {bundle_path.resolve()}" in output
         assert "pipelex-fix-preview-" not in output
 
+    def test_diff_preview_tolerates_missing_library_dir_like_the_real_run(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A non-existent -L dir must not crash --diff or mislabel it as a missing bundle: the real run skips it, so the preview must too."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+        missing_dir = tmp_path / "typo_dir"
+
+        fix_bundle_cmd(path=str(bundle_path), library_dir=[str(missing_dir)], diff=True)
+
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+        assert "bundle file not found" not in output
+        assert "Failed to fix" not in output
+
     def test_directory_mode_auto_detects_and_fixes(
         self,
         tmp_path: Path,
