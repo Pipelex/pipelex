@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
@@ -6,6 +6,10 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+
+if TYPE_CHECKING:
+    # Guarded to avoid a cycle: the transport module imports PipeFuncExecutionResult from here.
+    from pipelex.pipe_operators.func.pipe_func_execution_transport import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 
 
 class PipeFuncExecutionResult(BaseModel):
@@ -47,3 +51,16 @@ class PipeFuncExecutorProtocol(Protocol):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
     ) -> PipeFuncExecutionResult: ...
+
+    async def run_pipe_func_transported(self, *, request: "PipeFuncExecutionRequest") -> "PipeFuncExecutionResponse":
+        """Run one PipeFunc from a *serialized* request and return a *serialized* response.
+
+        The transported sibling of ``run_pipe_func``: it takes a ``PipeFuncExecutionRequest`` (crate +
+        transported working memory) instead of live objects, and returns a ``PipeFuncExecutionResponse``
+        (the output as a transported working memory, preserving dynamic-class identity). This is the
+        seam a serialized boundary crosses — a Temporal activity (``act_pipe_func``) resolves an
+        executor by ``execution_mode`` and calls this, so it never needs live objects. ``direct`` runs
+        it in-process (also what a sandbox box runs internally); a sandbox executor forwards the
+        request to its box and returns the box's response.
+        """
+        ...
