@@ -1,5 +1,9 @@
 from pipelex.hub import get_optional_config, get_required_config
 from pipelex.system.configuration.configs import PipelexConfig
+from pipelex.system.environment import get_optional_env
+
+_SANDBOX_HOSTED_ENV = "PIPELEX_SANDBOX_HOSTED"
+_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
 
 def get_config() -> PipelexConfig:
@@ -18,6 +22,11 @@ def is_pipe_func_sandbox_hosted() -> bool:
     is set, or it is not a PipelexConfig, the answer is False — i.e. local/direct behavior, which
     keeps the non-hosted path byte-identical to the pre-flag behavior.
     """
+    # An env override wins over config so a deployment (or a multi-process local run — submitter +
+    # worker) can flip hosted mode without editing a config file. Absent env → fall back to config.
+    env_value = get_optional_env(_SANDBOX_HOSTED_ENV)
+    if env_value is not None:
+        return env_value.strip().lower() in _TRUTHY
     optional_config = get_optional_config()
     if not isinstance(optional_config, PipelexConfig):
         return False

@@ -34,6 +34,7 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         api_key: str | None = None,
         snapshot: str | None = None,
         block_network: bool = True,
+        bootstrap_pip: str | None = None,
         create_timeout: float = 60.0,
         exec_timeout: int = 300,
     ) -> None:
@@ -41,8 +42,15 @@ class DaytonaSandboxClient(SandboxClientProtocol):
         self._api_key = api_key
         self._snapshot = snapshot
         self._block_network = block_network
+        # No-snapshot dev/fallback: a pip spec installed in the box before the entrypoint runs, for
+        # deployments without a pipelex-preinstalled snapshot (decision 13's runtime-install fallback).
+        # When set, egress MUST be open for pip, so network blocking is turned off for that box.
+        self._bootstrap_pip = bootstrap_pip
         self._create_timeout = create_timeout
         self._exec_timeout = exec_timeout
+
+    def _resolved_bootstrap_pip(self) -> str | None:
+        return self._bootstrap_pip or get_optional_env("DAYTONA_BOOTSTRAP_PIP")
 
     def _resolved_api_key(self) -> str:
         return self._api_key or get_required_env("DAYTONA_API_KEY")
@@ -65,13 +73,16 @@ class DaytonaSandboxClient(SandboxClientProtocol):
             msg = "DaytonaSandboxClient requires the 'daytona' extra: pip install 'pipelex[daytona]'"
             raise SandboxProvisioningError(msg) from exc
 
+        bootstrap_pip = self._resolved_bootstrap_pip()
+        # pip needs egress, so a bootstrap install forces the network open for that box.
+        block_network = self._block_network and not bootstrap_pip
         daytona = AsyncDaytona(DaytonaConfig(api_key=self._resolved_api_key()))
         try:
             sandbox = await self._provision(
                 daytona=daytona,
                 params=CreateSandboxFromSnapshotParams(
                     snapshot=self._resolved_snapshot(),
-                    network_block_all=self._block_network,
+                    network_block_all=block_network,
                     ephemeral=True,
                 ),
             )
@@ -95,6 +106,13 @@ class DaytonaSandboxClient(SandboxClientProtocol):
             raise SandboxProvisioningError(msg) from exc
 
     async def _run_in_box(self, *, sandbox: Any, request: SandboxRunRequest) -> SandboxRunResult:
+        bootstrap_pip = self._resolved_bootstrap_pip()
+        if bootstrap_pip:
+            install = await sandbox.process.exec(f"pip install --quiet {bootstrap_pip}", timeout=self._exec_timeout)
+            if install.exit_code != 0:
+                detail = (install.result or "").strip()
+                msg = f"Bootstrap pip install in the Daytona box failed with code {install.exit_code}:\n{detail}"
+                raise SandboxProvisioningError(msg)
         await sandbox.fs.upload_file(request.model_dump_json().encode("utf-8"), _REMOTE_REQUEST)
         response = await sandbox.process.exec(
             self._build_command(request_remote=_REMOTE_REQUEST, result_remote=_REMOTE_RESULT),
