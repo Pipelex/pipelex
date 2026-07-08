@@ -2,7 +2,19 @@
 
 Detailed design and working plan for master-plan steps 3 (hardened loop — real multi-file targeting) and 4 (agent apply surface — `pipelex-agent fix bundle`), landing together on the stacked branch `feature/Autofix-step4-Agnt-Apply` (base: `feature/Autofix-step2`, PR #1031). Map: [master-plan.md](master-plan.md). Architecture and per-checkpoint findings: [suggested-fixes-design.md](suggested-fixes-design.md).
 
-**Status: DESIGN — not started.** Step 3 must land before step 4 (the CLI pins the loop's result contract in tests; `files_written` and the write-scope bail reasons are step-3 semantics).
+**Status: STEP 3 CODE COMPLETE (2026-07-08) — gates green, CHECKPOINT 1 review NOT yet run.** All step-3 items (D3.1–D3.6) are implemented and pinned; `make agent-check`, `make tb`, and the **full `make agent-test` suite** all pass. Two step-4 preliminaries also landed early (loop `select_codes`/`ignore_codes` + `KNOWN_FIX_CODES`, and the shared bundle-path helper adopted by `validate bundle`). Everything is **uncommitted** on `feature/Autofix-step4-Agnt-Apply` (tip `84d1563b6` = this plan).
+
+**NEXT ACTION (cold start): run CHECKPOINT 1** — fresh-context `/code-review` fan-out on the step-3 diff (the whole uncommitted working tree; user explicitly asked to pause before this review). Fix confirmed bugs, defer tradeoffs to a new `deferred-checkpoint-e-review-items.md`, then proceed to the remaining step-4 tasks below (renderer → command → tests → docs).
+
+### Implementation record (what a cold session needs to know beyond the design)
+
+- **D3.1** — `_backfill_pipe_error_source` in `pipelex/pipeline/validate_bundle.py`, called first thing in the `except PipeValidationError` arm of `_translate_to_validate_bundle_error`. Full-pipe_ref lookup only; miss leaves `file_path=None`. Pins: 3 new pipe-channel tests in `test_validate_bundle_source_threading.py`.
+- **D3.2–D3.5** — `fix_loop.py` was substantially rewritten. Helper names: `_safe_fixes` (SAFE + single-file gate + select/ignore filters), `_partition_by_write_scope`, `_pipe_codes_by_file` (per-file map over entry + resolved dirs, rebuilt per iteration), `_colliding_op_name` + `_split_cross_file_collisions` (per-target), `_fix_target_path` (source → resolved Path, else entry). `FixBundleResult.files_written: list[str]` = **resolved** paths, first-write order, deduped. Out-of-scope bail wording: `fixes target files outside write scope: <paths> — pass their directory with -L/--library-dir to allow writing`. Cross-file bail wording changed to `…would write a pipe code (…) already declared in a sibling bundle` (covers renames AND main_pipe set_keys). Mixed scope proceeds with in-scope fixes (no all-or-nothing).
+- **D3.6 categorizer half** — `_main_pipe_strip_would_retarget` → `_main_pipe_strip_is_safe` (XOR predicate: safe iff exactly one of dotted/bare exists as a `[pipe]` key) in `validation_error_categorizer.py`; call site inverted (`not _main_pipe_strip_is_safe`). Cross-ref comment in `pipelex_bundle_blueprint.py` updated.
+- **D3.6 loop half** — the `main_pipe` `SET_KEY` drop needs only ONE condition (`value in other-file pipe codes`): "paired rename was dropped as colliding" is subsumed, since a rename is dropped iff its `new_key` is declared elsewhere, and that `new_key` equals the `main_pipe` value.
+- **Step-4 early items already DONE**: `fix_bundle_file(..., select_codes=None, ignore_codes=None)` filtering inside `_safe_fixes` + `KNOWN_FIX_CODES` frozenset in `planner.py` (pins: `tests/unit/pipelex/pipeline/fixes/test_fix_loop_select_ignore.py`); shared `pipelex/cli/agent_cli/commands/bundle_path_resolver.py` (`resolve_bundle_target(path, *, library_dir) -> tuple[str, list[str] | None]`) adopted by `validate bundle` verbatim-behavior (its now-stale `# type: ignore[arg-type]` comments removed; validate tests green).
+- **Corruption-regression fixture gotcha**: a dotted `main_pipe = "domain.pipe"` is itself invalid (strip-namespace fires) — multi-file fixtures must use the bare form (`main_pipe` resolution is bundle-local, so bare codes duplicated across domains in sibling files are fine).
+- Unit tests drive the loop with `mocker.patch("pipelex.pipeline.fixes.fix_loop.validate_bundle", side_effect=[...])` and, for ambient-dir cases, patch `...fix_loop.resolve_library_dirs`; pass `max_iterations` explicitly (or patch `...fix_loop.get_config`) to avoid needing a booted config.
 
 ## Scope
 
@@ -66,15 +78,15 @@ Step 3 rewrites exactly the code sites this deferral names, and multi-file write
 
 ### Step-3 tasks (TDD — red tests first per layer)
 
-- [ ] Integration: `test_validate_bundle_source_threading.py` grows pipe-channel assertions — `INADEQUATE_OUTPUT_*` and input-drift errors carry `source` for entry-file and sibling-file pipes; lookup-miss leaves `source` absent.
-- [ ] `validate_bundle.py` funnel backfill (D3.1).
-- [ ] Unit: `is_single_file` derivation cases (`[]` single, `None`+hub-default multi, explicit dirs multi) in `test_fix_loop_multi_file_scoping.py`; loop switch to `resolve_library_dirs` (D3.2).
-- [ ] Unit: write-scope policy — sourced fix under `-L` applies to the declaring sibling; ambient-dir fix excluded with the out-of-scope bail reason (D3.3).
-- [ ] Loop rework: per-file grouping + `files_written` + per-target collision scan rebuilt per iteration (D3.4), with unit pins for grouping and collision.
-- [ ] Integration: `test_fix_convergence_loop.py` multi-file cascade — an error declared in a sibling file is fixed *in the sibling*; both files written and reported; **regression pin for the original corruption scenario** (same pipe code in two domains across two files → the fix patches the declaring file, never the entry file's same-named table).
-- [ ] Config wiring (D3.5) + `make tb` boot check.
-- [ ] Checkpoint-C item 1 pins per the deferral doc's "if revisited" notes: typo'd-tail strip suppressed (file untouched), dotted-declaration path still converges, two-file `main_pipe` `SET_KEY` dropped alongside its blocked rename (D3.6).
-- [ ] `make agent-check` + `make agent-test` green.
+- [x] Integration: `test_validate_bundle_source_threading.py` grows pipe-channel assertions — `INADEQUATE_OUTPUT_*` and input-drift errors carry `source` for entry-file and sibling-file pipes; lookup-miss leaves `source` absent.
+- [x] `validate_bundle.py` funnel backfill (D3.1).
+- [x] Unit: `is_single_file` derivation cases (`[]` single, `None`+hub-default multi, explicit dirs multi) in `test_fix_loop_multi_file_scoping.py`; loop switch to `resolve_library_dirs` (D3.2).
+- [x] Unit: write-scope policy — sourced fix under `-L` applies to the declaring sibling; ambient-dir fix excluded with the out-of-scope bail reason (D3.3).
+- [x] Loop rework: per-file grouping + `files_written` + per-target collision scan rebuilt per iteration (D3.4), with unit pins for grouping and collision.
+- [x] Integration: `test_fix_convergence_loop.py` multi-file cascade — an error declared in a sibling file is fixed *in the sibling*; both files written and reported; **regression pin for the original corruption scenario** (same pipe code in two domains across two files → the fix patches the declaring file, never the entry file's same-named table).
+- [x] Config wiring (D3.5) + `make tb` boot check.
+- [x] Checkpoint-C item 1 pins per the deferral doc's "if revisited" notes: typo'd-tail strip suppressed (file untouched), dotted-declaration path still converges, two-file `main_pipe` `SET_KEY` dropped alongside its blocked rename (D3.6).
+- [x] `make agent-check` + `make agent-test` green (full suite, 2026-07-08).
 
 ### Exit — CHECKPOINT 1 (step-3 exit)
 
@@ -122,8 +134,8 @@ Factor `validate_bundle_cmd`'s path→bundle resolution (`commands/validate/bund
 
 ### Step-4 tasks (TDD)
 
-- [ ] Loop: keyword-only `select_codes`/`ignore_codes` on `fix_bundle_file` + known-codes frozenset beside the planner constants, with unit pins (filtering, unknown code raises at the CLI layer only).
-- [ ] Shared path-resolution helper factored out + adopted by validate (D4.6), validate's existing tests staying green.
+- [x] Loop: keyword-only `select_codes`/`ignore_codes` on `fix_bundle_file` + known-codes frozenset beside the planner constants, with unit pins (filtering, unknown code raises at the CLI layer only). (Landed early, with step 3.)
+- [x] Shared path-resolution helper factored out + adopted by validate (D4.6), validate's existing tests staying green. (Landed early: `commands/bundle_path_resolver.py`.)
 - [ ] Renderer: `fix_render.py` + unit tests (fixed / already-valid / multi-file arms).
 - [ ] Command: `fix/app.py` + `fix/bundle_cmd.py` + registration (D4.1-D4.3), with `tests/unit/pipelex/cli/agent_cli/test_fix_format.py` mirroring `test_validate_format.py` (patched core; both format arms; exit 0/1; `--select`/`--ignore` mutual exclusion and unknown-code rejection).
 - [ ] Integration: `tests/integration/pipelex/cli/test_agent_fix_bundle.py` — the command function against the real loop on `tmp_path` *copies* of fixtures (the command mutates files): fixable bundle → exit 0 + file actually fixed on disk; unfixable → structured error payload; `--select` honored end-to-end.
@@ -141,7 +153,8 @@ The command is shipped on the agent CLI and an agent can run validate → fix �
 - `tests/unit/pipelex/pipeline/fixes/test_fix_loop_multi_file_scoping.py` — resolved-dirs gate, write scope, out-of-scope bail (D3.2, D3.3).
 - `tests/integration/pipelex/pipeline/test_fix_convergence_loop.py` — multi-file cascades, corruption-scenario regression, `files_written` (D3.4).
 - `tests/integration/pipelex/pipeline/test_strip_namespace_enrichment.py` + `tests/unit/pipelex/pipeline/fixes/test_fix_convergence_loop.py` pins for checkpoint-C item 1 (D3.6).
-- `tests/unit/pipelex/pipeline/fixes/test_fix_render.py`, `tests/unit/pipelex/cli/agent_cli/test_fix_format.py`, `tests/integration/pipelex/cli/test_agent_fix_bundle.py`, `tests/e2e/agent_cli/test_fix_bundle.py` — step 4.
+- `tests/unit/pipelex/pipeline/fixes/test_fix_loop_select_ignore.py` — loop `select_codes`/`ignore_codes` pins (step 4, DONE).
+- `tests/unit/pipelex/pipeline/fixes/test_fix_render.py`, `tests/unit/pipelex/cli/agent_cli/test_fix_format.py`, `tests/integration/pipelex/cli/test_agent_fix_bundle.py`, `tests/e2e/agent_cli/test_fix_bundle.py` — step 4 (TODO).
 
 ## Sequencing
 

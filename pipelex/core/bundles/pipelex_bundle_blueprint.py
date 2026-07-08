@@ -39,9 +39,9 @@ def _strippable_same_domain_pipe_code(code: str, *, domain: str | None, existing
     ``existing_pipe_codes`` is supplied — no bare code already occupying that key (the rename would
     collide). ``main_pipe`` passes ``existing_pipe_codes=None``: it is a single value, not a table
     key, and the ``pipe`` field is not yet validated when the ``main_pipe`` validator runs — its
-    collision gate lives in the blueprint categorizer (``_main_pipe_strip_would_retarget``), which
-    holds the raw bundle dict and drops the enrichment when stripping would retarget ``main_pipe``
-    to a different declaration.
+    safety gate lives in the blueprint categorizer (``_main_pipe_strip_is_safe``), which holds the
+    raw bundle dict and drops the enrichment when stripping would retarget ``main_pipe`` to a
+    different declaration or rewrite it to a pipe that does not exist.
     """
     if domain is None or "." not in code:
         return None

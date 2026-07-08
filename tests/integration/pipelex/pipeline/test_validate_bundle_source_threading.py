@@ -1,19 +1,28 @@
-"""Integration: ``validate_bundle`` threads per-content ``mthds_sources`` into ``blueprint.source``.
+"""Integration: ``validate_bundle`` threads a real ``source`` onto its structured errors.
 
-The API submits sourceless bundle text (``mthds_contents: list[str]``), so without
-a per-item source the in-memory load path sets ``blueprint.source = None`` and
-cross-file diagnostics misfire. ``validate_bundle(mthds_sources=...)`` pairs each
-content with its logical source, so the loaded blueprint — and any
-``ValidateBundleError`` it raises — carries a real ``source`` the consumer can map
-to the owning file. The CLI's on-disk path keeps using real file paths and is
-unaffected.
+Two channels are pinned here:
+
+- The API submits sourceless bundle text (``mthds_contents: list[str]``), so without
+  a per-item source the in-memory load path sets ``blueprint.source = None`` and
+  cross-file diagnostics misfire. ``validate_bundle(mthds_sources=...)`` pairs each
+  content with its logical source, so the loaded blueprint — and any
+  ``ValidateBundleError`` it raises — carries a real ``source`` the consumer can map
+  to the owning file. The CLI's on-disk path keeps using real file paths and is
+  unaffected.
+- Pipe-channel errors (``PipeValidationError`` raised during library validation)
+  don't know their file at the raise site; the translate funnel backfills
+  ``file_path`` from the library manager's pipe-source map (keyed by the full
+  ``domain.pipe_code`` ref) so the categorized item — and the suggested fix riding
+  it — names the declaring ``.mthds`` file even in multi-file libraries.
 """
 
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 
-from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory
+from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 
@@ -44,6 +53,51 @@ domain = "testapp"
 [concept.Customer
 description = "the table header above is never closed"
 """
+
+# Deliberate INADEQUATE_OUTPUT_MULTIPLICITY: the sequence declares a single Idea while its last
+# step yields a list — a pipe-channel error raised during library validation, far from any file.
+_ENTRY_SEQ_MISMATCH_MTHDS = """domain = "srcthread_entry"
+main_pipe = "list_ideas"
+
+[concept]
+Idea = "An idea."
+
+[pipe.gen_ideas]
+type = "PipeLLM"
+description = "Generate ideas."
+inputs = { topic = "Text" }
+output = "Idea[]"
+prompt = "Generate ideas about $topic"
+
+[pipe.list_ideas]
+type = "PipeSequence"
+description = "Sequence declaring a single output while the last step yields a list."
+inputs = { topic = "Text" }
+output = "Idea"
+steps = [
+  { pipe = "gen_ideas", result = "ideas" },
+]
+"""
+
+# Same deliberate mismatch, declared by a *sibling* library file (different domain), so the
+# pipe-channel error must carry the sibling's path — not the entry file's.
+_SIBLING_SEQ_MISMATCH_MTHDS = _ENTRY_SEQ_MISMATCH_MTHDS.replace("srcthread_entry", "srcthread_sibling")
+
+_VALID_ENTRY_MTHDS = """domain = "srcthread_valid"
+main_pipe = "say_hi"
+
+[pipe.say_hi]
+type = "PipeLLM"
+description = "Say hi."
+output = "Text"
+prompt = "Say hi"
+"""
+
+
+def _pipe_channel_items(exc: ValidateBundleError, *, error_type: PipeValidationErrorType) -> list[ValidationErrorItem]:
+    report = exc.to_error_report()
+    assert report.validation_errors is not None
+    return [item for item in report.validation_errors if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type == error_type]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -116,3 +170,76 @@ class TestValidateBundleSourceThreading:
         load_empty_library()
         with pytest.raises(PipelexUnexpectedError, match="must be a per-item source list matching mthds_contents"):
             await validate_bundle(mthds_contents=[_VALID_MTHDS], mthds_sources=["a.mthds", "b.mthds"])
+
+    async def test_pipe_channel_error_carries_entry_file_source(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A pipe-channel error on an entry-file pipe carries the entry file as ``source``.
+
+        The raise site (``PipeSequence.validate_output_with_library``) doesn't know the file;
+        the translate funnel must backfill it from the library manager's pipe-source map so the
+        suggested fix riding the item is addressable to a file.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_ENTRY_SEQ_MISMATCH_MTHDS, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        items = _pipe_channel_items(exc_info.value, error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY)
+        assert items, "expected a pipe-channel INADEQUATE_OUTPUT_MULTIPLICITY item"
+        for item in items:
+            assert item.source is not None, "pipe-channel item must carry the declaring file as source"
+            assert Path(item.source).resolve() == bundle_path.resolve()
+            assert item.suggested_fix is not None
+            assert item.suggested_fix.source == item.source
+
+    async def test_pipe_channel_error_carries_sibling_file_source(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A pipe-channel error on a pipe declared by a sibling library file names the sibling.
+
+        This is what makes multi-file fix targeting possible: the fix must patch the declaring
+        file, never the entry file's same-named table.
+        """
+        load_empty_library()
+        bundle_path = tmp_path / "entry.mthds"
+        bundle_path.write_text(_VALID_ENTRY_MTHDS, encoding="utf-8")
+        libs_dir = tmp_path / "libs"
+        libs_dir.mkdir()
+        sibling_path = libs_dir / "sibling.mthds"
+        sibling_path.write_text(_SIBLING_SEQ_MISMATCH_MTHDS, encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path, library_dirs=[libs_dir])
+
+        items = _pipe_channel_items(exc_info.value, error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY)
+        assert items, "expected a pipe-channel INADEQUATE_OUTPUT_MULTIPLICITY item"
+        for item in items:
+            assert item.source is not None, "sibling-declared pipe error must carry the sibling file as source"
+            assert Path(item.source).resolve() == sibling_path.resolve()
+            assert item.suggested_fix is not None
+            assert item.suggested_fix.source == item.source
+
+    async def test_pipe_channel_lookup_miss_leaves_source_absent(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """When the pipe-source map has no entry (sourceless in-memory content), ``source`` stays unset.
+
+        The backfill must only set what it can prove — a lookup miss falls back to the source-less
+        conservative path, never a guess.
+        """
+        load_empty_library()
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[_ENTRY_SEQ_MISMATCH_MTHDS])
+
+        items = _pipe_channel_items(exc_info.value, error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY)
+        assert items, "expected a pipe-channel INADEQUATE_OUTPUT_MULTIPLICITY item"
+        for item in items:
+            assert item.source is None

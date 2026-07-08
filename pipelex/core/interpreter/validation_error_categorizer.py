@@ -66,24 +66,30 @@ def _extract_wrapped_invalid_pipe_code_syntax_error(error: ErrorDetails) -> Inva
     return None
 
 
-def _main_pipe_strip_would_retarget(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
-    """Whether stripping ``main_pipe`` would silently retarget it to a different declaration.
+def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
+    """Whether stripping ``main_pipe`` is provably safe at the document level.
 
     The ``main_pipe`` raise site runs before the ``pipe`` field validates, so it cannot see the
     declarations — this categorizer can (it holds the raw bundle dict), making it the document-level
-    gate the raise site cannot be. When BOTH the offending dotted code and its bare form exist as
-    declaration keys, the dotted declaration's own rename is collision-blocked, and stripping
-    ``main_pipe`` would flip it from the dotted declaration the author referenced to the unrelated
-    bare one — so the enrichment is suppressed and the ambiguity left to a human.
+    gate the raise site cannot be. The strip is safe iff EXACTLY ONE of the two codes exists as a
+    declaration key:
 
-    When the dotted code is NOT itself a declaration key, ``main_pipe`` is an over-qualified
-    *reference* (a same-domain qualified ref resolves to the bare pipe), so stripping stays safe.
+    - Only the bare tail exists: ``main_pipe`` is an over-qualified *reference* (a same-domain
+      qualified ref resolves to the bare pipe), so stripping just normalizes the spelling.
+    - Only the dotted code exists: its paired strip-namespace rename will materialize the bare
+      target, so the strip converges with it (the loop's cross-file collision split still drops
+      the pair together when a sibling file blocks the rename).
+    - Both exist: the dotted declaration's own rename is collision-blocked, and stripping
+      ``main_pipe`` would silently retarget it from the dotted declaration the author referenced
+      to the unrelated bare one — suppressed, ambiguity left to a human.
+    - Neither exists (typo'd tail): stripping would rewrite ``main_pipe`` to a pipe that does not
+      exist — a SAFE-labeled fix mutating the file while the bundle stays invalid — suppressed.
     """
     raw_pipe = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD)
     if not isinstance(raw_pipe, dict):
         return False
     pipe_keys = {key for key in cast("dict[Any, Any]", raw_pipe) if isinstance(key, str)}
-    return offending_code in pipe_keys and stripped_code in pipe_keys
+    return (offending_code in pipe_keys) != (stripped_code in pipe_keys)
 
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
@@ -361,14 +367,15 @@ def categorize_blueprint_validation_error(
     # the field). The bare ``ValueError`` path (malformed codes, cross-package refs) still falls
     # through to the message-matching ``_categorize_syntax_validation_error`` → unfixable.
     #
-    # The ``main_pipe`` raise site cannot collision-gate (the ``pipe`` field validates after it),
-    # so that gate lives here, on the raw bundle dict: a strip that would retarget ``main_pipe``
-    # to a different declaration keeps its category but loses the enrichment → no fix is planned.
+    # The ``main_pipe`` raise site cannot see the declarations (the ``pipe`` field validates after
+    # it), so the safety gate lives here, on the raw bundle dict: a strip that would retarget
+    # ``main_pipe`` to a different declaration, or rewrite it to a pipe that does not exist,
+    # keeps its category but loses the enrichment → no fix is planned.
     wrapped_invalid_pipe_code = _extract_wrapped_invalid_pipe_code_syntax_error(error)
     if wrapped_invalid_pipe_code is not None:
         is_main_pipe = bool(loc) and loc[0] == PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD
         stripped_pipe_code: str | None = wrapped_invalid_pipe_code.stripped_code
-        if is_main_pipe and _main_pipe_strip_would_retarget(
+        if is_main_pipe and not _main_pipe_strip_is_safe(
             offending_code=wrapped_invalid_pipe_code.offending_code,
             stripped_code=wrapped_invalid_pipe_code.stripped_code,
             blueprint_dict=blueprint_dict,
