@@ -265,6 +265,14 @@ class ValidationErrorCategory(StrEnum):
     PIPE_VALIDATION = "pipe_validation"
     DRY_RUN = "dry_run"
 
+    @property
+    def is_dry_run(self) -> bool:
+        match self:
+            case ValidationErrorCategory.DRY_RUN:
+                return True
+            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
+                return False
+
 
 class ValidationErrorItem(BaseModel):
     """One structured bundle-validation error, projected onto the error wire.

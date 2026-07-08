@@ -1,0 +1,13 @@
+domain    = "nativefix_inline"
+main_pipe = "make_note"
+
+[concept]
+# A real, non-native concept — must survive the fix untouched.
+Note = "A short note."
+
+[pipe.make_note]
+type        = "PipeLLM"
+description = "Make a note."
+inputs      = { topic = "Text" }
+output      = "Note"
+prompt      = "Write a note about $topic"

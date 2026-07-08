@@ -18,7 +18,7 @@ is no import cycle.
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.pipeline.fixes.planner import plan_fix_for_pipe_validation_error
+from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
 
 
 def build_validation_error_items(
@@ -90,6 +90,7 @@ def build_validation_error_items(
                 source=blueprint_error.source,
                 variable_names=blueprint_error.variable_names or None,
                 message=blueprint_error.message,
+                suggested_fix=plan_fix_for_blueprint_validation_error(blueprint_error),
             )
         )
 

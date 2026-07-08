@@ -8,6 +8,12 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 **Step 1 (spike) is DONE** — PR #1027 vs dev, merge-ready. The full chain is proven on one rule (`match-sequence-output`): enriched typed error → planner → tomlkit applier → convergence loop, all TDD, golden format-preservation tests pinning tomlkit's in-place style preservation. The `suggested_fix` payload already rides `pipelex-agent validate bundle --format json` and the `/validate` API 422 body, because the planner hooks into the one shared `build_validation_error_items` builder. Checkpoint findings are recorded in the design doc; deliberate deferrals in [deferred-checkpoint-0-review-items.md](deferred-checkpoint-0-review-items.md).
 
+**Step 2 (wave-1 rule breadth) is DONE** — on the stacked branch `feature/Autofix-step2` (PR #1031). All three wave-1 rules landed, each a deliberately different fix *shape*: `sync-controller-inputs` (multi-op in-place table sync, Phase A), `strip-native-concept-redecl` (delete-shaped, first blueprint channel, Phase B), and the stretch `strip-namespace` (position-preserving rename, Phase C — **GO, shipped**). Mid-step, Phase A′ swapped the applier's hand-rolled canonicalization for the in-process `pipelex_tools.format_mthds` backend (core runtime dep). **Abstraction verdict (CHECKPOINT 1): `SuggestedFix`/`FixOp` survived all four shapes with no structural change** — the only wire-level edit was widening `TomlValue` (the type of `FixOp.value`) to admit a flat scalar dict; the feared array-of-tables `table_path` extension was never needed. Full verdict + carried-forward warts in the design doc's "Step-2 exit — abstraction verdict" section; per-checkpoint deferrals in `deferred-checkpoint-{a,a-prime,b,c,d}-review-items.md`. Reviewer's guide: [step2-reviewers-guide.md](step2-reviewers-guide.md) (archived from the worktree-root `TODOS.md`).
+
+**Steps 3 (hardened loop) and 4 (agent apply surface) are DONE** — merged together as PR #1035 (`feature/Autofix-step4-Agnt-Apply`). Step 3 replaced the spike's drop-everything scoping guard with real multi-file targeting (source backfill at the translate funnel, resolved-dirs single-file gate, write-scope policy, per-file apply with `files_written`); step 4 shipped `pipelex-agent fix bundle` with the CLI-free markdown renderer and full test coverage. The PR review triage fixed two confirmed bugs and deferred one inert finding to [pr-1035-review-notes.md](pr-1035-review-notes.md).
+
+**Step 5 (human CLI surfacing) is DONE** — `pipelex fix bundle` (including the `--diff` preview), the `💡 Suggested fix:` lines + actionable footer in `pipelex validate`, docs, and changelog all landed on branch `feature/Autofix-step5`; detailed plan + decisions: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). The CHECKPOINT B exit review fixed five confirmed bugs on the branch and deferred five tradeoffs — triage in [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md). The branch is PR-ready; **step 6 (release train) is next**, and its CHANGELOG must still name the additive `suggested_fix` wire field in `/validate` payloads (deferred item 1c) plus regenerate the conformance fixture (deferred item 2).
+
 ## Sequencing doctrine (decided 2026-07-07)
 
 - **The agent surface is the proving ground.** Agent JSON output and tests are where the `SuggestedFix`/`FixOp` shape gets iterated freely — machine consumers we control, no format freeze. This is D3 operationalized.
@@ -23,9 +29,9 @@ Deterministic auto-fixing of `.mthds` validation errors. Full rationale and arch
 
 One rule through all layers, no CLI command, driven by tests. Exit criteria met: chain proven, format preservation demonstrated by golden tests, design doc updated with findings. Reviewer's guide: [spike-reviewers-guide.md](spike-reviewers-guide.md).
 
-### 2. Wave-1 rule breadth — stress the abstraction *(NEXT)*
+### 2. Wave-1 rule breadth — stress the abstraction — **DONE (PR #1031)**
 
-Detailed implementation plan with progress checkboxes: [`TODOS.md`](../../TODOS.md) at the worktree root.
+Detailed implementation plan with progress checkboxes: was `TODOS.md` at the worktree root, now archived as [step2-reviewers-guide.md](step2-reviewers-guide.md).
 
 Add the remaining wave-1 rules, in this order (each is a different fix *shape*, which is the point):
 
@@ -33,22 +39,28 @@ Add the remaining wave-1 rules, in this order (each is a different fix *shape*, 
 - **`strip-native-concept-redecl`** — blueprint-level error for a redeclared native concept → `delete_table` / `delete_key` for `[concept.X]` or inline `concept.X = "..."`. First *blueprint-channel* fix (the spike only enriched the pipe-validation channel) and first delete-shaped fix in production.
 - **`strip-namespace` (stretch)** — same-domain dotted pipe codes → position-preserving rename + rewrite of internal refs (`steps`, `branches`, `branch_pipe_code`, `outcomes`, `default_outcome`, `main_pipe`). Gated on **position-preserving rename mechanics** in tomlkit (the old branch's `del`+re-add reordering bug is the thing to avoid); if rename doesn't land clean, this rule stays out of wave 1. When rename lands, also add `new_key` to the loop fingerprint (deferred item 1b).
 
-Exit (**CHECKPOINT 1**): all wave-1 rules green with planner suppression tests + golden format-preservation tests; an explicit **abstraction verdict** recorded in the design doc — did `SuggestedFix`/`FixOp` survive multi-op, delete, and blueprint-channel fixes unchanged, or what had to bend? Decision on strip-namespace recorded.
+Exit (**CHECKPOINT 1**) — **met:** all wave-1 rules green with planner suppression tests + golden format-preservation tests; the explicit **abstraction verdict** is recorded in the design doc ("Step-2 exit — abstraction verdict") — `SuggestedFix`/`FixOp` survived multi-op, delete, blueprint-channel, **and** rename fixes with no structural change (only an additive `TomlValue` widening). **strip-namespace decision: GO — shipped** (position-preserving rename via tomlkit's `Container._replace`; `RENAME_TABLE_KEY` proven end-to-end; the array-of-tables `table_path` extension it was gated on turned out never to be needed).
 
 ### 3. Hardened loop — real multi-file targeting
 
+Detailed design + working plan (shared with step 4): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md), on the stacked branch `feature/Autofix-step4-Agnt-Apply`.
+
 Replaces the spike's conservative scoping guard (source-less fixes are simply dropped under `library_dirs`). Deferred items 0 and 1 from checkpoint 0:
 
-- Thread the declaring file into enriched errors — set `file_path` at the raise sites (or carry a domain qualifier the loop checks against the target file's `domain` key), so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
+- Thread the declaring file into enriched errors — set `file_path` or better yet `source` at the raise sites, so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
 - Derive `is_single_file` from the **resolved** effective dirs (`resolve_library_dirs`), fixing both wrong directions of the current raw-arg check (`[]` is documented single-file but treated as multi; `None` can fall through to hub defaults/`PIPELEXPATH` and load other files while being treated as single).
 
-Can start in parallel with step 2 once its shape is clear, but ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
+Ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
 
 ### 4. Agent apply surface — `pipelex-agent fix bundle`
 
+Detailed design + working plan (shared with step 3): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md).
+
 Thin command over `fix_bundle_file`: two-stream output per the workspace output conventions (`--format`/`--error-format`, JSON contract carrying `FixBundleResult` — is_valid, iterations, fixes_applied, remaining_errors, bail_reason; markdown rendering for the agent as presentation). e2e CLI snapshot tests. This is the milestone where an agent can run validate → fix → re-validate entirely from the CLI. Exit: command shipped on the agent CLI, snapshots green.
 
-### 5. Human CLI surfacing — gated on steps 2 + 4
+### 5. Human CLI surfacing — gated on steps 2 + 4 — **DONE (branch `feature/Autofix-step5`, PR-ready)**
+
+Detailed implementation plan with progress checkboxes: [step5-human-cli-surfacing.md](step5-human-cli-surfacing.md). Checkpoint B triage: [deferred-checkpoint-e-review-items.md](deferred-checkpoint-e-review-items.md).
 
 Both gates from the sequencing doctrine are now met. Two pieces, landed together for symmetry:
 

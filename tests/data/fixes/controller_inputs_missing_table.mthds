@@ -1,0 +1,23 @@
+# Golden fixture for the sync-controller-inputs applier test (no inputs declared at all).
+# The fix creates the whole `inputs` mapping as one inline table.
+domain    = "inputsfix_golden_missing"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary of a text."
+
+[pipe.write_summary]
+type        = "PipeLLM"
+description = "Summarize the text."
+inputs      = { text = "Text" }
+output      = "Summary"
+prompt      = "Summarize $text"
+
+# The sequence below forgot to declare its inputs.
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Sequence that declares no inputs."
+output = "Summary"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]
