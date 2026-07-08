@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
+from pipelex.cli.commands.fix.app import fix_app
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
@@ -31,6 +32,7 @@ _CORE_COMMAND_ORDER: list[str] = [
     "update",
     "build",
     "validate",
+    "fix",
     "run",
     "graph",
     "show",
@@ -226,6 +228,11 @@ app.add_typer(
     validate_app,
     name="validate",
     help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
+)
+app.add_typer(
+    fix_app,
+    name="fix",
+    help="Apply deterministic safe fixes to a bundle (.mthds) and re-validate until valid",
 )
 app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")

@@ -1,18 +1,48 @@
-"""Shared path→bundle resolution for agent CLI bundle commands.
+"""Path-to-bundle resolution for agent CLI bundle commands.
 
 ``validate bundle`` and ``fix bundle`` must resolve the user's ``path`` argument identically —
-fix must patch exactly the file validate judged. One helper owns the resolution: a ``.mthds``
-file is taken as-is; a directory auto-detects the default bundle file name (or a single
-``*.mthds``), errors loudly on ambiguity, and injects itself into the library dirs (making it
-part of the per-call write scope). Adoption by ``run bundle`` / ``inputs bundle`` is a
-follow-up.
+fix must patch exactly the file validate judged. The shared core owns the filesystem
+decision-making; this wrapper owns agent error envelopes.
 """
 
 from pathlib import Path
+from typing import NoReturn
 
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.cli.bundle_target_resolution import (
+    BundleTargetResolutionError,
+    BundleTargetResolutionErrorKind,
+    BundleTargetResolutionSuccess,
+    resolve_bundle_target_core,
+)
+
+
+def _stringify_library_dirs(library_dirs: list[Path] | None) -> list[str] | None:
+    if library_dirs is None:
+        return None
+    return [str(library_dir) for library_dir in library_dirs]
+
+
+def _handle_resolution_error(error: BundleTargetResolutionError) -> NoReturn:
+    match error.kind:
+        case BundleTargetResolutionErrorKind.NO_MTHDS_FILE:
+            agent_error(f"No .mthds bundle file found in directory '{error.input_path}'", error_type="FileNotFoundError", exit_code=2)
+        case BundleTargetResolutionErrorKind.AMBIGUOUS_MTHDS_FILES:
+            mthds_names = ", ".join(mthds_file.name for mthds_file in error.candidate_files)
+            agent_error(
+                f"Multiple .mthds files found in '{error.input_path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
+                f"Pass the .mthds file directly instead.",
+                error_type="ArgumentError",
+                exit_code=2,
+            )
+        case BundleTargetResolutionErrorKind.NOT_BUNDLE_TARGET:
+            agent_error(
+                f"'{error.input_path}' is not a .mthds file or directory. "
+                f"Use 'validate pipe <code>' for pipe codes, or 'validate bundle <path>' for .mthds files/directories.",
+                error_type="ArgumentError",
+                exit_code=2,
+            )
 
 
 def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> tuple[str, list[str] | None]:
@@ -34,42 +64,8 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> tuple[
         ``(bundle_path, library_dir)`` — the resolved bundle file path, and the possibly
         directory-augmented library dirs (``None`` when none apply).
     """
-    # Expand ``~`` up front so home-relative inputs resolve like every other CLI path arg. Library
-    # dirs are expanded first so the directory-mode membership check below compares like-for-like.
-    library_dir = [str(Path(lib_dir).expanduser()) for lib_dir in library_dir] if library_dir else None
-    target_path = Path(path).expanduser()
+    result = resolve_bundle_target_core(path, library_dir=library_dir)
+    if isinstance(result, BundleTargetResolutionSuccess):
+        return str(result.bundle_path), _stringify_library_dirs(result.library_dirs)
 
-    if target_path.is_dir():
-        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
-        if bundle_file.is_file():
-            bundle_path = str(bundle_file)
-        else:
-            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
-            if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError", exit_code=2)
-            if len(mthds_files) > 1:
-                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                agent_error(
-                    f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                    f"Pass the .mthds file directly instead.",
-                    error_type="ArgumentError",
-                    exit_code=2,
-                )
-            bundle_path = str(mthds_files[0])
-
-        target_dir_str = str(target_path)
-        if library_dir is None:
-            library_dir = [target_dir_str]
-        elif target_dir_str not in library_dir:
-            library_dir = [target_dir_str, *library_dir]
-        return bundle_path, library_dir
-
-    if is_pipelex_file(target_path):
-        return str(target_path), library_dir
-
-    agent_error(
-        f"'{path}' is not a .mthds file or directory. "
-        f"Use 'validate pipe <code>' for pipe codes, or 'validate bundle <path>' for .mthds files/directories.",
-        error_type="ArgumentError",
-        exit_code=2,
-    )
+    _handle_resolution_error(result)

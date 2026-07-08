@@ -5,6 +5,17 @@
 ### Added
 
 - **Agent bundle fixer:** Added `pipelex-agent fix bundle`, a deterministic in-place fixer over the shared validation fix loop. The command supports `--format`/`--error-format`, repeatable `--select`/`--ignore` fix-rule filters, `--allow-signatures`, `--max-iterations`, and the same bundle-file or directory resolution as `pipelex-agent validate bundle`. Successful fix results report `pending_signatures` and `is_runnable`; by default the command exits non-zero when a fixed bundle remains valid-but-not-runnable.
+- **Human bundle fixer:** Added `pipelex fix bundle`, the human counterpart of the agent fixer over the same fix loop, with Rich-rendered output naming every change made (fix descriptions, files written, iteration count), the same `--select`/`--ignore`/`--allow-signatures`/`--max-iterations` options, and the same bundle-file or directory resolution as `pipelex validate bundle`. A new `--diff` flag previews the changes as a unified diff without writing anything — the real fix loop runs against a temp-copy sandbox, and exit codes keep the verdict semantics so `--diff` answers "would it converge?".
+- **Suggested fixes surfaced in `pipelex validate`:** When a validation error has a deterministic safe fix, the human error output now shows a per-error `💡 Suggested fix:` line and ends with an actionable footer naming the exact `pipelex fix bundle` command (echoing the invocation's `-L` dirs) in place of the generic tip.
+
+### Changed
+
+- **Human validation error rendering routed through the shared structured items:** `pipelex validate`'s error details now render from the same `ValidationErrorItem`s the agent CLI and API emit, which surfaces information the old renderer silently dropped: pipe-factory errors (e.g. an unknown concept) get their own section, a parse-level failure (e.g. a TOML syntax error) now shows its message instead of no detail at all, and pipe validation errors name their source file. The dry-run message remains visible alongside categorized errors.
+
+### Fixed
+
+- **Human CLI `~` expansion:** `pipelex validate bundle` (and the new `pipelex fix bundle`) now expand `~` in the bundle path and `-L/--library-dir` values, matching the agent CLI.
+- **Validate telemetry label:** the `CLI_COMMAND` telemetry tag for `pipelex validate` subcommands no longer double-suffixes (previously "validate bundle bundle").
 
 ## [v0.38.0] - 2026-07-06
 

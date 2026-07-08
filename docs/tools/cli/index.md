@@ -16,6 +16,7 @@ The Pipelex CLI is organized into several command groups:
 | [**init**](init.md) | Initialize Pipelex configuration |
 | [**update**](update.md) | Refresh the model deck to match the installed pipelex version |
 | [**validate**](validate.md) | Validate configuration and pipelines |
+| [**fix**](fix.md) | Apply deterministic safe fixes to a bundle and re-validate |
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
@@ -44,6 +45,7 @@ Package manifest management currently lives in the `mthds` CLI:
 
     - Write or generate pipelines in `.mthds` files
     - Validate with `pipelex validate pipe your_pipe_code` or `pipelex validate bundle your_bundle.mthds` during development
+    - When validation errors carry a `💡 Suggested fix:` line, apply them automatically with `pipelex fix bundle your_bundle.mthds`
     - Run `pipelex validate pipe --all` before committing changes
 
 3. **Running Pipelines**

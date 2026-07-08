@@ -21,6 +21,7 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 | **`pipelex doctor`** | Check configuration health and suggest fixes |
 | **`pipelex build`** | AI-powered method generation from natural language requirements |
 | **`pipelex validate`** | Check pipeline syntax, structure, and run dry-run validation |
+| **`pipelex fix`** | Apply deterministic safe fixes to a bundle and re-validate (with `--diff` preview) |
 | **`pipelex run`** | Execute pipelines from bundle files or libraries |
 | **`pipelex graph`** | Generate and render execution graphs |
 | **`pipelex show`** | Display configuration, pipes, and list AI models |
@@ -49,6 +50,7 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `init` | Non-interactive configuration setup (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `run` | Execute a pipeline (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `validate` | Validate pipes, bundles, or methods (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
+| `fix` | Apply deterministic safe fixes to a bundle in place and re-validate (`--format markdown\|json` success, default: markdown; `--error-format` for errors, defaults to `--format`'s value) |
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
