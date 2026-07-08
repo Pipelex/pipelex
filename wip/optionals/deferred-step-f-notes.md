@@ -8,11 +8,24 @@ Found while ground-truthing the `optional_input_unguarded` conformance fixture. 
 
 ## Conformance optionals coverage is pinned ahead of the runtime — remove the gates at release
 
-All new conformance coverage (the `CATEGORIZED_VALIDATION_ITEMS` rows, `tests/pipelex_api/test_validate_optionals.py`, `tests/pipelex_api/test_validate_warnings.py`, `tests/pipelex_agent/test_validate_optionals.py`, and the QA-corpus cases) is gated on `OPTIONALS_PENDING_FEATURE` because the sibling venvs (`pipelex/.venv`, `pipelex-api/.venv`) run the released pipelex without optionals. The gated CLI-arm coverage has been validated LIVE against this branch via `CONFORMANCE_CLI_PIPELEX_AGENT=$workspace/_optionals/.venv/bin/pipelex-agent` (all categorized rows + both warnings tests pass, zero skips), so the gates are known non-vacuous. Once a pipelex release with optionals ships **and** pipelex-api re-pins to it:
+**DONE** (pipelex 0.38.0 + pipelex-api 0.8.0). The gate-removal checklist below was executed against the released runtimes. `OPTIONALS_PENDING_FEATURE` is gone; all six optionals QA cases + the categorized rows + the warnings tests are ungated and pass on both arms (agent-CLI and hosted HTTP), zero skips. The generic gate infrastructure (`pending_feature_skip_reason` / `runtime_supports_case` and the `pending_runtime_feature` field) was kept — it is independently harness-tested and still live for the `pipelex#996` QA gate, so it stays as dormant, reusable infra (no row/case sets it for optionals anymore).
 
-1. remove `pending_runtime_feature=OPTIONALS_PENDING_FEATURE` from the table rows and QA cases (the documented marker-removal policy),
-2. run `make validate-error-qa` in `conformance/` to generate the committed artifacts for the six new cases,
-3. drop the probe-skips if desired (they self-deactivate, but the gate comments say to remove them so regressions become visible).
+Two things came along for free with the same 0.35→0.38 pin bump and were reconciled in the same pass (they are NOT optionals):
+
+- **PipeSignature-tag retirement.** 0.38.0 rejects `type = "PipeSignature"` (`unknown_pipe_type`, "no longer a pipe type"); a signature is now a **type-less** pipe (no `type`, no implementation). The stale fixtures `pending_signature_bundle.mthds`, `valid-error-qa/cases/valid_pending_signature.mthds`, and the inline `_SIG_BUNDLE` in `tests/pipelex/test_validate_all.py` were modernized to type-less. The shipped verdict contract was confirmed and kept: a pending signature is `is_valid=true` in BOTH strict and `--allow-signatures` modes, gated only via exit code (strict→1, `--allow-signatures`→0) — `is_valid` ≠ `is_runnable`.
+- **Benign 0.38.0 corpus wording refreshes** in a few unrelated cases (`invalid_unresolved_concept*`, `valid_no_main_pipe`, `valid_runnable`) — verdict/category/error_type unchanged (the generator drift-check passes), only message wording.
+
+Open follow-ups surfaced (NOT done here — flagged to route):
+
+- **plxt/vscode-pipelex schema propagation.** pipelex 0.38.0's regenerated schema DOES carry `PipeSignatureBlueprint` (type-less, no required `type`), but the plxt-bundled schema is stale and rejects type-less bundles — an `mthds-schema-sync` propagation item (cross-repo wave).
+- **`pipelex#996` QA gate is now stale.** 0.38.0 emits `blueprint_validation / batch_item_name_collision` structured, so `invalid_batch_item_name_collision`'s `pending_runtime_feature="pipelex#996"` gate is dormant; per the marker-removal policy it should be dropped to close the invisible-regression window.
+- **`-L` directory-load path drops structured `error_type` for static-pass validators.** `library_manager.py:824` (`except ValidationError`) stringifies static-pass `PipeValidationError`s (e.g. `optional_output_required`, `optional_input_unguarded`) instead of categorizing them, so a `-L`-loaded bundle degrades to an uncategorized `blueprint_validation` residual — whereas single-file CLI and HTTP `mthds_contents` both categorize correctly. Latent pipelex bug (pre-existing, predates optionals), independent of this task.
+
+### The checklist as executed
+
+1. removed `pending_runtime_feature=OPTIONALS_PENDING_FEATURE` from the table rows and QA cases (the documented marker-removal policy),
+2. ran `make validate-error-qa` in `conformance/` to generate the committed artifacts for the six new cases,
+3. dropped the optionals-specific probe-skips (conftest `is_valid` probe → hard assert; agent `exit_code` probe → removed) so regressions become visible.
 
 ## PipeBatch compaction does not ledger the dropped branches (PipeParallel does)
 
