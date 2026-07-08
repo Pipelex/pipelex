@@ -39,6 +39,8 @@ Exit (**CHECKPOINT 1**) — **met:** all wave-1 rules green with planner suppres
 
 ### 3. Hardened loop — real multi-file targeting
 
+Detailed design + working plan (shared with step 4): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md), on the stacked branch `feature/Autofix-step4-Agnt-Apply`.
+
 Replaces the spike's conservative scoping guard (source-less fixes are simply dropped under `library_dirs`). Deferred items 0 and 1 from checkpoint 0:
 
 - Thread the declaring file into enriched errors — set `file_path` or better yet `source` at the raise sites, so `SuggestedFix.source` is actually populated and the loop's file check stops being dead code.
@@ -47,6 +49,8 @@ Replaces the spike's conservative scoping guard (source-less fixes are simply dr
 Ships behind CHECKPOINT 1. Exit: fixes apply correctly across multi-file bundles, targeting the declaring file only; the drop-everything guard is gone.
 
 ### 4. Agent apply surface — `pipelex-agent fix bundle`
+
+Detailed design + working plan (shared with step 3): [step3-step4-hardened-loop-and-agent-apply.md](step3-step4-hardened-loop-and-agent-apply.md).
 
 Thin command over `fix_bundle_file`: two-stream output per the workspace output conventions (`--format`/`--error-format`, JSON contract carrying `FixBundleResult` — is_valid, iterations, fixes_applied, remaining_errors, bail_reason; markdown rendering for the agent as presentation). e2e CLI snapshot tests. This is the milestone where an agent can run validate → fix → re-validate entirely from the CLI. Exit: command shipped on the agent CLI, snapshots green.
 
