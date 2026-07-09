@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
-from pipelex.pipe_operators.func.pipe_func_execution_transport import PipeFuncExecutionRequest
+from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
 
 
 def main() -> None:

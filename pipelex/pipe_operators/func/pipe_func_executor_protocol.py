@@ -8,8 +8,9 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 if TYPE_CHECKING:
-    # Guarded to avoid a cycle: the transport module imports PipeFuncExecutionResult from here.
-    from pipelex.pipe_operators.func.pipe_func_execution_transport import PipeFuncExecutionRequest, PipeFuncExecutionResponse
+    # Import from the LEAF dtos module (not the transport builder module, which reaches the hub) so the
+    # transported-seam annotation below does not close an import cycle through the hub.
+    from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 
 
 class PipeFuncExecutionResult(BaseModel):

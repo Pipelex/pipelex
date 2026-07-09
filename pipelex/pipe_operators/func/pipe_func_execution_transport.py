@@ -1,61 +1,20 @@
-from typing import Any
-
-from pydantic import BaseModel, ConfigDict, Field
-
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.hub import get_current_library, get_library_manager
-from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
+from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
+    DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
+    PipeFuncExecutionRequest,
+    PipeFuncExecutionResponse,
+)
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
-# Runaway-code guard: how long a single PipeFunc may run out-of-process before it is killed. Lives on
-# the request (not a process-wide setting) so it can vary per run — e.g. by the user's plan. 5s
-# default; the caller may raise it for a higher tier.
-DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS = 5.0
-
-
-class PipeFuncExecutionRequest(BaseModel):
-    """Everything needed to run ONE PipeFunc out-of-process, and nothing else.
-
-    The generic transport primitive for out-of-process PipeFunc execution — sibling to the
-    runtime-bridge serialization, carrying only open pipelex types. A backend (a sandbox box, a local
-    subprocess) runs it and returns a ``PipeFuncExecutionResponse``; a host runtime (a Temporal
-    activity) forwards it across its boundary. Carries the crate (which includes ``python_sources`` —
-    the customer's .py to register wherever it runs), the transported working memory (the function's
-    inputs), and the identity of the pipe/function to run. Deliberately carries NO secrets.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    crate: LibraryCrate
-    working_memory_raw: dict[str, Any]
-    pipe_code: str
-    function_name: str
-    job_metadata: JobMetadata
-    pipe_run_params: PipeRunParams
-    timeout_seconds: float = Field(
-        default=DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
-        gt=0,
-        description="Max wall-clock seconds the PipeFunc may run before it is killed (plan-dependent).",
-    )
-
-
-class PipeFuncExecutionResponse(BaseModel):
-    """The out-of-process outcome: the output as a transported working memory (main stuff = the output).
-
-    Transporting the output *through a working memory* (rather than as a bare StuffContent) is what
-    preserves the dynamic-class identity on the way back — the receiver rebinds the class from the
-    concept's ``structure_class_name`` against its own registry, exactly like the worker hydration.
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    output_memory_raw: dict[str, Any]
-    function_module: str | None = None
-    function_qualname: str | None = None
+# The transport DTOs (``PipeFuncExecutionRequest`` / ``PipeFuncExecutionResponse``) live in the leaf
+# ``pipe_func_execution_dtos`` module so the executor protocol can reference them without a hub cycle;
+# they are re-exported here (and genuinely used by the builders below), so existing
+# ``from ...pipe_func_execution_transport import PipeFuncExecutionRequest`` imports keep working.
 
 
 def build_pipe_func_execution_request(
@@ -74,6 +33,10 @@ def build_pipe_func_execution_request(
     library manager; both the ``load_libraries`` (hosted dir-load) and the ``load_from_crate``
     (transported, workflow) paths make it available through ``get_crate``. Building the request is
     pure/deterministic, so it is safe to call inside a Temporal workflow before dispatching.
+
+    ``timeout_seconds`` is the PipeFunc kill-timeout that rides on the request. Callers pass the
+    configured ``pipe_func_config.timeout_seconds`` (they live in plugins, outside core's import graph,
+    so they can read the config without a cycle); it falls back to the module default otherwise.
     """
     library_id = get_current_library()
     crate = get_library_manager().get_crate(library_id=library_id)

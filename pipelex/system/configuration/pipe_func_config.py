@@ -19,3 +19,11 @@ class PipeFuncConfig(ConfigModel):
     # against it without importing the heavy configs module, which would close an import cycle through
     # aws_config -> hub. Mirrors how StorageProviderConfig sits in its own module.
     execution_mode: str = Field(strict=False)
+
+    # Max wall-clock seconds a single PipeFunc body may run before it is killed. Backend-agnostic and
+    # set when the transport request is built, so it rides on the request to whatever backend runs it
+    # and is enforced both cooperatively (asyncio.wait_for in the box/subprocess) and as the sandbox's
+    # hard kill (box exec timeout = this + headroom). A hosted deployment may raise it per env/plan via
+    # a pipelex_{env}.toml override. Only meaningful for out-of-process modes; "direct" runs in-process
+    # and does not time-box.
+    timeout_seconds: float = Field(gt=0)

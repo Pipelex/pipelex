@@ -15,7 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_library_manager
 from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
-from pipelex.pipe_operators.func.pipe_func_execution_transport import PipeFuncExecutionRequest, PipeFuncExecutionResponse
+from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata

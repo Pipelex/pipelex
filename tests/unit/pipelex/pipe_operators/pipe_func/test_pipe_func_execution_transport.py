@@ -26,7 +26,7 @@ class TestPipeFuncExecutionTransport:
 
     def test_request_is_a_forbid_extra_wire_contract_with_default_timeout(self) -> None:
         """The request forbids unknown fields (wire contract) and defaults the runaway-code timeout."""
-        assert PipeFuncExecutionRequest.model_config["extra"] == "forbid"
+        assert PipeFuncExecutionRequest.model_config.get("extra") == "forbid"
         assert "crate" in PipeFuncExecutionRequest.model_fields
         assert "working_memory_raw" in PipeFuncExecutionRequest.model_fields
         assert PipeFuncExecutionRequest.model_fields["timeout_seconds"].default == DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS
