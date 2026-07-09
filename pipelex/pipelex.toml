@@ -296,9 +296,6 @@ pipe_stack_limit = 20
 # them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
 # executes it only inside an isolated sandbox, never imported here.
 execution_mode = "direct"
-# Max wall-clock seconds a single PipeFunc body may run before it is killed (out-of-process modes
-# only). Rides on the transport request to the sandbox; a hosted deployment may raise it per env/plan.
-timeout_seconds = 5.0
 
 ####################################################################################################
 # Pipeline execution config
