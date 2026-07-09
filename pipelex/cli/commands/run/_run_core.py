@@ -13,7 +13,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
+from pipelex.cli.commands.run.exceptions import InputsTimeOnlyNotSupportedError
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -143,6 +143,9 @@ async def _execute_run(
 
     # Load inputs if provided
     pipeline_inputs = None
+    # Directory bare relative file paths resolve against (Smart Inputs D3). Set only when inputs are
+    # file-loaded (its parent); None for inline JSON — an inline caller has no file to anchor to.
+    inputs_base_dir: Path | None = None
     if inputs:
         if inputs.startswith("{"):
             try:
@@ -157,9 +160,11 @@ async def _execute_run(
                 # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
                 inputs_path = Path(inputs).expanduser()
                 pipeline_inputs = load_inputs_dict_from_path(inputs_path)
-                # Resolve relative url paths against the inputs file's parent directory
-                base_dir = inputs_path.parent.resolve()
-                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=base_dir)
+                # Resolve relative url paths against the inputs file's parent directory. The same
+                # directory is threaded to the runner as inputs_base_dir so the shaper can resolve
+                # bare relative file-ish / CSV strings (whose declared concept the CLI cannot see).
+                inputs_base_dir = inputs_path.parent.resolve()
+                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir=inputs_base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
                 print_traceback_if_requested(get_console())
@@ -177,10 +182,10 @@ async def _execute_run(
                 print_traceback_if_requested(get_console())
                 typer.secho(f"Failed to parse input file: {toml_error_exc.message}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from toml_error_exc
-            except InputsDatetimeNotSupportedError as datetime_exc:
+            except InputsTimeOnlyNotSupportedError as time_only_exc:
                 print_traceback_if_requested(get_console())
-                typer.secho(f"Failed to load input file: {datetime_exc.message}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from datetime_exc
+                typer.secho(f"Failed to load input file: {time_only_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from time_only_exc
 
     # Determine pipe run mode
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
@@ -200,6 +205,7 @@ async def _execute_run(
             is_mock_usage=mock_usage,
             execution_config=execution_config,
             library_dirs=library_dir,
+            inputs_base_dir=inputs_base_dir,
         )
         response = await runner.execute(
             pipe_code=pipe_code,

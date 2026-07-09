@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import tomli
 
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result  # noqa: PLC2701
 from pipelex.cli.agent_cli.commands.inputs.pipe_cmd import inputs_pipe_cmd
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
@@ -76,3 +77,34 @@ class TestAgentInputsTemplateFormatToml:
         assert envelope["success"] is True
         assert envelope["inputs"] == {}
         assert "No inputs required" in envelope["message"]
+
+    def test_light_toml_carries_concept_comments(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """The agent-CLI TOML surface carries the same `# concept:` hints the human build inputs does."""
+        result: dict[str, Any] = {
+            "success": True,
+            "pipe_code": "demo.my_pipe",
+            "inputs": {"question": "text_value", "invoice": {"invoice_number": "INV-1"}},
+            "concept_comments": {"question": "concept: demo.Question", "invoice": "concept: demo.Invoice"},
+        }
+
+        emit_inputs_result(result, template_format=InputsTemplateFormat.TOML)
+
+        out = capsys.readouterr().out
+        assert "# concept: demo.Question" in out
+        assert "# concept: demo.Invoice" in out
+        assert tomli.loads(out) == {"question": "text_value", "invoice": {"invoice_number": "INV-1"}}
+
+    def test_json_mode_strips_internal_concept_comments(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """concept_comments is internal plumbing — it must not leak into the JSON envelope."""
+        result: dict[str, Any] = {
+            "success": True,
+            "pipe_code": "demo.my_pipe",
+            "inputs": {"question": "text_value"},
+            "concept_comments": {"question": "concept: demo.Question"},
+        }
+
+        emit_inputs_result(result, template_format=InputsTemplateFormat.JSON)
+
+        envelope = json.loads(capsys.readouterr().out)
+        assert "concept_comments" not in envelope
+        assert envelope["inputs"] == {"question": "text_value"}

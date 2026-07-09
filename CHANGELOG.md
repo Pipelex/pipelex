@@ -1,5 +1,28 @@
 # Changelog
 
+### Added
+- **Smart Inputs (signature-driven input shaping):** Inputs are now interpreted top-down against the pipe's declared input signature rather than bottom-up from their shape alone.
+  - Bare values (strings, numbers, booleans, dicts, lists) are automatically shaped into the declared concept (e.g., a bare string becomes a `legal.Question`, not a generic `native.Text`).
+  - Lists shape element-wise into the declared item concept; single values auto-wrap into lists where required, and empty lists are now legal.
+  - Bare URLs/paths for `Image` or `Document` inputs are resolved relative to the inputs file's directory.
+  - Declared structured lists (e.g., `Person[]`) accept a direct path to a `.csv` file by signature, without requiring an envelope.
+- **Native `YesNo` concept:** Built-in concept (backed by `YesNoContent`) for boolean judgments. Requires a strict boolean, renders as `yes`/`no` in downstream prompts, and can be read via `pipe_output.main_stuff_as_yes_no.yes_no`.
+- **Native `Date` concept:** Built-in concept (backed by `DateContent`) for calendar dates. Requires a `datetime.date` and accepts an optional `datetime.time`. Preserves source precision (never forcing the LLM to fabricate a time of day) and retains UTC offsets verbatim.
+- **Comprehensive input error handling:** A suite of typed errors for input shaping failures (`WrongScalarKindError`, `ListWhereSingularError`, `MultiplicityCountMismatchError`, `StructureValidationError`, `UnknownInputNameError`) that provide clear hints and render the expected JSON shape.
+- **CLI `--explicit` flag:** Added `--explicit` to `pipelex build inputs` and `pipelex-agent inputs` to generate the legacy `{"concept", "content"}` envelope templates.
+
+### Changed
+- (Breaking) **Input templates default to "light" shape:** `pipelex build inputs` and `pipelex-agent inputs` now generate light templates by default, outputting the bare values expected by the signature rather than the verbose `{"concept", "content"}` envelopes. TOML templates include the declared concept as a `# concept: ...` comment.
+- (Breaking) **Structure-field `type = "date"` behavior:** A `date` field now generates a `datetime.date` (JSON schema `format: date`), preventing LLMs from hallucinating times for calendar dates. A new `type = "datetime"` field handles full timestamps (`format: date-time`), and default-value validation now rejects a `datetime` default on a `date` field.
+- (Breaking) **Strict input validation:** Undeclared input names are now a hard error (previously silently ignored), and top-level `null` values are rejected—absence must be expressed by omitting the key.
+- (Breaking) **Explicit envelope validation:** The `{"concept", "content"}` escape hatch is now compatibility-checked against the pipe's declared signature; incompatible concepts raise a typed error.
+- (Breaking) **TOML date/time handling:** TOML date and datetime literals are natively supported and map directly to the `Date` concept. Only bare time-of-day literals are rejected (via the renamed `InputsTimeOnlyNotSupportedError`), since a time alone has no date to attach to.
+- **Documentation overhaul:** Updated `provide-inputs.md`, `executing-pipelines.md`, and `native-concepts.md` for the Smart Inputs paradigm, leading with the bare-value approach and demoting the envelope format to an escape hatch.
+
+### Fixed
+- **Silent mistyping of inputs:** Providing a bare string for a refined text concept (e.g., `legal.Question`) no longer silently degrades the type to a generic `native.Text`; the declared concept type is now retained.
+- **TOML inline table formatting:** Light templates now use inline tables for structured values, preventing trailing scalars from being swallowed into `[sections]`.
+
 ## [v0.38.0] - 2026-07-06
 
 ### Highlights

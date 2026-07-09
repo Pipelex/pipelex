@@ -1,3 +1,6 @@
+from datetime import date, datetime, timedelta, timezone
+from typing import cast
+
 import pytest
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -383,6 +386,140 @@ class TypeMappingTest(StructuredContent):
         assert result == expected_code
         assert issubclass(generated_class, StructuredContent)
 
+    def test_date_field_maps_to_calendar_date(self):
+        """`type = "date"` generates a `datetime.date` field (JSON schema `format: date`), no time."""
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'issued_on: date = Field(..., description="Issue date")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["issued_on"]["format"] == "date"
+
+    def test_datetime_field_maps_to_timestamp(self):
+        """`type = "datetime"` generates a `datetime.datetime` field (JSON schema `format: date-time`)."""
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'recorded_at: datetime = Field(..., description="Record timestamp")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["recorded_at"]["format"] == "date-time"
+
+    def test_date_field_with_default_round_trips(self):
+        """A `type = "date"` field with a date default generates code that evaluates.
+
+        `repr(date(...))` is module-qualified (`datetime.date(...)`), but the generated code imports
+        the bare `date` class, so the default must be emitted un-prefixed or the class body raises at eval.
+        """
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(
+                description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, default_value=date(2026, 7, 7)
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["issued_on"].default == date(2026, 7, 7)
+
+    def test_datetime_field_with_offset_default_round_trips(self):
+        """A `type = "datetime"` field with an offset-aware datetime default evaluates and keeps the offset."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(
+                description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, default_value=offset_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
+
+    def test_list_of_date_field_maps_to_list_of_calendar_date(self):
+        """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "deadlines": ConceptStructureBlueprint(
+                description="Deadlines", type=ConceptStructureBlueprintFieldType.LIST, item_type="date", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'deadlines: List[date] = Field(..., description="Deadlines")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
+    def test_list_of_datetime_field_maps_to_list_of_timestamp(self):
+        """`type = "list", item_type = "datetime"` generates a `List[datetime]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps", type=ConceptStructureBlueprintFieldType.LIST, item_type="datetime", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'logged_at: List[datetime] = Field(..., description="Log timestamps")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
+    def test_list_of_datetime_field_with_default_round_trips(self):
+        """List defaults containing datetimes are recursively formatted with generated imports."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps",
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type="datetime",
+                default_value=[offset_default],
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["logged_at"].default == [offset_default]
+
+    def test_dict_of_date_field_with_default_round_trips(self):
+        """Dict defaults containing dates are recursively formatted with generated imports."""
+        date_default = date(2026, 7, 7)
+        structure_blueprint = {
+            "deadlines_by_name": ConceptStructureBlueprint(
+                description="Deadlines",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="str",
+                value_type="date",
+                default_value={"ship": date_default},
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDictDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["deadlines_by_name"].default == {"ship": date_default}
+
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
         structure_blueprint = {
@@ -698,7 +835,7 @@ If you want to customize this structure:
 To regenerate: pipelex build structures <target_directory>
 """
 
-from datetime import datetime
+from datetime import date
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
@@ -710,7 +847,7 @@ class PersonInfo(StructuredContent):
 
     name: str = Field(..., description="The name of the person")
     age: float = Field(..., description="The age of the person")
-    birthdate: datetime = Field(..., description="The birthdate of the person")
+    birthdate: date = Field(..., description="The birthdate of the person")
 '''
 
         assert result == expected_code

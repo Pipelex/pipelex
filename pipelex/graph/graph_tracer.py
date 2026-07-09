@@ -12,6 +12,7 @@ from pipelex.graph.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
+    GraphSpecMode,
     IOSpec,
     NodeIOSpec,
     NodeKind,
@@ -19,6 +20,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    make_graphspec_meta,
     output_digest_is_optional,
 )
 from pipelex.graph.trace_context import TraceContext
@@ -154,6 +156,7 @@ class GraphTracer(GraphTracerProtocol):
         # Registries for pipe and concept data (keyed by pipe_ref and concept_ref)
         self._pipe_registry: dict[str, dict[str, Any]] = {}
         self._concept_registry: dict[str, dict[str, Any]] = {}
+        self._mode: GraphSpecMode = GraphSpecMode.LIVE
 
     @property
     def is_active(self) -> bool:
@@ -227,6 +230,7 @@ class GraphTracer(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -244,6 +248,7 @@ class GraphTracer(GraphTracerProtocol):
                 teardown skips the discarded spec build; the returned TraceContext carries the flag.
             emit_usage_events: Whether this run emits usage (cost) events. Stamped onto the returned
                 TraceContext so it is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
         """
         self._is_active = True
         self._emit_graph_events = emit_graph_events
@@ -267,6 +272,7 @@ class GraphTracer(GraphTracerProtocol):
         self._event_sequence = 0
         self._pipe_registry = {}
         self._concept_registry = {}
+        self._mode = mode
 
         return TraceContext(
             graph_id=graph_id,
@@ -314,6 +320,7 @@ class GraphTracer(GraphTracerProtocol):
                 pipeline_ref=self._pipeline_ref or PipelineRef(),
                 nodes=nodes,
                 edges=self._edges,
+                meta=make_graphspec_meta(mode=self._mode),
                 pipe_registry=dict(self._pipe_registry),
                 concept_registry=dict(self._concept_registry),
             )
@@ -338,6 +345,7 @@ class GraphTracer(GraphTracerProtocol):
         self._event_sequence = 0
         self._pipe_registry = {}
         self._concept_registry = {}
+        self._mode = GraphSpecMode.LIVE
 
         return graph
 

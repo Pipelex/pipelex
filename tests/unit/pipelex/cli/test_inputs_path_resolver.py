@@ -7,7 +7,8 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_path_resolver import is_relative_local_path, resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.tools.uri.uri_resolver import is_relative_local_path
 
 
 class _IsRelativeLocalPathCases:
@@ -230,6 +231,11 @@ class TestInputsPathResolver:
         assert resolve_url_in_value("hello", base_dir=Path("/base")) == "hello"
         assert resolve_url_in_value(42, base_dir=Path("/base")) == 42
         assert resolve_url_in_value(None, base_dir=Path("/base")) is None
+
+    def test_resolve_url_in_value_tilde_expands_to_home(self) -> None:
+        """A ~-prefixed url is home-anchored: it expands to home, never joined onto base_dir."""
+        resolved = resolve_url_in_value({"url": "~/photo.jpg"}, base_dir=Path("/base"))
+        assert resolved == {"url": str(Path("~/photo.jpg").expanduser())}
 
     # ---- resolve_inputs_paths ----
 

@@ -22,6 +22,22 @@ MAX_STACK_LENGTH = 2000
 GRAPHSPEC_FORMAT = "mthds"
 
 
+class GraphSpecMode(StrEnum):
+    """Provenance mode for a GraphSpec."""
+
+    DRY = "dry"
+    LIVE = "live"
+    STATIC = "static"
+
+
+def make_graphspec_meta(*, mode: GraphSpecMode, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Build canonical GraphSpec metadata while preserving caller extras."""
+    meta = dict(extra or {})
+    meta["format"] = GRAPHSPEC_FORMAT
+    meta["mode"] = mode
+    return meta
+
+
 class NodeKind(StrEnum):
     """Types of nodes in the execution graph."""
 
@@ -307,13 +323,21 @@ class GraphSpec(BaseModel):
     concept_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def ensure_format_meta(self) -> Self:
+    def ensure_meta_contract(self) -> Self:
         existing_format = self.meta.get("format")
         if existing_format is None:
             self.meta["format"] = GRAPHSPEC_FORMAT
         elif existing_format != GRAPHSPEC_FORMAT:
             msg = f"GraphSpec.meta['format'] must be '{GRAPHSPEC_FORMAT}', got '{existing_format}'"
             raise ValueError(msg)
+        if "mode" in self.meta:
+            existing_mode = self.meta["mode"]
+            try:
+                self.meta["mode"] = GraphSpecMode(existing_mode)
+            except ValueError as exc:
+                allowed_modes = ", ".join(mode for mode in GraphSpecMode)
+                msg = f"GraphSpec.meta['mode'] must be one of: {allowed_modes}; got '{existing_mode}'"
+                raise ValueError(msg) from exc
         return self
 
     def to_json(self) -> str:

@@ -1,0 +1,23 @@
+domain      = "date_demo"
+description = "Native Date as a pipeline input fed by TOML date/datetime literals"
+main_pipe   = "describe_departure"
+
+[pipe.describe_departure]
+type = "PipeLLM"
+description = "Writes a one-line note about a departure date"
+inputs = { departure = "Date" }
+output = "Text"
+prompt = """
+The scheduled departure is: $departure
+
+Write one sentence noting the departure.
+"""
+
+[pipe.extract_departure]
+type = "PipeLLM"
+description = "Extracts the departure date from a ticket"
+inputs = { ticket = "Text" }
+output = "Date"
+prompt = """
+Extract the scheduled departure from this ticket: $ticket
+"""

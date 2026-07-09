@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 
 from pipelex.graph.graph_tracer import GraphTracer
-from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
@@ -35,6 +35,21 @@ class TestGraphTracer:
         assert graph_spec is not None
         assert graph_spec.pipeline_ref.domain == "test.domain"
         assert graph_spec.pipeline_ref.main_pipe == "main_pipe"
+        assert graph_spec.meta["mode"] == GraphSpecMode.LIVE
+
+    def test_setup_with_dry_mode_stamps_graphspec_meta(self) -> None:
+        tracer = GraphTracer()
+        tracer.setup(
+            graph_id="test-graph-dry",
+            data_inclusion=make_defaulted_data_inclusion_config(),
+            mode=GraphSpecMode.DRY,
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        assert graph_spec.meta["format"] == "mthds"
+        assert graph_spec.meta["mode"] == GraphSpecMode.DRY
 
     def test_teardown_without_setup_returns_none(self) -> None:
         """Test that teardown returns None if not active."""

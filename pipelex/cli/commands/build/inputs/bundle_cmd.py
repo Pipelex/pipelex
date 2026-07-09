@@ -36,6 +36,10 @@ def build_inputs_bundle_cmd(
         InputsTemplateFormat,
         typer.Option("--format", help="Format of the generated inputs template (json or toml)"),
     ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
     """Generate an example inputs template from a bundle file or pipeline directory.
 
@@ -45,6 +49,7 @@ def build_inputs_bundle_cmd(
         pipelex build inputs bundle my_bundle.mthds --pipe my_pipe
         pipelex build inputs bundle pipeline_01/ --output custom_inputs.json
         pipelex build inputs bundle pipeline_01/ --format toml
+        pipelex build inputs bundle pipeline_01/ --explicit
     """
     target_path = Path(path)
     bundle_path: Path
@@ -102,4 +107,5 @@ def build_inputs_bundle_cmd(
         output_path=output_path_path,
         library_dir=library_dir,
         template_format=template_format,
+        explicit=explicit,
     )

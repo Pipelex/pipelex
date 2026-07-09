@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
@@ -104,6 +104,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         tracer_key: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -124,6 +125,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
                 (no post-hoc model_copy needed at the call site).
             emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
                 so the returned TraceContext is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -161,6 +163,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             pipeline_run_id=pipeline_run_id,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
+            mode=mode,
         )
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:

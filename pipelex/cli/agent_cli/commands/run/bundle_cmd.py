@@ -156,7 +156,8 @@ def run_bundle_cmd(
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
+    parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
+    pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
     runner_type: RunnerType = ctx.obj["runner"]
 
@@ -210,6 +211,7 @@ def run_bundle_cmd(
                         graph=graph,
                         costs=costs,
                         with_memory=with_memory,
+                        inputs_base_dir=parsed_inputs.inputs_base_dir,
                     )
                 )
                 agent_success_formatted(
