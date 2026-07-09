@@ -30,6 +30,17 @@ class TestPythonPydanticEmitter:
         assert report.score.value == 4.0
         assert report.status == "draft"
 
+    def test_serialize_parse_round_trip(self, pipeline_crate: LibraryCrate, tmp_path: Path):
+        """The generated pydantic helpers round-trip: model_dump (serialize) then model_validate (parse)
+        reproduce the value. Wire names are already snake_case Python names, so no binder is needed.
+        """
+        module = load_generated_module(
+            emit_python_pydantic(resolve_concepts_from_crate(pipeline_crate))[0].content, tmp_path=tmp_path, name="gen_models_roundtrip"
+        )
+        report = module.Report(score={"value": 4.0, "rationale": "high"}, label={"text": "x"}, tags=["a", "b"])
+        wire = report.model_dump(mode="json")
+        assert module.Report.model_validate(wire) == report
+
     def test_native_concept_is_emitted_as_a_model(self, pipeline_crate: LibraryCrate):
         content = emit_python_pydantic(resolve_concepts_from_crate(pipeline_crate))[0].content
         # Uniform treatment: the materialized native becomes a plain model (self-contained crate).

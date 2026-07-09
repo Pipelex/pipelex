@@ -10,14 +10,25 @@ class TestTsZodEmitter:
     here we assert the structural contract of the pure types file.
     """
 
-    def test_emits_a_single_pure_types_file(self, pipeline_crate: LibraryCrate):
+    def test_emits_a_pure_types_file_and_a_binder(self, pipeline_crate: LibraryCrate):
         files = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))
-        assert [file.filename for file in files] == ["types.ts"]
+        assert [file.filename for file in files] == ["types.ts", "binder.ts"]
         content = files[0].content
-        # Pure: imports only zod, nothing Pipelex.
+        # types.ts is pure: imports only zod, nothing Pipelex.
         assert 'import { z } from "zod";' in content
         assert "pipelex" not in content
         assert "projection: types / ts-zod" in content
+
+    def test_binder_maps_wire_and_validates_per_concept(self, pipeline_crate: LibraryCrate):
+        binder = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[1].content
+        # The binder is the wire<->domain layer: it depends on the pure types file, not on zod directly.
+        assert 'from "./types";' in binder
+        assert "ReportSchema,\n  type Report," in binder
+        # One parse/serialize pair per concept, validating through the schema.
+        assert "export function parseReport(wire: unknown): Report {" in binder
+        assert "return ReportSchema.parse(mapKeysDeep(wire, toCamel));" in binder
+        assert "export function serializeReport(value: Report): unknown {" in binder
+        assert "return mapKeysDeep(ReportSchema.parse(value), toSnake);" in binder
 
     def test_schema_and_inferred_type_per_concept(self, pipeline_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content

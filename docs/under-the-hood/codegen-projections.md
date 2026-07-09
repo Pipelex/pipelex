@@ -19,7 +19,28 @@ The `types` projection ranges over the crate's concept set (one type per qualifi
 
 - **`python-structures`** — Pipelex runtime `StructuredContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted.
 - **`python-pydantic`** — plain `pydantic.BaseModel` types with no Pipelex imports. Every concept is emitted uniformly, including the materialized natives, so the module depends only on `pydantic` and the standard library.
-- **`ts-zod`** — a pure TypeScript + Zod types file (imports only `zod`). Zod schemas plus their inferred types; type names are the concept codes; field keys are camelCase with a JSDoc `@wire <snake_name>` tag documenting the wire contract. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
+- **`ts-zod`** — a pure TypeScript + Zod types file (`types.ts`, imports only `zod`) plus a `binder.ts` companion. `types.ts` holds Zod schemas and their inferred types; type names are the concept codes; field keys are camelCase with a JSDoc `@wire <snake_name>` tag documenting the wire contract. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
+
+### The ts-zod purity split and the binder
+
+`types.ts` stays dependency-free and portable (only `zod`), so its schemas describe the *camelCase domain* shape. `binder.ts` is the thin companion that maps the *snake_case wire* payload to and from those domain types: one `parse<Name>` (snake wire → validated camel domain type) and `serialize<Name>` (domain type → snake wire) per concept, validating through the schema. Key mapping is a generic deep snake↔camel transform; the exact wire name of every field is documented by the `@wire` tags in `types.ts`. A pipe's IO types are concepts, so a pipe's output parser / input serializer is just the binder pair for those concept types — the binder is the concept-set-wide realization of the per-pipe parse/serialize helpers.
+
+For **`python-pydantic`**, no binder is generated: wire names are already snake_case Python names, so parse/serialize are the native `Model.model_validate(data)` / `model.model_dump(mode="json")`.
+
+### Refinement and native bases
+
+A concept that refines another keeps its `refines` link when the base is **native-backed** (the refinement chain bottoms out at a native such as `Text` or `Number`), because the native is materialized into the crate and the base carries real runtime behavior; the emitter then renders inheritance (`class Summary(TextContent)` / `class Summary(Text)` / `z.lazy(() => TextSchema)`), which round-trips to the correct base class. A concept that refines an **in-crate structured** base has that base's effective structure flattened in during normalization.
+
+## The CLI surface
+
+Two command families drive the engine (formal contract: `docs/specs/pipelex-codegen.md`, workspace root):
+
+- **`pipelex resolve [PATH]… [-f json|toml] [-L DIR]…`** — assembles the closure (working bundles + the local `.mthds/methods/` cache), requires it to be **valid**, and emits the normalized crate to stdout. The verdict rides the exit code, mirroring the bare `validate` group: `0` resolved, `1` the library is invalid (a negative verdict — no crate), `2` no verdict (empty closure / not found).
+- **`pipelex codegen <kind> …`** — the two-axis projection family (`kind` × `--target`):
+    - `pipelex codegen types --target ts-zod|python-pydantic|python-structures [-o DIR] [PATH]… [-L DIR]…` — projects the crate's concept set for a target and writes each emitted file under the output directory.
+    - `pipelex codegen inputs [--pipe <ref>] [-f json|toml] [--explicit] [-o FILE] [PATH]… [-L DIR]…` — projects a runnable inputs template for one pipe (Smart Inputs light shape by default, `--explicit` for the envelope), selected by qualified `--pipe` and defaulting to the closure's declared `main_pipe`.
+
+Both codegen commands load and normalize the crate through the same shared helper the resolver uses (`pipelex/cli/commands/crate_loading.py`), so they share the resolve/validate exit-code contract. `pipelex build inputs` renders through the same `input_renderer` engine, so it and `codegen inputs` never diverge; `pipelex build structures` still uses its own always-qualified per-file generator (re-pointing it onto the bare-when-unique engine is a Phase-2 naming reconciliation, deferred so its output does not change silently).
 
 ## Surfacing imprecision, never guessing
 

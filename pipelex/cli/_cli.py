@@ -6,6 +6,7 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.commands.build.app import build_app
+from pipelex.cli.commands.codegen.app import codegen_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
@@ -33,6 +34,7 @@ _CORE_COMMAND_ORDER: list[str] = [
     "build",
     "validate",
     "resolve",
+    "codegen",
     "run",
     "graph",
     "show",
@@ -230,6 +232,7 @@ app.add_typer(
     help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
 app.command(name="resolve", help="Resolve a bundle closure into the normalized library crate (JSON or TOML) on stdout")(resolve_cmd)
+app.add_typer(codegen_app, name="codegen", help="Project the resolved crate into typed, runnable artifacts (types, inputs)")
 app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

@@ -1,4 +1,6 @@
+import importlib.util
 import json
+import sys
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -7,6 +9,8 @@ import tomli
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.codegen.crate_encoding import encode_crate_json, encode_crate_toml
+from pipelex.codegen.emitters.target import CodegenTarget
+from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.hub import get_library_manager
@@ -112,3 +116,37 @@ class TestResolveFlow:
             reloaded = library_manager.get_library(library_id=reload_library_id)
             assert "pipeline.run_pipeline" in reloaded.pipe_library.root
             assert "pipeline.Report" in reloaded.concept_library.root
+
+    def test_multi_bundle_closure_feeds_every_emitter(self, tmp_path: Path):
+        """The resolved multi-bundle crate projects through every types target, and the emitted Python
+        execs into real classes — the resolve -> emit chain end to end (fixture 2).
+        """
+        library_manager = get_library_manager()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            closure_dir = Path(tmp_dir)
+            (closure_dir / "main.mthds").write_text(MAIN_MTHDS, encoding="utf-8")
+            (closure_dir / "steps.mthds").write_text(STEPS_MTHDS, encoding="utf-8")
+            resolve_library_id = load_libraries_and_activate([closure_dir])
+            crate = library_manager.get_crate(resolve_library_id)
+            assert crate is not None
+            normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+            library_manager.teardown(library_id=resolve_library_id)
+
+        # ts-zod projects a pure types file and its binder; each Python target projects one module.
+        assert {file.filename for file in emit_types(normalized, target=CodegenTarget.TS_ZOD)} == {"types.ts", "binder.ts"}
+        for target in (CodegenTarget.PYTHON_STRUCTURES, CodegenTarget.PYTHON_PYDANTIC):
+            emitted = emit_types(normalized, target=target)
+            assert len(emitted) == 1
+            module_name = emitted[0].filename.removesuffix(".py")
+            module_path = tmp_path / f"{target.name.lower()}_{emitted[0].filename}"
+            module_path.write_text(emitted[0].content, encoding="utf-8")
+            spec = importlib.util.spec_from_file_location(module_name, module_path)
+            assert spec is not None
+            assert spec.loader is not None
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[module_name] = module
+            spec.loader.exec_module(module)
+            # Report cross-references Score (defined in the sibling bundle) — both classes build, and
+            # Score, a leaf, instantiates. Report's fields survive the projection.
+            assert module.Score(value=1.0).value == 1.0
+            assert {"score", "label"} <= set(module.Report.model_fields)

@@ -7,8 +7,12 @@ is closed, canonical, and explicit:
 1. merge — already done upstream (keys are `domain.Code` / `domain.code`);
 2. fully qualify every *in-body* reference — pipe `inputs` / `output` concept refs, pipe-step / branch
    / outcome / batch pipe refs, concept `refines`, and structure-field `concept_ref` / `item_concept_ref`;
-3. flatten refinement — a refining concept adopts its base's effective structure (natives and
-   same-package bases resolved; the `refines` link is dropped once the structure is materialized);
+3. flatten refinement — a refining concept adopts its **in-crate structured** base's effective
+   structure (the `refines` link is dropped once the structure is materialized). A concept whose
+   refinement chain bottoms out at a **native** keeps its `refines` link: the native is materialized
+   into `concepts` by step 4, so the base is resolvable in-crate, and keeping the link preserves the
+   native content class on crate round-trip (`refines: native.Text` reloads as a `TextContent`
+   subclass rather than a bare `StructuredContent` that lost `TextContent`'s specialized rendering);
 4. expand natives — every referenced native is materialized into `concepts` as a `native.<Code>` entry
    (see `native_expansion`), transitively, and the crate is stamped with `mthds_version`;
 5. materialize string-described concepts — a `Foo = "text"` shorthand becomes a description-only
@@ -123,16 +127,46 @@ def _qualify_concept_ref(concept_ref_or_code: str, *, domain: str) -> str:
 
 def _flatten_refinement(concepts: dict[str, _ConceptEntry]) -> None:
     """Materialize each refining concept's effective structure in place, dropping the `refines` link
-    once a non-empty structure is materialized. A concept whose refinement base is structureless or
-    cross-package keeps its `refines` link (its base is materialized natively or resolved in-crate).
+    once a non-empty structure is materialized. Two kinds of base keep their `refines` link untouched:
+
+    - a **native-backed** base (the refinement chain bottoms out at a native): the native is
+      materialized into `concepts` by native expansion, so the base is resolvable in-crate; keeping
+      the link is what preserves the native content class on round-trip (B1-2) — flattening would drop
+      `refines: native.Text` and reload the concept as a bare `StructuredContent`, silently losing
+      `TextContent`'s specialized rendering;
+    - a structureless or cross-package base (nothing to materialize / not resolvable in-crate).
     """
     effective_cache: dict[str, dict[str, ConceptStructureBlueprint] | None] = {}
     for concept_ref, value in list(concepts.items()):
         if not isinstance(value, ConceptBlueprint) or not value.refines or isinstance(value.structure, dict):
             continue
+        if _base_is_native_backed(value.refines, concepts=concepts):
+            continue
         effective = _effective_structure(value.refines, concepts=concepts, cache=effective_cache, in_progress=set())
         if effective:
             concepts[concept_ref] = value.model_copy(update={"refines": None, "structure": dict(effective)})
+
+
+def _base_is_native_backed(base_ref: str, *, concepts: dict[str, _ConceptEntry]) -> bool:
+    """True when `base_ref`'s effective structure comes from a native ancestor.
+
+    Walks the refinement chain: a native ref is native-backed; an in-crate concept with its own
+    structure dict is a real structured base (not native-backed); an only-refining concept defers to
+    its own base; a cross-package / unknown base is not native-backed (and won't flatten anyway).
+    """
+    seen: set[str] = set()
+    current: str | None = base_ref
+    while current and current not in seen:
+        seen.add(current)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current):
+            return True
+        value = concepts.get(current)
+        if not isinstance(value, ConceptBlueprint):
+            return False
+        if isinstance(value.structure, dict):
+            return False
+        current = value.refines
+    return False
 
 
 def _effective_structure(

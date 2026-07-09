@@ -1,9 +1,11 @@
-"""ts-zod emitter: project a crate's concept set as a pure TypeScript + Zod types file.
+"""ts-zod emitter: project a crate's concept set as a pure TypeScript + Zod types file plus a binder.
 
-The purity split (see `docs/specs/pipelex-codegen.md`): this file imports **only** `zod` — Zod
-schemas plus their inferred types — so it stays dependency-free and portable. The thin binder that
-maps the snake_case wire payload to/from these camelCase domain types (parse / serialize helpers)
-is a separate file, emitted alongside the runnable per-pipe projections.
+The purity split (see `docs/specs/pipelex-codegen.md`): `types.ts` imports **only** `zod` — Zod
+schemas plus their inferred types — so it stays dependency-free and portable. `binder.ts` is the thin
+companion that maps the snake_case wire payload to/from these camelCase domain types: one
+`parse<Name>` / `serialize<Name>` pair per concept, validating through the schema. A pipe's IO types
+are concepts, so a pipe's output parser / input serializer is just the binder pair for those concept
+types — the binder is the concept-set-wide realization of the per-pipe parse/serialize helpers.
 
 Naming: type names are the concept codes (PascalCase, domain-qualified only on collision); field
 keys are camelCase, and every field carries a JSDoc `@wire <snake_name>` tag so the snake<->camel
@@ -11,7 +13,7 @@ mapping the binder applies is documented at the type. Concept references use `z.
 so schema declaration order is irrelevant and reference cycles are handled.
 
 TypeScript customization is by declaration merging (augment the generated `interface`/module from a
-sibling file), the TS analog of the Python subclassing story; the generated file is never edited.
+sibling file), the TS analog of the Python subclassing story; the generated files are never edited.
 """
 
 import json
@@ -22,15 +24,16 @@ from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
 
 _FILENAME = "types.ts"
+_BINDER_FILENAME = "binder.ts"
 
 
 def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
-    """Emit the pure `types.ts` file: a `<Name>Schema` const and inferred `<Name>` type per concept."""
+    """Emit the pure `types.ts` file and its `binder.ts` companion (wire<->domain parse/serialize)."""
     by_ref = library.by_ref()
     header = _ts_header()
     blocks = [_render_schema(concept, by_ref=by_ref) for concept in library.concepts]
     body = f'{header}import {{ z }} from "zod";\n\n\n' + "\n\n\n".join(blocks) + "\n"
-    return [EmittedFile(filename=_FILENAME, content=body)]
+    return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(library)]
 
 
 def _ts_header() -> str:
@@ -120,6 +123,69 @@ def _concept_schema(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedCo
         name = ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
         return f"z.lazy(() => {name}Schema)"
     return "z.unknown()"
+
+
+def _emit_binder(library: ResolvedLibrary) -> EmittedFile:
+    """Emit `binder.ts`: the wire<->domain mapping layer over the pure `types.ts` schemas.
+
+    One `parse<Name>` (snake wire -> validated camel domain type) and `serialize<Name>` (domain type ->
+    snake wire) per concept. Key mapping is a generic deep snake<->camel transform; the exact wire name
+    of every field is documented by the `@wire` JSDoc tags in `types.ts`.
+    """
+    type_names = [
+        ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification) for concept in library.concepts
+    ]
+    import_lines = "\n".join(f"  {name}Schema,\n  type {name}," for name in type_names)
+    pairs = "\n\n".join(_binder_pair(name) for name in type_names)
+    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{_binder_prelude(import_lines)}\n\n{pairs}\n")
+
+
+def _binder_pair(type_name: str) -> str:
+    """The `parse<Name>` / `serialize<Name>` pair for one concept type."""
+    return (
+        f"/** Parse a snake_case wire payload into a validated `{type_name}`. */\n"
+        f"export function parse{type_name}(wire: unknown): {type_name} {{\n"
+        f"  return {type_name}Schema.parse(mapKeysDeep(wire, toCamel));\n"
+        f"}}\n\n"
+        f"/** Serialize a `{type_name}` into its snake_case wire payload. */\n"
+        f"export function serialize{type_name}(value: {type_name}): unknown {{\n"
+        f"  return mapKeysDeep({type_name}Schema.parse(value), toSnake);\n"
+        f"}}"
+    )
+
+
+def _binder_prelude(import_lines: str) -> str:
+    return (
+        f'import {{\n{import_lines}\n}} from "./types";\n\n'
+        "/** Recursively remap object keys with `mapKey` (arrays and nested objects included). */\n"
+        "function mapKeysDeep(value: unknown, mapKey: (key: string) => string): unknown {\n"
+        "  if (Array.isArray(value)) {\n"
+        "    return value.map((item) => mapKeysDeep(item, mapKey));\n"
+        "  }\n"
+        '  if (value !== null && typeof value === "object") {\n'
+        "    return Object.fromEntries(\n"
+        "      Object.entries(value as Record<string, unknown>).map(([key, val]) => [mapKey(key), mapKeysDeep(val, mapKey)]),\n"
+        "    );\n"
+        "  }\n"
+        "  return value;\n"
+        "}\n\n"
+        "// snake_case <-> camelCase. MTHDS field names are snake_case; `types.ts` keys are camelCase.\n"
+        "const toCamel = (key: string): string => key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase());\n"
+        "const toSnake = (key: string): string => key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);"
+    )
+
+
+def _binder_header() -> str:
+    return (
+        "// ---------------------------------------------------------------------------\n"
+        "// AUTOGENERATED by Pipelex codegen — DO NOT EDIT.\n"
+        "//\n"
+        "// Wire<->domain binder for the pure `types.ts` schemas: snake_case wire payloads\n"
+        "// in, camelCase domain types out (and back). Regenerated from the method.\n"
+        "//\n"
+        "// projection: types / ts-zod (binder)\n"
+        "// ---------------------------------------------------------------------------\n"
+    )
 
 
 def _jsdoc(description: str, *, wire: str | None, imprecise: str | None, indent: str = "") -> str:
