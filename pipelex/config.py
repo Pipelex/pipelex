@@ -1,9 +1,6 @@
 from pipelex.hub import get_optional_config, get_required_config
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
 from pipelex.system.configuration.configs import PipelexConfig
-from pipelex.system.environment import get_optional_env
-
-_PIPE_FUNC_EXECUTION_MODE_ENV = "PIPELEX_PIPE_FUNC_EXECUTION_MODE"
 
 
 def get_config() -> PipelexConfig:
@@ -17,17 +14,13 @@ def get_config() -> PipelexConfig:
 def get_pipe_func_execution_mode() -> str:
     """The selected PipeFunc execution mode in this process (non-raising; defaults to ``direct``).
 
-    Read from the optional config so it is safe to call from pydantic validators that may run before
-    the global config is set (e.g. very early boot or isolated unit tests). When no config is set, or
-    it is not a PipelexConfig, the answer is ``direct`` — the in-process mode, which keeps the default
-    path byte-identical to the pre-seam behavior.
+    Read from the optional config (``pipelex.pipe_func_config.execution_mode``) so it is safe to call
+    from pydantic validators that may run before the global config is set (e.g. very early boot or
+    isolated unit tests). When no config is set, or it is not a PipelexConfig, the answer is
+    ``direct`` — the in-process mode, which keeps the default path byte-identical to the pre-seam
+    behavior. Selecting a sandbox backend is a deployment CONFIG concern (the hosted runner and the
+    worker set it in their ``.pipelex`` overrides), not an env var.
     """
-    # An env override wins over config so a deployment (or a multi-process local run — submitter +
-    # worker) can select the mode without editing a config file. Absent OR empty env → fall back to
-    # config: an empty value (e.g. `value: ""` in a k8s manifest) means "unset", not a mode named "".
-    env_value = get_optional_env(_PIPE_FUNC_EXECUTION_MODE_ENV)
-    if env_value and env_value.strip():
-        return env_value.strip()
     optional_config = get_optional_config()
     if not isinstance(optional_config, PipelexConfig):
         return DIRECT_PIPE_FUNC_EXECUTION_MODE
