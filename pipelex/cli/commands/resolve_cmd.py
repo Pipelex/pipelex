@@ -22,6 +22,7 @@ from pipelex.codegen.crate_encoding import CrateEncoding, encode_crate
 from pipelex.hub import get_library_manager, get_telemetry_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 from pipelex.system.runtime import IntegrationMode
@@ -64,8 +65,10 @@ def resolve_cmd(
 
             normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
             typer.echo(encode_crate(normalized, encoding=output_format), nl=False)
-    except LibraryLoadingError as exc:
-        # A negative verdict: the library is structurally invalid, so no crate can be produced.
+    except (LibraryLoadingError, PipeLibraryError) as exc:
+        # A negative verdict: the library is structurally invalid (failed to load, or a pipe conflict
+        # across bundles), so no crate can be produced. Internal invariant errors (e.g.
+        # CrateNormalizationError) are deliberately not caught here — they must surface, not be masked.
         typer.secho(f"Cannot resolve — the library is invalid:\n{exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
     except FileNotFoundError as exc:

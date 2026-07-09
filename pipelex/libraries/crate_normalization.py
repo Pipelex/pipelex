@@ -14,9 +14,15 @@ is closed, canonical, and explicit:
 5. materialize string-described concepts — a `Foo = "text"` shorthand becomes a description-only
    `ConceptBlueprint`; string structure fields become explicit `text` fields.
 
-Cross-package (`alias->…`) references are the one deferred case: the referenced dependency content is
-not folded into this crate yet, so those refs are left intact rather than rewritten to a canonical ref
-that would dangle. A single-package multi-bundle closure normalizes to a fully self-contained crate.
+Deferred normalization steps (the spec's [Library Crate Format] "Normalization Pass" lists these; they
+are not yet applied here, mirroring the spec's own "Specification Status" callout):
+
+- materialize defaults and multiplicity (spec step 5): multiplicity markers already present on a ref are
+  preserved (`_render_ref_with_markers`), but a bare singular ref is not rewritten to an explicit form,
+  and default values are not yet materialized;
+- cross-package (`alias->…`) references: the referenced dependency content is not folded into this crate
+  yet, so those refs are left intact rather than rewritten to a canonical ref that would dangle. A
+  single-package multi-bundle closure normalizes to a fully self-contained crate.
 
 [Library Crate Format]: mthds/docs/spec/library-crate.md
 """

@@ -17,6 +17,7 @@ import typer
 from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.codegen.crate_encoding import CrateEncoding
 from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -38,6 +39,15 @@ class TestResolveExitCodes:
     def test_invalid_library_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
         self._neutralize_boot(mocker)
         mocker.patch(f"{MODULE}.load_libraries_and_activate", side_effect=LibraryLoadingError("invalid library"))
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert exc_info.value.exit_code == 1
+
+    def test_pipe_conflict_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
+        # A duplicate-pipe-across-bundles conflict surfaces as PipeLibraryError (a LibraryError sibling
+        # of LibraryLoadingError, not a subclass): still an invalid-library negative verdict -> exit 1.
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{MODULE}.load_libraries_and_activate", side_effect=PipeLibraryError("duplicate pipe across bundles"))
         with pytest.raises(typer.Exit) as exc_info:
             resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
         assert exc_info.value.exit_code == 1
