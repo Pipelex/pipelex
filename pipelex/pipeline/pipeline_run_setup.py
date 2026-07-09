@@ -7,7 +7,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -40,14 +39,6 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
     from pipelex.graph.trace_context import TraceContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
-
-
-def _graphspec_mode_from_run_mode(run_mode: PipeRunMode) -> GraphSpecMode:
-    match run_mode:
-        case PipeRunMode.DRY:
-            return GraphSpecMode.DRY
-        case PipeRunMode.LIVE:
-            return GraphSpecMode.LIVE
 
 
 async def pipeline_run_setup(
@@ -247,7 +238,7 @@ async def pipeline_run_setup(
                 pipeline_run_id=pipeline_run_id,
                 emit_graph_events=is_generate_graph,
                 emit_usage_events=is_generate_usage,
-                mode=_graphspec_mode_from_run_mode(pipe_run_mode),
+                mode=pipe_run_mode.graphspec_mode,
             )
 
         # Register the event log on the report delegate for usage event emission — only when cost reporting

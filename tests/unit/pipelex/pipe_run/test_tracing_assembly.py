@@ -117,6 +117,7 @@ class TestTracingAssembly:
 
         assert result.graph_spec is sentinel_graph
         assert result.tokens_usages is None
+        assemble.assert_called_once()
         assert assemble.call_args.kwargs["mode"] == GraphSpecMode.DRY
 
     def test_graph_and_usage_both_assembled(self, mocker: MockerFixture) -> None:

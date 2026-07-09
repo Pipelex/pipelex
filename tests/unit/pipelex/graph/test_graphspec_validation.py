@@ -356,6 +356,17 @@ class TestGraphSpecValidation:
                 meta={"format": "mthds", "mode": "wrong"},
             )
 
+    def test_meta_mode_rejected_when_none(self) -> None:
+        with pytest.raises(ValidationError):
+            GraphSpec(
+                graph_id="test_graph",
+                created_at=ValidGraphData.CREATED_AT,
+                pipeline_ref=PipelineRef(),
+                nodes=[],
+                edges=[],
+                meta={"format": "mthds", "mode": None},
+            )
+
     def test_meta_format_rejected_when_wrong(self) -> None:
         with pytest.raises(ValidationError):
             GraphSpec(

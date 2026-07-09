@@ -18,7 +18,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, PipelineRef
+from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.hub import get_event_log_override
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.reporting.reporting_types import AnyTokensUsage
@@ -47,14 +47,6 @@ class TracingAssembly(BaseModel):
     graph_assembly_error: str | None = None
     tokens_usages: list[AnyTokensUsage] | None = None
     usage_assembly_error: str | None = None
-
-
-def _graphspec_mode_from_run_mode(run_mode: PipeRunMode) -> GraphSpecMode:
-    match run_mode:
-        case PipeRunMode.DRY:
-            return GraphSpecMode.DRY
-        case PipeRunMode.LIVE:
-            return GraphSpecMode.LIVE
 
 
 def assemble_tracing(
@@ -140,7 +132,7 @@ def assemble_tracing(
                     domain=domain_code,
                     main_pipe=main_pipe_code,
                 ),
-                mode=_graphspec_mode_from_run_mode(run_mode),
+                mode=run_mode.graphspec_mode,
             )
             log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
         except ValidationError as validation_error:

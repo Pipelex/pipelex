@@ -330,8 +330,8 @@ class GraphSpec(BaseModel):
         elif existing_format != GRAPHSPEC_FORMAT:
             msg = f"GraphSpec.meta['format'] must be '{GRAPHSPEC_FORMAT}', got '{existing_format}'"
             raise ValueError(msg)
-        existing_mode = self.meta.get("mode")
-        if existing_mode is not None:
+        if "mode" in self.meta:
+            existing_mode = self.meta["mode"]
             try:
                 self.meta["mode"] = GraphSpecMode(existing_mode)
             except ValueError as exc:
