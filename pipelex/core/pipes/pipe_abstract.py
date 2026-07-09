@@ -355,21 +355,14 @@ class PipeAbstract(ABC, BaseModel):
                 if needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING} and (
                     declared_stuff_spec.concept != needed_stuff_spec.concept or declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity
                 ):
-                    # Identify the specific mismatched field(s)
-                    mismatch_details: list[str] = []
-                    if declared_stuff_spec.concept != needed_stuff_spec.concept:
-                        mismatch_details.append(f"concept: declared='{declared_stuff_spec.concept}' vs required='{needed_stuff_spec.concept}'")
-                    if declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity:
-                        mismatch_details.append(
-                            f"multiplicity: declared='{declared_stuff_spec.multiplicity}' vs required='{needed_stuff_spec.multiplicity}'"
-                        )
-
-                    mismatch_summary = ", ".join(mismatch_details)
+                    # Render both specs the way an author would write them in this pipe's domain
+                    # (bare `Number` / `Text[]`, qualified only for foreign domains) — never the
+                    # Python repr of the Concept/StuffSpec objects.
+                    declared_ref = declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+                    required_ref = needed_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
                     msg = (
-                        f"In the pipe '{self.code}', the input variable '{var_name}' has a stuff spec mismatch.\n"
-                        f"Mismatched field(s): {mismatch_summary}\n"
-                        f"Declared: {declared_stuff_spec}\n"
-                        f"Required: {needed_stuff_spec}"
+                        f"In pipe '{self.code}', input '{var_name}' is declared as '{declared_ref}' "
+                        f"but its step needs '{required_ref}'. Update the input to '{required_ref}'."
                     )
                     raise PipeValidationError(
                         message=msg,

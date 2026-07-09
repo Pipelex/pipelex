@@ -10,8 +10,8 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
+    agent_error_validate_bundle,
     agent_success_formatted,
-    extract_validation_errors,
     set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
@@ -192,18 +192,11 @@ def validate_bundle_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
-        # Invalid verdict: emit the structured failure envelope. validation_errors[] is the shared
-        # builder's output — non-empty on every invalid verdict (a residual dry-run failure rides one
-        # dry_run item, not a separate field). is_valid:false is the discriminant mirroring the success
-        # envelope; signatures never reach here (they are a runnability fact, gated above).
-        agent_error(
-            exc.message,
-            error_type="ValidateBundleError",
-            cause=exc,
-            is_valid=False,
-            bundle_path=str(bundle_path),
-            validation_errors=extract_validation_errors(exc),
-        )
+        # Invalid verdict: emit the format-aware failure surface. JSON keeps the exact structured
+        # envelope (is_valid:false discriminant + validation_errors[], the shared builder's output,
+        # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
+        # footer. Signatures never reach here (they are a runnability fact, gated above).
+        agent_error_validate_bundle(exc, bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

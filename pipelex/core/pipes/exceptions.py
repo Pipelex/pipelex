@@ -212,6 +212,42 @@ class PipeValidationErrorType(StrEnum):
                 return False
 
     @property
+    def is_inadequate_output_multiplicity(self) -> bool:
+        """True only for the multiplicity-mismatch case.
+
+        The required/provided concept-ref suffix appended by the error categorizer is suppressed
+        for this case: a multiplicity mismatch has the same concept on both sides by definition
+        (the concept-compatibility check passed just before it fired), so the suffix would print
+        two identical refs and its list-repr brackets would masquerade as `[]` multiplicity syntax.
+        """
+        match self:
+            case PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
     def is_native_concept_redeclaration(self) -> bool:
         """True for the blueprint-channel native-concept redeclaration the fix planner strips."""
         match self:

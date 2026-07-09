@@ -111,11 +111,11 @@ class PipeSequence(PipeController):
             source_multiplicity=effective_last_step_output_multiplicity,
             target_multiplicity=self.output.multiplicity,
         ):
+            declared_output_ref = self.output.to_bundle_representation(relative_to_domain=self.domain_code)
             msg = (
-                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
-                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
-                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible. "
-                "Update one of them to match the other."
+                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares its output as "
+                f"'{declared_output_ref}', but its last step '{last_step_pipe.code}' yields '{expected_output_ref}'. "
+                f"Update the sequence's output to '{expected_output_ref}' (or change the last step)."
             )
             raise PipeValidationError(
                 message=msg,

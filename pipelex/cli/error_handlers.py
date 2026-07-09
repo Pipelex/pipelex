@@ -1,4 +1,3 @@
-import shlex
 from contextvars import ContextVar
 from enum import StrEnum
 from pathlib import Path
@@ -16,6 +15,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import build_fix_command
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
@@ -368,13 +368,8 @@ def handle_validate_bundle_error(
     # generic tip (two stacked 💡 tips would be noise).
     fixable_count = sum(1 for item in items if item.suggested_fix is not None)
     if fixable_count and bundle_path is not None:
-        command_parts = ["pipelex", "fix", "bundle", str(bundle_path)]
-        for library_dir in library_dirs or []:
-            command_parts.extend(["-L", str(library_dir)])
-        if allow_signatures:
-            command_parts.append("--allow-signatures")
-        # shlex.join so a path with spaces stays one argument when the user copy-pastes the footer.
-        fix_command = shlex.join(command_parts)
+        # Shared builder so the human and agent fix-command footers echo -L / --allow-signatures identically.
+        fix_command = build_fix_command("pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
         console.print(
             f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
         )

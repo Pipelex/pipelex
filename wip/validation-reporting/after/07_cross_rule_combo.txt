@@ -1,0 +1,183 @@
+########## HUMAN validate
+$ pipelex validate bundle bad_bundles/07_cross_rule_combo/bundle.mthds
+----------
+
+❌ Bundle validation failed
+
+Bundle: bad_bundles/07_cross_rule_combo/bundle.mthds
+
+Pipe Validation Errors:
+
+1. Missing Input Variable
+   Pipe: make_pitches
+   Domain: pitch_lab
+   Variables: market
+   → Required variable 'market' is not in the inputs of pipe 'make_pitches'. 
+Current inputs: (none)
+   💡 Suggested fix: Declare inputs of pipe 'make_pitches' as needed by its 
+steps: 'market'
+   └─ Path: bad_bundles/07_cross_rule_combo/bundle.mthds
+   └─ Source: bad_bundles/07_cross_rule_combo/bundle.mthds
+
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle 
+bad_bundles/07_cross_rule_combo/bundle.mthds
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT validate (markdown)
+$ pipelex-agent validate bundle bad_bundles/07_cross_rule_combo/bundle.mthds
+----------
+# Bundle validation failed
+
+**Bundle:** `bad_bundles/07_cross_rule_combo/bundle.mthds`
+
+## Pipe validation errors
+
+1. **Missing Input Variable**
+   - Pipe: `make_pitches`
+   - Domain: `pitch_lab`
+   - Variables: `market`
+   - Required variable 'market' is not in the inputs of pipe 'make_pitches'. Current inputs: (none)
+   - 💡 Suggested fix: Declare inputs of pipe 'make_pitches' as needed by its steps: 'market'
+   - Path: `bad_bundles/07_cross_rule_combo/bundle.mthds`
+   - Source: `bad_bundles/07_cross_rule_combo/bundle.mthds`
+
+💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle bad_bundles/07_cross_rule_combo/bundle.mthds`
+==> exit: 1
+
+########## AGENT validate (json)
+$ pipelex-agent validate bundle bad_bundles/07_cross_rule_combo/bundle.mthds --format json
+----------
+{
+  "error": true,
+  "error_type": "ValidateBundleError",
+  "message": "Pipe validation failed: Required variable 'market' is not in the inputs of pipe 'make_pitches'. Current inputs: (none)",
+  "hint": "Check the validation_errors array for specific issues",
+  "error_domain": "input",
+  "error_source": [
+    "ValidateBundleError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipeline/validate_bundle.py:160 (in _translate_to_validate_bundle_error)",
+    "PipeValidationError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/pipes/pipe_abstract.py:333 (in generic_validate_inputs_with_library)"
+  ],
+  "is_valid": false,
+  "bundle_path": "bad_bundles/07_cross_rule_combo/bundle.mthds",
+  "validation_errors": [
+    {
+      "category": "pipe_validation",
+      "message": "Required variable 'market' is not in the inputs of pipe 'make_pitches'. Current inputs: (none)",
+      "error_type": "missing_input_variable",
+      "pipe_code": "make_pitches",
+      "domain_code": "pitch_lab",
+      "source": "bad_bundles/07_cross_rule_combo/bundle.mthds",
+      "field_path": "bad_bundles/07_cross_rule_combo/bundle.mthds",
+      "variable_names": [
+        "market"
+      ],
+      "suggested_fix": {
+        "fix_code": "sync-controller-inputs",
+        "description": "Declare inputs of pipe 'make_pitches' as needed by its steps: 'market'",
+        "safety": "safe",
+        "source": "bad_bundles/07_cross_rule_combo/bundle.mthds",
+        "ops": [
+          {
+            "kind": "set_key",
+            "table_path": [
+              "pipe",
+              "make_pitches"
+            ],
+            "key": "inputs",
+            "value": {
+              "market": "Text"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
+==> exit: 1
+
+########## HUMAN fix --diff
+$ pipelex fix bundle bad_bundles/07_cross_rule_combo/bundle.mthds --diff
+----------
+
+Preview (--diff): no files were written. Proposed changes:
+
+--- 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/07_cross_rule_combo/bund
+le.mthds
++++ 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/07_cross_rule_combo/bund
+le.mthds (fixed)
+@@ -1,15 +1,15 @@
+-domain = "pitch_lab"
++domain    = "pitch_lab"
+ main_pipe = "make_pitches"
+ 
+ [concept]
+ Pitch = "A one-line startup pitch."
+ 
+ [pipe.gen_pitches]
+-type = "PipeLLM"
++type        = "PipeLLM"
+ description = "Generate pitches."
+-inputs = { market = "Text" }
+-output = "Pitch[]"
+-prompt = "Generate startup pitches for the $market market"
++inputs      = { market = "Text" }
++output      = "Pitch[]"
++prompt      = "Generate startup pitches for the $market market"
+ 
+ # BROKEN twice, with a twist: the sequence misses its needed input AND declares
+the
+ # wrong output. Inputs are validated before outputs, so the input error MASKS 
+the
+@@ -18,7 +18,8 @@
+ [pipe.make_pitches]
+ type = "PipeSequence"
+ description = "Sequence with drifted inputs and the wrong output."
+-output = "Pitch"
++output = "Pitch[]"
+ steps = [
+   { pipe = "gen_pitches", result = "pitches" },
+ ]
++inputs = { market = "Text" }
+
+✅ Fix preview — these fixes would make the bundle valid
+
+Bundle: bad_bundles/07_cross_rule_combo/bundle.mthds
+
+Fixes that would be applied:
+  1. Declare inputs of pipe 'make_pitches' as needed by its steps: 'market' 
+(sync-controller-inputs)
+  2. Set output of pipe 'make_pitches' to 'Pitch[]' to match its last step 
+(match-sequence-output)
+
+Files that would be written:
+  - 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/07_cross_rule_combo/bund
+le.mthds
+
+Iterations: 2
+
+==> exit: 0
+
+########## AGENT fix (markdown)
+$ pipelex-agent fix bundle bad_bundles/07_cross_rule_combo/bundle.mthds
+----------
+# Fix applied - bundle is valid
+
+- **Bundle:** `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/07_cross_rule_combo/bundle.mthds`
+- **Iterations:** 2
+
+## Applied Fixes
+
+- `sync-controller-inputs` - Declare inputs of pipe 'make_pitches' as needed by its steps: 'market'
+- `match-sequence-output` - Set output of pipe 'make_pitches' to 'Pitch[]' to match its last step
+
+## Files Written
+
+- `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/07_cross_rule_combo/bundle.mthds`
+==> exit: 0
+

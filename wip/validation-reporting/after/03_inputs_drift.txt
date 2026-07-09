@@ -1,0 +1,195 @@
+########## HUMAN validate
+$ pipelex validate bundle bad_bundles/03_inputs_drift/bundle.mthds
+----------
+
+❌ Bundle validation failed
+
+Bundle: bad_bundles/03_inputs_drift/bundle.mthds
+
+Pipe Validation Errors:
+
+1. Input Stuff Spec Mismatch
+   Pipe: make_recipe
+   Domain: recipe_maker
+   Variables: dish
+   → In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step 
+needs 'Text'. Update the input to 'Text'.
+   💡 Suggested fix: Sync inputs of pipe 'make_recipe' with its steps' needs: 
+add 'diet'; update 'dish'; remove 'garnish'
+   └─ Path: bad_bundles/03_inputs_drift/bundle.mthds
+   └─ Source: bad_bundles/03_inputs_drift/bundle.mthds
+
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle 
+bad_bundles/03_inputs_drift/bundle.mthds
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT validate (markdown)
+$ pipelex-agent validate bundle bad_bundles/03_inputs_drift/bundle.mthds
+----------
+# Bundle validation failed
+
+**Bundle:** `bad_bundles/03_inputs_drift/bundle.mthds`
+
+## Pipe validation errors
+
+1. **Input Stuff Spec Mismatch**
+   - Pipe: `make_recipe`
+   - Domain: `recipe_maker`
+   - Variables: `dish`
+   - In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'.
+   - 💡 Suggested fix: Sync inputs of pipe 'make_recipe' with its steps' needs: add 'diet'; update 'dish'; remove 'garnish'
+   - Path: `bad_bundles/03_inputs_drift/bundle.mthds`
+   - Source: `bad_bundles/03_inputs_drift/bundle.mthds`
+
+💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle bad_bundles/03_inputs_drift/bundle.mthds`
+==> exit: 1
+
+########## AGENT validate (json)
+$ pipelex-agent validate bundle bad_bundles/03_inputs_drift/bundle.mthds --format json
+----------
+{
+  "error": true,
+  "error_type": "ValidateBundleError",
+  "message": "Pipe validation failed: In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'.",
+  "hint": "Check the validation_errors array for specific issues",
+  "error_domain": "input",
+  "error_source": [
+    "ValidateBundleError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipeline/validate_bundle.py:160 (in _translate_to_validate_bundle_error)",
+    "PipeValidationError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/pipes/pipe_abstract.py:367 (in generic_validate_inputs_with_library)"
+  ],
+  "is_valid": false,
+  "bundle_path": "bad_bundles/03_inputs_drift/bundle.mthds",
+  "validation_errors": [
+    {
+      "category": "pipe_validation",
+      "message": "In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'.",
+      "error_type": "input_stuff_spec_mismatch",
+      "pipe_code": "make_recipe",
+      "domain_code": "recipe_maker",
+      "source": "bad_bundles/03_inputs_drift/bundle.mthds",
+      "field_path": "bad_bundles/03_inputs_drift/bundle.mthds",
+      "variable_names": [
+        "dish"
+      ],
+      "suggested_fix": {
+        "fix_code": "sync-controller-inputs",
+        "description": "Sync inputs of pipe 'make_recipe' with its steps' needs: add 'diet'; update 'dish'; remove 'garnish'",
+        "safety": "safe",
+        "source": "bad_bundles/03_inputs_drift/bundle.mthds",
+        "ops": [
+          {
+            "kind": "set_key",
+            "table_path": [
+              "pipe",
+              "make_recipe",
+              "inputs"
+            ],
+            "key": "dish",
+            "value": "Text"
+          },
+          {
+            "kind": "set_key",
+            "table_path": [
+              "pipe",
+              "make_recipe",
+              "inputs"
+            ],
+            "key": "diet",
+            "value": "Text"
+          },
+          {
+            "kind": "delete_key",
+            "table_path": [
+              "pipe",
+              "make_recipe",
+              "inputs"
+            ],
+            "key": "garnish"
+          }
+        ]
+      }
+    }
+  ]
+}
+==> exit: 1
+
+########## HUMAN fix --diff
+$ pipelex fix bundle bad_bundles/03_inputs_drift/bundle.mthds --diff
+----------
+
+Preview (--diff): no files were written. Proposed changes:
+
+--- 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/03_inputs_drift/bundle.m
+thds
++++ 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/03_inputs_drift/bundle.m
+thds (fixed)
+@@ -1,15 +1,15 @@
+-domain = "recipe_maker"
++domain    = "recipe_maker"
+ main_pipe = "make_recipe"
+ 
+ [concept]
+ Recipe = "A cooking recipe."
+ 
+ [pipe.write_recipe]
+-type = "PipeLLM"
++type        = "PipeLLM"
+ description = "Write a recipe."
+-inputs = { dish = "Text", diet = "Text" }
+-output = "Recipe"
+-prompt = "Write a recipe for $dish that fits a $diet diet"
++inputs      = { dish = "Text", diet = "Text" }
++output      = "Recipe"
++prompt      = "Write a recipe for $dish that fits a $diet diet"
+ 
+ # BROKEN three ways in one inputs table: 'dish' has the wrong concept (update),
+ # 'garnish' is not needed by any step (remove), and 'diet' is missing (add).
+@@ -17,7 +17,7 @@
+ [pipe.make_recipe]
+ type = "PipeSequence"
+ description = "Sequence with drifted inputs."
+-inputs = { dish = "Number", garnish = "Text" }
++inputs = { dish = "Text", diet = "Text" }
+ output = "Recipe"
+ steps = [
+   { pipe = "write_recipe", result = "recipe" },
+
+✅ Fix preview — these fixes would make the bundle valid
+
+Bundle: bad_bundles/03_inputs_drift/bundle.mthds
+
+Fixes that would be applied:
+  1. Sync inputs of pipe 'make_recipe' with its steps' needs: add 'diet'; update
+'dish'; remove 'garnish' (sync-controller-inputs)
+
+Files that would be written:
+  - 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/03_inputs_drift/bundle.m
+thds
+
+Iterations: 1
+
+==> exit: 0
+
+########## AGENT fix (markdown)
+$ pipelex-agent fix bundle bad_bundles/03_inputs_drift/bundle.mthds
+----------
+# Fix applied - bundle is valid
+
+- **Bundle:** `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/03_inputs_drift/bundle.mthds`
+- **Iterations:** 1
+
+## Applied Fixes
+
+- `sync-controller-inputs` - Sync inputs of pipe 'make_recipe' with its steps' needs: add 'diet'; update 'dish'; remove 'garnish'
+
+## Files Written
+
+- `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/03_inputs_drift/bundle.mthds`
+==> exit: 0
+

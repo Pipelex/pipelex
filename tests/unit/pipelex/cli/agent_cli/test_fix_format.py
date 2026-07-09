@@ -172,6 +172,33 @@ class TestFixFormat:
         assert parsed["bail_reason"] == "no safe fixes remain"
         assert parsed["remaining_errors"][0]["source"] == str(bundle_path)
 
+    def test_still_invalid_markdown_renders_prose(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Default (markdown) still-invalid renders the remaining errors as prose on stderr, not a JSON dump."""
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
+        result = FixBundleResult(
+            is_valid=False,
+            iterations=1,
+            fixes_applied=[_applied_fix(str(bundle_path))],
+            files_written=[str(bundle_path.resolve())],
+            remaining_errors=[_invalid_item(str(bundle_path))],
+            bail_reason="no safe fixes remain",
+        )
+        _patch_command(mocker, result=result)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path))  # default output_format is markdown
+
+        assert exc_info.value.exit_code == 1
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert captured.err.startswith("# Fix incomplete - bundle still invalid")
+        assert "## Applied Fixes" in captured.err
+        assert "**Stopped:** no safe fixes remain" in captured.err
+        assert "## Pipe validation errors" in captured.err
+        with pytest.raises(json.JSONDecodeError):
+            json.loads(captured.err)
+
     def test_select_and_ignore_are_mutually_exclusive(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             fix_bundle_cmd(

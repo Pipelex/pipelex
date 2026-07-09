@@ -1,0 +1,166 @@
+########## HUMAN validate
+$ pipelex validate bundle bad_bundles/05_native_concept_redecl/bundle.mthds
+----------
+
+❌ Bundle validation failed
+
+Bundle: bad_bundles/05_native_concept_redecl/bundle.mthds
+
+Blueprint Validation Errors:
+
+1. Native Concept Redeclaration
+   Concept: Text
+   Domain: greeting_desk
+   → Cannot declare a concept named 'Text' because it is natively available in 
+Pipelex. Native concepts are: Dynamic, Text, Image, Document, Html, 
+TextAndImages, Number, YesNo, Date, Page, JSON, SearchResult, Anything, 
+Composite. See 
+https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/
+   💡 Suggested fix: Remove the redeclaration of native concept 'Text'
+   └─ Source: bad_bundles/05_native_concept_redecl/bundle.mthds
+
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle 
+bad_bundles/05_native_concept_redecl/bundle.mthds
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT validate (markdown)
+$ pipelex-agent validate bundle bad_bundles/05_native_concept_redecl/bundle.mthds
+----------
+# Bundle validation failed
+
+**Bundle:** `bad_bundles/05_native_concept_redecl/bundle.mthds`
+
+## Blueprint validation errors
+
+1. **Native Concept Redeclaration**
+   - Concept: `Text`
+   - Domain: `greeting_desk`
+   - Cannot declare a concept named 'Text' because it is natively available in Pipelex. Native concepts are: Dynamic, Text, Image, Document, Html, TextAndImages, Number, YesNo, Date, Page, JSON, SearchResult, Anything, Composite. See https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/
+   - 💡 Suggested fix: Remove the redeclaration of native concept 'Text'
+   - Source: `bad_bundles/05_native_concept_redecl/bundle.mthds`
+
+💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle bad_bundles/05_native_concept_redecl/bundle.mthds`
+==> exit: 1
+
+########## AGENT validate (json)
+$ pipelex-agent validate bundle bad_bundles/05_native_concept_redecl/bundle.mthds --format json
+----------
+{
+  "error": true,
+  "error_type": "ValidateBundleError",
+  "message": "Validation error(s):\n\nValue errors: 'concept': Value error, Cannot declare a concept named 'Text' because it is natively available in Pipelex. Native concepts are: Dynamic, Text, Image, Document, Html, TextAndImages, Number, YesNo, Date, Page, JSON, SearchResult, Anything, Composite. See https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/",
+  "hint": "Check the validation_errors array for specific issues",
+  "error_domain": "input",
+  "error_source": [
+    "ValidateBundleError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipeline/validate_bundle.py:142 (in _translate_to_validate_bundle_error)",
+    "PipelexInterpreterError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/interpreter/interpreter.py:86 (in make_pipelex_bundle_blueprint)",
+    "ValidationError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/interpreter/interpreter.py:76 (in make_pipelex_bundle_blueprint)"
+  ],
+  "is_valid": false,
+  "bundle_path": "bad_bundles/05_native_concept_redecl/bundle.mthds",
+  "validation_errors": [
+    {
+      "category": "blueprint_validation",
+      "message": "Cannot declare a concept named 'Text' because it is natively available in Pipelex. Native concepts are: Dynamic, Text, Image, Document, Html, TextAndImages, Number, YesNo, Date, Page, JSON, SearchResult, Anything, Composite. See https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/",
+      "error_type": "native_concept_redeclaration",
+      "concept_code": "Text",
+      "domain_code": "greeting_desk",
+      "source": "bad_bundles/05_native_concept_redecl/bundle.mthds",
+      "suggested_fix": {
+        "fix_code": "strip-native-concept-redecl",
+        "description": "Remove the redeclaration of native concept 'Text'",
+        "safety": "safe",
+        "source": "bad_bundles/05_native_concept_redecl/bundle.mthds",
+        "ops": [
+          {
+            "kind": "delete_key",
+            "table_path": [
+              "concept"
+            ],
+            "key": "Text"
+          }
+        ]
+      }
+    }
+  ]
+}
+==> exit: 1
+
+########## HUMAN fix --diff
+$ pipelex fix bundle bad_bundles/05_native_concept_redecl/bundle.mthds --diff
+----------
+
+Preview (--diff): no files were written. Proposed changes:
+
+--- 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/05_native_concept_redecl
+/bundle.mthds
++++ 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/05_native_concept_redecl
+/bundle.mthds (fixed)
+@@ -1,4 +1,4 @@
+-domain = "greeting_desk"
++domain    = "greeting_desk"
+ main_pipe = "greet"
+ 
+ [concept]
+@@ -6,12 +6,10 @@
+ # BROKEN: both of these redeclare NATIVE concepts (illegal). Validation raises 
+on the
+ # first offending code per pass, so the loop strips one per iteration — two 
+iterations.
+ # The real concept 'Greeting' above must survive untouched.
+-Text = "Redeclared native Text."
+-Number = "Redeclared native Number."
+ 
+ [pipe.greet]
+-type = "PipeLLM"
++type        = "PipeLLM"
+ description = "Greet someone a number of times."
+-inputs = { name = "Text", count = "Number" }
+-output = "Greeting"
+-prompt = "Greet $name $count times"
++inputs      = { name = "Text", count = "Number" }
++output      = "Greeting"
++prompt      = "Greet $name $count times"
+
+✅ Fix preview — these fixes would make the bundle valid
+
+Bundle: bad_bundles/05_native_concept_redecl/bundle.mthds
+
+Fixes that would be applied:
+  1. Remove the redeclaration of native concept 'Text' 
+(strip-native-concept-redecl)
+  2. Remove the redeclaration of native concept 'Number' 
+(strip-native-concept-redecl)
+
+Files that would be written:
+  - 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/05_native_concept_redecl
+/bundle.mthds
+
+Iterations: 2
+
+==> exit: 0
+
+########## AGENT fix (markdown)
+$ pipelex-agent fix bundle bad_bundles/05_native_concept_redecl/bundle.mthds
+----------
+# Fix applied - bundle is valid
+
+- **Bundle:** `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/05_native_concept_redecl/bundle.mthds`
+- **Iterations:** 2
+
+## Applied Fixes
+
+- `strip-native-concept-redecl` - Remove the redeclaration of native concept 'Text'
+- `strip-native-concept-redecl` - Remove the redeclaration of native concept 'Number'
+
+## Files Written
+
+- `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/05_native_concept_redecl/bundle.mthds`
+==> exit: 0
+

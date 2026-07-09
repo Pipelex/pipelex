@@ -1,0 +1,216 @@
+########## HUMAN validate
+$ pipelex validate bundle bad_bundles/09_unfixable_collision/target.mthds -L bad_bundles/09_unfixable_collision
+----------
+
+❌ Bundle validation failed
+
+Bundle: bad_bundles/09_unfixable_collision/target.mthds
+
+Blueprint Validation Errors:
+
+1. Invalid Pipe Code Syntax
+   Pipe: tapas_bar.hola
+   Domain: tapas_bar
+   → Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.
+   💡 Suggested fix: Strip the same-domain prefix from pipe 'tapas_bar.hola' 
+(rename to 'hola')
+   └─ Source: bad_bundles/09_unfixable_collision/target.mthds
+
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle 
+bad_bundles/09_unfixable_collision/target.mthds -L 
+bad_bundles/09_unfixable_collision
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT validate (markdown)
+$ pipelex-agent validate bundle bad_bundles/09_unfixable_collision/target.mthds -L bad_bundles/09_unfixable_collision
+----------
+# Error: ValidateBundleError
+
+Could not load MTHDS bundle from 'bad_bundles/09_unfixable_collision/target.mthds' because of: Validation error(s):
+
+Value errors: 'pipe': Value error, Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.
+
+> 💡 **Hint:** Check the validation_errors array for specific issues
+
+## Details
+
+- **error_domain:** input
+- **is_valid:** False
+- **bundle_path:** bad_bundles/09_unfixable_collision/target.mthds
+- **validation_errors:**
+
+```json
+[
+  {
+    "category": "blueprint_validation",
+    "message": "Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
+    "error_type": "invalid_pipe_code_syntax",
+    "pipe_code": "tapas_bar.hola",
+    "domain_code": "tapas_bar",
+    "source": "bad_bundles/09_unfixable_collision/target.mthds",
+    "suggested_fix": {
+      "fix_code": "strip-namespace",
+      "description": "Strip the same-domain prefix from pipe 'tapas_bar.hola' (rename to 'hola')",
+      "safety": "safe",
+      "source": "bad_bundles/09_unfixable_collision/target.mthds",
+      "ops": [
+        {
+          "kind": "rename_table_key",
+          "table_path": [
+            "pipe"
+          ],
+          "key": "tapas_bar.hola",
+          "new_key": "hola"
+        }
+      ]
+    }
+  }
+]
+```
+
+==> exit: 1
+
+########## AGENT validate (json)
+$ pipelex-agent validate bundle bad_bundles/09_unfixable_collision/target.mthds -L bad_bundles/09_unfixable_collision --format json
+----------
+{
+  "error": true,
+  "error_type": "ValidateBundleError",
+  "message": "Could not load MTHDS bundle from 'bad_bundles/09_unfixable_collision/target.mthds' because of: Validation error(s):\n\nValue errors: 'pipe': Value error, Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
+  "hint": "Check the validation_errors array for specific issues",
+  "error_domain": "input",
+  "error_source": [
+    "ValidateBundleError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipeline/validate_bundle.py:202 (in _translate_to_validate_bundle_error)",
+    "LibraryLoadingError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/libraries/library_manager.py:788 (in _load_mthds_files_into_library)",
+    "PipelexInterpreterError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/interpreter/interpreter.py:86 (in make_pipelex_bundle_blueprint)",
+    "ValidationError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/core/interpreter/interpreter.py:76 (in make_pipelex_bundle_blueprint)"
+  ],
+  "is_valid": false,
+  "bundle_path": "bad_bundles/09_unfixable_collision/target.mthds",
+  "validation_errors": [
+    {
+      "category": "blueprint_validation",
+      "message": "Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
+      "error_type": "invalid_pipe_code_syntax",
+      "pipe_code": "tapas_bar.hola",
+      "domain_code": "tapas_bar",
+      "source": "bad_bundles/09_unfixable_collision/target.mthds",
+      "suggested_fix": {
+        "fix_code": "strip-namespace",
+        "description": "Strip the same-domain prefix from pipe 'tapas_bar.hola' (rename to 'hola')",
+        "safety": "safe",
+        "source": "bad_bundles/09_unfixable_collision/target.mthds",
+        "ops": [
+          {
+            "kind": "rename_table_key",
+            "table_path": [
+              "pipe"
+            ],
+            "key": "tapas_bar.hola",
+            "new_key": "hola"
+          }
+        ]
+      }
+    }
+  ]
+}
+==> exit: 1
+
+########## HUMAN fix --diff
+$ pipelex fix bundle bad_bundles/09_unfixable_collision/target.mthds -L bad_bundles/09_unfixable_collision --diff
+----------
+
+❌ Fix preview — the bundle would still be invalid
+
+Bundle: bad_bundles/09_unfixable_collision/target.mthds
+
+Stopped: cross-file collision: every remaining fix would write a pipe code 
+('hola') already declared in a sibling bundle
+
+Remaining errors:
+
+Blueprint Validation Errors:
+
+1. Invalid Pipe Code Syntax
+   Pipe: tapas_bar.hola
+   Domain: tapas_bar
+   → Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.
+   💡 Suggested fix: Strip the same-domain prefix from pipe 'tapas_bar.hola' 
+(rename to 'hola')
+   └─ Source: 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/09_unfixable_collision/t
+arget.mthds
+
+💡 Tip: Some remaining errors above still show a suggested fix that was not 
+applied — they were skipped by --select/--ignore, fell outside the write scope, 
+or the loop stopped early (see the reason above). Adjust those flags (or pass 
+-L) and re-run, or fix the rest manually.
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT fix (markdown)
+$ pipelex-agent fix bundle bad_bundles/09_unfixable_collision/target.mthds -L bad_bundles/09_unfixable_collision
+----------
+# Error: FixBundleError
+
+Fix loop stopped after 0 iteration(s): 0 fix(es) applied, 1 error(s) remaining; cross-file collision: every remaining fix would write a pipe code ('hola') already declared in a sibling bundle
+
+> 💡 **Hint:** Inspect remaining_errors and bail_reason, adjust the bundle, then run fix or validate again
+
+## Details
+
+- **error_domain:** input
+- **bundle_path:** /Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/09_unfixable_collision/target.mthds
+- **is_valid:** False
+- **iterations:** 0
+- **fixes_applied:**
+
+```json
+[]
+```
+
+- **files_written:**
+
+```json
+[]
+```
+
+- **remaining_errors:**
+
+```json
+[
+  {
+    "category": "blueprint_validation",
+    "message": "Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
+    "error_type": "invalid_pipe_code_syntax",
+    "pipe_code": "tapas_bar.hola",
+    "domain_code": "tapas_bar",
+    "source": "bad_bundles/09_unfixable_collision/target.mthds",
+    "suggested_fix": {
+      "fix_code": "strip-namespace",
+      "description": "Strip the same-domain prefix from pipe 'tapas_bar.hola' (rename to 'hola')",
+      "safety": "safe",
+      "source": "bad_bundles/09_unfixable_collision/target.mthds",
+      "ops": [
+        {
+          "kind": "rename_table_key",
+          "table_path": [
+            "pipe"
+          ],
+          "key": "tapas_bar.hola",
+          "new_key": "hola"
+        }
+      ]
+    }
+  }
+]
+```
+
+- **bail_reason:** cross-file collision: every remaining fix would write a pipe code ('hola') already declared in a sibling bundle
+==> exit: 1
+

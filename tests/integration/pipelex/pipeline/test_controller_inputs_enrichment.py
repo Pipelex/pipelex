@@ -319,6 +319,14 @@ class TestControllerInputsEnrichment:
         error_data = await _error_data_for([_CONCEPT_MISMATCH_MTHDS], error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH)
         assert error_data.pipe_code == "make_summary"
         assert error_data.expected_inputs == {"text": "Text"}
+        # The message speaks author syntax (Number vs Text) and names the fix — never the Python repr
+        # of the Concept/StuffSpec objects (`Concept(...)`, `presence=<PresenceMarker...>`).
+        assert (
+            error_data.message
+            == "In pipe 'make_summary', input 'text' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'."
+        )
+        assert "Concept(" not in error_data.message
+        assert "presence=" not in error_data.message
 
     async def test_multiplicity_mismatch_carries_expected_inputs(
         self,

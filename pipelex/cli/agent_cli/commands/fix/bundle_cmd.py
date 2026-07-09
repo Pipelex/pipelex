@@ -1,19 +1,26 @@
 """Agent CLI fix bundle command."""
 
 import asyncio
+import sys
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_error,
+    agent_success_formatted,
+    get_agent_cli_error_format,
+    set_agent_cli_error_format,
+)
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file
-from pipelex.pipeline.fixes.fix_render import format_fix_markdown
+from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
 
@@ -133,7 +140,15 @@ def fix_bundle_cmd(
                 raise typer.Exit(1)
             return
 
-        agent_error(_failure_message(result), error_type="FixBundleError", exit_code=1, **payload)
+        # Still-invalid verdict: format-aware. JSON keeps the exact FixBundleError envelope (the result
+        # fields + bail_reason via **payload); markdown renders the remaining errors as prose with their
+        # 💡 lines (mirroring the human still-invalid panel) instead of a raw JSON dump of the details.
+        match get_agent_cli_error_format():
+            case CliOutputFormat.JSON:
+                agent_error(_failure_message(result), error_type="FixBundleError", exit_code=1, **payload)
+            case CliOutputFormat.MARKDOWN:
+                print(format_fix_still_invalid_markdown(result, bundle_path=str(payload["bundle_path"])), file=sys.stderr)
+                raise typer.Exit(1)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)

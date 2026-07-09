@@ -1,0 +1,217 @@
+########## HUMAN validate
+$ pipelex validate bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs
+----------
+
+❌ Bundle validation failed
+
+Bundle: bad_bundles/08_multi_file_cascade/entry.mthds
+
+Pipe Validation Errors:
+
+1. Inadequate Output Multiplicity
+   Pipe: sibling_seq
+   Domain: quote_vault
+   → PipeSequence output multiplicity mismatch: the sequence 'sibling_seq' 
+declares its output as 'Quote', but its last step 'gen_quotes' yields 'Quote[]'.
+Update the sequence's output to 'Quote[]' (or change the last step).
+   💡 Suggested fix: Set output of pipe 'sibling_seq' to 'Quote[]' to match its 
+last step
+   └─ Path: bad_bundles/08_multi_file_cascade/libs/sibling.mthds
+   └─ Source: bad_bundles/08_multi_file_cascade/libs/sibling.mthds
+
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle 
+bad_bundles/08_multi_file_cascade/entry.mthds -L 
+bad_bundles/08_multi_file_cascade/libs
+Learn more: https://docs.pipelex.com/
+Join our Discord for help: https://go.pipelex.com/discord
+
+==> exit: 1
+
+########## AGENT validate (markdown)
+$ pipelex-agent validate bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs
+----------
+# Bundle validation failed
+
+**Bundle:** `bad_bundles/08_multi_file_cascade/entry.mthds`
+
+## Pipe validation errors
+
+1. **Inadequate Output Multiplicity**
+   - Pipe: `sibling_seq`
+   - Domain: `quote_vault`
+   - PipeSequence output multiplicity mismatch: the sequence 'sibling_seq' declares its output as 'Quote', but its last step 'gen_quotes' yields 'Quote[]'. Update the sequence's output to 'Quote[]' (or change the last step).
+   - 💡 Suggested fix: Set output of pipe 'sibling_seq' to 'Quote[]' to match its last step
+   - Path: `bad_bundles/08_multi_file_cascade/libs/sibling.mthds`
+   - Source: `bad_bundles/08_multi_file_cascade/libs/sibling.mthds`
+
+💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs`
+==> exit: 1
+
+########## AGENT validate (json)
+$ pipelex-agent validate bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs --format json
+----------
+{
+  "error": true,
+  "error_type": "ValidateBundleError",
+  "message": "Pipe validation failed: PipeSequence output multiplicity mismatch: the sequence 'sibling_seq' declares its output as 'Quote', but its last step 'gen_quotes' yields 'Quote[]'. Update the sequence's output to 'Quote[]' (or change the last step).",
+  "hint": "Check the validation_errors array for specific issues",
+  "error_domain": "input",
+  "error_source": [
+    "ValidateBundleError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipeline/validate_bundle.py:160 (in _translate_to_validate_bundle_error)",
+    "PipeValidationError @ /Users/lchoquel/repos/Pipelex/_autofix/pipelex/pipe_controllers/sequence/pipe_sequence.py:120 (in validate_output_with_library)"
+  ],
+  "is_valid": false,
+  "bundle_path": "bad_bundles/08_multi_file_cascade/entry.mthds",
+  "validation_errors": [
+    {
+      "category": "pipe_validation",
+      "message": "PipeSequence output multiplicity mismatch: the sequence 'sibling_seq' declares its output as 'Quote', but its last step 'gen_quotes' yields 'Quote[]'. Update the sequence's output to 'Quote[]' (or change the last step).",
+      "error_type": "inadequate_output_multiplicity",
+      "pipe_code": "sibling_seq",
+      "domain_code": "quote_vault",
+      "source": "bad_bundles/08_multi_file_cascade/libs/sibling.mthds",
+      "field_path": "bad_bundles/08_multi_file_cascade/libs/sibling.mthds",
+      "suggested_fix": {
+        "fix_code": "match-sequence-output",
+        "description": "Set output of pipe 'sibling_seq' to 'Quote[]' to match its last step",
+        "safety": "safe",
+        "source": "bad_bundles/08_multi_file_cascade/libs/sibling.mthds",
+        "ops": [
+          {
+            "kind": "set_key",
+            "table_path": [
+              "pipe",
+              "sibling_seq"
+            ],
+            "key": "output",
+            "value": "Quote[]"
+          }
+        ]
+      }
+    }
+  ]
+}
+==> exit: 1
+
+########## HUMAN fix --diff
+$ pipelex fix bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs --diff
+----------
+
+Preview (--diff): no files were written. Proposed changes:
+
+--- 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/li
+bs/sibling.mthds
++++ 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/li
+bs/sibling.mthds (fixed)
+@@ -4,11 +4,11 @@
+ Quote = "A memorable quote."
+ 
+ [pipe.gen_quotes]
+-type = "PipeLLM"
++type        = "PipeLLM"
+ description = "Collect memorable quotes."
+-inputs = { author = "Text" }
+-output = "Quote[]"
+-prompt = "List memorable quotes by $author"
++inputs      = { author = "Text" }
++output      = "Quote[]"
++prompt      = "List memorable quotes by $author"
+ 
+ # BROKEN: single output declared, last step yields a list — same disease as the
+entry
+ # file, but living in a library file. The fix must land HERE, not in 
+entry.mthds.
+@@ -16,7 +16,7 @@
+ type = "PipeSequence"
+ description = "Sibling sequence with the wrong output."
+ inputs = { author = "Text" }
+-output = "Quote"
++output = "Quote[]"
+ steps = [
+   { pipe = "gen_quotes", result = "quotes" },
+ ]
+
+--- 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/en
+try.mthds
++++ 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/en
+try.mthds (fixed)
+@@ -1,15 +1,15 @@
+-domain = "book_club"
++domain    = "book_club"
+ main_pipe = "entry_seq"
+ 
+ [concept]
+ Review = "A book review."
+ 
+ [pipe.write_reviews]
+-type = "PipeLLM"
++type        = "PipeLLM"
+ description = "Write book reviews."
+-inputs = { book = "Text" }
+-output = "Review[]"
+-prompt = "Write reviews of $book"
++inputs      = { book = "Text" }
++output      = "Review[]"
++prompt      = "Write reviews of $book"
+ 
+ # BROKEN: single output declared, last step yields a list. The sibling library 
+file
+ # under libs/ carries its OWN broken sequence — the loop patches each error in 
+the
+@@ -18,7 +18,7 @@
+ type = "PipeSequence"
+ description = "Entry sequence with the wrong output."
+ inputs = { book = "Text" }
+-output = "Review"
++output = "Review[]"
+ steps = [
+   { pipe = "write_reviews", result = "reviews" },
+ ]
+
+✅ Fix preview — these fixes would make the bundle valid
+
+Bundle: bad_bundles/08_multi_file_cascade/entry.mthds
+
+Fixes that would be applied:
+  1. Set output of pipe 'sibling_seq' to 'Quote[]' to match its last step 
+(match-sequence-output) — 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/li
+bs/sibling.mthds
+  2. Set output of pipe 'entry_seq' to 'Review[]' to match its last step 
+(match-sequence-output)
+
+Files that would be written:
+  - 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/li
+bs/sibling.mthds
+  - 
+/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/en
+try.mthds
+
+Iterations: 2
+
+==> exit: 0
+
+########## AGENT fix (markdown)
+$ pipelex-agent fix bundle bad_bundles/08_multi_file_cascade/entry.mthds -L bad_bundles/08_multi_file_cascade/libs
+----------
+# Fix applied - bundle is valid
+
+- **Bundle:** `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/entry.mthds`
+- **Iterations:** 2
+
+## Applied Fixes
+
+- `match-sequence-output` - Set output of pipe 'sibling_seq' to 'Quote[]' to match its last step (`bad_bundles/08_multi_file_cascade/libs/sibling.mthds`)
+- `match-sequence-output` - Set output of pipe 'entry_seq' to 'Review[]' to match its last step
+
+## Files Written
+
+- `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/libs/sibling.mthds`
+- `/Users/lchoquel/repos/Pipelex/pipelex-demos/bad_bundles/08_multi_file_cascade/entry.mthds`
+==> exit: 0
+
