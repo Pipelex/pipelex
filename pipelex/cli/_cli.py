@@ -12,6 +12,7 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.plugins_cmd import plugins_app
+from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
@@ -31,6 +32,7 @@ _CORE_COMMAND_ORDER: list[str] = [
     "update",
     "build",
     "validate",
+    "resolve",
     "run",
     "graph",
     "show",
@@ -227,6 +229,7 @@ app.add_typer(
     name="validate",
     help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
+app.command(name="resolve", help="Resolve a bundle closure into the normalized library crate (JSON or TOML) on stdout")(resolve_cmd)
 app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")

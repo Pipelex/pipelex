@@ -685,6 +685,13 @@ class LibraryManager(LibraryManagerAbstract):
         """
         ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
         for concept_ref, concept_blueprint in concepts.items():
+            # Native concepts are auto-registered in every library (make_empty_with_native_concepts).
+            # A normalized crate materializes them as explicit `native.<Code>` entries so external
+            # consumers are self-contained; re-adding them here would collide with the pre-registered
+            # natives. Skipping them makes a normalized crate directly loadable (round-trip), and is a
+            # no-op for a transport crate (which never carries native entries).
+            if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref):
+                continue
             parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
             if parsed.domain_path is None:
                 msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"

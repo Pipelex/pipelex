@@ -6,11 +6,11 @@
 
 ## Status block (update at every checkpoint)
 
-- **Current phase:** Phase 0 — **COMPLETE. CHECKPOINT A PASSED (2026-07-09).** Next session starts Phase 1.
-- **Next action:** begin Phase 1 — 1.1 (extract the neutral resolved-field layer from `StructureGenerator`). Before writing engine code, settle **D7** at Checkpoint B1 and confirm the still-PROPOSED D1–D6 with Louis (esp. **D4** — sibling `codegen.lock`, flagged below). Phase 1 is all in this pipelex worktree; run `make agent-check` + `make agent-test` (untouched in Phase 0, so must run for real in Phase 1).
+- **Current phase:** Phase 1 — **1.1, 1.2, 1.3 CODE COMPLETE + COMMITTED, gates green. CHECKPOINT B1 IN PROGRESS (protocol not finished — NOT yet passed).** The resolver + normalized-crate + encodings + `pipelex resolve` CLI all landed with tests; `make agent-check` and `make agent-test` both PASS.
+- **Next action:** finish the Checkpoint B1 protocol (the code is done — this is the review/settle/docs closeout): **(1)** run the `/code-review` fan-out — one cold Sonnet-5 reviewer on the pipelex diff since Checkpoint A (`git diff <checkpoint-A-pipelex-SHA>..HEAD` — the commit before this session's work), no plan/north-star context, high effort, anti-over-engineering; triage findings (apply clean-solid, defer design tradeoffs to `wip/devx/`). **(2)** Settle **D7** and confirm PROPOSED **D1–D6** with Louis (esp. **D4** — sibling `codegen.lock`). **(3)** Write the deferrals into `wip/devx/deferred-checkpoint-a-items.md` (or a new B1 doc): cross-package fold-in / fixture 1, and the conformance skeleton de-gate. **(4)** Update `wip/devx/devex-north-star.md` per its checkpoint protocol. **(5)** Cold-start test, then mark Checkpoint B1 PASSED. Then Phase 1 continues at **1.4 (emitters)**.
 - **Last checkpoint passed:** **Checkpoint A** — contracts spec'd + conformance skeletons + decisions recorded; all gates green; reviewed + fixed.
-- **Last commit(s):** mthds `feature/Codegen` `9104ea6` (spec + review fixes) · workspace-root `feature/Follow-ups` `50772e6` (docs/specs + review fixes) · conformance `feature/Codegen` `d42cadb` (skeletons + review fixes) · pipelex `feature/Devex-codegen` — TODOS commit is the final Checkpoint-A commit (this file). **None pushed.**
-- **Open decisions:** D1–D6 **PROPOSED** (built to; need Louis' SETTLED confirmation — D4 diverges from the plan's initial proposal, see Decision log). D7 OPEN (settle at B1), D8 OPEN (settle at C).
+- **Last commit(s):** mthds `feature/Codegen` `9104ea6` · workspace-root `feature/Follow-ups` `50772e6` · conformance `feature/Codegen` `d42cadb` · pipelex `feature/Devex-codegen` — **Checkpoint-A commit `1a7f9fe42` (tracker), then THIS SESSION's Phase-1 commit (see `git log`, message `feat(devx): Phase 1 — resolver + normalized crate + resolve CLI (1.1–1.3)`)**. **None pushed.**
+- **Open decisions:** D1–D6 **PROPOSED** (built to; need Louis' SETTLED confirmation — D4 diverges from the plan's initial proposal, see Decision log). D7 OPEN (settle at B1 — now due), D8 OPEN (settle at C).
 - **Deviations from north star found so far:** (1) The cookbook `extract_generic` case is *single-bundle* with the vendored dependency cache at the cookbook **repo root** (`pipelex-cookbook/.mthds/methods/documents/`), not per-case — the Phase 1 fixture must replicate that shape (bundle + ancestor `.mthds/methods/` cache) and a *separate* multi-bundle fixture must be authored, since no existing case exercises both at once. (2) Today's crate is built from **pre-validation blueprints** (`LibraryCrateFactory.make_from_blueprints`), while the north star requires the normalized crate be "built only from a valid library" — Phase 1 moves normalized-crate emission downstream of library load + validation (settled as D6). (3) **Two dependency caches exist** and the sibling standard specs only documented the global one (`~/.mthds/packages/{address}/{version}/`); the north star + pipelex use the project-local `.mthds/methods/<name>/` — the crate spec now documents both (Checkpoint-A review fix). (4) `codegen.lock` is proposed as a **sibling** to `methods.lock`, not an extension (D4) — diverges from the plan's initial "one lock, two sections."
 
 ## Cold-start protocol
@@ -117,30 +117,34 @@ Skeleton semantics (applies to all of Phase 0): a skeleton module asserts the sp
 
 A refactor around existing organs, not a rewrite. Genuinely new code: the normalization pass, the neutral resolved-field layer, the Zod/TS emitter.
 
-### 1.1 Neutral resolved-field layer (extraction from `StructureGenerator`)
+### 1.1 Neutral resolved-field layer (extraction from `StructureGenerator`) — ✅ DONE
 
-- [ ] Extract the semantic mapping (choices→literal, list/dict recursion, concept-ref resolution incl. natives, bare-ref promotion, `refines` base recovery, forward refs for cycles) into a neutral resolved-field model every emitter consumes (proposed home: `pipelex/codegen/resolved_fields.py`; today it emits Python type strings — the extraction makes it return language-neutral resolved fields).
-- [ ] Refactor `StructureGenerator` to consume the layer; runtime behavior via `concept_factory.py` unchanged (existing suite is the harness).
-- [ ] Delete the dead legacy dict-based path (`_generate_field`, `_get_python_type`, `enum_definitions`).
-- [ ] Where the source is imprecise (untyped `list`, structureless concept): resolved field carries an explicit imprecision marker emitters must surface (TODO comment / card caveat), never a guess.
+- [x] Extract the semantic mapping (choices→literal, list/dict recursion, concept-ref resolution incl. natives, bare-ref promotion, `refines` base recovery, forward refs for cycles) into a neutral resolved-field model every emitter consumes → `pipelex/codegen/resolved_fields.py` (`ResolvedField`/`ResolvedType`/`ResolvedTypeKind`, `resolve_structure_fields`).
+- [x] Refactor `StructureGenerator` to consume the layer; runtime behavior via `concept_factory.py` unchanged (existing suite is the harness — byte-identical output, 307 tests green).
+- [x] Delete the dead legacy dict-based path (`_generate_field`, `_get_python_type`, `enum_definitions`).
+- [x] Where the source is imprecise (untyped `list`, structureless concept): resolved field carries an explicit imprecision marker (`ANY` + `imprecise`/`imprecision_reason`) emitters must surface, never a guess.
 
-### 1.2 Normalization pass → normalized crate
+### 1.2 Normalization pass → normalized crate — ✅ DONE
 
-- [ ] Implement the spec'd normalization (proposed home: `pipelex/libraries/crate_normalization.py`), producing a normalized `LibraryCrate` from a loaded, validated Library (per D6): in-body ref qualification, refinement flattening into effective structures, native expansion pinned to spec version, defaults+multiplicity materialization, string-concept promotion (D5).
-- [ ] Fingerprint per D2 scope, reusing the canonical-JSON hashing seed; normalized fingerprint is THE semantic hash downstream.
-- [ ] Round-trip guarantee tests: normalized crate loads via `load_from_crate` and validates; normalizing twice is a fixed point (idempotent).
+- [x] Implement the spec'd normalization → `pipelex/libraries/crate_normalization.py` (`normalize_crate`), producing a normalized `LibraryCrate` from a loaded, validated Library (per D6): in-body ref qualification (multiplicity markers preserved), refinement flattening into effective structures, native expansion (`pipelex/codegen/native_expansion.py`, faithful-or-structureless via introspection, pinned to `mthds_version`), string-concept promotion (D5). `CrateNormalizationError` in `pipelex/libraries/exceptions.py`.
+- [x] Fingerprint per D2 scope → `LibraryCrate.compute_normalized_fingerprint` (concepts+pipes+domains, per-object `source` stripped, canonical JSON ≈ JCS); `compute_fingerprint_from_content` kept for the transport crate (D6/D-A2).
+- [x] Round-trip guarantee tests: normalized crate loads via `load_from_crate` and validates (integration); normalizing twice is a fixed point (unit idempotence test). **Loader change:** `_load_concepts_from_crate` now skips `native.*` entries (pre-registered natives would collide — this is the D-A1/D6 round-trip enabler).
 
-### 1.3 Crate encodings + `pipelex resolve` CLI
+### 1.3 Crate encodings + `pipelex resolve` CLI — ✅ DONE
 
-- [ ] JSON and TOML encodings per the 0.1 canonical-serialization rules.
-- [ ] New `pipelex resolve` command (new family under `pipelex/cli/commands/`): assembles the closure (working bundles + `.mthds/methods/` cache) and emits the normalized crate; format flag per spec.
-- [ ] TOML-encoded crate is directly runnable (feed it back to `pipelex run`/`validate` as a bundle set) — test it.
+- [x] JSON and TOML encodings → `pipelex/codegen/crate_encoding.py` (`encode_crate_json/toml`, `encode_crate`, `CrateEncoding`); top-level maps key-sorted, nested field order preserved, inline `source` + `pipe_category` dropped (non-semantic), TOML dotted qualified refs quoted (tomlkit).
+- [x] New `pipelex resolve [PATH]... [-f json|toml] [-L DIR]...` command → `pipelex/cli/commands/resolve_cmd.py`, registered in `pipelex/cli/_cli.py` (`_CORE_COMMAND_ORDER` + `app.command`). Flow: `make_pipelex_for_cli → load_libraries_and_activate → get_crate → normalize_crate(mthds_version=MTHDS_STANDARD_VERSION) → encode`. Exit codes 0 resolved / 1 invalid library / 2 empty-closure|not-found.
+- [x] TOML-encoded crate is directly runnable (parse → `LibraryCrate` → `load_from_crate` into a live library) — proven in `test_resolve_flow.py`.
 
-### CHECKPOINT B1 — resolver landed (mid-phase)
+  Tests added: `tests/unit/pipelex/libraries/test_crate_normalization.py`, `tests/integration/pipelex/libraries/test_crate_normalization_round_trip.py`, `tests/unit/pipelex/codegen/test_crate_encoding.py`, `tests/integration/pipelex/codegen/test_resolve_flow.py` (multi-bundle closure = fixture 2 shape), `tests/unit/pipelex/cli/test_resolve_exit_codes.py`.
 
-- [ ] Full checkpoint protocol executed (repos: `pipelex`; `/code-review` fan-out on the diff since Checkpoint A; update docs; STOP).
-- [ ] Definition of done: 1.1–1.3 complete; `pipelex resolve` emits a spec-conformant crate for both fixtures (see 1.7); conformance crate-shape skeleton now passes against real output; gates green.
-- [ ] Settle **D7 — where compile gates run**: emitted-TS `tsc --strict` gate needs a node toolchain — proposal: pyright gate on emitted Python lives in pipelex tests; the tsc gate lives in `conformance/` (cross-repo harness already exists). Record the decision.
+### CHECKPOINT B1 — resolver landed (mid-phase) — IN PROGRESS (code committed, protocol not finished)
+
+Code for 1.1–1.3 is written, committed on `feature/Devex-codegen`, and gates are green (`make agent-check` + `make agent-test` both PASS). Remaining protocol steps (do these on resume, then mark PASSED):
+
+- [ ] Full checkpoint protocol executed (repos: `pipelex`; `/code-review` fan-out on the diff since Checkpoint A — cold Sonnet-5, no plan/north-star context, anti-over-engineering; triage → apply clean-solid, defer tradeoffs to `wip/devx/`; update docs; STOP).
+- [~] Definition of done: **1.1–1.3 complete ✅** and gates green ✅; `pipelex resolve` emits a spec-conformant crate for the **multi-bundle fixture (fixture 2) ✅** — **fixture 1 (`extract_generic` cross-package) DEFERRED** (cross-package `->` fold-in: `get_crate` returns only root-package content; single-package closures fully normalize; fold-in is additive — capture in `wip/devx/`); **conformance crate-shape skeleton de-gate DEFERRED** (conformance repo not in this worktree — release-gated cross-repo step).
+- [ ] Settle **D7 — where compile gates run**: emitted-TS `tsc --strict` gate needs a node toolchain — proposal: pyright gate on emitted Python lives in pipelex tests; the tsc gate lives in `conformance/` (cross-repo harness already exists). Record the decision in the Decision log.
 
 ### 1.4 Emitters
 
