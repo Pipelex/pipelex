@@ -16,6 +16,7 @@ from pipelex.graph.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
+    GraphSpecMode,
     IOSpec,
     NodeIOSpec,
     NodeKind,
@@ -23,6 +24,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
     TimingSpec,
+    make_graphspec_meta,
     output_digest_is_optional,
 )
 from pipelex.tracing.trace_events import (
@@ -122,6 +124,7 @@ class GraphSpecAssembler:
         *,
         graph_id: str,
         pipeline_ref: PipelineRef | None = None,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> GraphSpec:
         """Assemble a GraphSpec from a flat list of trace events.
 
@@ -129,11 +132,12 @@ class GraphSpecAssembler:
             events: Flat list of trace events, pre-sorted by (workflow_id, sequence).
             graph_id: The graph identifier for the assembled GraphSpec.
             pipeline_ref: Optional pipeline reference metadata.
+            mode: Provenance mode to stamp onto the assembled GraphSpec.
 
         Returns:
             A complete GraphSpec with nodes and edges.
         """
-        assembler = _AssemblerState(graph_id=graph_id, pipeline_ref=pipeline_ref or PipelineRef())
+        assembler = _AssemblerState(graph_id=graph_id, pipeline_ref=pipeline_ref or PipelineRef(), mode=mode)
         assembler.pass_one(events)
         assembler.pass_two()
         return assembler.build_graph_spec()
@@ -142,9 +146,10 @@ class GraphSpecAssembler:
 class _AssemblerState:
     """Mutable state for a single assembler invocation."""
 
-    def __init__(self, graph_id: str, pipeline_ref: PipelineRef) -> None:
+    def __init__(self, graph_id: str, pipeline_ref: PipelineRef, mode: GraphSpecMode) -> None:
         self._graph_id = graph_id
         self._pipeline_ref = pipeline_ref
+        self._mode = mode
         self._earliest_timestamp: datetime | None = None
 
         # Pass 1 accumulation
@@ -215,6 +220,7 @@ class _AssemblerState:
             pipeline_ref=self._pipeline_ref,
             nodes=nodes,
             edges=all_edges,
+            meta=make_graphspec_meta(mode=self._mode),
             pipe_registry=dict(self._pipe_registry),
             concept_registry=dict(self._concept_registry),
         )

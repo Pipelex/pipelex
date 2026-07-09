@@ -81,6 +81,7 @@ class PipeRun(PipeRunProtocol):
                     assemble_usage=trace_context.emit_usage_events,
                     domain_code=pipe_job.pipe.domain_code,
                     main_pipe_code=pipe_job.pipe.code,
+                    run_mode=pipe_job.pipe_run_params.run_mode,
                 )
 
             if delivery_assignment is not None:

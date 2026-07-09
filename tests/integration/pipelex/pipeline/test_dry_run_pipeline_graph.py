@@ -16,6 +16,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 
@@ -59,6 +60,7 @@ class TestDryRunPipelineGraphTransport:
         graph_spec, pipe_code = await dry_run_pipeline(mthds_contents=[_DRY_RUN_GRAPH_MTHDS])
 
         assert pipe_code == f"{_DRY_RUN_GRAPH_DOMAIN}.echo_subject"
+        assert graph_spec.meta["mode"] == GraphSpecMode.DRY
         traced_pipe_codes = {node.pipe_code for node in graph_spec.nodes if node.pipe_code}
         assert "echo_subject" in traced_pipe_codes
         assert "source" not in graph_spec.pipe_registry[f"{_DRY_RUN_GRAPH_DOMAIN}.echo_subject"]
