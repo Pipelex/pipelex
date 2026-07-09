@@ -2,16 +2,16 @@
 
 **Source of truth for the vision:** [`wip/devx/devex-north-star.md`](../wip/devx/devex-north-star.md) (workspace root). This file is the execution tracker: tasks, checkpoints, decisions, and cold-start state. When the two disagree on *what to build*, the north star wins; when they disagree on *current status*, this file wins.
 
-**Working branch (pipelex):** `feature/Devex-codegen` in this worktree (`_codegen/`). Other repos get sibling branches named `feature/devex-codegen` when first touched. Phases 0–2 touch: `mthds/`, workspace-root repo (`docs/specs/`), `conformance/`, `pipelex` (this worktree), then the starters. Phases 3+ fan out to `pipelex-api/`, `mthds-js/`, `pipelex-sdk-js/`, and hosted repos.
+**Working branches (actual, as of Checkpoint A):** pipelex `feature/Devex-codegen` in this worktree (`_codegen/`); mthds `feature/Codegen`; conformance `feature/Codegen`; workspace-root (`docs/specs/` + `wip/devx/`) on `feature/Follow-ups` (which also carries the north-star drafts). Louis pre-created the `feature/Codegen` branches. Phases 0–2 touch: `mthds/`, workspace-root, `conformance/`, `pipelex` (this worktree), then the starters. Phases 3+ fan out to `pipelex-api/`, `mthds-js/`, `pipelex-sdk-js/`, and hosted repos.
 
 ## Status block (update at every checkpoint)
 
-- **Current phase:** Phase 0 — not started.
-- **Next action:** start 0.1 — draft `mthds/docs/spec/library-crate.md` (branch `feature/devex-codegen` in `mthds/`), proposing answers to D1/D2/D5/D6 in the Decision log as you go.
-- **Last checkpoint passed:** none.
-- **Last commit(s):** pipelex `76477238b` (branch point, clean).
-- **Open decisions:** see "Decision log" below — all Phase 0 decisions open.
-- **Deviations from north star found so far:** (1) The cookbook `extract_generic` case is *single-bundle* with the vendored dependency cache at the cookbook **repo root** (`pipelex-cookbook/.mthds/methods/documents/`), not per-case — the Phase 1 fixture must replicate that shape (bundle + ancestor `.mthds/methods/` cache) and a *separate* multi-bundle fixture must be authored, since no existing case exercises both at once. (2) Today's crate is built from **pre-validation blueprints** (`LibraryCrateFactory.make_from_blueprints`), while the north star requires the normalized crate be "built only from a valid library" — Phase 1 moves normalized-crate emission downstream of library load + validation.
+- **Current phase:** Phase 0 — **COMPLETE. CHECKPOINT A PASSED (2026-07-09).** Next session starts Phase 1.
+- **Next action:** begin Phase 1 — 1.1 (extract the neutral resolved-field layer from `StructureGenerator`). Before writing engine code, settle **D7** at Checkpoint B1 and confirm the still-PROPOSED D1–D6 with Louis (esp. **D4** — sibling `codegen.lock`, flagged below). Phase 1 is all in this pipelex worktree; run `make agent-check` + `make agent-test` (untouched in Phase 0, so must run for real in Phase 1).
+- **Last checkpoint passed:** **Checkpoint A** — contracts spec'd + conformance skeletons + decisions recorded; all gates green; reviewed + fixed.
+- **Last commit(s):** mthds `feature/Codegen` `9104ea6` (spec + review fixes) · workspace-root `feature/Follow-ups` `50772e6` (docs/specs + review fixes) · conformance `feature/Codegen` `d42cadb` (skeletons + review fixes) · pipelex `feature/Devex-codegen` — TODOS commit is the final Checkpoint-A commit (this file). **None pushed.**
+- **Open decisions:** D1–D6 **PROPOSED** (built to; need Louis' SETTLED confirmation — D4 diverges from the plan's initial proposal, see Decision log). D7 OPEN (settle at B1), D8 OPEN (settle at C).
+- **Deviations from north star found so far:** (1) The cookbook `extract_generic` case is *single-bundle* with the vendored dependency cache at the cookbook **repo root** (`pipelex-cookbook/.mthds/methods/documents/`), not per-case — the Phase 1 fixture must replicate that shape (bundle + ancestor `.mthds/methods/` cache) and a *separate* multi-bundle fixture must be authored, since no existing case exercises both at once. (2) Today's crate is built from **pre-validation blueprints** (`LibraryCrateFactory.make_from_blueprints`), while the north star requires the normalized crate be "built only from a valid library" — Phase 1 moves normalized-crate emission downstream of library load + validation (settled as D6). (3) **Two dependency caches exist** and the sibling standard specs only documented the global one (`~/.mthds/packages/{address}/{version}/`); the north star + pipelex use the project-local `.mthds/methods/<name>/` — the crate spec now documents both (Checkpoint-A review fix). (4) `codegen.lock` is proposed as a **sibling** to `methods.lock`, not an extension (D4) — diverges from the plan's initial "one lock, two sections."
 
 ## Cold-start protocol
 
@@ -68,48 +68,48 @@ Contract-first: nothing in Phase 1 starts until Checkpoint A passes.
 
 ### 0.1 Spec the normalized library crate in the MTHDS standard (`mthds/` repo)
 
-- [ ] New formal spec `mthds/docs/spec/library-crate.md`, beside `manifest-format.md` and `lock-format.md`, covering: the three units (bundle / library / pipe) and the resolution rule (resolve a library; project types over its concept set; project runnables per pipe).
-- [ ] Closure-assembly rules: working bundles + local method cache (`.mthds/methods/`, ancestor-walk discovery), cross-package refs, alignment with `namespace-resolution.md` and `docs/implementers/package-loading.md` §"Library Assembly" (cross-reference, don't duplicate).
-- [ ] Normalization pass, precisely: merge bundles; fully qualify **every** ref (dict keys AND in-body refs: pipe steps, inputs/output concept refs, `refines`); flatten refinement into effective structures; expand native concepts pinned to the spec version; materialize defaults and multiplicity; promote string-described concepts to explicit blueprint form; built only from a *valid* library (the artifact carries the verdict implicitly).
-- [ ] Fingerprint definition: SHA-256 over canonical JSON of normalized content; specify exact canonicalization (sorted keys, ascii, sorted refs — today's `compute_fingerprint_from_content` is the seed) and the hash **scope** decision (D2 below).
-- [ ] Both encodings: JSON (machine-native, keyed to the published `mthds_schema.json` model) and TOML (human-diffable, directly runnable); canonical serialization rules for each so independent implementations byte-agree.
-- [ ] The sufficiency guarantee, stated as a testable contract: a consumer with only a JSON/TOML parser and one normalized crate can emit correct types / render a correct form / register a correct tool — no loader, no namespace resolution, no hardcoded natives.
-- [ ] Wire into `mkdocs.yml` nav; add narrative pointer from `docs/packages/` if appropriate; `[Unreleased]` changelog entry.
+- [x] New formal spec `mthds/docs/spec/library-crate.md`, beside `manifest-format.md` and `lock-format.md`, covering: the three units (bundle / library / pipe) and the resolution rule (resolve a library; project types over its concept set; project runnables per pipe).
+- [x] Closure-assembly rules: working bundles + local method cache (`.mthds/methods/`, ancestor-walk discovery), cross-package refs, alignment with `namespace-resolution.md` and `docs/implementers/package-loading.md` §"Library Assembly" (cross-reference, don't duplicate).
+- [x] Normalization pass, precisely: merge bundles; fully qualify **every** ref (dict keys AND in-body refs: pipe steps, inputs/output concept refs, `refines`); flatten refinement into effective structures; expand native concepts pinned to the spec version; materialize defaults and multiplicity; promote string-described concepts to explicit blueprint form; built only from a *valid* library (the artifact carries the verdict implicitly).
+- [x] Fingerprint definition: SHA-256 over canonical JSON of normalized content; specify exact canonicalization (sorted keys, ascii, sorted refs — today's `compute_fingerprint_from_content` is the seed) and the hash **scope** decision (D2 below).
+- [x] Both encodings: JSON (machine-native, keyed to the published `mthds_schema.json` model) and TOML (human-diffable, directly runnable); canonical serialization rules for each so independent implementations byte-agree.
+- [x] The sufficiency guarantee, stated as a testable contract: a consumer with only a JSON/TOML parser and one normalized crate can emit correct types / render a correct form / register a correct tool — no loader, no namespace resolution, no hardcoded natives.
+- [x] Wire into `mkdocs.yml` nav; add narrative pointer from `docs/packages/` if appropriate; `[Unreleased]` changelog entry.
 
 ### 0.2 Spec the codegen surface in `docs/specs/` (workspace-root repo)
 
-- [ ] New spec (proposed: `docs/specs/pipelex-codegen.md`; split later only if it bloats — D3) with front matter (`id:`, `sources:`) and per-surface `> Verified by:` / `<!-- unverified: -->` markers, covering:
-  - [ ] **Stamp header format** — fields: source crate fingerprint, engine version, projection, options, generated-content hash; comment syntax per emitted language; self-describing requirement.
-  - [ ] **Lock format** — artifact-set manifest with hashes (catches deleted-concept stale files); named "lock" not "manifest"; relationship to `methods.lock` per decision D4.
-  - [ ] **Offline check algorithm** — pure hashing, no network / API key / engine; spec'd precisely enough for independent implementation (CLI, SDK, short CI script); exit/verdict semantics.
-  - [ ] **CLI surface** — `pipelex resolve` (emit crate, JSON|TOML); `pipelex codegen types|inputs|docs|tools|tests --target <flavor> [--pipe <pipe_ref>]` (two explicit axes, no flat kind×format enum; `--pipe` defaults to `main_pipe`); `codegen check`; `codegen diff`; `build inputs`/`build structures` re-pointing as aliases. Verdict in structured output, never exit code (workspace meta-rule).
-  - [ ] **Route envelopes** — codegen + resolve routes on `pipelex-api`: request accepts inline `files[]` (multi-bundle) *or* `method_ref`; response 200 discriminated on `is_valid` exactly like `/v1/validate`; request-shape errors (unknown projection/target) are 422 problem+json; resolution and type/schema projections flagged protocol capabilities (`x-mthds-protocol`), runtime-structures emission stays a Pipelex extension.
-  - [ ] **Name-derivation rules** — slug → file/module/type spellings spec'd once for every consumer: TS camelCase with bidirectional wire snake↔camel mapping and wire names documented inline; Python stays snake_case; domain-qualified class naming (existing `make_qualified_structure_class_name` behavior is the seed).
-- [ ] Update `docs/specs/command-surface-map.md` with the codegen/resolve chain.
-- [ ] Update `docs/specs/README.md` table.
+- [x] New spec (proposed: `docs/specs/pipelex-codegen.md`; split later only if it bloats — D3) with front matter (`id:`, `sources:`) and per-surface `> Verified by:` / `<!-- unverified: -->` markers, covering:
+  - [x] **Stamp header format** — fields: source crate fingerprint, engine version, projection, options, generated-content hash; comment syntax per emitted language; self-describing requirement.
+  - [x] **Lock format** — artifact-set manifest with hashes (catches deleted-concept stale files); named "lock" not "manifest"; relationship to `methods.lock` per decision D4.
+  - [x] **Offline check algorithm** — pure hashing, no network / API key / engine; spec'd precisely enough for independent implementation (CLI, SDK, short CI script); exit/verdict semantics.
+  - [x] **CLI surface** — `pipelex resolve` (emit crate, JSON|TOML); `pipelex codegen types|inputs|docs|tools|tests --target <flavor> [--pipe <pipe_ref>]` (two explicit axes, no flat kind×format enum; `--pipe` defaults to `main_pipe`); `codegen check`; `codegen diff`; `build inputs`/`build structures` re-pointing as aliases. Verdict in structured output, never exit code (workspace meta-rule).
+  - [x] **Route envelopes** — codegen + resolve routes on `pipelex-api`: request accepts inline `files[]` (multi-bundle) *or* `method_ref`; response 200 discriminated on `is_valid` exactly like `/v1/validate`; request-shape errors (unknown projection/target) are 422 problem+json; resolution and type/schema projections flagged protocol capabilities (`x-mthds-protocol`), runtime-structures emission stays a Pipelex extension.
+  - [x] **Name-derivation rules** — slug → file/module/type spellings spec'd once for every consumer: TS camelCase with bidirectional wire snake↔camel mapping and wire names documented inline; Python stays snake_case; domain-qualified class naming (existing `make_qualified_structure_class_name` behavior is the seed).
+- [x] Update `docs/specs/command-surface-map.md` with the codegen/resolve chain.
+- [x] Update `docs/specs/README.md` table.
 
 ### 0.3 Conformance skeletons (`conformance/` repo)
 
 Skeleton semantics (applies to all of Phase 0): a skeleton module asserts the spec'd envelope but is marked skip/xfail with a reason naming the phase that implements the surface (CLI surfaces → Phase 1, routes → Phase 3, check/stamp/lock → Phase 2); the implementing phase de-skeletons it. At Checkpoint A only `check-spec-links` must be green — no skeleton needs to pass.
 
-- [ ] Skeleton test modules pinning the CLI envelopes: `tests/pipelex/test_resolve*.py`, `tests/pipelex/test_codegen*.py`, each with `pytestmark = pytest.mark.spec(...)` pointing at 0.2 anchors; extend the dir's `test_data.py` CLISpec.
-- [ ] Skeleton module pinning the crate shape itself (normalized-crate JSON fixture asserted against the spec's structural promises: flat, fully qualified, no unexpanded natives, fingerprint present and recomputable).
-- [ ] Skeleton modules for the route envelopes under `tests/pipelex_api/`.
-- [ ] `make check-spec-links` green across the spec↔test pairs.
+- [x] Skeleton test modules pinning the CLI envelopes: `tests/pipelex/test_resolve*.py`, `tests/pipelex/test_codegen*.py`, each with `pytestmark = pytest.mark.spec(...)` pointing at 0.2 anchors; extend the dir's `test_data.py` CLISpec.
+- [x] Skeleton module pinning the crate shape itself (normalized-crate JSON fixture asserted against the spec's structural promises: flat, fully qualified, no unexpanded natives, fingerprint present and recomputable).
+- [x] Skeleton modules for the route envelopes under `tests/pipelex_api/`.
+- [x] `make check-spec-links` green across the spec↔test pairs.
 
 ### 0.4 Decisions to settle before Checkpoint A (record answers in the Decision log)
 
-- [ ] **D1 — crate spec naming**: "library crate" as the standard's term (neutral, no `pipelex_` wire fields) — confirm or rename once, before anything ships.
-- [ ] **D2 — fingerprint scope**: today's hash covers concepts+pipes only; domains carry `system_prompt` and `main_pipe` which are semantic. Decide inclusion (proposal: include normalized domain metadata; exclude `source_map`).
-- [ ] **D3 — one spec file or split** (CLI/stamps/lock/check vs routes vs naming). Proposal: one file, sectioned.
-- [ ] **D4 — lock relationship**: extend `methods.lock` (north star hints "same lock that will later pin remote-dependency SHAs") vs sibling artifact lock. Proposal: one lock file, two sections; spec the codegen section now, dependency section already spec'd.
-- [ ] **D5 — string-described concepts**: normalization promotes them to explicit `ConceptBlueprint` form — confirm the promoted shape.
-- [ ] **D6 — crate build point**: normalized crate is emitted from the loaded+validated Library (post-`validate_library()`), not from raw blueprints; the existing pre-validation `make_from_blueprints` path stays for Temporal transport until reconciled. Confirm.
+- [x] **D1 — crate spec naming**: "library crate" as the standard's term (neutral, no `pipelex_` wire fields) — confirm or rename once, before anything ships.
+- [x] **D2 — fingerprint scope**: today's hash covers concepts+pipes only; domains carry `system_prompt` and `main_pipe` which are semantic. Decide inclusion (proposal: include normalized domain metadata; exclude `source_map`).
+- [x] **D3 — one spec file or split** (CLI/stamps/lock/check vs routes vs naming). Proposal: one file, sectioned.
+- [x] **D4 — lock relationship**: extend `methods.lock` (north star hints "same lock that will later pin remote-dependency SHAs") vs sibling artifact lock. Proposal: one lock file, two sections; spec the codegen section now, dependency section already spec'd.
+- [x] **D5 — string-described concepts**: normalization promotes them to explicit `ConceptBlueprint` form — confirm the promoted shape.
+- [x] **D6 — crate build point**: normalized crate is emitted from the loaded+validated Library (post-`validate_library()`), not from raw blueprints; the existing pre-validation `make_from_blueprints` path stays for Temporal transport until reconciled. Confirm.
 
 ### CHECKPOINT A — contracts reviewed and settled before engine code
 
-- [ ] Full checkpoint protocol executed (verify · commit · `/code-review` fan-out per touched repo: `mthds`, workspace-root, `conformance` · TODOS/north-star update · cold-start test · STOP).
-- [ ] Definition of done: specs merged-ready on their branches; conformance skeletons exist and `check-spec-links` passes; every D1–D6 decision recorded with rationale.
+- [x] Full checkpoint protocol executed (verify · commit · `/code-review` fan-out per touched repo: `mthds`, workspace-root, `conformance` · TODOS/north-star update · cold-start test · STOP).
+- [x] Definition of done: specs merged-ready on their branches; conformance skeletons exist and `check-spec-links` passes; every D1–D6 decision recorded with rationale.
 
 ---
 
@@ -245,15 +245,33 @@ Statuses: OPEN (no proposal yet) → PROPOSED (agent's answer + rationale record
 
 | # | Decision | Status | Answer / rationale |
 | --- | --- | --- | --- |
-| D1 | Crate spec naming in the standard | OPEN | — |
-| D2 | Fingerprint hash scope (domains/system_prompt/main_pipe in or out) | OPEN | — |
-| D3 | One codegen spec file vs split | OPEN | proposal: one, sectioned |
-| D4 | Codegen lock: extend `methods.lock` vs sibling | OPEN | proposal: one lock, two sections |
-| D5 | Promoted shape for string-described concepts | OPEN | — |
-| D6 | Normalized crate built post-validation (loaded Library), transport crate path reconciled later | OPEN | — |
+| D1 | Crate spec naming in the standard | PROPOSED | **"library crate"** is the standard's term; the resolved-and-explicit form is the **"normalized library crate"** (short: "crate"). Wire/field names stay neutral — `concepts`, `pipes`, `domains`, `source_map`, `fingerprint` — no `pipelex_` prefix (matches the runtime `LibraryCrate` model and the brand rule: the artifact belongs to the standard). "Authored form" names the concise multi-bundle style. |
+| D2 | Fingerprint hash scope (domains/system_prompt/main_pipe in or out) | PROPOSED | **Widen** to `{concepts, pipes, domains}`: the normalized fingerprint is SHA-256 over canonical JSON of concepts + pipes + per-domain `{code, description, system_prompt, main_pipe}`. **Exclude** each domain's `source` and the top-level `source_map` (pure provenance — hashing file paths would make the fingerprint unstable under relocation). Rationale: `system_prompt` and `main_pipe` are execution semantics and `description` surfaces in doc/card projections, so a change to them *is* a meaning change that must invalidate downstream artifacts; today's concepts+pipes-only seed (`compute_fingerprint_from_content`) is widened in Phase 1. No back-compat concern (Temporal not shipped — see `project_temporal_not_shipped`). |
+| D3 | One codegen spec file vs split | PROPOSED | **One file**, `docs/specs/pipelex-codegen.md`, sectioned (stamp · lock · check · CLI · routes · naming · crate-shape contract). Split only if it bloats past readability. |
+| D4 | Codegen lock: extend `methods.lock` vs sibling | PROPOSED (⚠ diverges from plan's initial proposal) | **Sibling lock** (`codegen.lock`), a Pipelex-codegen artifact spec'd in `docs/specs/pipelex-codegen.md` — **not** an extension of the standard's `methods.lock`. Rationale: `methods.lock` is *standard-owned*, pins *remote dependencies* (version/hash/source) of an MTHDS **package**, and lives beside `METHODS.toml`; the codegen lock is *Pipelex-owned*, records the *generated-artifact set* (files + content hashes) in a **consumer project** that is often not an MTHDS package at all (a pure TS/Python app has no `METHODS.toml`/`methods.lock`). Different owner, location, content, lifecycle, and context-of-existence — folding Pipelex-codegen artifact hashes into the standard's lock would cross the brand/ownership boundary. The north star's "same lock that will later pin remote-dependency SHAs" is reconciled as a *possible future convergence* in the in-repo-package case, not a Phase-0 unification. **Flagged for Louis at Checkpoint A** — the one place I depart from the plan's stated proposal. |
+| D5 | Promoted shape for string-described concepts | PROPOSED | A string-described concept `R = "<text>"` promotes to `ConceptBlueprint(description="<text>")` with `structure` and `refines` both absent — a faithful, minimal promotion (the string form is exactly shorthand for a description-only concept). It stays **structureless**; whether a structureless concept is opaque or implicitly `Text`-like is a resolution/emission detail the projection surfaces as *imprecision* (a caveat / TODO), never a normalization-time guess. `source` carries over from `source_map`. |
+| D6 | Normalized crate built post-validation (loaded Library), transport crate path reconciled later | PROPOSED | **Accept.** The normalized crate is emitted from the loaded **and validated** Library (post-`validate_library()`), so the artifact carries the validation verdict implicitly ("built only from a valid library"). The existing pre-validation `LibraryCrateFactory.make_from_blueprints` transport path stays for Temporal until reconciled (Phase 1+). |
 | D7 | Where `tsc --strict` / pyright gates run | OPEN (settle at B1) | proposal: pyright in pipelex, tsc in conformance |
 | D8 | `mthds-starter-js` conversion in Phase 2 or deferred | OPEN (settle at C) | — |
 
 ## Checkpoint notes
 
 *(append-only; one block per checkpoint: what was verified, review findings applied/deferred/rejected, deviations reconciled, SHAs)*
+
+### CHECKPOINT A — 2026-07-09 — contracts reviewed and settled before engine code
+
+**Branches (user pre-created fresh ones):** mthds `feature/Codegen`, conformance `feature/Codegen`, workspace-root docs/specs on `feature/Follow-ups` (holds the north-star drafts too), pipelex `feature/Devex-codegen`.
+
+**Delivered.** 0.1 `mthds/docs/spec/library-crate.md` (+ mkdocs nav ×2 + `[Unreleased]` changelog). 0.2 `docs/specs/pipelex-codegen.md` + `command-surface-map.md` (Codegen/resolve section + Go-deeper row) + README table row. 0.3 four skip-gated conformance skeletons (`tests/pipelex/test_resolve.py`, `test_codegen.py`, `test_crate_shape.py`; `tests/pipelex_api/test_codegen_routes.py`) each pinning a `pipelex-codegen.md` anchor with a matching `> Verified by:`; `test_data.py` documents the forthcoming resolve/codegen subcommands without adding them to the live `--help` CLISpec. 0.4 D1–D6 recorded PROPOSED with rationale.
+
+**Verified (gates green).** conformance `make agent-check` = ruff + pyright (0) + mypy (0) + check-spec-links (OK) + fixture-drift (OK); the 11 skeleton tests collect and skip with phase-named reasons. mthds `mkdocs build --strict` builds (new page in nav, all cross-refs resolve). **pipelex source untouched in Phase 0** (only `TODOS.md`, a markdown tracker) — so its `agent-test` was not run; it runs for real in Phase 1.
+
+**`/code-review` fan-out** — one cold Sonnet-5 reviewer per touched repo (mthds b1f60c1, workspace-root 3458516, conformance 02ce7eb), no inherited plan/north-star context, high effort, anti-over-engineering. Triage:
+
+- **Applied (clean-solid), mthds** (fix commit `9104ea6`): added a Specification-Status note flagging the normalization pass / TOML encoding / full fingerprint scope as the forward contract (the spec read as present-tense reality for behavior `LibraryCrate` does not yet do); fingerprint canonicalization now defers to **RFC 8785 (JCS)** (the old "no insignificant whitespace" wording didn't match the reference `json.dumps` and left numeric formatting open — a real cross-impl byte-agreement gap); resolved the native-concept self-contradiction by **materializing referenced natives into `concepts`** + adding an `mthds_version` stamp member; distinguished the project-local `.mthds/methods/<name>/` cache from the global `~/.mthds/packages/…` VCS cache (was silently inconsistent with sibling specs); documented dual provenance (`source_map` + per-object `source`, both excluded from the hash); stated the domain-metadata conflict rule; required TOML dotted-key quoting; softened the TOML "directly runnable" claim to name the loader accommodation.
+- **Applied (clean-solid), workspace-root** (fix commit `50772e6`): corrected the **false claim** that `/v1/build/*` already share the 200+`is_valid` discipline (they return bare JSON / a retired `success` bool + 422 — re-pointing is a breaking change, now labelled so); reconciled phase tags (`codegen check` = Phase 2, `codegen diff` = Phase 4, not Phase 1) and narrowed the CLI `> Verified by:` to only the Phase-1 surface the skeleton covers; fixed the `build output`/`build runner` re-point asymmetry; corrected the `InputShaper` description (it hydrates caller inputs, doesn't render templates) + added its source path; "Owner repo"→"Owner repos".
+- **Applied (clean-solid), conformance** (fix commit `d42cadb`): the toml/json fingerprint test now actually parses both and asserts equality (was asserting nothing); `test_crate_shape` + `test_codegen` now **seed a bundle** (were running against an empty `tmp_path`, making assertions vacuous or exit-2); crate-shape assertions strengthened (string-concept promotion + `native.Text` materialization); dropped the `codegen check`/`diff` test from the Phase-1 module (wrong phase); noted de-skeletoning must add the hermetic env fixtures.
+- **Deferred** → `wip/devx/deferred-checkpoint-a-items.md`: **D-A1** whether the TOML crate is genuinely loadable as a bundle set and what loader accommodation `load_from_crate` needs (Phase 1 design question); **D-A2** whether Phase 1 widens the transport-crate fingerprint alongside the normalized one (D6 says the transport path stays until reconciled).
+- **Rejected (one line each):** "cut the TOML encoding as over-engineering" — TOML is a deliberate north-star requirement (human-diffable, committable crates for semantic diffing), not speculative; kept with the forward-contract disclaimer. "D4 is asserted as settled but the log says open" — intentional: PROPOSED decisions are built-to and flagged for Louis (this is the flag); the lock section already carries an `<!-- unverified -->` noting D4 is a decision. Minor nits not applied: native-list ordering (aligned anyway), `main_pipe` overloaded-term sentence (left — the units table already disambiguates), route-skeleton inline `_BUNDLE` vs shared fixture (acceptable for a Phase-3 skeleton).
+
+**For Louis (confirm/override at or before Phase 1):** D1–D6 PROPOSED → SETTLED, especially **D4** (sibling `codegen.lock` vs the plan's "one lock, two sections"). Nothing pushed; no PRs opened.
