@@ -49,7 +49,7 @@ $ pipelex-agent validate bundle bad_bundles/09_unfixable_collision/target.mthds 
 {
   "error": true,
   "error_type": "ValidateBundleError",
-  "message": "Could not load MTHDS bundle from 'bad_bundles/09_unfixable_collision/target.mthds' because of: Validation error(s):\n\nValue errors: 'pipe': Value error, Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
+  "message": "Pipe code 'tapas_bar.hola' is not a valid pipe code. Must be in snake_case.",
   "hint": "Check the validation_errors array for specific issues",
   "error_domain": "input",
   "error_source": [

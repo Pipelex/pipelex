@@ -386,9 +386,13 @@ async def fix_bundle_file(
 
         new_fixes = [fix for fix in in_scope_fixes if _fix_fingerprint(fix) not in seen_fingerprints]
         if not new_fixes:
+            # Author-facing: name the fixes that kept being re-proposed (their descriptions), not the
+            # internal fingerprints — a re-proposal that changed nothing means the fix's target could
+            # not be applied as written. The remaining errors (with their 💡 lines) print right below.
+            repeated_descriptions = ", ".join(sorted({fix.description for fix in in_scope_fixes}))
             bail_reason = (
-                "no progress: every proposed fix fingerprint was already applied or skipped in a previous iteration "
-                f"({', '.join(sorted(_fix_fingerprint(fix) for fix in in_scope_fixes))})"
+                f"no progress: the same fix was re-proposed without changing the bundle ({repeated_descriptions}); "
+                "its target could not be applied as written — fix the remaining errors manually"
             )
             return FixBundleResult(
                 is_valid=False,

@@ -121,13 +121,19 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
 def render_invalid_validation_markdown(report: dict[str, Any]) -> str:
     """Render an invalid validation verdict (the InvalidReport arm) as agent-readable markdown.
 
-    Faithfully renders the structured ``validation_errors`` the hosted ``/validate``
-    InvalidReport carries — the same typed items the agent CLI emits — as a
-    ``# Validation failed`` heading, the summary ``message``, then a numbered
-    ``## Errors`` list with each item's ``category`` + ``message`` and any present
-    locators (pipe / concept / domain / field / source). This is a faithful render
-    of the structured verdict; it does NOT reproduce the agent CLI's generic
-    error-envelope byte-for-byte.
+    Reconstructs the typed :class:`ValidationErrorItem`s from the report's serialized
+    ``validation_errors`` and delegates to the shared
+    :func:`format_validation_error_items_markdown` — the *same* prose renderer that backs the
+    agent ``validate`` failure surface and the human panel. So the markdown an agent reads
+    through the hosted ``/validate`` (the opt-in ``rendered_markdown``) is byte-identical in
+    structure to the local CLI prose: category-grouped items with humanized titles, identity
+    fields, the message, and per-item ``💡 Suggested fix`` lines (which the old dict-based
+    renderer dropped). A ``# Validation failed`` heading frames it.
+
+    ``rendered_markdown`` is presentation, never the contract — the machine consumer branches on
+    the JSON ``is_valid`` / ``validation_errors`` fields (see workspace ``CLAUDE.md`` § "Surface
+    output conventions"). No CLI-command footer is emitted here: an API consumer applies fixes via
+    the structured ``suggested_fix`` ops, not a ``pipelex-agent fix`` invocation.
 
     Args:
         report: The InvalidReport-shaped dict (``is_valid: False``,
@@ -136,35 +142,22 @@ def render_invalid_validation_markdown(report: dict[str, Any]) -> str:
     Returns:
         A markdown string.
     """
+    raw_items: list[dict[str, Any]] = report.get("validation_errors") or []
+    items = [ValidationErrorItem.model_validate(raw_item) for raw_item in raw_items]
+
     lines: list[str] = ["# Validation failed", ""]
+    body = format_validation_error_items_markdown(items)
+    if body:
+        lines.append(body)
+    else:
+        # Defensive: the structured-info invariant guarantees a non-empty validation_errors[] on
+        # every produced invalid verdict, so this branch should be unreachable — but a report that
+        # somehow carries no items still shows its summary message rather than a bare heading.
+        message = report.get("message")
+        if message:
+            lines.append(str(message))
 
-    message = report.get("message")
-    if message:
-        lines += [str(message), ""]
-
-    validation_errors: list[dict[str, Any]] = report.get("validation_errors") or []
-    lines += [f"## Errors ({len(validation_errors)})", ""]
-
-    # Locators rendered in a stable order, only when present (non-None) — mirrors the
-    # structured-info invariant: each item carries the locators it can attribute.
-    locator_labels: list[tuple[str, str]] = [
-        ("pipe", "pipe_code"),
-        ("missing pipe", "missing_pipe_code"),
-        ("concept", "concept_code"),
-        ("missing concept", "missing_concept_code"),
-        ("domain", "domain_code"),
-        ("field", "field_name"),
-        ("path", "field_path"),
-        ("source", "source"),
-    ]
-    for index, item in enumerate(validation_errors, start=1):
-        lines.append(f"{index}. **{item.get('category')}** — {item.get('message')}")
-        for label, key in locator_labels:
-            value = item.get(key)
-            if value:
-                lines.append(f"   - {label}: `{value}`")
-
-    return "\n".join(lines)
+    return "\n".join(lines).rstrip()
 
 
 def _markdown_category_header(category: ValidationErrorCategory) -> str:

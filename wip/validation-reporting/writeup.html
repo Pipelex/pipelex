@@ -1,0 +1,383 @@
+<meta charset="utf-8">
+<title>Validation-error reporting — quality track write-up</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1c2024; --muted: #5b6470; --line: #e3e6ea;
+    --card: #f7f8fa; --card2: #eef1f4;
+    --accent: #2f6feb; --accent-soft: #e7f0ff;
+    --good: #1a7f43; --good-soft: #e6f4ec; --bad: #c02626; --bad-soft: #fbeaea;
+    --warn: #9a6a00; --warn-soft: #fdf3d8;
+    --code-bg: #f4f6f8; --add: #e6f4ec; --add-bar:#1a7f43; --del:#fbeaea; --del-bar:#c02626;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#14171a; --fg:#e6e9ec; --muted:#9aa4af; --line:#2a2f36;
+      --card:#1b1f24; --card2:#232830;
+      --accent:#5b93ff; --accent-soft:#1a2740;
+      --good:#5bd48a; --good-soft:#12261a; --bad:#ff8080; --bad-soft:#2c1618;
+      --warn:#e6b34d; --warn-soft:#2a2310;
+      --code-bg:#0f1215; --add:#12261a; --add-bar:#3fa564; --del:#2c1618; --del-bar:#e06666;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 40px 24px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 22px; margin: 52px 0 14px; letter-spacing: -0.01em; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  h3 { font-size: 17px; margin: 26px 0 10px; }
+  p { margin: 12px 0; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--card2); padding: 1px 5px; border-radius: 4px; }
+  .sub { color: var(--muted); font-size: 14.5px; margin-top: 0; }
+  .pill-row { display:flex; flex-wrap:wrap; gap:8px; margin:16px 0 4px; }
+  .pill { font-size:12.5px; font-weight:600; padding:4px 10px; border-radius:100px; border:1px solid var(--line); background:var(--card); }
+  .pill.good { color:var(--good); background:var(--good-soft); border-color:transparent; }
+  .pill.warn { color:var(--warn); background:var(--warn-soft); border-color:transparent; }
+  .pill.accent { color:var(--accent); background:var(--accent-soft); border-color:transparent; }
+
+  .tldr { background: var(--accent-soft); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent); border-radius: 14px; padding: 20px 22px; margin: 24px 0 8px; }
+  .tldr h2 { margin:0 0 10px; border:0; padding:0; font-size:18px; color:var(--accent); }
+  .tldr ul { margin: 8px 0 0; padding-left: 20px; }
+  .tldr li { margin: 6px 0; }
+
+  .card { background: var(--card); border:1px solid var(--line); border-radius: 12px; padding: 4px 20px; margin: 16px 0; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+  @media (max-width:720px){ .grid2 { grid-template-columns:1fr; } }
+
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14.5px; display:block; overflow-x:auto; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+  tbody tr:last-child td { border-bottom: 0; }
+  .tag { display:inline-block; font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:6px; white-space:nowrap; }
+  .tag.done { color:var(--good); background:var(--good-soft); }
+  .tag.defer { color:var(--warn); background:var(--warn-soft); }
+
+  pre { margin: 0; }
+  .diff { background: var(--code-bg); border:1px solid var(--line); border-radius: 10px; overflow-x:auto; font-family: var(--mono); font-size: 12.8px; line-height:1.55; margin: 12px 0; }
+  .diff .h { padding: 7px 14px; color: var(--muted); border-bottom:1px solid var(--line); font-family: var(--mono); font-size:12px; background:var(--card); border-radius:10px 10px 0 0; }
+  .diff code { background:none; padding:0; border-radius:0; font-size:inherit; display:block; }
+  .diff .ln { display:block; padding: 1px 14px; white-space: pre; }
+  .diff .add { background: var(--add); box-shadow: inset 3px 0 var(--add-bar); }
+  .diff .del { background: var(--del); box-shadow: inset 3px 0 var(--del-bar); }
+  .diff .ctx { color: var(--fg); opacity:.8; }
+  .diff .cmt { color: var(--muted); }
+
+  .tabs { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin:16px 0; }
+  .tabbar { display:flex; flex-wrap:wrap; background:var(--card); border-bottom:1px solid var(--line); }
+  .tabbar button { appearance:none; border:0; background:none; color:var(--muted); font:inherit; font-size:13.5px; font-weight:600; padding:11px 15px; cursor:pointer; border-bottom:2px solid transparent; }
+  .tabbar button:hover { color:var(--fg); }
+  .tabbar button.on { color:var(--accent); border-bottom-color:var(--accent); }
+  .tabpane { display:none; padding:6px 18px 14px; }
+  .tabpane.on { display:block; }
+  .ba { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:12px 0; }
+  @media (max-width:720px){ .ba { grid-template-columns:1fr; } }
+  .ba .box { border-radius:10px; padding:10px 12px; font-family:var(--mono); font-size:12.4px; line-height:1.5; white-space:pre-wrap; word-break:break-word; overflow-wrap:anywhere; }
+  .ba .before { background:var(--del); box-shadow: inset 3px 0 var(--del-bar); }
+  .ba .after { background:var(--add); box-shadow: inset 3px 0 var(--add-bar); }
+  .ba .lbl { font-family:var(--mono); font-size:11px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; opacity:.7; margin-bottom:6px; display:block; }
+  .before .lbl { color:var(--bad); } .after .lbl { color:var(--good); }
+
+  details { border:1px solid var(--line); border-radius:10px; margin:12px 0; background:var(--card); }
+  details[open] { background:var(--bg); }
+  summary { cursor:pointer; padding:12px 16px; font-weight:600; font-size:15px; list-style:none; }
+  summary::-webkit-details-marker { display:none; }
+  summary::before { content:"▸"; color:var(--muted); margin-right:10px; display:inline-block; transition:transform .15s; }
+  details[open] summary::before { transform:rotate(90deg); }
+  details .body { padding: 2px 16px 14px; }
+
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin:16px 0; text-align:center; overflow-x:auto; }
+  .note { font-size:14px; color:var(--muted); }
+  .kbd { font-family:var(--mono); font-size:.85em; background:var(--card2); padding:1px 6px; border-radius:5px; border:1px solid var(--line); }
+  hr { border:0; border-top:1px solid var(--line); margin:40px 0; }
+  .foot { color:var(--muted); font-size:13.5px; margin-top:40px; }
+</style>
+
+<div class="wrap">
+
+  <h1>Validation-error reporting — quality track</h1>
+  <p class="sub">Make every Pipelex validation error read like a fix, not a stack trace — on every surface. · <code>feature/Autofix</code> · 2026-07-09</p>
+
+  <div class="pill-row">
+    <span class="pill good">Phases 0–4 done</span>
+    <span class="pill good">make agent-check ✓</span>
+    <span class="pill good">full agent-test ✓</span>
+    <span class="pill accent">one engine → every surface</span>
+    <span class="pill warn">conformance regen — release-gated</span>
+  </div>
+
+  <div class="tldr">
+    <h2>TL;DR</h2>
+    <p>Validation errors used to <b>leak Python internals</b> (<code>multiplicity=None</code>, <code>Concept(...)</code> reprs, <code>Value errors: '&lt;field&gt;': Value error,</code>) and the actionable content lived only in the <code>💡&nbsp;Suggested&nbsp;fix</code> line — which the agent surface didn't even render. We fixed the messages <b>at the engine</b> so every surface benefits at once.</p>
+    <ul>
+      <li><b>Messages now speak MTHDS author syntax.</b> <code>"declares its output as 'StoryIdea', but its last step yields 'StoryIdea[]'. Update the sequence's output to 'StoryIdea[]'"</code> — states the problem <i>and</i> the exact edit.</li>
+      <li><b>The agent CLI renders prose,</b> not a raw JSON dump: grouped items, humanized titles, per-error <code>💡&nbsp;Suggested&nbsp;fix</code> lines, and a footer naming the exact <code>pipelex-agent fix bundle</code> command.</li>
+      <li><b>The top-line <code>message</code> is a clean summary</b> everywhere — agent JSON <i>and</i> the API <code>/validate</code> body — instead of a pydantic dump. The API's opt-in <code>rendered_markdown</code> gained the same 💡 prose.</li>
+      <li><b>One engine, zero drift.</b> Human CLI, agent markdown/JSON, and the API all draw from the same raise-site messages + shared <code>ValidationErrorItem</code> builder. The <b>machine JSON contract is byte-stable</b> — only presentation improved.</li>
+      <li><b>Status:</b> all code is <b>uncommitted on <code>feature/Autofix</code></b>, gates green. One follow-up (the <code>conformance/validate-error-qa</code> corpus regen) is release-gated because it freshness-tests the <i>live</i> API.</li>
+    </ul>
+  </div>
+
+  <h2>Why we did this</h2>
+  <p>The autofix track (steps 1–5) shipped deterministic bundle fixes and a <code>💡&nbsp;Suggested&nbsp;fix</code> line. Dogfooding a playground of deliberately-broken bundles (<code>pipelex-demos/bad_bundles/</code>) surfaced a quality gap: the three surfaces were <i>consistent</i> (good — one engine), but the core error <b>message</b> was carrying almost none of the weight. It leaked internal repr, and the agent surface dumped raw JSON. We diagnosed six recurring "diseases":</p>
+
+  <table>
+    <thead><tr><th>#</th><th>Disease</th><th>Fixed in</th><th></th></tr></thead>
+    <tbody>
+      <tr><td><b>A</b></td><td>Internal Python <code>repr</code> in the message (<code>multiplicity=None</code>, <code>Concept(...)</code>, <code>PresenceMarker</code>)</td><td>Phase 1</td><td><span class="tag done">done</span></td></tr>
+      <tr><td><b>B</b></td><td>Misleading <code>(required: [...], provided: ...)</code> suffix — list-repr brackets mimic MTHDS <code>[]</code> syntax</td><td>Phase 1</td><td><span class="tag done">done</span></td></tr>
+      <tr><td><b>C</b></td><td>Pydantic top-line leak in agent JSON + API <code>message</code> (<code>Validation error(s): … Value errors: …</code>)</td><td>Phase 3</td><td><span class="tag done">done</span></td></tr>
+      <tr><td><b>D</b></td><td>Agent <code>validate</code> markdown = raw JSON dump, not prose</td><td>Phase 2</td><td><span class="tag done">done</span></td></tr>
+      <tr><td><b>E</b></td><td>Boilerplate agent hint ("Check the validation_errors array…") with no action</td><td>Phase 2</td><td><span class="tag done">done</span></td></tr>
+      <tr><td><b>F</b></td><td>"Must be in snake_case" slightly misleads on dotted codes</td><td>—</td><td><span class="tag defer">deferred</span></td></tr>
+    </tbody>
+  </table>
+  <p class="note">Disease F was deliberately deferred: low value (the 💡 line already says "Strip the same-domain prefix") and it would churn a well-pinned categorizer contract.</p>
+
+  <h2>Mental model — one engine, every surface</h2>
+  <p>The whole design rests on a single principle from the workspace's <b>"format follows consumer"</b> doctrine: improvements go into the <b>message at the raise site</b> or the <b>shared item builder / renderer</b> — never into per-surface private wording that can drift. Everything downstream is presentation.</p>
+
+  <pre class="mermaid">
+flowchart TD
+    RS["🛑 Raise sites<br/>pipe_sequence.py · pipe_abstract.py<br/><b>author-syntax messages — Phase 1</b>"] --> VBE
+    VBE["<b>ValidateBundleError</b><br/>• message = clean summary <b>(Phase 3)</b><br/>• categorized error data"]
+    VBE --> BUILD["build_validation_error_items()<br/>→ ValidationErrorItem[] &nbsp;(+ suggested_fix)"]
+    BUILD --> SHARED["format_validation_error_items_markdown()<br/><i>shared CLI-free prose renderer</i>"]
+
+    BUILD --> HUMAN["👤 Human CLI<br/>Rich panel + 💡 + fix footer"]
+    SHARED --> AMD["🤖 Agent CLI · markdown<br/>prose + 💡 + fix-aware footer <b>(Phase 2)</b>"]
+    VBE --> AJSON["🤖 Agent CLI · JSON<br/>message + validation_errors[]<br/><i>machine contract — byte-stable</i>"]
+    BUILD --> AJSON
+    VBE --> APIMSG["🌐 API /validate<br/>InvalidReport.message <b>(Phase 3)</b>"]
+    SHARED --> APIMD["🌐 API rendered_markdown<br/>now carries 💡 lines <b>(Phase 3)</b>"]
+
+    classDef eng fill:#2f6feb22,stroke:#2f6feb,stroke-width:1px;
+    classDef sink fill:#1a7f4322,stroke:#1a7f43,stroke-width:1px;
+    class RS,VBE,BUILD,SHARED eng;
+    class HUMAN,AMD,AJSON,APIMSG,APIMD sink;
+  </pre>
+  <p class="note">Blue = the single engine (raise sites → error → shared builder/renderer). Green = the five presentation surfaces. A message change at a raise site, or in the shared renderer, lands on all of them with no per-surface edits.</p>
+
+  <h2>Before / after — the surfaces</h2>
+  <p>Captured live against the <code>bad_bundles</code> playground (demos venv points at this worktree, so changes dogfood immediately). Pick a scenario:</p>
+
+  <div class="tabs">
+    <div class="tabbar">
+      <button class="on" onclick="tab(this,'s01')">01 · sequence output multiplicity</button>
+      <button onclick="tab(this,'s03')">03 · input type drift</button>
+      <button onclick="tab(this,'s06')">06 · multi-error (disease C)</button>
+    </div>
+
+    <div class="tabpane on" id="s01">
+      <h3>Top-line <code>message</code> (agent JSON &amp; API)</h3>
+      <div class="ba">
+        <div class="box before"><span class="lbl">before</span>PipeSequence output multiplicity mismatch: the sequence 'brainstorm' declares output multiplicity=None, but the last step 'gen_ideas' has output multiplicity=True. They are not compatible. Update one of them to match the other. (required: ['story_studio.StoryIdea'], provided: story_studio.StoryIdea)</div>
+        <div class="box after"><span class="lbl">after</span>PipeSequence output multiplicity mismatch: the sequence 'brainstorm' declares its output as 'StoryIdea', but its last step 'gen_ideas' yields 'StoryIdea[]'. Update the sequence's output to 'StoryIdea[]' (or change the last step).</div>
+      </div>
+      <p class="note"><code>multiplicity=None/True</code> (Python internals) → <code>StoryIdea</code> vs <code>StoryIdea[]</code> (author syntax); the misleading identical-refs suffix is gone; the exact edit is spelled out. <b>Diseases A + B.</b></p>
+    </div>
+
+    <div class="tabpane" id="s03">
+      <h3>Human <code>validate</code> error detail (the worst offender)</h3>
+      <div class="ba">
+        <div class="box before"><span class="lbl">before</span>In the pipe 'make_recipe', the input variable 'dish' has a stuff spec mismatch.
+Mismatched field(s): concept: declared='code='Number' domain_code='native' … refines=None' vs required=…
+Declared: concept=Concept(code='Number', …) multiplicity=None presence=&lt;PresenceMarker.PLAIN: 'plain'&gt;
+Required: concept=Concept(code='Text', …) multiplicity=None presence=&lt;PresenceMarker.PLAIN: 'plain'&gt;</div>
+        <div class="box after"><span class="lbl">after</span>In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'.</div>
+      </div>
+      <p class="note">Four lines of <code>str(Concept)</code> / <code>PresenceMarker</code> repr → one author-facing sentence with the fix. <b>Disease A.</b></p>
+    </div>
+
+    <div class="tabpane" id="s06">
+      <h3>Top-line <code>message</code>, multiple errors (agent JSON &amp; API)</h3>
+      <div class="ba">
+        <div class="box before"><span class="lbl">before</span>Validation error(s):
+
+Value errors: 'main_pipe': Value error, Invalid main pipe syntax 'postcard_shop.run_seq'. Must be in snake_case., 'pipe': Value error, Pipe code 'postcard_shop.hello' is not a valid pipe code. Must be in snake_case.</div>
+        <div class="box after"><span class="lbl">after</span>2 validation errors (first: Invalid main pipe syntax 'postcard_shop.run_seq'. Must be in snake_case.)</div>
+      </div>
+      <p class="note">The raw <code>str(pydantic ValidationError)</code> dump → a clean count-and-first summary derived from the already-clean item messages. The full per-error detail still rides <code>validation_errors[]</code>. <b>Disease C.</b></p>
+    </div>
+  </div>
+
+  <details>
+    <summary>See the full agent <code>validate</code> markdown (prose surface — Phase 2)</summary>
+    <div class="body">
+      <p>Before Phase 2, this was a title + truncated message + boilerplate hint + a fenced <code>json</code> dump of <code>validation_errors</code>. Now (scenario 03):</p>
+      <div class="diff"><div class="h">$ pipelex-agent validate bundle bad_bundles/03_inputs_drift/bundle.mthds</div><pre><code><span class="ln ctx"># Bundle validation failed</span>
+<span class="ln ctx"></span>
+<span class="ln ctx">**Bundle:** `bad_bundles/03_inputs_drift/bundle.mthds`</span>
+<span class="ln ctx"></span>
+<span class="ln ctx">## Pipe validation errors</span>
+<span class="ln ctx"></span>
+<span class="ln ctx">1. **Input Stuff Spec Mismatch**</span>
+<span class="ln ctx">   - Pipe: `make_recipe`</span>
+<span class="ln ctx">   - Domain: `recipe_maker`</span>
+<span class="ln ctx">   - Variables: `dish`</span>
+<span class="ln ctx">   - In pipe 'make_recipe', input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'.</span>
+<span class="ln add">   - 💡 Suggested fix: Sync inputs of pipe 'make_recipe' with its steps' needs: add 'diet'; update 'dish'; remove 'garnish'</span>
+<span class="ln ctx">   - Source: `bad_bundles/03_inputs_drift/bundle.mthds`</span>
+<span class="ln ctx"></span>
+<span class="ln add">💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle bad_bundles/03_inputs_drift/bundle.mthds`</span></code></pre></div>
+      <p class="note">The JSON stream (<code>--format json</code>) stayed byte-identical — hooks pin <code>--format json</code> and branch on structured fields, so the machine contract must not move.</p>
+    </div>
+  </details>
+
+  <h2>What changed — the critical diffs</h2>
+
+  <h3>Phase 1 · author-syntax messages at the raise site</h3>
+  <div class="diff"><div class="h">pipelex/pipe_controllers/sequence/pipe_sequence.py — multiplicity mismatch</div><pre><code><span class="ln del">-    f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "</span>
+<span class="ln del">-    f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "</span>
+<span class="ln del">-    f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible. "</span>
+<span class="ln del">-    "Update one of them to match the other."</span>
+<span class="ln add">+    f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares its output as "</span>
+<span class="ln add">+    f"'{declared_output_ref}', but its last step '{last_step_pipe.code}' yields '{expected_output_ref}'. "</span>
+<span class="ln add">+    f"Update the sequence's output to '{expected_output_ref}' (or change the last step)."</span></code></pre></div>
+  <p class="note"><code>expected_output_ref</code> (already computed for the fix planner, e.g. <code>"StoryIdea[]"</code>) now reaches the message. The declared side is rendered the same way via <code>to_bundle_representation</code>.</p>
+
+  <div class="diff"><div class="h">pipelex/core/pipes/handle_pipe_errors.py — suffix suppression (disease B)</div><pre><code><span class="ln del">-    if pipe_error.required_concept_codes and pipe_error.provided_concept_code:</span>
+<span class="ln del">-        message += f" (required: {pipe_error.required_concept_codes}, provided: {pipe_error.provided_concept_code})"</span>
+<span class="ln cmt">+    # Suppress for multiplicity errors (identical concept on both sides); otherwise join</span>
+<span class="ln cmt">+    # author-syntax refs — never a Python list repr (['x'] brackets mimic MTHDS [] syntax).</span>
+<span class="ln add">+    if not error_type.is_inadequate_output_multiplicity and pipe_error.required_concept_codes and pipe_error.provided_concept_code:</span>
+<span class="ln add">+        required_refs = ", ".join(pipe_error.required_concept_codes)</span>
+<span class="ln add">+        message += f" (required: {required_refs}, provided: {pipe_error.provided_concept_code})"</span></code></pre></div>
+
+  <h3>Phase 3 · disease C — clean the top-line at the source</h3>
+  <p>The leak lived in <code>ValidateBundleError.message</code>, built by <code>str()</code>-ing a pydantic <code>ValidationError</code>. Rather than patch it per-surface (which would drift CLI vs API), we summarize from the already-clean structured items <b>in the constructor</b> — so agent JSON and the API report both benefit.</p>
+
+  <pre class="mermaid">
+flowchart LR
+    subgraph B["❌ Before"]
+      direction TB
+      PE["pydantic ValidationError"] -->|"str()"| L["message = 'Validation error(s):<br/>… Value errors: 'concept': Value error, …'"]
+    end
+    subgraph A["✅ After"]
+      direction TB
+      IT["structured items<br/>(clean per-error messages)"] -->|"_summarize_bundle_validation_message()"| C["message = 'Cannot declare a concept named Text …'<br/>— or —<br/>'N validation errors (first: …)'"]
+    end
+    B ~~~ A
+    classDef bad fill:#c0262622,stroke:#c02626; classDef good fill:#1a7f4322,stroke:#1a7f43;
+    class PE,L bad; class IT,C good;
+  </pre>
+
+  <div class="diff"><div class="h">pipelex/pipeline/exceptions.py — new summarizer, called from ValidateBundleError.__init__</div><pre><code><span class="ln add">+def _summarize_bundle_validation_message(*, blueprint_errors, factory_errors,</span>
+<span class="ln add">+        pipe_validation_errors, dry_run_error_message, raw_message) -&gt; str:</span>
+<span class="ln add">+    item_messages  = [e.message for e in blueprint_errors]</span>
+<span class="ln add">+    item_messages += [e.message for e in factory_errors]</span>
+<span class="ln add">+    item_messages += [e.message for e in pipe_validation_errors]</span>
+<span class="ln add">+    if not item_messages and dry_run_error_message:</span>
+<span class="ln add">+        item_messages = [dry_run_error_message]</span>
+<span class="ln cmt">+    # No categorized data → a parse-level failure (TOML syntax); raw message is authoritative.</span>
+<span class="ln add">+    if not item_messages:</span>
+<span class="ln add">+        return raw_message</span>
+<span class="ln add">+    if len(item_messages) == 1:</span>
+<span class="ln add">+        return item_messages[0]</span>
+<span class="ln add">+    return f"{len(item_messages)} validation errors (first: {item_messages[0]})"</span>
+<span class="ln ctx"> </span>
+<span class="ln ctx"> class ValidateBundleError(PipelexError):</span>
+<span class="ln ctx">     def __init__(self, message, ...):</span>
+<span class="ln ctx">         ...  # store the categorized error-data lists</span>
+<span class="ln del">-        super().__init__(message)</span>
+<span class="ln add">+        super().__init__(_summarize_bundle_validation_message(</span>
+<span class="ln add">+            blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,</span>
+<span class="ln add">+            factory_errors=self.pipe_factory_errors,</span>
+<span class="ln add">+            pipe_validation_errors=self.pipe_validation_error_data,</span>
+<span class="ln add">+            dry_run_error_message=self.dry_run_error_message,</span>
+<span class="ln add">+            raw_message=message))</span></code></pre></div>
+  <p class="note">The fallback keeps the <code>pipelex-api</code> pin <code>"TOML" in body["message"]</code> green: a TOML-syntax failure has no categorized items, so the raw message (which names "TOML") passes through unchanged.</p>
+
+  <h3>Phase 3 · API <code>rendered_markdown</code> — one prose renderer, not two</h3>
+  <div class="diff"><div class="h">pipelex/pipeline/validation_render.py — render_invalid_validation_markdown</div><pre><code><span class="ln cmt"> # Old: a dict-based `## Errors (N)` list, no 💡 lines.</span>
+<span class="ln cmt"> # New: reconstruct typed items and delegate to the shared prose renderer.</span>
+<span class="ln add">+ raw_items = report.get("validation_errors") or []</span>
+<span class="ln add">+ items = [ValidationErrorItem.model_validate(raw) for raw in raw_items]</span>
+<span class="ln add">+ body = format_validation_error_items_markdown(items)   # ← same renderer as the agent CLI</span>
+<span class="ln add">+ return "\n".join(["# Validation failed", "", body]).rstrip()</span></code></pre></div>
+  <p class="note">The API's opt-in <code>rendered_markdown</code> now shows the same category-grouped prose with per-error 💡 lines as the CLI. It's presentation (never the contract): machine consumers still branch on <code>is_valid</code> / <code>validation_errors[]</code>.</p>
+
+  <details>
+    <summary>Phase 3 · fix-loop "no progress" bail — stop leaking fingerprints</summary>
+    <div class="body">
+      <div class="diff"><div class="h">pipelex/pipeline/fixes/fix_loop.py</div><pre><code><span class="ln add">+ repeated_descriptions = ", ".join(sorted({fix.description for fix in in_scope_fixes}))</span>
+<span class="ln ctx">  bail_reason = (</span>
+<span class="ln del">-     "no progress: every proposed fix fingerprint was already applied or skipped in a previous iteration "</span>
+<span class="ln del">-     f"({', '.join(sorted(_fix_fingerprint(fix) for fix in in_scope_fixes))})"</span>
+<span class="ln add">+     f"no progress: the same fix was re-proposed without changing the bundle ({repeated_descriptions}); "</span>
+<span class="ln add">+     "its target could not be applied as written — fix the remaining errors manually"</span>
+<span class="ln ctx">  )</span></code></pre></div>
+      <p class="note">The internal <code>_fix_fingerprint</code> string (<code>match-sequence-output|/path|set_key:pipe.x:output:'…':None</code>) is replaced by the fix's author-facing description. Other bail reasons (out-of-scope, cross-file collision, max-iterations) already met the bar. The <code>--diff</code> preview reruns the <i>real</i> loop against a sandbox copy, so its wording is guaranteed to match the real run.</p>
+    </div>
+  </details>
+
+  <h2>Design decisions worth knowing</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>No new wire fields</h3>
+      <p class="note">We considered adding <code>expected_output_ref</code> to <code>ValidationErrorItem</code>. Declined: the <code>suggested_fix</code> ops already carry the machine-actionable data (<code>set_key output = "StoryIdea[]"</code>) and the message states it in author syntax. Adding it would expand the contract (changelog + conformance regen) for no concrete consumer — against "smallest correct surface".</p>
+    </div>
+    <div class="card">
+      <h3>Category framing subsumed</h3>
+      <p class="note">The old <code>"Could not load blueprints/concepts because of:"</code> prefix rode the leaky pydantic message. It's now dropped from <code>message</code> (the structured items carry the category), so <code>test_validate_bundle_category_framing.py</code> was retargeted from a framing pin to a <b>clean-summary invariant</b>.</p>
+    </div>
+    <div class="card">
+      <h3>JSON contract byte-stable</h3>
+      <p class="note">Only the top-line <code>message</code> (presentation) changed in JSON; <code>validation_errors[]</code>, <code>is_valid</code>, <code>hint</code>, and the envelope shape are untouched. PostToolUse hooks that pin <code>--format json</code> keep working unchanged.</p>
+    </div>
+    <div class="card">
+      <h3>Human surface unchanged</h3>
+      <p class="note">The human CLI already rendered items (not <code>exc.message</code>), so it was byte-identical through Phases 3–4. The full-sweep re-capture confirmed the <b>only</b> per-scenario delta vs Phase 2 is the JSON <code>message</code> line.</p>
+    </div>
+  </div>
+
+  <h2>Testing &amp; QA</h2>
+  <ul>
+    <li><b>Full sweep:</b> 10 scenarios × 5 surfaces re-captured to <code>wip/validation-reporting/{before,after}/</code>. Zero leak fragments (<code>Value errors:</code>, <code>multiplicity=None</code>, <code>Could not load …</code>) remain in any capture.</li>
+    <li><b>String-pin tests updated in the same change</b> (that's the point of them): <code>test_pipe_sequence_output_multiplicity.py</code>, <code>test_controller_inputs_enrichment.py</code>, <code>test_handle_pipe_errors_suffix.py</code> (new), <code>test_validate_bundle_error_format.py</code> (new), <code>test_validation_render.py</code>, <code>test_fix_render.py</code>, <code>test_fix_loop_bail.py</code>, <code>test_validate_bundle_category_framing.py</code>.</li>
+    <li><b>Gates:</b> <code>make agent-check</code> green; <b>full <code>make agent-test</code> green</b> (run because the change touches the shared <code>ValidateBundleError</code> base).</li>
+  </ul>
+
+  <h2>What's left — release-gated</h2>
+  <div class="card" style="border-color: color-mix(in srgb, var(--warn) 40%, transparent); background: var(--warn-soft);">
+    <p style="margin:14px 0;"><b>Regenerate the <code>conformance/validate-error-qa/</code> corpus.</b> All 40 <code>invalid_*.{json,md}</code> fixtures pin the <i>old</i> leaky top-line, and the freshness guard asserts them byte-for-byte against the <b>live</b> <code>/validate</code> API (the conformance repo pins a <i>released</i> pipelex). So the corpus can only be regenerated (<code>make validate-error-qa</code>) once these wordings ship — coordinate with step 6's already-owed <code>suggested_fix</code> fixture regen. The <code>invalid_*.agentcli.md</code> channel is unaffected (already prose, ungated).</p>
+  </div>
+  <p class="note">All code is <b>uncommitted on <code>feature/Autofix</code></b>; there is no PR for this track yet. It sits on top of the merged autofix steps.</p>
+
+  <h2>Links</h2>
+  <table>
+    <thead><tr><th>What</th><th>Where</th></tr></thead>
+    <tbody>
+      <tr><td>Autofix spike (chain proven end-to-end)</td><td><a href="https://github.com/Pipelex/pipelex/pull/1027">Pipelex/pipelex#1027</a></td></tr>
+      <tr><td>Step 2 — fix rules (sync-inputs, strip-native-redecl, strip-namespace)</td><td><a href="https://github.com/Pipelex/pipelex/pull/1031">Pipelex/pipelex#1031</a></td></tr>
+      <tr><td>Steps 3+4 — hardened loop + agent <code>fix bundle</code></td><td><a href="https://github.com/Pipelex/pipelex/pull/1035">Pipelex/pipelex#1035</a></td></tr>
+      <tr><td>Step 5 + this reporting track</td><td>uncommitted on <code>feature/Autofix</code> — no PR yet</td></tr>
+      <tr><td>API consumer of the summary + <code>rendered_markdown</code></td><td><a href="https://github.com/Pipelex/pipelex-api">Pipelex/pipelex-api</a> · <code>api/routes/pipelex/validate.py</code></td></tr>
+      <tr><td>Cross-repo wording corpus (release-gated regen)</td><td><a href="https://github.com/Pipelex/conformance">Pipelex/conformance</a> · <code>validate-error-qa/</code></td></tr>
+    </tbody>
+  </table>
+
+  <hr>
+  <p class="foot">Generated for co-developers · lives beside the before/after captures in <code>wip/validation-reporting/</code>. Regenerate the captures with the demos playground: <span class="kbd">cd pipelex-demos &amp;&amp; ./bad_bundles/restore.sh</span>. Full plan &amp; status log: <code>TODOS.md</code> in this worktree.</p>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  const dark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'neutral', securityLevel: 'loose', flowchart: { htmlLabels: true, curve: 'basis' } });
+</script>
+<script>
+  function tab(btn, id) {
+    const tabs = btn.closest('.tabs');
+    tabs.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('on'));
+    tabs.querySelectorAll('.tabpane').forEach(p => p.classList.remove('on'));
+    btn.classList.add('on');
+    tabs.querySelector('#' + id).classList.add('on');
+  }
+</script>

@@ -64,7 +64,10 @@ class TestFixLoopBail:
 
         assert result.is_valid is False
         assert result.bail_reason is not None
-        assert "fingerprint" in result.bail_reason
+        # The bail reason states the no-progress stop in author terms (naming the re-proposed
+        # fix's description), never leaking the internal fingerprint string.
+        assert result.bail_reason.startswith("no progress:")
+        assert "fingerprint" not in result.bail_reason
         # One apply round happened (all ops skipped), then the repeat was detected: the loop
         # validated twice, not five times.
         assert result.iterations == 1

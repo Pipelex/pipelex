@@ -53,7 +53,7 @@ $ pipelex-agent validate bundle bad_bundles/04_missing_inputs/bundle.mthds --for
 {
   "error": true,
   "error_type": "ValidateBundleError",
-  "message": "Pipe validation failed: Required variable 'destination' is not in the inputs of pipe 'plan_trip'. Current inputs: (none)",
+  "message": "Required variable 'destination' is not in the inputs of pipe 'plan_trip'. Current inputs: (none)",
   "hint": "Check the validation_errors array for specific issues",
   "error_domain": "input",
   "error_source": [

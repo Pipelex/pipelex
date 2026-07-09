@@ -102,9 +102,11 @@ class TestValidationRender:
         assert "✅" not in markdown
         assert "⚠️" not in markdown
 
-    def test_renders_invalid_report_with_locators_and_dry_run_residual(self):
-        """The invalid-arm renderer surfaces the message, an error count, and each item's
-        category + message with its present locators; a dry_run residual (no locators) renders too.
+    def test_renders_invalid_report_as_prose_with_fix_lines_and_dry_run_residual(self):
+        """The invalid-arm renderer reconstructs the typed items from the report and delegates to
+        the shared prose renderer: category-grouped headings, humanized titles, identity fields,
+        the message, per-item `💡 Suggested fix` lines, and the plain dry_run residual — the same
+        prose the agent CLI and human panel show (no more dict-based `## Errors (N)` list).
         """
         report: dict[str, Any] = {
             "is_valid": False,
@@ -112,12 +114,18 @@ class TestValidationRender:
             "validation_errors": [
                 {
                     "category": "pipe_validation",
-                    "error_type": "PipeValidationError",
+                    "error_type": "inadequate_output_multiplicity",
                     "message": "Pipe references an unknown concept.",
                     "pipe_code": "summarize",
                     "concept_code": "Contractt",
                     "field_name": "output",
                     "source": "/fake/method.mthds",
+                    "suggested_fix": {
+                        "fix_code": "match-sequence-output",
+                        "description": "Set output of pipe 'summarize' to 'Contract'",
+                        "safety": "safe",
+                        "ops": [],
+                    },
                 },
                 {
                     "category": "dry_run",
@@ -130,14 +138,18 @@ class TestValidationRender:
         markdown = render_invalid_validation_markdown(report)
 
         assert markdown.startswith("# Validation failed")
-        assert "MTHDS validation found errors" in markdown
-        assert "## Errors (2)" in markdown
-        assert "1. **pipe_validation** — Pipe references an unknown concept." in markdown
-        assert "   - pipe: `summarize`" in markdown
-        assert "   - concept: `Contractt`" in markdown
-        assert "   - source: `/fake/method.mthds`" in markdown
-        # The dry_run residual has no locators — it renders its category + message, no sub-bullets.
-        assert "2. **dry_run** — Dry run failed: boom." in markdown
+        # Prose shape from the shared renderer: category heading + humanized title + identity fields.
+        assert "## Pipe validation errors" in markdown
+        assert "1. **Inadequate Output Multiplicity**" in markdown
+        assert "   - Pipe: `summarize`" in markdown
+        assert "   - Concept: `Contractt`" in markdown
+        assert "   - Field: `output`" in markdown
+        assert "   - Pipe references an unknown concept." in markdown
+        assert "   - 💡 Suggested fix: Set output of pipe 'summarize' to 'Contract'" in markdown
+        assert "   - Source: `/fake/method.mthds`" in markdown
+        # The dry_run residual keeps its plain single-message rendering.
+        assert "## Dry run error" in markdown
+        assert "Dry run failed: boom." in markdown
 
     def test_format_validation_error_items_markdown_groups_categories_and_renders_fix_line(self):
         """The shared items renderer groups by category, humanizes the error_type title, renders
