@@ -149,6 +149,13 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
+    # TODO: rethink this, it's not forcing
+    if pipe_run_mode is None:
+        if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
+            pipe_run_mode = PipeRunMode(run_mode_from_env)
+        else:
+            pipe_run_mode = PipeRunMode.LIVE
+
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
 
@@ -231,14 +238,8 @@ async def pipeline_run_setup(
                 pipeline_run_id=pipeline_run_id,
                 emit_graph_events=is_generate_graph,
                 emit_usage_events=is_generate_usage,
+                mode=pipe_run_mode.graphspec_mode,
             )
-
-        # TODO: rethink this, it's not forcing
-        if pipe_run_mode is None:
-            if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
-                pipe_run_mode = PipeRunMode(run_mode_from_env)
-            else:
-                pipe_run_mode = PipeRunMode.LIVE
 
         # Register the event log on the report delegate for usage event emission — only when cost reporting
         # is on. In graph-only mode (--graph --no-costs) the tracer owns the event_log for graph events, but

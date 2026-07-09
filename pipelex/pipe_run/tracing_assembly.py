@@ -20,6 +20,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.hub import get_event_log_override
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
@@ -55,6 +56,7 @@ def assemble_tracing(
     assemble_usage: bool,
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
+    run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> TracingAssembly:
     """Read the trace events for ``pipeline_run_id`` once and assemble the requested artifacts.
 
@@ -76,6 +78,7 @@ def assemble_tracing(
         assemble_usage: Whether to aggregate token usage from the events.
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
+        run_mode: Final pipe run mode used to stamp GraphSpec provenance.
 
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
@@ -129,6 +132,7 @@ def assemble_tracing(
                     domain=domain_code,
                     main_pipe=main_pipe_code,
                 ),
+                mode=run_mode.graphspec_mode,
             )
             log.debug(f"Graph assembled from {len(events)} events for pipeline_run_id={pipeline_run_id}")
         except ValidationError as validation_error:
@@ -147,6 +151,7 @@ def assemble_tracing_on_output(
     assemble_usage: bool,
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
+    run_mode: PipeRunMode = PipeRunMode.LIVE,
 ) -> None:
     """Assemble graph and/or usage from trace events and set them on pipe_output (DIRECT mode).
 
@@ -161,6 +166,7 @@ def assemble_tracing_on_output(
         assemble_usage: Whether to aggregate and set token usage.
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
+        run_mode: Final pipe run mode used to stamp GraphSpec provenance.
     """
     result = assemble_tracing(
         pipeline_run_id=pipeline_run_id,
@@ -168,6 +174,7 @@ def assemble_tracing_on_output(
         assemble_usage=assemble_usage,
         domain_code=domain_code,
         main_pipe_code=main_pipe_code,
+        run_mode=run_mode,
     )
     if result.graph_spec is not None:
         pipe_output.graph_spec = result.graph_spec

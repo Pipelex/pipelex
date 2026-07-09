@@ -19,6 +19,7 @@ from pytest_mock import MockerFixture
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
@@ -73,6 +74,7 @@ class TestDirectTracingAssembly:
         assert pipe_output.tokens_usages is not None
         assert len(pipe_output.tokens_usages) >= 1
         assert pipe_output.graph_spec is not None
+        assert pipe_output.graph_spec.meta["mode"] == GraphSpecMode.DRY
         assert pipe_output.usage_assembly_error is None
 
     async def test_costs_only_leaves_graph_spec_none(self, tmp_path_factory: pytest.TempPathFactory, mocker: MockerFixture) -> None:

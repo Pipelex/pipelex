@@ -4,7 +4,7 @@ from typing import Any, Protocol
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
@@ -28,6 +28,7 @@ class GraphTracerProtocol(Protocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -43,6 +44,7 @@ class GraphTracerProtocol(Protocol):
                 Stamped onto the returned TraceContext so it is born with the correct flag.
             emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
                 Stamped onto the returned TraceContext so it is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -292,6 +294,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         return TraceContext(
             graph_id=graph_id,
