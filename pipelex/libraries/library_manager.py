@@ -334,8 +334,20 @@ class LibraryManager(LibraryManagerAbstract):
             if is_sandbox_hosted:
                 # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
                 # process. Capture every .py as source text (no import) so it can travel to the
-                # sandbox, where it is registered and executed instead. Accumulate across dirs.
-                self._library_sources.setdefault(library_id, {}).update(FuncRegistryUtils.read_py_sources(folder_path=library_dir))
+                # sandbox, where it is registered and executed instead. Accumulate across dirs, but
+                # fail loud on a relpath collision: the sandbox writes sources flat by relpath, so two
+                # dirs sharing a path would otherwise silently clobber one customer's code and run the
+                # wrong PipeFunc body.
+                captured_sources = self._library_sources.setdefault(library_id, {})
+                for relpath, source in FuncRegistryUtils.read_py_sources(folder_path=library_dir).items():
+                    if relpath in captured_sources and captured_sources[relpath] != source:
+                        msg = (
+                            f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "
+                            f"'{library_id}'. Sandbox sources are keyed by relative path, so two dirs sharing a path "
+                            f"would clobber each other — give them distinct relative paths."
+                        )
+                        raise LibraryError(msg)
+                    captured_sources[relpath] = source
             else:
                 # Local/direct mode (unchanged): import files that contain @pipe_func decorated
                 # functions (uses AST pre-check) and register them in the process-global func_registry.
