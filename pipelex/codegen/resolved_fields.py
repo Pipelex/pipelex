@@ -87,6 +87,24 @@ def resolve_structure_fields(
     ]
 
 
+def iter_imprecision_reasons(resolved_type: ResolvedType) -> list[str]:
+    """Collect every declared-imprecision reason in a resolved-type tree, depth-first.
+
+    Imprecision markers are set (never guessed) wherever the source under-specifies a shape — a
+    `list` with no `item_type`, a `concept` field with no ref, an unrecognized nested type name.
+    They are write-only until an emitter surfaces them: this walker is how an emitter turns the
+    markers on a field's whole type tree into caveats (a `# imprecise:` comment / JSDoc note)
+    instead of emitting a silent `Any` / `z.any()`.
+    """
+    reasons: list[str] = []
+    if resolved_type.imprecise and resolved_type.imprecision_reason:
+        reasons.append(resolved_type.imprecision_reason)
+    for child in (resolved_type.item, resolved_type.key, resolved_type.value):
+        if child is not None:
+            reasons.extend(iter_imprecision_reasons(child))
+    return reasons
+
+
 def resolve_field(
     field_name: str,
     *,
