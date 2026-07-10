@@ -150,7 +150,7 @@ class Pipelex(metaclass=MetaSingleton):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @staticmethod
-    def _get_config_file_not_found_error_msg(component_name: str) -> str:
+    def _get_config_file_not_found_error_msg(*, component_name: str) -> str:
         """Generate error message for missing config files."""
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
@@ -348,13 +348,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("routing profile library")
+            msg = self._get_config_file_not_found_error_msg(component_name="routing profile library")
             raise PipelexSetupError(msg) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("inference backend library")
+            msg = self._get_config_file_not_found_error_msg(component_name="inference backend library")
             raise PipelexSetupError(msg) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("model deck")
+            msg = self._get_config_file_not_found_error_msg(component_name="model deck")
             raise PipelexSetupError(msg) from deck_not_found_exc
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"

@@ -2,43 +2,31 @@ version = 1
 
 ["pipelex/base_exceptions.py::ErrorReport.from_dict"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/base_exceptions.py::ErrorReport.to_dict"]
-param = "disclosure_mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the report from the dict; single operand."
 
 ["pipelex/base_exceptions.py::PipelexError._enrich_error_report_from_cause"]
 param = "report"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: enriches the report; single operand."
 
 ["pipelex/base_exceptions.py::_humanize_class_name"]
 param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the class name into a human title; single operand."
 
 ["pipelex/base_exceptions.py::_redact_provider_metadata_for_strict"]
 param = "metadata_payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the metadata payload; single operand."
 
 ["pipelex/base_exceptions.py::error_domain_is_input"]
 param = "error_domain"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error domain; single operand."
 
 ["pipelex/base_exceptions.py::error_domain_to_http_status"]
 param = "error_domain"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: maps the error domain to a status; single operand."
 
 ["pipelex/base_exceptions.py::iter_cause_chain"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: iterates the exception's cause chain; single operand."
 
 ["pipelex/builder/concept/concept_spec.py::ConceptSpec._format_type_display"]
 param = "field_spec"
@@ -3732,543 +3720,407 @@ rationale = "Verb-object: renders the index from the subsystem grouping; single 
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.from_graphspec"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the analysis from the graph spec; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.get_children"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query accessor keyed by the node it inspects; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.get_consumers"]
 param = "digest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.get_producer"]
 param = "digest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.get_stuff_info"]
 param = "digest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query accessor keyed by the stuff digest it inspects; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.is_controller"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the node named by the id; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.is_root"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the node named by the id; single operand."
 
 ["pipelex/graph/graph_factory.py::generate_graph_outputs"]
 param = "graph_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: generates outputs from the graph spec; rendering options stay keyword."
 
 ["pipelex/graph/graph_factory.py::save_graph_outputs_to_dir"]
 param = "graph_outputs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: saves the graph outputs; destination stays keyword."
 
 ["pipelex/graph/graph_rendering.py::_dry_run_bundle"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: dry-runs the bundle at the path; options stay keyword."
 
 ["pipelex/graph/graph_rendering.py::_sanitize_graph_name"]
 param = "graph_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the graph name; single operand."
 
 ["pipelex/graph/graph_rendering.py::generate_graph_for_bundle"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: generates the graph for the bundle at the path; options stay keyword."
 
 ["pipelex/graph/graph_rendering.py::generate_view_for_bundle"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: generates the view for the bundle at the path; options stay keyword."
 
 ["pipelex/graph/graph_rendering.py::render_graph_from_spec"]
 param = "graph_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders from the graph spec; options stay keyword."
 
 ["pipelex/graph/graph_tracer.py::GraphTracer._emit_event"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer.py::GraphTracer.add_selected_outcome_edge"]
-param = "condition_node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: emits the trace event; single operand."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager._get_tracer"]
 param = "graph_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Manager getter keyed by the tracer's graph id; single operand."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.close_tracer"]
 param = "tracer_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: closes the tracer named by the key; single operand."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.get_instance_tracer"]
 param = "lookup_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Manager getter keyed by the tracer's lookup key; single operand."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.get_tracer"]
 param = "graph_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Manager getter keyed by the tracer's graph id; single operand."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.on_pipe_start"]
 param = "trace_context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Event handler: the trace context being handled; event fields stay keyword."
 
 ["pipelex/graph/graph_tracer_manager.py::GraphTracerManager.open_tracer"]
 param = "graph_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: opens the tracer for the graph id; config stays keyword."
 
 ["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.on_pipe_end_error"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol event handler: the node whose run ended; event fields stay keyword."
 
 ["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.on_pipe_end_success"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol event handler: the node whose run ended; event fields stay keyword."
 
 ["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.on_pipe_start"]
 param = "trace_context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.register_batch_aggregation"]
-param = "output_list_stuff_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.register_batch_item_extraction"]
-param = "list_stuff_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.register_controller_output"]
-param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.register_execution_data"]
-param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.register_parallel_combine"]
-param = "combined_stuff_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.setup"]
-param = "graph_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol event handler: the trace context being handled; event fields stay keyword."
 
 ["pipelex/graph/graphspec.py::_truncate_string"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; max_length stays keyword."
 
 ["pipelex/graph/mermaidflow/mermaid_html.py::render_mermaid_html"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the mermaid code; presentation options stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaid_html.py::render_mermaid_html_async"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the mermaid code; presentation options stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaid_html.py::render_mermaid_html_with_data_async"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the mermaid code; data payloads stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory._get_node_label"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the node spec; single operand."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory._render_dashed_edges"]
 param = "edges"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the edges; accumulators stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory._render_node"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the node; rendering context stays keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory._render_stuff_node"]
 param = "digest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the stuff node identified by the digest; display fields stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory._render_subgraph_recursive"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the subgraph rooted at the node id; lookup maps stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_factory.py::MermaidflowFactory.make_from_graphspec"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the diagram from the graph spec; options stay keyword."
 
 ["pipelex/graph/mermaidflow/mermaidflow_utils.py::make_stuff_id"]
 param = "digest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation: encodes the digest into a node id; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::_collect_stuff_field"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; the extractor stays keyword."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_content_type"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_data"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_data_html"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_data_text"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_metadata"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the graph; single operand."
 
 ["pipelex/graph/mermaidflow/stuff_collector.py::collect_stuff_metadata.extract_metadata"]
 param = "io_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional Callable protocol: passed as the extractor callback, invoked extractor(io_spec)."
 
 ["pipelex/graph/reactflow/reactflow_html.py::_build_templating_context"]
 param = "graphspec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds the context from the graph spec; config and title stay keyword."
 
 ["pipelex/graph/reactflow/reactflow_html.py::_build_viewer_config"]
 param = "config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the viewer dict from the rendering config; single operand."
 
 ["pipelex/graph/reactflow/reactflow_html.py::generate_reactflow_html"]
 param = "graphspec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the graph spec to HTML; options stay keyword."
 
 ["pipelex/graph/reactflow/reactflow_html.py::generate_reactflow_html_async"]
 param = "graphspec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the graph spec to HTML; options stay keyword."
 
 ["pipelex/graph/trace_context.py::TraceContext.copy_for_child"]
 param = "child_node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: copies the context for the child node; sequence stays keyword."
 
 ["pipelex/graph/validation.py::_validate_edge_references"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the graph; single operand."
 
 ["pipelex/graph/validation.py::_validate_failed_nodes_have_errors"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the graph; single operand."
 
 ["pipelex/graph/validation.py::_validate_unique_edge_ids"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the graph; single operand."
 
 ["pipelex/graph/validation.py::_validate_unique_node_ids"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the graph; single operand."
 
 ["pipelex/graph/validation.py::validate_graphspec"]
 param = "graph"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the graph spec; single operand."
 
 ["pipelex/hub.py::PipelexHub.set_bundle_validator_registry"]
 param = "bundle_validator_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the bundle validator registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_class_registry"]
 param = "class_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the class registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_concept_library"]
 param = "concept_library"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the concept library; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_config"]
 param = "config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the config; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_console"]
 param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the console; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_console_print_target"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the print target; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_content_generator"]
 param = "content_generator"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the content generator; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_default_library_dirs"]
 param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the default library dirs; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_domain_library"]
 param = "domain_library"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the domain library; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_func_registry"]
 param = "func_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the func registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_inference_backend_registry"]
 param = "inference_backend_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the inference backend registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_inference_manager"]
 param = "inference_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the inference manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_instance"]
 param = "pipelex_hub"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the hub singleton; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_isolated_execution_probe"]
 param = "probe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the execution probe; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_library_manager"]
 param = "library_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the library manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_model_lister_registry"]
 param = "model_lister_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the model lister registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_models_manager"]
 param = "models_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the models manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_observer"]
 param = "observer"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the observer; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_orchestrator_registry"]
 param = "orchestrator_registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the orchestrator registry; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_pipe_library"]
 param = "pipe_library"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the pipe library; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_pipe_router"]
 param = "pipe_router"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the pipe router; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_pipe_run"]
 param = "pipe_run"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the pipe-run holder; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_pipeline_manager"]
 param = "pipeline_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the pipeline manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_report_delegate"]
 param = "reporting_delegate"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the reporting delegate; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_sdk_client_manager"]
 param = "sdk_client_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the SDK client manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_secrets_provider"]
 param = "secrets_provider"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the secrets provider; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_storage_provider"]
 param = "storage_provider"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the storage provider; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.set_telemetry_manager"]
 param = "telemetry_manager"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub setter: installs the telemetry manager; single self-labelling operand."
 
 ["pipelex/hub.py::PipelexHub.setup_config"]
 param = "config_cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Sets up config from the given config class; single operand."
 
 ["pipelex/hub.py::get_extract_worker"]
 param = "extract_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the worker's handle; single operand."
 
 ["pipelex/hub.py::get_img_gen_worker"]
 param = "img_gen_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the worker's handle; single operand."
 
 ["pipelex/hub.py::get_llm_worker"]
 param = "llm_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the worker's handle; single operand."
 
 ["pipelex/hub.py::get_native_concept"]
 param = "native_concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter: the native concept being fetched; single operand."
 
 ["pipelex/hub.py::get_optional_domain"]
 param = "domain_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the domain code; single operand."
 
 ["pipelex/hub.py::get_optional_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the pipe code; single operand."
 
 ["pipelex/hub.py::get_pipe_source"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the pipe code; single operand."
 
 ["pipelex/hub.py::get_pipeline"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the pipeline run id; single operand."
 
 ["pipelex/hub.py::get_required_concept"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the concept ref; single operand."
 
 ["pipelex/hub.py::get_required_domain"]
 param = "domain_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the domain code; single operand."
 
 ["pipelex/hub.py::get_required_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the pipe code; single operand."
 
 ["pipelex/hub.py::get_secret"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Hub getter keyed by the secret id; single operand."
 
 ["pipelex/hub.py::resolve_library_dirs"]
 param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: resolves the given library dirs; single operand."
 
 ["pipelex/hub.py::scoped_content_generator"]
 param = "content_generator"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Context manager scoping the given content generator; single self-labelling operand."
 
 ["pipelex/hub.py::scoped_current_library"]
 param = "library_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Context manager scoping to the library named by the id; single operand."
 
 ["pipelex/hub.py::scoped_event_log"]
 param = "event_log"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Context manager scoping the given event log; single self-labelling operand."
 
 ["pipelex/hub.py::scoped_pipe_router"]
 param = "pipe_router"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Context manager scoping the given pipe router; single self-labelling operand."
 
 ["pipelex/hub.py::set_current_library"]
 param = "library_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Module-level setter: selects the library named by the id; single operand."
 
 ["pipelex/hub.py::set_pipe_router"]
 param = "pipe_router"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Module-level setter: installs the pipe router; single self-labelling operand."
 
 ["pipelex/hub.py::set_pipelex_hub"]
 param = "pipelex_hub"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Module-level setter: installs the hub singleton; single self-labelling operand."
 
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
@@ -5145,11 +4997,6 @@ rationale = "Verb-object: walks from the root pipe; accumulators stay keyword."
 ["pipelex/pipe_signature/signature_walk.py::collect_signature_refs"]
 param = "pipe"
 rationale = "Verb-object: walks from the root pipe; visited set stays keyword."
-
-["pipelex/pipelex.py::Pipelex._get_config_file_not_found_error_msg"]
-param = "component_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
 
 ["pipelex/pipeline/blueprint_selection.py::select_primary_blueprint"]
 param = "blueprints"
