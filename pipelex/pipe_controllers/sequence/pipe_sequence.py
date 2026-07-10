@@ -10,7 +10,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
@@ -79,14 +79,24 @@ class PipeSequence(PipeController):
         if not effective_last_step_output_multiplicity:
             effective_last_step_output_multiplicity = last_step_pipe.output.multiplicity
 
+        taint_analysis = self.analyze_taint()
+
         # The last step's effective output in bundle representation — what the sequence's declared
         # output should be. This is the enriched semantic fact the fix planner needs, rendered the
         # way an author in the sequence's domain would write it, with the effective multiplicity
-        # (sub-pipe override wins) and the presence marker.
+        # (sub-pipe override wins) and boundary presence. A singular sequence boundary remains
+        # optional when its declaration, last step, or taint propagation says it may be absent.
+        # Plural outputs must stay plain because the grammar forbids combining multiplicity with
+        # a presence marker and represents an absent plural result as an empty list.
+        expected_output_presence = PresenceMarker.PLAIN
+        if effective_last_step_output_multiplicity is None and (
+            self.output.presence.is_optional or last_step_pipe.output.presence.is_optional or taint_analysis.output_taint is not None
+        ):
+            expected_output_presence = PresenceMarker.OPTIONAL
         expected_output_ref = StuffSpec(
             concept=last_step_pipe.output.concept,
             multiplicity=effective_last_step_output_multiplicity,
-            presence=last_step_pipe.output.presence,
+            presence=expected_output_presence,
         ).to_bundle_representation(relative_to_domain=self.domain_code)
 
         # Check concept compatibility
@@ -129,7 +139,6 @@ class PipeSequence(PipeController):
 
         # The absence-taint boundary check (D6): a maybe-absent slot ending the sequence must be
         # matched by an optional (`?`) declared output, or the taint silently escapes the boundary.
-        taint_analysis = self.analyze_taint()
         if taint_analysis.output_taint is not None and not self.output.presence.is_optional:
             msg = (
                 f"PipeSequence '{self.code}' output '{self.output.concept.concept_ref}' may resolve absent at run time, "

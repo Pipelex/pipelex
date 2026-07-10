@@ -51,6 +51,29 @@ steps = [
 ]
 """
 
+_OPTIONAL_BOUNDARY_MTHDS = """domain = "seqfix_loop_presence"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary."
+
+[pipe.write_summary]
+type = "PipeLLM"
+description = "Summarize text."
+inputs = { text = "Text" }
+output = "Summary"
+prompt = "Summarize $text"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Lift over optional input while declaring the wrong output concept."
+inputs = { text = "Text?" }
+output = "Number?"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]
+"""
+
 _CASCADE_MTHDS = """domain = "seqfix_loop_cascade"
 main_pipe = "outer"
 
@@ -414,6 +437,26 @@ class TestFixConvergenceLoop:
         assert result.remaining_errors == []
         assert result.bail_reason is None
         assert 'output = "Idea[]"' in bundle_path.read_text(encoding="utf-8")
+
+    async def test_optional_sequence_boundary_converges_in_one_iteration(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A concept fix preserves taint-derived sequence optionality and fully converges."""
+        load_empty_library()
+        bundle_path = tmp_path / "optional_boundary.mthds"
+        bundle_path.write_text(_OPTIONAL_BOUNDARY_MTHDS, encoding="utf-8")
+
+        result = await fix_bundle_file(bundle_path, library_dirs=[])
+
+        assert result.is_valid is True
+        assert result.is_runnable is True
+        assert result.iterations == 1
+        assert [fix.fix_code for fix in result.fixes_applied] == ["match-sequence-output"]
+        assert result.remaining_errors == []
+        assert result.bail_reason is None
+        assert _pipes(bundle_path)["make_summary"]["output"] == "Summary?"
 
     async def test_concurrent_edit_during_render_is_not_overwritten(
         self,

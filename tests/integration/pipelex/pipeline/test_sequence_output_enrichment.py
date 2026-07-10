@@ -126,6 +126,54 @@ steps = [
 ]
 """
 
+_TAINTED_OPTIONAL_BOUNDARY_MTHDS = """
+domain = "seqfix_tainted_boundary"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary."
+
+[pipe.write_summary]
+type = "PipeLLM"
+description = "Summarize text."
+inputs = { text = "Text" }
+output = "Summary"
+prompt = "Summarize $text"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Lift over optional input while declaring the wrong output concept."
+inputs = { text = "Text?" }
+output = "Number?"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]
+"""
+
+_PLURAL_OUTPUT_WITH_OPTIONAL_DECLARATION_MTHDS = """
+domain = "seqfix_plural_presence"
+main_pipe = "make_ideas"
+
+[concept]
+Idea = "An idea."
+
+[pipe.write_idea]
+type = "PipeLLM"
+description = "Write one idea."
+inputs = { topic = "Text" }
+output = "Idea"
+prompt = "Write one idea about $topic"
+
+[pipe.make_ideas]
+type = "PipeSequence"
+description = "Declare an optional wrong concept while the last step produces a list."
+inputs = { topic = "Text" }
+output = "Number?"
+steps = [
+  { pipe = "write_idea", result = "ideas", nb_output = 3 },
+]
+"""
+
 
 async def _enriched_error_data_for(
     mthds_content: str,
@@ -181,3 +229,43 @@ class TestSequenceOutputEnrichment:
         error_data = await _enriched_error_data_for(_OPTIONAL_MARKER_MTHDS, error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT)
         assert error_data.pipe_code == "gated_check"
         assert error_data.expected_output_ref == "Verdict?"
+
+    async def test_sequence_taint_preserves_optional_boundary_in_expected_ref(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A lifted singular last step keeps the sequence boundary's valid optional marker."""
+        load_empty_library()
+        error_data = await _enriched_error_data_for(
+            _TAINTED_OPTIONAL_BOUNDARY_MTHDS,
+            error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+        )
+        assert error_data.pipe_code == "make_summary"
+        assert error_data.expected_output_ref == "Summary?"
+
+    async def test_sequence_taint_adds_optional_boundary_to_plain_expected_ref(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """Taint makes the singular expected ref optional even when the wrong declaration is plain."""
+        load_empty_library()
+        mthds_content = _TAINTED_OPTIONAL_BOUNDARY_MTHDS.replace('output = "Number?"', 'output = "Number"')
+        error_data = await _enriched_error_data_for(
+            mthds_content,
+            error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+        )
+        assert error_data.pipe_code == "make_summary"
+        assert error_data.expected_output_ref == "Summary?"
+
+    async def test_plural_expected_output_drops_optional_presence_marker(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A multiplicity override never combines the plural expected ref with `?`."""
+        load_empty_library()
+        error_data = await _enriched_error_data_for(
+            _PLURAL_OUTPUT_WITH_OPTIONAL_DECLARATION_MTHDS,
+            error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+        )
+        assert error_data.pipe_code == "make_ideas"
+        assert error_data.expected_output_ref == "Idea[3]"
