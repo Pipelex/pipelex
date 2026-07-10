@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.codegen.emission import WriteReport, write_stamped_projection
+from pipelex.codegen.emission import WriteReport, build_stamped_projection, write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, load_lock
 from pipelex.codegen.stamp import has_stamp
@@ -59,6 +59,23 @@ class TestEmission:
         assert lock is not None
         assert lock.paths() == {"models.py"}
         assert lock.crate_fingerprint == "fp2"
+
+    def test_pure_build_and_disk_write_agree_byte_for_byte(self, tmp_path: Path) -> None:
+        """The pure core and the writer must never drift: a host serving `build_stamped_projection`
+        over the wire (the HTTP codegen route) hands out exactly the bytes a local
+        `write_stamped_projection` run puts on disk — stamped artifacts and lock alike.
+        """
+        projection = build_stamped_projection(
+            _FILES,
+            crate_fingerprint="fp1",
+            engine_version="0.1.0",
+            kind=CodegenKind.TYPES,
+            target=CodegenTarget.PYTHON_PYDANTIC,
+        )
+        self._write(tmp_path)
+        for stamped_file in projection.files:
+            assert (tmp_path / stamped_file.filename).read_text(encoding="utf-8") == stamped_file.content
+        assert (tmp_path / CODEGEN_LOCK_FILENAME).read_text(encoding="utf-8") == projection.lock_content
 
     def test_pruning_never_touches_an_unstamped_file(self, tmp_path: Path) -> None:
         self._write(tmp_path)
