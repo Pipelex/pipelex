@@ -3920,10 +3920,6 @@ rationale = "Library getter keyed by the concept ref; single operand."
 param = "concept_ref_or_code"
 rationale = "Library getter keyed by the ref-or-code; single operand."
 
-["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.is_compatible"]
-param = "tested_concept"
-rationale = "Predicate subject: the concept under test; the wanted concept and strictness stay keyword."
-
 ["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.list_concepts_by_domain"]
 param = "domain_code"
 rationale = "Query keyed by the domain code it lists; single operand."
@@ -5892,11 +5888,6 @@ seeded = true
 
 ["pipelex/tools/jinja2/jinja2_with_images_filter.py::_render_sequence_with_images"]
 param = "sequence"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/tools/jinja2/text_format_renderable.py::TextFormatRenderable.rendered_for_template_async"]
-param = "text_format"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 

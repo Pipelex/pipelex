@@ -96,7 +96,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                 del self.root[concept_ref]
 
     @override
-    def is_compatible(self, tested_concept: Concept, *, wanted_concept: Concept, strict: bool = False) -> bool:
+    def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         return Concept.are_concept_compatible(
             concept_1=tested_concept,
             concept_2=wanted_concept,
