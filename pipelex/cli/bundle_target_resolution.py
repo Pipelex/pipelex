@@ -13,6 +13,7 @@ class BundleTargetResolutionErrorKind(StrEnum):
 
     NO_MTHDS_FILE = "no_mthds_file"
     AMBIGUOUS_MTHDS_FILES = "ambiguous_mthds_files"
+    UNSAFE_AUTO_DETECTED_SYMLINK = "unsafe_auto_detected_symlink"
     NOT_BUNDLE_TARGET = "not_bundle_target"
 
 
@@ -44,6 +45,13 @@ def resolve_bundle_target_core(
 
     if target_path.is_dir():
         default_bundle_path = target_path / DEFAULT_BUNDLE_FILE_NAME
+        if default_bundle_path.is_symlink():
+            return BundleTargetResolutionError(
+                kind=BundleTargetResolutionErrorKind.UNSAFE_AUTO_DETECTED_SYMLINK,
+                input_path=path,
+                target_path=target_path,
+                candidate_files=[default_bundle_path],
+            )
         if default_bundle_path.is_file():
             bundle_path = default_bundle_path
         else:
@@ -54,6 +62,13 @@ def resolve_bundle_target_core(
                     input_path=path,
                     target_path=target_path,
                     candidate_files=[],
+                )
+            if len(mthds_files) == 1 and mthds_files[0].is_symlink():
+                return BundleTargetResolutionError(
+                    kind=BundleTargetResolutionErrorKind.UNSAFE_AUTO_DETECTED_SYMLINK,
+                    input_path=path,
+                    target_path=target_path,
+                    candidate_files=mthds_files,
                 )
             if len(mthds_files) > 1:
                 return BundleTargetResolutionError(

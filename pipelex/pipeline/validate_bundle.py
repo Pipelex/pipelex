@@ -96,7 +96,7 @@ def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
 
     Raise sites (``PipeAbstract`` input checks, ``PipeSequence`` output checks) don't know their
     file — pipes deliberately carry no source; provenance lives in the crate's ``source_map``,
-    mirrored into ``LibraryManager._pipe_source_map`` during load, *before* ``validate_library``
+    mirrored into the current library's source map during load, *before* ``validate_library``
     runs. Intercepting once at this catch boundary covers every raise site, present and future.
 
     Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback

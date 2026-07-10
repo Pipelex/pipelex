@@ -22,10 +22,14 @@ Two scoping rules bound what gets touched:
   loudly, naming the files and the ``-L`` remedy.
 """
 
+import os
+import stat
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
+import tomlkit
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import ValidationErrorItem
@@ -33,15 +37,145 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError, ValidateBundleError
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
 from pipelex.suggested_fix import FixOp, FixOpKind, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 _MAIN_PIPE_KEY = "main_pipe"
+
+
+class _FileSnapshot(NamedTuple):
+    """Bytes and permission bits read from one target before fixes are applied."""
+
+    path: Path
+    content: bytes
+    mode: int
+    device: int
+    inode: int
+
+
+class _PendingFileUpdate(NamedTuple):
+    """A fully rendered replacement paired with the snapshot it was derived from."""
+
+    snapshot: _FileSnapshot
+    new_content: str
+
+
+class _StagedFileUpdate(NamedTuple):
+    """Same-directory temp files for one replacement and its rollback copy."""
+
+    snapshot: _FileSnapshot
+    replacement_path: Path
+    rollback_path: Path
+
+
+def _read_file_snapshot(path: Path) -> _FileSnapshot:
+    """Read bytes and mode from one open file descriptor, avoiding split stat/read state."""
+    with path.open("rb") as file:
+        content = file.read()
+        file_stat = os.fstat(file.fileno())
+    return _FileSnapshot(
+        path=path,
+        content=content,
+        mode=stat.S_IMODE(file_stat.st_mode),
+        device=file_stat.st_dev,
+        inode=file_stat.st_ino,
+    )
+
+
+def _write_staged_file(snapshot: _FileSnapshot, *, content: bytes, label: str) -> Path:
+    """Write and fsync a same-directory temp file ready for atomic replacement."""
+    temp_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed before the atomic replace
+        mode="wb",
+        dir=str(snapshot.path.parent),
+        prefix=f".{snapshot.path.name}.pipelex-fix-{label}.",
+        suffix=".tmp",
+        delete=False,
+    )
+    temp_path = Path(temp_file.name)
+    try:
+        try:
+            temp_file.write(content)
+            os.fchmod(temp_file.fileno(), snapshot.mode)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        finally:
+            temp_file.close()
+    except OSError:
+        temp_path.unlink(missing_ok=True)
+        raise
+    return temp_path
+
+
+def _stage_file_update(update: _PendingFileUpdate) -> _StagedFileUpdate:
+    replacement_path = _write_staged_file(update.snapshot, content=update.new_content.encode("utf-8"), label="new")
+    try:
+        rollback_path = _write_staged_file(update.snapshot, content=update.snapshot.content, label="rollback")
+    except OSError:
+        replacement_path.unlink(missing_ok=True)
+        raise
+    return _StagedFileUpdate(snapshot=update.snapshot, replacement_path=replacement_path, rollback_path=rollback_path)
+
+
+def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
+    """Optimistic concurrency guard immediately before a target is replaced."""
+    try:
+        current_snapshot = _read_file_snapshot(snapshot.path)
+    except FileNotFoundError as exc:
+        msg = f"refusing to overwrite '{snapshot.path}': the file was removed while fixes were being prepared"
+        raise FixWriteConflictError(msg) from exc
+    if (
+        current_snapshot.content != snapshot.content
+        or current_snapshot.mode != snapshot.mode
+        or current_snapshot.device != snapshot.device
+        or current_snapshot.inode != snapshot.inode
+    ):
+        msg = f"refusing to overwrite '{snapshot.path}': the file changed while fixes were being prepared"
+        raise FixWriteConflictError(msg)
+
+
+def _rollback_committed_updates(committed_updates: list[_StagedFileUpdate]) -> list[str]:
+    """Restore already-replaced targets, returning any rollback failures."""
+    failures: list[str] = []
+    for staged_update in reversed(committed_updates):
+        try:
+            staged_update.rollback_path.replace(staged_update.snapshot.path)
+        except OSError as exc:
+            failures.append(f"{staged_update.snapshot.path}: {exc}")
+    return failures
+
+
+def _commit_staged_updates(staged_updates: list[_StagedFileUpdate]) -> None:
+    committed_updates: list[_StagedFileUpdate] = []
+    try:
+        for staged_update in staged_updates:
+            _assert_snapshot_unchanged(staged_update.snapshot)
+            staged_update.replacement_path.replace(staged_update.snapshot.path)
+            committed_updates.append(staged_update)
+    except (FixWriteConflictError, OSError) as exc:
+        rollback_failures = _rollback_committed_updates(committed_updates)
+        if rollback_failures:
+            failures = "; ".join(rollback_failures)
+            msg = f"autofix commit failed and rollback was incomplete ({failures}); inspect the named files before retrying"
+            raise FixTransactionError(msg) from exc
+        raise
+
+
+def _commit_file_updates(updates: list[_PendingFileUpdate]) -> None:
+    """Stage a round completely, then atomically replace targets with rollback on failure."""
+    staged_updates: list[_StagedFileUpdate] = []
+    try:
+        for update in updates:
+            staged_updates.append(_stage_file_update(update))
+        _commit_staged_updates(staged_updates)
+    finally:
+        for staged_update in staged_updates:
+            staged_update.replacement_path.unlink(missing_ok=True)
+            staged_update.rollback_path.unlink(missing_ok=True)
 
 
 class FixBundleResult(BaseModel):
@@ -407,20 +541,29 @@ async def fix_bundle_file(
         for fix in new_fixes:
             fixes_by_target.setdefault(_fix_target_path(fix, entry_path=entry_path), []).append(fix)
 
+        pending_updates: list[_PendingFileUpdate] = []
+        round_fixes_applied: list[SuggestedFix] = []
+        round_written_paths: list[Path] = []
         for target_path, target_fixes in fixes_by_target.items():
-            toml_doc = load_toml_with_tomlkit(target_path)
+            snapshot = _read_file_snapshot(target_path)
+            toml_doc = tomlkit.loads(snapshot.content.decode("utf-8"))
             any_op_applied = False
             for fix in target_fixes:
-                seen_fingerprints.add(_fix_fingerprint(fix))
                 applications = apply_fix_ops(toml_doc, ops=fix.ops)
                 if any(application.outcome.did_apply for application in applications):
-                    fixes_applied.append(fix)
+                    round_fixes_applied.append(fix)
                     any_op_applied = True
             if any_op_applied:
-                target_path.write_text(serialize_and_format(toml_doc), encoding="utf-8")
-                if target_path not in written_paths:
-                    written_paths.add(target_path)
-                    files_written.append(str(target_path))
+                pending_updates.append(_PendingFileUpdate(snapshot=snapshot, new_content=serialize_and_format(toml_doc)))
+                round_written_paths.append(target_path)
+
+        _commit_file_updates(pending_updates)
+        seen_fingerprints.update(_fix_fingerprint(fix) for fix in new_fixes)
+        fixes_applied.extend(round_fixes_applied)
+        for target_path in round_written_paths:
+            if target_path not in written_paths:
+                written_paths.add(target_path)
+                files_written.append(str(target_path))
         apply_rounds += 1
 
     # max_iterations apply rounds done — the final verdict comes from one last validation.

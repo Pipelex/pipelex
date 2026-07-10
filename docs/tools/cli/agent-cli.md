@@ -18,7 +18,7 @@ It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which its
 
 ## Commands Overview
 
-The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`, and `inputs`, each with `pipe`, `bundle`, and `method` subcommands.
+The agent CLI mirrors the main CLI's subcommand structure for `run`, `validate`, and `inputs`, each with `pipe`, `bundle`, and `method` subcommands. It also provides `fix bundle` for deterministic in-place repairs.
 
 ### Run
 
@@ -79,6 +79,26 @@ For `bundle`, additional options are available:
 !!! note "Advisory warnings on validate"
     Whole-bundle validate surfaces (`validate bundle`, `validate method`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
 
+### Fix
+
+Apply deterministic safe fixes to a bundle, re-validating after each round until the bundle is valid, no applicable fix remains, or the iteration limit is reached.
+
+```bash
+pipelex-agent fix bundle <PATH> [OPTIONS]
+```
+
+**Options:**
+
+- `--library-dir`, `-L` - Additional library directory; files in explicitly supplied directories may be fixed when an error identifies them as the source
+- `--allow-signatures` - Accept `PipeSignature` placeholders during validation
+- `--max-iterations` - Limit the number of validate/apply rounds
+- `--select` - Apply only the named fix rule; repeat for multiple rules
+- `--ignore` - Skip the named fix rule; repeat for multiple rules (`--select` and `--ignore` are mutually exclusive)
+- `--format` - Success output format: `markdown` (default) or `json`
+- `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
+
+The result reports `iterations`, `fixes_applied`, `files_written`, and any `remaining_errors`. A fully valid result exits 0; a completed fix attempt that remains invalid exits 1; argument, setup, or unexpected failures exit 2.
+
 ### Inputs
 
 Generate an example inputs template for a pipe, bundle, or method. By default the template is the **light** signature-driven shape (bare values matching the pipe's declared concepts), which is exactly what `run` accepts; `--explicit` emits the ceremonial `{concept, content}` envelope form instead.
@@ -120,7 +140,7 @@ These commands do not have subcommands:
 
 Commands use different stdout formats depending on their purpose:
 
-- **Markdown or JSON**: `run`, `validate`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
+- **Markdown or JSON**: `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor` — markdown by default, JSON with `--format json`. Error format follows `--error-format` (defaults to `--format`'s value, so `--format json` flips both).
 - **JSON or raw TOML**: `inputs` — structured JSON via `agent_success()` by default (`--format json`), or the raw TOML template printed directly to stdout with `--format toml`
 - **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
 - **Passthrough**: `fmt`, `lint` — raw `plxt` output

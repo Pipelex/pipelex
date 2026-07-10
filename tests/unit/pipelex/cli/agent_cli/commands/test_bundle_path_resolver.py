@@ -66,3 +66,19 @@ class TestResolveBundleTarget:
         assert exc_info.value.exit_code == 2
         err = capsys.readouterr().err
         assert "(a.mthds, b.mthds)" in err
+
+    def test_directory_refuses_auto_detected_symlink(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Directory mode must not turn an external symlink target into an implicitly writable entry file."""
+        outside_bundle = tmp_path.parent / f"{tmp_path.name}-outside.mthds"
+        outside_bundle.write_text('domain = "outside"\n', encoding="utf-8")
+        (tmp_path / DEFAULT_BUNDLE_FILE_NAME).symlink_to(outside_bundle)
+
+        set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
+        try:
+            with pytest.raises(typer.Exit) as exc_info:
+                resolve_bundle_target(str(tmp_path), library_dir=None)
+        finally:
+            set_agent_cli_error_format(CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 2
+        assert "Refusing to auto-detect symlinked bundle" in capsys.readouterr().err

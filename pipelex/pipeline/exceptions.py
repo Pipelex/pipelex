@@ -69,6 +69,14 @@ class PipelineManagerAlreadyExistsError(PipelexError):
     pass
 
 
+class FixWriteConflictError(PipelexError):
+    """A bundle changed after autofix read it but before the atomic commit."""
+
+
+class FixTransactionError(PipelexUnexpectedError):
+    """An autofix multi-file commit failed and could not be fully rolled back."""
+
+
 def _summarize_bundle_validation_message(
     *,
     blueprint_errors: list[PipelexBundleBlueprintValidationErrorData],

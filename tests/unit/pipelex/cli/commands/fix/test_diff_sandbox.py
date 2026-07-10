@@ -92,3 +92,34 @@ class TestDiffSandbox:
         sandbox = mirror_bundle_for_preview(entry, library_dirs=None, sandbox_root=self._sandbox_root(tmp_path))
 
         assert sandbox.to_original(str(ambient_file)) == str(ambient_file.resolve())
+
+    def test_copy_uses_loader_exclusions(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        entry = bundle_dir / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+        excluded_dir = bundle_dir / ".venv"
+        excluded_dir.mkdir()
+        (excluded_dir / "large.bin").write_bytes(b"must not be copied")
+
+        sandbox = mirror_bundle_for_preview(entry, library_dirs=[bundle_dir], sandbox_root=self._sandbox_root(tmp_path))
+
+        assert sandbox.library_dirs is not None
+        assert not (sandbox.library_dirs[0] / ".venv").exists()
+
+    def test_copy_preserves_external_directory_symlink(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        entry = bundle_dir / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+        external_dir = tmp_path / "external"
+        external_dir.mkdir()
+        (external_dir / "large.bin").write_bytes(b"must not be copied")
+        (bundle_dir / "linked").symlink_to(external_dir, target_is_directory=True)
+
+        sandbox = mirror_bundle_for_preview(entry, library_dirs=[bundle_dir], sandbox_root=self._sandbox_root(tmp_path))
+
+        assert sandbox.library_dirs is not None
+        copied_link = sandbox.library_dirs[0] / "linked"
+        assert copied_link.is_symlink()
+        assert copied_link.readlink() == external_dir

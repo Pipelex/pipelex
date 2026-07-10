@@ -11,7 +11,10 @@ from typing import Any, cast
 
 import pytest
 import tomlkit
+from pytest_mock import MockerFixture
 
+from pipelex.pipeline.exceptions import FixWriteConflictError
+from pipelex.pipeline.fixes import fix_loop
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
 
 
@@ -411,6 +414,30 @@ class TestFixConvergenceLoop:
         assert result.remaining_errors == []
         assert result.bail_reason is None
         assert 'output = "Idea[]"' in bundle_path.read_text(encoding="utf-8")
+
+    async def test_concurrent_edit_during_render_is_not_overwritten(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        load_empty_library()
+        bundle_path = tmp_path / "concurrent.mthds"
+        bundle_path.write_text(_SINGLE_PASS_MTHDS, encoding="utf-8")
+        user_edit = f"{_SINGLE_PASS_MTHDS}\n# concurrent user edit\n"
+        original_serialize = fix_loop.serialize_and_format
+
+        def serialize_after_user_edit(toml_doc: tomlkit.TOMLDocument) -> str:
+            rendered = original_serialize(toml_doc)
+            bundle_path.write_text(user_edit, encoding="utf-8")
+            return rendered
+
+        mocker.patch.object(fix_loop, "serialize_and_format", side_effect=serialize_after_user_edit)
+
+        with pytest.raises(FixWriteConflictError, match="file changed"):
+            await fix_bundle_file(bundle_path)
+
+        assert bundle_path.read_text(encoding="utf-8") == user_edit
 
     async def test_cascade_needs_two_iterations(
         self,

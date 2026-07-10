@@ -50,6 +50,14 @@ def _handle_resolution_error(
                 err=True,
             )
             raise typer.Exit(2)
+        case BundleTargetResolutionErrorKind.UNSAFE_AUTO_DETECTED_SYMLINK:
+            typer.secho(
+                f"Failed to {command}: refusing to auto-detect symlinked bundle '{error.candidate_files[0]}'. "
+                "Pass a regular .mthds file inside the directory.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(2)
         case BundleTargetResolutionErrorKind.NOT_BUNDLE_TARGET:
             typer.secho(
                 f"Failed to {command}: '{error.input_path}' is not a .mthds file or directory.\n{not_a_bundle_hint}",

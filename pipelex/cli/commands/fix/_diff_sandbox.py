@@ -18,6 +18,37 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
+from pipelex.config import get_config
+
+
+def _excluded_copy_entries(  # kw-only: ignore - shutil.copytree invokes ignore callbacks positionally
+    directory: str,
+    names: list[str],
+) -> set[str]:
+    """Return directory entries excluded by the real library scanners.
+
+    ``copytree`` otherwise mirrors virtualenvs, VCS data, caches, and result trees that the
+    loader never reads. Symlink entries are not traversed here; ``copytree(symlinks=True)``
+    preserves them as links instead of copying data from outside the requested root.
+    """
+    excluded_entries: set[str] = set()
+    excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
+    current_dir = Path(directory)
+    for name in names:
+        candidate = current_dir / name
+        if not candidate.is_dir():
+            continue
+        for excluded_dir in excluded_dirs:
+            excluded_path = Path(excluded_dir)
+            if excluded_path.is_absolute():
+                if candidate.resolve().is_relative_to(excluded_path.resolve()):
+                    excluded_entries.add(name)
+                    break
+            elif name == excluded_dir:
+                excluded_entries.add(name)
+                break
+    return excluded_entries
+
 
 class PreviewSandbox(NamedTuple):
     """The mirrored bundle a ``--diff`` preview runs against, plus the copy→original mapping."""
@@ -54,8 +85,9 @@ def mirror_bundle_for_preview(
 ) -> PreviewSandbox:
     """Mirror the entry file and each explicit ``-L`` dir into ``sandbox_root``.
 
-    Each explicit dir is copied wholesale (the loader may read more than ``.mthds`` files),
-    preserving its internal layout under ``sandbox_root/lib_<i>``. The entry file resolves to
+    Each explicit dir is copied with the loader's configured directory exclusions (the loader
+    may read Python files as well as ``.mthds`` files), preserving its internal layout under
+    ``sandbox_root/lib_<i>``. Symlinks are preserved rather than dereferenced. The entry file resolves to
     its in-copy location when it lives under one of the dirs, else to a standalone copy under
     ``sandbox_root/entry``. ``library_dirs=None`` (ambient resolution) and an explicit ``[]``
     (genuinely single-file) pass through unchanged so the sandbox run keeps the same
@@ -72,7 +104,7 @@ def mirror_bundle_for_preview(
             original_root = Path(library_dir).resolve()
             copy_root = (sandbox_root / f"lib_{dir_index}").resolve()
             if original_root.exists():
-                shutil.copytree(original_root, copy_root)
+                shutil.copytree(original_root, copy_root, symlinks=True, ignore=_excluded_copy_entries)
             else:
                 # The real loader skips a missing -L dir (it contributes no files) while
                 # keeping it in effective_dirs; mirror that as an empty copy so copytree does

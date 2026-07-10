@@ -36,6 +36,12 @@ def _handle_resolution_error(error: BundleTargetResolutionError) -> NoReturn:
                 error_type="ArgumentError",
                 exit_code=2,
             )
+        case BundleTargetResolutionErrorKind.UNSAFE_AUTO_DETECTED_SYMLINK:
+            agent_error(
+                f"Refusing to auto-detect symlinked bundle '{error.candidate_files[0]}'. Pass a regular .mthds file inside the directory.",
+                error_type="ArgumentError",
+                exit_code=2,
+            )
         case BundleTargetResolutionErrorKind.NOT_BUNDLE_TARGET:
             agent_error(
                 f"'{error.input_path}' is not a .mthds file or directory. "

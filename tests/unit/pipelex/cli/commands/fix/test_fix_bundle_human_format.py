@@ -307,6 +307,19 @@ class TestFixBundleHumanFormat:
         assert exc_info.value.exit_code == 2
         assert "Failed to fix: boom" in capsys.readouterr().err
 
+    @pytest.mark.usefixtures("console")
+    def test_setup_failure_exits_two_and_tears_down(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        bundle_path = self._bundle_file(tmp_path)
+        mocker.patch(f"{FIX_CORE_MODULE}.make_pipelex_for_cli", side_effect=RuntimeError("setup exploded"))
+        teardown_mock = mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path))
+
+        assert exc_info.value.exit_code == 2
+        assert "Failed to fix: setup exploded" in capsys.readouterr().err
+        teardown_mock.assert_called_once_with()
+
     def test_diff_previews_changes_without_writing_and_labels_would_be(
         self,
         tmp_path: Path,

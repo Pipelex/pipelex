@@ -70,6 +70,18 @@ class TestHumanBundlePathResolver:
         assert bundle_path == str(bundle_file)
         assert library_dir == [str(tmp_path)]
 
+    @pytest.mark.parametrize("bundle_name", [DEFAULT_BUNDLE_FILE_NAME, "only_one.mthds"])
+    def test_directory_refuses_auto_detected_symlink(self, tmp_path: Path, capsys: pytest.CaptureFixture[str], bundle_name: str) -> None:
+        outside_bundle = tmp_path.parent / f"{tmp_path.name}-outside.mthds"
+        outside_bundle.write_text('domain = "outside"\n', encoding="utf-8")
+        (tmp_path / bundle_name).symlink_to(outside_bundle)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_bundle_target(str(tmp_path), library_dir=None, command="fix", not_a_bundle_hint=_HINT)
+
+        assert exc_info.value.exit_code == 2
+        assert "refusing to auto-detect symlinked bundle" in capsys.readouterr().err
+
     def test_directory_is_prepended_to_existing_library_dirs_without_duplication(self, tmp_path: Path) -> None:
         bundle_file = tmp_path / DEFAULT_BUNDLE_FILE_NAME
         bundle_file.write_text('domain = "demo"\n', encoding="utf-8")
