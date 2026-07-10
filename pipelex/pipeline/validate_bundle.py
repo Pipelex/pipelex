@@ -91,11 +91,12 @@ def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]
 
 
 @contextmanager
-def _translate_to_validate_bundle_error() -> Generator[None, None, None]:
+def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
-    Single source of truth for the bundle-loading error cascade, used by both
-    entry points: ``validate_bundle`` and ``validate_bundles_from_directory``.
+    Single source of truth for the bundle-loading error cascade, shared by the
+    bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
+    and ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``.
     A ``PipelexInterpreterError`` becomes a ``ValidateBundleError`` carrying the
     blueprint validation errors, a ``PipeFactoryError`` carries the categorized
     factory error, etc. Sharing one source of truth means a new handler only
@@ -251,7 +252,7 @@ async def validate_bundle(
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-        with _translate_to_validate_bundle_error():
+        with translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(
@@ -330,7 +331,7 @@ async def validate_bundles_from_directory(directory: Path, *, allow_signatures: 
     prev_library_id = get_current_library_id_or_none()
     try:
         set_current_library(library_id=library_id)
-        with _translate_to_validate_bundle_error():
+        with translate_to_validate_bundle_error():
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)

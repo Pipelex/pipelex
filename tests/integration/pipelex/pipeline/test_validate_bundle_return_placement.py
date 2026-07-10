@@ -2,7 +2,7 @@
 
 Both bundle-loading entry points (``validate_bundle`` and
 ``validate_bundles_from_directory``) must place their final ``return`` inside
-the ``with _translate_to_validate_bundle_error()`` block. A
+the ``with translate_to_validate_bundle_error()`` block. A
 ``pydantic.ValidationError`` raised from result-class construction therefore
 surfaces as a single ``ValidateBundleError`` envelope regardless of entry point.
 

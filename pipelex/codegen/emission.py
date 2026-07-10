@@ -16,9 +16,62 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
-from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, build_lock, encode_lock, load_lock
+from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, CodegenLock, build_lock, encode_lock, load_lock
 from pipelex.codegen.stamp import apply_stamp, comment_prefix_for, compute_content_hash, has_stamp
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, failable_load_text_from_path, remove_file, save_text_to_path
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+
+class StampedProjection(BaseModel):
+    """One projection's stamped artifact set plus its lock — pure content, no filesystem.
+
+    This is the single source of truth for what a projection *is* on disk: `write_stamped_projection`
+    materializes it locally, and a serving host (the HTTP codegen route) returns it over the wire —
+    so a client that writes `files` and `lock_content` verbatim produces byte-identical artifacts
+    and passes the offline `codegen check` exactly as a local run would.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    files: list[EmittedFile] = Field(default_factory=empty_list_factory_of(EmittedFile))
+    """The emitted files with their stamp headers applied (same filenames, stamped contents)."""
+
+    lock: CodegenLock
+    """The artifact-set lock (paths + body hashes + crate fingerprint + engine version)."""
+
+    lock_content: str
+    """The lock encoded as canonical TOML — written verbatim as `codegen.lock`."""
+
+
+def build_stamped_projection(
+    emitted: list[EmittedFile],
+    *,
+    crate_fingerprint: str,
+    engine_version: str,
+    kind: CodegenKind,
+    target: CodegenTarget,
+    pipe_ref: str | None = None,
+    options: dict[str, str] | None = None,
+) -> StampedProjection:
+    """Stamp each emitted body and assemble the matching lock — pure, no filesystem access."""
+    resolved_options = options or {}
+    stamped_files: list[EmittedFile] = []
+    artifact_hashes: dict[str, str] = {}
+    for emitted_file in emitted:
+        stamped = apply_stamp(
+            emitted_file.content,
+            crate_fingerprint=crate_fingerprint,
+            engine_version=engine_version,
+            kind=kind,
+            target=target,
+            pipe_ref=pipe_ref,
+            options=resolved_options,
+            comment_prefix=comment_prefix_for(emitted_file.filename),
+        )
+        stamped_files.append(EmittedFile(filename=emitted_file.filename, content=stamped))
+        artifact_hashes[emitted_file.filename] = compute_content_hash(emitted_file.content)
+    lock = build_lock(crate_fingerprint=crate_fingerprint, engine_version=engine_version, artifacts=artifact_hashes)
+    return StampedProjection(files=stamped_files, lock=lock, lock_content=encode_lock(lock))
 
 
 class WriteReport(BaseModel):
@@ -51,36 +104,31 @@ def write_stamped_projection(
     options: dict[str, str] | None = None,
 ) -> WriteReport:
     """Stamp, write-if-changed, prune de-listed files, and rewrite the lock for one projection run."""
-    resolved_options = options or {}
     lock_path = output_dir / CODEGEN_LOCK_FILENAME
     previous_paths = _previous_tracked_paths(lock_path)
 
+    projection = build_stamped_projection(
+        emitted,
+        crate_fingerprint=crate_fingerprint,
+        engine_version=engine_version,
+        kind=kind,
+        target=target,
+        pipe_ref=pipe_ref,
+        options=options,
+    )
+
     written: list[str] = []
     unchanged: list[str] = []
-    artifact_hashes: dict[str, str] = {}
-
-    for emitted_file in emitted:
-        stamped = apply_stamp(
-            emitted_file.content,
-            crate_fingerprint=crate_fingerprint,
-            engine_version=engine_version,
-            kind=kind,
-            target=target,
-            pipe_ref=pipe_ref,
-            options=resolved_options,
-            comment_prefix=comment_prefix_for(emitted_file.filename),
-        )
-        artifact_hashes[emitted_file.filename] = compute_content_hash(emitted_file.content)
-        destination = output_dir / emitted_file.filename
-        if _write_if_changed(destination, content=stamped):
-            written.append(emitted_file.filename)
+    for stamped_file in projection.files:
+        destination = output_dir / stamped_file.filename
+        if _write_if_changed(destination, content=stamped_file.content):
+            written.append(stamped_file.filename)
         else:
-            unchanged.append(emitted_file.filename)
+            unchanged.append(stamped_file.filename)
 
-    removed = _prune_delisted(output_dir=output_dir, previous_paths=previous_paths, current_paths=set(artifact_hashes))
+    removed = _prune_delisted(output_dir=output_dir, previous_paths=previous_paths, current_paths=projection.lock.paths())
 
-    lock = build_lock(crate_fingerprint=crate_fingerprint, engine_version=engine_version, artifacts=artifact_hashes)
-    _write_if_changed(lock_path, content=encode_lock(lock))
+    _write_if_changed(lock_path, content=projection.lock_content)
 
     return WriteReport(written=written, unchanged=unchanged, removed=removed, lock_path=CODEGEN_LOCK_FILENAME)
 

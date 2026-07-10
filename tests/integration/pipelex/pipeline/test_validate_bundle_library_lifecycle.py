@@ -3,7 +3,7 @@
 Both bundle-loading entry points (``validate_bundle`` and
 ``validate_bundles_from_directory``) call ``library_manager.open_library()``
 before doing any work. When the body raises (including a translated
-``ValidateBundleError`` from ``_translate_to_validate_bundle_error``), the
+``ValidateBundleError`` from ``translate_to_validate_bundle_error``), the
 opened library must be torn down so the process does not accumulate one
 un-torn-down ``Library`` per failed validation.
 

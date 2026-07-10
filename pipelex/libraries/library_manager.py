@@ -688,7 +688,7 @@ class LibraryManager(LibraryManagerAbstract):
             # contract mismatches, duplicate refs) carry no structured validation payload — unlike
             # LibraryLoadingError, which must propagate intact so its aggregated errors survive.
             # Add the batch's file list as context, then let the outer
-            # _translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
+            # translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
             msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
             raise type(ref_error)(msg) from ref_error
 
