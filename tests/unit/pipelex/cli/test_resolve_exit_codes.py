@@ -20,6 +20,8 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
     from pytest_mock import MockerFixture
 
 MODULE = "pipelex.cli.commands.resolve_cmd"
@@ -31,13 +33,14 @@ CRATE_LOADING = "pipelex.cli.commands.crate_loading"
 class TestResolveExitCodes:
     """The resolve 0/1/2 exit-code policy, with boot/teardown mocked out."""
 
-    def _neutralize_boot(self, mocker: MockerFixture) -> None:
-        mocker.patch(f"{MODULE}.make_pipelex_for_cli")
+    def _neutralize_boot(self, mocker: MockerFixture) -> MagicMock:
+        boot = mocker.patch(f"{MODULE}.make_pipelex_for_cli")
         mocker.patch(f"{MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{MODULE}.tag")
         telemetry_manager = mocker.patch(f"{MODULE}.get_telemetry_manager").return_value
         # A real null context manager — a bare MagicMock would suppress the exception under test.
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
+        return boot
 
     def test_invalid_library_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
         self._neutralize_boot(mocker)
@@ -81,3 +84,17 @@ class TestResolveExitCodes:
         # A resolved library emits the crate to stdout and does not raise (implicit exit 0).
         resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
         assert "<<crate-body>>" in capsys.readouterr().out
+
+    def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture) -> None:
+        """Resolve boots offline but WITH model specs (like `validate`): library validation checks
+        pipe model pins against the deck, so a spec-less boot would reject any bundle that pins a model.
+        """
+        boot = self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = mocker.MagicMock()
+        mocker.patch(f"{CRATE_LOADING}.normalize_crate", return_value=mocker.MagicMock())
+        mocker.patch(f"{MODULE}.encode_crate", return_value="{}")
+        resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert boot.call_args.kwargs["needs_inference"] is False
+        assert boot.call_args.kwargs["needs_model_specs"] is True

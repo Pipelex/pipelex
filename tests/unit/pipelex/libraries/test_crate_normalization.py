@@ -47,8 +47,9 @@ def _authored_crate() -> LibraryCrate:
             ),
             # Refines a same-package concept that HAS a structure -> flattened (refines dropped).
             "scoring.DetailedScore": ConceptBlueprint(description="a detailed score", refines="WeightedScore"),
-            # Refines a STRUCTURELESS native (Image) -> refines kept, no structure materialized.
-            "scoring.CustomImage": ConceptBlueprint(description="a domain-specific image", refines="Image"),
+            # Refines a STRUCTURELESS native (Date, whose content class has no mappable structure) ->
+            # refines kept, no structure materialized.
+            "scoring.CustomDate": ConceptBlueprint(description="a domain-specific date", refines="Date"),
             # Refines a STRUCTURED native (Text, whose materialized structure has a `text` field) ->
             # refines kept (B1-2): flattening would drop the native base on round-trip.
             "scoring.Summary": ConceptBlueprint(description="a short summary", refines="Text"),
@@ -127,12 +128,12 @@ class TestCrateNormalization:
         assert _structure_field(detailed, "note").concept_ref == "native.Text"
 
     def test_refinement_with_structureless_native_base_keeps_refines(self):
-        """Refining a structureless native (Image) keeps a qualified `refines` and stays structureless."""
+        """Refining a structureless native (Date) keeps a qualified `refines` and stays structureless."""
         result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
-        custom_image = result.concepts["scoring.CustomImage"]
-        assert isinstance(custom_image, ConceptBlueprint)
-        assert custom_image.refines == "native.Image"
-        assert custom_image.structure is None
+        custom_date = result.concepts["scoring.CustomDate"]
+        assert isinstance(custom_date, ConceptBlueprint)
+        assert custom_date.refines == "native.Date"
+        assert custom_date.structure is None
 
     def test_refinement_with_structured_native_base_keeps_refines(self):
         """Refining a STRUCTURED native (Text) keeps the qualified `refines` and is NOT flattened (B1-2).
@@ -166,10 +167,11 @@ class TestCrateNormalization:
         assert isinstance(text_native, ConceptBlueprint)
         assert isinstance(text_native.structure, dict)
         assert "text" in text_native.structure
-        # native.Image is referenced via a `refines`; it is a structureless native.
-        image_native = result.concepts["native.Image"]
-        assert isinstance(image_native, ConceptBlueprint)
-        assert image_native.structure is None
+        # native.Date is referenced via a `refines`; its content class has no mappable structure,
+        # so it materializes structureless (declared imprecision, not a guessed shape).
+        date_native = result.concepts["native.Date"]
+        assert isinstance(date_native, ConceptBlueprint)
+        assert date_native.structure is None
 
     def test_unreferenced_natives_absent(self):
         """Natives that nothing references are not materialized into the crate."""

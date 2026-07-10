@@ -33,6 +33,8 @@ For **`python-pydantic`**, no key mapping is ever needed either: wire names are 
 
 A concept that refines another keeps its `refines` link when the base is **native-backed** (the refinement chain bottoms out at a native such as `Text` or `Number`), because the native is materialized into the crate and the base carries real runtime behavior; the emitter then renders inheritance (`class Summary(TextContent)` / `class Summary(Text)` / `z.lazy(() => TextSchema)`), which round-trips to the correct base class. A concept that refines an **in-crate structured** base has that base's effective structure flattened in during normalization.
 
+Native materialization itself is faithful-or-absent per native: a content-class field maps when it has an unambiguous blueprint form — primitives, dicts, lists, references to other natives, and nested non-native models, which serialize as JSON objects and therefore map to a `dict` blueprint with unspecified value types (declared imprecision the emitters surface, e.g. `Image.size`). A field with no honest blueprint form at all (e.g. `datetime.time` on `Date`) leaves the whole native structureless rather than guessing a partial shape.
+
 ## The CLI surface
 
 Two command families drive the engine (formal contract: `docs/specs/pipelex-codegen.md`, workspace root):

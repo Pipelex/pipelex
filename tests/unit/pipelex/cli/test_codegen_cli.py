@@ -25,6 +25,7 @@ from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from unittest.mock import MagicMock
 
     from pytest_mock import MockerFixture
 
@@ -35,12 +36,13 @@ INPUTS = "pipelex.cli.commands.codegen.inputs_cmd"
 class TestCodegenCli:
     """The two Phase-1 codegen commands, with boot/teardown and the crate loader mocked out."""
 
-    def _neutralize_boot(self, mocker: MockerFixture, *, module: str) -> None:
-        mocker.patch(f"{module}.make_pipelex_for_cli")
+    def _neutralize_boot(self, mocker: MockerFixture, *, module: str) -> MagicMock:
+        boot = mocker.patch(f"{module}.make_pipelex_for_cli")
         mocker.patch(f"{module}.Pipelex.teardown_if_needed")
         mocker.patch(f"{module}.tag")
         telemetry_manager = mocker.patch(f"{module}.get_telemetry_manager").return_value
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
+        return boot
 
     def test_types_writes_every_emitted_stamped_and_locked_exit_0(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)
@@ -58,6 +60,33 @@ class TestCodegenCli:
         assert types_text.endswith("// types\n")
         assert (tmp_path / "binder.ts").read_text(encoding="utf-8").endswith("// binder\n")
         assert (tmp_path / CODEGEN_LOCK_FILENAME).is_file()
+
+    @pytest.mark.parametrize("module", [TYPES, INPUTS])
+    def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path, module: str) -> None:
+        """Codegen boots offline but WITH model specs (like `validate`): library validation checks
+        pipe model pins (`model = "gpt-4o-mini"`) against the deck, so a spec-less boot would reject
+        any bundle that pins a model — the drift this test guards against.
+        """
+        boot = self._neutralize_boot(mocker, module=module)
+        if module == TYPES:
+            mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
+            mocker.patch(f"{TYPES}.emit_types", return_value=[EmittedFile(filename="types.ts", content="// types\n")])
+            codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
+        else:
+            crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
+            mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
+            mocker.patch(f"{INPUTS}.get_required_pipe")
+            mocker.patch(f"{INPUTS}.render_inputs", return_value="{}")
+            codegen_inputs_cmd(
+                pipe=None,
+                paths=None,
+                template_format=InputsTemplateFormat.JSON,
+                explicit=False,
+                output=str(tmp_path / "inputs.json"),
+                library_dir=None,
+            )
+        assert boot.call_args.kwargs["needs_inference"] is False
+        assert boot.call_args.kwargs["needs_model_specs"] is True
 
     def test_types_invalid_library_verdict_propagates(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)

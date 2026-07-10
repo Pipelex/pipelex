@@ -22,6 +22,9 @@
 - **Documentation overhaul:** Updated `provide-inputs.md`, `executing-pipelines.md`, and `native-concepts.md` for the Smart Inputs paradigm, leading with the bare-value approach and demoting the envelope format to an escape hatch.
 
 ### Fixed
+- **`resolve` / `codegen` rejected bundles that pin a model:** the resolve and codegen commands booted without model specs, so library validation could not check pipe model pins (`model = "gpt-4o-mini"`) against the deck and rejected any bundle carrying one. They now boot like `validate` — offline, but with model specs loaded.
+- **Native `Image` (and any native with a nested-model field) no longer materializes structureless:** a native content-class field holding a nested non-native model (e.g. `ImageSize`) now maps to a `dict` blueprint with unspecified value types — its honest wire shape — instead of making the whole native structureless. Generated clients for image-producing pipes now expose `url`, `public_url`, `caption`, etc.
+- **Deterministic input-template placeholders:** mock URL placeholders in generated inputs templates (`codegen inputs` / `build inputs`) are now deterministic (`https://mock.invalid/<field>`), so committed templates no longer churn on every regeneration.
 - **Silent mistyping of inputs:** Providing a bare string for a refined text concept (e.g., `legal.Question`) no longer silently degrades the type to a generic `native.Text`; the declared concept type is now retained.
 - **TOML inline table formatting:** Light templates now use inline tables for structured values, preventing trailing scalars from being swallowed into `[sections]`.
 

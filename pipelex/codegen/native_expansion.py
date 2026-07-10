@@ -7,16 +7,20 @@ here into a `ConceptBlueprint`: its canonical description plus, where the conten
 cleanly onto the authoring structure language, its structure.
 
 Materialization is faithful-or-absent: a native's structure is emitted only when *every* field of its
-content class maps unambiguously to a blueprint field (primitive, dict, list, or a reference to
-another native). A field whose annotation has no clean blueprint form (e.g. `ImageSize`,
-`datetime.time`) makes the whole native structureless — the sufficiency contract surfaces that as
-declared imprecision rather than a guessed shape. The `mthds_version` the crate is stamped with pins
-which version these materialized definitions correspond to.
+content class maps unambiguously to a blueprint field — primitive, dict, list, a reference to another
+native, or a nested non-native model (whose wire form is a JSON object, so it maps honestly to a
+`dict` blueprint with unspecified value types — declared imprecision the emitters surface). A field
+whose annotation has no honest blueprint form at all (e.g. `datetime.time`, a non-Optional union)
+makes the whole native structureless — the sufficiency contract surfaces that as declared imprecision
+rather than a guessed shape. The `mthds_version` the crate is stamped with pins which version these
+materialized definitions correspond to.
 """
 
 import datetime
 from types import UnionType
 from typing import Any, Union, cast, get_args, get_origin
+
+from pydantic import BaseModel
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -94,6 +98,13 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
             description=description, type=ConceptStructureBlueprintFieldType.CONCEPT, concept_ref=native_code.concept_ref, required=required
         )
 
+    if _is_nested_model(inner):
+        # A nested non-native model (e.g. `ImageSize`) serializes as a JSON object; its honest
+        # blueprint form is a dict with unspecified value types — declared imprecision, not a guess.
+        return ConceptStructureBlueprint(
+            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="str", value_type="Any", required=required
+        )
+
     raise _UnmappableAnnotationError
 
 
@@ -157,3 +168,8 @@ def _native_code_for_content_class(annotation: Any) -> NativeConceptCode | None:
     if not isinstance(annotation, type) or not issubclass(annotation, StuffContent):
         return None
     return _NATIVE_CLASS_NAME_TO_CODE.get(annotation.__name__)
+
+
+def _is_nested_model(annotation: Any) -> bool:
+    """A pydantic model that is not itself a native content class — an object on the wire."""
+    return isinstance(annotation, type) and issubclass(annotation, BaseModel)

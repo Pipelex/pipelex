@@ -9,7 +9,6 @@ import inspect
 import random
 import types
 import typing
-import uuid
 from enum import StrEnum
 from typing import Any, Union, cast, get_args, get_origin
 
@@ -303,7 +302,10 @@ class ConceptRepresentationGenerator:
         """
         if actual_type is str:
             if field_name == "url" or field_name.endswith("_url"):
-                return f"https://mock-{uuid.uuid4().hex[:8]}.invalid/{uuid.uuid4()}"
+                # Deterministic on purpose: these placeholders land in committed inputs templates
+                # (`codegen inputs` / `build inputs`), where a random URL would churn on every regen.
+                # `.invalid` is a reserved TLD, so the URL can never resolve.
+                return f"https://mock.invalid/{field_name}"
             return f"{field_name}_value"
         elif actual_type is int:
             return 0

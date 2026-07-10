@@ -181,7 +181,9 @@ def _resolve_scalar_type_name(type_name: str | None, *, local_domain: str | None
     ref (concept nesting uses the dedicated `concept` / `item_concept_ref` path). An unset or
     unrecognized name is genuine source imprecision, surfaced as ANY rather than guessed.
     """
-    if type_name is None:
+    if type_name is None or type_name == "Any":
+        # "Any" is the explicit unspecified-value sentinel (dict blueprints require a value_type,
+        # so native expansion writes "Any" where the values are genuinely untyped).
         return ResolvedType(kind=ResolvedTypeKind.ANY, imprecise=True, imprecision_reason=f"{context} type unspecified")
     try:
         field_type = ConceptStructureBlueprintFieldType(type_name)
