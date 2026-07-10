@@ -21,8 +21,8 @@ if TYPE_CHECKING:
 
 
 async def build_inputs_for_pipe(
-    pipe_code: str | None = None,
     *,
+    pipe_code: str | None = None,
     mthds_contents: list[str] | None = None,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,

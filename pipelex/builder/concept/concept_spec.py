@@ -175,19 +175,19 @@ class ConceptStructureSpec(StructuredContent):
         match self.type:
             case ConceptStructureSpecFieldType.TEXT:
                 if not isinstance(self.default_value, str):
-                    self._raise_type_mismatch_error("str", actual_type_name=type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="str", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.INTEGER:
                 if not isinstance(self.default_value, int):
-                    self._raise_type_mismatch_error("int", actual_type_name=type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="int", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.BOOLEAN:
                 if not isinstance(self.default_value, bool):
-                    self._raise_type_mismatch_error("bool", actual_type_name=type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="bool", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
-                    self._raise_type_mismatch_error("number (int or float)", actual_type_name=type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="number (int or float)", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
-                    self._raise_type_mismatch_error("date", actual_type_name=type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="date", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
@@ -195,7 +195,7 @@ class ConceptStructureSpec(StructuredContent):
                 # LIST type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
 
-    def _raise_type_mismatch_error(self, expected_type_name: str, *, actual_type_name: str) -> None:
+    def _raise_type_mismatch_error(self, *, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         raise ValueError(msg)
 

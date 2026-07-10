@@ -42,153 +42,99 @@ seeded = true
 
 ["pipelex/builder/concept/concept_spec.py::ConceptSpec._format_type_display"]
 param = "field_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/concept/concept_spec.py::ConceptStructureSpec._raise_type_mismatch_error"]
-param = "expected_type_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: formats the field spec's type display; single operand."
 
 ["pipelex/builder/operations/concept_ops.py::concept_spec_to_toml"]
 param = "concept_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the concept spec being rendered to TOML; single operand."
 
 ["pipelex/builder/operations/concept_ops.py::parse_concept_spec"]
 param = "spec_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw spec data; single operand."
 
 ["pipelex/builder/operations/concept_ops.py::structure_field_to_dict"]
 param = "field_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/operations/inputs_ops.py::build_inputs_for_pipe"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the field spec being dictified; single operand."
 
 ["pipelex/builder/operations/models_ops.py::_filter_aliases_by_backend"]
 param = "aliases"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the alias mapping being filtered; backend context stays keyword."
 
 ["pipelex/builder/operations/models_ops.py::_filter_presets_by_backend"]
 param = "presets_list"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the preset list being filtered; backend context stays keyword."
 
 ["pipelex/builder/operations/models_ops.py::_filter_waterfalls_by_backend"]
 param = "waterfalls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the waterfall mapping being filtered; backend context stays keyword."
 
 ["pipelex/builder/operations/models_ops.py::_should_include"]
 param = "category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the candidate category; the filter list stays keyword."
 
 ["pipelex/builder/operations/models_ops.py::format_models_markdown"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/operations/models_ops.py::list_models"]
-param = "categories"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: formats the list_models result dict; single operand."
 
 ["pipelex/builder/operations/pipe_ops.py::_normalize_pipe_code_aliases"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: normalizes the dict in place; single operand."
 
 ["pipelex/builder/operations/pipe_ops.py::_normalize_prompt_aliases"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: normalizes the dict in place; single operand."
 
 ["pipelex/builder/operations/pipe_ops.py::_normalize_sub_pipe_dict"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: normalizes the step/branch dict in place; single operand."
 
 ["pipelex/builder/operations/pipe_ops.py::_normalize_sub_pipe_list"]
 param = "raw_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/operations/pipe_ops.py::add_type_specific_fields"]
-param = "pipe_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the raw steps/branches value being normalized; field_name stays keyword."
 
 ["pipelex/builder/operations/pipe_ops.py::parse_pipe_spec"]
 param = "spec_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw spec data; pipe_type stays keyword."
 
 ["pipelex/builder/operations/pipe_ops.py::pipe_spec_to_toml"]
 param = "pipe_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/operations/validate_ops.py::validate_all"]
-param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the pipe spec being rendered to TOML; single operand."
 
 ["pipelex/builder/operations/validate_ops.py::validate_bundle_content"]
 param = "mthds_contents"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the given .mthds contents; single operand."
 
 ["pipelex/builder/operations/validate_ops.py::validate_bundle_file"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the bundle at the given path; library_dirs stays keyword."
 
 ["pipelex/builder/operations/validate_ops.py::validate_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the pipe named by the code; single operand."
 
 ["pipelex/builder/pipe/pipe_spec.py::PipeSpec.validate_pipe_code_syntax"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates/normalizes the pipe code; also invoked positionally by the field validator."
 
 ["pipelex/builder/runner_code.py::_collect_concept_info"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects import info for the concept; single operand."
 
 ["pipelex/builder/runner_code.py::_collect_imports_for_inputs"]
 param = "inputs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects imports for the pipe inputs; single operand."
 
 ["pipelex/builder/runner_code.py::_format_representation_as_python"]
 param = "representation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/builder/runner_code.py::_get_structure_class_import"]
-param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: formats the representation dict as Python; is_multiple stays keyword."
 
 ["pipelex/builder/runner_code.py::_is_multiple"]
 param = "multiplicity"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the multiplicity value; single operand."
 
 ["pipelex/builder/runner_code.py::generate_runner_code"]
 param = "pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: generates runner code for the pipe; single obvious operand."
 
 ["pipelex/cli/agent_cli/commands/agent_cli_factory.py::make_pipelex_for_agent_cli"]
 param = "library_dirs"
