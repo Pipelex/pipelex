@@ -51,8 +51,8 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     @classmethod
     def _make_template_mode(
         cls,
-        pipe_code: str,
         *,
+        pipe_code: str,
         domain_code: str,
         description: str,
         inputs: InputStuffSpecs,

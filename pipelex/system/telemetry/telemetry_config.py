@@ -236,7 +236,7 @@ class TelemetryRedactionConfig(BaseModel):
             )
 
 
-def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
+def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
 
     Files are deep-merged in this order (later wins per leaf key):

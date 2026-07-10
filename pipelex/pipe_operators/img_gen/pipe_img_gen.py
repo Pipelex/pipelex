@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 
-def resolve_default_size(explicit_aspect_ratio: AspectRatio | None, *, default_size: ImgGenSize | None) -> ImgGenSize | None:
+def resolve_default_size(*, explicit_aspect_ratio: AspectRatio | None, default_size: ImgGenSize | None) -> ImgGenSize | None:
     """Resolve the config-level size default applicable to a pipe, honoring exact-size/aspect-ratio exclusivity.
 
     An exact size implies its own aspect ratio (the blueprint forbids setting both on a pipe), so an
@@ -151,8 +151,8 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -212,7 +212,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Build ImgGenJobParams from ImgGenSetting + one-time settings
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
-            size=self.size or resolve_default_size(self.aspect_ratio, default_size=img_gen_param_defaults.size),
+            size=self.size or resolve_default_size(explicit_aspect_ratio=self.aspect_ratio, default_size=img_gen_param_defaults.size),
             background=self.background or img_gen_param_defaults.background,
             quality=img_gen_setting.quality,
             nb_steps=img_gen_setting.nb_steps,
@@ -298,7 +298,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             "nb_images": nb_images,
         }
 
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeImgGenOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -306,12 +306,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

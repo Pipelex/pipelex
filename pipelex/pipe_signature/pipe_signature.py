@@ -62,8 +62,8 @@ class PipeSignature(PipeAbstract):
     @override
     async def _validate_before_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -73,8 +73,8 @@ class PipeSignature(PipeAbstract):
     @override
     async def _validate_after_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -84,8 +84,8 @@ class PipeSignature(PipeAbstract):
     @override
     async def _live_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -96,8 +96,8 @@ class PipeSignature(PipeAbstract):
     @override
     async def _dry_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,

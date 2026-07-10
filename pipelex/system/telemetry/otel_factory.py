@@ -197,8 +197,8 @@ class OtelFactory:
     @classmethod
     def make_ai_tracer(
         cls,
-        user_id: str | None,
         *,
+        user_id: str | None,
         custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,
         pipelex_posthog_client: "Posthog | None",

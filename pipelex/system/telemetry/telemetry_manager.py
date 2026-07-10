@@ -191,7 +191,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @override
@@ -390,7 +390,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self._pipelex_telemetry_enabled
 
     @override
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.
