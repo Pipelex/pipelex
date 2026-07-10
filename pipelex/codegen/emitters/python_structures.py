@@ -28,7 +28,9 @@ def emit_python_structures(library: ResolvedLibrary) -> list[EmittedFile]:
     in_module = {concept.concept_ref for concept in emitted}
     ordered = order_by_base(emitted, in_module=in_module)
 
-    imports: set[str] = {"from pydantic import Field", "from pipelex.core.stuffs.structured_content import StructuredContent"}
+    has_opaque = any(concept.structureless for concept in emitted)
+    pydantic_import = "from pydantic import ConfigDict, Field" if has_opaque else "from pydantic import Field"
+    imports: set[str] = {pydantic_import, "from pipelex.core.stuffs.structured_content import StructuredContent"}
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
     header = python_header(target="python-structures")
@@ -43,6 +45,10 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     caveat = f"Imprecise: {concept.imprecision_reason}." if concept.structureless and concept.imprecision_reason else None
     docstring = class_docstring(concept.description, extra_line=caveat)
     header = f"class {class_name}({base}):"
+    if concept.structureless:
+        # Opaque = pass-through, never lossy (B1-1): the runtime base inherits pydantic's default
+        # extra="ignore", which would silently strip every field on model_validate.
+        return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
         return f"{header}\n{docstring}"
     lines = [_render_field(concept_field, by_ref=by_ref, imports=imports) for concept_field in concept.fields]

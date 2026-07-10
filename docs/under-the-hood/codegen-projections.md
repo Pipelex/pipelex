@@ -97,6 +97,8 @@ Two concept-level cases are surfaced the same honest way:
 - A **structureless** concept (no structure, no refinement) projects as an opaque type (an empty model / `z.unknown()`) with the imprecision stated in its docstring.
 - A **Python-class-backed** concept (`structure = "<ClassName>"`, whose shape lives only in hand-written Python, not in MTHDS) is surfaced as opaque — the bare class name is never silently emitted into a portable crate.
 
+Opaque is always **pass-through, never lossy**: the ts-zod `z.unknown()` hands the wire object through verbatim, and the Python emitters set `model_config = ConfigDict(extra="allow")` on opaque classes so `model_validate` keeps every field (pydantic's default `extra="ignore"` would silently strip the content). The owner of a Python-class-backed concept recovers the typed object by validating with their own class (`MyLegacyClass.model_validate(payload)`); every other consumer gets the honest untyped object.
+
 ## The extension-file story
 
 Generated code is never edited — hand edits are overwritten on regeneration, and the trust chain treats them as drift. Customization lives in **sibling extension files** that survive regeneration, and each generated file's header says so:

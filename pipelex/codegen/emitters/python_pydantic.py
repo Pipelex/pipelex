@@ -24,7 +24,8 @@ def emit_python_pydantic(library: ResolvedLibrary) -> list[EmittedFile]:
     in_module = {concept.concept_ref for concept in library.concepts}
     ordered = order_by_base(library.concepts, in_module=in_module)
 
-    imports: set[str] = {"from pydantic import BaseModel, Field"}
+    has_opaque = any(concept.structureless for concept in library.concepts)
+    imports: set[str] = {"from pydantic import BaseModel, ConfigDict, Field"} if has_opaque else {"from pydantic import BaseModel, Field"}
     blocks = [_render_class(concept, by_ref=by_ref, imports=imports) for concept in ordered]
 
     header = python_header(target="python-pydantic")
@@ -39,6 +40,10 @@ def _render_class(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept
     caveat = f"Imprecise: {concept.imprecision_reason}." if concept.structureless and concept.imprecision_reason else None
     docstring = class_docstring(concept.description, extra_line=caveat)
     header = f"class {class_name}({base}):"
+    if concept.structureless:
+        # Opaque = pass-through, never lossy (B1-1): pydantic's default extra="ignore" would
+        # silently strip every field on model_validate, so the unknown shape is kept verbatim.
+        return f'{header}\n{docstring}\n\n    model_config = ConfigDict(extra="allow")'
     if not concept.fields:
         return f"{header}\n{docstring}"
     lines = [_render_field(concept_field, by_ref=by_ref, imports=imports) for concept_field in concept.fields]

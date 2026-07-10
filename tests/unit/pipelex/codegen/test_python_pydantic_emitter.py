@@ -64,6 +64,20 @@ class TestPythonPydanticEmitter:
         image = module.Image(url="pipelex-storage://runs/abc/image.png", size={"width": 512, "height": 256})
         assert module.Image.model_validate(image.model_dump(mode="json")) == image
 
+    def test_opaque_concepts_pass_content_through(self, edge_crate: LibraryCrate, tmp_path: Path):
+        """Opaque = pass-through, never lossy (B1-1): a structureless / Python-class-backed concept
+        validates any payload and keeps every field verbatim (extra="allow"), instead of pydantic's
+        default extra="ignore" silently stripping the content.
+        """
+        content = emit_python_pydantic(resolve_concepts_from_crate(edge_crate))[0].content
+        assert 'model_config = ConfigDict(extra="allow")' in content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_models_opaque")
+        payload = {"kind": "legacy", "nested": {"x": 1}}
+        legacy = module.Legacy.model_validate(payload)
+        assert legacy.model_dump() == payload
+        blob = module.Blob.model_validate(payload)
+        assert blob.model_dump() == payload
+
     def test_collision_qualifies_class_names(self, edge_crate: LibraryCrate):
         content = emit_python_pydantic(resolve_concepts_from_crate(edge_crate))[0].content
         assert "class alpha__Result(BaseModel):" in content

@@ -62,3 +62,14 @@ class TestPythonStructuresEmitter:
         assert "Imprecise: concept is backed by the Python class 'MyLegacyClass'" in content
         # Still valid, importable Python despite the opaque concepts.
         load_generated_module(content, tmp_path=tmp_path, name="gen_structures_edge")
+
+    def test_opaque_concepts_pass_content_through(self, edge_crate: LibraryCrate, tmp_path: Path):
+        """Opaque = pass-through, never lossy (B1-1): the runtime base inherits pydantic's default
+        extra="ignore", so without extra="allow" an opaque class would silently strip every field.
+        """
+        content = emit_python_structures(resolve_concepts_from_crate(edge_crate))[0].content
+        assert 'model_config = ConfigDict(extra="allow")' in content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_structures_opaque")
+        payload = {"kind": "legacy", "nested": {"x": 1}}
+        legacy: Any = module.Legacy.model_validate(payload)
+        assert legacy.model_dump() == payload
