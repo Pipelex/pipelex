@@ -106,7 +106,7 @@ class BackendFileReport(BaseModel):
     has_kit_template: bool = False
 
 
-def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
+def check_config_files(*, config_dir: Path | None = None) -> tuple[bool, int, str]:
     """Check if configuration files are present and main config is valid.
 
     Args:
@@ -159,7 +159,7 @@ def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     return False, missing_count, f"{missing_count} configuration file(s) missing"
 
 
-def check_telemetry_config(config_dir: Path | None = None) -> tuple[bool, str]:
+def check_telemetry_config(*, config_dir: Path | None = None) -> tuple[bool, str]:
     """Check if telemetry configuration is valid.
 
     Args:
@@ -188,7 +188,7 @@ def check_telemetry_config(config_dir: Path | None = None) -> tuple[bool, str]:
         return False, "Invalid configuration - run 'pipelex init telemetry' to fix"
 
 
-def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
+def check_backend_credentials(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
     """Check if backend credentials are properly configured.
 
     Args:
@@ -330,7 +330,7 @@ def replace_backend_file(backend_name: str, *, dry_run: bool = False, config_dir
         return False
 
 
-def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
+def check_backend_files(*, config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
 
     Args:
@@ -703,7 +703,7 @@ def display_health_report(
             console.print()
 
 
-def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
+def check_deck_sync(*, config_dir: Path | None = None) -> tuple[bool, DeckSyncReport, str]:
     """Check whether the installed model deck is in sync with the kit shipped by this pipelex version.
 
     Args:
@@ -738,11 +738,7 @@ def check_deck_sync(config_dir: Path | None = None) -> tuple[bool, DeckSyncRepor
     return False, report, f"{len(actionable)} deck file(s) need action"
 
 
-def setup_doctor_runtime(
-    log_config_overrides: Mapping[str, Any] | None = None,
-    *,
-    config_dir: Path | None = None,
-) -> None:
+def setup_doctor_runtime(*, log_config_overrides: Mapping[str, Any] | None = None, config_dir: Path | None = None) -> None:
     """Spin up a fresh PipelexHub and configure logging for doctor checks.
 
     Doctor intentionally bypasses ``Pipelex.make`` so it can diagnose a broken config
@@ -793,7 +789,7 @@ def setup_doctor_runtime(
     log.configure_if_unset(log_config=log_config)
 
 
-def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
+def check_models(*, config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
 
     Assumes ``setup_doctor_runtime`` has already run — the function reads from the

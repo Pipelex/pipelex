@@ -71,7 +71,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     return tomlkit.dumps(doc)
 
 
-def _add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
+def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
     """Add type-specific fields to the pipe TOML table.
 
     Args:

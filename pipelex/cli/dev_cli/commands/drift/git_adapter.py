@@ -39,7 +39,7 @@ def _run_git(args: list[str], *, cwd: Path) -> str:
     return result.stdout
 
 
-def get_repo_toplevel(cwd: Path | None = None) -> Path:
+def get_repo_toplevel(*, cwd: Path | None = None) -> Path:
     """Resolve the git toplevel directory from cwd (where drift.toml and .drift/ live)."""
     output = _run_git(["rev-parse", "--show-toplevel"], cwd=cwd or Path.cwd())
     return Path(output.strip())

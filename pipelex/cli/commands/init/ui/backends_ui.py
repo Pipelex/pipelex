@@ -153,11 +153,7 @@ def build_backend_selection_panel(
 
 
 def prompt_backend_select(
-    console: Console,
-    *,
-    backend_options: list[tuple[str, str]],
-    currently_enabled: list[int] | None = None,
-    is_first_time_setup: bool = False,
+    *, console: Console, backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
 ) -> tuple[list[int], set[str]]:
     """Prompt user to select backend indices with validation.
 

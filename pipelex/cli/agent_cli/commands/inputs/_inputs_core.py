@@ -10,12 +10,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-async def inputs_core(
-    pipe_code: str | None = None,
-    *,
-    bundle_path: Path | None = None,
-    library_dirs: list[Path] | None = None,
-) -> dict[str, Any]:
+async def inputs_core(*, pipe_code: str | None = None, bundle_path: Path | None = None, library_dirs: list[Path] | None = None) -> dict[str, Any]:
     """Core logic for generating input JSON for a pipe.
 
     Args:

@@ -133,7 +133,7 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
 
         # Suggest IDE extension install after backend selection, before gateway terms
         try:
-            suggest_extension_install_if_needed(console)
+            suggest_extension_install_if_needed(console=console)
         except EOFError as exc:
             # No stdin available for the install prompt — skip the optional IDE extension suggestion.
             log.debug(f"IDE extension suggestion skipped: {exc}")
@@ -141,13 +141,13 @@ def customize_backends_config(*, is_first_time_setup: bool = False, target_confi
         # Check if pipelex_gateway is selected and handle terms acceptance prompt
         gateway_terms_accepted: bool | None = None
         if PipelexBackend.GATEWAY in selected_backends:
-            gateway_accepted = prompt_gateway_acceptance(console)
+            gateway_accepted = prompt_gateway_acceptance(console=console)
 
             if gateway_accepted:
-                display_gateway_accepted_message(console)
+                display_gateway_accepted_message(console=console)
                 gateway_terms_accepted = True
             else:
-                display_gateway_declined_message(console)
+                display_gateway_declined_message(console=console)
                 gateway_terms_accepted = False
 
                 # Remove pipelex_gateway from selected indices

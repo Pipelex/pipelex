@@ -124,505 +124,261 @@ rationale = "Predicate on the multiplicity value; single operand."
 param = "pipe"
 rationale = "Verb-object: generates runner code for the pipe; single obvious operand."
 
-["pipelex/cli/agent_cli/commands/agent_cli_factory.py::make_pipelex_for_agent_cli"]
-param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds the error JSON around the message; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::_assemble_error_payload"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Assembles the error payload around the message; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::_build_error_source"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the exc; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::_render_error_markdown"]
 param = "payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the payload; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Emits an agent error for the message; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_markdown"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the message; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Emits the success result payload; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success_formatted"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Emits the formatted success result; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::extract_validation_errors"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::record_setup_warning"]
 param = "warning_payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Records the setup-warning payload; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::set_agent_cli_error_format"]
 param = "error_format"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the agent-CLI error format; single operand."
 
 ["pipelex/cli/agent_cli/commands/check_model_cmd.py::_format_check_markdown"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/agent_cli/commands/concept_cmd.py::_concept_spec_to_toml"]
 param = "concept_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Serializes the concept_spec to TOML; single operand."
 
 ["pipelex/cli/agent_cli/commands/doctor_cmd.py::_format_doctor_markdown"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_configure_routing"]
 param = "selected_backend_keys"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Configures routing from the selected backend keys; single operand."
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_copy_inference_templates"]
 param = "target_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Copies the inference templates into the target dir; single operand."
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_copy_telemetry_template"]
 param = "target_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Copies the telemetry template into the target dir; single operand."
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_format_init_markdown"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_parse_config_arg"]
 param = "config_arg"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/agent_cli/commands/inputs/_inputs_core.py::inputs_core"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/agent_cli/commands/pipe_cmd.py::_add_type_specific_fields"]
-param = "pipe_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the config_arg; single operand."
 
 ["pipelex/cli/agent_cli/commands/pipe_cmd.py::_pipe_spec_to_toml"]
 param = "pipe_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Serializes the pipe_spec to TOML; single operand."
 
 ["pipelex/cli/agent_cli/commands/plxt_passthrough.py::run_plxt"]
 param = "subcommand"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Runs the given plxt subcommand; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/_output_helpers.py::_render_json_payload_lines"]
 param = "result_payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result_payload; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/_output_helpers.py::format_run_markdown"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/_run_core.py::run_pipeline_core"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Runs the pipe identified by pipe_code; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/_run_core_api.py::run_pipeline_core_api"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Runs the pipe identified by pipe_code via the API; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_extract_concept_code"]
 param = "concept_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the concept_data; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_extract_stuff_entry"]
 param = "stuff_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the stuff_data; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::_parse_inputs_arg"]
 param = "inputs_arg"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the inputs_arg; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::parse_cli_inputs"]
 param = "inputs_arg"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the inputs_arg; single operand."
 
 ["pipelex/cli/agent_cli/commands/run/stdin_resolver.py::resolve_stdin_inputs"]
 param = "stdin_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_all_core"]
-param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the stdin_data; single operand."
 
 ["pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_bundle_core"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates the bundle at the path; single operand."
 
 ["pipelex/cli/agent_cli/commands/validate/_validate_core.py::validate_pipe_core"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/inputs/_inputs_core.py::_generate_inputs_core"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/inputs/_inputs_core.py::execute_generate_inputs"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/output/_output_core.py::_generate_output_core"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/output/_output_core.py::execute_generate_output"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/runner/_runner_core.py::_prepare_runner_core"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/build/runner/_runner_core.py::execute_prepare_runner"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates the pipe identified by pipe_code; single operand."
 
 ["pipelex/cli/commands/build/structures_cmd.py::_build_concept_ref_to_class_info"]
 param = "blueprints"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the blueprints; single operand."
 
 ["pipelex/cli/commands/build/structures_cmd.py::_compute_relative_path_from_output_dir"]
 param = "output_directory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the relative path from the output directory; single operand."
 
 ["pipelex/cli/commands/build/structures_cmd.py::generate_structures_from_blueprints"]
 param = "blueprints"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_backend_credentials"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_backend_files"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_config_files"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_deck_sync"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: generates structures from the blueprints; single operand."
 
 ["pipelex/cli/commands/doctor_cmd.py::check_kit_template_exists"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_models"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::check_telemetry_config"]
-param = "config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: checks the backend_name; single operand."
 
 ["pipelex/cli/commands/doctor_cmd.py::replace_backend_file"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime"]
-param = "log_config_overrides"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Replaces the named backend's file; single operand."
 
 ["pipelex/cli/commands/graph_cmd.py::_do_graph_render"]
 param = "input_file"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the input file to a graph; single operand."
 
 ["pipelex/cli/commands/init/backends.py::disable_gateway_backend"]
 param = "backends_toml_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Edits the backends TOML at the path to disable the gateway; single operand."
 
 ["pipelex/cli/commands/init/backends.py::get_selected_backend_keys"]
 param = "backends_toml_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the backends_toml_path; single operand."
 
 ["pipelex/cli/commands/init/backends.py::update_backends_in_toml"]
 param = "toml_doc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::_check_gateway_terms_if_needed"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::_init_agreement"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::attempt_prime_remote_config_cache"]
-param = "target_config_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::confirm_initialization"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::execute_initialization"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Mutates the given TOML document in place; single operand."
 
 ["pipelex/cli/commands/init/command.py::init_cmd"]
 param = "focus"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/command.py::prime_remote_config_cache"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "The init focus is the single operand; flags keyword-only."
 
 ["pipelex/cli/commands/init/credentials.py::get_required_vars_for_enabled_backends"]
 param = "backends_toml_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/credentials.py::prompt_credentials"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the backends_toml_path; single operand."
 
 ["pipelex/cli/commands/init/credentials.py::read_env_file"]
 param = "env_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the env_path path; single operand."
 
 ["pipelex/cli/commands/init/credentials.py::write_env_file"]
 param = "env_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the env_path path; single operand."
 
 ["pipelex/cli/commands/init/ide_extension.py::_install_extension"]
 param = "ide_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Installs the extension for the named IDE; single operand."
 
 ["pipelex/cli/commands/init/ide_extension.py::_is_extension_installed"]
 param = "cmd"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ide_extension.py::suggest_extension_install_if_needed"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the cmd; single operand."
 
 ["pipelex/cli/commands/init/routing.py::customize_routing_profile"]
 param = "selected_backend_keys"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Customizes the routing profile from the selected backend keys; single operand."
 
 ["pipelex/cli/commands/init/ui/backends_ui.py::build_backend_selection_panel"]
 param = "backend_options"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the backend_options; single operand."
 
 ["pipelex/cli/commands/init/ui/backends_ui.py::get_backend_options_from_toml"]
 param = "template_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the template_path; single operand."
 
 ["pipelex/cli/commands/init/ui/backends_ui.py::get_currently_enabled_backends"]
 param = "backends_toml_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/backends_ui.py::prompt_backend_select"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/gateway_ui.py::display_gateway_accepted_message"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/gateway_ui.py::display_gateway_declined_message"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/gateway_ui.py::prompt_gateway_acceptance"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the backends_toml_path; single operand."
 
 ["pipelex/cli/commands/init/ui/routing_ui.py::build_fallback_order_panel"]
 param = "remaining_backends"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the remaining_backends; single operand."
 
 ["pipelex/cli/commands/init/ui/routing_ui.py::build_primary_backend_panel"]
 param = "backend_keys"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/routing_ui.py::display_routing_profile_result"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/init/ui/routing_ui.py::prompt_fallback_order"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the backend_keys; single operand."
 
 ["pipelex/cli/commands/login/command.py::save_api_key"]
 param = "api_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the api_key path; single operand."
 
 ["pipelex/cli/commands/login/command.py::serve_until_callback"]
 param = "server"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Serves the HTTP server until the callback fires; single operand."
 
 ["pipelex/cli/commands/run/_inputs_path_resolver.py::is_relative_local_path"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the uri; single operand."
 
 ["pipelex/cli/commands/run/_inputs_path_resolver.py::resolve_inputs_paths"]
 param = "inputs_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the inputs_dict; single operand."
 
 ["pipelex/cli/commands/run/_inputs_path_resolver.py::resolve_url_in_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/run/_run_core.py::_execute_run"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/run/_run_core.py::execute_run"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the value; single operand."
 
 ["pipelex/cli/commands/show_cmd.py::do_show_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Shows the pipe identified by pipe_code; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_action_description"]
 param = "status"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the status; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_apply_updates"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Applies deck updates in the deck dir; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_print_status_table"]
 param = "report"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the deck-sync report; single operand."
 
 ["pipelex/cli/commands/update_cmd.py::_summary_panel"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/validate/_validate_core.py::_validate_pipe_or_bundle"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/validate/_validate_core.py::do_validate_all_libraries_and_dry_run"]
-param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/commands/validate/_validate_core.py::execute_validate"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the message; single operand."
 
 ["pipelex/cli/commands/which_cmd.py::do_which_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Locates the pipe identified by pipe_code; single operand."
 
 ["pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py::_package_of"]
 param = "key_or_path"
@@ -638,258 +394,187 @@ rationale = "Verb–object: prints one line per violation; single operand."
 
 ["pipelex/cli/dev_cli/commands/check_urls_cmd.py::check_all_urls_async"]
 param = "url_pairs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/check_urls_cmd.py::check_single_url_async"]
-param = "client"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: checks the url_pairs; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::_normalize_pattern"]
 param = "pattern"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the pattern; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::_pattern_to_regex"]
 param = "pattern"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the pattern; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::build_plan_packets"]
 param = "manifest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the manifest; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::compute_contract_digest"]
 param = "contract"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the contract; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::compute_current_digest"]
 param = "contract"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/drift/core.py::diff_trigger_files"]
-param = "stored"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the contract; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::find_dead_patterns"]
 param = "files"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the files; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::find_issues"]
 param = "manifest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the manifest; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::match_files"]
 param = "files"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the files; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/core.py::match_pattern"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_issue_message"]
 param = "issue"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the issue; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_render_packet_markdown"]
 param = "packet"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the packet; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_resolve_repo_root"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the repo_root; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_run_verify_commands"]
 param = "commands"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the commands; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_warn_uncovered_working_tree"]
 param = "contract"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Warns about the contract's uncovered working tree; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::drift_ack_cmd"]
 param = "contract_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Acks the drift contract identified by id; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::drift_plan_cmd"]
 param = "contract_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plans the drift contract identified by id (None = all); single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::_run_git"]
 param = "args"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the args; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::get_git_user_name"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/drift/git_adapter.py::get_repo_toplevel"]
-param = "cwd"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives from the repo_root; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::read_staged_files"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::read_unstaged_modified"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::read_untracked"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::ack_file_path"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::load_ack"]
 param = "ack_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the ack_path path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::load_all_acks"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::load_manifest"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the repo_root path; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::save_ack"]
 param = "ack"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File op keyed by the ack path; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::extract_reference_data"]
 param = "model_specs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the model_specs; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_markdown_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the models as a markdown table; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_markdown_table.sort_by_preferred"]
 param = "items"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Sorts the items by the preferred order; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_pure_markdown_list"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the models as a plain markdown list; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_pure_markdown_list.sort_by_preferred"]
 param = "items"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Sorts the items by the preferred order; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_reference_markdown"]
 param = "model_specs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the model_specs; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::generate_reference_pure_markdown"]
 param = "model_specs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the model_specs; single operand."
 
 ["pipelex/cli/dev_cli/commands/gateway_models_generator.py::normalize_for_comparison"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/generate_error_pages_cmd.py::generate_error_pages_cmd"]
-param = "output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/generate_mthds_schema_cmd.py::generate_mthds_schema_cmd"]
-param = "output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Normalizes the content for comparison; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_Collector._visit_function"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_annotation_has_typer_metadata"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the annotation; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_callee_name"]
 param = "func"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the func; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_decorator_matches_carveout"]
 param = "decorator"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the decorator; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_def_line_has_escape_hatch"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_evaluate_def"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_find_fix_records_in_source"]
 param = "source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the source; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_fix_insertion_point"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_has_carveout_decorator"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_has_typer_param_annotation"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_is_dunder"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the name; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_is_literal_type_name"]
 param = "annotation"
@@ -901,23 +586,19 @@ rationale = "Predicate on its single operand: does this annotation denote a lite
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_iter_subscript_metadata"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the annotation; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_positional_or_keyword_count"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the node; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_qualify"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the name; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_split_source_lines"]
 param = "source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the source; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::_subject_param"]
 param = "node"
@@ -929,138 +610,99 @@ rationale = "Verb–object: flattens the annotation into its union members; sing
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_all_def_infos"]
 param = "root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the root; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_all_violations"]
 param = "root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the root; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_def_infos_in_source"]
 param = "source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the source; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_violations_for_files"]
 param = "paths"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the paths; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::find_violations_in_source"]
 param = "source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the source; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::fix_all_violations"]
 param = "root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the root; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::fix_source"]
 param = "source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the source; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::iter_source_files"]
 param = "root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the root; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::main"]
 param = "argv"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the argv; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::module_qname_for"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the path; single operand."
 
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::relative_source_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Guard/CLI helper: operates on the path; single operand."
 
 ["pipelex/cli/dev_cli/commands/kit_cmd.py::_cleanup_other_targets"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/kit_cmd.py::_sync_agent_rules"]
-param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Cleans up stale kit targets in the repo root; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_display_summary"]
 param = "availability"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the availability; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_extract_models_from_backend_toml"]
 param = "backend_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the backend_path; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_filter_models_by_profile"]
 param = "availability"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Filters the availability map by profile; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_generate_fixtures_python"]
 param = "combo_pairs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Generates fixture source from the combo pairs; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_load_test_profile"]
 param = "profile_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Loads the named test profile; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_process_collections_from_toml"]
 param = "collections_raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the raw collections payload; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_resolve_model_list"]
 param = "raw_list"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the raw_list; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::preprocess_test_models_cmd"]
 param = "profile"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Preprocesses test models for the named profile; single operand."
 
 ["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::_fetch"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Fetches the URL; single operand."
 
 ["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::_python_string_literal"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the value as a Python string literal; single operand."
 
 ["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::_sha384_sri"]
 param = "payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Computes the SRI hash of the payload; single operand."
 
 ["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::_validate_sri"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::_validate_version"]
-param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/dev_cli/commands/refresh_graph_ui_sri_cmd.py::refresh_graph_ui_sri_cmd"]
-param = "mthds_ui_version"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates the SRI value; single operand."
 
 ["pipelex/cli/dev_cli/commands/subject_grant_cmd.py::_fail"]
 param = "message"
@@ -1068,168 +710,123 @@ rationale = "Verb–object: fails with the given message; single operand, call s
 
 ["pipelex/cli/dev_cli/commands/sync_kit_configs_cmd.py::_display_result"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/dev_cli/commands/sync_main_config_cmd.py::_display_sync_result"]
 param = "result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the result; single operand."
 
 ["pipelex/cli/dev_cli/commands/sync_main_config_cmd.py::_format_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the value; single operand."
 
 ["pipelex/cli/dev_cli/commands/sync_main_config_cmd.py::sync_main_config_cmd"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Syncs the main config toward the target; single operand."
 
 ["pipelex/cli/dev_cli/commands/update_gateway_models_cmd.py::_all_references_up_to_date"]
 param = "reference_files"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/error_handlers.py::_display_validation_error_details"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/error_handlers.py::display_error_panel"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate: whether the reference files are current; single operand."
 
 ["pipelex/cli/error_handlers.py::handle_gateway_api_key_missing_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_gateway_do_not_track_conflict_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_gateway_terms_not_accepted_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_gateway_unknown_model_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_inference_setup_required_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_model_availability_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_model_choice_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_model_deck_preset_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_remote_config_unavailable_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_remote_config_validation_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_telemetry_config_validation_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/error_handlers.py::handle_validate_bundle_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cli/error_handlers.py::print_traceback_if_requested"]
-param = "console"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Error handler: the exc is the single operand handled."
 
 ["pipelex/cli/installed_methods.py::discover_method_at"]
 param = "method_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the method_dir; single operand."
 
 ["pipelex/cli/installed_methods.py::discover_methods_from_library_dirs"]
 param = "library_dirs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the library_dirs; single operand."
 
 ["pipelex/cli/installed_methods.py::find_method_by_full_address"]
 param = "full_address"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the full_address; single operand."
 
 ["pipelex/cli/installed_methods.py::find_method_by_name"]
 param = "method_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the method_name; single operand."
 
 ["pipelex/cli/method_resolver.py::_find_method_by_exported_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the pipe_code; single operand."
 
 ["pipelex/cli/method_resolver.py::_get_all_exported_pipes"]
 param = "method"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Looks up from the method; single operand."
 
 ["pipelex/cli/method_resolver.py::is_github_url"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the target; single operand."
 
 ["pipelex/cli/method_resolver.py::is_local_path"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the target; single operand."
 
 ["pipelex/cli/method_resolver.py::parse_github_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the url; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_method_from_path"]
 param = "method_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the method_path; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_method_from_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the url; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_method_target"]
 param = "method_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the method_name; single operand."
 
 ["pipelex/cli/method_resolver.py::resolve_pipe_from_exports"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the pipe_code; single operand."
 
 ["pipelex/cogt/config_cogt.py::ImgGenConfig.get_num_inference_steps"]
 param = "model_name"

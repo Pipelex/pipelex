@@ -29,8 +29,8 @@ kit_app = typer.Typer(no_args_is_help=True)
 
 
 def _sync_agent_rules(
-    repo_root: Path | None,
     *,
+    repo_root: Path | None,
     agent_set: str | None,
     cleanup: bool,
     kit_index: KitIndex | None = None,
