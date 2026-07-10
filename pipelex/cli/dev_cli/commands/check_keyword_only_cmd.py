@@ -45,9 +45,16 @@ if TYPE_CHECKING:
 
 
 def _package_of(key_or_path: str) -> str:
-    """The top-level package of a ``pipelex/...`` path or ``<path>::<qualname>`` key, for report grouping."""
+    """The top-level package of a ``pipelex/...`` path or ``<path>::<qualname>`` key, for report grouping.
+
+    Files sitting directly under the source root (``pipelex/hub.py``) group under ``(root)`` rather than
+    each filename becoming its own one-off "package" line in the report.
+    """
     path = key_or_path.partition("::")[0]
-    return path.split("/")[1] if "/" in path else path
+    parts = path.split("/")
+    if len(parts) > 2:
+        return parts[1]
+    return "(root)" if len(parts) == 2 else path
 
 
 def _print_report(violations: list[Violation], *, grants: dict[str, SubjectGrant]) -> None:

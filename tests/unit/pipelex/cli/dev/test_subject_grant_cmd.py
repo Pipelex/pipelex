@@ -143,6 +143,15 @@ class TestSubjectGrantCmd:
         assert "pipelex/sample/module.py::all_keyword" not in data  # no positional subject
         assert "pipelex/sample/module.py::__dunder_like__" not in data  # exempt
 
+    def test_seed_reports_disagreeing_overloads_and_first_seen_wins(self, repo: Path) -> None:
+        """Same-qualname defs disagreeing on the subject name: first one seen is seeded, the conflict is surfaced."""
+        subject_grant_cmd(func_key=None, rationale=None, seed=True, quiet=True)
+        data = _read_registry(repo)
+        assert data["pipelex/sample/overloads.py::parse"]["param"] == "spec"  # source order: parse(spec) precedes parse(data)
+        output = self.console.export_text()
+        assert "disagree" in output
+        assert "pipelex/sample/overloads.py::parse" in output
+
     def test_seed_is_idempotent_and_keeps_reviewed_entries(self, repo: Path) -> None:
         """A second seed adds nothing, and a reviewed (non-seeded) entry is never overwritten by seeding."""
         subject_grant_cmd(func_key="pipelex/sample/module.py::render", rationale="Reviewed for real.", quiet=True)
