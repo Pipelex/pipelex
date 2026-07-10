@@ -4844,1425 +4844,1137 @@ rationale = "Framework-owned pytest hook signature; pluggy binds by parameter na
 param = "config"
 rationale = "Framework-owned pytest hook signature; pluggy binds by parameter name."
 
-["pipelex/tools/aws/aws_config.py::AwsConfig.get_aws_access_keys_with_method"]
-param = "api_key_method"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/tools/jinja2/image_registry.py::ImageRegistry.get_image_placeholder"]
 param = "image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the image; single operand."
 
 ["pipelex/tools/jinja2/image_registry.py::ImageRegistry.make_finalize.finalize"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable jinja2 finalize hook: value is the single operand jinja passes."
 
 ["pipelex/tools/jinja2/image_registry.py::ImageRegistry.register_image"]
 param = "image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the image; single operand."
 
 ["pipelex/tools/jinja2/jinja2_environment.py::_register_filters"]
 param = "jinja2_env"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the jinja2_env; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_environment.py::make_jinja2_env_from_registry"]
 param = "template_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the template_category; single operand."
 
 ["pipelex/tools/jinja2/jinja2_environment.py::make_jinja2_env_without_loader"]
 param = "template_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the template_category; single operand."
 
 ["pipelex/tools/jinja2/jinja2_filters.py::escape_script_tag"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/tools/jinja2/jinja2_parsing.py::check_jinja2_parsing"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_add_to_templating_context"]
 param = "templating_context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the templating_context; single operand."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_compile_jinja2_template"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_make_non_type_error_msg"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the template_source; single operand."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_make_type_error_msg"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the template_source; single operand."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_prepare_templating_context"]
 param = "templating_context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the templating_context; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_async"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_sync"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::render_jinja2_async"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::render_jinja2_sync"]
 param = "template_source"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_build_full_path"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_declarations_from_body"]
 param = "body"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the body; single operand."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_full_variable_paths"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_collect_variable_references"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_required_variables.py::_extract_filters_and_variable"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the node; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.is_loaded"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the name; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.load"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the name; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_loader.py::TemplateLoader.reload"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the name; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_registry.py::TemplateRegistry.get"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the key; single operand."
 
 ["pipelex/tools/jinja2/jinja2_template_registry.py::TemplateRegistry.is_registered"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the key; single operand."
 
 ["pipelex/tools/jinja2/jinja2_with_images_filter.py::_render_sequence_with_images"]
 param = "sequence"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the sequence; single operand (context keyword-only)."
 
 ["pipelex/tools/log/log.py::Log._should_ignore"]
 param = "problem_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the problem id; single operand."
 
 ["pipelex/tools/log/log.py::Log.configure"]
 param = "log_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the log_config; single operand."
 
 ["pipelex/tools/log/log.py::Log.configure_if_unset"]
 param = "log_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the log_config; single operand."
 
 ["pipelex/tools/log/log.py::Log.critical"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.debug"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.dev"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.error"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.info"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.set_level"]
 param = "level"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the level; single operand."
 
 ["pipelex/tools/log/log.py::Log.set_level_by_name"]
 param = "level_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the level_name; single operand."
 
 ["pipelex/tools/log/log.py::Log.set_level_for_package"]
 param = "package_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the package_name; single operand."
 
 ["pipelex/tools/log/log.py::Log.set_levels_for_packages"]
 param = "package_log_levels"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the package_log_levels; single operand."
 
 ["pipelex/tools/log/log.py::Log.set_log_mode"]
 param = "mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the mode; single operand."
 
 ["pipelex/tools/log/log.py::Log.set_poor_log_formatter"]
 param = "formatter"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the formatter; single operand."
 
 ["pipelex/tools/log/log.py::Log.verbose"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log.py::Log.warning"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log_config.py::CallerInfoTemplate.for_template_key"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the key; single operand."
 
 ["pipelex/tools/log/log_config.py::RichLogConfig.make_rich_handler"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the target; single operand."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch._log_data"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch._log_message"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch._log_to_console"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the message; single operand."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch.configure"]
 param = "log_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the log_config; single operand."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch.dispatch"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Logs the content; single operand (formatting keyword-only)."
 
 ["pipelex/tools/log/log_dispatch.py::LogDispatch.set_log_mode"]
 param = "mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the mode; single operand."
 
 ["pipelex/tools/log/log_formatter.py::emoji_for_channel"]
 param = "channel_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the channel_name; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::clean_str_for_mermaid_node_title"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the text; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::encode_pako_from_bytes"]
 param = "state_bytes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the state_bytes; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::encode_pako_from_string"]
 param = "state"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the state; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::escape_mermaid_label"]
 param = "label"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the label; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::make_mermaid_url"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the mermaid_code; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::print_mermaid_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the url; single operand."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::render_mermaid_html_generic"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the mermaid_code; single operand (context keyword-only)."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::render_mermaid_html_generic_async"]
 param = "mermaid_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the mermaid_code; single operand (context keyword-only)."
 
 ["pipelex/tools/mermaid/mermaid_utils.py::sanitize_mermaid_id"]
 param = "node_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the node_id; single operand."
 
 ["pipelex/tools/misc/async_utils.py::_invoke"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the factory; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/misc/async_utils.py::gather_bounded"]
 param = "task_factories"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the task_factories; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher._looks_like_base64"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher._truncate_bytes"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher._truncate_string"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher.apply_truncation_recursive"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the obj; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher.get_truncated_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the value; single operand."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher.should_truncate"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::extract_base64_str_from_base64_url_if_possible"]
 param = "possibly_base64_url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the possibly_base64_url; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::is_prefixed_base64_url"]
 param = "possibly_base64_url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the possibly_base64_url; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::load_binary_as_base64"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url"]
 param = "base64_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the base64_data; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_bytes"]
 param = "raw_bytes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the raw_bytes; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_http_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the url; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::make_base64_url_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the path; single operand."
 
 ["pipelex/tools/misc/base64_utils.py::strip_base64_str_if_needed"]
 param = "base64_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the base64_str; single operand."
 
 ["pipelex/tools/misc/context_provider_abstract.py::ContextProviderAbstract.get_typed_object_or_attribute"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the name; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::apply_to_strings_in_list"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::apply_to_strings_recursive"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::extract_vars_from_strings_recursive"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the data; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::extract_vars_from_strings_recursive.extract_from_string"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner recursion helper: extracts vars from the text; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::extract_vars_from_strings_recursive.traverse"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner recursion helper: traverses the value; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::insert_before"]
 param = "dictionary"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the dictionary; single operand."
 
 ["pipelex/tools/misc/dict_utils.py::substitute_nested_in_context"]
 param = "context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the context; single operand."
 
 ["pipelex/tools/misc/diff.py::_generate_diff_summary"]
 param = "diff_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the diff_content; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/misc/diff.py::has_diff_dirs._filter_excluded_files"]
 param = "file_list"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner helper: filters the file list; single operand."
 
 ["pipelex/tools/misc/diff.py::has_diff_dirs._has_diff"]
 param = "dir_comparison"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner helper: tests the dir comparison; single operand."
 
 ["pipelex/tools/misc/diff.py::make_diff_dirs_pretty._collect_diffs"]
 param = "dir_comparison"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner helper: collects diffs from the dir comparison; single operand."
 
 ["pipelex/tools/misc/diff.py::make_diff_dirs_pretty._filter_excluded_files"]
 param = "file_list"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner helper: filters the file list; single operand."
 
 ["pipelex/tools/misc/document_utils.py::DocumentFormat.from_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the mime_type; single operand."
 
 ["pipelex/tools/misc/document_utils.py::DocumentFormat.is_supported_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the mime_type; single operand."
 
 ["pipelex/tools/misc/document_utils.py::DocumentFormat.raise_if_unsupported_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the mime_type; single operand."
 
 ["pipelex/tools/misc/exceptions.py::TomlError.from_tomli_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the exc; single operand."
 
 ["pipelex/tools/misc/file_fetch_utils.py::fetch_file_from_url_httpx"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Fetches the file at the URL; single operand."
 
 ["pipelex/tools/misc/file_utils.py::_reraise_walk_error"]
 param = "walk_error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the walk_error; single operand."
 
 ["pipelex/tools/misc/file_utils.py::copy_file_from_package"]
 param = "package_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the package_name; single operand."
 
 ["pipelex/tools/misc/file_utils.py::copy_folder_from_package"]
 param = "package_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the package_name; single operand."
 
 ["pipelex/tools/misc/file_utils.py::ensure_directory_exists"]
 param = "directory_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the directory_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::ensure_directory_for_file_path"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the file_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::ensure_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::failable_load_text_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Loads text from the path (failable); single operand."
 
 ["pipelex/tools/misc/file_utils.py::find_files_in_dir"]
 param = "dir_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the dir_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::get_incremental_directory_path"]
 param = "base_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the base_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::get_incremental_file_path"]
 param = "base_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the base_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::load_binary"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::load_binary_async"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::load_text_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::path_exists"]
 param = "path_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the path_str; single operand."
 
 ["pipelex/tools/misc/file_utils.py::reject_bare_str_or_path"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the value; single operand."
 
 ["pipelex/tools/misc/file_utils.py::remove_file"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the file_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::remove_folder"]
 param = "folder_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the folder_path; single operand."
 
 ["pipelex/tools/misc/file_utils.py::save_bytes_to_binary_file"]
 param = "byte_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the byte_data; single operand."
 
 ["pipelex/tools/misc/file_utils.py::save_text_to_path"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the text; single operand."
 
 ["pipelex/tools/misc/filetype_utils.py::detect_file_type_from_base64"]
 param = "base64_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the base64_data; single operand."
 
 ["pipelex/tools/misc/filetype_utils.py::detect_file_type_from_bytes"]
 param = "raw_bytes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the raw_bytes; single operand."
 
 ["pipelex/tools/misc/filetype_utils.py::detect_file_type_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/filetype_utils.py::mime_type_to_extension"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the mime_type; single operand."
 
 ["pipelex/tools/misc/hash_utils.py::hash_md5_to_int"]
 param = "string"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the string; single operand."
 
 ["pipelex/tools/misc/hash_utils.py::hash_sha256"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/http_utils.py::_validate_http_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the url; single operand."
 
 ["pipelex/tools/misc/http_utils.py::_validate_local_path"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the url; single operand."
 
 ["pipelex/tools/misc/http_utils.py::validate_url_resource_exists"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the url; single operand."
 
 ["pipelex/tools/misc/image_utils.py::ImageFormat.from_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the mime_type; single operand."
 
 ["pipelex/tools/misc/image_utils.py::ImageFormat.is_supported_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the mime_type; single operand."
 
 ["pipelex/tools/misc/image_utils.py::ImageFormat.raise_if_unsupported_mime_type"]
 param = "mime_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the mime_type; single operand."
 
 ["pipelex/tools/misc/image_utils.py::pil_image_to_bytes"]
 param = "pil_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the pil_image; single operand."
 
 ["pipelex/tools/misc/json_utils.py::clean_json_content"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the content; single operand."
 
 ["pipelex/tools/misc/json_utils.py::clean_json_dumps"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::deep_update"]
 param = "target_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the target_dict; single operand."
 
 ["pipelex/tools/misc/json_utils.py::json_str"]
 param = "some_object"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the some_object; single operand."
 
 ["pipelex/tools/misc/json_utils.py::load_json_dict_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/json_utils.py::load_json_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/json_utils.py::load_json_list_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/json_utils.py::pure_json_str"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::purify_json"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::purify_json_dict"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::purify_json_list"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::remove_none_values"]
 param = "json_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the json_content; single operand."
 
 ["pipelex/tools/misc/json_utils.py::remove_none_values_from_dict"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/json_utils.py::save_as_json_to_path"]
 param = "object_to_save"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the object_to_save; single operand."
 
 ["pipelex/tools/misc/markdown_utils.py::convert_to_markdown"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/misc/placeholder.py::make_placeholder_value"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the key; single operand."
 
 ["pipelex/tools/misc/placeholder.py::value_is_placeholder"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.make_pretty"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the value; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.make_pretty_panel"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_html"]
 param = "pretty"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the pretty; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_print"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_print_url_without_rich"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_print_using_rich"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_print_without_rich"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_svg"]
 param = "pretty"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the pretty; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.pretty_text"]
 param = "pretty"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the pretty; single operand."
 
 ["pipelex/tools/misc/pretty.py::PrettyPrinter.wrap_in_panel"]
 param = "pretty"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the pretty; single operand."
 
 ["pipelex/tools/misc/pretty.py::pretty_print"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::pretty_print_md"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the content; single operand."
 
 ["pipelex/tools/misc/pretty.py::pretty_print_url"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the url; single operand."
 
 ["pipelex/tools/misc/semver.py::parse_constraint"]
 param = "constraint_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the constraint_str; single operand."
 
 ["pipelex/tools/misc/semver.py::parse_version"]
 param = "version_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the version_str; single operand."
 
 ["pipelex/tools/misc/semver.py::parse_version_tag"]
 param = "tag"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the tag; single operand."
 
 ["pipelex/tools/misc/semver.py::select_minimum_version"]
 param = "available_versions"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the available_versions; single operand."
 
 ["pipelex/tools/misc/semver.py::select_minimum_version_for_multiple_constraints"]
 param = "available_versions"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the available_versions; single operand."
 
 ["pipelex/tools/misc/semver.py::version_satisfies"]
 param = "version"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the version; single operand."
 
 ["pipelex/tools/misc/string_utils.py::camel_to_snake_case"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the name; single operand."
 
 ["pipelex/tools/misc/string_utils.py::can_inject_text"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the value; single operand."
 
 ["pipelex/tools/misc/string_utils.py::get_root_from_dotted_path"]
 param = "dotted_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the dotted_path; single operand."
 
 ["pipelex/tools/misc/string_utils.py::has_text"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the text; single operand."
 
 ["pipelex/tools/misc/string_utils.py::is_none_or_has_text"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the text; single operand."
 
 ["pipelex/tools/misc/string_utils.py::is_not_none_and_has_text"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the text; single operand."
 
 ["pipelex/tools/misc/string_utils.py::is_pascal_case"]
 param = "word"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the word; single operand."
 
 ["pipelex/tools/misc/string_utils.py::is_snake_case"]
 param = "word"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the word; single operand."
 
 ["pipelex/tools/misc/string_utils.py::matches_wildcard_pattern"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the text; single operand."
 
 ["pipelex/tools/misc/string_utils.py::normalize_to_ascii"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the text; single operand."
 
 ["pipelex/tools/misc/string_utils.py::pascal_case_to_kebab"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the name; single operand."
 
 ["pipelex/tools/misc/string_utils.py::pascal_case_to_sentence"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the name; single operand."
 
 ["pipelex/tools/misc/string_utils.py::pascal_case_to_snake_case"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the name; single operand."
 
 ["pipelex/tools/misc/string_utils.py::snake_to_capitalize_first_letter"]
 param = "snake_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the snake_str; single operand."
 
 ["pipelex/tools/misc/string_utils.py::snake_to_pascal_case"]
 param = "snake_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the snake_str; single operand."
 
 ["pipelex/tools/misc/string_utils.py::snake_to_title_case"]
 param = "snake_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the snake_str; single operand."
 
 ["pipelex/tools/misc/tenacity_utils.py::log_retry"]
 param = "retry_state"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the retry_state; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/misc/toml_sync.py::collect_leaf_key_paths"]
 param = "doc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the doc; single operand."
 
 ["pipelex/tools/misc/toml_sync.py::get_nested_value"]
 param = "doc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the doc; single operand."
 
 ["pipelex/tools/misc/toml_sync.py::set_nested_value"]
 param = "doc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the doc; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_content"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the content; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_path_and_merge_with_overrides"]
 param = "paths"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the paths; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_from_path_if_exists"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::load_toml_with_tomlkit"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/misc/toml_utils.py::save_toml_to_path"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data; single operand."
 
 ["pipelex/tools/network/host_rules.py::is_disallowed_host"]
 param = "host"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the host; single operand."
 
 ["pipelex/tools/network/host_rules.py::is_disallowed_ip"]
 param = "host"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the host; single operand."
 
 ["pipelex/tools/network/ssrf_guard.py::resolve_to_allowed_ips"]
 param = "host"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the host; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer._extract_embedded_images_from_page_sync"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer._extract_embedded_images_from_pdf_sync"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer._extract_text_from_pdf_pages_sync"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer._render_pdf_pages_sync"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the pdf_input; single operand (context keyword-only)."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.extract_embedded_images_from_page"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.extract_embedded_images_from_pdf"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.extract_embedded_images_from_pdf_uri"]
 param = "pdf_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_uri; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.extract_text_from_pdf_pages"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_input; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.extract_text_from_pdf_pages_from_uri"]
 param = "pdf_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the pdf_uri; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.render_pdf_pages"]
 param = "pdf_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the pdf_input; single operand (context keyword-only)."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::PyPdfium2Renderer.render_pdf_pages_from_uri"]
 param = "pdf_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Jinja op on the pdf_uri; single operand (context keyword-only)."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::_extract_image_from_pdf_object"]
 param = "image_obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the image_obj; single operand."
 
 ["pipelex/tools/pdf/pypdfium2_renderer.py::_resolve_pdf_uri_to_input"]
 param = "pdf_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the pdf_uri; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.get_optional_secret"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.get_optional_secret_specific_version"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.get_required_secret"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.get_required_secret_specific_version"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.get_secret"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_provider_abstract.py::SecretsProviderAbstract.set_secret_as_env_var"]
 param = "secret_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the secret_id; single operand."
 
 ["pipelex/tools/secrets/secrets_utils.py::_get_env_var"]
 param = "var_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the var_name; single operand."
 
 ["pipelex/tools/secrets/secrets_utils.py::_get_secret"]
 param = "secret_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the secret_name; single operand."
 
 ["pipelex/tools/secrets/secrets_utils.py::_handle_fallback_pattern"]
 param = "var_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the var_spec; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/secrets/secrets_utils.py::substitute_vars"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the content; single operand (qualifiers keyword-only)."
 
 ["pipelex/tools/secrets/secrets_utils.py::substitute_vars.replace_var"]
 param = "match"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable re.sub repl: match is the single operand re passes."
 
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._generate_signed_url_sync"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the key; single operand."
 
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_with_metadata_sync"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the key; single operand."
 
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._make_public_url"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the key; single operand."
 
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._store_sync"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Stores the data; single operand (key keyword-only)."
 
 ["pipelex/tools/storage/local_storage_provider.py::LocalStorageProvider._validate_key"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the key; single operand."
 
 ["pipelex/tools/storage/s3_storage_provider.py::S3StorageProvider._make_public_url"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the key; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._add_scheme"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the key; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_with_metadata"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the key; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._store"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the data; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._strip_scheme"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_with_metadata"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.public_url"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the uri; single operand."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.store"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the data; single operand."
 
 ["pipelex/tools/storage/storage_provider_factory.py::make_storage_provider_from_config"]
 param = "storage_provider_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the storage_provider_config; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_annotation_allows_none"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the annotation; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_assert_single_char_delimiter"]
 param = "delimiter"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the delimiter; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_is_flat_annotation"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the annotation; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_read_table"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_row_to_dict"]
 param = "data_row"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the data_row; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_to_cell"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_validate_header"]
 param = "header"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the header; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::_validation_error_label"]
 param = "error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the error; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::assert_supported_table_suffix"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "File/path op on the path; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::csv_from_list_content"]
 param = "list_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the list_content; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::flat_field_names"]
 param = "row_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the row_model; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::is_tabular_path"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the path; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::list_content_from_csv"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the path; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::read_rows"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the path; single operand."
 
 ["pipelex/tools/typing/class_utils.py::has_compatible_field"]
 param = "model_cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the model_cls; single operand."
 
 ["pipelex/tools/typing/class_utils.py::has_compatible_field._is_compatible"]
 param = "type_param"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner predicate: tests the type param; single operand."
 
 ["pipelex/tools/typing/class_utils.py::normalize_properties_for_comparison"]
 param = "properties"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the properties; single operand."
 
 ["pipelex/tools/typing/class_utils.py::normalize_property_for_comparison"]
 param = "prop"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the prop; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::convert_file_path_to_module_path"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::find_class_names_in_file"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::find_classes_in_module"]
 param = "module"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the module; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::find_decorated_function_names_in_file"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::import_module_from_file"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::import_module_from_file_if_has_classes"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the file_path; single operand."
 
 ["pipelex/tools/typing/module_inspector.py::import_module_from_file_if_has_decorated_functions"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the file_path; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::_serialize_context"]
 param = "ctx"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the ctx; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::_serialize_input_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::_truncated_rich_repr_from_items"]
 param = "rich_repr_items"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the rich_repr_items; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::analyze_pydantic_validation_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the exc; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::clean_model_to_dict"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the obj; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::convert_strenum_to_str"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the obj; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::empty_dict_factory_of"]
 param = "_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the _key; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::empty_list_factory_of"]
 param = "_"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the _; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::format_pydantic_validation_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the exc; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::format_pydantic_validation_error_for_agent"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates/checks the exc; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::make_truncated_wrapper"]
 param = "model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model; single operand."
 
 ["pipelex/tools/typing/pydantic_utils.py::make_truncated_wrapper.rich_repr_method"]
 param = "_self"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable __rich_repr__: the bound instance is passed positionally by Rich."
 
 ["pipelex/tools/typing/pydantic_utils.py::serialize_model"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the obj; single operand."
 
 ["pipelex/tools/typing/structure_printer.py::StructurePrinter.get_type_structure"]
 param = "tp"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the tp; single operand."
 
 ["pipelex/tools/typing/structure_printer.py::StructurePrinter.get_type_structure.collect_types"]
 param = "tp"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner recursion helper: collects types from tp; single operand."
 
 ["pipelex/tools/typing/structure_printer.py::StructurePrinter.get_type_structure.format_type"]
 param = "tp"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inner recursion helper: formats tp; single operand."
 
 ["pipelex/tools/typing/structure_printer.py::StructurePrinter.pretty_type"]
 param = "tp"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Renders the tp; single operand."
 
 ["pipelex/tools/typing/validation_utils.py::has_exactly_one_among_attributes_from_list"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the obj; single operand."
 
 ["pipelex/tools/typing/validation_utils.py::has_more_than_one_among_attributes_from_list"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the obj; single operand."
 
 ["pipelex/tools/typing/validation_utils.py::has_more_than_one_among_attributes_from_lists"]
 param = "obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the obj; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::_resolve_base64_data_url"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::_resolve_file_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::describe_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::extract_filename_from_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::make_base64_url_from_any_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the uri; single operand."
 
 ["pipelex/tools/uri/uri_resolver.py::resolve_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/reads the uri; single operand."
 
 ["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.get_or_create"]
 param = "tracing_config"

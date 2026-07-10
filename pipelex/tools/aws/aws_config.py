@@ -34,7 +34,7 @@ class AwsConfig(ConfigModel):
     def get_aws_access_keys(self) -> tuple[str, str, str]:
         return self.get_aws_access_keys_with_method(api_key_method=self.api_key_method)
 
-    def get_aws_access_keys_with_method(self, api_key_method: AwsKeyMethod) -> tuple[str, str, str]:
+    def get_aws_access_keys_with_method(self, *, api_key_method: AwsKeyMethod) -> tuple[str, str, str]:
         match api_key_method:
             case AwsKeyMethod.ENV:
                 log.verbose("Getting AWS access keys from environment (key id and secret access key).")
