@@ -32,6 +32,7 @@ from pipelex.urls import URLs
 if TYPE_CHECKING:
     from rich.console import Console
 
+    from pipelex.base_exceptions import ValidationErrorItem
     from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox
     from pipelex.pipeline.fixes.fix_loop import FixBundleResult
     from pipelex.suggested_fix import SuggestedFix
@@ -141,6 +142,30 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
     raise typer.Exit(1)
 
 
+def _remap_validation_error_to_original(item: ValidationErrorItem, *, sandbox: PreviewSandbox) -> ValidationErrorItem:
+    """Remap only the diagnostic values proven to carry mirrored filesystem paths."""
+    updates: dict[str, object] = {}
+    source = item.source
+    remapped_source: str | None = None
+    if source is not None:
+        remapped_source = sandbox.to_original(source)
+        updates["source"] = remapped_source
+        if source and remapped_source != source and source in item.message:
+            updates["message"] = item.message.replace(source, remapped_source)
+
+    field_path = item.field_path
+    if field_path is not None:
+        if source is not None and field_path == source:
+            updates["field_path"] = remapped_source
+        elif Path(field_path).is_absolute():
+            resolved_field_path = str(Path(field_path).resolve())
+            remapped_field_path = sandbox.to_original(field_path)
+            if remapped_field_path != resolved_field_path:
+                updates["field_path"] = remapped_field_path
+
+    return item.model_copy(update=updates) if updates else item
+
+
 def _remap_result_to_originals(result: FixBundleResult, *, sandbox: PreviewSandbox) -> FixBundleResult:
     """Rebuild a sandbox-run result with every file path mapped back to the original it mirrors."""
     return result.model_copy(
@@ -149,10 +174,7 @@ def _remap_result_to_originals(result: FixBundleResult, *, sandbox: PreviewSandb
                 fix.model_copy(update={"source": sandbox.to_original(fix.source)}) if fix.source is not None else fix for fix in result.fixes_applied
             ],
             "files_written": [sandbox.to_original(file_path) for file_path in result.files_written],
-            "remaining_errors": [
-                item.model_copy(update={"source": sandbox.to_original(item.source)}) if item.source is not None else item
-                for item in result.remaining_errors
-            ],
+            "remaining_errors": [_remap_validation_error_to_original(item, sandbox=sandbox) for item in result.remaining_errors],
         }
     )
 

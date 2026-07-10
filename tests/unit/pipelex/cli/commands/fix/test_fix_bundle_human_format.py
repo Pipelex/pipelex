@@ -14,6 +14,8 @@ import typer
 from rich.console import Console
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox  # noqa: PLC2701
+from pipelex.cli.commands.fix._fix_core import _remap_result_to_originals  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
 from pipelex.cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.suggested_fix import FixSafety, SuggestedFix
@@ -276,6 +278,43 @@ class TestFixBundleHumanFormat:
         assert "would be valid but still NOT runnable" in output
         assert "fix_human_format.pending_pipe" in output
         assert "Bundle is valid but NOT yet runnable" not in output
+
+    def test_preview_result_remaps_filesystem_error_paths_without_rewriting_semantic_paths(self, tmp_path: Path) -> None:
+        """Remaining diagnostics must not retain deleted sandbox paths in structured fields or messages."""
+        original_path = (tmp_path / "bundle.mthds").resolve()
+        sandbox_path = (tmp_path / "pipelex-fix-preview-test" / "entry" / "bundle.mthds").resolve()
+        sandbox = PreviewSandbox(
+            entry_path=sandbox_path,
+            library_dirs=[],
+            dir_mappings=[],
+            entry_mapping=(sandbox_path, original_path),
+        )
+        filesystem_item = ValidationErrorItem(
+            category=ValidationErrorCategory.PIPE_VALIDATION,
+            message=f"Validation failed in file '{sandbox_path}'",
+            source=str(sandbox_path),
+            field_path=str(sandbox_path),
+        )
+        semantic_item = ValidationErrorItem(
+            category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
+            message="Output declaration is invalid",
+            source=str(sandbox_path),
+            field_path="pipe → output",
+        )
+        result = FixBundleResult(
+            is_valid=False,
+            iterations=0,
+            fixes_applied=[],
+            remaining_errors=[filesystem_item, semantic_item],
+        )
+
+        remapped = _remap_result_to_originals(result, sandbox=sandbox)
+
+        assert remapped.remaining_errors[0].source == str(original_path)
+        assert remapped.remaining_errors[0].field_path == str(original_path)
+        assert remapped.remaining_errors[0].message == f"Validation failed in file '{original_path}'"
+        assert remapped.remaining_errors[1].source == str(original_path)
+        assert remapped.remaining_errors[1].field_path == "pipe → output"
 
     @pytest.mark.usefixtures("console")
     def test_file_not_found_exits_two(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:

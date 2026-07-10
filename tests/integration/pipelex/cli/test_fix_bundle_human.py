@@ -49,6 +49,38 @@ steps = [
 ]
 """
 
+_CASCADE_SEQUENCE_MTHDS = """domain = "human_fix_cascade"
+main_pipe = "outer"
+
+[concept]
+Idea = "An idea."
+
+[pipe.gen_ideas]
+type = "PipeLLM"
+description = "Generate ideas."
+inputs = { topic = "Text" }
+output = "Idea[]"
+prompt = "Generate ideas about $topic"
+
+[pipe.inner]
+type = "PipeSequence"
+description = "Inner sequence with the wrong output."
+inputs = { topic = "Text" }
+output = "Idea"
+steps = [
+  { pipe = "gen_ideas", result = "ideas" },
+]
+
+[pipe.outer]
+type = "PipeSequence"
+description = "Outer sequence matching the inner's wrong declared output."
+inputs = { topic = "Text" }
+output = "Idea"
+steps = [
+  { pipe = "inner", result = "ideas" },
+]
+"""
+
 _UNFIXABLE_MTHDS = """domain = "human_fix_unfixable"
 main_pipe = "say_hi"
 
@@ -184,6 +216,32 @@ class TestFixBundleHuman:
         assert bundle_path.read_bytes() == original_bytes
         output = console.export_text()
         assert "❌ Fix preview — the bundle would still be invalid" in output
+
+    def test_diff_preview_still_invalid_exits_one_without_writing(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """Partial previews name original files in both diagnostic path fields after the sandbox is removed."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_CASCADE_SEQUENCE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(bundle_path), max_iterations=1, diff=True)
+
+        assert exc_info.value.exit_code == 1
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "❌ Fix preview — the bundle would still be invalid" in output
+        assert "Fixes that would be applied:" in output
+        assert f"Path: {bundle_path.resolve()}" in output
+        assert f"Source: {bundle_path.resolve()}" in output
+        assert "pipelex-fix-preview-" not in output
 
     def test_diff_preview_directory_mode_maps_paths_to_originals(
         self,
