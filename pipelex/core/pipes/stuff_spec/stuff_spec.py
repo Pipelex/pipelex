@@ -25,7 +25,7 @@ class StuffSpec(BaseModel):
             return f"{self.concept.concept_ref}[]"
         return f"{self.concept.concept_ref}[{self.multiplicity}]"
 
-    def render_stuff_spec(self, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
+    def render_stuff_spec(self, *, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
         """Render a representation of this stuff spec.
 
         Args:

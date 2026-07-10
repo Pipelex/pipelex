@@ -52,7 +52,7 @@ class PipeSignature(PipeAbstract):
         pass
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override

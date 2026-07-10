@@ -107,7 +107,7 @@ class PipeSequence(PipeController):
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -130,7 +130,7 @@ class PipeSequence(PipeController):
             else:
                 sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
             # Use the centralized recursion detection
-            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
+            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
             if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
                 for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
@@ -158,11 +158,11 @@ class PipeSequence(PipeController):
                     )
                     for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                            needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
             else:
                 for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
-                        needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                        needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
 
             # Add this step's output to generated outputs
             if sequential_sub_pipe.output_name:

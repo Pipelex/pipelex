@@ -21,8 +21,8 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
     @override
     def make(
         cls,
-        pipe_category: Any,
         *,
+        pipe_category: Any,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,

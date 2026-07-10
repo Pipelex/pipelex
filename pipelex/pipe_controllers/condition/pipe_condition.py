@@ -61,7 +61,7 @@ class PipeCondition(PipeController):
         return {var for var in required_variables if not var.startswith("_")}
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -94,7 +94,7 @@ class PipeCondition(PipeController):
         for pipe_code in self.pipe_dependencies():
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
-            pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
+            pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
             for input_name, stuff_spec in pipe_needed_inputs.items:
                 needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)

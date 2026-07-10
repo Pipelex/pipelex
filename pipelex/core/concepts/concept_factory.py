@@ -85,7 +85,7 @@ class DomainAndConceptCode(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def make(cls, concept_code: str, *, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
+    def make(cls, *, concept_code: str, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
             domain_code=domain_code,
@@ -337,8 +337,8 @@ class ConceptFactory:
     @classmethod
     def _handle_basic_blueprint(
         cls,
-        concept_code: str,
         *,
+        concept_code: str,
         domain_code: str,
         description: str,
     ) -> StructureNameAndRefine:

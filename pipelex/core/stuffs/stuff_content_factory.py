@@ -9,7 +9,7 @@ from pipelex.hub import get_class_registry
 
 class StuffContentFactory:
     @classmethod
-    def make_content_from_value(cls, stuff_content_subclass: type[StuffContent], *, value: dict[str, Any] | str) -> StuffContent:
+    def make_content_from_value(cls, *, stuff_content_subclass: type[StuffContent], value: dict[str, Any] | str) -> StuffContent:
         if isinstance(value, str) and stuff_content_subclass == TextContent:
             return TextContent(text=value)
         return stuff_content_subclass.model_validate(obj=value)

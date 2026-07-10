@@ -66,7 +66,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     output_multiplicity: VariableMultiplicity
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         return self.inputs
 

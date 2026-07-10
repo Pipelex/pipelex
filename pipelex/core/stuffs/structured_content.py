@@ -120,8 +120,8 @@ class StructuredContent(StuffContent):
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
         """Render with image extraction - recursively handles nested structures.
@@ -167,7 +167,7 @@ class StructuredContent(StuffContent):
         if value is None:
             return ""
         if isinstance(value, ImageRenderable):
-            return value.render_with_images(registry, text_format=text_format)
+            return value.render_with_images(registry=registry, text_format=text_format)
         if isinstance(value, (list, tuple)):
             parts: list[str] = []
             list_value = cast("list[Any]", value)
@@ -185,7 +185,7 @@ class StructuredContent(StuffContent):
                     dict_parts.append(f"{key}: {rendered}")
             return "\n".join(dict_parts)
         if isinstance(value, StuffContent):
-            return value.rendered_for_prompt(text_format)
+            return value.rendered_for_prompt(text_format=text_format)
         return str(value)
 
     # -------------------------------------------------------------------------

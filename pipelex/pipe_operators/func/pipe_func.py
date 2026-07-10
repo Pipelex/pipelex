@@ -37,7 +37,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @field_validator("function_name", mode="before")

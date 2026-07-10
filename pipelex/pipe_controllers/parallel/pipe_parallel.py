@@ -62,7 +62,7 @@ class PipeParallel(PipeController):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -78,7 +78,7 @@ class PipeParallel(PipeController):
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
             # Use the centralized recursion detection
-            pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
+            pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
             if sub_pipe.batch_params:
                 try:
                     stuff_spec = pipe_needed_inputs.get_required_stuff_spec(variable_name=sub_pipe.batch_params.input_item_stuff_name)
@@ -96,10 +96,10 @@ class PipeParallel(PipeController):
                 )
                 for input_name, stuff_spec in pipe_needed_inputs.items:
                     if input_name != sub_pipe.batch_params.input_item_stuff_name:
-                        needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                        needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
             else:
                 for input_name, stuff_spec in pipe_needed_inputs.items:
-                    needed_inputs.add_stuff_spec(input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                    needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
         return needed_inputs
 
     @model_validator(mode="after")

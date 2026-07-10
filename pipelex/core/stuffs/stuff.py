@@ -247,7 +247,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             title = f"Some stuff ([bold green]{self.concept.code}[/bold green])"
         return self.content.rendered_pretty(title=title, depth=depth)
 
-    def pretty_print_stuff(self, title: str | None = None) -> None:
+    def pretty_print_stuff(self, *, title: str | None = None) -> None:
         title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
         self.content.pretty_print_content(title=title)
 

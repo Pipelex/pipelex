@@ -100,7 +100,7 @@ class StructureGenerator:
         """
         # Generate the class
         class_code = self._generate_class_source_code_from_blueprint(
-            class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
+            class_name=class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
         )
 
         # Generate the complete module with a header comment
@@ -248,8 +248,8 @@ class StructureGenerator:
 
     def _generate_class_source_code_from_blueprint(
         self,
-        class_name: str,
         *,
+        class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
         description: str = "",
@@ -298,7 +298,7 @@ class StructureGenerator:
         # Generate fields
         field_definitions: list[str] = []
         for field_name, field_blueprint in structure_blueprint.items():
-            field_code = self._generate_field_from_blueprint(field_name, field_blueprint=field_blueprint)
+            field_code = self._generate_field_from_blueprint(field_name=field_name, field_blueprint=field_blueprint)
             field_definitions.append(field_code)
 
         if not field_definitions:
@@ -308,7 +308,7 @@ class StructureGenerator:
         fields_code = "\n".join(field_definitions)
         return class_header + "\n" + fields_code
 
-    def _generate_field_from_blueprint(self, field_name: str, *, field_blueprint: ConceptStructureBlueprint) -> str:
+    def _generate_field_from_blueprint(self, *, field_name: str, field_blueprint: ConceptStructureBlueprint) -> str:
         """Generate a field definition from ConceptStructureBlueprint.
 
         Args:
@@ -477,7 +477,7 @@ class StructureGenerator:
             return f'"{qualified_name}"'
         return f'"{concept_code}"'
 
-    def _generate_field(self, field_name: str, *, field_def: dict[str, Any] | str) -> str:
+    def _generate_field(self, *, field_name: str, field_def: dict[str, Any] | str) -> str:
         """Generate a single field definition.
 
         Args:

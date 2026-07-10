@@ -126,7 +126,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for input_name, stuff_spec in self.inputs.items:

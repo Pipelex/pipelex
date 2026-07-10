@@ -76,7 +76,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         return kajson.dumps(self.smart_dump(), indent=4)
 
     @final
-    def rendered_for_prompt(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    def rendered_for_prompt(self, *, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return self.rendered_plain()
@@ -92,7 +92,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     # -------------------------------------------------------------------------------------
 
     @final
-    async def rendered_for_template_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    async def rendered_for_template_async(self, *, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return await self.rendered_plain_async()
@@ -132,7 +132,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         json_data = self.smart_dump()
         return JSON.from_data(json_data, indent=4)
 
-    def pretty_print_content(self, title: str | None = None) -> None:
+    def pretty_print_content(self, *, title: str | None = None) -> None:
         pretty = self.rendered_pretty()
         width = PrettyPrinter.pretty_width()
         pretty_print(pretty, title=title, width=width)

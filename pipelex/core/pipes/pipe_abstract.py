@@ -425,7 +425,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Return the stuff specs that are needed for the pipe to run.
 
         Args:
@@ -758,8 +758,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _start_pipe_span(
         self,
-        parent_otel_context: OtelContext,
         *,
+        parent_otel_context: OtelContext,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:

@@ -385,7 +385,7 @@ class ComplexEntity(StructuredContent):
         }
 
         generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
-        class_code = generator._generate_class_source_code_from_blueprint("SkillMatchResult", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        class_code = generator._generate_class_source_code_from_blueprint(class_name="SkillMatchResult", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         expected_class_code = '''\
 class SkillMatchResult(StructuredContent):
@@ -430,7 +430,7 @@ class SkillMatchResult(StructuredContent):
         }
 
         generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
-        class_code = generator._generate_class_source_code_from_blueprint("TechAnalysis", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        class_code = generator._generate_class_source_code_from_blueprint(class_name="TechAnalysis", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         expected_class_code = '''\
 class TechAnalysis(StructuredContent):
@@ -514,7 +514,7 @@ class Container(StructuredContent):
         }
 
         generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
-        class_code = generator._generate_class_source_code_from_blueprint("Order", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        class_code = generator._generate_class_source_code_from_blueprint(class_name="Order", structure_blueprint=structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
         expected_class_code = '''\
 class Order(StructuredContent):

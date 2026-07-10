@@ -41,7 +41,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     is_structured_output: bool
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override

@@ -26,8 +26,8 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
     @classmethod
     def make(
         cls,
-        pipe_category: Any,
         *,
+        pipe_category: Any,
         pipe_type: str,
         pipe_code: str,
         domain_code: str,

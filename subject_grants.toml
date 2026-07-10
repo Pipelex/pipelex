@@ -2638,978 +2638,683 @@ seeded = true
 
 ["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies"]
 param = "pipes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: sorts the pipes; single operand."
 
 ["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies.visit"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Nested DFS visitor on the pipe code; single operand."
 
 ["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_concept"]
 param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects refs from the concept named; context stays keyword."
 
 ["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint._collect_local_refs_from_pipe"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects refs from the pipe named; context stays keyword."
 
 ["pipelex/core/bundles/pipelex_bundle_blueprint.py::PipelexBundleBlueprint.get_elaboration_for"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query accessor keyed by the pipe code; single operand."
 
 ["pipelex/core/concepts/concept.py::Concept.is_native_concept"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept; single operand."
 
 ["pipelex/core/concepts/concept.py::Concept.is_valid_structure_class"]
 param = "structure_class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the class name; single operand."
 
 ["pipelex/core/concepts/concept.py::Concept.sentence_from_concept"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/concept_factory.py::ConceptFactory._handle_basic_blueprint"]
-param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the concept; single operand."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory._handle_blueprint_with_structure"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: handles the blueprint; context stays keyword."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory._handle_refines"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: handles the blueprint; context stays keyword."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory._handle_structure_with_classname"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/concept_factory.py::ConceptFactory.make"]
-param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: handles the blueprint; context stays keyword."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: splits the ref-or-code; fallback domain stays keyword."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory.make_native_concept"]
 param = "native_concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the native concept code; single operand."
 
 ["pipelex/core/concepts/concept_factory.py::ConceptFactory.make_refine"]
 param = "refine"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._format_as_python"]
-param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: normalizes the refine string; domain stays keyword."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._format_python_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_basemodel_representation"]
 param = "model_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the model class; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_basic_value"]
 param = "actual_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the type; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_dict_value"]
 param = "field_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation keyed by the field name; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_enum_value"]
 param = "enum_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the enum type; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_fields_dict"]
 param = "content_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the content class; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_list_value"]
 param = "args"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the type args; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._generate_literal_value"]
 param = "literal_args"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the literal args; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._unwrap_optional"]
 param = "field_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the field type; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator.generate_class_representation"]
 param = "content_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the content class; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator.generate_field_value"]
 param = "field_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the field type; context stays keyword."
 
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator.generate_representation"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation keyed by the concept ref; format stays keyword."
 
 ["pipelex/core/concepts/concept_representation_generator.py::generate_json_representation"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation keyed by the concept ref; single operand."
 
 ["pipelex/core/concepts/concept_representation_generator.py::generate_python_representation"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/concept_structure_blueprint.py::ConceptStructureBlueprint._raise_type_mismatch_error"]
-param = "expected_type_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation keyed by the concept ref; single operand."
 
 ["pipelex/core/concepts/helpers.py::extract_concept_code_from_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: extracts from the ref-or-code; single operand."
 
 ["pipelex/core/concepts/helpers.py::get_structure_class_name_from_blueprint"]
 param = "blueprint_or_string_description"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the blueprint-or-description; single operand."
 
 ["pipelex/core/concepts/helpers.py::normalize_structure_blueprint"]
 param = "structure_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: normalizes the structure dict; single operand."
 
 ["pipelex/core/concepts/helpers.py::strip_multiplicity_from_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the ref-or-code; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.get_native_structure_class"]
 param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Lookup keyed by the class name it resolves; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.get_validated_native_concept_ref"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the ref-or-code; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_dynamic_concept"]
 param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept code; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_native_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the ref-or-code; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_native_structure_class"]
 param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the class name; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_text_concept"]
 param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept code; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.is_valid_native_concept_ref"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept ref; single operand."
 
 ["pipelex/core/concepts/native/concept_native.py::NativeConceptCode.validate_native_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the ref-or-code; single operand."
 
 ["pipelex/core/concepts/structure_generation/exceptions.py::SyntaxErrorData.from_syntax_error"]
 param = "syntax_error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the syntax error; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._escape_string_for_python"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_class_docstring"]
 param = "docstring"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the docstring; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_default_value"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; context stays keyword."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_field_description"]
 param = "description"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_class_source_code_from_blueprint"]
-param = "class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field"]
-param = "field_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_from_blueprint"]
-param = "field_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the description; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._get_python_type"]
 param = "field_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the field type; context stays keyword."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._get_python_type_from_blueprint"]
 param = "field_blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the field blueprint; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._resolve_concept_ref_to_type"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: resolves the concept ref; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._validate_execution"]
 param = "python_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the python code; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator.validate_generated_code"]
 param = "python_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the python code; single operand."
 
 ["pipelex/core/concepts/validation.py::is_concept_code_valid"]
 param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept code; single operand."
 
 ["pipelex/core/concepts/validation.py::is_concept_ref_or_code_valid"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the ref-or-code; single operand."
 
 ["pipelex/core/concepts/validation.py::is_concept_ref_valid"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the concept ref; single operand."
 
 ["pipelex/core/concepts/validation.py::validate_concept_code"]
 param = "concept_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the concept code; single operand."
 
 ["pipelex/core/concepts/validation.py::validate_concept_ref"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the concept ref; single operand."
 
 ["pipelex/core/concepts/validation.py::validate_concept_ref_or_code"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the ref-or-code; single operand."
 
 ["pipelex/core/domains/domain.py::SpecialDomain.is_native"]
 param = "domain_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the domain code; single operand."
 
 ["pipelex/core/domains/domain_factory.py::DomainFactory.make_from_blueprint"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the domain from the blueprint; single operand."
 
 ["pipelex/core/domains/validation.py::is_domain_code_valid"]
 param = "code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the domain code; single operand."
 
 ["pipelex/core/domains/validation.py::validate_domain_code"]
 param = "code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/interpreter/bundle_elaborator.py::BundleElaborator._elaborate_preliminary_text"]
-param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the domain code; single operand."
 
 ["pipelex/core/interpreter/bundle_elaborator.py::BundleElaborator.elaborate"]
 param = "bundle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: elaborates the bundle; single operand."
 
 ["pipelex/core/interpreter/bundle_elaborator.py::_is_preliminary_text_pipe"]
 param = "pipe_blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the pipe blueprint; single operand."
 
 ["pipelex/core/interpreter/helpers.py::ValidationErrorScope.is_pipe_scope"]
 param = "scope"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the scope; single operand."
 
 ["pipelex/core/interpreter/helpers.py::get_error_scope"]
 param = "loc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error loc; single operand."
 
 ["pipelex/core/interpreter/helpers.py::is_pipelex_file"]
 param = "file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the file path; single operand."
 
 ["pipelex/core/interpreter/interpreter.py::PipelexInterpreter.make_pipelex_bundle_blueprint"]
 param = "bundle_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: parses the bundle at the path; options stay keyword."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_concept_validation_error"]
 param = "loc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_input_validation_error"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the error message; context stays keyword."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_syntax_validation_error"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the error message; context stays keyword."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::_extract_variable_names_from_message"]
 param = "message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: extracts from the message; single operand."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::_is_pydantic_internal_loc_element"]
 param = "element"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the loc element; single operand."
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::categorize_blueprint_validation_error"]
 param = "error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the error; context stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory._get_typed_items_from_list_content"]
 param = "list_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reads the list content; expected type stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.add_alias"]
 param = "alias"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the alias being added; its target stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_aliases_for"]
 param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Query keyed by the target name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_existing_stuffs"]
 param = "names"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff names; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_list_stuff_first_item_as"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; item type stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_optional_stuff"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; content type stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_document"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_html"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_image"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_list"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; item type stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_mermaid"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_number"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_str"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_text"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_text_and_image"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff name; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuffs"]
 param = "names"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Memory getter keyed by the stuff names; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.is_stuff_code_used"]
 param = "stuff_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the stuff code; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.is_stuff_exists"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the stuff named; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.main_list_stuff_first_item_as"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.main_stuff_as"]
 param = "content_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target content type; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.main_stuff_as_list"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.remove_alias"]
 param = "alias"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: removes the alias; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.remove_stuff"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: removes the stuff named; single operand."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.set_alias"]
 param = "alias"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the alias being set; its target stays keyword."
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.set_new_main_stuff"]
 param = "stuff"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: installs the stuff as main; name stays keyword."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory._get_mockable_class"]
 param = "structure_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the structure class; single operand."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_stuff_spec_to_typed_named"]
 param = "stuff_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: transforms the stuff spec; context stays keyword."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.convert_to_working_memory_format"]
 param = "needed_inputs_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: transforms the needed-inputs spec; single operand."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_multiple_stuffs"]
 param = "stuff_list"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the stuff list; options stay keyword."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_pipeline_inputs"]
 param = "pipeline_inputs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the pipeline inputs; options stay keyword."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_from_single_stuff"]
 param = "stuff"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the stuff; options stay keyword."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_mock_content"]
 param = "typed_named_stuff_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the typed-named spec; single operand."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_mock_inputs"]
 param = "needed_inputs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the needed inputs; single operand."
 
 ["pipelex/core/memory/working_memory_factory.py::WorkingMemoryFactory.make_mock_stuff"]
 param = "typed_named_stuff_spec"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the typed-named spec; single operand."
 
 ["pipelex/core/pipes/handle_pipe_errors.py::_handle_pipe_errors"]
 param = "error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: handles the error; context stays keyword."
 
 ["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_factory_error"]
 param = "factory_error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the factory error; context stays keyword."
 
 ["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_validation_error"]
 param = "validation_error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the validation error; context stays keyword."
 
 ["pipelex/core/pipes/handle_pipe_errors.py::categorize_pipe_validation_with_libraries_error"]
 param = "pipe_error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: categorizes the pipe error; context stays keyword."
 
 ["pipelex/core/pipes/handle_pipe_errors.py::extract_wrapped_pipe_validation_error"]
 param = "error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: unwraps the error; single operand."
 
 ["pipelex/core/pipes/inputs/input_renderer.py::render_inputs"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/pipes/inputs/input_stuff_specs.py::InputStuffSpecs.add_stuff_spec"]
-param = "variable_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the pipe's inputs; format stays keyword."
 
 ["pipelex/core/pipes/inputs/input_stuff_specs.py::InputStuffSpecs.get_required_stuff_spec"]
 param = "variable_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Specs getter keyed by the variable name; single operand."
 
 ["pipelex/core/pipes/inputs/input_stuff_specs.py::InputStuffSpecs.is_variable_existing"]
 param = "variable_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the variable named; single operand."
 
 ["pipelex/core/pipes/inputs/input_stuff_specs.py::InputStuffSpecs.set_default_domain"]
 param = "domain_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Setter: installs the default domain code; single operand."
 
 ["pipelex/core/pipes/inputs/input_stuff_specs.py::TypedNamedStuffSpec.make_from_named"]
 param = "named"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the named spec; context stays keyword."
 
 ["pipelex/core/pipes/output/output_renderer.py::_collect_possible_outputs"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: collects from the pipe; single operand."
 
 ["pipelex/core/pipes/output/output_renderer.py::_render_json_output"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the pipe's output; single operand."
 
 ["pipelex/core/pipes/output/output_renderer.py::_render_python_output"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the pipe's output; single operand."
 
 ["pipelex/core/pipes/output/output_renderer.py::_render_schema_output"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the pipe's output; single operand."
 
 ["pipelex/core/pipes/output/output_renderer.py::render_output"]
 param = "the_pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the pipe's output; format stays keyword."
 
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_error"]
 param = "span"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: ends the span; error fields stay keyword."
 
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._end_pipe_span_success"]
 param = "span"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: ends the span; result fields stay keyword."
 
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._format_pipe_run_info"]
 param = "pipe_run_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the run params; single operand."
 
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._make_single_concept_data_for_registry"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._start_pipe_span"]
-param = "parent_otel_context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/pipes/pipe_abstract.py::PipeAbstract.needed_inputs"]
-param = "visited_pipes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the concept; single operand."
 
 ["pipelex/core/pipes/pipe_blueprint.py::PipeCategory.is_controller_by_str"]
 param = "category_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/pipes/pipe_factory.py::PipeFactoryProtocol.make"]
-param = "pipe_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the category string; single operand."
 
 ["pipelex/core/pipes/pipe_output.py::PipeOutput.main_stuff_as"]
 param = "content_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target content type; single operand."
 
 ["pipelex/core/pipes/pipe_output.py::PipeOutput.main_stuff_as_items"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/pipes/pipe_output.py::PipeOutput.main_stuff_as_list"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/pipes/stuff_spec/stuff_spec.py::StuffSpec.render_stuff_spec"]
-param = "output_format"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/pipes/validation.py::is_input_used_by_variables"]
 param = "input_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the input named; the variables stay keyword."
 
 ["pipelex/core/pipes/validation.py::is_pipe_code_valid"]
 param = "pipe_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the pipe code; single operand."
 
 ["pipelex/core/pipes/validation.py::is_valid_input_name"]
 param = "input_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the input name; single operand."
 
 ["pipelex/core/pipes/validation.py::is_variable_satisfied_by_inputs"]
 param = "variable_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the variable path; the inputs stay keyword."
 
 ["pipelex/core/pipes/validation.py::validate_input_name"]
 param = "input_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: validates the input name; single operand."
 
 ["pipelex/core/pipes/variable_multiplicity.py::format_concept_with_multiplicity"]
 param = "concept_code_or_string"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the concept string; multiplicity stays keyword."
 
 ["pipelex/core/pipes/variable_multiplicity.py::parse_concept_with_multiplicity"]
 param = "concept_ref_or_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/qualified_ref.py::QualifiedRef.from_domain_and_code"]
-param = "domain_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the ref-or-code; single operand."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.has_cross_package_prefix"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the raw ref string; single operand."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.is_address_based_alias"]
 param = "alias"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the alias; single operand."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.is_external_to"]
 param = "domain"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate against the domain; single operand."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.is_local_to"]
 param = "domain"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate against the domain; single operand."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.parse"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw ref string; options stay keyword."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.parse_concept_ref"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw ref string; options stay keyword."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.parse_pipe_ref"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw ref string; options stay keyword."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.parse_stripping_cross_package"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: parses the raw ref string; options stay keyword."
 
 ["pipelex/core/qualified_ref.py::QualifiedRef.split_cross_package_ref"]
 param = "raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/image_content.py::ImageContent.render_with_images"]
-param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: splits the raw ref string; single operand."
 
 ["pipelex/core/stuffs/image_field_search.py::check_generic_container_for_images"]
 param = "container_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: inspects the container type; context stays keyword."
 
 ["pipelex/core/stuffs/image_field_search.py::search_for_nested_image_fields"]
 param = "content_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: scans the content class; context stays keyword."
 
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/list_content.py::ListContent.render_with_images"]
-param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_html"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; single operand."
 
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_with_images"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/structured_content.py::StructuredContent.render_with_images"]
-param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the value; rendering context stays keyword."
 
 ["pipelex/core/stuffs/stuff.py::Stuff.as_list_of_fixed_content_type"]
 param = "item_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target item type; single operand."
 
 ["pipelex/core/stuffs/stuff.py::Stuff.content_as"]
 param = "content_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Type-directed accessor: the target content type; single operand."
 
 ["pipelex/core/stuffs/stuff.py::Stuff.make_stuff_name"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff.py::Stuff.pretty_print_stuff"]
-param = "title"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the concept; single operand."
 
 ["pipelex/core/stuffs/stuff.py::Stuff.verify_content_type"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: verifies the content; expected type stays keyword."
 
 ["pipelex/core/stuffs/stuff_artefact.py::StuffArtefact.get"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_artefact.py::StuffArtefact.render_with_images"]
-param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_artefact.py::StuffArtefact.rendered_for_template_async"]
-param = "text_format"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_content.py::StuffContent.pretty_print_content"]
-param = "title"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_content.py::StuffContent.rendered_for_prompt"]
-param = "text_format"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_content.py::StuffContent.rendered_for_template_async"]
-param = "text_format"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_content_from_value"]
-param = "stuff_content_subclass"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Mapping-protocol getter keyed by the key; single operand."
 
 ["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_stuff_content_from_concept_required"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the concept; the value stays keyword."
 
 ["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_stuff_content_from_concept_with_fallback"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the concept; the value stays keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory._try_make_csv_list_stuff"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the concept; the value stays keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.combine_stuffs"]
 param = "stuff_contents"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: combines the stuff contents; options stay keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_blueprint"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the stuff from the blueprint; single operand."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_concept_ref"]
 param = "concept_ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the concept ref; the value stays keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_from_str"]
 param = "str_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the string value; options stay keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory keyed by the concept; content and name stay keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff_from_stuff_content_or_data"]
 param = "stuff_content_or_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds from the content-or-data; options stay keyword."
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff_name"]
 param = "concept"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the concept; single operand."
 
 ["pipelex/core/stuffs/stuff_viewer.py::_get_html_tab_label"]
 param = "content_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the content type; single operand."
 
 ["pipelex/core/stuffs/stuff_viewer.py::render_stuff_content_viewer"]
 param = "stuff_data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the stuff data; options stay keyword."
 
 ["pipelex/core/stuffs/stuff_viewer.py::render_stuff_viewer"]
 param = "stuff"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/text_and_images_content.py::TextAndImagesContent.render_with_images"]
-param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the stuff; options stay keyword."
 
 ["pipelex/errors/error_pages_generator.py::_group_by_subsystem"]
 param = "classes"
@@ -6062,11 +5767,6 @@ seeded = true
 
 ["pipelex/tools/jinja2/image_registry.py::ImageRegistry.register_image"]
 param = "image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/tools/jinja2/image_renderable.py::ImageRenderable.render_with_images"]
-param = "registry"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 

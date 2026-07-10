@@ -81,7 +81,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
-    def add_stuff_spec(self, variable_name: str, *, concept: Concept, multiplicity: VariableMultiplicity | None = None):
+    def add_stuff_spec(self, *, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
         self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
 
     @property
@@ -161,6 +161,6 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         """
         json_inputs: dict[str, Any] = {}
         for var_name, stuff_spec in self.root.items():
-            json_inputs[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+            json_inputs[var_name] = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
 
         return json.dumps(json_inputs, indent=indent, ensure_ascii=False)
