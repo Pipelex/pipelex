@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import sys
 import tempfile
 from pathlib import Path
 from typing import cast
@@ -94,6 +95,20 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             target = workdir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(source, encoding="utf-8")
+
+        # Put the bundle's directories on sys.path so a PipeFunc (or structure class) can import a sibling
+        # file from the same bundle. This is only reached in-box (transported path): the crate is
+        # re-materialized into a throwaway workdir that is NOT on sys.path, and each module is imported by
+        # file path (spec_from_file_location), which does NOT add its directory to sys.path either — so a
+        # top-level `from helpers import ...` between sibling files raises ModuleNotFoundError, the module
+        # never finishes importing, and its @pipe_func never registers. A local direct run does not hit
+        # this: its funcs were registered at boot from the real on-disk project already on sys.path. The
+        # box is one-shot and disposable, so mutating sys.path is safe: add workdir (resolves
+        # `from funcs.helpers import ...`) and every subdirectory holding a .py file (resolves the
+        # sibling-relative `from helpers import ...`).
+        source_dirs = {workdir} | {py_file.parent for py_file in workdir.rglob("*.py")}
+        for source_dir in source_dirs:
+            sys.path.insert(0, str(source_dir))
 
         # Register the customer's structure classes and @pipe_func functions from their real source,
         # before rehydration seeds a per-run registry from the global one and before the function lookup.
