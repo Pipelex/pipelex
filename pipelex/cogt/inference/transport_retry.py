@@ -78,7 +78,7 @@ def _transport_retry_wait(retry_state: RetryCallState) -> float:
     return _exponential_wait(retry_state)
 
 
-def _make_retry_predicate(retry_on_ambiguous_failure: bool) -> Callable[[BaseException], bool]:
+def _make_retry_predicate(*, retry_on_ambiguous_failure: bool) -> Callable[[BaseException], bool]:
     """Build the retry predicate for the configured idempotency posture.
 
     With ``retry_on_ambiguous_failure`` True the predicate retries the full transient set — every
@@ -134,7 +134,7 @@ async def request_with_transport_retry(
         httpx.HTTPError: The last attempt's error, re-raised once the retry budget is exhausted.
     """
     retrying = AsyncRetrying(
-        retry=retry_if_exception(_make_retry_predicate(retry_on_ambiguous_failure)),
+        retry=retry_if_exception(_make_retry_predicate(retry_on_ambiguous_failure=retry_on_ambiguous_failure)),
         wait=_transport_retry_wait,
         stop=stop_after_attempt(max_retries + 1),
         reraise=True,

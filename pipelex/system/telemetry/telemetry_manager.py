@@ -297,7 +297,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             yield
 
     @override
-    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
             log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
@@ -319,7 +319,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             return False
 
     @override
-    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if (
             not is_debug

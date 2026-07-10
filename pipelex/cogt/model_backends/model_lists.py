@@ -86,8 +86,8 @@ class ModelLister:
 
     @staticmethod
     def _display_unsupported_sdks_message(
-        any_listed: bool,
         *,
+        any_listed: bool,
         unsupported_sdks: list[str],
         backend_name: str,
         models_by_sdk: dict[str, list[str]],

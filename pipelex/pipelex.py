@@ -406,7 +406,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
         self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
 
-        self.pipelex_hub.set_dry_run_forced(not needs_inference)
+        self.pipelex_hub.set_dry_run_forced(is_forced=not needs_inference)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
         # only here, never at register, so booting a non-worker process imports no host-runtime SDK.

@@ -133,7 +133,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
-    def format_for_display(self, indent: int = 6) -> str:
+    def format_for_display(self, *, indent: int = 6) -> str:
         """Format input stuff specs as a human-readable multi-line string.
 
         Args:
@@ -150,7 +150,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
         return "\n" + "\n".join(lines)
 
-    def render_inputs(self, indent: int = 2) -> str:
+    def render_inputs(self, *, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:

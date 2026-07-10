@@ -892,6 +892,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
 
 
 def doctor_cmd(
+    *,
     fix: bool = False,
 ) -> None:
     """Check Pipelex configuration health and suggest fixes.
@@ -916,6 +917,7 @@ def doctor_cmd(
 
 
 def do_doctor_cmd(
+    *,
     fix: bool = False,
 ) -> None:
     """Check Pipelex configuration health and suggest fixes.

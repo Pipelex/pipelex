@@ -1,8 +1,8 @@
 contract = "keyword-only-convention"
-digest = "sha256:36e661cb6a2b7dc41b959780be78a2d94dd2554ef08688581583bb72bb11d3e8"
-reviewed_by = "Claude (Fable 5)"
-reviewed_at = "2026-07-03T19:51:01Z"
-rationale = "Initial review: verified every claim in docs/contribute/keyword-only-arguments.md against keyword_only_guard.py — the rule, both exceptions, the symmetric-tuple allowlist entries, all carve-out categories, the escape-hatch placement, --fix insertion/unfixable shapes/re-parse safety, and the make/CI/hook gates. All accurate; no doc change needed."
+digest = "sha256:48c2f401467eba57d851be970a6f0bb432d82b15a848321b68365a807e56a3d9"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-07-10T18:35:31Z"
+rationale = "Guard gained the subject-grant registry (ungranted/literal/stale-grant violation kinds, tomllib registry read, DefInfo surface): rewrote docs/contribute/keyword-only-arguments.md accordingly — Exception 1 is now granted subjects with the rubric, literal-subject ban, symmetric staleness, transitional seeding, and the reversal recorded honestly."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:7030c7d666929b899880c02863f5719c62a3e26a"
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:b2b10778c88f7efe6e78e805461657b7653cc9ab"

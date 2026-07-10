@@ -61,7 +61,7 @@ class DryRunFactory:
         return f"{cls.generate_snake_case_code()}.{cls.generate_pascal_case_code()}"
 
     @classmethod
-    def generate_dict_snake_key_pascal_value(cls, num_items: int = 2) -> dict[str, str]:
+    def generate_dict_snake_key_pascal_value(cls, *, num_items: int = 2) -> dict[str, str]:
         """Generate a dict with snake_case keys and PascalCase values."""
         result: dict[str, str] = {}
         for _ in range(num_items):

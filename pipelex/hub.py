@@ -221,7 +221,7 @@ class PipelexHub:
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
 
-    def set_dry_run_forced(self, is_forced: bool) -> None:
+    def set_dry_run_forced(self, *, is_forced: bool) -> None:
         self._is_dry_run_forced = is_forced
 
     def is_dry_run_forced(self) -> bool:

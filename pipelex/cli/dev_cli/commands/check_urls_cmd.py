@@ -142,7 +142,7 @@ async def check_all_urls_async(
     return list(results)
 
 
-def check_urls_cmd(quiet: bool = False, *, timeout: int = DEFAULT_TIMEOUT) -> None:
+def check_urls_cmd(*, quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
     """Check all URLs defined in pipelex/urls.py for broken links.
 
     Args:

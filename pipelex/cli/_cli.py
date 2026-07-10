@@ -83,7 +83,7 @@ class PipelexCLI(TyperGroup):
         ctx.obj["traceback"] = traceback
         # Record at parse time so error handlers honor --traceback without relying on
         # an active global Click context (absent under typer >= 0.26 / click >= 8.4).
-        set_traceback_requested(traceback)
+        set_traceback_requested(value=traceback)
         return ctx
 
 
@@ -95,7 +95,7 @@ app = typer.Typer(
 )
 
 
-def version_callback(value: bool) -> None:
+def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
     """Print version and exit when --version is passed."""
     if value:
         package_version = get_package_version()

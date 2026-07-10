@@ -44,7 +44,7 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
 
     validated_pipes: list[dict[str, Any]] = result.get("validated_pipes") or []
     total_pipes = result.get("total_pipes", len(validated_pipes))
-    lines.append(f"Validated {count_with_noun(total_pipes, singular='pipe')}:")
+    lines.append(f"Validated {count_with_noun(count=total_pipes, singular='pipe')}:")
     lines.append("")
     for entry in validated_pipes:
         lines.append(f"- `{entry.get('pipe_ref')}` — {entry.get('status')}")

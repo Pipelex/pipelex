@@ -53,7 +53,7 @@ class ErrorContext(StrEnum):
 _traceback_requested: ContextVar[bool] = ContextVar("pipelex_cli_traceback_requested", default=False)
 
 
-def set_traceback_requested(value: bool) -> None:
+def set_traceback_requested(*, value: bool) -> None:
     """Record whether --traceback was passed, independent of the Click context."""
     _traceback_requested.set(value)
 

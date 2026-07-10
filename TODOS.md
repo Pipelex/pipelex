@@ -1,224 +1,173 @@
-# Drift Contracts — implementation plan
+# Subject Grants — dropping the generic positional-subject exception
 
-Implements [wip/drift-contracts-design.md](wip/drift-contracts-design.md). Read that design doc first — it is the authority on semantics (validity rule, manifest schema, ack format, command behaviors). This file tracks execution state.
+Hardens the keyword-only-arguments convention: Exception 1 (the positional subject) stops being a generic permission and becomes an **explicitly granted, recorded exception**. There is no separate design doc — this file is the authority on the design (decisions, rubric, registry format) and tracks execution state.
 
 ## Cold-start context (update at every checkpoint)
 
-- **Status:** Phase 2 COMPLETE, CHECKPOINT 2 CLEARED — wiring/seeds/docs in `836c4fd02`, review-triage fixes in the follow-up commit. Gates green: `make check` end-to-end (incl. drift-check), `make agent-test`, mkdocs strict build. The no-context Sonnet `/code-review` fan-out surfaced 5 findings, ALL fixed: (1) MEDIUM `config-docs` triggers missed the documented submodel sources (`config_cogt.py`, `img_gen_job_components.py`, `aws_config.py`, `log_config.py`, `telemetry_config.py`) — an Optional-field addition there would have reopened nothing; triggers broadened + contract honestly re-acked (the initial review had already verified those files' docs); (2) "gates CI" wording overstated the advisory CI job — softened in drift.toml header + contribute doc; (3) `make drift-ack` guard now checks RATIONALE too; (4) two leftover "conflict is meaningful" spots in the design doc corrected; (5) hardcoded count removed from changelog. Design notes (no action): `cli-docs` breadth stays a dogfood-watch; "no blocking gate until promotion" is the accepted advisory-first tradeoff, promotion already tracked below; drift doesn't cover its own docs (growth follows pain). **NEXT = STOP AND DOGFOOD for a few weeks of normal PRs** (per the post-Checkpoint-2 instruction below), then the promotion follow-up, then Phase 3 gated on the dogfood verdict. Phase 1 landed in `fc190e8a0` + `8389bfc64` (Checkpoint 1 cleared; two review defects fixed: Rich-markup escaping in check output, `EMPTY_EFFECTIVE_TRIGGERS` rot detection). Phase 2 delivered: Make targets `drift-plan`/`drift-check`/`drift-ack` (+ `dp`/`dc`/`da`), `drift-check` in the `make check` aggregate (NOT `agent-check`), advisory `lint-drift` CI job (OUT of `lint-all` `needs`), seed `drift.toml` (three contracts), the three initial reviews performed FOR REAL, `docs/contribute/drift-contracts.md` (+ mkdocs nav ×2), design-doc corrections (index-OID digest wording, merge-conflict framing, CRLF resolved), kit rules `drift` section + regenerated CLAUDE.md, changelog entry. **The first dogfood caught real staleness — 20 defects fixed across config and CLI docs** (worst: dead `[cogt.inference_manager_config]` section and invalid `output_format` defaults key, both would crash a user's config load under `extra="forbid"`; phantom `--log-level` option; wrong `pending_signatures` gating scope; dead `telemetry_mode` config field). All three acks recorded with honest rationales (`reviewed_by = "Claude (Fable 5)"`), `drift check` green.
-- **Branch / worktree:** `docs/Update` in the `_docs` worktree (the design doc landed here in `122ffd6f3`). Treat `_docs` as the repo root.
-- **Phase 1 as-built notes** (deviations/additions a fresh session must know):
-    - `.drift/` (the ack state dir) is **always excluded from trigger matching** (`DRIFT_STATE_PREFIX` in `core.py`): if a trigger glob could match ack files, every ack would invalidate its own digest once the ack file is staged — an unfixable open-contract loop. Small addition beyond the design; documented in the code.
-    - The check also validates ack-contract-field ↔ filename-stem equality and orphan acks, per the plan's hardening list.
-    - `drift ack` warns (does not fail) on matched trigger files that are unstaged-modified or untracked — the faster-feedback nicety from the failure-modes table.
-    - New `DriftError` classes (under `drift/exceptions.py`, base `PipelexCLIError`) required regenerating `docs/errors/` pages (`make gep`) — included in the commit.
-    - Test-capture gotcha: the hub console binds stdout at creation, so command tests patch `drift_cmd.get_console` with a recording `Console(width=200, record=True, color_system=None)` (house pattern from `test_doctor_display_report.py`) — `capsys`/`capfd` are unreliable for it. `plan` output goes through `typer.echo`, so plan tests use `capfd`.
-    - The reusable `git_repo` fixture lives in `tests/unit/pipelex/cli/dev/conftest.py` (GitRepo helper class: write/add/commit/git).
-- **Key repo facts** (verified against the tree — three claims from the first draft were WRONG and are corrected here):
-    - Dev CLI commands live in `pipelex/cli/dev_cli/commands/`, registered in `pipelex/cli/dev_cli/_dev_cli.py`. The `kit` sub-app (`app.add_typer(kit_app, name="kit")`, `_dev_cli.py:77`) is the one command-group precedent — `drift` follows it. House style is two-layer: a Typer wrapper in `_dev_cli.py` delegating to a keyword-only `*_cmd()` in the module; the CI-gate idiom (`check_config_sync_cmd.py`) prints a rich panel then `sys.exit(1)`.
-    - Dev CLI unit tests live under `tests/unit/pipelex/cli/dev/`. **CORRECTION: no git-temp-repo fixture exists**, and there is **no `check-config-sync` test to copy** — existing check tests use inline source snippets (`find_violations_in_source`), not temp repos. A reusable `git_repo` conftest fixture is net-new (see Phase 1 test notes). With the pure-core/adapter split most tests stay pure-Python; only the adapter needs the fixture.
-    - **CORRECTION: TOML I/O reuses `pipelex/tools/misc/toml_utils.py`** (`load_toml_with_tomlkit` to read `drift.toml`, `save_toml_to_path` to write ack files) — do NOT hand-roll raw `tomlkit` (that idiom is reserved for the agent-CLI *emitters* that synthesize commented documents). `tomlkit` (≥0.13.2) and `tomli` are direct deps.
-    - **No git-subprocess helper exists anywhere in `pipelex/`** — the drift git adapter is net-new and needs its own tests. Mirror the `subprocess.run(..., capture_output=True, text=True, timeout=..., check=False)` idiom with `# noqa: S603/S404` from `cli/commands/init/ide_extension.py:36-47`.
-    - Makefile: the `check` aggregate is at `Makefile:1081`; per-target pattern with shorthand alias is e.g. `check-config-sync`/`ccs` (`Makefile:323-328`); `.PHONY` is one block (`Makefile:196`). **CORRECTION: CI runs check targets as separate JOBS, not steps** — `lint-check.yml` has `lint-config-sync` / `lint-keyword-only` jobs and a `lint-all` aggregator (`needs: [...]`) that is the single required status check. A new gate is a new job **plus** (only when promoted from advisory to required) an entry in `lint-all`'s `needs`.
-    - Contribute docs live in `docs/contribute/`; mkdocs nav references them in **two places** in `mkdocs.yml` (~lines 324 and 555) — update both.
-    - Keyword-only convention applies to all new code (`make agent-check` enforces).
-- **Decisions taken** (from the `/plan-eng-review` on 2026-07-03 — these override any conflicting wording in the design doc; the design doc will be corrected to match):
-    1. **Digest source = index/staged blob OIDs**, read via a single `git ls-files -s` over matched trigger paths — NOT working-tree bytes via `git hash-object`. Matching and hashing come from the same index source (no working-tree leak), it is filter-normalized (CRLF/smudge safe), it IS "what lands in the commit" (the design's own stated goal), and there is no ARG_MAX concern. **Cost: `git add` the trigger files before `drift ack`** (stage, not commit; other unstaged changes are fine). This supersedes the design's `git hash-object` wording and resolves the codex #1/#3/#21 tree-state findings.
-    2. **Contract digest canonicalization = normalized pydantic model → canonical JSON.** Parse `drift.toml` into the manifest model, then hash a canonical JSON dump of the contract: sorted object keys AND sorted glob lists, with the `(path, oid)` pairs as a nested JSON structure — never string concatenation (no delimiter-framing footgun). Defaulted/empty fields (missing `exclude` == `[]`) normalize identically. Reordering globs or reformatting `drift.toml` must NOT change the digest.
-    3. **Engine layering = pure core + thin git adapter.** A pure module (glob-match over a given file list, digest over given `(path, oid)` pairs, plan-diff, check-compare) that takes injected data, plus one thin git adapter (`git ls-files` / `git ls-files -s`). Most tests are fast pure-Python on literals; only the adapter needs the `git_repo` fixture. Mirrors the `keyword_only_guard.py` pure-core idiom. This makes `commands/drift/` a genuine package (`core.py` + `git_adapter.py` + `models.py` + `drift_cmd.py`).
-    4. **verify_commands = argv via `shlex.split`, no shell.** Each string is `shlex`-split and run with `shell=False`. Run from repo root, inherit env, stop at first failure, surface captured output when one aborts the ack. No `&&`/pipes (verify_commands are single targeted checks by design).
-    5. **Rollout = advisory first, then promote.** Phase 2 adds the drift CI job but leaves it OUT of `lint-all`'s `needs` (runs + visible, does not block merges) plus `drift-check` in `make check` locally. Promote into `lint-all`'s `needs` once the current open-PR backlog lands. Reason: the seed triggers cover hot paths and the workspace has a large active-branch backlog that would eat fresh CI failures on next dev-merge.
-    6. **Scope accepted as-is** — keep `plan`'s per-file trigger-diff in Phase 1 (highest-value packet content, cheap with CC).
-- **Cross-model tensions — KEPT AS DESIGNED** (codex pushed on these; decision is to keep the design and let dogfooding rule): no-skip-verify (capture an audited-skip idea as a deferred item only), broad `cli-docs` trigger, three seeds vs a one-contract spike, the checkpoint `/code-review` protocol, and strict TDD (TDD the engine logic; test-after is fine for Typer wiring / rich-panel formatting). `config-docs` trigger breadth is a **dogfood-watch** item (candidate to narrow to `configs.py` + `config_model.py` + `pipelex.toml` if it opens on config plumbing edits).
-- **Open questions:** (none blocking — the audited-skip-verify escape hatch is deferred, not open)
-- **Dogfood-phase addition (2026-07-04, user-requested):** repo-local skill `.claude/skills/drift-review/` — guides the resolve workflow (plan → genuine review → stage → ack) and makes a dogfood-log entry mandatory per ack (`wip/drift-contracts/dogfood-log.md`, created on first use; verdicts real-catch / clean-pass / friction). This pulls the "repo-local skill" idea forward from Phase 3 at the user's request; the Phase 3 checkbox about teaching the workflow should account for it. Smoke-tested against a synthetic repo: a fresh Sonnet agent found and fixed real doc staleness and acked with an honest rationale.
+- **Status:** CHECKPOINT 1 CLEARED (2026-07-10) — Phases 1+2+3 done, gates green (`make agent-check`, full `make agent-test`, `make check` end-to-end incl. drift-check, mkdocs strict build), committed as one unit, /code-review fanned out and triaged. NEXT = Phase 4 (the review grind): 1,667 seeded entries across ~15 packages; batch via `--report`, rubric per entry, one commit per batch.
+- **Registry state at checkpoint:** 1,675 grants total, 1,667 `seeded = true` remaining, 8 real (the new guard/cmd helpers, granted via the command as dogfood). 43 literal-typed subjects swept (not ~30 as the snapshot estimated): 41 made keyword-only (27 by `fko`, 14 manual star-moves — the `subject, *` shape), 2 escape-hatched (`version_callback` ×2 — click invokes Option callbacks positionally). All broken call sites fixed pyright-guided; full `make agent-test` passed (the framework-positional safety net).
+- **Deviations from the plan (all deliberate):**
+    - The seed NEVER enters literal-typed subjects (rather than seeding then removing them) — they can never be granted (D4), so seeding them would only create entries destined for deletion. Same end state, no dead entries.
+    - `--report` grant/seeded progress meter lives in `check-keyword-only --report`; violation kinds are `missing-star` / `ungranted-subject` / `literal-subject` / `grant-param-mismatch` (def-level, lean path sees it) / `dead-grant` (full-scan only — covers deleted, renamed, demoted-to-all-keyword, and newly-carved-out defs).
+    - `SubjectGrantRegistryError` is defined IN `keyword_only_guard.py` (not an `exceptions.py`): the lean hook path cannot import a sibling module without dragging the `pipelex` package chain. It is a plain `Exception` subclass, not a `PipelexError` (no error page needed; `make gep` not required).
+    - TWO drift contracts opened (not one): `cli-docs` also triggered because the literal sweep touched `pipelex/cli/**`. Both acked genuinely; dogfood log has a real-catch (keyword-only-convention) + a clean-pass (cli-docs) entry.
+    - The workspace-root `.claude/rules/python-standards.md` keyword-only section was spliced from the kit source by hand (section-only replacement — the rest of that file tracks dev, which is ahead of this branch on Python-3.10-drop wording; do NOT copy the whole kit file over it).
+- **Branch / worktree:** `feature/Signatures` in the `_sig` worktree (branched off `docs/Update`). Treat `_sig` as the repo root. This file replaced the drift-contracts tracker inherited from `docs/Update` — that plan lives on in the `docs/Update` branch history and is in its dogfood phase; not this project's concern.
+- **Problem being solved:** the guard mechanically allows ANY first non-`self`/`cls` parameter to stay positional-or-keyword. Coding agents abuse that judgment-shaped permission, leaving first arguments positional when they are not the subject or not obviously so. The check must stay deterministic, but the exception must become deliberate, recorded, and reviewable — and **every existing positional subject is considered new: seeded into the registry unreviewed, then actually checked** (Phase 4).
+- **The shape in one paragraph:** a committed registry (`subject_grants.toml` at repo root) lists every def allowed a positional subject, with the subject param name and a one-sentence rationale. `check-keyword-only` fails on any positional subject without a matching grant, on any grant without a matching def (staleness is symmetric), and on any literal-typed positional subject regardless of grant. `make fko` already rewrites to the all-keyword form, so the lazy path is the strict path; keeping a positional subject costs a deliberate `subject-grant` command with an honest rationale, visible as a registry diff in every PR. Judgment happens at grant time and in review of the registry diff — CI stays 100% deterministic (no LLM in any gate, ever).
 
-## Checkpoint protocol (mandatory — applies to every checkpoint below)
+### Decisions (settled — do not relitigate without Louis)
 
-At each checkpoint the agent MUST STOP and, in order:
+- **D1 — Generic exception dropped.** A positional-or-keyword subject is legal only when a subject grant exists for that def. No grant → violation; `fko` auto-fixes it to all-keyword.
+- **D2 — Registry** = `subject_grants.toml` at repo root. One entry per def, keyed `<relative_path>::<qualified_name>` (exactly the guard's `Violation.key` format), recording `param` (the subject's name) and `rationale`. The file is rewritten sorted by key on every change so diffs are stable and merge conflicts stay trivial.
+- **D3 — CI stays deterministic.** No model verdict in any gate. The guard only verifies grant existence, param match, and freshness. The judgment lives in the grant rationale and in PR review of the registry diff (drift-ack spirit: an honest sentence, on the record).
+- **D4 — Literal-typed subjects banned outright**, grant impossible: a subject annotated `bool`, `int`, or `float` (including `X | None` / `Optional[X]` forms of those) is a violation no matter what. `f(True)` call sites are never acceptable. `str` subjects stay grantable — they are the house style (`pipe_code`, `name`, `uri`, …).
+- **D5 — Strict-all scope.** Grants are required for every positional subject: lone-subject defs (`def render(node)`) and subject-plus-kwonly defs (`def f(spec, *, ...)`) alike. Relaxing later (e.g. exempting lone-subject defs) is trivial; re-tightening later reopens ~1,000 defs — so start strict.
+- **D6 — All existing positional subjects are treated as NEW.** Seeded into the registry with `seeded = true` and a placeholder rationale, then every one is genuinely reviewed in Phase 4: real rationale (keep), or converted to keyword-only (demote), or `# kw-only: ignore` (rare, framework-positional). Zero `seeded` entries may remain at finalization.
+- **D7 — Staleness is symmetric and hard-fails.** Positional subject without grant = violation. Grant whose def no longer exists, or whose recorded `param` no longer matches the def's first param = violation. Renames and file moves therefore force a re-grant — that is a deliberate re-decision, not friction to engineer away.
+- **D8 — Existing mechanisms unchanged.** `# kw-only: ignore` (stronger hatch, short-circuits before the rule — required for framework-positional callables), the symmetric-tuple allowlist (whole-function, stays curated in code, NOT merged into the registry — different semantics), all carve-outs, and `fko`'s insert-leftmost behavior. Note `fko`'s reach grows: an ungranted subject def is now a violation, so `fko` (which runs inside `make agent-check`) will silently kwonly it — grant BEFORE running checks if you want the subject positional.
+- **D9 — `/` (positional-only) stays banned.** The convention doc's deliberate no-`/` decision stands; callers keep keyword discretion on granted subjects.
+- **D10 — Hook budget preserved.** The lean single-file path (`keyword_only_guard.py` run by file path from the PostToolUse hook) stays stdlib-only: it reads the registry with `tomllib` (read-only, machine-written file — the tomli-error-attrs concern applies to user-config parsing, not here). Registry writes happen only in the full CLI via `pipelex/tools/misc/toml_utils.py` (`load_toml_with_tomlkit` / `save_toml_to_path` — do not hand-roll tomlkit).
+- **D11 — Same-qualname defs share one entry.** `@overload` stubs and conditional redefinitions collapse onto one key; the recorded `param` must match each of them (forces overload stubs to align their subject name — acceptable).
 
-1. **Verify progress.** Run the phase's gates (listed per checkpoint). Do not proceed with failures.
-2. **Commit the phase's work** (one coherent commit; do not push unless asked).
-3. **Update this file** — tick the boxes, refresh the "Cold-start context" section (status, decisions, open questions, commit SHAs) so a brand-new session can resume with zero conversation context.
-4. **Fan out `/code-review`** — spawn a Sonnet-5 sub-agent (Agent tool, `subagent_type: general-purpose`, `model: sonnet` — a fresh agent, **never** a fork) whose prompt instructs it to run the `/code-review` skill. **No inherited context:** the prompt hands it only a pointer to the changes under review (the phase's commit range, e.g. `git diff <sha-before>..<sha-after>`, or the working-tree files) — never this plan, the design doc rationale, or your own conclusions. The review goal is clean solid software, not over-engineering.
-5. **Triage findings.** Fix real defects and over-engineering flags; commit the fixes. Findings that are design tradeoffs rather than defects get captured in a deferred-items doc under `wip/drift-contracts/` (fold the design doc into that folder with a README if it becomes multi-doc), not reflexively applied.
-6. Only then continue to the next phase — or end the session; this is a natural handoff point.
+### Scan snapshot (2026-07-10 — point-in-time measurements, they WILL drift; regenerate via the Phase 1 `--report` extension)
 
----
+- ~2,600 defs inspected by the guard (after carve-outs); ~650 of them take no params.
+- **~1,700 use Exception 1 today** (~1,000 lone-subject, ~700 subject-plus-kwonly) — roughly 9 in 10 param-bearing inspected defs. The stock is the house style and looks overwhelmingly legitimate (top subject names: `name`, `pipe_code`, `exc`, `value`, `path`, `content`, `data`, `node`, …) — which is why the stock is seeded-then-reviewed rather than mass-demoted.
+- ~220 defs are already fully keyword-only; zero use `/`; a handful of `# kw-only: ignore` hatches.
+- **~30 literal-typed subjects** (`bool`/`int`/`float`, e.g. `do_doctor_cmd(fix: bool)`) — the mechanically-catchable slice of exactly the abuse this project kills. Beware: some are framework-positional (`version_callback(value: bool)` is invoked positionally by Typer via `callback=` — pyright is blind to that; `make agent-test` is the safety net).
 
-## Phase 1 — engine (`pipelex-dev drift plan|check|ack`)
+### Key repo facts (verified 2026-07-10)
 
-Everything in `pipelex/cli/dev_cli/commands/drift/` (a genuine package — the pure-core/adapter split earns it), no Makefile or CI wiring yet. **TDD the engine logic** (models, digest, matching, plan-diff, check-compare) — red-green per component. Test-after is acceptable for the Typer wiring and rich-panel formatting.
+- Guard core: `pipelex/cli/dev_cli/commands/keyword_only_guard.py` (pure stdlib; `_evaluate_def` order = dunder → escape hatch → decorator carve-outs → typer-annotation → symmetric allowlist → rule). Presentation layer: `check_keyword_only_cmd.py`. Hook: `.claude/hooks/check-keyword-only.sh` invokes the guard **by file path** (never `-m` — that would import the `pipelex` package chain and blow the cold-start budget).
+- `make fko` inserts the bare `*` leftmost (all-keyword form) and is non-gating; read-only `make cko` owns the gate and runs last in `agent-check`, in `make check`, and as the `lint-keyword-only` CI job (aggregated by `lint-all`).
+- Convention doc: `docs/contribute/keyword-only-arguments.md`. **Drift contract `keyword-only-convention`** (in root `drift.toml`) triggers on the guard file with that doc as review target → Phase 3 must stage the trigger and `make drift-ack CONTRACT=keyword-only-convention RATIONALE="…"` after genuinely updating the doc. The new dev-CLI command sits under `pipelex/cli/dev_cli/**`, which the `cli-docs` contract excludes — only the one contract opens.
+- Dev CLI house style: Typer wrapper in `_dev_cli.py` delegating to a keyword-only `*_cmd()` in the module; CI-gate idiom prints a rich panel then `sys.exit(1)` (see `check_config_sync_cmd.py`). Unit tests: `tests/unit/pipelex/cli/dev/`, inline-source style (`find_violations_in_source` on snippets); a reusable `git_repo` fixture already exists in that conftest (built by the drift project) if needed.
+- If new CLI error classes are added (grant-command failures), they go in an `exceptions.py` per house rules and require `make gep` (error-pages regeneration) in the same commit.
+- Agent-rules source: the keyword-only section of `.claude/rules/python-standards.md` (workspace root) is generated from the kit rules source in this repo — edit the kit source, then regenerate (`make rules` family), never the generated file.
+- Makefile: per-target + shorthand-alias pattern (`check-keyword-only`/`cko`); `.PHONY` is one block. mkdocs nav lists contribute docs in TWO places in `mkdocs.yml` — update both if a doc is added (none planned; the convention doc already exists).
 
-**Module layout (Decision 3 — pure core + thin git adapter):**
+## Checkpoint protocol (mandatory at every CHECKPOINT below)
 
-- `models.py` — manifest + ack pydantic models, with contract-ID charset validation.
-- `git_adapter.py` — the ONLY git-touching module: `git ls-files` (matching set) and `git ls-files -s` (staged OIDs for matched paths). `subprocess.run(..., text=True, timeout=..., check=False)` + `# noqa: S603/S404`. Tested against the `git_repo` fixture.
-- `core.py` — pure functions over injected data: glob-match a given file list, digest over given `(path, oid)` pairs + canonical contract JSON, plan-diff (stored map vs current), check-compare. Fast pure-Python tests on literals, no git.
-- `drift_cmd.py` — Typer sub-app (three commands), wires core + adapter, presentation only.
+1. **Verify:** the phase's gates green — `make agent-check`, full `make agent-test` (targeted tests are fine between checkpoints), plus the checkpoint's specific gates. Do not proceed with failures.
+2. **Commit** the phase's work as one coherent commit (do not push unless asked).
+3. **Update this file** — tick boxes, refresh Cold-start context (status, decisions, deviations, commit SHAs) so a brand-new session resumes with zero conversation context.
+4. **Fan out `/code-review`** — a fresh no-context Sonnet sub-agent (Agent tool, `general-purpose`, `model: sonnet`, never a fork) pointed only at the commit range; never hand it this plan or your own conclusions.
+5. **Triage findings:** fix real defects; findings that are design tradeoffs get captured in a deferred-items doc under `wip/subject-grants/`, not reflexively applied.
+6. **STOP** — natural handoff point.
 
-### 1a. Skeleton and models
+## Rubric — what earns a grant
 
-- [x] Create the `drift/` package with the four modules above (merge only if two stay trivially small; do not add speculative ones).
-- [x] Manifest models per the design: `version`, `[contracts.<id>]` with `description`, `triggers`, `exclude` (defaults to `[]`), `review`, `verify_commands` (defaults to `[]`). Read `drift.toml` from the git toplevel via `toml_utils.load_toml_with_tomlkit`; schema-invalid manifest is a hard error with an actionable message. **Validate contract IDs** against a safe charset (`[a-z0-9-]+`) since they become filenames AND TOML table keys.
-- [x] Ack model per the design: `contract`, `digest`, `reviewed_by`, `reviewed_at`, `rationale`, `[trigger_files]` path→OID map. One file per contract at `.drift/acks/<contract-id>.toml`; read with `toml_utils.load_toml_with_tomlkit`, write with `toml_utils.save_toml_to_path` via a temp file + atomic `os.replace` (concurrency-safe).
+Applies to every Phase 4 review and every future grant. Formalized into the convention doc in Phase 3; until then this section is the reference.
 
-### 1b. Digest engine (Decision 1 + 2)
+A subject grant is warranted when EITHER:
 
-- [x] File matching (pure `core.py`): triggers/exclude globs evaluated against the injected `git ls-files` set (tracked files). Pin the semantics: directory review target (`docs/tools/cli/`) resolves iff ≥1 tracked file lives under it; trailing slashes normalized; matching is case-sensitive per POSIX; symlinks are not followed.
-- [x] Content hashing (`git_adapter.py`): staged blob OIDs via **one** `git ls-files -s <matched-paths>` call — matching and hashing share the index source. NOT `git hash-object`, NOT working-tree bytes. No ARG_MAX exposure (pathspecs), filter-normalized.
-- [x] Contract digest (pure `core.py`): `sha256` over a **canonical JSON** document — the normalized pydantic contract (sorted keys, sorted glob lists) plus the sorted `(path, oid)` pairs as nested JSON. Deterministic across runs, `drift.toml` reformatting, comment edits, and glob reordering.
-- [x] Tests: **pure-core** (no git) — digest stability across runs; digest stability across manifest reformatting/comments; **glob-list REORDER → SAME digest** (the executable proof of Decision 2); contract-definition change → digest change; defaulted-vs-explicit-empty `exclude` → SAME digest. **Adapter** (git_repo fixture) — trigger edit/add/delete/rename → OID/digest change; a staged edit is reflected, an unstaged edit is NOT (index semantics); `git ls-files -s` output parsed correctly.
-- [x] Build the reusable `git_repo` pytest fixture (`git init` + commit in `tmp_path`) in a dev-CLI `conftest.py` — net-new, foundational for every adapter/command test.
+- **Verb–object test:** the function name is a verb (phrase) and the param is its direct object — the call reads as a sentence (`render(node)`, `validate_bundle(bundle)`, `parse_concept_spec(spec_data)`) — AND it is the **single candidate** (if you hesitate between two params, neither is the subject) — AND typical call sites pass a **self-labelling expression**, never a bare literal (literal-typed subjects are banned by D4 anyway);
+- OR the def must satisfy a **positional `Callable` protocol** (it is passed as a value to something that calls it positionally) and a grant keeps it compliant without reaching for the heavier `# kw-only: ignore`.
 
-### 1c. `drift check` (the pure gate)
+When in doubt → keyword-only. The grant is the exception tier; all-keyword is always compliant and often more readable. Rationales must be def-specific but may be terse for obvious keeps ("verb–object; single operand") — the value is that someone actually looked; copy-paste boilerplate across dozens of entries defeats the point and is what Louis will spot-check for.
 
-- [x] Validates: manifest parses and is schema-valid; contract IDs are unique and charset-valid; every trigger glob matches ≥1 tracked file (dead glob = hard error); **every review target resolves the same way (a review glob/path matching zero tracked files is an equally hard error — rot symmetry)**; every contract has an ack; **every ack file maps to a manifest contract (orphan ack = hard error) and its `contract` field equals its filename stem**; every ack digest equals the recomputed digest. Git plumbing only (`ls-files`) — **no `verify_commands` execution** (correct the design's "no subprocesses" wording: it shells to git, just never runs verify).
-- [x] Failure output: per open contract, an actionable block in the style of the existing check targets, ending with "run `make drift-plan`". A dead-glob/missing-target failure additionally says "edit `drift.toml` first" (a mid-rename glob can go temporarily dead on the very PR that should fix it). Exit non-zero on any failure via `sys.exit(1)` (Typer layer idiom).
-- [x] Tests: each validation failure class (bad manifest, invalid/duplicate ID, dead trigger glob, zero-match review target, missing ack, orphan ack, `contract`≠filename, digest mismatch after staged edit), the all-green pass, and the failure message ends with "run `make drift-plan`".
+## Registry format
 
-### 1d. `drift plan [CONTRACT]`
+```toml
+version = 1
 
-- [x] Lists open contracts; Markdown by default (per the workspace surface-output conventions — the consumer is an agent). For each open contract: description, per-file added/removed/modified trigger changes (diff of stored `[trigger_files]` map vs current index — no git-diff machinery), review targets, verify commands, previous ack's reviewer/date/rationale, and the exact `make drift-ack ...` invocation to fulfill.
-- [x] With a `CONTRACT` argument: the full packet for that contract only. Unknown contract id = hard error.
-- [x] Tests: added/removed/modified reporting correctness; previous-rationale surfacing; fulfilled contracts excluded from output; **the emitted `make drift-ack CONTRACT=… RATIONALE="…"` string is exact and copy-pasteable** (agents run it verbatim).
+["pipelex/graph/render.py::render_node"]
+param = "node"
+rationale = "Verb–object: renders the node; single obvious operand."
 
-### 1e. `drift ack CONTRACT --rationale "…"`
+# Transitional shape during Phases 2-4 only (rejected entirely by the guard after Phase 5):
+["pipelex/foo/bar.py::SomeClass.some_method"]
+param = "spec"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+```
 
-- [x] `--rationale` required; `reviewed_by` defaults from `git config user.name`, `--by` overrides. **If `git config user.name` is unset AND no `--by`: hard error with an actionable message** ("set git config user.name or pass --by") — never write an empty/placeholder reviewer. `reviewed_at` UTC ISO timestamp (audit-only, no validity semantics).
-- [x] Runs the contract's `verify_commands` first (Decision 4 — each `shlex`-split, `shell=False`, cwd=repo root, env inherited, stop at first failure, captured output shown on abort); any failure aborts the ack without writing. **No `--skip-verify` flag** (design decision; an audited-skip variant is a deferred item, see Deferred). 
-- [x] Recomputes the digest from the **index** at ack time and writes the ack file. Clean tree NOT required, but **trigger files must be staged** (`git add`) to be covered — document this in the failure/help text. Optionally warn when a matched trigger file is untracked or unstaged-modified so the author knows coverage will lag until staged.
-- [x] Tests: ack round-trip (stage → ack → check green); ack-then-edit invalidation (ack → edit+stage trigger → check fails); verify-command failure aborts without writing; missing rationale rejected; `reviewed_by` resolution trio (git-config default / `--by` override / unset+no-`--by` → error); unknown CONTRACT id → hard error; ack permitted with an otherwise-dirty tree.
+Schema after finalization: exactly `param` + `rationale` per entry, `version` at top; unknown keys are a check failure.
 
-### 1f. CLI registration and gates
+## Phase 1 — Mechanism: guard + registry + commands
 
-- [x] Register the `drift` Typer sub-app in `_dev_cli.py` following the `kit` pattern; `--help` smoke works for all three commands.
-- [x] `make agent-check` green (includes keyword-only guard).
-- [x] `make agent-test` green.
+- [x] Guard core (`keyword_only_guard.py`, stays stdlib-only): load `subject_grants.toml` from repo root (`tomllib`); missing registry file = explicit check error (not mass-violation). New rule: a positional-or-keyword subject requires a matching grant (key + `param`); a literal-typed subject (D4) is a violation even with a grant; grants with no matching def or mismatched `param` are check failures. `# kw-only: ignore` keeps short-circuiting everything (existing evaluation order).
+- [x] Distinct violation messages per kind — "ungranted positional subject" / "banned literal-typed subject" / "stale grant" — each naming its fix (`make fko`, `make subject-grant FUNC=… RATIONALE=…`, or registry cleanup). Update the lean `main()` hook message text too.
+- [x] `pipelex-dev subject-grant "<path>::<qualname>" --rationale "…"`: validates the def exists, its first non-`self`/`cls` param is positional-or-keyword and not literal-typed, rationale non-empty; records `param` automatically; rewrites the registry sorted. Make target `subject-grant` (+ short alias, e.g. `sgr`), following the existing per-target pattern.
+- [x] Temporary `--seed` mode on `subject-grant` (deleted in Phase 5): scan the tree, emit an entry for every existing positional subject with `seeded = true` + the placeholder rationale.
+- [x] Extend `check-keyword-only --report`: per-package grant totals and seeded-remaining counts — this is the Phase 4 progress meter.
+- [x] Verify `fko` handles the new violation kind (it already inserts `*` leftmost; ungranted subject defs must be mechanically fixable; the re-parse-before-write guarantee is unchanged).
+- [x] Unit tests (inline-source style + injected registry content): grant match / missing grant / param mismatch / dead entry / seeded accepted (transitional) / literal ban incl. union and Optional forms / ignore-hatch precedence / same-qualname sharing (D11) / lean single-file path reads the registry / sorted-write round-trip / grant-command refusals (literal subject, non-positional subject, empty rationale, missing def).
+- [x] New code itself passes the convention; new error classes (if any) in `exceptions.py` + `make gep`.
 
-### CHECKPOINT 1 — STOP (engine done, nothing wired)
+## Phase 2 — Seed + literal-subject sweep (lands atomically with Phase 1 — the tree must never gate red)
 
-Gates: `make agent-check` + `make agent-test` green; `pipelex-dev drift --help` smoke. Then run the full checkpoint protocol above (commit → update this file → fan out `/code-review` per the no-inherited-context convention → triage → commit fixes). Natural handoff: the remaining work is integration and manifest authoring — a fresh session can pick it up from the tests and this file.
+⚠ **Ordering hazard:** between flipping the guard and committing the seed, NEVER run `make fko` / `make agent-check` on the tree — the fixer would kwonly ~1,700 defs. Generate the seed first (standalone scan), commit guard + registry together.
 
----
+- [x] Run `--seed`, commit the registry: every existing positional subject enters as `seeded = true`.
+- [x] Sweep the literal-typed subjects (~30 per snapshot): kwonly each (fix call sites, pyright-guided), EXCEPT framework-positional ones (Typer `callback=`, etc.) which get `# kw-only: ignore` with a nearby justification. Remove their seed entries. `make agent-test` is the safety net for the pyright-blind cases.
+- [x] Gates green: `make agent-check`, `make agent-test`, `make cko`.
 
-## Phase 2 — wiring, seeds, docs
+## Phase 3 — Docs, rules, drift-ack (before the grind — mid-grind sessions must read the NEW convention, not the stale one)
 
-### 2a. Make and CI wiring (Decision 5 — advisory first)
+- [x] Rewrite `docs/contribute/keyword-only-arguments.md`: Exception 1 becomes "granted subjects" (registry, commands, staleness semantics, D4 literal ban), add the rubric verbatim, record the reversal honestly (generic permission → explicit grant, and why: agents follow checks, not prose). Keep the no-`/` decision section (D9).
+- [x] Update the kit rules source for the keyword-only section (the generated `.claude/rules/python-standards.md` block) + regenerate; update the summary block in this repo's `CLAUDE.md`.
+- [x] Drift: stage the trigger files, then `make drift-ack CONTRACT=keyword-only-convention RATIONALE="…"` — a genuine review, and a real dogfood data point for the drift system (log it via the drift-review skill's dogfood log).
 
-- [x] Make targets `drift-plan`, `drift-check`, `drift-ack` (with `RATIONALE=`/`CONTRACT=` vars for ack), following the existing target+shorthand pattern; register in `.PHONY` (`Makefile:196`).
-- [x] Add `drift-check` to the `make check` aggregate (`Makefile:1081`). Deliberately NOT in `agent-check` (design decision: review obligations belong at the end of a change, not in the post-edit lint loop).
-- [x] Add a **new `lint-drift` job** to `.github/workflows/lint-check.yml` (its own job running `make drift-check`, modeled on the `lint-config-sync` job — NOT a step inside an existing job). **Leave it OUT of the `lint-all` aggregator's `needs`** so it runs and is visible but does NOT block merges (advisory grace period). Add a one-line comment marking it advisory and the promotion condition.
-- [ ] **Promotion (separate, later):** once the current open-PR backlog lands, add `lint-drift` to `lint-all`'s `needs` to make it a required gate. Track this as its own follow-up, not part of the Phase 2 landing.
+### CHECKPOINT 1 — mechanism live, seeded, documented
 
-### 2b. Seed contracts and initial acks (the first dogfood)
+Everything except the grind is done and reviewed as one unit. Gates: full checkpoint protocol + `make check` end-to-end (includes `drift-check`) + mkdocs strict build if docs changed.
 
-- [x] Author root `drift.toml` with the three seed contracts from the design (config-docs, cli-docs, keyword-only-convention). All nine trigger/review paths were verified to resolve (`docs/configuration/`, `docs/tools/cli/` + `pipelex/cli/agent_cli/CLAUDE.md`, `docs/contribute/keyword-only-arguments.md` + `keyword_only_guard.py` all exist) — but **re-confirm at authoring time**, otherwise `drift check` hard-errors on dead globs.
-- [x] **`config-docs` breadth is a dogfood-watch item** (codex #8): `pipelex/system/configuration/**/*.py` includes plumbing (`config_loader.py`, `config_check.py`) whose edits don't touch user-facing prose. Start broad per the design, but if it opens on plumbing edits, narrow to `configs.py` + `config_model.py` + `pipelex.toml`. Note the observation in Cold-start context if it fires.
-- [x] Perform the three initial reviews **for real** — actually read each contract's review targets against the current trigger sources, fix any staleness found, `git add` the trigger files, and only then `drift ack` each with an honest rationale. This is the first dogfood; do not rubber-stamp.
-- [x] Commit `drift.toml` + `.drift/acks/*` + any doc fixes the reviews surfaced.
+## Phase 4 — The review grind (every seeded grant treated as new)
 
-### 2c. Documentation
+Batch by top-level package (`pipelex/core`, `pipelex/builder`, `pipelex/cli`, `pipelex/cogt`, …), sized via `--report` — expect on the order of 10–15 batches for ~1,700 entries. This phase is the dominant cost of the project.
 
-- [x] New page `docs/contribute/drift-contracts.md`: what a contract is, the three-tier framing (derived / linkage / review — and the rule that anything mechanizable becomes a derived check), the ack workflow (**including "`git add` trigger files before `drift ack`" — index semantics**), and the no-bypass rationale. **Merge-conflict rule — state it correctly (codex #13):** the safety net is that `drift check` recomputes the digest over the merged tree and flags the mismatch; a literal ack-file conflict is *possible but not guaranteed* (line-wise auto-merge can produce a Frankenstein ack), so the guarantee to rely on is the post-merge digest check, not the conflict. Resolution either way: finish the merge, re-`ack`. Add to `mkdocs.yml` nav in **both** places. **Also correct the same over-sold "conflict is a feature" wording in `wip/drift-contracts-design.md`.**
-- [x] Add `drift` to the pipelex-dev command list in the agent rules kit source (the section that generates the `Pipelex Dev CLI` part of `CLAUDE.md`/`AGENTS.md`) and regenerate via the kit make targets — do not edit `CLAUDE.md` directly.
-- [x] `CHANGELOG.md` entry under `[Unreleased]`.
-- [x] `make docs-check` (or the mkdocs strict build) green.
+Per seeded entry, apply the rubric and pick exactly one:
 
-### CHECKPOINT 2 — STOP (CI enforcing, seeds live)
+- **Keep:** replace the placeholder with a real, def-specific rationale; drop `seeded`.
+- **Demote:** convert the def to all-keyword (`*` leftmost), fix call sites (pyright-guided), delete the entry.
+- **Hatch (rare):** `# kw-only: ignore` when the positional shape is framework-owned; delete the entry.
 
-Gates: `make check` green end-to-end (now includes `drift-check` against the committed acks); `make agent-test` green; mkdocs strict build green. Then the full checkpoint protocol (commit → update this file → `/code-review` fan-out, no inherited context → triage → commit fixes).
+Rules of engagement:
 
-**After this checkpoint: stop and dogfood for a few weeks of normal PRs before touching Phase 3 or growing the manifest.** The question only usage answers: is ack friction proportionate to the staleness caught? Record observations (reflexive acks, real catches, friction complaints) in the Cold-start section or a wip note as they happen.
+- [ ] Each batch is one commit, gates green (`make agent-check` + targeted tests; full `make agent-test` at checkpoints and after any batch that demoted framework-adjacent defs).
+- [ ] Expect drift toward all-keyword — that is desired; grants are the luxury tier.
+- [ ] **Demoted public surfaces:** any demotion on a surface external consumers may call positionally (public API of the `pipelex` package) gets appended to the list below for the release-wave cross-repo sweep (cookbook, cocode, pipelex-api, …). No backward compat, but the breakage must be inventoried.
 
----
+Demoted public surfaces (append as you grind — the Phase 2 literal sweep already demoted these; external consumers calling them positionally break):
 
-## Phase 3 — agent ergonomics (GATED on dogfooding verdict — do not start in the implementation sessions)
+- `pipelex.tools.misc.string_utils.pluralize` / `count_with_noun` — `count` now keyword-only
+- `pipelex.tools.log.log.Log.set_level_by_int` (`level_int`) and `pipelex.tools.log.log_levels.LogLevel.from_int` (`logging_level`)
+- `pipelex.tools.misc.pretty.PrettyPrinter.pretty_width` (`width`)
+- `pipelex.hub.PipelexHub.set_dry_run_forced` (`is_forced`)
+- `pipelex.cli.installed_methods.discover_installed_methods` (`include_global`)
+- `pipelex.cli.commands.init.config_files.init_config` (`reset`)
+- `pipelex.system.telemetry.*.is_custom_portkey_logging_enabled` / `is_pipelex_gateway_portkey_logging_enabled` (`is_debug_configured`; internal callers already keyword)
+- `pipelex.plugins.anthropic.anthropic_factory.AnthropicFactory.calculate_safe_max_tokens_for_timeout` (`timeout_seconds`)
+- CLI-internal helpers (doctor/show/update/validate `*_cmd` delegates and UI builders) — almost certainly not called externally, listed for completeness in the diff, not here
 
-- [ ] Dogfooding verdict recorded (keep / narrow / mechanize / drop, per contract).
-- [ ] Polish the `drift plan` packet for agent consumption based on observed agent behavior.
-- [ ] `--format json` on `plan` (and `check` if a software consumer materialized) for software consumers, per the surface-output conventions.
-- [ ] Teach the workflow where agents already look: contributor docs section + the CI failure-message text. A repo-local skill only if the raw commands prove insufficient.
-- [ ] CHECKPOINT 3 — STOP: same protocol (verify → commit → update this file → `/code-review` fan-out → triage).
+### CHECKPOINT 2 — mid-grind (after roughly half the batches)
 
-## Deferred (tracked in the design doc — do not implement)
+Full checkpoint protocol. Update the seeded-remaining count and any rubric adjustments learned from the first batches into this file.
 
-Symbol-level triggers (griffe), markdown-anchor targets, pytest node-ID validation, derived-tier entries in `plan` output, cross-repo contracts, cocode semantic assistance, standalone-tool extraction. See the design doc's "Deferred" section. If a review finding lands here, note it in `wip/drift-contracts/` instead of implementing it.
+### CHECKPOINT 3 — grind complete
 
-Added by the `/plan-eng-review` (2026-07-03), deferred not dropped:
+Zero `seeded = true` entries remain (`--report` proves it). Full checkpoint protocol.
 
-- **Audited `--skip-verify`** (codex #11): if a targeted `verify_command` ever requires unavailable local services or flakes, the only current bypass is hand-editing ack TOML — worse than an audited escape. Deferred design: a `--skip-verify` that records `verify_skipped = true` + a reason IN the ack file (auditable, PR-visible), so it's an on-the-record override, not a silent one. Do NOT add in the MVP — the seed `verify_commands` (`make tb`, `[]`) don't need it; revisit only if a real verifier hits this.
-- **Mechanical generated-path guard in `review`** (codex #12): today generated docs are forbidden from `review` lists by prose only. A denylist of known generated dirs (`docs/errors/`, `derived/`, gateway model docs) that `check` rejects would enforce it. Low priority; the manifest author knows the rule.
+## Phase 5 — Finalization
 
----
+- [ ] Delete `--seed` and all `seeded`-field support; tighten the registry schema (exactly `param` + `rationale`; unknown keys fail the check).
+- [ ] CHANGELOG `[Unreleased]`: convention hardened (grants registry, literal-subject ban) + breaking note covering the demoted signatures.
+- [ ] Final docs pass (convention doc reflects the post-transitional state; no `seeded` mentions survive); re-ack drift if the guard changed again.
+- [ ] Hand off the demoted-public-surfaces list to the release-gated cross-repo sweep (house pattern).
+- [ ] Full gates: `make check` end-to-end + `make agent-test`. Update Cold-start context to COMPLETE.
 
-## Review outputs (`/plan-eng-review`, 2026-07-03)
+## Risks & safety nets
 
-### NOT in scope (considered, deliberately deferred)
+- **Framework-positional callers** (Typer `callback=`, Jinja filters, SDK hooks): pyright passes a wrongly-kwonly'd callback; `make agent-test` is the net — mandatory after the Phase 2 sweep and any suspicious Phase 4 demotion.
+- **fko-before-seed hazard** (Phase 2 warning above) — the one truly destructive misstep; land guard + seed atomically.
+- **Rubber-stamp risk in the grind:** rationale honesty can't be mechanized. Mitigations: def-specific rationale rule, Louis spot-checks registry diffs, batches small enough to review for real.
+- **Registry merge conflicts** across parallel branches: sorted, append-mostly file; conflicts resolve trivially, same as the drift manifest.
+- **Hook cold-start budget:** one `tomllib` read of a machine-written file — negligible; keep the lean path import-clean (no tomlkit there).
 
-- **Symbol-level triggers (griffe), markdown-anchor targets, pytest node-ID validation** — dependency weight + slower check; the seed contracts don't need them.
-- **Cross-repo contracts** — separate design; the spec/conformance pair is already covered by `check-spec-links.py` (linkage tier). `drift` stays per-repo.
-- **`--format json` on `plan`/`check`** — Phase 3, gated on the dogfood verdict AND a real software consumer materializing. Agents read the Markdown.
-- **Audited `--skip-verify`, mechanical generated-path guard** — captured in Deferred; not built in the MVP.
-- **`config-docs` trigger narrowing** — a dogfood-watch item, not a pre-optimization (design starts broad on purpose).
-- **Repo-local drift skill** — Phase 3, only if the raw commands + CI failure text prove insufficient for agents.
-- **Repo-wide doc backfill** — the tool enforces the floor going forward; it does not sweep the whole tree for existing drift.
-- **CRLF / cross-platform hashing** — was a deferred risk under working-tree hashing; **now resolved for free** by Decision 1 (index OIDs are filter-normalized). No longer open.
+## Out of scope
 
-### What already exists (reuse map — plan reuses, does not rebuild)
-
-- **Derived-tier checks** (`check-config-sync`, `check-mthds-schema`, `check-gateway-models`, `check-rules`) — drift covers ONLY the review tier; it correctly does not touch these. `config-docs` deliberately covers the *prose* that `make tb`/config-sync can't.
-- **Linkage-tier `check-spec-links.py`** — cross-repo, purpose-built; drift does not absorb it. Correct boundary.
-- **`pipelex/tools/misc/toml_utils.py`** — reused for all TOML read/write (was slated as raw `tomlkit`). DRY win.
-- **`keyword_only_guard.py`** — the pure-stdlib-core idiom that the `core.py` / `git_adapter.py` split mirrors.
-- **`check_config_sync_cmd.py`** — the CI-gate presentation idiom (rich panel → `sys.exit(1)`) reused by `drift check`.
-- **`cli/commands/init/ide_extension.py:36-47`** — the `subprocess.run(check=False)` + `noqa: S603/S404` pattern for the git adapter.
-- **`git ls-files -s`** — reuses git's own index/OID machinery instead of a custom working-tree hashing scheme.
-- **Two-layer Typer wrapper convention** (`_dev_cli.py` wrapper → keyword-only `*_cmd`) — followed.
-
-### Failure modes (per new codepath — realistic prod failure / test / error-handling / visibility)
-
-| Codepath | Realistic failure | Test | Handling | Visible? |
-|---|---|---|---|---|
-| git adapter | git binary missing / not a repo | ✅ (added) | catch → actionable error | clear error |
-| git adapter | `ls-files -s` non-zero / malformed output | ✅ (added) | raise with stderr | clear error |
-| `ack` verify | verify_command flakes / times out | ✅ (added) | abort ack, show captured output | ack refuses, visible |
-| `ack` index | untracked new trigger file at ack → local under-coverage | ✅ index-semantics test | optional warn | **backstopped**: once the file is `git add`+committed the matched set changes → digest changes → CI `drift check` fails. Not a silent prod failure. |
-| `check` merge | Frankenstein auto-merged ack | ✅ (post-merge mismatch) | digest recompute flags it | CI failure, visible |
-| `check` rename | orphan ack after contract rename | ✅ (added) | hard error | CI failure, visible |
-| `core` digest | glob reorder churns digest | ✅ reorder→same-digest | canonical JSON | would be noisy re-acks, not silent |
-
-**Zero critical silent-failure gaps.** The one candidate (untracked new trigger file at ack) is backstopped by the same digest recompute in CI once the file is committed — the warn is a faster-feedback nicety, not a correctness requirement.
-
-### Worktree parallelization
-
-**Sequential implementation, no meaningful parallelization opportunity.** Phase 1 is one small tightly-coupled package (commands depend on core + adapter + models). Phase 2's sub-parts are loosely independent but too small and interdependent to warrant worktrees (the CI gate is meaningless before the seeds exist; the docs reference the commands). Build in order; the checkpoint boundaries are the real handoff points.
-
-### Implementation Tasks
-
-Synthesized from this review's findings. Each derives from a specific decision/finding above.
-
-- [x] **T1 (P1)** — engine — digest source = index OIDs via a single `git ls-files -s` (Decision 1); drop `git hash-object`/working-tree. Verify: adapter test — staged edit reflected, unstaged not.
-- [x] **T2 (P1)** — core — canonical-JSON digest over normalized pydantic contract + sorted `(path, oid)` (Decision 2). Verify: glob-reorder → SAME digest; reformat → SAME digest.
-- [x] **T3 (P1)** — package — pure `core.py` + thin `git_adapter.py` + `models.py` + `drift_cmd.py` (Decision 3); build the reusable `git_repo` conftest fixture. Verify: core tests run with no git.
-- [x] **T4 (P2)** — models — contract-ID charset validation, `toml_utils` I/O, atomic ack write (temp + `os.replace`). Verify: invalid ID rejected; ack round-trip.
-- [x] **T5 (P2)** — `check` — add validations: review zero-match hard error (symmetry), orphan-ack, `ack.contract`==filename, unique IDs; failure text says "edit drift.toml first" on dead glob. Verify: one test per failure class.
-- [x] **T6 (P2)** — `ack` — verify_commands `shlex`+`shell=False`, cwd=root, env-inherit, fail-fast, output-on-abort (Decision 4); `reviewed_by` unset+no-`--by` → error; document git-add-before-ack. Verify: reviewed_by trio; verify-fail aborts without write.
-- [x] **T7 (P2)** — CI — new `lint-drift` job, OUT of `lint-all` `needs` (advisory) (Decision 5). Verify: job runs, merges not blocked.
-- [x] **T8 (P3)** — docs — correct the merge-conflict framing (rely on post-merge digest mismatch, not the conflict) in `docs/contribute/drift-contracts.md` AND `wip/drift-contracts-design.md`. Verify: mkdocs strict build green.
-- [x] **T9 (P2)** — git adapter — failure-path tests: missing binary, non-zero exit, timeout. Verify: each raises an actionable error.
-
-## GSTACK REVIEW REPORT
-
-| Review | Trigger | Why | Runs | Status | Findings |
-|--------|---------|-----|------|--------|----------|
-| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
-| Codex Review | `/codex review` | Independent 2nd opinion | 1 | issues_found | ~24 raised; 7 new, 2 consensus, rest tensions/hardening |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | clean | 9 issues folded, 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — (no UI surface) |
-| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
-
-- **CODEX:** outside voice (gpt-5.5, high) surfaced the digest-source leak (index vs working-tree) — its best catch, adopted as Decision 1 — plus verify_commands exec model (Decision 4) and a batch of validation hardening (orphan acks, ID charset, atomic writes, path-matching precision, merge-conflict framing). Pushed on no-skip-verify / broad triggers / strict TDD / checkpoint ceremony — all kept as designed.
-- **CROSS-MODEL:** consensus on advisory-first rollout (both reviewers) and on canonicalization being underspecified. No unresolved tension — every codex point was either adopted, folded as hardening, deferred, or explicitly kept-as-designed with rationale.
-- **VERDICT:** ENG CLEARED — ready to implement. Seven decisions locked, nine findings folded into the plan, two items deferred (not dropped).
-
-NO UNRESOLVED DECISIONS
+- Any LLM verdict inside CI (D3 — permanent).
+- Other repos' conventions; the conformance suite (this is repo-internal dev tooling, no cross-repo spec surface).
+- Retro-fitting the symmetric-tuple allowlist into the registry (D8 — different semantics, stays in code).

@@ -20,14 +20,15 @@
 
 ## Keyword-only arguments check
 
-   Non-subject function parameters across `pipelex/` source must be keyword-only (a bare `*` after the subject). The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+   Non-subject function parameters across `pipelex/` source must be keyword-only, and a positional subject is legal only under a grant recorded in `subject_grants.toml`. The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
 
    ```bash
    make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
    make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"   # alias: make sgr — grant a positional subject
    ```
 
-   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can (including ungranted subjects — grant BEFORE running checks if the subject should stay positional) and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
 
 ## Cleaning Derived Files
 

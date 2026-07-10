@@ -248,7 +248,7 @@ def confirm_initialization(
     console.print()
     console.print(
         build_initialization_panel(
-            needs_config,
+            needs_config=needs_config,
             needs_inference=needs_inference,
             needs_routing=needs_routing,
             needs_telemetry=needs_telemetry,

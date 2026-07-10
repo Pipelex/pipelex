@@ -249,7 +249,7 @@ class AnthropicFactory:
         return nb_tokens_by_category
 
     @staticmethod
-    def calculate_safe_max_tokens_for_timeout(timeout_seconds: int) -> int:
+    def calculate_safe_max_tokens_for_timeout(*, timeout_seconds: int) -> int:
         """Calculate max_tokens that won't trigger SDK timeout protection.
 
         Formula: max_tokens = timeout_seconds * 128000 / 3600

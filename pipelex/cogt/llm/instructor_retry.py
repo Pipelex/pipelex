@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt
 
 
-def make_instructor_schema_retrying(max_attempts: int) -> AsyncRetrying:
+def make_instructor_schema_retrying(*, max_attempts: int) -> AsyncRetrying:
     """Build a ``tenacity.AsyncRetrying`` that confines ``instructor``'s retry to schema re-ask.
 
     Passed a bare ``int``, ``instructor``'s ``max_retries`` builds a retry loop whose default

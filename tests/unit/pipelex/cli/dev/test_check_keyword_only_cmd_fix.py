@@ -18,7 +18,7 @@ from rich.console import Console
 
 from pipelex.cli.dev_cli.commands import check_keyword_only_cmd as cmd_mod
 from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_only_cmd
-from pipelex.cli.dev_cli.commands.keyword_only_guard import Violation
+from pipelex.cli.dev_cli.commands.keyword_only_guard import Violation, ViolationKind
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 
 
 def _violation(name: str) -> Violation:
-    return Violation(relative_path="pipelex/sample/module.py", qualified_name=name, lineno=7)
+    return Violation(relative_path="pipelex/sample/module.py", qualified_name=name, lineno=7, kind=ViolationKind.MISSING_STAR)
 
 
 class TestCheckKeywordOnlyCmdFix:
@@ -38,6 +38,8 @@ class TestCheckKeywordOnlyCmdFix:
         mocker.patch.object(cmd_mod, "get_console", return_value=Console(file=buffer, force_terminal=False, width=200))
         # SOURCE_ROOT only needs to exist for the guard's pre-flight check; the scanners are mocked per test.
         mocker.patch.object(cmd_mod, "SOURCE_ROOT", tmp_path)
+        # The registry is loaded before any scan; these tests drive the scanners directly, so keep it empty.
+        mocker.patch.object(cmd_mod, "load_subject_grants", return_value={})
         return buffer
 
     def test_fix_only_exits_zero_and_reports_fixed(self, mocker: MockerFixture, console_buffer: io.StringIO) -> None:

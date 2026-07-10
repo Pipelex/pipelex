@@ -321,7 +321,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         timeout_seconds = anthropic_config.structured_output_timeout_seconds
 
         # Calculate safe max_tokens based on timeout
-        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds)
+        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds=timeout_seconds)
 
         # Use minimum of requested and safe limit
         requested_max_tokens = job_params.max_tokens or self.default_max_tokens

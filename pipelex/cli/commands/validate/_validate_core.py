@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 COMMAND = "validate"
 
 
-def _format_signatures_summary_suffix(signature_count: int) -> str:
+def _format_signatures_summary_suffix(*, signature_count: int) -> str:
     """Return the suffix appended to lenient-mode validation summaries.
 
     Empty when no signatures were involved so fully-implemented bundles read naturally.
@@ -79,7 +79,7 @@ def do_validate_all_libraries_and_dry_run(
             pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
-                typer.echo(f"Validating {count_with_noun(len(pipes), singular='pipe')} from: {dirs_str}")
+                typer.echo(f"Validating {count_with_noun(count=len(pipes), singular='pipe')} from: {dirs_str}")
 
             # validate_current_library owns the static wiring pass and the single PIPE_DRY_RUN telemetry
             # event — sweeping the library we just loaded, without teardown.
@@ -102,7 +102,9 @@ def do_validate_all_libraries_and_dry_run(
                 raise typer.Exit(1)
 
             signature_count = sum(1 for pipe in all_pipes if pipe.is_signature)
-            typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
+            typer.echo(
+                f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count=signature_count)}"
+            )
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     except PipeOperatorModelChoiceError as exc:
@@ -138,7 +140,7 @@ async def _validate_pipe_or_bundle(
                 raise typer.Exit(1)
             signature_count = sum(1 for pipe in bundle_result.pipes if pipe.is_signature)
             typer.secho(
-                f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count)}",
+                f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
                 fg=typer.colors.GREEN,
             )
         except FileNotFoundError as exc:
@@ -172,7 +174,7 @@ async def _validate_pipe_or_bundle(
         )
         signature_count = len(collect_signature_refs(pipe=pipe))
         typer.secho(
-            f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
+            f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
             fg=typer.colors.GREEN,
         )
     else:

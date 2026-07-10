@@ -154,6 +154,8 @@ make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
 make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a bare *)
 make fko                      - Shorthand -> fix-keyword-only
+make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>" RATIONALE="…")
+make sgr                      - Shorthand -> subject-grant
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -193,7 +195,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -342,6 +344,17 @@ fix-keyword-only: env
 
 fko: fix-keyword-only
 	@echo "> done: fko = fix-keyword-only"
+
+subject-grant: env
+	$(call PRINT_TITLE,"Recording a subject grant")
+	@if [ -z "$(FUNC)" ] || [ -z "$(RATIONALE)" ]; then \
+		echo 'Usage: make subject-grant FUNC="<relative_path>::<qualified_name>" RATIONALE="…"'; \
+		exit 1; \
+	fi
+	$(VENV_PIPELEX_DEV) subject-grant "$(FUNC)" --rationale "$(RATIONALE)"
+
+sgr: subject-grant
+	@echo "> done: sgr = subject-grant"
 
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
