@@ -282,27 +282,21 @@ pipelex build structures ./my_pipelines/ -o ./generated/
 
 ### Example Output
 
-Given the Invoice example from above, Pipelex generates:
+Given the Invoice example from above, Pipelex generates one stamped `structures.py` module (plus a `codegen.lock` for the offline drift check) containing every concept of the closure:
 
 ```python
-# generated/finance__invoice.py
-from datetime import date
-from pydantic import Field
-from pipelex.core.stuffs.structured_content import StructuredContent
-from .finance__customer import Customer
-from .finance__line_item import LineItem
-
+# generated/structures.py (below the codegen stamp header)
 class Invoice(StructuredContent):
     """A commercial document issued by a seller to a buyer"""
 
-    invoice_number: str = Field(description="The unique invoice identifier")
+    invoice_number: str = Field(..., description="The unique invoice identifier")
     issue_date: date = Field(..., description="The date the invoice was issued")
     customer: Customer = Field(..., description="The customer for this invoice")
-    line_items: list[LineItem] = Field(..., description="List of line items")
+    line_items: List[LineItem] = Field(..., description="List of line items")
     total_amount: float = Field(..., description="The total invoice amount")
 ```
 
-You can then import and use these classes with full type safety.
+You can then import and use these classes with full type safety. Generated files are never edited in place — to customize a class, subclass it in a sibling module (the generated header shows how).
 
 ## When to Use Inline Structures
 

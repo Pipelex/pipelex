@@ -9,24 +9,17 @@ The disambiguated spelling differs by target because identifier grammars differ:
 - TypeScript does not allow `·` in identifiers, so a colliding TS type PascalCases and joins the
   domain segments before the code (`legal.contracts` + `Result` -> `LegalContractsResult`).
 
-Field names: the crate's snake_case is the wire contract. Python keeps it verbatim; TypeScript maps
-it to camelCase and documents the wire name inline (a JSDoc `@wire` tag) so the round trip is exact.
+Field names: the crate's snake_case is the wire contract, and every target keeps it verbatim (D10:
+wire-native keys — a TS schema validates the wire payload directly, no key remapping layer).
 """
 
+from pipelex.codegen.resolved_concepts import ResolvedLibrary
 from pipelex.core.concepts.helpers import make_qualified_structure_class_name
 
 
 def snake_to_pascal(name: str) -> str:
     """`snake_case` -> `PascalCase` (empty segments from stray underscores are dropped)."""
     return "".join(part[:1].upper() + part[1:] for part in name.split("_") if part)
-
-
-def snake_to_camel(name: str) -> str:
-    """`snake_case` -> `camelCase`, preserving the first segment's case."""
-    parts = [part for part in name.split("_") if part]
-    if not parts:
-        return name
-    return parts[0] + "".join(part[:1].upper() + part[1:] for part in parts[1:])
 
 
 def python_class_name(*, domain: str, code: str, needs_qualification: bool) -> str:
@@ -42,3 +35,21 @@ def ts_type_name(*, domain: str, code: str, needs_qualification: bool) -> str:
         return code
     domain_pascal = "".join(snake_to_pascal(segment) for segment in domain.split("."))
     return f"{domain_pascal}{code}"
+
+
+def runtime_to_emitted_class_names(library: ResolvedLibrary) -> dict[str, str]:
+    """Map each concept's runtime structure-class name to its emitted Python class name.
+
+    The runtime materializes every non-native concept under the domain-qualified spelling
+    (`make_qualified_structure_class_name`), while the Python emitters name bare-when-unique — this
+    mapping lets a consumer (the runner-script generator) spell classes the way the emitted
+    projection defines them. Opaque Python-backed concepts (`structure = "<ClassName>"`) keep the
+    user's real class at runtime, so they are deliberately not remapped.
+    """
+    mapping: dict[str, str] = {}
+    for concept in library.concepts:
+        if concept.is_native or concept.opaque_python_class:
+            continue
+        runtime_name = make_qualified_structure_class_name(domain_code=concept.domain, concept_code=concept.code)
+        mapping[runtime_name] = python_class_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
+    return mapping

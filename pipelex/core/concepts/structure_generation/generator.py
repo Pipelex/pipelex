@@ -13,7 +13,6 @@ from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 # Target line length for emitted code (matches the project's ruff config).
@@ -30,36 +29,13 @@ def _get_class_registry() -> ClassRegistryAbstract:
     return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
-class ConceptClassInfo:
-    """Information about a concept's structure class for import generation."""
-
-    def __init__(self, class_name: str, module_path: str | None = None):
-        """Initialize ConceptClassInfo.
-
-        Args:
-            class_name: The name of the structure class (e.g., "Skill")
-            module_path: Optional module path where the class is defined (e.g., "myapp.structures.skill").
-                         If None, a forward reference (string) will be used.
-        """
-        self.class_name = class_name
-        self.module_path = module_path
-
-
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
-    # TODO: use StrEnum instead of Enum
-    def __init__(
-        self,
-        concept_ref_to_class_info: dict[str, ConceptClassInfo] | None = None,
-        local_domain: str | None = None,
-    ):
+    def __init__(self, local_domain: str | None = None):
         """Initialize the StructureGenerator.
 
         Args:
-            concept_ref_to_class_info: Optional mapping from concept refs to ConceptClassInfo.
-                When module_path is provided, proper import statements will be generated.
-                When module_path is None, forward references (strings) will be used.
             local_domain: Optional domain to use when resolving bare concept refs
                 (refs without a domain prefix, e.g. "ColorPalette") to their
                 domain-qualified structure class name.
@@ -70,10 +46,7 @@ class StructureGenerator:
             "from pipelex.core.stuffs.structured_content import StructuredContent",
             "from pydantic import Field",
         }
-        self.concept_ref_to_class_info = concept_ref_to_class_info or {}
         self.local_domain = local_domain
-        # Track concept classes that need to be mocked during validation (for file generation)
-        self._concept_classes_to_mock: set[str] = set()
 
     def generate_from_structure_blueprint(
         self,
@@ -300,19 +273,10 @@ class StructureGenerator:
                 raise ConceptStructureGeneratorError(msg)
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
-            # Check if we have module info for this custom base class in concept_ref_to_class_info
-            base_module_path: str | None = None
-            for class_info in self.concept_ref_to_class_info.values():
-                if class_info.class_name == base_class and class_info.module_path:
-                    base_module_path = class_info.module_path
-                    break
-            if base_module_path is None:
-                # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
-                registered_cls = _get_class_registry().get_class(name=base_class)
-                if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
-                    base_module_path = registered_cls.__module__
-            if base_module_path:
-                self.imports.add(f"from {base_module_path} import {base_class}")
+            # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
+            registered_cls = _get_class_registry().get_class(name=base_class)
+            if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
+                self.imports.add(f"from {registered_cls.__module__} import {base_class}")
 
         # Generate class header with docstring (use class name if no description provided)
         docstring = description or f"Generated {class_name} class"
@@ -391,8 +355,6 @@ class StructureGenerator:
         The concept ref is already normalized by the resolved-field layer (natives flagged, bare
         refs promoted to the local domain). Emits:
         - for native concepts: an import of the native content class and its class name;
-        - when a module path is known (file generation): an import + the class name, and tracks the
-          class for mocking during validation;
         - otherwise: a domain-qualified forward reference (resolved via model_rebuild at runtime).
         """
         concept_ref = resolved_type.concept_ref
@@ -410,15 +372,6 @@ class StructureGenerator:
                 if structure_class:
                     self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
                     return structure_class.__name__
-
-        if concept_ref in self.concept_ref_to_class_info:
-            class_info = self.concept_ref_to_class_info[concept_ref]
-            if class_info.module_path:
-                self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
-                self._concept_classes_to_mock.add(class_info.class_name)
-                return class_info.class_name
-            # No module path: use a forward reference (resolved via model_rebuild at runtime).
-            return f'"{class_info.class_name}"'
 
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
@@ -460,20 +413,6 @@ class StructureGenerator:
                 exec_globals[structure_class.__name__] = structure_class
 
         validation_code = python_code
-
-        # For file generation: create mock classes for concept references that would fail import
-        # These classes don't exist yet or their modules aren't in the path
-        for mock_class_name in self._concept_classes_to_mock:
-            # Create a mock class that inherits from StructuredContent
-            mock_class = type(mock_class_name, (StructuredContent,), {})
-            exec_globals[mock_class_name] = mock_class
-            # Remove the import line for this class from the validation code
-            # (the actual generated code will still have it)
-            lines = validation_code.split("\n")
-            filtered_lines = [
-                line for line in lines if not (line.strip().startswith("from ") and f"import {mock_class_name}" in line and "pipelex" not in line)
-            ]
-            validation_code = "\n".join(filtered_lines)
 
         # If a custom base class is specified that's not a native class, get it from the registry
         if base_class_name:
