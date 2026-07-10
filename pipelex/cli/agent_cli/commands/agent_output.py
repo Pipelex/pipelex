@@ -144,6 +144,13 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
     # Init errors
     "InitConfigError": "Check the --config JSON and ensure backend keys match available backends in the template",
+    # Codegen errors
+    "CodegenDriftError": (
+        "Regenerate with 'pipelex-agent codegen types --target <flavor> -o <dir>' (a dev action). "
+        "Check 'drifts' in this error response for the drifting artifacts and their categories."
+    ),
+    "CodegenLockNotFoundError": "Pass the directory that holds codegen.lock, or generate first with 'pipelex-agent codegen types'",
+    "CodegenLockError": "The codegen.lock file is unreadable or malformed — regenerate with 'pipelex-agent codegen types'",
     # Unknown command
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
@@ -169,6 +176,9 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipelineRequestError": "input",
     "GraphSpecParseError": "input",
     "UnknownCommandError": "input",
+    "CodegenDriftError": "input",
+    "CodegenLockNotFoundError": "input",
+    "CodegenLockError": "input",
     # config = environment/config changes needed
     "ClientAuthenticationError": "config",
     "PipeOperatorModelChoiceError": "config",
