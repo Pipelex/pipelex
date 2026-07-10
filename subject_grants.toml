@@ -830,1408 +830,1099 @@ rationale = "Operates on the pipe_code; single operand."
 
 ["pipelex/cogt/config_cogt.py::ImgGenConfig.get_num_inference_steps"]
 param = "model_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_name; single operand."
 
 ["pipelex/cogt/config_cogt.py::LLMConfig.get_reasoning_budget"]
 param = "prompting_target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the prompting_target; single operand."
 
 ["pipelex/cogt/config_cogt.py::LLMConfig.get_template"]
 param = "template_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the template_name; single operand."
 
 ["pipelex/cogt/content_generation/assignment_models.py::LLMAssignment.clone_with_new_prompt"]
 param = "new_prompt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the new_prompt; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/content_generation/assignment_models.py::ObjectAssignment.make_for_class"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the object_class; single operand."
 
 ["pipelex/cogt/content_generation/assignment_models.py::SearchObjectAssignment.make_for_class"]
 param = "output_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the output_class; single operand."
 
 ["pipelex/cogt/content_generation/content_generator.py::_revalidate_against_object_class"]
 param = "raw_obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the raw_obj; single operand."
 
 ["pipelex/cogt/content_generation/content_generator_protocol.py::ContentGeneratorProtocol.make_search_sourced_answer"]
 param = "search_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/content_generator_protocol.py::update_job_metadata"]
 param = "func"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Decorator: wraps the single func operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_dry_image_content"]
 param = "image_url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the image_url; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_dry_report_func"]
 param = "cogt_run_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the cogt_run_params; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_leaf_gen_object"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_leaf_gen_object_list"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_nb_list_items"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::_reconstruct_object_class"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::build_mock_object"]
 param = "model_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_class; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::build_mock_objects"]
 param = "model_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_class; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_extract_page_contents"]
 param = "extract_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the extract_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_img_gen_image_contents"]
 param = "img_gen_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the img_gen_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_object"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_object_list"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_llm_gen_text"]
 param = "llm_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the llm_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_render_page_views"]
 param = "render_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the render_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_sourced_answer"]
 param = "search_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_search_gen_structured"]
 param = "search_object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the search_object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::dry_templating_gen_text"]
 param = "templating_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the templating_assignment; single operand."
 
 ["pipelex/cogt/content_generation/dry_mock.py::report_dry_llm_job"]
 param = "job_metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable reporter protocol (_ReportLLMJobFunc.__call__): job_metadata stays positional to match report_func(job_metadata, ...)."
 
 ["pipelex/cogt/content_generation/dry_mock.py::report_mock_usage_llm_job"]
 param = "job_metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable reporter protocol (_ReportLLMJobFunc.__call__): job_metadata stays positional to match report_func(job_metadata, ...)."
 
 ["pipelex/cogt/content_generation/dry_mock.py::stamp_mock_main_coordination"]
 param = "items"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Consumes the items; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._create_nested_factory"]
 param = "nested_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds a nested mock factory for the class; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._detect_examples_constraints"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the object class for example constraints; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._detect_format_constraints"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the object class for format constraints; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._detect_literal_fields"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the object class for literal fields; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._extract_types_from_annotation"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the annotation; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._find_nested_base_model_classes"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Inspects the object class for nested models; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._get_examples_from_field"]
 param = "field_info"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the field_info; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._get_literal_values_from_annotation"]
 param = "annotation"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the annotation; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._get_mock_format_from_field"]
 param = "field_info"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the field_info; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory._make_example_picker"]
 param = "examples"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the examples; single operand."
 
 ["pipelex/cogt/content_generation/dry_run_factory.py::DryRunFactory.make_dry_run_factory"]
 param = "object_class"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the object_class; single operand."
 
 ["pipelex/cogt/content_generation/exceptions.py::DryRunMockBuildError.for_object_class"]
 param = "object_class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the object_class_name; single operand."
 
 ["pipelex/cogt/content_generation/exceptions.py::DryRunObjectFidelityError.for_object_class"]
 param = "object_class_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the object_class_name; single operand."
 
 ["pipelex/cogt/content_generation/extract_generate.py::extract_gen_pages"]
 param = "extract_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_assignment; single operand."
 
 ["pipelex/cogt/content_generation/extract_generate.py::extract_gen_pages_and_store"]
 param = "extract_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_assignment; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory._build_storage_key"]
 param = "primary_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds the storage key from the primary id; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory._fetch_remote_content"]
 param = "url"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Fetches the remote content at the URL; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_image_content"]
 param = "primary_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the primary_id; single operand."
 
 ["pipelex/cogt/content_generation/generated_content_factory.py::GeneratedContentFactory.make_page_contents"]
 param = "primary_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the primary_id; single operand."
 
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_image_list"]
 param = "img_gen_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the img-gen assignment; single operand."
 
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_image_list_and_store"]
 param = "img_gen_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the img-gen assignment; single operand."
 
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_single_image"]
 param = "img_gen_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the img-gen assignment; single operand."
 
 ["pipelex/cogt/content_generation/img_gen_generate.py::img_gen_single_image_and_store"]
 param = "img_gen_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the img-gen assignment; single operand."
 
 ["pipelex/cogt/content_generation/llm_generate.py::llm_gen_object"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the object assignment; single operand."
 
 ["pipelex/cogt/content_generation/llm_generate.py::llm_gen_object_list"]
 param = "object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the object assignment; single operand."
 
 ["pipelex/cogt/content_generation/llm_generate.py::llm_gen_text"]
 param = "llm_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the LLM assignment; single operand."
 
 ["pipelex/cogt/content_generation/render_generate.py::render_page_views_and_store"]
 param = "render_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the render_assignment; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._collect_unsafe_extension_paths"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Walks the schema node; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_and_extract_class"]
 param = "source_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Executes the generated source code; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._exec_source_to_types"]
 param = "source_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Executes the generated source code; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._generate_source_from_schema"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the schema; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._normalize_class_name"]
 param = "title"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the title; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory._reject_unsafe_schema_extensions"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Rejects unsafe extensions in the schema; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_from_json_schema"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the schema; single operand."
 
 ["pipelex/cogt/content_generation/schema_to_model_factory.py::SchemaToModelFactory.make_types_from_source"]
 param = "source_code"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the source_code; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::_make_search_job"]
 param = "search_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::_make_search_worker"]
 param = "search_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_sourced_answer"]
 param = "search_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_assignment; single operand."
 
 ["pipelex/cogt/content_generation/search_generate.py::search_gen_structured"]
 param = "search_object_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_object_assignment; single operand."
 
 ["pipelex/cogt/content_generation/templating_generate.py::templating_gen_text"]
 param = "templating_assignment"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/document/prompt_document_factory.py::PromptDocumentFactory.make_prompt_document"]
-param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Processes the templating assignment; single operand."
 
 ["pipelex/cogt/document/prompt_document_utils.py::prep_prompt_documents"]
 param = "prompt_documents"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt documents; single operand."
 
 ["pipelex/cogt/document/prompt_document_utils.py::prepare_prompt_document"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt document; single operand."
 
 ["pipelex/cogt/document/prompt_document_utils.py::prepare_prompt_document_as_base64"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt document as base64; single operand."
 
 ["pipelex/cogt/exceptions.py::CogtError.fill_model_and_provider"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the model_handle; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/exceptions.py::find_inference_error_category_in_chain"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/extract/extract_job.py::ExtractJob.extract_job_before_start"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the inference_model; single operand."
 
 ["pipelex/cogt/extract/extract_job_factory.py::ExtractJobFactory.make_extract_job"]
 param = "extract_input"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the extract_input; single operand."
 
 ["pipelex/cogt/extract/extract_report.py::ExtractTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/extract/extract_report.py::ExtractTokenCostReportField.report_field_for_nb_tokens_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/extract/extract_worker_abstract.py::ExtractWorkerAbstract._check_can_perform_job"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the extract_job; single operand."
 
 ["pipelex/cogt/extract/extract_worker_abstract.py::ExtractWorkerAbstract._extract_pages"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_job; single operand."
 
 ["pipelex/cogt/extract/extract_worker_abstract.py::ExtractWorkerAbstract.extract_pages"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_job; single operand."
 
 ["pipelex/cogt/extract/extract_worker_factory.py::ExtractWorkerFactory.make_extract_worker"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/cogt/file/file_preparation_utils.py::prepare_file_from_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the file from the URI; single operand."
 
 ["pipelex/cogt/image/generated_image.py::GeneratedImageRawDetails.make_from_pil_image"]
 param = "pil_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/image/prompt_image_factory.py::PromptImageFactory.make_prompt_image"]
-param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the pil_image; single operand."
 
 ["pipelex/cogt/image/prompt_image_utils.py::prep_prompt_images"]
 param = "prompt_images"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt images; single operand."
 
 ["pipelex/cogt/image/prompt_image_utils.py::prepare_prompt_image"]
 param = "prompt_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt image; single operand."
 
 ["pipelex/cogt/image/prompt_image_utils.py::prepare_prompt_image_as_base64"]
 param = "prompt_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the prompt image as base64; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_for_model"]
 param = "model_rules"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_rules; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_aspect_ratio"]
 param = "aspect_ratio_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the aspect_ratio_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_background"]
 param = "background_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the background_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_inference"]
 param = "inference_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_input_fidelity"]
 param = "input_fidelity_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the input_fidelity_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_input_images"]
 param = "input_images_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the input_images_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_model_name"]
 param = "model_name_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_name_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_num_images"]
 param = "num_images_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the num_images_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_output_compression"]
 param = "output_compression_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the output_compression_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_output_format"]
 param = "output_format_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the output_format_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_prompt"]
 param = "prompt_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the prompt_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_safety_checker"]
 param = "safety_checker_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the safety_checker_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_args_factory.py::ImgGenArgsFactory.make_args_from_specific"]
 param = "specific_taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the specific_taxonomy; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_job.py::ImgGenJob.img_gen_job_before_start"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the job against the inference_model; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_job_components.py::parse_img_gen_size"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_job_factory.py::ImgGenJobFactory.make_img_gen_job_from_prompt"]
 param = "img_gen_prompt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the img_gen_prompt; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_job_factory.py::ImgGenJobFactory.make_img_gen_job_from_prompt_contents"]
 param = "positive_text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the positive_text; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_report.py::ImgGenTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_report.py::ImgGenTokenCostReportField.report_field_for_nb_tokens_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_abstract.py::ImgGenWorkerAbstract._check_can_perform_job"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the img_gen_job; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_abstract.py::ImgGenWorkerAbstract._gen_image"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the img_gen_job; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_abstract.py::ImgGenWorkerAbstract._gen_image_list"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the img_gen_job; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_abstract.py::ImgGenWorkerAbstract.gen_image"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the img_gen_job; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_abstract.py::ImgGenWorkerAbstract.gen_image_list"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the img_gen_job; single operand."
 
 ["pipelex/cogt/img_gen/img_gen_worker_factory.py::ImgGenWorkerFactory.make_img_gen_worker"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_build_azure_metadata"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the response; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_google_provider_error_code_from_details"]
 param = "details"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the details; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_content_policy_violation"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_anthropic"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_aws"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_gateway"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_google"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_mistral"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_openai"]
 param = "error_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error_message; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_parse_response_text_body"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the response; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_parse_retry_after_seconds"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_body"]
 param = "body"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the body; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_provider_error_code_from_flat_body"]
 param = "body"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the body; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_resolve_sdk_exception_type"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::_stringify_for_scan"]
 param = "body"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts/derives from the body; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_anthropic_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_azure_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_azure_metadata_from_response"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_bedrock_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_fal_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_gateway_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_google_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_huggingface_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_linkup_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_local_extract_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_mistral_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_openai_metadata"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cogt/inference/error_classification.py::extract_underlying_sdk_exception"]
 param = "instructor_exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the instructor_exc; single operand."
 
 ["pipelex/cogt/inference/error_classify.py::_classify_statusless"]
 param = "metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Classifies the metadata; single operand."
 
 ["pipelex/cogt/inference/error_classify.py::classify_inference_error"]
 param = "metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Classifies the metadata; single operand."
 
 ["pipelex/cogt/inference/error_render.py::_format_message"]
 param = "metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the metadata; single operand."
 
 ["pipelex/cogt/inference/error_render.py::_render_detail"]
 param = "metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the metadata; single operand."
 
 ["pipelex/cogt/inference/error_render.py::render_inference_error"]
 param = "metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the metadata; single operand."
 
 ["pipelex/cogt/inference/inference_constants.py::InferenceOutputType.is_text"]
 param = "output_desc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the output_desc; single operand."
 
 ["pipelex/cogt/inference/inference_manager.py::InferenceManager._setup_one_extract_worker"]
 param = "extract_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the extract_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager.py::InferenceManager._setup_one_img_gen_worker"]
 param = "img_gen_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the img_gen_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager.py::InferenceManager._setup_one_internal_llm_worker"]
 param = "llm_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the llm_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager_protocol.py::InferenceManagerProtocol.get_extract_worker"]
 param = "extract_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the extract_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager_protocol.py::InferenceManagerProtocol.get_img_gen_worker"]
 param = "img_gen_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the img_gen_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager_protocol.py::InferenceManagerProtocol.get_llm_worker"]
 param = "llm_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the llm_handle; single operand."
 
 ["pipelex/cogt/inference/inference_manager_protocol.py::InferenceManagerProtocol.set_llm_worker_from_external_plugin"]
 param = "llm_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the llm_handle; single operand."
 
 ["pipelex/cogt/inference/transport_retry.py::_make_retry_predicate.should_retry"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable tenacity retry predicate: exc is the single operand tenacity passes."
 
 ["pipelex/cogt/inference/transport_retry.py::_parse_retry_after"]
 param = "raw_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the raw_value; single operand."
 
 ["pipelex/cogt/inference/transport_retry.py::_transport_retry_wait"]
 param = "retry_state"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional-Callable tenacity wait strategy: retry_state is the single operand tenacity passes."
 
 ["pipelex/cogt/inference/transport_retry.py::request_with_transport_retry"]
 param = "send_request"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Runs the send_request callable under transport retry; single operand."
 
 ["pipelex/cogt/llm/llm_job.py::LLMJob.llm_job_before_start"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Prepares the job against the inference_model; single operand."
 
 ["pipelex/cogt/llm/llm_job_factory.py::LLMJobFactory.make_llm_job"]
 param = "llm_prompt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_prompt_template.py::LLMPromptTemplate._make_llm_prompt"]
-param = "system_text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_prompt; single operand."
 
 ["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by"]
 param = "additional_template_inputs"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the additional_template_inputs; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/llm/llm_prompt_template_inputs.py::LLMPromptTemplateInputs.complemented_by_dict"]
 param = "additional_inputs_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the additional_inputs_dict; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/llm/llm_report.py::LLMTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/llm/llm_report.py::LLMTokenCostReportField.report_field_for_nb_tokens_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_setting.py::LLMSettingChoices.make_completed_with_defaults"]
-param = "for_text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/llm/llm_utils.py::dump_error"]
 param = "error"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dumps the error for debugging; single operand."
 
 ["pipelex/cogt/llm/llm_utils.py::dump_prompt"]
 param = "llm_prompt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dumps the llm_prompt for debugging; single operand."
 
 ["pipelex/cogt/llm/llm_utils.py::dump_response_from_structured_gen"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dumps the response for debugging; single operand."
 
 ["pipelex/cogt/llm/llm_utils.py::dump_response_from_text_gen"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dumps the response for debugging; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._before_job"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._check_can_perform_job"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._end_otel_span_with_completion_object"]
 param = "span"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the span; single operand (attached data keyword-only)."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._end_otel_span_with_completion_text"]
 param = "span"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the span; single operand (attached data keyword-only)."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._end_otel_span_with_error"]
 param = "span"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the span; single operand (attached data keyword-only)."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._gen_object"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._gen_text"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._start_otel_span_llm"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the llm_job; single operand (attached data keyword-only)."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract.gen_object"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract.gen_text"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_factory.py::LLMWorkerFactory.make_llm_worker"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._apply_constraints"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._check_document_support"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._check_vision_support"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_job; single operand."
 
 ["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._validate_no_reasoning_for_structured_gen"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the job_params; single operand."
 
 ["pipelex/cogt/llm/reasoning_config_base.py::validate_effort_to_level_map"]
 param = "effort_to_level_map"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the effort_to_level_map; single operand."
 
 ["pipelex/cogt/model_backends/backend.py::InferenceBackend.get_extra_config"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the key; single operand."
 
 ["pipelex/cogt/model_backends/backend.py::InferenceBackend.get_model_spec"]
 param = "model_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_name; single operand."
 
 ["pipelex/cogt/model_backends/backend.py::PipelexBackend.is_gateway_backend"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the backend_name; single operand."
 
 ["pipelex/cogt/model_backends/backend_credentials.py::BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg"]
 param = "backend_credential_reports"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the backend_credential_reports; single operand."
 
 ["pipelex/cogt/model_backends/backend_factory.py::InferenceBackendFactory.make_inference_backend"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the name; single operand."
 
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._load_gateway_model_specs"]
 param = "gateway_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Loads model specs from the gateway config; single operand."
 
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary._load_local_model_specs"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Loads model specs for the named backend; single operand."
 
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.check_backend_credentials"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the path; single operand."
 
 ["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.get_inference_backend"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/model_backends/backend_library.py::InferenceBackendLibrary.load"]
-param = "secrets_provider"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the backend_name; single operand."
 
 ["pipelex/cogt/model_backends/model_lists.py::ModelLister.list_models"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the backend_name; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/model_backends/model_spec_factory.py::InferenceModelSpecFactory.make_inference_model_spec"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/model_routing/routing_profile.py::RoutingProfile.get_backend_match_for_model"]
-param = "enabled_backends"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the backend_name; single operand."
 
 ["pipelex/cogt/model_routing/routing_profile_factory.py::RoutingProfileFactory.make_routing_profile"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the name; single operand."
 
 ["pipelex/cogt/model_routing/routing_profile_loader.py::load_active_routing_profile"]
 param = "routing_profile_library_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the routing_profile_library_path; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::DeckSyncReport.files_with_status"]
 param = "status"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the status; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::_is_managed_deck_filename"]
 param = "filename"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the filename; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::_is_manifest_older"]
 param = "manifest_version"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the manifest_version; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::_try_parse_version"]
 param = "version"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the version; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::compute_deck_sync_report"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::compute_file_sha256"]
 param = "path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the path; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::compute_sha256"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the data; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::is_deck_stale_fast"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::list_managed_installed_files"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::manifest_path"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::read_manifest"]
 param = "deck_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the deck_dir; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::status_rich_label"]
 param = "status"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the status; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::suggest_x_custom_filename"]
 param = "numbered_filename"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the numbered_filename; single operand."
 
 ["pipelex/cogt/models/deck_manifest.py::write_manifest"]
 param = "manifest"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the manifest; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._get_optional_inference_model"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._is_model_available_in_backend"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._raise_handle_not_found_error"]
 param = "ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._resolve_waterfall"]
 param = "waterfall_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the waterfall_name; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._validate_llm_setting"]
 param = "llm_setting"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_setting; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_extract"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the name; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_img_gen"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the name; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_llm"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the name; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck._warn_if_ambiguous_search"]
 param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the name; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.check_llm_choice"]
 param = "llm_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.final_validate"]
 param = "deck"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the deck; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_aliases_and_waterfalls_for_type"]
 param = "model_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_type; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_extract_setting"]
 param = "extract_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the extract_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_img_gen_setting"]
 param = "img_gen_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the img_gen_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_llm_setting"]
 param = "llm_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the llm_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_optional_inference_model"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_required_inference_model"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.get_search_setting"]
 param = "search_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the search_choice; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.is_handle_defined"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck.py::ModelDeck.is_model_handle_defined"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the model_handle; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::_raise_model_choice_not_found"]
 param = "msg"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the msg; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_deck_check.py::check_extract_choice_with_deck"]
 param = "extract_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the extract_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::check_img_gen_choice_with_deck"]
 param = "img_gen_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the img_gen_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::check_llm_choice_with_deck"]
 param = "llm_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the llm_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_check.py::check_search_choice_with_deck"]
 param = "search_choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the search_choice; single operand."
 
 ["pipelex/cogt/models/model_deck_loader.py::load_model_deck_blueprint"]
 param = "model_deck_paths"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the model_deck_paths; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._collect_candidates"]
 param = "ref"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the ref; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._collect_deck_referenced_handles"]
 param = "deck"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the deck; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._enforce_gateway_model_membership"]
 param = "gateway_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the gateway_config; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._extract_choice_handle"]
 param = "choice"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the choice; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager._resolve_terminal_candidates"]
 param = "deck"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the deck; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager.build_deck"]
 param = "model_deck_blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_deck_blueprint; single operand."
 
 ["pipelex/cogt/models/model_manager.py::ModelManager.get_model_deck_paths"]
 param = "deck_dir_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the deck_dir_path; single operand."
 
 ["pipelex/cogt/models/model_manager_abstract.py::ModelManagerAbstract.get_inference_model"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_handle; single operand."
 
 ["pipelex/cogt/models/model_manager_abstract.py::ModelManagerAbstract.get_required_inference_backend"]
 param = "backend_name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/models/model_manager_abstract.py::ModelManagerAbstract.setup"]
-param = "secrets_provider"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the backend_name; single operand."
 
 ["pipelex/cogt/models/model_reference.py::ModelReference.parse"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the value into a model reference; single operand."
 
 ["pipelex/cogt/models/model_reference.py::ensure_model_reference"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/models/model_reference.py::parse_model_reference"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses the value; single operand."
 
 ["pipelex/cogt/models/model_suggestion.py::get_collection_keys"]
 param = "model_deck"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Keyed accessor by the model_deck; single operand."
 
 ["pipelex/cogt/models/model_suggestion.py::suggest_model_alternatives"]
 param = "model_deck"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the model_deck; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/search/search_job.py::SearchJob.search_job_before_start"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the inference_model; single operand."
 
 ["pipelex/cogt/search/search_job_factory.py::SearchJobFactory.make_search_job"]
 param = "query"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the query; single operand."
 
 ["pipelex/cogt/search/search_report.py::SearchTokenCostReportField.report_field_for_cost_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/search/search_report.py::SearchTokenCostReportField.report_field_for_nb_tokens_by_category"]
 param = "token_category"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the report field for the token category; single operand."
 
 ["pipelex/cogt/search/search_worker_abstract.py::SearchWorkerAbstract._search_sourced_answer"]
 param = "search_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_job; single operand."
 
 ["pipelex/cogt/search/search_worker_abstract.py::SearchWorkerAbstract._search_structured"]
 param = "search_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_job; single operand."
 
 ["pipelex/cogt/search/search_worker_abstract.py::SearchWorkerAbstract.search_sourced_answer"]
 param = "search_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_job; single operand."
 
 ["pipelex/cogt/search/search_worker_abstract.py::SearchWorkerAbstract.search_structured"]
 param = "search_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Worker verb–object: processes the search_job; single operand."
 
 ["pipelex/cogt/search/search_worker_factory.py::SearchWorkerFactory.make_search_worker"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::_normalize_and_escape"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the template; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::_replace_at_sigil"]
 param = "match"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the match; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::_replace_dollar_sigil"]
 param = "match"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the match; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::_validate_at_sigil_alone_on_line"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the template; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::preprocess_template"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the template; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::rewrite_template_sigils"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the template; single operand."
 
 ["pipelex/cogt/templating/template_preprocessor.py::validate_template_sigils"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: validates/checks the template; single operand."
 
 ["pipelex/cogt/templating/template_rendering.py::render_template"]
 param = "template"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the template; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.aggregate_costs"]
 param = "tokens_usages"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Cost report op on the tokens_usages; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.build_cost_summary"]
 param = "tokens_usages"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the tokens_usages; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.complete_cost_report"]
 param = "tokens_usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Cost report op on the tokens_usage; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.compute_cost_report"]
 param = "tokens_usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Deck/file op on the tokens_usage; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.generate_report"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Cost report op on the pipeline_run_id; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.render_report"]
 param = "aggregated"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms/renders the aggregated; single operand."
 
 ["pipelex/cogt/usage/cost_registry.py::CostRegistry.save_to_csv"]
 param = "records"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Cost report op on the records; single operand."
 
 ["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies"]
 param = "pipes"

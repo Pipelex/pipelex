@@ -57,8 +57,8 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def load(
         self,
-        secrets_provider: SecretsProviderAbstract,
         *,
+        secrets_provider: SecretsProviderAbstract,
         backends_library_path: str,
         backends_dir_path: str,
         include_disabled: bool = False,
