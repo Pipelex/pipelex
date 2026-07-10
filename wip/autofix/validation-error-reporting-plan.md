@@ -1,13 +1,15 @@
 # Validation-error reporting & surfacing — improvement plan
 
+> **ARCHIVED — track COMPLETE (2026-07-09).** All phases done; the only open item is the release-gated `conformance/validate-error-qa/` corpus regen (folded into the autofix step-6 release train). The durable record now lives in the code, the wording-pinning tests (`test_validation_render.py`, `test_validate_bundle_error_format.py`, `test_handle_pipe_errors_suffix.py`, `test_fix_loop_bail.py`, and the `*_enrichment.py` suites), the CHANGELOG `[Unreleased]` entries, and the conformance corpus. The `wip/validation-reporting/` before/after captures + `phase0-inventory.md` + `writeup.html` referenced throughout were dogfooding artifacts, removed at archival — recoverable from git history (`d4fc4749a`, `4911b6b90`). Archived here from the worktree-root `TODOS.md`.
+
 ## Goal (use this as the /goal)
 
 Perfect, clear validation-error reports and fix reports on every surface: every validation error must state — in MTHDS author syntax, never internal repr — what is wrong, where it is, and exactly what to write to fix it; and every surface (human `pipelex validate` / `pipelex fix`, agent `pipelex-agent validate` / `pipelex-agent fix` in markdown and JSON, the API `/validate` payload) must present that explanation at full strength, with an actionable next step, verified hands-on against the `pipelex-demos/bad_bundles` playground.
 
 ## Where this work lives
 
-- Branch/worktree: `feature/Autofix` in `_autofix/` (this directory). The autofix track's steps 1–5 are done (rules, loop, agent + human `fix bundle` CLIs, `💡 Suggested fix:` lines in validate); step 6 (release train) is pending — see `wip/autofix/master-plan.md` and `wip/autofix/step5-human-cli-surfacing.md`. This plan is a follow-on quality track born from dogfooding the playground.
-- Related deferred items to fold in opportunistically: `wip/autofix/deferred-checkpoint-e-review-items.md` (validate footer over-count; cross-CLI duplications) and the step-5 doc's explicitly-deferred "richer still-invalid markdown for the agent command".
+- Branch/worktree: `feature/Autofix` in `_autofix/` (this directory). The autofix track's steps 1–5 are done (rules, loop, agent + human `fix bundle` CLIs, `💡 Suggested fix:` lines in validate); step 6 (release train) is pending — see `master-plan.md` and `step5-human-cli-surfacing.md` (this folder). This plan is a follow-on quality track born from dogfooding the playground.
+- Related deferred items to fold in opportunistically: `deferred-checkpoint-e-review-items.md` (this folder — validate footer over-count; cross-CLI duplications) and the step-5 doc's explicitly-deferred "richer still-invalid markdown for the agent command".
 
 ## The test bed (built 2026-07-09, session before this plan)
 
@@ -75,7 +77,7 @@ The intended architecture for Phase 2 (agent surfaces catch up), converged after
 
 - [x] Read this file top to bottom; skim `wip/autofix/step5-human-cli-surfacing.md` (design decisions D5.4/D5.5 explain the human renderer) and `pipelex/cli/agent_cli/CLAUDE.md` (two-stream output conventions).
 - [x] Run the playground: `./bad_bundles/restore.sh`, then all surfaces on scenario 01 (commands above) and capture the current outputs as the "before" baseline. Captured **all** scenarios × five surfaces → `wip/validation-reporting/before/` (regen: `scratchpad/capture_before.sh`).
-- [x] Sweep the remaining scenarios (02–10) across the surfaces and note, per scenario, every message that fails the bar "states the problem AND the concrete author-syntax action". → **inventory in [`wip/validation-reporting/phase0-inventory.md`](wip/validation-reporting/phase0-inventory.md)** (diseases A–F, per-scenario verdict table, Phase 1 scope).
+- [x] Sweep the remaining scenarios (02–10) across the surfaces and note, per scenario, every message that fails the bar "states the problem AND the concrete author-syntax action". → **inventory** (diseases A–F, per-scenario verdict table, Phase 1 scope) — was captured in `phase0-inventory.md` (removed at archival); its findings are summarized in "Confirmed diagnosis" above and the Phase 0 status-log entry below.
 
 ### Phase 1 — Message quality at the source (the engine, so every surface benefits) — DONE
 
