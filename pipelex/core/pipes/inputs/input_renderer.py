@@ -147,7 +147,7 @@ def _delighten_entry(entry: dict[str, Any], *, kind: InputKind) -> Any:
             return entry
         case InputKind.STRUCTURED:
             return entry["content"]
-        case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.IMAGE | InputKind.DOCUMENT:
+        case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.TIME | InputKind.IMAGE | InputKind.DOCUMENT:
             return _unwrap_scalar_content(entry["content"], envelope=entry)
 
 

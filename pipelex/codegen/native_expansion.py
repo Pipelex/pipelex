@@ -1,19 +1,22 @@
 """Materialize native concepts into explicit concept-object form for the normalized crate.
 
-Native concepts (`native.Text`, `native.Image`, ...) are the standard's built-in vocabulary. In the
-runtime they are hand-written pydantic content classes, not authored blueprints — so to make a crate
-self-contained (a consumer needs no hardcoded native table), every referenced native is materialized
-here into a `ConceptBlueprint`: its canonical description plus, where the content class's shape maps
-cleanly onto the authoring structure language, its structure.
+Native concepts (`native.Text`, `native.Image`, ...) are the standard's built-in vocabulary. To
+make a crate self-contained (a consumer needs no hardcoded native table), every referenced native
+is materialized into a `ConceptBlueprint`. Materialization is a **lookup, not a computation**: the
+standard pins every native's normative blueprint form per MTHDS version
+(`mthds/docs/spec/native-concepts.md`), and `pipelex/core/concepts/native/pinned_blueprints.py` is
+the runtime copy of that pinned set. Deriving the definitions from the runtime content classes by
+reflection would make this implementation's quirks the de-facto standard and break cross-
+implementation fingerprint byte-agreement — so the reflection below is retained **only as the
+consistency probe**: the unit test compares each runtime content class's reflected shape against
+its pinned blueprint, proving the two can never drift silently.
 
-Materialization is faithful-or-absent: a native's structure is emitted only when *every* field of its
-content class maps unambiguously to a blueprint field — primitive, dict, list, a reference to another
-native, or a nested non-native model (whose wire form is a JSON object, so it maps honestly to a
-`dict` blueprint with unspecified value types — declared imprecision the emitters surface). A field
-whose annotation has no honest blueprint form at all (e.g. `datetime.time`, a non-Optional union)
-makes the whole native structureless — the sufficiency contract surfaces that as declared imprecision
-rather than a guessed shape. The `mthds_version` the crate is stamped with pins which version these
-materialized definitions correspond to.
+Reflection is faithful-or-absent: a native's structure is reflected only when *every* field of its
+content class maps unambiguously to a blueprint field — primitive, dict, list, a reference to
+another native, or a nested non-native model (whose wire form is a JSON object, so it maps honestly
+to a `dict` blueprint with unspecified value types — declared imprecision). A field whose
+annotation has no honest blueprint form at all (e.g. a non-Optional union) makes the whole
+reflected structure absent.
 """
 
 import datetime
@@ -25,6 +28,7 @@ from pydantic import BaseModel
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 _NATIVE_CLASS_NAME_TO_CODE: dict[str, NativeConceptCode] = {native_code.structure_class_name: native_code for native_code in NativeConceptCode}
@@ -35,13 +39,8 @@ class _UnmappableAnnotationError(Exception):
 
 
 def materialize_native_concept(native_code: NativeConceptCode) -> ConceptBlueprint:
-    """Build the explicit `ConceptBlueprint` for a native concept (description + structure-if-clean)."""
-    # Local import: the concept factory pulls in the class registry lazily; keeping the import here
-    # avoids an import cycle when this module is loaded during codegen bootstrapping.
-    from pipelex.core.concepts.concept_factory import ConceptFactory  # noqa: PLC0415
-
-    description = ConceptFactory.make_native_concept(native_concept_code=native_code).description
-    return ConceptBlueprint(source=None, description=description, structure=_native_structure(native_code))
+    """Return the pinned normative `ConceptBlueprint` for a native concept (a lookup, never reflection)."""
+    return make_pinned_native_blueprint(native_code)
 
 
 def collect_native_refs_from_structure(structure: dict[str, ConceptStructureBlueprint]) -> set[str]:
@@ -54,7 +53,8 @@ def collect_native_refs_from_structure(structure: dict[str, ConceptStructureBlue
     return refs
 
 
-def _native_structure(native_code: NativeConceptCode) -> dict[str, ConceptStructureBlueprintType] | None:
+def reflect_native_structure(native_code: NativeConceptCode) -> dict[str, ConceptStructureBlueprintType] | None:
+    """Reflect a native's runtime content class into blueprint form — the consistency probe, not the authority."""
     structure_class = native_code.structure_class
     if structure_class is None:
         return None
@@ -83,7 +83,7 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
     origin = get_origin(inner)
     if origin is dict:
         return ConceptStructureBlueprint(
-            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="str", value_type="Any", required=required
+            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="Any", required=required
         )
     if origin is list:
         return _list_blueprint(inner, description=description, required=required)
@@ -99,10 +99,11 @@ def _annotation_to_blueprint(annotation: Any, *, description: str) -> ConceptStr
         )
 
     if _is_nested_model(inner):
-        # A nested non-native model (e.g. `ImageSize`) serializes as a JSON object; its honest
-        # blueprint form is a dict with unspecified value types — declared imprecision, not a guess.
+        # A nested non-native model serializes as a JSON object; its honest blueprint form is a dict
+        # with unspecified value types — declared imprecision, not a guess. (No pinned native uses
+        # this today — a hit here means a runtime class drifted from its pinned blueprint.)
         return ConceptStructureBlueprint(
-            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="str", value_type="Any", required=required
+            description=description, type=ConceptStructureBlueprintFieldType.DICT, key_type="text", value_type="Any", required=required
         )
 
     raise _UnmappableAnnotationError
@@ -161,6 +162,8 @@ def _scalar_field_type(annotation: Any) -> ConceptStructureBlueprintFieldType | 
         return ConceptStructureBlueprintFieldType.DATETIME
     if annotation is datetime.date:
         return ConceptStructureBlueprintFieldType.DATE
+    if annotation is datetime.time:
+        return ConceptStructureBlueprintFieldType.TIME
     return None
 
 

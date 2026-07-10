@@ -36,6 +36,7 @@ class ResolvedTypeKind(StrEnum):
     BOOLEAN = "boolean"
     DATE = "date"
     DATETIME = "datetime"
+    TIME = "time"
     LITERAL = "literal"
     CONCEPT = "concept"
     LIST = "list"
@@ -143,6 +144,8 @@ def _resolve_type(blueprint: ConceptStructureBlueprint, *, local_domain: str | N
             return ResolvedType(kind=ResolvedTypeKind.DATE)
         case ConceptStructureBlueprintFieldType.DATETIME:
             return ResolvedType(kind=ResolvedTypeKind.DATETIME)
+        case ConceptStructureBlueprintFieldType.TIME:
+            return ResolvedType(kind=ResolvedTypeKind.TIME)
         case ConceptStructureBlueprintFieldType.CONCEPT:
             return _resolve_concept(blueprint.concept_ref, local_domain=local_domain)
         case ConceptStructureBlueprintFieldType.LIST:
@@ -200,6 +203,7 @@ def _resolve_scalar_type_name(type_name: str | None, *, local_domain: str | None
             | ConceptStructureBlueprintFieldType.BOOLEAN
             | ConceptStructureBlueprintFieldType.DATE
             | ConceptStructureBlueprintFieldType.DATETIME
+            | ConceptStructureBlueprintFieldType.TIME
         ):
             return _resolve_type(ConceptStructureBlueprint(description="", type=field_type), local_domain=local_domain)
         case ConceptStructureBlueprintFieldType.LIST:

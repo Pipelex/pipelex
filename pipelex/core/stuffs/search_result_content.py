@@ -15,8 +15,10 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 class SearchResultContent(StuffContent):
     """Represents the result of a search query with an answer and list of sources."""
 
-    answer: str
-    sources: list[DocumentContent] = Field(default_factory=empty_list_factory_of(DocumentContent))
+    answer: str = Field(description="The answer to the search query")
+    sources: list[DocumentContent] = Field(
+        default_factory=empty_list_factory_of(DocumentContent), description="The source documents supporting the answer"
+    )
 
     @property
     @override

@@ -83,6 +83,9 @@ def _annotation(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcep
         case ResolvedTypeKind.DATETIME:
             imports.add("from datetime import datetime")
             return "datetime"
+        case ResolvedTypeKind.TIME:
+            imports.add("from datetime import time")
+            return "time"
         case ResolvedTypeKind.LITERAL:
             imports.add("from typing import Literal")
             return f"Literal[{', '.join(repr(choice) for choice in resolved_type.choices or [])}]"

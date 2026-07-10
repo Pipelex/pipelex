@@ -367,6 +367,9 @@ class StructureGenerator:
             case ResolvedTypeKind.DATETIME:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
+            case ResolvedTypeKind.TIME:
+                self.imports.add("from datetime import time")
+                return "time"
             case ResolvedTypeKind.LITERAL:
                 choices = resolved_type.choices or []
                 return f"Literal[{', '.join(repr(choice) for choice in choices)}]"

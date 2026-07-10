@@ -103,6 +103,7 @@ own page. Classes are grouped by subsystem.
 
 - [`ConceptLibraryError`](concept-library-error.md) — Concept library
 - [`ConceptLoadingError`](concept-loading-error.md) — Concept loading
+- [`CrateNormalizationError`](crate-normalization-error.md) — Crate normalization error
 - [`DomainLibraryError`](domain-library-error.md) — Domain library
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
 - [`LibraryError`](library-error.md) — Library error

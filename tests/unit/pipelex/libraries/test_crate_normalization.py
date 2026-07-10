@@ -167,11 +167,12 @@ class TestCrateNormalization:
         assert isinstance(text_native, ConceptBlueprint)
         assert isinstance(text_native.structure, dict)
         assert "text" in text_native.structure
-        # native.Date is referenced via a `refines`; its content class has no mappable structure,
-        # so it materializes structureless (declared imprecision, not a guessed shape).
+        # native.Date is referenced via a `refines`; it materializes from the pinned definitions
+        # with its declared structure (a required `date` plus an optional `time` field).
         date_native = result.concepts["native.Date"]
         assert isinstance(date_native, ConceptBlueprint)
-        assert date_native.structure is None
+        assert isinstance(date_native.structure, dict)
+        assert set(date_native.structure.keys()) == {"date", "time"}
 
     def test_unreferenced_natives_absent(self):
         """Natives that nothing references are not materialized into the crate."""

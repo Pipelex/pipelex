@@ -61,13 +61,15 @@ class TestTsZodEmitter:
         assert "export const BetaResultSchema = z.object({" in content
 
     def test_dict_fields_render_records_honestly(self, materialized_image_crate: LibraryCrate):
-        """The DICT path — the materialized `Image.size` (unspecified values) and an authored typed
-        dict — renders honest z.record schemas with the imprecision surfaced, never a guessed shape.
+        """The DICT path — an authored unspecified-values dict and an authored typed dict — renders
+        honest z.record schemas with the imprecision surfaced, never a guessed shape; the pinned
+        `Image` materializes flat pixel dimensions.
         """
         content = emit_ts_zod(resolve_concepts_from_crate(materialized_image_crate))[0].content
-        assert "size: z.record(z.string(), z.unknown()).optional()" in content
+        assert "metadata: z.record(z.string(), z.unknown()).optional()" in content
         assert "@imprecise dict value type unspecified" in content
         assert "captions: z.record(z.string(), z.string())" in content
+        assert "width: z.number().int().optional()" in content
 
     def test_imprecision_and_opaque_are_surfaced(self, edge_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(edge_crate))[0].content

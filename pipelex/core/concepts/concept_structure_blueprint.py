@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import StrEnum
 from typing import Any, Self
 
@@ -43,6 +43,7 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     NUMBER = "number"
     DATE = "date"
     DATETIME = "datetime"
+    TIME = "time"
     CONCEPT = "concept"
 
 
@@ -125,6 +126,7 @@ class ConceptStructureBlueprint(BaseModel):
                 | ConceptStructureBlueprintFieldType.NUMBER
                 | ConceptStructureBlueprintFieldType.DATE
                 | ConceptStructureBlueprintFieldType.DATETIME
+                | ConceptStructureBlueprintFieldType.TIME
                 | None
             ):
                 pass
@@ -185,6 +187,9 @@ class ConceptStructureBlueprint(BaseModel):
             case ConceptStructureBlueprintFieldType.DATETIME:
                 if not isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("datetime", actual_type_name=type(self.default_value).__name__)
+            case ConceptStructureBlueprintFieldType.TIME:
+                if not isinstance(self.default_value, time):
+                    self._raise_type_mismatch_error("time", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureBlueprintFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 # This case is here for exhaustiveness

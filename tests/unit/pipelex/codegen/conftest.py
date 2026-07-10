@@ -69,9 +69,10 @@ def edge_crate() -> LibraryCrate:
 
 @pytest.fixture
 def materialized_image_crate() -> LibraryCrate:
-    """A normalized crate that references the `Image` native, so normalization actually materializes it —
-    including the nested-model `size` field that resolves to a dict with unspecified values — plus an
-    authored typed-dict field so the DICT path is covered for every emitter (natives included or skipped).
+    """A normalized crate that references the `Image` native, so normalization actually materializes it
+    (from the pinned definitions — flat `width`/`height`), plus authored dict fields covering the DICT
+    path for every emitter: a typed dict and an unspecified-values dict (the `Any` sentinel, surfaced
+    as declared imprecision).
     """
     authored = LibraryCrate(
         concepts={
@@ -85,6 +86,13 @@ def materialized_image_crate() -> LibraryCrate:
                         key_type="str",
                         value_type="text",
                         required=True,
+                    ),
+                    "metadata": ConceptStructureBlueprint(
+                        description="free-form metadata",
+                        type=ConceptStructureBlueprintFieldType.DICT,
+                        key_type="str",
+                        value_type="Any",
+                        required=False,
                     ),
                 },
             ),

@@ -101,8 +101,8 @@ def _zod_type(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept]
             return "z.number().int()"
         case ResolvedTypeKind.BOOLEAN:
             return "z.boolean()"
-        case ResolvedTypeKind.DATE | ResolvedTypeKind.DATETIME:
-            # ISO date / datetime string on the wire (the `@wire` field keeps the shape documented).
+        case ResolvedTypeKind.DATE | ResolvedTypeKind.DATETIME | ResolvedTypeKind.TIME:
+            # ISO date / datetime / time string on the wire (the `@wire` field keeps the shape documented).
             return "z.string()"
         case ResolvedTypeKind.LITERAL:
             choices = ", ".join(json.dumps(choice) for choice in resolved_type.choices or [])

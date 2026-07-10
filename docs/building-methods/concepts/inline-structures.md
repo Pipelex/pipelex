@@ -131,8 +131,17 @@ A timestamp — a date *and* a time of day. Generates a `datetime.datetime` fiel
 created_at = { type = "datetime", description = "Creation timestamp" }
 ```
 
-!!! note "Field type vs the native `Date` concept"
-    A structure field's `date` / `datetime` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional time.
+### time
+
+A time of day, optionally with a UTC offset — no date attached. Generates a `datetime.time` field (JSON schema `format: time`). Use it for opening hours, schedules, recurring times — anything you'd write as `09:00:00` or `15:40:00+02:00`.
+
+```toml
+[concept.OpeningHours.structure]
+opens_at = { type = "time", description = "Daily opening time" }
+```
+
+!!! note "Field type vs the native `Date` / `Time` concepts"
+    A structure field's `date` / `datetime` / `time` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional `time` field.
 
 ### list
 

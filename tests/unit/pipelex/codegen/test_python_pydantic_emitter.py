@@ -53,15 +53,19 @@ class TestPythonPydanticEmitter:
         load_generated_module(content, tmp_path=tmp_path, name="gen_models_refines")
 
     def test_dict_fields_render_honestly_and_round_trip(self, materialized_image_crate: LibraryCrate, tmp_path: Path):
-        """The DICT path — both the materialized `Image.size` (unspecified values, imprecision surfaced)
-        and an authored typed dict — renders honest annotations in a module that compiles and round-trips.
+        """The DICT path — both an authored unspecified-values dict (imprecision surfaced) and an
+        authored typed dict — renders honest annotations in a module that compiles and round-trips,
+        and the pinned `Image` materializes flat `width`/`height` integers (D11 resolution).
         """
         content = emit_python_pydantic(resolve_concepts_from_crate(materialized_image_crate))[0].content
-        assert "size: dict[str, Any] | None" in content
+        assert "metadata: dict[str, Any] | None" in content
         assert "imprecise: dict value type unspecified" in content
         assert "captions: dict[str, str]" in content
+        assert "width: int | None" in content
+        assert "height: int | None" in content
+        assert "size" not in content
         module = load_generated_module(content, tmp_path=tmp_path, name="gen_models_dict")
-        image = module.Image(url="pipelex-storage://runs/abc/image.png", size={"width": 512, "height": 256})
+        image = module.Image(url="pipelex-storage://runs/abc/image.png", width=512, height=256)
         assert module.Image.model_validate(image.model_dump(mode="json")) == image
 
     def test_opaque_concepts_pass_content_through(self, edge_crate: LibraryCrate, tmp_path: Path):

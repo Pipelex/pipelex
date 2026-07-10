@@ -88,8 +88,13 @@ own page. Classes are grouped by subsystem.
 ## CLI
 
 - [`AmbiguousInputsFilesError`](ambiguous-inputs-files-error.md) — Ambiguous inputs files
-- [`InputsTimeOnlyNotSupportedError`](inputs-time-only-not-supported-error.md) — Inputs time only not supported
 - [`PipelexCLIError`](pipelex-cli-error.md) — Pipelex CLI
 - [`ReadinessCheckError`](readiness-check-error.md) — Readiness check
+
+## Codegen
+
+- [`CodegenError`](codegen-error.md) — Codegen error
+- [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
+- [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
 
 [Back to Error Reference](index.md)
