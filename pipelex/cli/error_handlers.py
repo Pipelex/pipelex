@@ -9,11 +9,13 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
@@ -32,6 +34,7 @@ class ErrorContext(StrEnum):
 
     PIPE_RUN = "Pipe run"
     VALIDATION = "Pipe validation"
+    FIX = "Bundle fix"
     BUILD = "Pipe build"
 
     # Pre-validation contexts (for Pipelex.make() errors)
@@ -248,86 +251,103 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, contex
     raise typer.Exit(1) from exc
 
 
-def _display_validation_error_details(console: Console, *, exc: ValidateBundleError) -> None:
-    """Display the detailed validation error information from a ValidateBundleError.
+def _validation_category_header(category: ValidationErrorCategory) -> str:
+    match category:
+        case ValidationErrorCategory.BLUEPRINT_VALIDATION:
+            return "Blueprint Validation Errors:"
+        case ValidationErrorCategory.PIPE_FACTORY:
+            return "Pipe Factory Errors:"
+        case ValidationErrorCategory.PIPE_VALIDATION:
+            return "Pipe Validation Errors:"
+        case ValidationErrorCategory.DRY_RUN:
+            return "Dry Run Error:"
 
-    Args:
-        console: Rich console instance to print to
-        exc: The bundle validation error exception
+
+def _display_validation_error_item(console: Console, *, item: ValidationErrorItem, error_index: int) -> None:
+    """Render one structured validation-error item: title, identity fields, message, fix, locators."""
+    error_type_display = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
+    console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
+
+    if item.pipe_code:
+        console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(item.pipe_code)}[/yellow]")
+    if item.concept_code:
+        console.print(f"   [cyan]Concept:[/cyan] [yellow]{escape(item.concept_code)}[/yellow]")
+    if item.domain_code:
+        console.print(f"   [cyan]Domain:[/cyan] [green]{escape(item.domain_code)}[/green]")
+    if item.field_name:
+        console.print(f"   [cyan]Field:[/cyan] [yellow]{escape(item.field_name)}[/yellow]")
+    if item.missing_concept_code:
+        console.print(f"   [cyan]Missing Concept:[/cyan] [yellow]{escape(item.missing_concept_code)}[/yellow]")
+    if item.missing_pipe_code:
+        console.print(f"   [cyan]Missing Pipe:[/cyan] [yellow]{escape(item.missing_pipe_code)}[/yellow]")
+    if item.declared_concepts:
+        declared_str = ", ".join([f"[yellow]{escape(concept_code)}[/yellow]" for concept_code in item.declared_concepts])
+        console.print(f"   [cyan]Declared Concepts:[/cyan] {declared_str}")
+    if item.variable_names:
+        variables_str = ", ".join([f"[yellow]{escape(variable_name)}[/yellow]" for variable_name in item.variable_names])
+        console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
+
+    console.print(f"   [cyan]→[/cyan] {escape(item.message)}")
+
+    if item.suggested_fix is not None:
+        console.print(f"   [green]💡 Suggested fix:[/green] {escape(item.suggested_fix.description)}")
+
+    if item.field_path:
+        console.print(f"   [dim]└─ Path: {escape(item.field_path)}[/dim]")
+    if item.source:
+        console.print(f"   [dim]└─ Source: {escape(item.source)}[/dim]")
+
+    console.print()
+
+
+def display_validation_error_items(console: Console, *, items: list[ValidationErrorItem]) -> None:
+    """Render structured validation-error items grouped by category, with per-item suggested fixes.
+
+    The single human renderer for bundle-validation diagnostics — used by ``pipelex validate``
+    (via :func:`handle_validate_bundle_error`) and by ``pipelex fix``'s still-invalid arm
+    (``remaining_errors``), so the two commands cannot drift. Items come from the shared
+    ``build_validation_error_items`` builder, which is also what attaches ``suggested_fix``.
     """
-    # Display blueprint validation errors (e.g., MISSING_INPUT_VARIABLE, EXTRANEOUS_INPUT_VARIABLE from blueprint validation)
-    if exc.pipelex_bundle_blueprint_validation_errors:
-        console.print("[bold cyan]Blueprint Validation Errors:[/bold cyan]\n")
-        for error_index, blueprint_error in enumerate(exc.pipelex_bundle_blueprint_validation_errors, 1):
-            error_type_display = blueprint_error.error_type.replace("_", " ").title() if blueprint_error.error_type else "Validation Error"
-            console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
+    items_by_category: dict[ValidationErrorCategory, list[ValidationErrorItem]] = {}
+    for item in items:
+        items_by_category.setdefault(item.category, []).append(item)
 
-            # Display key identification info
-            if blueprint_error.pipe_code:
-                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(blueprint_error.pipe_code)}[/yellow]")
-            if blueprint_error.domain_code:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{escape(blueprint_error.domain_code)}[/green]")
-
-            # Variables
-            if blueprint_error.variable_names:
-                variables_str = ", ".join([f"[yellow]{escape(v)}[/yellow]" for v in blueprint_error.variable_names])
-                console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
-
-            # Error message
-            console.print(f"   [cyan]→[/cyan] {escape(blueprint_error.message)}")
-
-            # Source file
-            if blueprint_error.source:
-                console.print(f"   [dim]└─ Source: {escape(blueprint_error.source)}[/dim]")
-
-            console.print()
-
-    # Display pipe validation errors
-    if exc.pipe_validation_errors:
-        console.print("[bold cyan]Pipe Validation Errors:[/bold cyan]\n")
-        for pipe_index, pipe_error in enumerate(exc.pipe_validation_errors, 1):
-            console.print(f"[bold yellow]{pipe_index}. {pipe_error.error_type.replace('_', ' ').title()}[/bold yellow]")
-
-            # Display key identification info
-            if pipe_error.pipe_code:
-                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(pipe_error.pipe_code)}[/yellow]")
-            if pipe_error.concept_code:
-                console.print(f"   [cyan]Concept:[/cyan] [yellow]{escape(pipe_error.concept_code)}[/yellow]")
-            if pipe_error.domain_code:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{escape(pipe_error.domain_code)}[/green]")
-
-            # Field name if present
-            if pipe_error.field_name:
-                console.print(f"   [cyan]Field:[/cyan] [yellow]{escape(pipe_error.field_name)}[/yellow]")
-
-            # Variables
-            if pipe_error.variable_names:
-                variables_str = ", ".join([f"[yellow]{escape(v)}[/yellow]" for v in pipe_error.variable_names])
-                console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
-
-            # Error message
-            console.print(f"   [cyan]→[/cyan] {escape(pipe_error.message)}")
-
-            # Field path as secondary info
-            if pipe_error.field_path:
-                console.print(f"   [dim]└─ Path: {escape(pipe_error.field_path)}[/dim]")
-
-            console.print()
-
-    # Display dry run error message
-    if exc.dry_run_error_message:
-        console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
-        console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
+    for category in ValidationErrorCategory:
+        category_items = items_by_category.get(category, [])
+        if not category_items:
+            continue
+        console.print(f"[bold cyan]{_validation_category_header(category)}[/bold cyan]\n")
+        match category:
+            case ValidationErrorCategory.DRY_RUN:
+                # The dry-run residual is a single graph-level message with no identity fields —
+                # keep its historical plain rendering rather than a numbered item.
+                for item in category_items:
+                    console.print(f"[yellow]{escape(item.message)}[/yellow]\n")
+            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
+                for error_index, item in enumerate(category_items, 1):
+                    _display_validation_error_item(console, item=item, error_index=error_index)
 
 
-def handle_validate_bundle_error(exc: ValidateBundleError, *, bundle_path: Path | None = None) -> NoReturn:
+def handle_validate_bundle_error(
+    exc: ValidateBundleError,
+    *,
+    bundle_path: Path | None = None,
+    library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
+) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
     Args:
         exc: The bundle validation error exception
         bundle_path: Optional path to the bundle file being validated
+        library_dirs: The ``-L/--library-dir`` values of the invocation, echoed into the
+            actionable ``pipelex fix bundle`` footer so the suggested command reproduces the
+            same write scope
+        allow_signatures: Whether the invocation accepted PipeSignature placeholders; when true,
+            the actionable fix command preserves the same leniency.
     """
     report = exc.to_error_report()
+    items = list(report.validation_errors or [])
     console = get_console()
     print_traceback_if_requested(console)
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
@@ -335,13 +355,30 @@ def handle_validate_bundle_error(exc: ValidateBundleError, *, bundle_path: Path 
     if bundle_path:
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
-    _display_validation_error_details(console=console, exc=exc)
+    display_validation_error_items(console, items=items)
 
-    # Display helpful tips
-    tip = report.user_action_detail() or (
-        "Review the error messages above and check your pipeline configuration. Make sure all required fields are present and correctly formatted."
-    )
-    console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
+    # The shared items builder projects the dry-run channel only when it is the sole failure
+    # channel (the wire's structured-info invariant); the human surface keeps printing it
+    # alongside categorized errors so no diagnostic is lost.
+    if exc.dry_run_error_message and not any(item.category.is_dry_run for item in items):
+        console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
+        console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
+
+    # A hint needs an action behind it: when fixes exist, the actionable footer replaces the
+    # generic tip (two stacked 💡 tips would be noise).
+    fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs) if bundle_path is not None else 0
+    if fixable_count and bundle_path is not None:
+        # Shared builder so the human and agent fix-command footers echo -L / --allow-signatures identically.
+        fix_command = build_fix_command("pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+        console.print(
+            f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
+        )
+    else:
+        tip = report.user_action_detail() or (
+            "Review the error messages above and check your pipeline configuration. "
+            "Make sure all required fields are present and correctly formatted."
+        )
+        console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

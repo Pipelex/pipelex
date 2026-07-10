@@ -1,6 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
 ### Added
+
+- **Agent bundle fixer:** Added `pipelex-agent fix bundle`, a deterministic in-place fixer over the shared validation fix loop. The command supports `--format`/`--error-format`, repeatable `--select`/`--ignore` fix-rule filters, `--allow-signatures`, `--max-iterations`, and the same bundle-file or directory resolution as `pipelex-agent validate bundle`. Successful fix results report `pending_signatures` and `is_runnable`; by default the command exits non-zero when a fixed bundle remains valid-but-not-runnable.
+- **Human bundle fixer:** Added `pipelex fix bundle`, the human counterpart of the agent fixer over the same fix loop, with Rich-rendered output naming every change made (fix descriptions, files written, iteration count), the same `--select`/`--ignore`/`--allow-signatures`/`--max-iterations` options, and the same bundle-file or directory resolution as `pipelex validate bundle`. A new `--diff` flag previews the changes as a unified diff without writing anything — the real fix loop runs against a temp-copy sandbox, and exit codes keep the verdict semantics so `--diff` answers "would it converge?".
+- **Suggested fixes surfaced in `pipelex validate`:** When a validation error has a deterministic safe fix, the human error output now shows a per-error `💡 Suggested fix:` line and ends with an actionable footer naming the exact `pipelex fix bundle` command (echoing the invocation's `-L` dirs) in place of the generic tip.
+- **`suggested_fix` field in `/validate` payloads:** Each validation error that has a deterministic safe fix now carries an additive structured `suggested_fix` object — `fix_code` (the kebab-case rule id), `description` (the author-facing 💡 text), `safety` (`safe`/`unsafe`), optional `source` file, and `ops` (the semantic patch operations) — on every `validation_errors[]` item, both in the `pipelex-agent validate`/`fix` JSON envelopes and in the API `/validate` response body. This is the machine-actionable counterpart of the 💡 line, letting a software consumer apply the fix directly from the structured payload.
 - **Smart Inputs (signature-driven input shaping):** Inputs are now interpreted top-down against the pipe's declared input signature rather than bottom-up from their shape alone.
   - Bare values (strings, numbers, booleans, dicts, lists) are automatically shaped into the declared concept (e.g., a bare string becomes a `legal.Question`, not a generic `native.Text`).
   - Lists shape element-wise into the declared item concept; single values auto-wrap into lists where required, and empty lists are now legal.
@@ -12,6 +19,11 @@
 - **CLI `--explicit` flag:** Added `--explicit` to `pipelex build inputs` and `pipelex-agent inputs` to generate the legacy `{"concept", "content"}` envelope templates.
 
 ### Changed
+
+- **Human validation error rendering routed through the shared structured items:** `pipelex validate`'s error details now render from the same `ValidationErrorItem`s the agent CLI and API emit, which surfaces information the old renderer silently dropped: pipe-factory errors (e.g. an unknown concept) get their own section, a parse-level failure (e.g. a TOML syntax error) now shows its message instead of no detail at all, and pipe validation errors name their source file. The dry-run message remains visible alongside categorized errors.
+- **Validation error messages now speak MTHDS author syntax:** Pipe validation errors state the problem and the fix the way an author writes them — a sequence output-multiplicity mismatch now reads "declares its output as 'StoryIdea', but its last step yields 'StoryIdea[]'. Update the sequence's output to 'StoryIdea[]'", and an input-type mismatch reads "input 'dish' is declared as 'Number' but its step needs 'Text'. Update the input to 'Text'" — instead of leaking Python internals (`multiplicity=None`, `Concept(...)`/`PresenceMarker` reprs). The misleading `(required: […], provided: …)` suffix is suppressed for multiplicity errors (where both sides are identical by definition) and rendered as joined author-syntax refs — never Python list-repr brackets — elsewhere.
+- **Agent `validate` / `fix` output renders prose, not a JSON dump:** `pipelex-agent validate bundle` and `pipelex-agent fix bundle` markdown output now renders validation errors as category-grouped prose (a humanized title, identity fields, the message, and a `💡 Suggested fix:` line) followed by a fix-aware footer naming the exact `pipelex-agent fix bundle` command when a safe fix exists — mirroring the human panel. The machine-facing JSON stream (`--format json`) is unchanged, so software consumers keep branching on the same structured fields.
+- **Clean validation summary message on every surface:** The top-level error `message` (agent JSON, the API `/validate` body) is now a clean, author-facing summary derived from the structured errors, instead of the raw pydantic dump (`Validation error(s): … Value errors: '<field>': Value error, …`). The API's opt-in invalid-verdict `rendered_markdown` now carries the same per-error `💡 Suggested fix` prose as the CLI. A still-invalid fix that stops with no progress now names the re-proposed fix in author terms rather than dumping an internal fingerprint string.
 - (Breaking) **Input templates default to "light" shape:** `pipelex build inputs` and `pipelex-agent inputs` now generate light templates by default, outputting the bare values expected by the signature rather than the verbose `{"concept", "content"}` envelopes. TOML templates include the declared concept as a `# concept: ...` comment.
 - (Breaking) **Structure-field `type = "date"` behavior:** A `date` field now generates a `datetime.date` (JSON schema `format: date`), preventing LLMs from hallucinating times for calendar dates. A new `type = "datetime"` field handles full timestamps (`format: date-time`), and default-value validation now rejects a `datetime` default on a `date` field.
 - (Breaking) **Strict input validation:** Undeclared input names are now a hard error (previously silently ignored), and top-level `null` values are rejected—absence must be expressed by omitting the key.
@@ -20,6 +32,9 @@
 - **Documentation overhaul:** Updated `provide-inputs.md`, `executing-pipelines.md`, and `native-concepts.md` for the Smart Inputs paradigm, leading with the bare-value approach and demoting the envelope format to an escape hatch.
 
 ### Fixed
+
+- **Human CLI `~` expansion:** `pipelex validate bundle` (and the new `pipelex fix bundle`) now expand `~` in the bundle path and `-L/--library-dir` values, matching the agent CLI.
+- **Validate telemetry label:** the `CLI_COMMAND` telemetry tag for `pipelex validate` subcommands no longer double-suffixes (previously "validate bundle bundle").
 - **Silent mistyping of inputs:** Providing a bare string for a refined text concept (e.g., `legal.Question`) no longer silently degrades the type to a generic `native.Text`; the declared concept type is now retained.
 - **TOML inline table formatting:** Light templates now use inline tables for structured values, preventing trailing scalars from being swallowed into `[sections]`.
 

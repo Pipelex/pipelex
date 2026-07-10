@@ -17,6 +17,7 @@ from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidat
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.suggested_fix import FixOpKind
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
@@ -270,6 +271,132 @@ class TestBuildValidationErrorItems:
         problem_document = exc.to_error_report().to_problem_document()
         assert problem_document["validation_errors"] == cli_dicts
         assert json.dumps(problem_document["validation_errors"], sort_keys=True) == json.dumps(cli_dicts, sort_keys=True)
+
+    def test_enriched_pipe_validation_error_rides_a_suggested_fix(self) -> None:
+        """An enriched output-mismatch error data yields an item carrying the planner's suggested_fix."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="list_ideas",
+                    message="output mismatch",
+                    field_path="",
+                    expected_output_ref="Idea[]",
+                ),
+            ],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "match-sequence-output"
+        assert suggested_fix.ops[0].table_path == ["pipe", "list_ideas"]
+        assert suggested_fix.ops[0].value == "Idea[]"
+
+    def test_input_drift_error_rides_a_sync_controller_inputs_fix(self) -> None:
+        """An enriched controller input-drift error data yields an item carrying the multi-op fix."""
+        items = build_validation_error_items(
+            blueprint_errors=[],
+            factory_errors=[],
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="make_summary",
+                    message="input drift",
+                    field_path="",
+                    expected_inputs={"text": "Text"},
+                    declared_inputs={"text": "Number", "note": "Text"},
+                ),
+            ],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "sync-controller-inputs"
+        assert suggested_fix.source == "main.mthds"
+        assert [(op.kind, op.key) for op in suggested_fix.ops] == [
+            (FixOpKind.SET_KEY, "text"),
+            (FixOpKind.DELETE_KEY, "note"),
+        ]
+
+    def test_blueprint_native_redeclaration_rides_a_strip_fix(self) -> None:
+        """An enriched native-concept redeclaration blueprint error carries the strip fix through the builder.
+
+        First blueprint-channel fix: the builder's blueprint loop now runs the planner too, and the
+        fix carries a populated ``source`` (blueprint error data has one, unlike the pipe raise sites).
+        """
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION,
+                    domain_code="nativefix",
+                    source="main.mthds",
+                    concept_code="Text",
+                    message="Cannot declare a concept named 'Text' because it is natively available in Pipelex.",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "strip-native-concept-redecl"
+        assert suggested_fix.source == "main.mthds"
+        assert [(op.kind, op.table_path, op.key) for op in suggested_fix.ops] == [(FixOpKind.DELETE_KEY, ["concept"], "Text")]
+
+    def test_blueprint_strip_namespace_rides_a_rename_fix(self) -> None:
+        """An enriched same-domain dotted declaration carries a strip-namespace rename through the builder."""
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+                    domain_code="greetings",
+                    source="main.mthds",
+                    pipe_code="greetings.hello",
+                    stripped_pipe_code="hello",
+                    message="Pipe code 'greetings.hello' is not a valid pipe code. Must be in snake_case.",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        suggested_fix = items[0].suggested_fix
+        assert suggested_fix is not None
+        assert suggested_fix.fix_code == "strip-namespace"
+        assert [(op.kind, op.table_path, op.key, op.new_key) for op in suggested_fix.ops] == [
+            (FixOpKind.RENAME_TABLE_KEY, ["pipe"], "greetings.hello", "hello"),
+        ]
+
+    def test_non_fixable_blueprint_error_has_no_suggested_fix(self) -> None:
+        """An un-enriched INVALID_PIPE_CODE_SYNTAX (no ``stripped_pipe_code``) keeps ``suggested_fix`` unset."""
+        items = build_validation_error_items(
+            blueprint_errors=[
+                PipelexBundleBlueprintValidationErrorData(
+                    error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+                    domain_code="nativefix",
+                    source="main.mthds",
+                    message="Invalid pipe code syntax",
+                ),
+            ],
+            factory_errors=[],
+            pipe_validation_errors=[],
+        )
+        assert len(items) == 1
+        assert items[0].suggested_fix is None
+
+    def test_non_fixable_pipe_validation_error_has_no_suggested_fix(self) -> None:
+        """A pipe-validation item with no enriched data keeps suggested_fix unset (wire unchanged)."""
+        items = _build_items(_all_category_error())
+        assert all(item.suggested_fix is None for item in items)
+        for item in items:
+            assert "suggested_fix" not in item.model_dump(mode="json", exclude_none=True)
 
     def test_instantiation_errors_are_projected_as_pipe_validation(self) -> None:
         """Pipe/concept *instantiation* errors reach the wire too (not silently dropped).

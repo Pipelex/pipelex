@@ -3,7 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import get_library_manager
+from pipelex.hub import clear_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 
 SCORING_MTHDS = """\
@@ -105,3 +105,28 @@ class TestLoadFromCrate:
             crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
             assert "scoring" in crate.domains
             assert crate.domains["scoring"].main_pipe == "compute_score"
+
+    def test_pipe_source_is_scoped_to_current_library(self, tmp_path: Path) -> None:
+        """Same pipe refs loaded concurrently must retain each library's own source path."""
+        first_path = tmp_path / "first.mthds"
+        second_path = tmp_path / "second.mthds"
+        first_path.write_text(SCORING_MTHDS, encoding="utf-8")
+        second_path.write_text(SCORING_MTHDS, encoding="utf-8")
+        first_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=first_path)
+        second_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=second_path)
+        library_manager = get_library_manager()
+        first_library_id, _ = library_manager.open_library()
+        second_library_id, _ = library_manager.open_library()
+
+        try:
+            library_manager.load_from_blueprints(library_id=first_library_id, blueprints=[first_blueprint])
+            library_manager.load_from_blueprints(library_id=second_library_id, blueprints=[second_blueprint])
+
+            set_current_library(library_id=first_library_id)
+            assert library_manager.get_pipe_source("scoring.compute_score") == str(first_path)
+            set_current_library(library_id=second_library_id)
+            assert library_manager.get_pipe_source("scoring.compute_score") == str(second_path)
+        finally:
+            clear_current_library()
+            library_manager.teardown(library_id=first_library_id)
+            library_manager.teardown(library_id=second_library_id)

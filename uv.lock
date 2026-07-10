@@ -3263,6 +3263,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow" },
+    { name = "pipelex-tools-py" },
     { name = "polyfactory" },
     { name = "portkey-ai" },
     { name = "posthog" },
@@ -3415,6 +3416,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow", specifier = ">=12.1.1" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.6.0" },
+    { name = "pipelex-tools-py", specifier = "==0.1.1" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },
@@ -3467,6 +3469,21 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/aa/d5/64f158aaf1d0c2fa81c45b407d9f478e7537a01f79d16de1d03928870442/pipelex_tools-0.6.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2d59d95934d13ac81092375f0299986461f9281ce8b7c397be2d0e00c23f46bd", size = 5290791, upload-time = "2026-05-31T23:15:01.262Z" },
     { url = "https://files.pythonhosted.org/packages/6b/01/361093296364c2da83ab5031688bb33d3471716a52df07cbd943090de165/pipelex_tools-0.6.0-py3-none-win32.whl", hash = "sha256:97d8560e7e0a70aceb63c13a899cefd333b2601ba299ba8950174e1bf3494df8", size = 4668464, upload-time = "2026-05-31T23:15:03.039Z" },
     { url = "https://files.pythonhosted.org/packages/87/97/bb4a9034781e7f189d903b8940de837c723201d1733a71bb7072d0bcf309/pipelex_tools-0.6.0-py3-none-win_amd64.whl", hash = "sha256:56424ede9de3268c816af937f3525bf0b4c4fce8612bf6907e21f4ce078c3ead", size = 5471901, upload-time = "2026-05-31T23:15:04.587Z" },
+]
+
+[[package]]
+name = "pipelex-tools-py"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/1c/7a/475d5314cf2c8a402ff646ebf435ccc9d51b9d4e3c52eb063b37130e6ee5/pipelex_tools_py-0.1.1.tar.gz", hash = "sha256:ec1f5e30fe666417f210a5bb1013394cef8b0c246d070037d78cf8dfcd086603", size = 114697, upload-time = "2026-06-29T10:23:00.415Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/51/701114de4b1744dbddf37ec172ab97649177d6c7c761d75689a4b1ea6788/pipelex_tools_py-0.1.1-cp38-abi3-macosx_10_12_x86_64.whl", hash = "sha256:69e930881da8787259cf3040eb33b669dfb4bd4ed13c8a68f082ee284f4fa3a7", size = 2490500, upload-time = "2026-06-29T10:22:48.96Z" },
+    { url = "https://files.pythonhosted.org/packages/b0/4f/3f28ffe46d8a31760841f29a773519794b86c3e4a1d4eec70c9b74f97282/pipelex_tools_py-0.1.1-cp38-abi3-macosx_11_0_arm64.whl", hash = "sha256:fe07dbf840deace1fa8bebe8154fef0abb4284177aae89961437edf9bddf3257", size = 2388577, upload-time = "2026-06-29T10:22:50.771Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/79/6d235117695c803946ae0fdcb5ad9410c11ed70f7182bf7a01460bf4d410/pipelex_tools_py-0.1.1-cp38-abi3-manylinux_2_12_i686.manylinux2010_i686.whl", hash = "sha256:29b818d6af5af6510bf25505acbe7d3cdca309f1443cd95299c61b0b7fd0e180", size = 2717460, upload-time = "2026-06-29T10:22:52.446Z" },
+    { url = "https://files.pythonhosted.org/packages/43/aa/31f70c2ef5b7417d0b46c3b1079f797d3d42a2fc60ceaf176a8a9d52938f/pipelex_tools_py-0.1.1-cp38-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:902b69127df66a91f80d3b3158217ff29aa40c2ad86917b46de7e9640a6f81ab", size = 2505388, upload-time = "2026-06-29T10:22:53.902Z" },
+    { url = "https://files.pythonhosted.org/packages/b9/4f/53f3e3e10391d3035bbc84966a80439277b04a9efc8cab09e890871a3cfe/pipelex_tools_py-0.1.1-cp38-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f89c17a9c58161ff0ff515bc7054bfc58710c9edec3d4dfc842d07966f239ba", size = 2629996, upload-time = "2026-06-29T10:22:55.713Z" },
+    { url = "https://files.pythonhosted.org/packages/8d/72/4a68e0b3f3c758c0808a888db40299d46af1f79b23aa0c3fcc442f3a68de/pipelex_tools_py-0.1.1-cp38-abi3-win32.whl", hash = "sha256:b26e93fd975682b7dc15d0d300ddb540650cfdf9dff917a6e4880cc1283e83c8", size = 2396611, upload-time = "2026-06-29T10:22:57.173Z" },
+    { url = "https://files.pythonhosted.org/packages/98/16/aa4ad4790c29d2f7d0a9160e3fe2faf1b8be12d9dde081f989654038fc63/pipelex_tools_py-0.1.1-cp38-abi3-win_amd64.whl", hash = "sha256:a925bdc2e0ee00dde3adc9fe360e227f2968376b2ed0bbe4e14bb82014d9ac7e", size = 2633419, upload-time = "2026-06-29T10:22:58.875Z" },
 ]
 
 [[package]]
