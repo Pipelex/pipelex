@@ -38,9 +38,9 @@ def build_registrar(*, config: "PipelexConfig") -> PluginRegistrar:
 
     # Built-ins are already instantiated, so their name is known up front.
     for plugin in BUILTIN_PLUGINS:
-        if _skip_if_disabled(registrar, name=plugin.name, origin=PluginOrigin.BUILTIN, targets_api=plugin.targets_api, disabled=disabled):
+        if _skip_if_disabled(registrar=registrar, name=plugin.name, origin=PluginOrigin.BUILTIN, targets_api=plugin.targets_api, disabled=disabled):
             continue
-        _register_plugin(registrar, plugin=plugin, origin=PluginOrigin.BUILTIN)
+        _register_plugin(registrar=registrar, plugin=plugin, origin=PluginOrigin.BUILTIN)
 
     # External entry points: denylist by entry-point name *before* load(), so a
     # broken/dependency-missing installed plugin can still be recovered by disabling
@@ -48,17 +48,17 @@ def build_registrar(*, config: "PipelexConfig") -> PluginRegistrar:
     # entry-point name; the post-load check honors the denylist on that too, so
     # either name disables it.
     for entry_point in _external_entry_points():
-        if _skip_if_disabled(registrar, name=entry_point.name, origin=PluginOrigin.EXTERNAL, targets_api=None, disabled=disabled):
+        if _skip_if_disabled(registrar=registrar, name=entry_point.name, origin=PluginOrigin.EXTERNAL, targets_api=None, disabled=disabled):
             continue
         plugin = _load_external_plugin(entry_point)
-        if _skip_if_disabled(registrar, name=plugin.name, origin=PluginOrigin.EXTERNAL, targets_api=plugin.targets_api, disabled=disabled):
+        if _skip_if_disabled(registrar=registrar, name=plugin.name, origin=PluginOrigin.EXTERNAL, targets_api=plugin.targets_api, disabled=disabled):
             continue
-        _register_plugin(registrar, plugin=plugin, origin=PluginOrigin.EXTERNAL)
+        _register_plugin(registrar=registrar, plugin=plugin, origin=PluginOrigin.EXTERNAL)
 
     return registrar
 
 
-def _skip_if_disabled(registrar: PluginRegistrar, *, name: str, origin: PluginOrigin, targets_api: int | None, disabled: set[str]) -> bool:
+def _skip_if_disabled(*, registrar: PluginRegistrar, name: str, origin: PluginOrigin, targets_api: int | None, disabled: set[str]) -> bool:
     """Record and skip a denylisted plugin; return ``True`` if it was skipped.
 
     Fail-loud when a core-unconditional plugin is denylisted — that is a
@@ -96,7 +96,7 @@ def _load_external_plugin(entry_point: importlib.metadata.EntryPoint) -> Pipelex
         raise BrokenPluginError(plugin_name=entry_point.name, reason=f"failed to load entry point: {exc}") from exc
 
 
-def _register_plugin(registrar: PluginRegistrar, *, plugin: PipelexPlugin, origin: PluginOrigin) -> None:
+def _register_plugin(*, registrar: PluginRegistrar, plugin: PipelexPlugin, origin: PluginOrigin) -> None:
     targets_api = getattr(plugin, "targets_api", None)
     if targets_api != PLUGIN_API_VERSION:
         raise PluginApiVersionMismatchError(

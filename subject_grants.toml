@@ -4526,793 +4526,603 @@ rationale = "Verb-object: renders the validation report; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_config.py::AnthropicConfig.get_reasoning_level"]
 param = "effort"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory._make_document_block_param"]
 param = "prepped_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the prepped_document; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory._make_image_block_param"]
 param = "prepped_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the prepped_image; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_anthropic_client"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_nb_tokens_by_category"]
 param = "usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the usage; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_simple_messages"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.make_user_message"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_factory.py::AnthropicFactory.openai_typed_user_message"]
 param = "user_content_txt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the user_content_txt; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_list.py::_display_anthropic_models_flat"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_list.py::_display_anthropic_models_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/anthropic/anthropic_list.py::list_anthropic_models"]
-param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the job_params; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params_for_budget"]
 param = "thinking_mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the thinking_mode; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_llm_worker.py::AnthropicLLMWorker._build_thinking_params_for_effort"]
 param = "thinking_mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the thinking_mode; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_llms.py::anthropic_list_available_models"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Lists the available models for the model handle; single operand."
 
 ["pipelex/plugins/anthropic/anthropic_plugin.py::AnthropicPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/azure_rest/azure_img_gen_worker.py::AzureImgGenWorker._raise_categorized_azure_status_error"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Categorizes and re-raises the Azure HTTP status error; single operand."
 
 ["pipelex/plugins/azure_rest/azure_rest_plugin.py::AzureRestPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_client_protocol.py::BedrockClientProtocol.chat"]
 param = "messages"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol chat: the messages list is the payload operand; provider params keyword-only."
 
 ["pipelex/plugins/bedrock/bedrock_factory.py::BedrockFactory.make_bedrock_client"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_factory.py::BedrockFactory.make_simple_message"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_list.py::_display_bedrock_models_flat"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_list.py::_display_bedrock_models_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/bedrock/bedrock_list.py::list_bedrock_models"]
-param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_llm_worker.py::BedrockLLMWorker._validate_no_reasoning_params"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Validates the job params carry no unsupported reasoning settings; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_llms.py::bedrock_list_available_models"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Lists the available models for the model handle; single operand."
 
 ["pipelex/plugins/bedrock/bedrock_plugin.py::BedrockPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/blackboxai/blackboxai_plugin.py::BlackboxaiPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/contract.py::PipelexPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/direct/direct_plugin.py::DirectOrchestratorPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/discovery.py::_load_external_plugin"]
 param = "entry_point"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/discovery.py::_register_plugin"]
-param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/discovery.py::_skip_if_disabled"]
-param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Loads the plugin from the entry point; single operand."
 
 ["pipelex/plugins/docling/docling_extract_worker.py::DoclingExtractWorker._extract_from_source"]
 param = "source_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the source_uri; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/docling/docling_factory.py::DoclingFactory.make_extract_output_from_docling_document"]
 param = "doc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the doc; single operand."
 
 ["pipelex/plugins/docling/docling_plugin.py::DoclingPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/fal/fal_factory.py::FalFactory.make_generated_image"]
 param = "fal_result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the fal_result; single operand."
 
 ["pipelex/plugins/fal/fal_factory.py::FalFactory.make_generated_image_list"]
 param = "fal_result"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the fal_result; single operand."
 
 ["pipelex/plugins/fal/fal_img_gen_worker.py::FalImgGenWorker._submit_and_get_result"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Submits the img-gen job and returns its result; single operand."
 
 ["pipelex/plugins/fal/fal_plugin.py::FalPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/fal/fal_poller.py::FalPoller._is_transient_http"]
 param = "exc"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the exc; single operand."
 
 ["pipelex/plugins/fal/fal_poller.py::FalPoller.poll_queue_until_complete"]
 param = "response_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/consumes the response_dict; single operand."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._extract_content_string_from_response"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._extract_pages_from_choices_content"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_azure"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the response; single operand."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_deepseek"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the response; single operand."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_linkup_fetch"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the response; single operand."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory._make_extract_output_from_response_mistral"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the response; single operand."
 
 ["pipelex/plugins/gateway/gateway_completions_factory.py::GatewayCompletionsFactory.make_portkey_openai_client_for_completions"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/gateway/gateway_constants.py::GatewayOpenAISdkVariant.is_completions"]
 param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the sdk; single operand."
 
 ["pipelex/plugins/gateway/gateway_constants.py::GatewayOpenAISdkVariant.is_responses"]
 param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the sdk; single operand."
 
 ["pipelex/plugins/gateway/gateway_deck.py::GatewayDeck.get_config_id"]
 param = "headers"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the gateway config id from the request headers; single operand."
 
 ["pipelex/plugins/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_base64_url"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_document"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_extract_worker.py::GatewayExtractWorker._extract_web_fetch"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the extract_job; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory._make_gemini_image_config"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory.get_api_key"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the value from the backend config; single operand."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory.get_endpoint"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the value from the backend config; single operand."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory.is_debug_enabled"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory.make_extras"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/plugins/gateway/gateway_factory.py::GatewayFactory.make_portkey_client"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the backend; single operand."
 
 ["pipelex/plugins/gateway/gateway_plugin.py::GatewayPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/gateway/gateway_protocols.py::GatewayExtractProtocol.make_from_model_handle"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/gateway/gateway_responses_factory.py::GatewayResponsesFactory.make_portkey_openai_client_for_responses"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/gateway/gateway_search_worker.py::GatewaySearchWorker._call_relay"]
-param = "model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/gateway/gateway_search_worker.py::GatewaySearchWorker._extract_content"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/gateway/gateway_search_worker.py::GatewaySearchWorker._extract_usage"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/google/google_config.py::GoogleConfig.get_reasoning_level"]
 param = "effort"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.extract_text_from_response"]
 param = "response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the response; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.extract_token_usage"]
 param = "usage_metadata"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the usage_metadata; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.make_google_client"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the backend; single operand."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.prepare_document_part"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the prompt_document into provider parts; single operand."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.prepare_image_part"]
 param = "prompt_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the prompt_image into provider parts; single operand."
 
 ["pipelex/plugins/google/google_factory.py::GoogleFactory.prepare_user_contents"]
 param = "llm_prompt"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the llm_prompt into provider parts; single operand."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.aspect_ratio_literal"]
 param = "aspect_ratio"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Converts the aspect ratio to its provider literal; single operand."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.derive_ratio_and_size_from_exact_size"]
 param = "taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size"]
 param = "taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.grids_for_taxonomy"]
 param = "taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.image_size_for_tier"]
 param = "tier"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the image size for the size tier; single operand."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.img_gen_taxonomy"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.optional_img_gen_taxonomy"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_img_gen_factory.py::GoogleImgGenFactory.resolve_image_config"]
 param = "taxonomy"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Operates on the aspect-ratio taxonomy; the lookup keys stay keyword-only."
 
 ["pipelex/plugins/google/google_list.py::_display_google_models_flat"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/google/google_list.py::_display_google_models_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/google/google_list.py::list_google_models"]
-param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the job_params; single operand."
 
 ["pipelex/plugins/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config_for_budget"]
 param = "thinking_mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the thinking_mode; single operand."
 
 ["pipelex/plugins/google/google_llm_worker.py::GoogleLLMWorker._build_thinking_config_for_effort"]
 param = "thinking_mode"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds provider thinking params from the thinking_mode; single operand."
 
 ["pipelex/plugins/google/google_plugin.py::GooglePlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/huggingface/huggingface_factory.py::HuggingFaceFactory.make_huggingface_inference_provider"]
 param = "provider_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the provider_str; single operand."
 
 ["pipelex/plugins/huggingface/huggingface_img_gen_worker.py::HuggingFaceImgGenWorker._generate_single_image"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Generates one image from the img-gen job; single operand."
 
 ["pipelex/plugins/huggingface/huggingface_plugin.py::HuggingFacePlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/linkup/linkup_plugin.py::LinkupPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/linkup/linkup_search_worker.py::LinkupSearchWorker._parse_date"]
 param = "date_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Parses/consumes the date_str; single operand."
 
 ["pipelex/plugins/mistral/mistral_config.py::MistralConfig.get_reasoning_level"]
 param = "effort"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
 
 ["pipelex/plugins/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_page_from_image"]
 param = "image_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the image_uri; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/mistral/mistral_extract_worker.py::MistralExtractWorker._extract_pages_from_document"]
 param = "document_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts from the document_uri; single operand (qualifiers keyword-only)."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory._clean_mistral_image_base64"]
 param = "base64_str"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Normalizes the base64 image string; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_extract_output_from_mistral_response"]
 param = "mistral_extract_response"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the mistral_extract_response; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_extracted_image_from_page_from_mistral_ocr_image_obj"]
 param = "mistral_ocr_image_obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the mistral_ocr_image_obj; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_mistral_client"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the backend; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_mistral_document_url"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the prompt_document; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_mistral_image_url"]
 param = "prompt_image"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the prompt_image; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_mistral_image_url_chunk_from_uri"]
 param = "uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the uri; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_nb_tokens_by_category"]
 param = "usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the usage; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_simple_messages"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/mistral/mistral_factory.py::MistralFactory.make_simple_messages_openai_typed"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/mistral/mistral_list.py::_display_mistral_models_flat"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/mistral/mistral_list.py::_display_mistral_models_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/mistral/mistral_list.py::list_mistral_models"]
-param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/mistral/mistral_llm_worker.py::MistralLLMWorker._resolve_prompt_mode"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Resolves the prompt mode from the job params; single operand."
 
 ["pipelex/plugins/mistral/mistral_plugin.py::MistralPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/model_handle.py::ModelHandle.make_for_inference_model"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/plugins/openai/openai_client_factory.py::OpenAIClientFactory.make_openai_client"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/openai/openai_completions_factory.py::OpenAICompletionsFactory._get_document_filename"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the upload filename from the prompt document; single operand."
 
 ["pipelex/plugins/openai/openai_completions_factory.py::OpenAICompletionsFactory.make_nb_tokens_by_category"]
 param = "usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the usage; single operand."
 
 ["pipelex/plugins/openai/openai_completions_factory.py::OpenAICompletionsFactory.make_simple_messages"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/openai/openai_completions_img_gen_worker.py::OpenAICompletionsImgGenWorker._build_messages_with_images"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Builds the messages payload from the img-gen job; single operand."
 
 ["pipelex/plugins/openai/openai_completions_llm_worker.py::OpenAICompletionsLLMWorker._resolve_reasoning_effort"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Resolves the reasoning effort from the job params; single operand."
 
 ["pipelex/plugins/openai/openai_config.py::OpenAIConfig.get_reasoning_level"]
 param = "effort"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Maps the reasoning effort to a provider reasoning level; single operand."
 
 ["pipelex/plugins/openai/openai_func.py::create_openai_schema_from_function"]
 param = "func"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the OpenAI tool schema from the function; single operand."
 
 ["pipelex/plugins/openai/openai_func.py::create_pydantic_model_from_function"]
 param = "func"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the pydantic model from the function; single operand."
 
 ["pipelex/plugins/openai/openai_func.py::list_openai_tools"]
 param = "openai_message"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the tool-call list from the OpenAI message; single operand."
 
 ["pipelex/plugins/openai/openai_img_gen_factory.py::OpenAIImgGenFactory._size_to_string"]
 param = "size"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Converts the image size to its provider string; single operand."
 
 ["pipelex/plugins/openai/openai_img_gen_factory.py::OpenAIImgGenFactory.input_fidelity_for_openai_image"]
 param = "input_fidelity"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the OpenAI fidelity literal from the input fidelity; single operand."
 
 ["pipelex/plugins/openai/openai_img_gen_worker.py::OpenAIImgGenWorker._get_requested_size"]
 param = "args_dict"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Extracts the requested size from the args dict; single operand."
 
 ["pipelex/plugins/openai/openai_list.py::_display_openai_models_flat"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/openai/openai_list.py::_display_openai_models_table"]
 param = "models"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/plugins/openai/openai_list.py::list_openai_models"]
-param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb–object: renders the model list; single operand."
 
 ["pipelex/plugins/openai/openai_llms.py::openai_list_available_models"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Lists the available models for the model handle; single operand."
 
 ["pipelex/plugins/openai/openai_plugin.py::OpenAIPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/openai/openai_responses_factory.py::OpenAIResponsesFactory._get_document_filename"]
 param = "prompt_document"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the upload filename from the prompt document; single operand."
 
 ["pipelex/plugins/openai/openai_responses_factory.py::OpenAIResponsesFactory.make_input_items"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the llm_job; single operand."
 
 ["pipelex/plugins/openai/openai_responses_factory.py::OpenAIResponsesFactory.make_nb_tokens_by_category"]
 param = "usage"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the usage; single operand."
 
 ["pipelex/plugins/openai/openai_responses_llm_worker.py::OpenAIResponsesLLMWorker._resolve_reasoning"]
 param = "job_params"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Resolves the reasoning config from the job params; single operand."
 
 ["pipelex/plugins/openai/vertexai_factory.py::VertexAIFactory._make_api_key"]
 param = "gcp_credentials_file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the gcp_credentials_file_path; single operand."
 
 ["pipelex/plugins/openai/vertexai_factory.py::VertexAIFactory._make_endpoint"]
 param = "gcp_project_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the gcp_project_id; single operand."
 
 ["pipelex/plugins/openai/vertexai_factory.py::VertexAIFactory.make_endpoint_and_api_key"]
 param = "extra_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the extra_config; single operand."
 
 ["pipelex/plugins/openrouter/openrouter_plugin.py::OpenRouterPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/portkey/portkey_completions_factory.py::PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/portkey/portkey_constants.py::PortkeyOpenAISdkVariant.is_completions"]
 param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the sdk; single operand."
 
 ["pipelex/plugins/portkey/portkey_constants.py::PortkeyOpenAISdkVariant.is_responses"]
 param = "sdk"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the sdk; single operand."
 
 ["pipelex/plugins/portkey/portkey_factory.py::PortkeyFactory.get_api_key"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the value from the backend config; single operand."
 
 ["pipelex/plugins/portkey/portkey_factory.py::PortkeyFactory.get_endpoint"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derives the value from the backend config; single operand."
 
 ["pipelex/plugins/portkey/portkey_factory.py::PortkeyFactory.is_debug_enabled"]
 param = "backend"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate: reports whether debug logging is enabled for the backend; single operand."
 
 ["pipelex/plugins/portkey/portkey_factory.py::PortkeyFactory.make_extras"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the inference_model; single operand."
 
 ["pipelex/plugins/portkey/portkey_plugin.py::PortkeyPlugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/portkey/portkey_responses_factory.py::PortkeyResponsesFactory.make_portkey_openai_client_for_responses"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the result from the model_handle; single operand."
 
 ["pipelex/plugins/pypdfium2/pypdfium2_plugin.py::Pypdfium2Plugin.register"]
 param = "registrar"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
 ["pipelex/plugins/pypdfium2/pypdfium2_worker.py::Pypdfium2Worker._resolve_pdf_uri"]
 param = "pdf_uri"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Resolves the PDF URI to a readable local source; single operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.add_teardown"]
 param = "callback"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the callback callable as the sole operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_content_generator"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the factory callable as the sole operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_isolated_execution_probe"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the factory callable as the sole operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_router"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the factory callable as the sole operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_run"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the factory callable as the sole operand."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_task_manager"]
 param = "factory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registers the factory callable as the sole operand."
 
 ["pipelex/plugins/sdk_client_registry.py::SdkClientRegistry.get"]
 param = "model_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Registry getter keyed by the model handle."
 
 ["pipelex/reporting/cost_report_renderer.py::render_cost_report_for_output"]
 param = "pipe_output"

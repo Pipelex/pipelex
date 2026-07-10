@@ -137,7 +137,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                 nb_tokens[TokenCategory.OUTPUT] = output_tokens
             search_tokens_usage.nb_tokens_by_category = nb_tokens
 
-    async def _call_relay(self, model: str, *, content: str) -> GenericResponse:
+    async def _call_relay(self, *, model: str, content: str) -> GenericResponse:
         """Send a request through Portkey to the relay.
 
         Args:

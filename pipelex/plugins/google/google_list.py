@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 
 async def list_google_models(
-    sdk: str,
     *,
+    sdk: str,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,
