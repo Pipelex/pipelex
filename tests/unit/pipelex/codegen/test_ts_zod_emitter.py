@@ -19,16 +19,17 @@ class TestTsZodEmitter:
         assert "pipelex" not in content
         assert "projection: types / ts-zod" in content
 
-    def test_binder_maps_wire_and_validates_per_concept(self, pipeline_crate: LibraryCrate):
+    def test_binder_validates_per_concept_over_the_types_file(self, pipeline_crate: LibraryCrate):
         binder = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[1].content
-        # The binder is the wire<->domain layer: it depends on the pure types file, not on zod directly.
+        # The binder depends on the pure types file, not on zod directly.
         assert 'from "./types";' in binder
         assert "ReportSchema,\n  type Report," in binder
-        # One parse/serialize pair per concept, validating through the schema.
+        # Keys are wire-native, so parse/serialize are a direct Schema.parse — no key remapping helper.
+        assert "mapKeysDeep" not in binder
+        assert "toCamel" not in binder
         assert "export function parseReport(wire: unknown): Report {" in binder
-        assert "return ReportSchema.parse(mapKeysDeep(wire, toCamel));" in binder
-        assert "export function serializeReport(value: Report): unknown {" in binder
-        assert "return mapKeysDeep(ReportSchema.parse(value), toSnake);" in binder
+        assert "return ReportSchema.parse(wire);" in binder
+        assert "export function serializeReport(value: Report): Report {" in binder
 
     def test_schema_and_inferred_type_per_concept(self, pipeline_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
@@ -41,10 +42,18 @@ class TestTsZodEmitter:
         assert "score: z.lazy(() => ScoreSchema).optional()" in content
         assert 'status: z.enum(["draft", "final"]).default("draft")' in content
 
-    def test_camelcase_keys_document_the_snake_wire_name(self, edge_crate: LibraryCrate):
+    def test_field_keys_are_wire_native_snake_case(self, edge_crate: LibraryCrate):
+        # Keys are the crate's snake_case field names verbatim (D10) — the schema validates the wire
+        # directly, with no camelCase remapping layer that could corrupt nested record/opaque data.
         content = emit_ts_zod(resolve_concepts_from_crate(edge_crate))[0].content
-        assert "itemCount: z.number().int()" in content
-        assert "@wire item_count" in content
+        assert "item_count: z.number().int()" in content
+        assert "itemCount" not in content
+        assert "@wire" not in content
+
+    def test_refines_native_renders_a_lazy_base_schema(self, pipeline_crate: LibraryCrate):
+        # Summary refines native.Text (kept, not flattened) — a forward-safe lazy ref to the native.
+        content = emit_ts_zod(resolve_concepts_from_crate(pipeline_crate))[0].content
+        assert "export const SummarySchema = z.lazy(() => TextSchema);" in content
 
     def test_collision_qualifies_type_names(self, edge_crate: LibraryCrate):
         content = emit_ts_zod(resolve_concepts_from_crate(edge_crate))[0].content

@@ -1,16 +1,19 @@
 """ts-zod emitter: project a crate's concept set as a pure TypeScript + Zod types file plus a binder.
 
-The purity split (see `docs/specs/pipelex-codegen.md`): `types.ts` imports **only** `zod` — Zod
-schemas plus their inferred types — so it stays dependency-free and portable. `binder.ts` is the thin
-companion that maps the snake_case wire payload to/from these camelCase domain types: one
-`parse<Name>` / `serialize<Name>` pair per concept, validating through the schema. A pipe's IO types
-are concepts, so a pipe's output parser / input serializer is just the binder pair for those concept
-types — the binder is the concept-set-wide realization of the per-pipe parse/serialize helpers.
+`types.ts` imports **only** `zod` — Zod schemas plus their inferred types — so it stays dependency-free
+and portable. `binder.ts` is the thin companion that exposes a typed `parse<Name>` / `serialize<Name>`
+pair per concept over those schemas. A pipe's IO types are concepts, so a pipe's output parser / input
+serializer is just the binder pair for those concept types — the binder is the concept-set-wide
+realization of the per-pipe parse/serialize helpers.
 
-Naming: type names are the concept codes (PascalCase, domain-qualified only on collision); field
-keys are camelCase, and every field carries a JSDoc `@wire <snake_name>` tag so the snake<->camel
-mapping the binder applies is documented at the type. Concept references use `z.lazy(() => XSchema)`
-so schema declaration order is irrelevant and reference cycles are handled.
+**Wire-native field keys (D10).** Object keys are the crate's snake_case field names *verbatim*, so a
+schema validates a wire payload directly — no key remapping layer, and therefore no way to silently
+corrupt arbitrary keys inside a `z.record()` / `z.unknown()` value (a camelCase remapping binder can't
+tell a schema-declared field key from arbitrary data — e.g. `native.JSON`'s `json_obj` map). The
+inferred `z.infer` types therefore carry snake_case keys. (This departs from a camelCase-TS convention;
+if camelCase ergonomics are later wanted they must ride a *schema-aware* transform, not a blind deep
+key remap — see D10 in `_codegen/TODOS.md`.) Concept references use `z.lazy(() => XSchema)` so schema
+declaration order is irrelevant and reference cycles are handled.
 
 TypeScript customization is by declaration merging (augment the generated `interface`/module from a
 sibling file), the TS analog of the Python subclassing story; the generated files are never edited.
@@ -18,7 +21,7 @@ sibling file), the TS analog of the Python subclassing story; the generated file
 
 import json
 
-from pipelex.codegen.emitters.naming import snake_to_camel, ts_type_name
+from pipelex.codegen.emitters.naming import ts_type_name
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
@@ -54,7 +57,7 @@ def _ts_header() -> str:
 
 def _render_schema(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept]) -> str:
     type_name = ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
-    doc = _jsdoc(concept.description, wire=None, imprecise=concept.imprecision_reason if concept.structureless else None)
+    doc = _jsdoc(concept.description, imprecise=concept.imprecision_reason if concept.structureless else None)
 
     schema_expr = _schema_expr(concept, by_ref=by_ref)
     return f"{doc}export const {type_name}Schema = {schema_expr};\nexport type {type_name} = z.infer<typeof {type_name}Schema>;"
@@ -75,9 +78,11 @@ def _schema_expr(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept]
 
 
 def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept]) -> str:
-    key = snake_to_camel(concept_field.name)
+    # Wire-native key: the crate's snake_case field name verbatim (D10), so the schema validates the
+    # wire payload directly and no key transform can corrupt nested record/opaque data.
+    key = concept_field.name
     reasons = list(dict.fromkeys(iter_imprecision_reasons(concept_field.resolved_type)))
-    doc = _jsdoc(concept_field.description, wire=concept_field.name, imprecise="; ".join(reasons) if reasons else None, indent="  ")
+    doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
     expr = _zod_type(concept_field.resolved_type, by_ref=by_ref)
     if concept_field.default_value is not None:
         expr = f"{expr}.default({json.dumps(concept_field.default_value)})"
@@ -126,52 +131,31 @@ def _concept_schema(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedCo
 
 
 def _emit_binder(library: ResolvedLibrary) -> EmittedFile:
-    """Emit `binder.ts`: the wire<->domain mapping layer over the pure `types.ts` schemas.
+    """Emit `binder.ts`: typed `parse<Name>` / `serialize<Name>` helpers over the `types.ts` schemas.
 
-    One `parse<Name>` (snake wire -> validated camel domain type) and `serialize<Name>` (domain type ->
-    snake wire) per concept. Key mapping is a generic deep snake<->camel transform; the exact wire name
-    of every field is documented by the `@wire` JSDoc tags in `types.ts`.
+    Keys are wire-native (D10), so parse/serialize are a direct `Schema.parse` — no key remapping, and
+    thus no risk of corrupting arbitrary keys inside a `z.record()` / `z.unknown()` value.
     """
     type_names = [
         ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification) for concept in library.concepts
     ]
     import_lines = "\n".join(f"  {name}Schema,\n  type {name}," for name in type_names)
     pairs = "\n\n".join(_binder_pair(name) for name in type_names)
-    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{_binder_prelude(import_lines)}\n\n{pairs}\n")
+    prelude = f'import {{\n{import_lines}\n}} from "./types";'
+    return EmittedFile(filename=_BINDER_FILENAME, content=f"{_binder_header()}{prelude}\n\n\n{pairs}\n")
 
 
 def _binder_pair(type_name: str) -> str:
-    """The `parse<Name>` / `serialize<Name>` pair for one concept type."""
+    """The `parse<Name>` / `serialize<Name>` pair for one concept type (wire-native, so `Schema.parse`)."""
     return (
-        f"/** Parse a snake_case wire payload into a validated `{type_name}`. */\n"
+        f"/** Parse a wire payload into a validated `{type_name}`. */\n"
         f"export function parse{type_name}(wire: unknown): {type_name} {{\n"
-        f"  return {type_name}Schema.parse(mapKeysDeep(wire, toCamel));\n"
+        f"  return {type_name}Schema.parse(wire);\n"
         f"}}\n\n"
-        f"/** Serialize a `{type_name}` into its snake_case wire payload. */\n"
-        f"export function serialize{type_name}(value: {type_name}): unknown {{\n"
-        f"  return mapKeysDeep({type_name}Schema.parse(value), toSnake);\n"
+        f"/** Validate a `{type_name}` for the wire (keys are already wire-native). */\n"
+        f"export function serialize{type_name}(value: {type_name}): {type_name} {{\n"
+        f"  return {type_name}Schema.parse(value);\n"
         f"}}"
-    )
-
-
-def _binder_prelude(import_lines: str) -> str:
-    return (
-        f'import {{\n{import_lines}\n}} from "./types";\n\n'
-        "/** Recursively remap object keys with `mapKey` (arrays and nested objects included). */\n"
-        "function mapKeysDeep(value: unknown, mapKey: (key: string) => string): unknown {\n"
-        "  if (Array.isArray(value)) {\n"
-        "    return value.map((item) => mapKeysDeep(item, mapKey));\n"
-        "  }\n"
-        '  if (value !== null && typeof value === "object") {\n'
-        "    return Object.fromEntries(\n"
-        "      Object.entries(value as Record<string, unknown>).map(([key, val]) => [mapKey(key), mapKeysDeep(val, mapKey)]),\n"
-        "    );\n"
-        "  }\n"
-        "  return value;\n"
-        "}\n\n"
-        "// snake_case <-> camelCase. MTHDS field names are snake_case; `types.ts` keys are camelCase.\n"
-        "const toCamel = (key: string): string => key.replace(/_([a-z0-9])/g, (_match, char: string) => char.toUpperCase());\n"
-        "const toSnake = (key: string): string => key.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);"
     )
 
 
@@ -180,23 +164,21 @@ def _binder_header() -> str:
         "// ---------------------------------------------------------------------------\n"
         "// AUTOGENERATED by Pipelex codegen — DO NOT EDIT.\n"
         "//\n"
-        "// Wire<->domain binder for the pure `types.ts` schemas: snake_case wire payloads\n"
-        "// in, camelCase domain types out (and back). Regenerated from the method.\n"
+        "// Typed parse/serialize helpers over the pure `types.ts` schemas. Field keys are\n"
+        "// wire-native (snake_case), so parse/serialize validate the wire payload directly.\n"
         "//\n"
         "// projection: types / ts-zod (binder)\n"
         "// ---------------------------------------------------------------------------\n"
     )
 
 
-def _jsdoc(description: str, *, wire: str | None, imprecise: str | None, indent: str = "") -> str:
+def _jsdoc(description: str, *, imprecise: str | None, indent: str = "") -> str:
     parts = [description] if description else []
-    if wire is not None:
-        parts.append(f"@wire {wire}")
     if imprecise:
         parts.append(f"@imprecise {imprecise}")
     if not parts:
         return ""
-    if len(parts) == 1 and wire is None and imprecise is None:
+    if len(parts) == 1 and imprecise is None:
         return f"{indent}/** {parts[0]} */\n"
     body = "".join(f"{indent} * {part}\n" for part in parts)
     return f"{indent}/**\n{body}{indent} */\n"

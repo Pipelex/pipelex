@@ -49,6 +49,11 @@ def _authored_crate() -> LibraryCrate:
             "scoring.DetailedScore": ConceptBlueprint(description="a detailed score", refines="WeightedScore"),
             # Refines a STRUCTURELESS native (Image) -> refines kept, no structure materialized.
             "scoring.CustomImage": ConceptBlueprint(description="a domain-specific image", refines="Image"),
+            # Refines a STRUCTURED native (Text, whose materialized structure has a `text` field) ->
+            # refines kept (B1-2): flattening would drop the native base on round-trip.
+            "scoring.Summary": ConceptBlueprint(description="a short summary", refines="Text"),
+            # Multi-hop: refines a concept that itself bottoms out at a native -> refines kept.
+            "scoring.LongSummary": ConceptBlueprint(description="a longer summary", refines="Summary"),
         },
         pipes={
             "scoring.compute_score": PipeLLMBlueprint(
@@ -128,6 +133,30 @@ class TestCrateNormalization:
         assert isinstance(custom_image, ConceptBlueprint)
         assert custom_image.refines == "native.Image"
         assert custom_image.structure is None
+
+    def test_refinement_with_structured_native_base_keeps_refines(self):
+        """Refining a STRUCTURED native (Text) keeps the qualified `refines` and is NOT flattened (B1-2).
+
+        The old behavior inlined native.Text's `text` field and dropped `refines`, which loses the
+        native content class on round-trip. The native is materialized separately (step 4), so keeping
+        the link is both sufficient and identity-preserving.
+        """
+        result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
+        summary = result.concepts["scoring.Summary"]
+        assert isinstance(summary, ConceptBlueprint)
+        assert summary.refines == "native.Text"
+        assert summary.structure is None
+        # The native base it points at is materialized in the crate (so the link resolves).
+        assert "native.Text" in result.concepts
+
+    def test_multi_hop_native_backed_chain_keeps_refines(self):
+        """A concept whose refinement chain reaches a native only through an intermediate keeps `refines`."""
+        result = normalize_crate(_authored_crate(), mthds_version=MTHDS_TEST_VERSION)
+        long_summary = result.concepts["scoring.LongSummary"]
+        assert isinstance(long_summary, ConceptBlueprint)
+        # Not flattened: the chain LongSummary -> Summary -> native.Text bottoms at a native.
+        assert long_summary.refines == "scoring.Summary"
+        assert long_summary.structure is None
 
     def test_referenced_natives_are_materialized(self):
         """Every referenced native is materialized as a `native.<Code>` concept entry."""

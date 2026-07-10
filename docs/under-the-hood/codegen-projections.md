@@ -19,13 +19,15 @@ The `types` projection ranges over the crate's concept set (one type per qualifi
 
 - **`python-structures`** — Pipelex runtime `StructuredContent` subclasses (the runtime idiom, the successor to `pipelex build structures`). Native references map to the runtime content classes (`TextContent`, …); native concepts themselves are not re-emitted.
 - **`python-pydantic`** — plain `pydantic.BaseModel` types with no Pipelex imports. Every concept is emitted uniformly, including the materialized natives, so the module depends only on `pydantic` and the standard library.
-- **`ts-zod`** — a pure TypeScript + Zod types file (`types.ts`, imports only `zod`) plus a `binder.ts` companion. `types.ts` holds Zod schemas and their inferred types; type names are the concept codes; field keys are camelCase with a JSDoc `@wire <snake_name>` tag documenting the wire contract. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
+- **`ts-zod`** — a pure TypeScript + Zod types file (`types.ts`, imports only `zod`) plus a `binder.ts` companion. `types.ts` holds Zod schemas and their inferred types; type names are the concept codes; **field keys are the crate's snake_case wire names verbatim**. Concept references use `z.lazy(() => XSchema)` so declaration order is irrelevant and cycles are handled.
 
-### The ts-zod purity split and the binder
+### The ts-zod types file and its binder
 
-`types.ts` stays dependency-free and portable (only `zod`), so its schemas describe the *camelCase domain* shape. `binder.ts` is the thin companion that maps the *snake_case wire* payload to and from those domain types: one `parse<Name>` (snake wire → validated camel domain type) and `serialize<Name>` (domain type → snake wire) per concept, validating through the schema. Key mapping is a generic deep snake↔camel transform; the exact wire name of every field is documented by the `@wire` tags in `types.ts`. A pipe's IO types are concepts, so a pipe's output parser / input serializer is just the binder pair for those concept types — the binder is the concept-set-wide realization of the per-pipe parse/serialize helpers.
+`types.ts` stays dependency-free and portable (only `zod`). Its object keys are **wire-native** (snake_case), so a schema validates a wire payload *directly*. `binder.ts` is the thin companion exposing one typed `parse<Name>` / `serialize<Name>` pair per concept — each a direct `Schema.parse`, with no key-remapping layer. A pipe's IO types are concepts, so a pipe's output parser / input serializer is just the binder pair for those concept types — the binder is the concept-set-wide realization of the per-pipe parse/serialize helpers.
 
-For **`python-pydantic`**, no binder is generated: wire names are already snake_case Python names, so parse/serialize are the native `Model.model_validate(data)` / `model.model_dump(mode="json")`.
+Wire-native keys (D10) are a deliberate correctness choice: a camelCase-keyed schema would need a binder that remaps keys, and a *generic* deep remap cannot tell a schema-declared field key from arbitrary data inside a `z.record()` / `z.unknown()` value (e.g. `native.JSON`'s `json_obj` map) — so it would silently rename the caller's actual data. Keeping keys wire-native removes that hazard entirely; if camelCase ergonomics are wanted later, they must ride a *schema-aware* transform, not a blind key remap.
+
+For **`python-pydantic`**, no key mapping is ever needed either: wire names are already snake_case Python names, so parse/serialize are the native `Model.model_validate(data)` / `model.model_dump(mode="json")`.
 
 ### Refinement and native bases
 
