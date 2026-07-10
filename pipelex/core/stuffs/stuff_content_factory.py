@@ -73,7 +73,7 @@ class StuffContentFactory:
         # Require the extended HH:MM[:SS] form (optionally with fractional seconds and a UTC offset).
         # time.fromisoformat (3.11+) also accepts the basic "HHMMSS" form, which would let an all-digit
         # string slip past TimeContent's own no-number guard — pin extended-only, mirroring Date.
-        if not re.fullmatch(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}:?\d{2})?", value.strip()):
+        if not re.fullmatch(r"\d{2}:\d{2}(:\d{2}(\.\d+)?)?([Zz]|[+-]\d{2}(:?\d{2})?)?", value.strip()):
             msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
             raise StuffContentFactoryError(msg)
         try:

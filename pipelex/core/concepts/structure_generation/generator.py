@@ -1,6 +1,6 @@
 import ast
 import textwrap
-from datetime import date, datetime
+from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, List, Literal, Optional, cast
 
@@ -395,6 +395,7 @@ class StructureGenerator:
             # Provide these directly as they're used in generated code but not imported from pipelex
             "date": date,
             "datetime": datetime,
+            "time": time,
             "Enum": Enum,
             "Optional": Optional,
             "List": List,  # noqa: UP006
