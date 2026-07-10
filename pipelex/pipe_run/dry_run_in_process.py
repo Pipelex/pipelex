@@ -30,7 +30,7 @@ from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 
-async def best_effort_graph_spec(pipe_ref: str | None, *, library_id: str | None, log_context: str) -> GraphSpec | None:
+async def best_effort_graph_spec(*, pipe_ref: str | None, library_id: str | None, log_context: str) -> GraphSpec | None:
     """Best-effort graph arm of the validate surfaces: dry-run ``pipe_ref`` for its graph, or degrade to None.
 
     The ONE implementation of the validate graph-arm contract, shared by every backend
