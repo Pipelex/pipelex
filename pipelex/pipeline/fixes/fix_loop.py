@@ -69,7 +69,7 @@ class _StagedFileUpdate(NamedTuple):
     """Same-directory temp files for one replacement and its rollback copy."""
 
     snapshot: _FileSnapshot
-    replacement_path: Path
+    replacement_snapshot: _FileSnapshot
     rollback_path: Path
 
 
@@ -114,11 +114,22 @@ def _write_staged_file(snapshot: _FileSnapshot, *, content: bytes, label: str) -
 def _stage_file_update(update: _PendingFileUpdate) -> _StagedFileUpdate:
     replacement_path = _write_staged_file(update.snapshot, content=update.new_content.encode("utf-8"), label="new")
     try:
+        replacement_snapshot = _read_file_snapshot(replacement_path)
         rollback_path = _write_staged_file(update.snapshot, content=update.snapshot.content, label="rollback")
     except OSError:
         replacement_path.unlink(missing_ok=True)
         raise
-    return _StagedFileUpdate(snapshot=update.snapshot, replacement_path=replacement_path, rollback_path=rollback_path)
+    return _StagedFileUpdate(snapshot=update.snapshot, replacement_snapshot=replacement_snapshot, rollback_path=rollback_path)
+
+
+def _file_state_matches(current_snapshot: _FileSnapshot, *, expected_snapshot: _FileSnapshot) -> bool:
+    """Whether content, permissions, and filesystem identity still match an observed file."""
+    return (
+        current_snapshot.content == expected_snapshot.content
+        and current_snapshot.mode == expected_snapshot.mode
+        and current_snapshot.device == expected_snapshot.device
+        and current_snapshot.inode == expected_snapshot.inode
+    )
 
 
 def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
@@ -128,24 +139,24 @@ def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
     except FileNotFoundError as exc:
         msg = f"refusing to overwrite '{snapshot.path}': the file was removed while fixes were being prepared"
         raise FixWriteConflictError(msg) from exc
-    if (
-        current_snapshot.content != snapshot.content
-        or current_snapshot.mode != snapshot.mode
-        or current_snapshot.device != snapshot.device
-        or current_snapshot.inode != snapshot.inode
-    ):
+    if not _file_state_matches(current_snapshot, expected_snapshot=snapshot):
         msg = f"refusing to overwrite '{snapshot.path}': the file changed while fixes were being prepared"
         raise FixWriteConflictError(msg)
 
 
 def _rollback_committed_updates(committed_updates: list[_StagedFileUpdate]) -> list[str]:
-    """Restore already-replaced targets, returning any rollback failures."""
+    """Restore targets still owned by this transaction, returning rollback failures."""
     failures: list[str] = []
     for staged_update in reversed(committed_updates):
+        target_path = staged_update.snapshot.path
         try:
-            staged_update.rollback_path.replace(staged_update.snapshot.path)
+            current_snapshot = _read_file_snapshot(target_path)
+            if not _file_state_matches(current_snapshot, expected_snapshot=staged_update.replacement_snapshot):
+                failures.append(f"{target_path}: file changed after the autofix replacement was committed")
+                continue
+            staged_update.rollback_path.replace(target_path)
         except OSError as exc:
-            failures.append(f"{staged_update.snapshot.path}: {exc}")
+            failures.append(f"{target_path}: {exc}")
     return failures
 
 
@@ -154,7 +165,7 @@ def _commit_staged_updates(staged_updates: list[_StagedFileUpdate]) -> None:
     try:
         for staged_update in staged_updates:
             _assert_snapshot_unchanged(staged_update.snapshot)
-            staged_update.replacement_path.replace(staged_update.snapshot.path)
+            staged_update.replacement_snapshot.path.replace(staged_update.snapshot.path)
             committed_updates.append(staged_update)
     except (FixWriteConflictError, OSError) as exc:
         rollback_failures = _rollback_committed_updates(committed_updates)
@@ -174,7 +185,7 @@ def _commit_file_updates(updates: list[_PendingFileUpdate]) -> None:
         _commit_staged_updates(staged_updates)
     finally:
         for staged_update in staged_updates:
-            staged_update.replacement_path.unlink(missing_ok=True)
+            staged_update.replacement_snapshot.path.unlink(missing_ok=True)
             staged_update.rollback_path.unlink(missing_ok=True)
 
 
