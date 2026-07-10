@@ -28,7 +28,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_class_registry, get_current_library
+from pipelex.hub import get_class_registry, get_current_library, get_current_library_id_or_none
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
@@ -98,7 +98,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
+        self._pipe_source_maps: dict[str, dict[str, str]] = {}  # library_id -> pipe_ref -> source identifier
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
@@ -131,11 +131,9 @@ class LibraryManager(LibraryManagerAbstract):
         if library is None:
             return False
         try:
-            # Remove source map entries for pipes in this library
-            for pipe_ref in library.pipe_library.root:
-                self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
         finally:
+            self._pipe_source_maps.pop(library_id, None)
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
@@ -156,7 +154,7 @@ class LibraryManager(LibraryManagerAbstract):
         # teardown can result from a raising library.
         libraries = list(self._libraries.values())
         self._libraries = {}
-        self._pipe_source_map = {}
+        self._pipe_source_maps = {}
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
@@ -232,23 +230,29 @@ class LibraryManager(LibraryManagerAbstract):
         return self._libraries[library_id]
 
     @override
-    def get_pipe_source(self, pipe_code: str) -> Path | None:
-        """Get the source file path for a pipe.
+    def get_pipe_source(self, pipe_code: str) -> str | None:
+        """Get the source identifier for a pipe.
 
         Args:
             pipe_code: The pipe code or pipe_ref (domain.code) to look up.
 
         Returns:
-            Path to the .mthds file the pipe was loaded from, or None if unknown.
+            The source the pipe was loaded from — a filesystem path or a logical URI
+            (e.g. ``api://bundle-0.mthds``), preserved verbatim — or None if unknown.
         """
+        library_id = get_current_library_id_or_none()
+        if library_id is None:
+            return None
+        source_map = self._pipe_source_maps.get(library_id, {})
+
         # Direct lookup by pipe_ref
-        result = self._pipe_source_map.get(pipe_code)
+        result = source_map.get(pipe_code)
         if result is not None:
             return result
         # Bare code fallback: search for a key ending with .pipe_code
         if "." not in pipe_code:
             suffix = f".{pipe_code}"
-            matches = [path for key, path in self._pipe_source_map.items() if key.endswith(suffix)]
+            matches = [path for key, path in source_map.items() if key.endswith(suffix)]
             if len(matches) == 1:
                 return matches[0]
         return None
@@ -415,7 +419,7 @@ class LibraryManager(LibraryManagerAbstract):
             # Track source file for this pipe (used by get_pipe_source)
             source = crate.source_map.get(pipe_ref)
             if source:
-                self._pipe_source_map[pipe_ref] = Path(source)
+                self._pipe_source_maps.setdefault(library_id, {})[pipe_ref] = source
 
         library.pipe_library.add_pipes(pipes=all_pipes)
 

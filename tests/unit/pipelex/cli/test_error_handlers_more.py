@@ -188,8 +188,13 @@ class TestErrorHandlersExtended:
         assert "Dry Run Error:" in output
         assert "dry run exploded" in output
 
-    def test_handle_validate_bundle_error_minimal_skips_sections(self, console: Console) -> None:
-        """With no detail lists and no bundle path, only the banner and tip render."""
+    def test_handle_validate_bundle_error_minimal_renders_fallback_residual(self, console: Console) -> None:
+        """A message-only error renders the fallback residual item, so the message is never lost.
+
+        The item routing surfaces the shared builder's fallback residual (one blueprint-validation
+        item carrying the error message) — previously a parse-level failure showed no detail at all
+        in human output.
+        """
         exc = ValidateBundleError(message="validation failed")
 
         with pytest.raises(typer.Exit):
@@ -198,7 +203,8 @@ class TestErrorHandlersExtended:
         output = console.export_text()
         assert "❌ Bundle validation failed" in output
         assert "Bundle:" not in output
-        assert "Blueprint Validation Errors:" not in output
+        assert "Blueprint Validation Errors:" in output
+        assert "→ validation failed" in output
         assert "Pipe Validation Errors:" not in output
         assert "Dry Run Error:" not in output
         assert "💡 Tip:" in output

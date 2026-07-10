@@ -90,6 +90,30 @@ def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]
     return sorted(pipe.pipe_ref for ref_key, pipe in pipes_by_ref.items() if pipe.is_signature and not QualifiedRef.has_cross_package_prefix(ref_key))
 
 
+def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
+    """Backfill ``file_path`` on a pipe-channel error from the library manager's pipe-source map.
+
+    Raise sites (``PipeAbstract`` input checks, ``PipeSequence`` output checks) don't know their
+    file — pipes deliberately carry no source; provenance lives in the crate's ``source_map``,
+    mirrored into the current library's source map during load, *before* ``validate_library``
+    runs. Intercepting once at this catch boundary covers every raise site, present and future.
+
+    Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback
+    (bare codes are ambiguous across domains, exactly what the fix loop's cross-file guard
+    defends against). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
+    falls under the conservative single-file rule, which is the safe direction.
+    """
+    if pipe_error.file_path is not None:
+        return
+    if pipe_error.domain_code is None or pipe_error.pipe_code is None:
+        return
+    source = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
+    if source is not None:
+        # Compatibility boundary: injected managers written against the previous protocol may
+        # still return ``Path``. Normalize before assigning to the string-only error model.
+        pipe_error.file_path = str(source)
+
+
 @contextmanager
 def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
@@ -121,6 +145,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     # ``pydantic.ValidationError``) is pinned by
     # ``tests/unit/pipelex/pipeline/test_validate_bundle_helper.py``.
     except PipeValidationError as pipe_error:
+        _backfill_pipe_error_source(pipe_error)
         pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
             message=f"Pipe validation failed: {pipe_error}",

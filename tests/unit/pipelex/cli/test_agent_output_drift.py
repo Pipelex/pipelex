@@ -43,6 +43,7 @@ _NON_PIPELEX_ERROR_KEYS: frozenset[str] = frozenset(
         "PipelineRequestError",  # mthds API client package
         "ArgumentError",  # synthetic error_type label
         "BinaryNotFoundError",  # synthetic error_type label
+        "FixBundleError",  # synthetic error_type label
         "GraphSpecParseError",  # synthetic error_type label
         "BundleError",  # synthetic error_type label
         "CodegenDriftError",  # synthetic error_type label (a drift verdict, not an exception)

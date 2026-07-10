@@ -55,14 +55,15 @@ class LibraryManagerAbstract(ABC):
         """
         return None
 
-    def get_pipe_source(self, pipe_code: str) -> Path | None:  # noqa: ARG002
-        """Get the source file path for a pipe.
+    def get_pipe_source(self, pipe_code: str) -> str | None:  # noqa: ARG002
+        """Get the source identifier for a pipe.
 
         Args:
             pipe_code: The pipe code to look up.
 
         Returns:
-            Path to the .mthds file the pipe was loaded from, or None if unknown.
+            The source the pipe was loaded from — a filesystem path or a logical URI,
+            preserved verbatim — or None if unknown.
         """
         return None
 

@@ -1,0 +1,27 @@
+# Golden fixture for the sync-controller-inputs applier test (block `[pipe.x.inputs]` form).
+domain    = "inputsfix_golden_block"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary of a text."
+
+[pipe.write_summary]
+type        = "PipeLLM"
+description = "Summarize the text."
+inputs      = { text = "Text" }
+output      = "Summary"
+prompt      = "Summarize $text"
+
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Sequence with drifted block-form inputs."
+output = "Summary"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]
+
+# Comment above the inputs block survives.
+[pipe.make_summary.inputs]
+# Comment inside the block survives.
+text = "Number" # wrong concept on purpose
+note = "Text"   # extraneous on purpose

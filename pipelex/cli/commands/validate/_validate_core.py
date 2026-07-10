@@ -171,7 +171,7 @@ async def _validate_pipe_or_bundle(
             )
             raise typer.Exit(2) from exc
         except ValidateBundleError as bundle_error:
-            handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
+            handle_validate_bundle_error(bundle_error, bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
     elif pipe_code:
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
@@ -228,10 +228,9 @@ def execute_validate(
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-            if bundle_path:
-                tag(name=EventProperty.CLI_COMMAND, value=f"{telemetry_command_label} bundle")
-            else:
-                tag(name=EventProperty.CLI_COMMAND, value=f"{telemetry_command_label} pipe")
+            # The label already carries the subcommand (each caller passes e.g. "validate bundle") —
+            # tagging it verbatim fixes the historical double suffix ("validate bundle bundle").
+            tag(name=EventProperty.CLI_COMMAND, value=telemetry_command_label)
 
             asyncio.run(
                 _validate_pipe_or_bundle(

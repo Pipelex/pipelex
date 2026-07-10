@@ -23,13 +23,15 @@ import traceback
 from collections.abc import Callable
 from contextvars import ContextVar
 from enum import StrEnum
+from pathlib import Path
 from typing import Any, NoReturn, cast
 
 import typer
 
-from pipelex.base_exceptions import PipelexError, iter_cause_chain
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 # Module-level capture for setup-time warnings (currently used by RemoteConfigStaleWarning).
@@ -107,6 +109,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # Validation errors
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
+    "FixBundleError": "Inspect remaining_errors and bail_reason, adjust the bundle, then run fix or validate again",
     # Execution errors
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     # File/input errors
@@ -165,6 +168,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ModelChoiceNotFoundError": "input",
     "PipeValidationError": "input",
+    "FixBundleError": "input",
     "FileNotFoundError": "input",
     "JSONDecodeError": "input",
     "JsonTypeError": "input",
@@ -451,3 +455,74 @@ def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:
         fallback_message=exc.message,
     )
     return [item.model_dump(mode="json", exclude_none=True) for item in items]
+
+
+def _render_validate_bundle_markdown(
+    items: list[ValidationErrorItem],
+    *,
+    bundle_path: Path,
+    library_dirs: list[Path] | None,
+    allow_signatures: bool,
+) -> str:
+    """Compose the agent ``validate`` failure markdown: heading, bundle, prose items, fix-aware footer.
+
+    Mirrors the human ``handle_validate_bundle_error`` panel: the structured items become prose
+    (via the shared :func:`format_validation_error_items_markdown`) rather than a JSON dump, and
+    the footer either names the exact ``pipelex-agent fix bundle`` command when items carry a
+    suggested fix, or points at the messages above when nothing is auto-fixable. Doc/Discord
+    links are deliberately dropped — they are noise for an LLM fixing a ``.mthds`` file.
+    """
+    lines: list[str] = ["# Bundle validation failed", "", f"**Bundle:** `{bundle_path}`", "", format_validation_error_items_markdown(items)]
+
+    # A hint needs an action behind it (disease E): when items carry a suggested fix, name the exact
+    # fix command — same predicate and command shape as the human footer — instead of the boilerplate
+    # "check the validation_errors array" hint that the JSON envelope keeps.
+    fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
+    if fixable_count:
+        fix_command = build_fix_command("pipelex-agent", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+        lines += ["", f"💡 {fixable_count} of these errors can be fixed automatically — run: `{fix_command}`"]
+    else:
+        lines += ["", "💡 These errors have no automatic fix — review the messages above and edit the bundle."]
+    return "\n".join(lines)
+
+
+def agent_error_validate_bundle(
+    exc: ValidateBundleError,
+    *,
+    bundle_path: Path,
+    library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
+) -> NoReturn:
+    """Emit an agent-CLI bundle-validation failure to stderr, format-aware, and exit 1.
+
+    The dedicated dispatcher for the ``validate`` invalid verdict (the sibling of
+    :func:`agent_error` for this one error type). It keeps the two streams honest to the
+    workspace's "format follows consumer" doctrine:
+
+    - **markdown** renders the structured items as prose with per-item ``💡 Suggested fix`` lines
+      and a fix-aware footer, mirroring the human ``handle_validate_bundle_error`` panel;
+    - **JSON** emits the *exact same* structured envelope as before — ``is_valid`` / ``bundle_path``
+      / ``validation_errors`` — because software consumers (hooks pin ``--format json``) branch on
+      those structured fields; the machine contract must not change.
+
+    Args:
+        exc: The bundle-validation failure to report.
+        bundle_path: The bundle file / pipeline directory that failed validation.
+        library_dirs: The ``-L/--library-dir`` values, echoed into the markdown fix-command footer.
+        allow_signatures: Whether the invocation accepted ``PipeSignature`` placeholders; echoed into
+            the markdown fix-command footer so the suggested fix keeps the same leniency.
+    """
+    match get_agent_cli_error_format():
+        case CliOutputFormat.JSON:
+            _agent_error_json(
+                exc.message,
+                error_type="ValidateBundleError",
+                cause=exc,
+                extra={"is_valid": False, "bundle_path": str(bundle_path), "validation_errors": extract_validation_errors(exc)},
+                exit_code=1,
+            )
+        case CliOutputFormat.MARKDOWN:
+            items = list(exc.to_error_report().validation_errors or [])
+            markdown = _render_validate_bundle_markdown(items, bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+            print(markdown, file=sys.stderr)
+            raise typer.Exit(1) from exc

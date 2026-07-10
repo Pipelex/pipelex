@@ -271,6 +271,7 @@ plugins:
         - tools/cli/init.md: "CLI Init"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/validate.md: "CLI Validate"
+        - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
@@ -493,6 +494,7 @@ nav:
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
+      - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md

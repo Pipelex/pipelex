@@ -122,6 +122,16 @@ pipelex validate method invoice_extractor
 pipelex validate method invoice_extractor --pipe extract_amounts
 ```
 
+## Suggested Fixes
+
+When a validation error has a deterministic safe fix, the error output includes a `💡 Suggested fix:` line describing the change, and the report ends with the exact command to apply every suggested fix automatically:
+
+```text
+💡 1 of these errors can be fixed automatically — run: pipelex fix bundle my_pipeline.mthds
+```
+
+See [Fix Commands](fix.md) for `pipelex fix bundle`, including the `--diff` preview.
+
 ## What Validation Checks
 
 All validation commands check:

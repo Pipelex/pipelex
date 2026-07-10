@@ -1,0 +1,12 @@
+domain    = "nativefix_dotted"
+main_pipe = "make_memo"
+
+# A real, non-native concept — must survive the fix untouched.
+concept.Memo = "A memo."
+
+[pipe.make_memo]
+type        = "PipeLLM"
+description = "Make a memo."
+inputs      = { count = "Number" }
+output      = "Memo"
+prompt      = "Write a memo with $count items"
