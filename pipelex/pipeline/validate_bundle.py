@@ -110,7 +110,9 @@ def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
         return
     source = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
     if source is not None:
-        pipe_error.file_path = source
+        # Compatibility boundary: injected managers written against the previous protocol may
+        # still return ``Path``. Normalize before assigning to the string-only error model.
+        pipe_error.file_path = str(source)
 
 
 @contextmanager

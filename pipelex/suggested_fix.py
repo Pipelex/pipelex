@@ -25,6 +25,7 @@ class FixOpKind(StrEnum):
     """The semantic patch operations a suggested fix is composed of."""
 
     SET_KEY = "set_key"
+    ENSURE_TABLE = "ensure_table"
     DELETE_KEY = "delete_key"
     DELETE_TABLE = "delete_table"
     RENAME_TABLE_KEY = "rename_table_key"
@@ -49,8 +50,9 @@ class FixOp(BaseModel):
     """One semantic patch op addressed by TOML path.
 
     ``table_path`` addresses the containing table (e.g. ``["pipe", "my_seq"]``), aligned with
-    the ``field_path`` conventions of validation errors. ``key`` / ``value`` are used by
-    ``set_key`` / ``delete_key``; ``new_key`` only by ``rename_table_key``.
+    the ``field_path`` conventions of validation errors. For ``ensure_table`` it addresses the
+    table to create when absent. ``key`` / ``value`` are used by ``set_key`` / ``delete_key``;
+    ``new_key`` only by ``rename_table_key``.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")

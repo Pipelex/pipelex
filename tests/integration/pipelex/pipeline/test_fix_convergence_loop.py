@@ -13,7 +13,7 @@ import pytest
 import tomlkit
 from pytest_mock import MockerFixture
 
-from pipelex.pipeline.exceptions import FixWriteConflictError
+from pipelex.pipeline.exceptions import FixWriteConflictError, ValidateBundleError
 from pipelex.pipeline.fixes import fix_loop
 from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
 
@@ -476,6 +476,37 @@ class TestFixConvergenceLoop:
             return rendered
 
         mocker.patch.object(fix_loop, "serialize_and_format", side_effect=serialize_after_user_edit)
+
+        with pytest.raises(FixWriteConflictError, match="file changed"):
+            await fix_bundle_file(bundle_path)
+
+        assert bundle_path.read_text(encoding="utf-8") == user_edit
+
+    async def test_edit_during_validation_is_not_overwritten(
+        self,
+        tmp_path: Path,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+    ) -> None:
+        """A fix derived from pre-edit validation cannot be applied to post-edit bytes."""
+        load_empty_library()
+        bundle_path = tmp_path / "validation_race.mthds"
+        bundle_path.write_text(_SINGLE_PASS_MTHDS, encoding="utf-8")
+        user_edit = f"{_SINGLE_PASS_MTHDS}\n# edit saved during validation\n"
+        original_validate = fix_loop.validate_bundle
+        injected = False
+
+        async def validate_then_edit(**kwargs: Any) -> Any:
+            nonlocal injected
+            try:
+                return await original_validate(**kwargs)
+            except ValidateBundleError:
+                if not injected:
+                    injected = True
+                    bundle_path.write_text(user_edit, encoding="utf-8")
+                raise
+
+        mocker.patch.object(fix_loop, "validate_bundle", new=validate_then_edit)
 
         with pytest.raises(FixWriteConflictError, match="file changed"):
             await fix_bundle_file(bundle_path)

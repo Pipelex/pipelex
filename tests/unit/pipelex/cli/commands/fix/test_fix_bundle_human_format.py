@@ -286,6 +286,7 @@ class TestFixBundleHumanFormat:
         sandbox = PreviewSandbox(
             entry_path=sandbox_path,
             library_dirs=[],
+            writable_library_dirs=[],
             dir_mappings=[],
             entry_mapping=(sandbox_path, original_path),
         )

@@ -15,7 +15,7 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_render import build_fix_command
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
@@ -366,7 +366,7 @@ def handle_validate_bundle_error(
 
     # A hint needs an action behind it: when fixes exist, the actionable footer replaces the
     # generic tip (two stacked 💡 tips would be noise).
-    fixable_count = sum(1 for item in items if item.suggested_fix is not None)
+    fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs) if bundle_path is not None else 0
     if fixable_count and bundle_path is not None:
         # Shared builder so the human and agent fix-command footers echo -L / --allow-signatures identically.
         fix_command = build_fix_command("pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)

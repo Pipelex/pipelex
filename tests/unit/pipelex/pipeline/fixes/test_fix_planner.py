@@ -158,8 +158,8 @@ class TestFixPlanner:
         assert fix is not None
         assert [(op.kind, op.key) for op in fix.ops] == [(FixOpKind.SET_KEY, "note")]
 
-    def test_no_declared_inputs_creates_whole_inputs_table(self) -> None:
-        """With no declared inputs there is no table to patch — one set_key writes the whole mapping."""
+    def test_no_declared_inputs_ensures_table_then_sets_each_key(self) -> None:
+        """The same ops create a missing table or preserve an explicitly empty block table."""
         fix = plan_fix_for_pipe_validation_error(
             _input_drift_error_data(
                 expected_inputs={"text": "Text", "doc": "Doc?"},
@@ -167,12 +167,12 @@ class TestFixPlanner:
             )
         )
         assert fix is not None
-        assert len(fix.ops) == 1
-        the_op = fix.ops[0]
-        assert the_op.kind == FixOpKind.SET_KEY
-        assert the_op.table_path == ["pipe", "make_summary"]
-        assert the_op.key == "inputs"
-        assert the_op.value == {"text": "Text", "doc": "Doc?"}
+        assert [(op.kind, op.key, op.value) for op in fix.ops] == [
+            (FixOpKind.ENSURE_TABLE, None, None),
+            (FixOpKind.SET_KEY, "text", "Text"),
+            (FixOpKind.SET_KEY, "doc", "Doc?"),
+        ]
+        assert all(op.table_path == ["pipe", "make_summary", "inputs"] for op in fix.ops)
 
     def test_equal_mappings_yield_none(self) -> None:
         """An empty diff (renderings already agree) must not produce a no-op fix."""

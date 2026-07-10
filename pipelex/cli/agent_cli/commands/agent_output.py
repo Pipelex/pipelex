@@ -31,7 +31,7 @@ import typer
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_cause_chain
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items
-from pipelex.pipeline.validation_render import build_fix_command, format_validation_error_items_markdown
+from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 # Module-level capture for setup-time warnings (currently used by RemoteConfigStaleWarning).
@@ -467,7 +467,7 @@ def _render_validate_bundle_markdown(
     # A hint needs an action behind it (disease E): when items carry a suggested fix, name the exact
     # fix command — same predicate and command shape as the human footer — instead of the boilerplate
     # "check the validation_errors array" hint that the JSON envelope keeps.
-    fixable_count = sum(1 for item in items if item.suggested_fix is not None)
+    fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
     if fixable_count:
         fix_command = build_fix_command("pipelex-agent", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
         lines += ["", f"💡 {fixable_count} of these errors can be fixed automatically — run: `{fix_command}`"]

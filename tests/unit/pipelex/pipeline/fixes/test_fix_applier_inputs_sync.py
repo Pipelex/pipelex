@@ -44,7 +44,8 @@ _BLOCK_OPS = [
 ]
 
 _MISSING_TABLE_OPS = [
-    FixOp(kind=FixOpKind.SET_KEY, table_path=["pipe", "make_summary"], key="inputs", value={"text": "Text"}),
+    FixOp(kind=FixOpKind.ENSURE_TABLE, table_path=_INPUTS_TABLE_PATH),
+    FixOp(kind=FixOpKind.SET_KEY, table_path=_INPUTS_TABLE_PATH, key="text", value="Text"),
 ]
 
 
@@ -67,8 +68,25 @@ class TestFixApplierInputsSync:
         """With no inputs declared, one set_key writes the whole mapping as an inline table."""
         toml_doc = _load("controller_inputs_missing_table")
         applications = apply_fix_ops(toml_doc, ops=_MISSING_TABLE_OPS)
-        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED] * 2
         assert serialize_and_format(toml_doc) == _golden("controller_inputs_missing_table")
+
+    def test_explicit_empty_block_keeps_its_comment(self) -> None:
+        """Ensuring an existing empty block mutates it in place instead of replacing it."""
+        source = """[pipe.make_summary]
+type = "PipeSequence"
+output = "Text"
+
+[pipe.make_summary.inputs]
+# keep this author note
+"""
+        toml_doc = tomlkit.loads(source)
+        applications = apply_fix_ops(toml_doc, ops=_MISSING_TABLE_OPS)
+
+        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED, FixOpOutcome.APPLIED]
+        formatted = serialize_and_format(toml_doc)
+        assert "# keep this author note" in formatted
+        assert 'text = "Text"' in formatted
 
     def test_inline_diff_applied_twice_is_idempotent(self) -> None:
         """Re-applying the same diff yields the same bytes."""
@@ -88,7 +106,7 @@ class TestFixApplierInputsSync:
         apply_fix_ops(toml_doc, ops=_MISSING_TABLE_OPS)
         once = _dumps(toml_doc)
         applications = apply_fix_ops(toml_doc, ops=_MISSING_TABLE_OPS)
-        assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
+        assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED, FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == once
 
     def test_dotted_input_key_survives_format(self) -> None:

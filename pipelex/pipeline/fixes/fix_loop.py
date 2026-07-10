@@ -24,6 +24,7 @@ Two scoping rules bound what gets touched:
 
 import os
 import stat
+import sys
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -38,6 +39,7 @@ from pipelex.core.pipes.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError, ValidateBundleError
+from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.fixes.applier import apply_fix_ops, serialize_and_format
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_errors import build_validation_error_items
@@ -71,6 +73,17 @@ class _StagedFileUpdate(NamedTuple):
     snapshot: _FileSnapshot
     replacement_snapshot: _FileSnapshot
     rollback_path: Path
+
+
+class _BoundFix(NamedTuple):
+    """A suggested fix pinned to the source identity snapshotted before validation."""
+
+    fix: SuggestedFix
+    snapshot: _FileSnapshot
+
+    @property
+    def target_path(self) -> Path:
+        return self.snapshot.path
 
 
 def _read_file_snapshot(path: Path) -> _FileSnapshot:
@@ -133,7 +146,7 @@ def _file_state_matches(current_snapshot: _FileSnapshot, *, expected_snapshot: _
 
 
 def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
-    """Optimistic concurrency guard immediately before a target is replaced."""
+    """Verify that a path still names the exact file state previously observed."""
     try:
         current_snapshot = _read_file_snapshot(snapshot.path)
     except FileNotFoundError as exc:
@@ -164,6 +177,8 @@ def _commit_staged_updates(staged_updates: list[_StagedFileUpdate]) -> None:
     committed_updates: list[_StagedFileUpdate] = []
     try:
         for staged_update in staged_updates:
+            # Accepted portability tradeoff: this check and Path.replace() are not one compare-and-swap operation.
+            # An edit in the tiny gap can be overwritten; keep this portable unless real-world evidence justifies serialization.
             _assert_snapshot_unchanged(staged_update.snapshot)
             staged_update.replacement_snapshot.path.replace(staged_update.snapshot.path)
             committed_updates.append(staged_update)
@@ -176,6 +191,18 @@ def _commit_staged_updates(staged_updates: list[_StagedFileUpdate]) -> None:
         raise
 
 
+def _cleanup_staged_updates(staged_updates: list[_StagedFileUpdate]) -> list[str]:
+    """Remove transaction temps and record cleanup failures for the caller to report."""
+    failures: list[str] = []
+    for staged_update in staged_updates:
+        for temp_path in (staged_update.replacement_snapshot.path, staged_update.rollback_path):
+            try:
+                temp_path.unlink(missing_ok=True)
+            except OSError as exc:
+                failures.append(f"{temp_path}: {exc}")
+    return failures
+
+
 def _commit_file_updates(updates: list[_PendingFileUpdate]) -> None:
     """Stage a round completely, then atomically replace targets with rollback on failure."""
     staged_updates: list[_StagedFileUpdate] = []
@@ -184,9 +211,14 @@ def _commit_file_updates(updates: list[_PendingFileUpdate]) -> None:
             staged_updates.append(_stage_file_update(update))
         _commit_staged_updates(staged_updates)
     finally:
-        for staged_update in staged_updates:
-            staged_update.replacement_snapshot.path.unlink(missing_ok=True)
-            staged_update.rollback_path.unlink(missing_ok=True)
+        cleanup_failures = _cleanup_staged_updates(staged_updates)
+        active_exception = sys.exception()
+        if cleanup_failures and active_exception is not None:
+            active_exception.add_note(f"autofix temporary-file cleanup also failed ({'; '.join(cleanup_failures)})")
+        elif cleanup_failures:
+            failures = "; ".join(cleanup_failures)
+            msg = f"autofix target changes were committed, but temporary-file cleanup failed ({failures})"
+            raise FixTransactionError(msg)
 
 
 class FixBundleResult(BaseModel):
@@ -247,11 +279,58 @@ def _pending_signatures_from_validation_result(validation_result: Any) -> list[s
     return validated_pending_signatures
 
 
-def _fix_target_path(fix: SuggestedFix, *, entry_path: Path) -> Path:
-    """The file this fix's ops address: its ``source`` when known, else the entry file."""
-    if fix.source is None:
-        return entry_path
-    return Path(fix.source).resolve()
+def _absolute_source_path(path: Path) -> Path:
+    """Normalize a source pathname without following symlinks."""
+    return Path(os.path.abspath(path))
+
+
+def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, _FileSnapshot]:
+    """Snapshot every source identity validation is about to load.
+
+    Keys are lexical absolute source names, while each snapshot is pinned to the destination
+    resolved at the same time. The resolved destination is also an alias when unambiguous, which
+    accommodates injected managers that already report canonical source paths.
+    """
+    source_paths: set[Path] = {_absolute_source_path(entry_source_path)}
+    source_paths.update(
+        _absolute_source_path(mthds_path)
+        for mthds_path in get_pipelex_mthds_files_from_dirs(dirs={_absolute_source_path(directory) for directory in effective_dirs})
+    )
+    snapshots_by_source: dict[Path, _FileSnapshot] = {}
+    for source_path in sorted(source_paths, key=str):
+        target_path = source_path.resolve()
+        snapshot = _read_file_snapshot(target_path)
+        snapshots_by_source[source_path] = snapshot
+        snapshots_by_source.setdefault(target_path, snapshot)
+    return snapshots_by_source
+
+
+def _bind_fixes_to_snapshots(
+    fixes: list[SuggestedFix],
+    *,
+    entry_source_path: Path,
+    snapshots_by_source: dict[Path, _FileSnapshot],
+) -> list[_BoundFix]:
+    """Bind each fix once to the pre-validation file identity that supplied its source."""
+    bound_fixes: list[_BoundFix] = []
+    for fix in fixes:
+        source_path = entry_source_path if fix.source is None else Path(fix.source)
+        absolute_source = _absolute_source_path(source_path)
+        snapshot = snapshots_by_source.get(absolute_source)
+        if snapshot is None:
+            msg = f"refusing to apply fix from '{absolute_source}': its source identity changed during validation"
+            raise FixWriteConflictError(msg)
+        try:
+            current_target = absolute_source.resolve(strict=True)
+        except FileNotFoundError as exc:
+            msg = f"refusing to apply fix from '{absolute_source}': its source was removed during validation"
+            raise FixWriteConflictError(msg) from exc
+        if current_target != snapshot.path:
+            msg = f"refusing to apply fix from '{absolute_source}': its source was retargeted during validation"
+            raise FixWriteConflictError(msg)
+        _assert_snapshot_unchanged(snapshot)
+        bound_fixes.append(_BoundFix(fix=fix, snapshot=snapshot))
+    return bound_fixes
 
 
 def _safe_fixes(
@@ -274,9 +353,7 @@ def _safe_fixes(
     fixes: list[SuggestedFix] = []
     for item in items:
         suggested_fix = item.suggested_fix
-        if suggested_fix is None or not suggested_fix.safety.is_safe:
-            continue
-        if suggested_fix.source is None and not is_single_file:
+        if suggested_fix is None or not is_safe_fix_for_load_scope(suggested_fix, is_single_file=is_single_file):
             continue
         if select_codes is not None and suggested_fix.fix_code not in select_codes:
             continue
@@ -287,22 +364,22 @@ def _safe_fixes(
 
 
 def _partition_by_write_scope(
-    fixes: list[SuggestedFix],
+    fixes: list[_BoundFix],
     *,
     entry_path: Path,
     writable_dirs: Sequence[Path],
-) -> tuple[list[SuggestedFix], list[Path]]:
+) -> tuple[list[_BoundFix], list[Path]]:
     """Split fixes into (writable, out-of-scope target paths).
 
     Writable = the entry file, plus anything under a per-call ``library_dirs`` directory.
     Files loaded via ambient resolution (hub defaults, ``PIPELEXPATH``) are read-only: the
     user did not pass them to THIS command, so their fixes are excluded rather than applied.
     """
-    in_scope: list[SuggestedFix] = []
+    in_scope: list[_BoundFix] = []
     out_of_scope_paths: list[Path] = []
     for fix in fixes:
-        target_path = _fix_target_path(fix, entry_path=entry_path)
-        if target_path == entry_path or any(target_path.is_relative_to(writable_dir) for writable_dir in writable_dirs):
+        target_path = fix.target_path
+        if is_target_in_write_scope(target_path, entry_path=entry_path, writable_dirs=writable_dirs):
             in_scope.append(fix)
         else:
             out_of_scope_paths.append(target_path)
@@ -384,16 +461,15 @@ def _colliding_op_name(
             ):
                 return fix_op.value
             return None
-        case FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE:
+        case FixOpKind.ENSURE_TABLE | FixOpKind.DELETE_KEY | FixOpKind.DELETE_TABLE:
             return None
 
 
 def _split_cross_file_collisions(
-    fixes: list[SuggestedFix],
+    fixes: list[_BoundFix],
     *,
-    entry_path: Path,
     codes_by_file: dict[Path, set[str]],
-) -> tuple[list[SuggestedFix], list[str]]:
+) -> tuple[list[_BoundFix], list[str]]:
     """Split ``fixes`` into (kept, colliding pipe codes of the dropped ones).
 
     The raise-site collision gate only sees the one file being validated; in a multi-file run a
@@ -402,11 +478,11 @@ def _split_cross_file_collisions(
     fix is checked against the pipe codes of every loaded file OTHER than its own target.
     Dropped fixes simply leave their error unfixed (still reported in ``remaining_errors``).
     """
-    kept: list[SuggestedFix] = []
+    kept: list[_BoundFix] = []
     colliding_names: list[str] = []
     other_codes_cache: dict[Path, set[str]] = {}
     for fix in fixes:
-        target_path = _fix_target_path(fix, entry_path=entry_path)
+        target_path = fix.target_path
         target_codes = codes_by_file.get(target_path, set())
         other_codes = other_codes_cache.get(target_path)
         if other_codes is None:
@@ -417,7 +493,7 @@ def _split_cross_file_collisions(
             other_codes_cache[target_path] = other_codes
         fix_collisions = [
             name
-            for fix_op in fix.ops
+            for fix_op in fix.fix.ops
             if (
                 name := _colliding_op_name(
                     fix_op,
@@ -438,6 +514,7 @@ async def fix_bundle_file(
     mthds_file_path: Path,
     *,
     library_dirs: Sequence[Path] | None = None,
+    writable_library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     max_iterations: int | None = None,
     select_codes: Sequence[str] | None = None,
@@ -457,10 +534,12 @@ async def fix_bundle_file(
     """
     if max_iterations is None:
         max_iterations = get_config().pipelex.builder_config.fix_loop_max_attempts
-    entry_path = mthds_file_path.resolve()
+    entry_source_path = _absolute_source_path(mthds_file_path)
+    entry_path = entry_source_path.resolve()
     effective_dirs, _ = resolve_library_dirs(library_dirs)
     is_single_file = not effective_dirs
-    writable_dirs: list[Path] = [Path(writable_dir).resolve() for writable_dir in library_dirs] if library_dirs is not None else []
+    write_scope_dirs = library_dirs if writable_library_dirs is None else writable_library_dirs
+    writable_dirs: list[Path] = [Path(writable_dir).resolve() for writable_dir in write_scope_dirs] if write_scope_dirs is not None else []
 
     seen_fingerprints: set[str] = set()
     fixes_applied: list[SuggestedFix] = []
@@ -470,6 +549,7 @@ async def fix_bundle_file(
     last_error_items: list[ValidationErrorItem] = []
 
     for _ in range(max_iterations):
+        snapshots_by_source = _snapshot_loaded_sources(entry_source_path=entry_source_path, effective_dirs=effective_dirs)
         try:
             validation_result = await validate_bundle(
                 mthds_file_path=mthds_file_path,
@@ -499,7 +579,12 @@ async def fix_bundle_file(
                 remaining_errors=last_error_items,
             )
 
-        in_scope_fixes, out_of_scope_paths = _partition_by_write_scope(safe_fixes, entry_path=entry_path, writable_dirs=writable_dirs)
+        bound_fixes = _bind_fixes_to_snapshots(
+            safe_fixes,
+            entry_source_path=entry_source_path,
+            snapshots_by_source=snapshots_by_source,
+        )
+        in_scope_fixes, out_of_scope_paths = _partition_by_write_scope(bound_fixes, entry_path=entry_path, writable_dirs=writable_dirs)
         if not in_scope_fixes:
             out_of_scope_names = ", ".join(sorted({str(out_path) for out_path in out_of_scope_paths}))
             bail_reason = (
@@ -516,7 +601,7 @@ async def fix_bundle_file(
 
         if not is_single_file:
             codes_by_file = _pipe_codes_by_file(entry_path=entry_path, effective_dirs=effective_dirs)
-            in_scope_fixes, colliding_names = _split_cross_file_collisions(in_scope_fixes, entry_path=entry_path, codes_by_file=codes_by_file)
+            in_scope_fixes, colliding_names = _split_cross_file_collisions(in_scope_fixes, codes_by_file=codes_by_file)
             if not in_scope_fixes:
                 colliding = ", ".join(f"'{name}'" for name in sorted(set(colliding_names)))
                 bail_reason = f"cross-file collision: every remaining fix would write a pipe code ({colliding}) already declared in a sibling bundle"
@@ -529,12 +614,12 @@ async def fix_bundle_file(
                     bail_reason=bail_reason,
                 )
 
-        new_fixes = [fix for fix in in_scope_fixes if _fix_fingerprint(fix) not in seen_fingerprints]
+        new_fixes = [fix for fix in in_scope_fixes if _fix_fingerprint(fix.fix) not in seen_fingerprints]
         if not new_fixes:
             # Author-facing: name the fixes that kept being re-proposed (their descriptions), not the
             # internal fingerprints — a re-proposal that changed nothing means the fix's target could
             # not be applied as written. The remaining errors (with their 💡 lines) print right below.
-            repeated_descriptions = ", ".join(sorted({fix.description for fix in in_scope_fixes}))
+            repeated_descriptions = ", ".join(sorted({fix.fix.description for fix in in_scope_fixes}))
             bail_reason = (
                 f"no progress: the same fix was re-proposed without changing the bundle ({repeated_descriptions}); "
                 "its target could not be applied as written — fix the remaining errors manually"
@@ -548,28 +633,28 @@ async def fix_bundle_file(
                 bail_reason=bail_reason,
             )
 
-        fixes_by_target: dict[Path, list[SuggestedFix]] = {}
-        for fix in new_fixes:
-            fixes_by_target.setdefault(_fix_target_path(fix, entry_path=entry_path), []).append(fix)
+        fixes_by_target: dict[Path, tuple[_FileSnapshot, list[SuggestedFix]]] = {}
+        for bound_fix in new_fixes:
+            target_group = fixes_by_target.setdefault(bound_fix.target_path, (bound_fix.snapshot, []))
+            target_group[1].append(bound_fix.fix)
 
         pending_updates: list[_PendingFileUpdate] = []
         round_fixes_applied: list[SuggestedFix] = []
         round_written_paths: list[Path] = []
-        for target_path, target_fixes in fixes_by_target.items():
-            snapshot = _read_file_snapshot(target_path)
+        for target_path, (snapshot, target_fixes) in fixes_by_target.items():
             toml_doc = tomlkit.loads(snapshot.content.decode("utf-8"))
             any_op_applied = False
-            for fix in target_fixes:
-                applications = apply_fix_ops(toml_doc, ops=fix.ops)
+            for target_fix in target_fixes:
+                applications = apply_fix_ops(toml_doc, ops=target_fix.ops)
                 if any(application.outcome.did_apply for application in applications):
-                    round_fixes_applied.append(fix)
+                    round_fixes_applied.append(target_fix)
                     any_op_applied = True
             if any_op_applied:
                 pending_updates.append(_PendingFileUpdate(snapshot=snapshot, new_content=serialize_and_format(toml_doc)))
                 round_written_paths.append(target_path)
 
         _commit_file_updates(pending_updates)
-        seen_fingerprints.update(_fix_fingerprint(fix) for fix in new_fixes)
+        seen_fingerprints.update(_fix_fingerprint(fix.fix) for fix in new_fixes)
         fixes_applied.extend(round_fixes_applied)
         for target_path in round_written_paths:
             if target_path not in written_paths:

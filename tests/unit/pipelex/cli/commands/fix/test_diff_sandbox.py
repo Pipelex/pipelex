@@ -9,6 +9,8 @@ from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview  # 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pytest_mock import MockerFixture
+
 
 class TestDiffSandbox:
     def _sandbox_root(self, tmp_path: Path) -> Path:
@@ -16,7 +18,7 @@ class TestDiffSandbox:
         sandbox_root.mkdir()
         return sandbox_root
 
-    def test_entry_only_copies_entry_and_passes_none_dirs_through(self, tmp_path: Path) -> None:
+    def test_entry_only_copies_entry_with_frozen_empty_load_scope(self, tmp_path: Path) -> None:
         entry = tmp_path / "bundle.mthds"
         entry.write_text('domain = "demo"\n', encoding="utf-8")
 
@@ -24,7 +26,8 @@ class TestDiffSandbox:
 
         assert sandbox.entry_path != entry.resolve()
         assert sandbox.entry_path.read_text(encoding="utf-8") == 'domain = "demo"\n'
-        assert sandbox.library_dirs is None
+        assert sandbox.library_dirs == []
+        assert sandbox.writable_library_dirs == []
         assert sandbox.to_original(str(sandbox.entry_path)) == str(entry.resolve())
 
     def test_explicit_empty_dirs_stay_empty(self, tmp_path: Path) -> None:
@@ -34,6 +37,7 @@ class TestDiffSandbox:
         sandbox = mirror_bundle_for_preview(entry, library_dirs=[], sandbox_root=self._sandbox_root(tmp_path))
 
         assert sandbox.library_dirs == []
+        assert sandbox.writable_library_dirs == []
 
     def test_entry_under_library_dir_maps_inside_the_dir_copy(self, tmp_path: Path) -> None:
         """Directory mode: the sandbox entry must be the file INSIDE the mirrored dir, or pipes load twice."""
@@ -50,6 +54,39 @@ class TestDiffSandbox:
         assert sandbox.entry_path == copy_dir / "bundle.mthds"
         assert (copy_dir / "sibling.mthds").is_file()
         assert sandbox.to_original(str(copy_dir / "sibling.mthds")) == str((bundle_dir / "sibling.mthds").resolve())
+        assert sandbox.writable_library_dirs == [copy_dir]
+
+    def test_equivalent_explicit_dirs_share_one_canonical_copy(self, tmp_path: Path) -> None:
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        entry = bundle_dir / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+
+        sandbox = mirror_bundle_for_preview(
+            entry,
+            library_dirs=[bundle_dir, bundle_dir / "."],
+            sandbox_root=self._sandbox_root(tmp_path),
+        )
+
+        assert sandbox.library_dirs is not None
+        assert len(sandbox.library_dirs) == 1
+        assert sandbox.writable_library_dirs == sandbox.library_dirs
+
+    def test_ambient_entry_uses_same_read_only_canonical_copy(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        bundle_dir = tmp_path / "bundle"
+        bundle_dir.mkdir()
+        entry = bundle_dir / "bundle.mthds"
+        entry.write_text('domain = "demo"\n', encoding="utf-8")
+        mocker.patch(
+            "pipelex.cli.commands.fix._diff_sandbox.resolve_library_dirs",
+            return_value=([bundle_dir], "PIPELEXPATH"),
+        )
+
+        sandbox = mirror_bundle_for_preview(entry, library_dirs=None, sandbox_root=self._sandbox_root(tmp_path))
+
+        assert sandbox.library_dirs is not None
+        assert sandbox.entry_path == sandbox.library_dirs[0] / entry.name
+        assert sandbox.writable_library_dirs == []
 
     def test_entry_outside_library_dirs_gets_standalone_copy(self, tmp_path: Path) -> None:
         entry = tmp_path / "bundle.mthds"

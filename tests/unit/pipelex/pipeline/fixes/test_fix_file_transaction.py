@@ -8,14 +8,32 @@ from pytest_mock import MockerFixture
 from pipelex.pipeline.exceptions import FixTransactionError, FixWriteConflictError
 from pipelex.pipeline.fixes.fix_loop import (
     _assert_snapshot_unchanged,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
+    _bind_fixes_to_snapshots,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
     _commit_file_updates,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
     _FileSnapshot,  # pyright: ignore[reportPrivateUsage]
     _PendingFileUpdate,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
     _read_file_snapshot,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
+    _snapshot_loaded_sources,  # pyright: ignore[reportPrivateUsage]  # noqa: PLC2701
 )
+from pipelex.suggested_fix import FixSafety, SuggestedFix
 
 
 class TestFixFileTransaction:
+    def test_symlink_retarget_during_validation_is_rejected(self, tmp_path: Path) -> None:
+        first_target = tmp_path / "first.mthds"
+        second_target = tmp_path / "second.mthds"
+        first_target.write_text("first\n", encoding="utf-8")
+        second_target.write_text("second\n", encoding="utf-8")
+        source_link = tmp_path / "library.mthds"
+        source_link.symlink_to(first_target)
+        snapshots = _snapshot_loaded_sources(entry_source_path=source_link, effective_dirs=[])
+        fix = SuggestedFix(fix_code="test", description="test", safety=FixSafety.SAFE, source=str(source_link), ops=[])
+        source_link.unlink()
+        source_link.symlink_to(second_target)
+
+        with pytest.raises(FixWriteConflictError, match="retargeted"):
+            _bind_fixes_to_snapshots([fix], entry_source_path=source_link, snapshots_by_source=snapshots)
+
     def test_concurrent_edit_is_not_overwritten(self, tmp_path: Path) -> None:
         target = tmp_path / "bundle.mthds"
         target.write_text("original\n", encoding="utf-8")
@@ -112,3 +130,37 @@ class TestFixFileTransaction:
         assert str(second_path) in str(exc_info.value)
         assert "inspect the named files before retrying" in str(exc_info.value)
         assert list(tmp_path.glob(".*.pipelex-fix-*.tmp")) == []
+
+    def test_cleanup_failure_reports_committed_outcome(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        target = tmp_path / "bundle.mthds"
+        target.write_text("original\n", encoding="utf-8")
+        snapshot = _read_file_snapshot(target)
+        original_unlink = Path.unlink
+
+        def fail_temp_cleanup(path: Path, *, missing_ok: bool = False) -> None:
+            if ".pipelex-fix-rollback." in path.name:
+                msg = "cleanup failed"
+                raise OSError(msg)
+            original_unlink(path, missing_ok=missing_ok)
+
+        mocker.patch.object(Path, "unlink", new=fail_temp_cleanup)
+
+        with pytest.raises(FixTransactionError, match=r"target changes were committed.*cleanup failed"):
+            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+
+        assert target.read_text(encoding="utf-8") == "fixed\n"
+
+    def test_cleanup_failure_does_not_mask_commit_failure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        target = tmp_path / "bundle.mthds"
+        target.write_text("original\n", encoding="utf-8")
+        snapshot = _read_file_snapshot(target)
+
+        mocker.patch.object(Path, "replace", side_effect=OSError("primary replace failure"))
+        mocker.patch.object(Path, "unlink", side_effect=OSError("secondary cleanup failure"))
+
+        with pytest.raises(OSError, match="primary replace failure") as exc_info:
+            _commit_file_updates([_PendingFileUpdate(snapshot=snapshot, new_content="fixed\n")])
+
+        assert target.read_text(encoding="utf-8") == "original\n"
+        assert len(exc_info.value.__notes__) == 1
+        assert "secondary cleanup failure" in exc_info.value.__notes__[0]

@@ -27,13 +27,13 @@ cannot drift. ``build_fix_command`` is the shared builder for the copy-pasteable
 from __future__ import annotations
 
 import shlex
-from typing import TYPE_CHECKING, Any, cast
+from pathlib import Path
+from typing import Any, cast
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.hub import resolve_library_dirs
+from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.tools.misc.string_utils import count_with_noun
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 def format_validate_markdown(result: dict[str, Any]) -> str:
@@ -278,3 +278,28 @@ def build_fix_command(executable: str, *, bundle_path: Path, library_dirs: list[
     if allow_signatures:
         command_parts.append("--allow-signatures")
     return shlex.join(command_parts)
+
+
+def count_applicable_fixes(
+    items: list[ValidationErrorItem],
+    *,
+    bundle_path: Path,
+    library_dirs: list[Path] | None,
+) -> int:
+    """Count safe fixes the displayed command is authorized and able to apply."""
+    effective_dirs, _ = resolve_library_dirs(library_dirs)
+    is_single_file = not effective_dirs
+    entry_path = bundle_path.resolve()
+    writable_dirs = [library_dir.resolve() for library_dir in library_dirs] if library_dirs is not None else []
+    applicable_count = 0
+    for item in items:
+        fix = item.suggested_fix
+        if fix is None or not is_safe_fix_for_load_scope(fix, is_single_file=is_single_file):
+            continue
+        if fix.source is None:
+            target_path = entry_path
+        else:
+            target_path = Path(fix.source).resolve()
+        if is_target_in_write_scope(target_path, entry_path=entry_path, writable_dirs=writable_dirs):
+            applicable_count += 1
+    return applicable_count

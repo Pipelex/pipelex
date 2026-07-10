@@ -20,11 +20,12 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError, ValidationErrorCategory, ValidationErrorItem
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import _backfill_pipe_error_source, validate_bundle  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 
 _VALID_MTHDS = """
 domain = "testapp"
@@ -140,6 +141,18 @@ def _input_drift_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestValidateBundleSourceThreading:
+    async def test_old_injected_manager_path_source_is_normalized(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Managers implementing the former ``Path`` return contract remain compatible."""
+        source_path = tmp_path / "legacy.mthds"
+        manager = mocker.Mock()
+        manager.get_pipe_source.return_value = source_path
+        mocker.patch("pipelex.pipeline.validate_bundle.get_library_manager", return_value=manager)
+        pipe_error = PipeValidationError(message="invalid", domain_code="demo", pipe_code="broken")
+
+        _backfill_pipe_error_source(pipe_error)
+
+        assert pipe_error.file_path == str(source_path)
+
     async def test_valid_bundle_blueprint_carries_threaded_source(
         self,
         load_empty_library: Callable[[], str],

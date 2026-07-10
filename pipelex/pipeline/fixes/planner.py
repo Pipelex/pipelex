@@ -7,7 +7,7 @@ of the validation report — CLI, API, MCP — sees fixes with zero extra plumbi
 
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix, TomlScalar
+from pipelex.suggested_fix import FixOp, FixOpKind, FixSafety, SuggestedFix
 
 MATCH_SEQUENCE_OUTPUT_FIX_CODE = "match-sequence-output"
 SYNC_CONTROLLER_INPUTS_FIX_CODE = "sync-controller-inputs"
@@ -68,8 +68,9 @@ def _plan_sync_controller_inputs(error_data: PipesAndConceptValidationErrorData)
     + ``declared_inputs`` mappings becomes a minimal diff of the pipe's ``inputs`` table —
     ``set_key`` for added/changed variables, ``delete_key`` for extraneous ones. Because the
     mappings are complete, one fix repairs all input drift for the pipe even though validation
-    aborts at the first error. With nothing declared there is no table to patch in place, so a
-    single ``set_key`` writes the whole mapping.
+    aborts at the first error. With nothing declared, an ``ensure_table`` followed by per-key
+    writes creates a missing inline table while preserving an explicitly empty block table and
+    any comments attached inside it.
     """
     if error_data.expected_inputs is None or error_data.declared_inputs is None or error_data.pipe_code is None:
         return None
@@ -78,19 +79,18 @@ def _plan_sync_controller_inputs(error_data: PipesAndConceptValidationErrorData)
         if not error_data.expected_inputs:
             return None
         variables = ", ".join(f"'{var_name}'" for var_name in error_data.expected_inputs)
+        inputs_table_path = ["pipe", error_data.pipe_code, "inputs"]
+        create_ops = [FixOp(kind=FixOpKind.ENSURE_TABLE, table_path=inputs_table_path)]
+        create_ops.extend(
+            FixOp(kind=FixOpKind.SET_KEY, table_path=inputs_table_path, key=var_name, value=expected_ref)
+            for var_name, expected_ref in error_data.expected_inputs.items()
+        )
         return SuggestedFix(
             fix_code=SYNC_CONTROLLER_INPUTS_FIX_CODE,
             description=f"Declare inputs of pipe '{error_data.pipe_code}' as needed by its steps: {variables}",
             safety=FixSafety.SAFE,
             source=error_data.source,
-            ops=[
-                FixOp(
-                    kind=FixOpKind.SET_KEY,
-                    table_path=["pipe", error_data.pipe_code],
-                    key="inputs",
-                    value=dict[str, TomlScalar](error_data.expected_inputs),
-                ),
-            ],
+            ops=create_ops,
         )
 
     inputs_table_path = ["pipe", error_data.pipe_code, "inputs"]

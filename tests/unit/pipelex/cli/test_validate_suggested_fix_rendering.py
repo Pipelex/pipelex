@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _fixable_pipe_error() -> PipesAndConceptValidationErrorData:
+def _fixable_pipe_error(*, source: str | None = None) -> PipesAndConceptValidationErrorData:
     """An enriched INADEQUATE_OUTPUT_CONCEPT — the fix planner derives ``match-sequence-output`` from it."""
     return PipesAndConceptValidationErrorData(
         error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
@@ -34,6 +34,7 @@ def _fixable_pipe_error() -> PipesAndConceptValidationErrorData:
         message="output concept mismatch",
         field_path="pipes.list_ideas.output",
         expected_output_ref="Idea[]",
+        source=source,
     )
 
 
@@ -57,7 +58,7 @@ class TestValidateSuggestedFixRendering:
         return recorded_console
 
     def test_fixable_error_renders_suggested_fix_line_and_actionable_footer(self, console: Console) -> None:
-        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="methods/demo.mthds")])
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_validate_bundle_error(exc, bundle_path=Path("methods/demo.mthds"))
@@ -71,7 +72,7 @@ class TestValidateSuggestedFixRendering:
         assert "💡 Tip:" not in output
 
     def test_footer_echoes_library_dirs(self, console: Console) -> None:
-        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="methods/demo.mthds")])
 
         with pytest.raises(typer.Exit):
             handle_validate_bundle_error(
@@ -98,7 +99,7 @@ class TestValidateSuggestedFixRendering:
 
     def test_footer_shell_quotes_paths_with_spaces(self, console: Console) -> None:
         """A path with a space must stay one argument when the footer command is copy-pasted."""
-        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
+        exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="my methods/demo.mthds")])
 
         with pytest.raises(typer.Exit):
             handle_validate_bundle_error(
@@ -109,6 +110,25 @@ class TestValidateSuggestedFixRendering:
 
         output = console.export_text()
         assert "pipelex fix bundle 'my methods/demo.mthds' -L 'shared libs'" in output
+
+    def test_ambient_source_is_not_advertised_as_applicable(self, console: Console, tmp_path: Path, mocker: MockerFixture) -> None:
+        bundle_path = tmp_path / "entry.mthds"
+        ambient_dir = tmp_path / "ambient"
+        ambient_dir.mkdir()
+        ambient_source = ambient_dir / "library.mthds"
+        exc = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[_fixable_pipe_error(source=str(ambient_source))],
+        )
+        mocker.patch("pipelex.pipeline.validation_render.resolve_library_dirs", return_value=([ambient_dir], "PIPELEXPATH"))
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc, bundle_path=bundle_path, library_dirs=None)
+
+        output = console.export_text()
+        assert "can be fixed automatically" not in output
+        assert "pipelex fix bundle" not in output
+        assert "💡 Tip:" in output
 
     def test_non_fixable_errors_keep_generic_tip_and_no_fix_line(self, console: Console) -> None:
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_non_fixable_pipe_error()])

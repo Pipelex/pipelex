@@ -227,6 +227,7 @@ def _run_fix_preview(
             fix_bundle_file(
                 sandbox.entry_path,
                 library_dirs=sandbox.library_dirs,
+                writable_library_dirs=sandbox.writable_library_dirs,
                 allow_signatures=allow_signatures,
                 max_iterations=max_iterations,
                 select_codes=select_codes,

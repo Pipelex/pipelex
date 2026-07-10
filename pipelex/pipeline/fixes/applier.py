@@ -197,6 +197,19 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
+        case FixOpKind.ENSURE_TABLE:
+            if not fix_op.table_path:
+                msg = "ensure_table op requires a non-empty table_path — planner bug"
+                raise PipelexUnexpectedError(msg)
+            existing_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            if existing_table is not None:
+                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' already exists")
+            parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path[:-1])
+            table_key = fix_op.table_path[-1]
+            if parent_table is None or table_key in parent_table:
+                return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"parent of table '{table_path_str}' not found")
+            parent_table[table_key] = tomlkit.inline_table()
+            return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)
         case FixOpKind.DELETE_KEY:
             if fix_op.key is None:
                 msg = f"delete_key op on '{table_path_str}' requires a key — planner bug"

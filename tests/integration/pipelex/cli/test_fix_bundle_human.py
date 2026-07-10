@@ -196,6 +196,54 @@ class TestFixBundleHuman:
         assert '-output = "Idea"' in output
         assert "✅ Fix preview — these fixes would make the bundle valid" in output
 
+    def test_diff_preview_uses_ambient_entry_copy_without_duplicate_identity(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """An entry discoverable through ambient scope is loaded once from its sandbox copy."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+        original_bytes = bundle_path.read_bytes()
+        mocker.patch(
+            "pipelex.cli.commands.fix._diff_sandbox.resolve_library_dirs",
+            return_value=([tmp_path], "PIPELEXPATH"),
+        )
+
+        fix_bundle_cmd(path=str(bundle_path), diff=True)
+
+        assert bundle_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+        assert "outside write scope" not in output
+
+    def test_diff_preview_deduplicates_equivalent_explicit_library_dirs(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """Equivalent ``-L`` aliases do not invent duplicate declarations in the sandbox."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+
+        fix_bundle_cmd(
+            path=str(bundle_path),
+            library_dir=[str(tmp_path), str(tmp_path / ".")],
+            diff=True,
+        )
+
+        output = console.export_text()
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+        assert "already declared" not in output
+
     def test_diff_preview_on_unfixable_bundle_exits_one_originals_untouched(
         self,
         tmp_path: Path,

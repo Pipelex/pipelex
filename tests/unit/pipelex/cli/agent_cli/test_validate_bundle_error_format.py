@@ -27,18 +27,19 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _fixable_item() -> ValidationErrorItem:
+def _fixable_item(*, source: Path) -> ValidationErrorItem:
     return ValidationErrorItem(
         category=ValidationErrorCategory.PIPE_VALIDATION,
         error_type="inadequate_output_multiplicity",
         pipe_code="brainstorm",
         domain_code="story_studio",
-        source="/w/bundle.mthds",
+        source=str(source),
         message="the sequence declares 'StoryIdea' but its last step yields 'StoryIdea[]'.",
         suggested_fix=SuggestedFix(
             fix_code="match-sequence-output",
             description="Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step",
             safety=FixSafety.SAFE,
+            source=str(source),
             ops=[],
         ),
     )
@@ -56,7 +57,7 @@ class TestValidateBundleErrorFormat:
         """Markdown renders a heading, the bundle, prose items with the 💡 fix line, and a fix-aware footer."""
         bundle_path = tmp_path / "bundle.mthds"
         markdown = _render_validate_bundle_markdown(
-            [_fixable_item()],
+            [_fixable_item(source=bundle_path)],
             bundle_path=bundle_path,
             library_dirs=[tmp_path / "libs"],
             allow_signatures=False,
