@@ -720,10 +720,6 @@ rationale = "Renders the result; single operand."
 param = "value"
 rationale = "Renders the value; single operand."
 
-["pipelex/cli/dev_cli/commands/sync_main_config_cmd.py::sync_main_config_cmd"]
-param = "target"
-rationale = "Syncs the main config toward the target; single operand."
-
 ["pipelex/cli/dev_cli/commands/update_gateway_models_cmd.py::_all_references_up_to_date"]
 param = "reference_files"
 rationale = "Predicate: whether the reference files are current; single operand."
@@ -1788,10 +1784,6 @@ rationale = "Operates on the gateway_config; single operand (qualifiers keyword-
 param = "choice"
 rationale = "Extracts from the choice; single operand."
 
-["pipelex/cogt/models/model_manager.py::ModelManager._resolve_terminal_candidates"]
-param = "deck"
-rationale = "Operates on the deck; single operand (qualifiers keyword-only)."
-
 ["pipelex/cogt/models/model_manager.py::ModelManager.build_deck"]
 param = "model_deck_blueprint"
 rationale = "Factory from source: builds the result from the model_deck_blueprint; single operand."
@@ -1823,10 +1815,6 @@ rationale = "Parses the value; single operand."
 ["pipelex/cogt/models/model_suggestion.py::get_collection_keys"]
 param = "model_deck"
 rationale = "Keyed accessor by the model_deck; single operand."
-
-["pipelex/cogt/models/model_suggestion.py::suggest_model_alternatives"]
-param = "model_deck"
-rationale = "Operates on the model_deck; single operand (qualifiers keyword-only)."
 
 ["pipelex/cogt/search/search_job.py::SearchJob.search_job_before_start"]
 param = "inference_model"

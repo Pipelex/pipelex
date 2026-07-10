@@ -190,13 +190,7 @@ class ModelManager(ModelManagerAbstract):
         return choice.model
 
     @classmethod
-    def _resolve_terminal_candidates(
-        cls,
-        deck: ModelDeck,
-        *,
-        ref: ModelReference,
-        model_type: ModelType,
-    ) -> list[str]:
+    def _resolve_terminal_candidates(cls, *, deck: ModelDeck, ref: ModelReference, model_type: ModelType) -> list[str]:
         """Return every terminal handle reachable from ``ref`` via aliases/waterfalls.
 
         For ``HANDLE`` references: returns ``[name]`` (bare strings are HANDLEs by design —
