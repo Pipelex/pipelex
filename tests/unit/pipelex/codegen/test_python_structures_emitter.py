@@ -46,6 +46,16 @@ class TestPythonStructuresEmitter:
         assert "class alpha__Result(" in content
         assert "class beta__Result(" in content
 
+    def test_typed_dict_field_maps_to_dict_annotation(self, materialized_image_crate: LibraryCrate, tmp_path: Path):
+        """An authored typed dict renders the runtime Dict annotation (natives are skipped by this
+        emitter, so the authored concept is the DICT path's only route here) and builds at runtime.
+        """
+        content = emit_python_structures(resolve_concepts_from_crate(materialized_image_crate))[0].content
+        assert "captions: Dict[str, str]" in content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_structures_dict")
+        gallery: Any = module.Gallery(captions={"p1": "sunset"})
+        assert gallery.captions == {"p1": "sunset"}
+
     def test_imprecision_and_opaque_are_surfaced(self, edge_crate: LibraryCrate, tmp_path: Path):
         content = emit_python_structures(resolve_concepts_from_crate(edge_crate))[0].content
         assert "# imprecise: list item type unspecified" in content

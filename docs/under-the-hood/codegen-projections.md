@@ -83,7 +83,7 @@ The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current,
 
 ### Idempotent emission
 
-`pipelex/codegen/emission.py` ties it together: it stamps each body, writes each file only when its content changed (write-if-changed — no mtime churn, clean diffs, watch-mode friendly), removes any previously-tracked stamped file that dropped out of the set, and rewrites the lock. Only files the tool itself stamped are ever removed, so a hand-authored file sharing the output directory is never touched.
+`pipelex/codegen/emission.py` ties it together: it stamps each body, writes each file only when its content changed (write-if-changed — no mtime churn, clean diffs, watch-mode friendly), removes any previously-tracked stamped file that dropped out of the set, and rewrites the lock. Only files the tool itself stamped are ever removed, so a hand-authored file sharing the output directory is never touched. `codegen inputs` applies the same write-if-changed rule to its single (unstamped) template file, so a full regeneration pass over a committed consumer is a true no-op when everything is current.
 
 ## Surfacing imprecision, never guessing
 

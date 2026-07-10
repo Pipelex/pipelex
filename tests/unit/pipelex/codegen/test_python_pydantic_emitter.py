@@ -52,6 +52,18 @@ class TestPythonPydanticEmitter:
         # The base is defined before the subclass (inheritance is eager) and the module imports cleanly.
         load_generated_module(content, tmp_path=tmp_path, name="gen_models_refines")
 
+    def test_dict_fields_render_honestly_and_round_trip(self, materialized_image_crate: LibraryCrate, tmp_path: Path):
+        """The DICT path — both the materialized `Image.size` (unspecified values, imprecision surfaced)
+        and an authored typed dict — renders honest annotations in a module that compiles and round-trips.
+        """
+        content = emit_python_pydantic(resolve_concepts_from_crate(materialized_image_crate))[0].content
+        assert "size: dict[str, Any] | None" in content
+        assert "imprecise: dict value type unspecified" in content
+        assert "captions: dict[str, str]" in content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_models_dict")
+        image = module.Image(url="pipelex-storage://runs/abc/image.png", size={"width": 512, "height": 256})
+        assert module.Image.model_validate(image.model_dump(mode="json")) == image
+
     def test_collision_qualifies_class_names(self, edge_crate: LibraryCrate):
         content = emit_python_pydantic(resolve_concepts_from_crate(edge_crate))[0].content
         assert "class alpha__Result(BaseModel):" in content

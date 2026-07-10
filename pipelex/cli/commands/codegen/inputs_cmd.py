@@ -87,9 +87,14 @@ def codegen_inputs_cmd(
                 raise typer.Exit(0) from exc
 
             destination = Path(output) if output else Path("results") / default_file_name
-            ensure_directory_for_file_path(file_path=destination)
-            save_text_to_path(text=content, path=destination)
-            typer.secho(f"Generated {destination}", fg=typer.colors.GREEN)
+            # Write-if-changed, like `codegen types`: no mtime churn and a truthful console verdict
+            # when the committed template is already current.
+            if destination.is_file() and destination.read_text(encoding="utf-8") == content:
+                typer.secho(f"Unchanged {destination}", fg=typer.colors.BLUE)
+            else:
+                ensure_directory_for_file_path(file_path=destination)
+                save_text_to_path(text=content, path=destination)
+                typer.secho(f"Generated {destination}", fg=typer.colors.GREEN)
     finally:
         Pipelex.teardown_if_needed()
 

@@ -68,6 +68,33 @@ def edge_crate() -> LibraryCrate:
 
 
 @pytest.fixture
+def materialized_image_crate() -> LibraryCrate:
+    """A normalized crate that references the `Image` native, so normalization actually materializes it —
+    including the nested-model `size` field that resolves to a dict with unspecified values — plus an
+    authored typed-dict field so the DICT path is covered for every emitter (natives included or skipped).
+    """
+    authored = LibraryCrate(
+        concepts={
+            "media.Photo": ConceptBlueprint(description="A photo", refines="Image"),
+            "media.Gallery": ConceptBlueprint(
+                description="A gallery",
+                structure={
+                    "captions": ConceptStructureBlueprint(
+                        description="caption per photo code",
+                        type=ConceptStructureBlueprintFieldType.DICT,
+                        key_type="str",
+                        value_type="text",
+                        required=True,
+                    ),
+                },
+            ),
+        },
+        domains={"media": DomainBlueprint(code="media", description="Media domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
 def refines_crate() -> LibraryCrate:
     """A concept refining a structureless native keeps its refines link, so the emitter renders inheritance."""
     return LibraryCrate(

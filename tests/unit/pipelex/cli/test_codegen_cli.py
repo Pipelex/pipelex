@@ -109,6 +109,23 @@ class TestCodegenCli:
         assert get_required_pipe.call_args.kwargs["pipe_code"] == "scoring.run_scoring"
         assert destination.read_text(encoding="utf-8") == '{"topic": "x"}'
 
+    def test_inputs_write_if_changed_leaves_identical_file_untouched(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Like `codegen types`, `codegen inputs` is write-if-changed: an already-current template is
+        not rewritten (no mtime churn), so re-running codegen in a committed consumer stays a no-op.
+        """
+        self._neutralize_boot(mocker, module=INPUTS)
+        crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe="run_scoring")})
+        mocker.patch(f"{INPUTS}.load_normalized_crate_or_exit", return_value=crate)
+        mocker.patch(f"{INPUTS}.get_required_pipe")
+        mocker.patch(f"{INPUTS}.render_inputs", return_value='{"topic": "x"}')
+        destination = tmp_path / "inputs.json"
+        destination.write_text('{"topic": "x"}', encoding="utf-8")
+        save = mocker.patch(f"{INPUTS}.save_text_to_path")
+        codegen_inputs_cmd(
+            pipe=None, paths=None, template_format=InputsTemplateFormat.JSON, explicit=False, output=str(destination), library_dir=None
+        )
+        save.assert_not_called()
+
     def test_inputs_no_main_pipe_is_exit_1(self, mocker: MockerFixture) -> None:
         self._neutralize_boot(mocker, module=INPUTS)
         crate = LibraryCrate(domains={"scoring": DomainBlueprint(code="scoring", description="d", main_pipe=None)})
