@@ -3678,90 +3678,57 @@ param = "registry"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/errors/error_pages_generator.py::_commit_page"]
-param = "target"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/errors/error_pages_generator.py::_group_by_subsystem"]
 param = "classes"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: groups the error classes; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_humanize_subsystem"]
 param = "key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Transforms the subsystem key into a human heading; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_is_production_subclass"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_parent_link"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class ('the parent link of cls'); single operand."
 
 ["pipelex/errors/error_pages_generator.py::_remove_orphans"]
 param = "output_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: prunes the output dir; expected stems and report stay keyword."
 
 ["pipelex/errors/error_pages_generator.py::_resolve_class_level_domain"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_resolve_class_level_user_action"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_short_docstring"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::_subsystem_key"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/errors/error_pages_generator.py::_subsystems_for_macro"]
-param = "macro_slug"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/errors/error_pages_generator.py::generate_error_pages"]
-param = "output_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::has_authored_marker"]
 param = "content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the page content; single operand."
 
 ["pipelex/errors/error_pages_generator.py::page_slug"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the error class ('the page slug of cls'); single operand."
 
 ["pipelex/errors/error_pages_generator.py::render_error_page"]
 param = "cls"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the page for the error class; single operand."
 
 ["pipelex/errors/error_pages_generator.py::render_index_page"]
 param = "by_subsystem"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/errors/error_pages_generator.py::render_macro_page"]
-param = "macro_heading"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the index from the subsystem grouping; single operand."
 
 ["pipelex/graph/graph_analysis.py::GraphAnalysis.from_graphspec"]
 param = "graph"
@@ -4303,50 +4270,37 @@ param = "pipelex_hub"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/kit/cursor_rules.py::_front_matter_for"]
-param = "name"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the .mdc file path; single operand."
 
 ["pipelex/kit/cursor_rules.py::_iter_agent_files"]
 param = "agents_dir"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: iterates the agents dir; single operand."
 
 ["pipelex/kit/cursor_rules.py::remove_cursor_rules"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the repo root being cleaned; kit_index stays keyword."
 
 ["pipelex/kit/cursor_rules.py::update_cursor_rules"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the repo root being updated; kit context stays keyword."
 
 ["pipelex/kit/single_file_agent_rules.py::_demote_headings"]
 param = "md_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: transforms the markdown content; levels stays keyword."
 
 ["pipelex/kit/single_file_agent_rules.py::_demote_headings.demote_match"]
 param = "match"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional Callable protocol: re.sub replacement callback, invoked repl(match)."
 
 ["pipelex/kit/single_file_agent_rules.py::remove_from_targets"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the repo root being cleaned; options stay keyword."
 
 ["pipelex/kit/single_file_agent_rules.py::update_single_file_agent_rules"]
 param = "repo_root"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the repo root being updated; options stay keyword."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.add_spaces_to_inline_tables"]
 param = "toml_string"
@@ -6149,93 +6103,59 @@ seeded = true
 
 ["pipelex/reporting/cost_report_renderer.py::render_cost_report_for_output"]
 param = "pipe_output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: renders the report for the pipe output; single operand."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._emit_usage_event"]
 param = "inference_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: emits usage for the inference job; tokens_usage stays keyword."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._emit_usage_event_runner_fallback"]
 param = "inference_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/reporting/reporting_manager.py::ReportingManager._emit_via_registered_context"]
-param = "context"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: emits usage for the inference job via fallback; context stays keyword."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._report_extract_job"]
 param = "extract_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reports the extract job; single operand."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._report_img_gen_job"]
 param = "img_gen_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reports the img-gen job; single operand."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._report_llm_job"]
 param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reports the LLM job; single operand."
 
 ["pipelex/reporting/reporting_manager.py::ReportingManager._report_search_job"]
 param = "search_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/reporting/reporting_protocol.py::ReportingProtocol.clear_event_log"]
-param = "context_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reports the search job; single operand."
 
 ["pipelex/reporting/reporting_protocol.py::ReportingProtocol.report_inference_job"]
 param = "inference_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/reporting/reporting_protocol.py::ReportingProtocol.set_event_log"]
-param = "context_key"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/runtime_bridge/bootstrap.py::ensure_pipelex_booted"]
-param = "config_overrides"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: reports the inference job; single operand across implementations."
 
 ["pipelex/runtime_bridge/primitives/hydration.py::_hydrate_list_item"]
 param = "raw_item"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: hydrates the raw item; single operand."
 
 ["pipelex/runtime_bridge/primitives/hydration.py::hydrate_content"]
 param = "raw_content"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: hydrates the raw content; concept stays keyword."
 
 ["pipelex/runtime_bridge/primitives/hydration.py::hydrate_working_memory"]
 param = "working_memory_raw"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: hydrates the raw working-memory dict; single operand."
 
 ["pipelex/runtime_bridge/serialization.py::resolve_main_stuff_root_key"]
 param = "pipe_output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation from the pipe output; single operand."
 
 ["pipelex/runtime_bridge/serialization.py::serialize_completed_output"]
 param = "pipe_output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: serializes the pipe output; workflow_id stays keyword."
 
 ["pipelex/runtime_bridge/serialization.py::serialize_pipe_output"]
 param = "pipe_output"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: serializes the pipe output; single operand."
 
 ["pipelex/system/configuration/config_loader.py::ConfigLoader._override_files_for_dir"]
 param = "config_dir"
@@ -6704,33 +6624,27 @@ seeded = true
 
 ["pipelex/test_extras/shared_pytest_plugins.py::_cleanup_placeholder_env_vars"]
 param = "env_var_keys"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the env-var keys being cleaned up; single operand."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::_setup_env_var_placeholders"]
 param = "env_var_keys"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: the env-var keys being set up; single operand."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::is_inference_disabled_in_pipelex"]
 param = "request"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate inspecting the pytest request; single operand."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::needs_inference_in_pipelex"]
 param = "request"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate inspecting the pytest request; single operand."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::pytest_addoption"]
 param = "parser"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Framework-owned pytest hook signature; pluggy binds by parameter name."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::pytest_configure"]
 param = "config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Framework-owned pytest hook signature; pluggy binds by parameter name."
 
 ["pipelex/tools/aws/aws_config.py::AwsConfig.get_aws_access_keys_with_method"]
 param = "api_key_method"
@@ -8164,115 +8078,88 @@ seeded = true
 
 ["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.get_or_create"]
 param = "tracing_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.log_once_runner_fallback_engaged"]
-param = "workflow_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the event log from the tracing config; single operand."
 
 ["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog._key_condition"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation: encodes the run id into a key condition; single operand."
 
 ["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog._make_pk"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation: encodes the run id into the partition key; single operand."
 
 ["pipelex/tracing/dynamodb_event_log.py::DynamoDBEventLog._make_sk"]
 param = "workflow_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation: encodes the workflow id into the sort key; writer/sequence stay keyword."
 
 ["pipelex/tracing/event_log_factory.py::make_event_log"]
 param = "tracing_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the event log from the tracing config; writer_id stays keyword."
 
 ["pipelex/tracing/event_log_protocol.py::EventLogProtocol.cleanup"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: purges the run identified by the id; single operand across implementations."
 
 ["pipelex/tracing/event_log_protocol.py::EventLogProtocol.emit"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: emits the trace event; single operand across implementations."
 
 ["pipelex/tracing/event_log_protocol.py::EventLogProtocol.read_events"]
 param = "pipeline_run_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: reads the run identified by the id; single operand across implementations."
 
 ["pipelex/tracing/graphspec_assembler.py::GraphSpecAssembler.assemble"]
 param = "events"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: assembles the graph from the events; graph metadata stays keyword."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_batch_aggregate"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_batch_item"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_controller_output"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_edge_event"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_execution_data"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_parallel_combine"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_error"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_success"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_start"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Dispatch handler: handles the event; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._track_earliest_timestamp"]
 param = "event"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: reads the event to track its timestamp; single operand."
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState.pass_one"]
 param = "events"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "First pass over the event sequence; single operand."
 
 ["pipelex/tracing/ndjson_event_log.py::NdjsonEventLog._file_name_for"]
 param = "workflow_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Derivation: encodes the workflow id into a file name; writer_id stays keyword."
 
 ["pipelex/tracing/usage_aggregator.py::UsageAggregator.aggregate"]
 param = "events"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: aggregates the events; single operand."

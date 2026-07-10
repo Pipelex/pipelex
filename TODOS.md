@@ -140,6 +140,10 @@ Demoted public surfaces (append as you grind — the Phase 2 literal sweep alrea
 - `pipelex.cli.commands.init.config_files.init_config` (`reset`)
 - `pipelex.system.telemetry.*.is_custom_portkey_logging_enabled` / `is_pipelex_gateway_portkey_logging_enabled` (`is_debug_configured`; internal callers already keyword)
 - `pipelex.plugins.anthropic.anthropic_factory.AnthropicFactory.calculate_safe_max_tokens_for_timeout` (`timeout_seconds`)
+- `pipelex.runtime_bridge.bootstrap.ensure_pipelex_booted` (`config_overrides`) — runtime_bridge is consumed by pipelex-api / pipelex-worker; positional callers break
+- `pipelex.builder.operations` entry points `build_inputs_for_pipe` (`pipe_code`), `list_models` (`categories`), `validate_all` (`library_dirs`) — agent-CLI/MCP plumbing, but importable
+- `pipelex.errors.error_pages_generator.generate_error_pages` (`output_dir`) — dev tooling, listed for completeness
+- `pipelex.reporting` protocol methods `set_event_log` / `clear_event_log` (`context_key`) — external ReportingProtocol implementations must match
 - CLI-internal helpers (doctor/show/update/validate `*_cmd` delegates and UI builders) — almost certainly not called externally, listed for completeness in the diff, not here
 
 ### CHECKPOINT 2 — mid-grind (after roughly half the batches)

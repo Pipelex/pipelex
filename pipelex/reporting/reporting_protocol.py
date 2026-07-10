@@ -15,14 +15,14 @@ class ReportingProtocol(Protocol):
 
     def set_event_log(
         self,
-        context_key: str,
         *,
+        context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
     ) -> None: ...
 
-    def clear_event_log(self, context_key: str) -> None: ...
+    def clear_event_log(self, *, context_key: str) -> None: ...
 
 
 class ReportingNoOp(ReportingProtocol):
@@ -41,8 +41,8 @@ class ReportingNoOp(ReportingProtocol):
     @override
     def set_event_log(
         self,
-        context_key: str,
         *,
+        context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
@@ -50,5 +50,5 @@ class ReportingNoOp(ReportingProtocol):
         pass
 
     @override
-    def clear_event_log(self, context_key: str) -> None:
+    def clear_event_log(self, *, context_key: str) -> None:
         pass

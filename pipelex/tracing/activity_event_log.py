@@ -77,7 +77,7 @@ class ActivityEventLogCache:
             return cls._cached_event_log
 
     @classmethod
-    def log_once_runner_fallback_engaged(cls, workflow_id: str, *, writer_id: str) -> None:
+    def log_once_runner_fallback_engaged(cls, *, workflow_id: str, writer_id: str) -> None:
         """Log a single INFO the first time activity-side emission engages.
 
         The log is per-process; subsequent emissions from the same process are
