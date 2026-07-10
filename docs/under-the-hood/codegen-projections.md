@@ -44,6 +44,45 @@ Two command families drive the engine (formal contract: `docs/specs/pipelex-code
 
 Both codegen commands load and normalize the crate through the same shared helper the resolver uses (`pipelex/cli/commands/crate_loading.py`), so they share the resolve/validate exit-code contract. `pipelex build inputs` renders through the same `input_renderer` engine, so it and `codegen inputs` never diverge; `pipelex build structures` still uses its own always-qualified per-file generator (re-pointing it onto the bare-when-unique engine is a Phase-2 naming reconciliation, deferred so its output does not change silently).
 
+## The trust chain: stamps, lock, and the offline check
+
+Drift — generated code that no longer matches the method it was generated from — is the tax every codegen system eventually charges. The engine refuses to pay it. Every file `pipelex codegen types` writes carries a machine-parseable **stamp** header, the artifact set is recorded in a sibling **`codegen.lock`**, and `pipelex codegen check` verifies both — entirely offline.
+
+### Stamps
+
+`pipelex/codegen/stamp.py` prepends a fenced comment block (in the target's comment syntax — `#` for Python, `//` for TypeScript) to each generated file:
+
+```python
+# >>> pipelex-codegen-stamp >>>
+# crate_fingerprint: 1336e999…293f46
+# engine_version: 0.38.0
+# projection: types / python-pydantic
+# options: {}
+# content_hash: 1d074a49…6f42e4
+# <<< pipelex-codegen-stamp <<<
+```
+
+The `crate_fingerprint` is the crate's semantic hash, so reformatting or commenting a `.mthds` file never changes a stamp — only a change to the method's effective type surface does. The `content_hash` is a SHA-256 over the body **below** the stamp, so a lone file can testify that it has not been hand-edited, without the engine, the network, or the lock.
+
+### Lock
+
+`pipelex/codegen/lock.py` writes `codegen.lock` (human-diffable TOML) recording each generated artifact's path and body hash, plus the crate fingerprint and engine version the set was built against. The lock catches the one drift class per-file stamps cannot: a deleted concept whose stale generated file lingers on disk. It is a Pipelex-owned artifact, distinct from the standard's `methods.lock` (which pins remote dependency versions).
+
+### Offline check
+
+`pipelex codegen check [DIR]` (`pipelex/codegen/check.py`) is pure hashing — **no engine, no network, no API key** — so any client (this CLI, an SDK, a short CI script) implements it identically. It reports drift by category:
+
+- **missing** — an artifact in the lock is absent on disk;
+- **modified** — a file's body no longer matches its locked hash;
+- **hand-edited** — a file's stamp is stripped or its recorded content hash no longer matches the body;
+- **orphan** — a stamped generated file on disk that the lock does not track.
+
+The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current, `1` drift present, `2` no lock found. Regeneration against the engine is a **dev action**; the offline check is the **CI action** — so template improvements never redden a consumer's CI.
+
+### Idempotent emission
+
+`pipelex/codegen/emission.py` ties it together: it stamps each body, writes each file only when its content changed (write-if-changed — no mtime churn, clean diffs, watch-mode friendly), removes any previously-tracked stamped file that dropped out of the set, and rewrites the lock. Only files the tool itself stamped are ever removed, so a hand-authored file sharing the output directory is never touched.
+
 ## Surfacing imprecision, never guessing
 
 A deterministic tool that guesses is a liability. Where a resolved type carries an imprecision marker, the emitter surfaces it rather than inventing a shape:

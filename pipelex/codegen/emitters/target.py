@@ -1,14 +1,25 @@
-"""The codegen `target` axis and the emitted-file unit shared by every emitter.
+"""The two codegen axes (`kind` and `target`) and the emitted-file unit shared by every emitter.
 
-`target` is the *for-whom* axis of codegen (see `docs/specs/pipelex-codegen.md` → "Two axes"): a
-language / idiom flavor. An emitter returns one or more `EmittedFile`s — a filename relative to the
+Codegen has exactly two explicit axes (see `docs/specs/pipelex-codegen.md` → "Two axes"): `kind` is
+*what* to project (`types` over the concept set, `inputs` per pipe, …), `target` is *for whom* (a
+language / idiom flavor). An emitter returns one or more `EmittedFile`s — a filename relative to the
 output root plus its content — so a single projection can span more than one file (the ts-zod purity
-split: a pure types file now, a thin binder file later).
+split: a pure types file plus a thin binder file). The `kind`/`target` pair is what a generated file's
+stamp records as its projection.
 """
 
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict
+
+
+class CodegenKind(StrEnum):
+    """A codegen projection `kind` — the *what* axis. Only the kinds that emit tracked artifacts today
+    are listed: `types` (over the concept set) and `inputs` (per pipe). Recorded in a file's stamp.
+    """
+
+    TYPES = "types"
+    INPUTS = "inputs"
 
 
 class CodegenTarget(StrEnum):

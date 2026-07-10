@@ -17,6 +17,7 @@ import typer
 from pipelex.cli.commands.codegen.inputs_cmd import codegen_inputs_cmd
 from pipelex.cli.commands.codegen.types_cmd import codegen_types_cmd
 from pipelex.codegen.emitters.target import CodegenTarget, EmittedFile
+from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 from pipelex.libraries.library_crate import LibraryCrate
@@ -41,16 +42,22 @@ class TestCodegenCli:
         telemetry_manager = mocker.patch(f"{module}.get_telemetry_manager").return_value
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
 
-    def test_types_writes_every_emitted_file_exit_0(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_types_writes_every_emitted_stamped_and_locked_exit_0(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)
-        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=mocker.MagicMock())
+        crate = LibraryCrate(fingerprint="deadbeef")
+        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=crate)
         mocker.patch(
             f"{TYPES}.emit_types",
-            return_value=[EmittedFile(filename="types.ts", content="// types"), EmittedFile(filename="binder.ts", content="// binder")],
+            return_value=[EmittedFile(filename="types.ts", content="// types\n"), EmittedFile(filename="binder.ts", content="// binder\n")],
         )
         codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
-        assert (tmp_path / "types.ts").read_text(encoding="utf-8") == "// types"
-        assert (tmp_path / "binder.ts").read_text(encoding="utf-8") == "// binder"
+        # Each file is stamped (self-describing) with the body preserved below the stamp, and locked.
+        types_text = (tmp_path / "types.ts").read_text(encoding="utf-8")
+        assert types_text.startswith("// >>> pipelex-codegen-stamp >>>")
+        assert "crate_fingerprint: deadbeef" in types_text
+        assert types_text.endswith("// types\n")
+        assert (tmp_path / "binder.ts").read_text(encoding="utf-8").endswith("// binder\n")
+        assert (tmp_path / CODEGEN_LOCK_FILENAME).is_file()
 
     def test_types_invalid_library_verdict_propagates(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=TYPES)

@@ -17,13 +17,13 @@ from posthog import tag
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.codegen.emitters.target import CodegenTarget
+from pipelex.codegen.emission import write_stamped_projection
+from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.hub import get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, save_text_to_path
 from pipelex.tools.misc.package_utils import get_package_version
 
 COMMAND = "codegen"
@@ -62,10 +62,20 @@ def codegen_types_cmd(
             crate = load_normalized_crate_or_exit(library_dirs=combined_dirs or None)
 
             emitted = emit_types(crate, target=target)
-            for emitted_file in emitted:
-                destination = output_root / emitted_file.filename
-                ensure_directory_for_file_path(file_path=destination)
-                save_text_to_path(text=emitted_file.content, path=destination)
-                typer.secho(f"Generated {destination}", fg=typer.colors.GREEN)
+            report = write_stamped_projection(
+                emitted,
+                output_dir=output_root,
+                crate_fingerprint=crate.fingerprint,
+                engine_version=get_package_version(),
+                kind=CodegenKind.TYPES,
+                target=target,
+            )
+            for filename in report.written:
+                typer.secho(f"Generated {output_root / filename}", fg=typer.colors.GREEN)
+            for filename in report.unchanged:
+                typer.secho(f"Unchanged {output_root / filename}", fg=typer.colors.BLUE)
+            for filename in report.removed:
+                typer.secho(f"Removed stale {output_root / filename}", fg=typer.colors.YELLOW)
+            typer.secho(f"Locked {output_root / report.lock_path}", fg=typer.colors.GREEN)
     finally:
         Pipelex.teardown_if_needed()
