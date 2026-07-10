@@ -4350,108 +4350,87 @@ seeded = true
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.add_spaces_to_inline_tables"]
 param = "toml_string"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: transforms the TOML string; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.add_spaces_to_inline_tables.find_and_replace_inline_tables"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Nested helper transforming the text; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.convert_dicts_to_inline_tables"]
 param = "value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the value being recursively converted; field_ordering stays keyword."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.convert_mapping_to_table"]
 param = "mapping"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the mapping being converted to a table; field_ordering stays keyword."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.dict_to_mthds_styled_toml"]
 param = "data"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Conversion: the data dict being rendered to styled TOML; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.format_tomlkit_string"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: formats the text as a tomlkit string node; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.make_construct_table"]
 param = "construct_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the table from the construct mapping; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.make_mthds_content"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: renders the bundle blueprint to .mthds content; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.make_table_obj_for_concept"]
 param = "section_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the table from the concept section mapping; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.make_table_obj_for_pipe"]
 param = "section_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the table from the pipe section mapping; single operand."
 
 ["pipelex/language/mthds_factory.py::MthdsFactory.make_template_table"]
 param = "template_value"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: builds the table from the template mapping; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_add_taplo_metadata"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_convert_to_draft4"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_draft4_visitor"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Positional Callable protocol: passed as _walk_schema visitor, invoked visitor(node)."
 
 ["pipelex/language/mthds_schema_generator.py::_patch_construct_schema"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_promote_schema_required_fields"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_remove_from_required"]
 param = "schema_obj"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: mutates the schema object's required list; field_names stays keyword."
 
 ["pipelex/language/mthds_schema_generator.py::_remove_internal_fields"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_require_type_on_pipe_definitions"]
 param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Schema-pipeline stage transforming the schema dict; single operand."
 
 ["pipelex/language/mthds_schema_generator.py::_walk_schema"]
 param = "node"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: walks the schema node tree; the visitor stays keyword."
 
 ["pipelex/language/toml_string_utils.py::format_toml_string"]
 param = "text"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: formats the text; formatting options stay keyword."
 
 ["pipelex/libraries/concept/concept_library.py::ConceptLibrary.get_optional_concept"]
 param = "concept_ref"
@@ -4805,48 +4784,35 @@ seeded = true
 
 ["pipelex/observer/observer_protocol.py::ObserverProtocol.observe_after_failing_run"]
 param = "payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: observes the run payload; single operand across implementations."
 
 ["pipelex/observer/observer_protocol.py::ObserverProtocol.observe_after_successful_run"]
 param = "payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: observes the run payload; single operand across implementations."
 
 ["pipelex/observer/observer_protocol.py::ObserverProtocol.observe_before_run"]
 param = "payload"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Protocol method: observes the run payload; single operand across implementations."
 
 ["pipelex/pipe_controllers/batch/pipe_batch.py::PipeBatch._live_run_controller_pipe._run_branch"]
 param = "item_input_stuff"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: runs the branch for the item stuff; invoked positionally via functools.partial."
 
 ["pipelex/pipe_controllers/batch/pipe_batch.py::resolve_batch_max_concurrency"]
 param = "max_concurrency_setting"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/pipe_controllers/condition/pipe_condition.py::PipeCondition._evaluate_expression"]
-param = "working_memory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: resolves the config setting value; single operand, callers pass a labelled config read."
 
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_continue"]
 param = "outcome"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the outcome string; single operand."
 
 ["pipelex/pipe_controllers/condition/special_outcome.py::SpecialOutcome.is_fail"]
 param = "outcome"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Predicate on the outcome string; single operand."
 
 ["pipelex/pipe_controllers/sub_pipe_factory.py::SubPipeFactory.make_from_blueprint"]
 param = "blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Factory from source: the name names the operand; single obvious operand."
 
 ["pipelex/pipe_operators/compose/construct_blueprint.py::ConstructBlueprint.make_from_raw"]
 param = "raw"
@@ -5220,13 +5186,11 @@ seeded = true
 
 ["pipelex/pipe_signature/signature_walk.py::collect_signature_paths"]
 param = "pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: walks from the root pipe; accumulators stay keyword."
 
 ["pipelex/pipe_signature/signature_walk.py::collect_signature_refs"]
 param = "pipe"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
+rationale = "Verb-object: walks from the root pipe; visited set stays keyword."
 
 ["pipelex/pipelex.py::Pipelex._get_config_file_not_found_error_msg"]
 param = "component_name"

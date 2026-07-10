@@ -196,6 +196,7 @@ class PipeCondition(PipeController):
 
     async def _evaluate_expression(
         self,
+        *,
         working_memory: WorkingMemory,
     ) -> str:
         """Evaluate the conditional expression and select the appropriate pipe.
