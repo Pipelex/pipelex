@@ -17,17 +17,22 @@ The verdict rides the structured `CodegenCheckReport`, never the exit code alone
 artifacts are enumerated by category.
 """
 
+from collections.abc import Iterator
 from enum import StrEnum
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, CodegenLock, load_lock
-from pipelex.codegen.stamp import comment_prefix_for, compute_content_hash, has_stamp, parse_stamped
+from pipelex.codegen.stamp import STAMPABLE_SUFFIXES, comment_prefix_for, compute_content_hash, has_stamp, parse_stamped
 from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
-_STAMPABLE_SUFFIXES = {".py", ".ts"}
+# Vendor / VCS / cache directories that never hold generated output — pruned from the orphan scan so a
+# `codegen check` at a project root does not read (and choke on) unrelated files under them.
+_SKIP_DIRS = frozenset(
+    {".git", ".hg", ".svn", ".venv", "venv", "node_modules", "__pycache__", "dist", "build", ".next", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+)
 
 
 class DriftCategory(StrEnum):
@@ -96,7 +101,9 @@ def _check_locked_artifacts(*, root: Path, lock: CodegenLock) -> list[CodegenDri
 
 
 def _check_present_artifact(*, path: str, file_path: Path, locked_hash: str) -> CodegenDrift | None:
-    text = load_text_from_path(file_path)
+    text = _read_text_or_none(file_path)
+    if text is None:
+        return CodegenDrift(path=path, category=DriftCategory.HAND_EDITED, detail="File is not valid UTF-8 — not generated output.")
     parsed = parse_stamped(text, comment_prefix=comment_prefix_for(path))
     if parsed is None:
         return CodegenDrift(path=path, category=DriftCategory.HAND_EDITED, detail="Stamp header is missing or unparseable.")
@@ -111,14 +118,12 @@ def _check_present_artifact(*, path: str, file_path: Path, locked_hash: str) -> 
 def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
     tracked = lock.paths()
     orphans: list[CodegenDrift] = []
-    for file_path in sorted(root.rglob("*")):
-        if not file_path.is_file() or file_path.suffix not in _STAMPABLE_SUFFIXES:
-            continue
+    for file_path in _iter_stampable_files(root):
         relative = file_path.relative_to(root).as_posix()
         if relative in tracked:
             continue
-        text = load_text_from_path(file_path)
-        if has_stamp(text, comment_prefix=comment_prefix_for(relative)):
+        text = _read_text_or_none(file_path)
+        if text is not None and has_stamp(text, comment_prefix=comment_prefix_for(relative)):
             orphans.append(
                 CodegenDrift(
                     path=relative,
@@ -127,3 +132,21 @@ def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
                 )
             )
     return orphans
+
+
+def _iter_stampable_files(directory: Path) -> Iterator[Path]:
+    """Yield stampable files under `directory`, pre-order and deterministic, pruning vendor/VCS dirs."""
+    for entry in sorted(directory.iterdir()):
+        if entry.is_dir():
+            if entry.name not in _SKIP_DIRS:
+                yield from _iter_stampable_files(entry)
+        elif entry.suffix in STAMPABLE_SUFFIXES:
+            yield entry
+
+
+def _read_text_or_none(path: Path) -> str | None:
+    """Read UTF-8 text, or `None` if the file is not valid UTF-8 (so it cannot be our generated output)."""
+    try:
+        return load_text_from_path(path)
+    except UnicodeDecodeError:
+        return None

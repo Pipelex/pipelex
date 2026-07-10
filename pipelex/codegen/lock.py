@@ -21,7 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.exceptions import CodegenLockError
 from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.file_utils import failable_load_text_from_path
+from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.misc.toml_utils import load_toml_from_content
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -75,13 +75,14 @@ def encode_lock(lock: CodegenLock) -> str:
 
 def load_lock(lock_path: Path) -> CodegenLock | None:
     """Read and parse a `codegen.lock`, or `None` if it does not exist. Raises on a malformed lock."""
-    content = failable_load_text_from_path(lock_path)
-    if content is None:
+    if not lock_path.is_file():
         return None
     try:
+        content = load_text_from_path(lock_path)
         data = load_toml_from_content(content)
         return CodegenLock.model_validate(data)
     except (TomlError, ValueError, TypeError) as exc:
-        # TomlError = malformed TOML; ValueError = pydantic ValidationError on a shape mismatch.
+        # TomlError = malformed TOML; UnicodeDecodeError/ValueError = non-UTF-8 bytes or a pydantic
+        # ValidationError on a shape mismatch (UnicodeDecodeError is a ValueError subclass).
         msg = f"Malformed codegen lock at '{lock_path}': {exc}"
         raise CodegenLockError(msg) from exc

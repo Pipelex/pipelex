@@ -38,3 +38,9 @@ class TestLock:
         lock_path.write_text("this is not = valid = toml [[", encoding="utf-8")
         with pytest.raises(CodegenLockError):
             load_lock(lock_path)
+
+    def test_non_utf8_lock_raises_clean_error_not_a_crash(self, tmp_path: Path) -> None:
+        lock_path = tmp_path / CODEGEN_LOCK_FILENAME
+        lock_path.write_bytes(b"\xff\xfe not valid utf-8")
+        with pytest.raises(CodegenLockError):
+            load_lock(lock_path)

@@ -28,6 +28,9 @@ _END_MARKER = "<<< pipelex-codegen-stamp <<<"
 
 _COMMENT_PREFIX_BY_SUFFIX = {".py": "#", ".ts": "//"}
 
+# The file suffixes codegen stamps — the single source of truth (the offline check derives from this).
+STAMPABLE_SUFFIXES = frozenset(_COMMENT_PREFIX_BY_SUFFIX)
+
 
 class CodegenStamp(BaseModel):
     """The self-describing header of one generated file (everything but the body it protects)."""

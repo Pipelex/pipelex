@@ -72,3 +72,32 @@ class TestCheck:
         (tmp_path / "hand_written.py").write_text("x = 1\n", encoding="utf-8")  # no stamp -> not our artifact
         report = run_codegen_check(root=tmp_path)
         assert report.is_current
+
+    def test_non_utf8_tracked_file_is_hand_edited_not_a_crash(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        (tmp_path / "models.py").write_bytes(b"\xff\xfe not valid utf-8")
+        report = run_codegen_check(root=tmp_path)  # must not raise
+        assert any(d.path == "models.py" and d.category == DriftCategory.HAND_EDITED for d in report.drifts)
+
+    def test_non_utf8_stray_file_is_ignored_not_a_crash(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        (tmp_path / "legacy.py").write_bytes(b"# caf\xe9\n")  # latin-1 bytes, unrelated file
+        report = run_codegen_check(root=tmp_path)  # orphan scan must not choke on it
+        assert report.is_current
+
+    def test_orphan_scan_prunes_vendor_directories(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        # A stamped file buried in a vendor dir must not be flagged as an orphan (the scan prunes it).
+        vendor = tmp_path / "node_modules" / "pkg"
+        vendor.mkdir(parents=True)
+        (vendor / "types.ts").write_text((tmp_path / "models.py").read_text(encoding="utf-8"), encoding="utf-8")
+        report = run_codegen_check(root=tmp_path)
+        assert report.is_current
+
+    def test_nested_stamped_orphan_is_detected(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        nested = tmp_path / "sub" / "deep"
+        nested.mkdir(parents=True)
+        (nested / "stray.py").write_text((tmp_path / "models.py").read_text(encoding="utf-8"), encoding="utf-8")
+        report = run_codegen_check(root=tmp_path)
+        assert any(d.path == "sub/deep/stray.py" and d.category == DriftCategory.ORPHAN for d in report.drifts)
