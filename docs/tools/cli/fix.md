@@ -65,3 +65,4 @@ Only fixes classified as SAFE are applied — deterministic corrections derived 
 ## Related Documentation
 
 - [Validate Commands](validate.md) - Where suggested fixes are surfaced
+- [Error Model — suggested fixes](../../under-the-hood/error-model.md#suggested_fix-structured-deterministic-fixes) - The `SuggestedFix` wire model, the fix planner, and the patch-op vocabulary

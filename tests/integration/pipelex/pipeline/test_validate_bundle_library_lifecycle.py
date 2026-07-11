@@ -1,10 +1,9 @@
 """Pin: an opened library is torn down when bundle-validation fails.
 
-Every bundle-loading entry point (``validate_bundle``,
-``validate_bundles_from_directory``, ``load_concepts_only``,
-``load_concepts_only_from_directory``) calls ``library_manager.open_library()``
+Both bundle-loading entry points (``validate_bundle`` and
+``validate_bundles_from_directory``) call ``library_manager.open_library()``
 before doing any work. When the body raises (including a translated
-``ValidateBundleError`` from ``_translate_to_validate_bundle_error``), the
+``ValidateBundleError`` from ``translate_to_validate_bundle_error``), the
 opened library must be torn down so the process does not accumulate one
 un-torn-down ``Library`` per failed validation.
 
@@ -35,8 +34,6 @@ from pipelex.hub import clear_current_library, get_current_library, get_library_
 from pipelex.pipeline import validate_bundle as validate_bundle_module
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (
-    load_concepts_only,
-    load_concepts_only_from_directory,
     validate_bundle,
     validate_bundles_from_directory,
 )
@@ -104,46 +101,6 @@ class TestValidateBundleLibraryLifecycle:
             teardown_calls_before = teardown_spy.call_count
             with pytest.raises(ValidateBundleError):
                 await validate_bundles_from_directory(directory=Path(tmp_dir))
-        assert teardown_spy.call_count == teardown_calls_before + 1
-        latest_call = teardown_spy.call_args_list[-1]
-        opened_library_id, _ = open_library_spy.spy_return
-        assert latest_call.kwargs["library_id"] == opened_library_id
-
-    async def test_load_concepts_only_tears_down_library_on_translated_error(
-        self,
-        load_empty_library: Callable[[], str],
-        mocker: MockerFixture,
-    ) -> None:
-        load_empty_library()
-        library_manager = get_library_manager()
-        open_library_spy = mocker.spy(library_manager, "open_library")
-        teardown_spy = mocker.spy(library_manager, "teardown")
-        mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
-
-        teardown_calls_before = teardown_spy.call_count
-        with pytest.raises(ValidateBundleError):
-            load_concepts_only(mthds_contents=[_VALID_MTHDS])
-        assert teardown_spy.call_count == teardown_calls_before + 1
-        latest_call = teardown_spy.call_args_list[-1]
-        opened_library_id, _ = open_library_spy.spy_return
-        assert latest_call.kwargs["library_id"] == opened_library_id
-
-    async def test_load_concepts_only_from_directory_tears_down_library_on_translated_error(
-        self,
-        load_empty_library: Callable[[], str],
-        mocker: MockerFixture,
-    ) -> None:
-        load_empty_library()
-        library_manager = get_library_manager()
-        open_library_spy = mocker.spy(library_manager, "open_library")
-        teardown_spy = mocker.spy(library_manager, "teardown")
-        mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            (Path(tmp_dir) / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
-            teardown_calls_before = teardown_spy.call_count
-            with pytest.raises(ValidateBundleError):
-                load_concepts_only_from_directory(directory=Path(tmp_dir))
         assert teardown_spy.call_count == teardown_calls_before + 1
         latest_call = teardown_spy.call_args_list[-1]
         opened_library_id, _ = open_library_spy.spy_return
@@ -219,36 +176,6 @@ class TestValidateBundleLibraryLifecycle:
         opened_library_id, _ = open_library_spy.spy_return
         assert latest_call.kwargs["library_id"] == opened_library_id
 
-    async def test_load_concepts_only_tears_down_on_resolve_library_dirs_failure(
-        self,
-        load_empty_library: Callable[[], str],
-        mocker: MockerFixture,
-    ) -> None:
-        """Pin: same pre-try-leak guarantee for the concepts-only entry point.
-
-        The concepts-only path also calls ``resolve_library_dirs`` between
-        ``open_library`` and the helper ``with`` block. The fix applies
-        symmetrically to both entry points that consume ``library_dirs``.
-        """
-        load_empty_library()
-        library_manager = get_library_manager()
-        open_library_spy = mocker.spy(library_manager, "open_library")
-        teardown_spy = mocker.spy(library_manager, "teardown")
-        mocker.patch.object(
-            validate_bundle_module,
-            "resolve_library_dirs",
-            side_effect=TypeError("simulated invalid library_dirs element"),
-        )
-
-        teardown_calls_before = teardown_spy.call_count
-        with pytest.raises(TypeError):
-            load_concepts_only(mthds_contents=[_VALID_MTHDS])
-
-        assert teardown_spy.call_count == teardown_calls_before + 1
-        latest_call = teardown_spy.call_args_list[-1]
-        opened_library_id, _ = open_library_spy.spy_return
-        assert latest_call.kwargs["library_id"] == opened_library_id
-
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestValidateBundleRestoresOuterLibraryOnFailure:
@@ -261,9 +188,8 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
     set — clearing it strands every subsequent ``get_current_library()`` in
     the same async context with ``RuntimeError: No current library set``.
 
-    Covers all four entry points that touch ``_library_id``:
-    ``validate_bundle``, ``validate_bundles_from_directory``,
-    ``load_concepts_only``, ``load_concepts_only_from_directory``.
+    Covers both entry points that touch ``_library_id``:
+    ``validate_bundle`` and ``validate_bundles_from_directory``.
     """
 
     async def test_validate_bundle_restores_previous_current_library(
@@ -294,38 +220,6 @@ class TestValidateBundleRestoresOuterLibraryOnFailure:
                 (Path(tmp_dir) / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
                 with pytest.raises(ValidateBundleError):
                     await validate_bundles_from_directory(directory=Path(tmp_dir))
-            assert get_current_library() == outer_library_id
-        finally:
-            clear_current_library()
-
-    async def test_load_concepts_only_restores_previous_current_library(
-        self,
-        load_empty_library: Callable[[], str],
-        mocker: MockerFixture,
-    ) -> None:
-        outer_library_id = load_empty_library()
-        set_current_library(library_id=outer_library_id)
-        try:
-            mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
-            with pytest.raises(ValidateBundleError):
-                load_concepts_only(mthds_contents=[_VALID_MTHDS])
-            assert get_current_library() == outer_library_id
-        finally:
-            clear_current_library()
-
-    async def test_load_concepts_only_from_directory_restores_previous_current_library(
-        self,
-        load_empty_library: Callable[[], str],
-        mocker: MockerFixture,
-    ) -> None:
-        outer_library_id = load_empty_library()
-        set_current_library(library_id=outer_library_id)
-        try:
-            mocker.patch.object(validate_bundle_module, "LoadConceptsOnlyResult", _BrokenResult)
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                (Path(tmp_dir) / "test.mthds").write_text(_VALID_MTHDS, encoding="utf-8")
-                with pytest.raises(ValidateBundleError):
-                    load_concepts_only_from_directory(directory=Path(tmp_dir))
             assert get_current_library() == outer_library_id
         finally:
             clear_current_library()

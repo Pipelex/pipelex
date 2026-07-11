@@ -15,6 +15,7 @@ from pipelex.cli.agent_cli.commands.agent_output import AGENT_ERROR_DOMAINS, AGE
 # Modules defining every PipelexError subclass referenced by the lookup dicts.
 # Imported so PipelexError.__subclasses__() sees them when the registry is built.
 _EXCEPTION_MODULES: tuple[str, ...] = (
+    "pipelex.codegen.exceptions",
     "pipelex.cogt.exceptions",
     "pipelex.core.interpreter.exceptions",
     "pipelex.core.pipes.exceptions",
@@ -45,6 +46,8 @@ _NON_PIPELEX_ERROR_KEYS: frozenset[str] = frozenset(
         "FixBundleError",  # synthetic error_type label
         "GraphSpecParseError",  # synthetic error_type label
         "BundleError",  # synthetic error_type label
+        "CodegenDriftError",  # synthetic error_type label (a drift verdict, not an exception)
+        "CodegenLockNotFoundError",  # synthetic error_type label
         "InitConfigError",  # synthetic error_type label
         "UnknownCommandError",  # synthetic error_type label
     }

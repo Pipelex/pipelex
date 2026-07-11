@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import io
 import json
 from typing import TYPE_CHECKING, Any
@@ -11,6 +12,7 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs, resolve_stdin_inputs
+from pipelex.core.stuffs.time_content import TimeContent
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -365,21 +367,15 @@ class TestStdinResolver:
         assert envelope["error_domain"] == "input"
         assert "hint" in envelope
 
-    def test_inputs_toml_time_only_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """A bare TOML time-of-day input emits the time-only-not-supported envelope with the include-a-date hint."""
-        set_agent_cli_error_format(CliOutputFormat.JSON)
+    def test_inputs_toml_time_only_becomes_time_content(self, tmp_path: Path) -> None:
+        """A bare TOML time-of-day input maps to a native Time content (no rejection since native.Time exists)."""
         toml_file = tmp_path / "inputs.toml"
         toml_file.write_text("opening = 09:00:00\n", encoding="utf-8")
 
-        with pytest.raises(typer.Exit) as exc_info:
-            parse_cli_inputs(inputs_arg=str(toml_file))
+        parsed = parse_cli_inputs(inputs_arg=str(toml_file))
 
-        assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "InputsTimeOnlyNotSupportedError"
-        assert envelope["error_domain"] == "input"
-        assert "opening" in envelope["message"]
-        assert "no date to attach to" in envelope["hint"]
+        assert parsed.pipeline_inputs is not None
+        assert parsed.pipeline_inputs["opening"] == TimeContent(time=datetime.time(9, 0))
 
     def test_inputs_json_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Invalid JSON in a .json inputs file emits a JSONDecodeError envelope (not a raw traceback)."""

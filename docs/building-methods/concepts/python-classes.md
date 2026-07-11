@@ -100,13 +100,13 @@ The easiest way to get Python classes is to use `pipelex build structures`:
 pipelex build structures ./my_pipelines/
 ```
 
-This generates Python classes from your inline definitions, giving you type hints and IDE autocomplete without writing boilerplate.
+This generates a single stamped `structures.py` module from your inline definitions, giving you type hints and IDE autocomplete without writing boilerplate. Generated files are never edited in place — they are overwritten on every regeneration, and `pipelex codegen check` flags hand edits as drift.
 
 ### When You Need Custom Logic
 
 If you need custom validation or computed properties, you have two options:
 
-1. **Generate then customize**: Run `pipelex build structures`, then add your custom logic to the generated files
+1. **Generate then copy**: Run `pipelex build structures`, then copy the generated class into your own module and customize it there
 2. **Write from scratch**: Create a Python class manually with your custom logic
 
 ### Example: Adding Custom Validation
@@ -131,7 +131,7 @@ pipelex build structures ./my_pipeline.mthds -o ./structures/
 
 **Step 3: Add custom validation**
 
-Edit the generated file to add your validation:
+Copy the generated class into your own module (never edit the generated file — it is overwritten on regeneration) and add your validation:
 
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -168,7 +168,7 @@ The Python class is automatically discovered and registered.
 
 ### From Inline Structure to Python Class
 
-The easiest migration path is to use `pipelex build structures` to generate the Python class, then customize it:
+The easiest migration path is to use `pipelex build structures` to generate the Python class, then copy it into your own module and customize it there:
 
 **1. You have this inline structure:**
 
@@ -191,7 +191,7 @@ in_stock = { type = "boolean", description = "Stock availability", default_value
 pipelex build structures ./ecommerce.mthds -o ./structures/
 ```
 
-**3. Add your custom logic** to the generated file:
+**3. Copy the generated class into your own module** and add your custom logic:
 
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent

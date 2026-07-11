@@ -5,7 +5,7 @@ from datetime import date, datetime
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 
 
@@ -157,6 +157,21 @@ class TestConceptStructureBlueprintValidation:
         # Dict type without value_type
         with pytest.raises(ValidationError, match="value_type must not be empty"):
             ConceptStructureBlueprint(description="Dict field without value_type", type=ConceptStructureBlueprintFieldType.DICT, key_type="text")
+
+    @pytest.mark.parametrize("key_type", ["integer", "boolean", "date"])
+    def test_dict_rejects_non_text_key_type(self, key_type: str):
+        with pytest.raises(ValidationError, match="key_type must be 'text'"):
+            ConceptStructureBlueprint(
+                description="Unsupported map key",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type=key_type,
+                value_type="text",
+            )
+
+    @pytest.mark.parametrize("field_name", ["not-valid", "2fast", "class"])
+    def test_concept_rejects_field_names_that_are_not_python_identifiers(self, field_name: str):
+        with pytest.raises(ValidationError, match="valid Python identifiers"):
+            ConceptBlueprint(description="Invalid field name", structure={field_name: "A value"})
 
     def test_edge_cases(self):
         """Test edge cases for validation."""

@@ -6,7 +6,7 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 Two independent options control the two output streams:
 
-- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
+- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `codegen types`, `codegen check`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
 - `--error-format markdown|json` — **error reporting** (stderr). Optional. When omitted, **inherits the value of `--format`**, so `--format json` still flips both as it did historically. Accepted by the same commands as `--format`.
 
 Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, log-level/runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
@@ -66,6 +66,10 @@ commands/
     bundle_cmd.py              # inputs bundle — inputs from bundle file/directory
     method_cmd.py              # inputs method — inputs for installed method
     _inputs_core.py            # Shared inputs logic
+  codegen/                     # codegen — crate projections + offline drift check
+    app.py                     # codegen_app Typer, subcommand registration
+    types_cmd.py               # codegen types — project the crate's concept set (stamped files + codegen.lock)
+    check_cmd.py               # codegen check — offline drift check (pure hashing, no Pipelex boot)
   fmt_cmd.py                   # fmt — format file via plxt passthrough
   lint_cmd.py                  # lint — lint file via plxt passthrough
   plxt_passthrough.py          # Shared helper for plxt subprocess delegation
@@ -88,6 +92,7 @@ commands/
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates an example inputs template for a pipe/bundle/method (pipe\|bundle\|method subcommands). `--format json\|toml` (template serialization, default: json — NOT the markdown\|json pair); `toml` prints raw TOML to stdout |
+| `codegen` | Agent mirror of the bare `pipelex codegen` family (types\|check subcommands). `types --target <flavor>` resolves the closure into the normalized crate and writes stamped typed artifacts + `codegen.lock` (write-if-changed); `check` is the offline drift check (pure hashing, no Pipelex boot — exit 0 current, 1 drift as a structured `CodegenDriftError` with `drifts[]`, 2 no/unreadable lock). Both: `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Converts a JSON pipe spec into raw TOML (stdout). A spec with a `type` (via `--type` or a `type` key) is that concrete pipe; a **typeless** spec (no `type`) is a signature and renders a `[pipe.x]` section with no type line. An explicit `type = "PipeSignature"` is rejected with a migration error — `PipeSignature` is not a type. |
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |

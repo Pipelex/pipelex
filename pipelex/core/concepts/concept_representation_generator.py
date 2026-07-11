@@ -9,7 +9,6 @@ import inspect
 import random
 import types
 import typing
-import uuid
 from enum import StrEnum
 from typing import Any, Union, cast, get_args, get_origin
 
@@ -39,8 +38,19 @@ class ConceptRepresentationGenerator:
         {"concept": "domain.ConceptCode", "content": "MyClass(field1='value1', ...)"}
     """
 
-    def __init__(self, output_format: ConceptRepresentationFormat):
+    def __init__(self, output_format: ConceptRepresentationFormat, *, class_name_overrides: dict[str, str] | None = None):
+        """Initialize the generator.
+
+        Args:
+            output_format: The representation format to generate.
+            class_name_overrides: Optional runtime-class-name -> rendered-name mapping. Python
+                representations spell class names as the runtime classes are named; a caller that
+                pairs the representation with codegen-emitted classes (whose names may differ, e.g.
+                bare-when-unique vs domain-qualified) passes the mapping so instantiation code and
+                ``imports_needed`` use the emitted spellings.
+        """
         self.output_format = output_format
+        self._class_name_overrides = class_name_overrides or {}
         self._imports_needed: set[str] = set()
 
     @property
@@ -91,7 +101,7 @@ class ConceptRepresentationGenerator:
         Returns:
             Dict (JSON) or string (Python) representing the class
         """
-        class_name = content_class.__name__
+        class_name = self._class_name_overrides.get(content_class.__name__, content_class.__name__)
         self._imports_needed.add(class_name)
 
         fields_dict = self._generate_fields_dict(content_class, include_optional=include_optional)
@@ -273,7 +283,7 @@ class ConceptRepresentationGenerator:
         Returns:
             Dict (JSON) or string (Python)
         """
-        class_name = model_class.__name__
+        class_name = self._class_name_overrides.get(model_class.__name__, model_class.__name__)
         self._imports_needed.add(class_name)
 
         fields_dict: dict[str, Any] = {}
@@ -303,7 +313,10 @@ class ConceptRepresentationGenerator:
         """
         if actual_type is str:
             if field_name == "url" or field_name.endswith("_url"):
-                return f"https://mock-{uuid.uuid4().hex[:8]}.invalid/{uuid.uuid4()}"
+                # Deterministic on purpose: these placeholders land in committed inputs templates
+                # (`codegen inputs` / `build inputs`), where a random URL would churn on every regen.
+                # `.invalid` is a reserved TLD, so the URL can never resolve.
+                return f"https://mock.invalid/{field_name}"
             return f"{field_name}_value"
         elif actual_type is int:
             return 0

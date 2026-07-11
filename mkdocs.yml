@@ -308,6 +308,7 @@ plugins:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
+        - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"

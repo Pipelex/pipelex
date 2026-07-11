@@ -1,0 +1,112 @@
+"""The `pipelex resolve` 0/1/2 exit-code policy (mirrors the bare `validate` group).
+
+Policy: exit 0 = resolved (crate emitted); exit 1 = a produced NEGATIVE VERDICT (the library is
+invalid, so no crate can be produced); exit 2 = NO VERDICT (empty closure, file-not-found). The
+verdict cases mock the resolve internals — boot/teardown are neutralized so no real Pipelex is made.
+The real end-to-end exit codes against the binary are pinned by the conformance suite.
+"""
+
+from __future__ import annotations
+
+import contextlib
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+import pytest
+import typer
+
+from pipelex.cli.commands.crate_loading import load_normalized_crate
+from pipelex.cli.commands.resolve_cmd import resolve_cmd
+from pipelex.codegen.crate_encoding import CrateEncoding
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
+
+if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
+    from pytest_mock import MockerFixture
+
+MODULE = "pipelex.cli.commands.resolve_cmd"
+# The load/normalize/library-manager seams now live in the shared crate-loading helper, so the
+# verdict-path patches target that module; boot/teardown/encode still live on resolve_cmd.
+CRATE_LOADING = "pipelex.cli.commands.crate_loading"
+
+
+class TestResolveExitCodes:
+    """The resolve 0/1/2 exit-code policy, with boot/teardown mocked out."""
+
+    def _neutralize_boot(self, mocker: MockerFixture) -> MagicMock:
+        boot = mocker.patch(f"{MODULE}.make_pipelex_for_cli")
+        mocker.patch(f"{MODULE}.Pipelex.teardown_if_needed")
+        mocker.patch(f"{MODULE}.tag")
+        telemetry_manager = mocker.patch(f"{MODULE}.get_telemetry_manager").return_value
+        # A real null context manager — a bare MagicMock would suppress the exception under test.
+        telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
+        return boot
+
+    def test_invalid_library_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", side_effect=LibraryLoadingError("invalid library"))
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert exc_info.value.exit_code == 1
+
+    def test_pipe_conflict_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
+        # A duplicate-pipe-across-bundles conflict surfaces as PipeLibraryError (a LibraryError sibling
+        # of LibraryLoadingError, not a subclass): still an invalid-library negative verdict -> exit 1.
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", side_effect=PipeLibraryError("duplicate pipe across bundles"))
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert exc_info.value.exit_code == 1
+
+    def test_empty_closure_is_no_verdict_exit_2(self, mocker: MockerFixture) -> None:
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = None
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert exc_info.value.exit_code == 2
+
+    def test_file_not_found_is_no_verdict_exit_2(self, mocker: MockerFixture) -> None:
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", side_effect=FileNotFoundError("no such directory"))
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert exc_info.value.exit_code == 2
+
+    def test_valid_library_emits_crate_exit_0(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = mocker.MagicMock()
+        mocker.patch(f"{CRATE_LOADING}.normalize_crate", return_value=mocker.MagicMock())
+        mocker.patch(f"{MODULE}.encode_crate", return_value="<<crate-body>>")
+        # A resolved library emits the crate to stdout and does not raise (implicit exit 0).
+        resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert "<<crate-body>>" in capsys.readouterr().out
+
+    def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture) -> None:
+        """Resolve boots offline but WITH model specs (like `validate`): library validation checks
+        pipe model pins against the deck, so a spec-less boot would reject any bundle that pins a model.
+        """
+        boot = self._neutralize_boot(mocker)
+        mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = mocker.MagicMock()
+        mocker.patch(f"{CRATE_LOADING}.normalize_crate", return_value=mocker.MagicMock())
+        mocker.patch(f"{MODULE}.encode_crate", return_value="{}")
+        resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
+        assert boot.call_args.kwargs["needs_inference"] is False
+        assert boot.call_args.kwargs["needs_model_specs"] is True
+
+    def test_home_relative_library_dirs_are_expanded(self, mocker: MockerFixture) -> None:
+        activate = mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = mocker.MagicMock()
+        mocker.patch(f"{CRATE_LOADING}.normalize_crate", return_value=mocker.MagicMock())
+
+        load_normalized_crate(library_dirs=[Path("~/bundles")])
+
+        activate.assert_called_once_with([Path.home() / "bundles"])
