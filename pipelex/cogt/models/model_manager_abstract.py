@@ -21,8 +21,8 @@ class ModelManagerAbstract(ABC):
     @abstractmethod
     def setup(
         self,
-        secrets_provider: SecretsProviderAbstract,
         *,
+        secrets_provider: SecretsProviderAbstract,
         gateway_config: GatewayConfig | None,
         gateway_config_source: RemoteConfigSource | None,
         needs_inference: bool = True,

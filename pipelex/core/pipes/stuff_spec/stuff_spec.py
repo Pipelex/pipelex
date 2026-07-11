@@ -38,7 +38,7 @@ class StuffSpec(BaseModel):
             presence=self.presence,
         )
 
-    def render_stuff_spec(self, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
+    def render_stuff_spec(self, *, output_format: ConceptRepresentationFormat) -> dict[str, Any]:
         """Render a representation of this stuff spec.
 
         Args:

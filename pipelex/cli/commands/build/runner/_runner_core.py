@@ -50,11 +50,7 @@ SUB_COMMAND_RUNNER = "runner"
 
 
 async def _prepare_runner_core(
-    pipe_code: str | None = None,
-    *,
-    bundle_path: Path | None = None,
-    output_path: Path | None = None,
-    library_dirs: list[Path] | None = None,
+    *, pipe_code: str | None = None, bundle_path: Path | None = None, output_path: Path | None = None, library_dirs: list[Path] | None = None
 ) -> None:
     """Core logic for generating a Python runner file."""
     all_blueprints: list[PipelexBundleBlueprint] = []
@@ -166,8 +162,8 @@ async def _prepare_runner_core(
 
 
 def execute_prepare_runner(
-    pipe_code: str | None,
     *,
+    pipe_code: str | None,
     bundle_path: Path | None,
     output_path: Path | None,
     library_dirs: list[Path] | None = None,

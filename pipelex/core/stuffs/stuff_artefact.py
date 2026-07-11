@@ -344,7 +344,7 @@ class StuffArtefact:
     # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    async def rendered_for_template_async(self, text_format: TextFormat) -> str:
+    async def rendered_for_template_async(self, *, text_format: TextFormat) -> str:
         """Render content for templates in the specified text format.
 
         Args:
@@ -362,8 +362,8 @@ class StuffArtefact:
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
         """Delegate to content's render_with_images.
@@ -386,7 +386,7 @@ class StuffArtefact:
                 f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
             )
             raise TypeError(msg)
-        return content.render_with_images(registry, text_format=text_format)
+        return content.render_with_images(registry=registry, text_format=text_format)
 
     # -------------------------------------------------------------------------
     # Access to underlying Stuff

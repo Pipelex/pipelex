@@ -59,7 +59,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 
     # Protocol-based rendering
     if isinstance(value, ImageRenderable):
-        return value.render_with_images(registry, text_format=text_format)
+        return value.render_with_images(registry=registry, text_format=text_format)
 
     # Handle plain lists/tuples (structural types that may contain ImageRenderable items)
     if isinstance(value, (list, tuple)):
@@ -94,7 +94,7 @@ def _render_sequence_with_images(
     parts: list[str] = []
     for item in sequence:
         if isinstance(item, ImageRenderable):
-            rendered = item.render_with_images(registry, text_format=text_format)
+            rendered = item.render_with_images(registry=registry, text_format=text_format)
         else:
             rendered = str(item)
         if rendered:

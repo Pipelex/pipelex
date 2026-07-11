@@ -73,7 +73,7 @@ class StructureGenerator:
         """
         # Generate the class
         class_code = self._generate_class_source_code_from_blueprint(
-            class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
+            class_name=class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
         )
 
         # Generate the complete module with a header comment
@@ -246,8 +246,8 @@ class StructureGenerator:
 
     def _generate_class_source_code_from_blueprint(
         self,
-        class_name: str,
         *,
+        class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
         description: str = "",

@@ -66,7 +66,7 @@ def _format_representation_as_python(representation: dict[str, Any], *, is_multi
     return f'{{\n            "concept": "{concept}",\n            "content": {content},\n        }}'
 
 
-def _get_structure_class_import(class_name: str) -> str | None:
+def _get_structure_class_import(*, class_name: str) -> str | None:
     """Get the import statement for a native structure class.
 
     The import statement is generated dynamically from the class's actual module location,
@@ -202,7 +202,7 @@ def generate_runner_code(
     # Add native content class imports
     native_imports: list[str] = []
     for class_name in sorted(native_classes):
-        import_stmt = _get_structure_class_import(class_name)
+        import_stmt = _get_structure_class_import(class_name=class_name)
         if import_stmt:
             native_imports.append(import_stmt)
     import_lines.extend(native_imports)

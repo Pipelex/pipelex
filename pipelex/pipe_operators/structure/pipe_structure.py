@@ -45,7 +45,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     output_multiplicity: VariableMultiplicity | None = None
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
         for input_name, stuff_spec in self.inputs.items:
             needed_inputs.add_stuff_spec(
@@ -103,8 +103,8 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -196,7 +196,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             "rendered_user_prompt": rendered_user_prompt,
             "structuring_path": "structure",
         }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeStructureOutput(
             working_memory=working_memory,
@@ -208,12 +208,12 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

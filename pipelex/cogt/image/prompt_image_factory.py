@@ -15,13 +15,7 @@ from pipelex.tools.misc.base64_utils import (
 
 class PromptImageFactory:
     @classmethod
-    def make_prompt_image(
-        cls,
-        uri: str | None = None,
-        *,
-        base64_data: str | None = None,
-        raw_bytes: bytes | None = None,
-    ) -> PromptImage:
+    def make_prompt_image(cls, *, uri: str | None = None, base64_data: str | None = None, raw_bytes: bytes | None = None) -> PromptImage:
         """Create a PromptImage from the provided input.
 
         Args:

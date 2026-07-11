@@ -66,7 +66,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override
@@ -95,7 +95,7 @@ class PipeBatch(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_list_stuff_name = batch_params.input_list_stuff_name
@@ -256,7 +256,7 @@ class PipeBatch(PipeController):
             "item_count": len(input_content.items),
             "branch_pipe_code": self.branch_pipe_code,
         }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,
@@ -293,6 +293,6 @@ class PipeBatch(PipeController):
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

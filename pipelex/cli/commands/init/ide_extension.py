@@ -86,7 +86,7 @@ def _install_extension(ide_name: str, *, cmd: str, console: Console) -> bool:
         return False
 
 
-def suggest_extension_install_if_needed(console: Console) -> None:
+def suggest_extension_install_if_needed(*, console: Console) -> None:
     """Check whether the Pipelex IDE extension is installed and offer to install it.
 
     Uses ``<cmd> --list-extensions`` to reliably detect whether the extension

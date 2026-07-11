@@ -86,7 +86,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.is_langfuse_enabled
 
     @abstractmethod
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @abstractmethod
@@ -153,7 +153,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
 
     @abstractmethod
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
 
         Args:
@@ -165,7 +165,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @override
@@ -234,5 +234,5 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         pass

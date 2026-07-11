@@ -95,7 +95,7 @@ def agent_check_model_cmd(
 
         if not is_valid:
             suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(
-                model_deck, model_type=resolved_model_type, name=ref.name, kind=ref.kind
+                model_deck=model_deck, model_type=resolved_model_type, name=ref.name, kind=ref.kind
             )
             result["suggestions"] = suggestions
             result["wrong_sigil_hints"] = wrong_sigil_hints

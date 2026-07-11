@@ -134,7 +134,7 @@ class TriggerFilesDiff:
         return not (self.added or self.removed or self.modified)
 
 
-def diff_trigger_files(stored: Mapping[str, str], *, current: Mapping[str, str]) -> TriggerFilesDiff:
+def diff_trigger_files(*, stored: Mapping[str, str], current: Mapping[str, str]) -> TriggerFilesDiff:
     """Diff the ack's stored trigger-file map against the current one (messaging only, no validity)."""
     added = sorted(path for path in current if path not in stored)
     removed = sorted(path for path in stored if path not in current)
@@ -237,6 +237,6 @@ def build_plan_packets(manifest: DriftManifest, *, staged_oids: Mapping[str, str
         if ack is not None and ack.digest == digest_result.digest:
             continue
         stored = ack.trigger_files if ack is not None else {}
-        diff = diff_trigger_files(stored, current=digest_result.trigger_files)
+        diff = diff_trigger_files(stored=stored, current=digest_result.trigger_files)
         packets.append(ContractPlanPacket(contract_id=contract_id, contract=contract, previous_ack=ack, diff=diff))
     return packets

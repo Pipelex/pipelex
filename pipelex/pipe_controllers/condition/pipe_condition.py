@@ -63,7 +63,7 @@ class PipeCondition(PipeController):
         return {var for var in required_variables if not var.startswith("_")}
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -97,7 +97,7 @@ class PipeCondition(PipeController):
         for pipe_code in self.pipe_dependencies():
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
-            pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
+            pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
             for input_name, stuff_spec in pipe_needed_inputs.items:
                 needed_inputs.add_stuff_spec(
@@ -228,7 +228,7 @@ class PipeCondition(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         evaluated_expression = await render_template(
             template=self.expression,
@@ -245,12 +245,13 @@ class PipeCondition(PipeController):
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     async def _evaluate_expression(
         self,
+        *,
         working_memory: WorkingMemory,
     ) -> str:
         """Evaluate the conditional expression and select the appropriate pipe.
@@ -302,7 +303,7 @@ class PipeCondition(PipeController):
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
-            self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,
@@ -311,7 +312,7 @@ class PipeCondition(PipeController):
             return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
-            self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+            self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
@@ -349,7 +350,7 @@ class PipeCondition(PipeController):
                 library_crate=library_crate,
             ),
         )
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return pipe_output
 
     @override
@@ -407,7 +408,7 @@ class PipeCondition(PipeController):
             "evaluated_expression": "dry_run",
             "selected_outcome": "all_outcomes",
         }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         # Dry-run parity with the live `continue` arm: with only special outcomes mapped, no pipe
         # dry-ran into this memory. When `continue` is reachable the declared output resolves
         # absent, memory otherwise unchanged (the static rule "continue-reachable ⇒ `?` output" is

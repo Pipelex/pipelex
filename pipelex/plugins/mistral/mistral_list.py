@@ -11,8 +11,8 @@ from pipelex.hub import get_console
 
 
 def list_mistral_models(
-    sdk: str,
     *,
+    sdk: str,
     backend_name: str,
     flat: bool,
     any_listed: bool,

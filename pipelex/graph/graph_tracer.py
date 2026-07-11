@@ -489,8 +489,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def register_batch_item_extraction(
         self,
-        list_stuff_code: str,
         *,
+        list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -533,8 +533,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def register_batch_aggregation(
         self,
-        output_list_stuff_code: str,
         *,
+        output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -577,8 +577,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def register_parallel_combine(
         self,
-        combined_stuff_code: str,
         *,
+        combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
     ) -> None:
@@ -709,8 +709,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def register_execution_data(
         self,
-        node_id: str,
         *,
+        node_id: str,
         execution_data: dict[str, Any],
     ) -> None:
         """Register execution metadata for a node."""
@@ -801,8 +801,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def register_controller_output(
         self,
-        node_id: str,
         *,
+        node_id: str,
         output_spec: IOSpec,
     ) -> None:
         """Register an additional output for a controller node.
@@ -993,8 +993,8 @@ class GraphTracer(GraphTracerProtocol):
 
     def add_selected_outcome_edge(
         self,
-        condition_node_id: str,
         *,
+        condition_node_id: str,
         outcome_node_id: str,
         outcome_value: str,
     ) -> None:

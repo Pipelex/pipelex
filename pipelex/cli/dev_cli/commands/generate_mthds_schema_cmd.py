@@ -15,7 +15,7 @@ from pipelex.language.mthds_schema_generator import generate_mthds_schema
 MTHDS_SCHEMA_PATH = Path("derived/mthds_schema.json")
 
 
-def generate_mthds_schema_cmd(output: Path | None = None, *, quiet: bool = False) -> None:
+def generate_mthds_schema_cmd(*, output: Path | None = None, quiet: bool = False) -> None:
     """Generate a Taplo-compatible JSON Schema for .mthds files.
 
     Generates the schema from PipelexBundleBlueprint and writes it as JSON.

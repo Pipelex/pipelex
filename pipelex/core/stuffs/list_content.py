@@ -140,15 +140,15 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
         """Render each item with images."""
         parts: list[str] = []
         for item in self.items:
             if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
-                rendered = item.render_with_images(registry, text_format=text_format)
+                rendered = item.render_with_images(registry=registry, text_format=text_format)
             else:
                 rendered = item.rendered_markdown()
             if rendered:

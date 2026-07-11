@@ -291,7 +291,7 @@ def execute_fix(
             )
             _render_fix_result(get_console(), result=result, bundle_path=bundle_path, allow_signatures=allow_signatures)
     except FileNotFoundError as exc:
-        print_traceback_if_requested(get_console())
+        print_traceback_if_requested(console=get_console())
         typer.secho(f"Failed to fix: bundle file not found: '{bundle_path}'", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
@@ -302,7 +302,7 @@ def execute_fix(
         raise
     except Exception as exc:
         # Human CLI command boundary: an unexpected failure produced no verdict — exit 2.
-        print_traceback_if_requested(get_console())
+        print_traceback_if_requested(console=get_console())
         typer.secho(f"Failed to fix: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     finally:

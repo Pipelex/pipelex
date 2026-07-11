@@ -58,7 +58,7 @@ class CachePrimingResult(BaseModel):
     error_message: str | None = None
 
 
-def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> CachePrimingResult:
+def attempt_prime_remote_config_cache(*, target_config_dir: Path | None = None) -> CachePrimingResult:
     """Prime the on-disk remote-config cache so later offline runs can fall back to it.
 
     Pure-logic variant: no I/O on the way out, so both the interactive (`pipelex init`) and
@@ -126,7 +126,7 @@ def attempt_prime_remote_config_cache(target_config_dir: Path | None = None) -> 
     return CachePrimingResult(primed=True)
 
 
-def prime_remote_config_cache(console: Console, *, target_config_dir: Path | None = None) -> None:
+def prime_remote_config_cache(*, console: Console, target_config_dir: Path | None = None) -> None:
     """Interactive-surface wrapper around :func:`attempt_prime_remote_config_cache`.
 
     Prints a yellow warning to the console when a fetch was attempted and failed; otherwise
@@ -141,7 +141,7 @@ def prime_remote_config_cache(console: Console, *, target_config_dir: Path | Non
         console.print("[dim]Re-run 'pipelex init' while online to prime the cache for offline dry-runs.[/dim]")
 
 
-def _check_gateway_terms_if_needed(console: Console, *, backends_toml_path: Path) -> None:
+def _check_gateway_terms_if_needed(*, console: Console, backends_toml_path: Path) -> None:
     """Check if gateway is enabled and terms not yet accepted, then prompt for acceptance.
 
     This is called after init_config() to ensure users who have gateway enabled
@@ -166,14 +166,14 @@ def _check_gateway_terms_if_needed(console: Console, *, backends_toml_path: Path
         return
 
     # Gateway is enabled but terms not accepted - prompt user
-    gateway_accepted = prompt_gateway_acceptance(console)
+    gateway_accepted = prompt_gateway_acceptance(console=console)
 
     config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
     if gateway_accepted:
-        display_gateway_accepted_message(console)
+        display_gateway_accepted_message(console=console)
         update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
     else:
-        display_gateway_declined_message(console)
+        display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
         # Actually disable the gateway in backends.toml
         disable_gateway_backend(backends_toml_path)
@@ -217,8 +217,8 @@ def determine_needs(
 
 
 def confirm_initialization(
-    console: Console,
     *,
+    console: Console,
     needs_config: bool,
     needs_inference: bool,
     needs_routing: bool,
@@ -275,8 +275,8 @@ def confirm_initialization(
 
 
 def execute_initialization(
-    console: Console,
     *,
+    console: Console,
     needs_config: bool,
     needs_inference: bool,
     needs_routing: bool,
@@ -329,7 +329,7 @@ def execute_initialization(
         # If we're NOT going to run customize_backends_config (which handles gateway terms),
         # we need to check if gateway is enabled and terms not accepted
         if not needs_inference and backends_existed_before:
-            _check_gateway_terms_if_needed(console, backends_toml_path=backends_toml_path)
+            _check_gateway_terms_if_needed(console=console, backends_toml_path=backends_toml_path)
 
     # Determine if this is truly a first-time setup
     first_time_setup = is_first_time_backends_setup
@@ -390,7 +390,7 @@ def execute_initialization(
 
     # Step 2.5: Prompt for missing credentials
     if check_credentials:
-        prompt_credentials(console, backends_toml_path=backends_toml_path)
+        prompt_credentials(console=console, backends_toml_path=backends_toml_path)
 
     # Step 3: Set up routing profile if specifically requested
     if needs_routing:
@@ -419,12 +419,12 @@ def execute_initialization(
     # No-op when gateway is disabled or terms have not been accepted. We forward
     # ``target_config_dir`` so the gateway-enabled check inspects the directory we just
     # initialized (matters for ``--local`` vs default init).
-    prime_remote_config_cache(console, target_config_dir=target_config_dir)
+    prime_remote_config_cache(console=console, target_config_dir=target_config_dir)
 
     console.print()
 
 
-def _init_agreement(console: Console) -> None:
+def _init_agreement(*, console: Console) -> None:
     """Handle the agreement-only initialization flow.
 
     This prompts the user to accept Pipelex Gateway terms without resetting any configuration.
@@ -462,10 +462,10 @@ def _init_agreement(console: Console) -> None:
     )
 
     if accepted:
-        display_gateway_accepted_message(console)
+        display_gateway_accepted_message(console=console)
         update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
     else:
-        display_gateway_declined_message(console)
+        display_gateway_declined_message(console=console)
         update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
         # Disable the gateway since terms were declined
         backends_toml_path = config_manager.pipelex_config_dir / "inference" / "backends.toml"
@@ -495,7 +495,7 @@ def init_cmd(
 
     # Handle agreement-only flow separately (no reset needed)
     if focus == InitFocus.AGREEMENT:
-        _init_agreement(console)
+        _init_agreement(console=console)
         return
 
     # Handle credentials-only flow separately (no reset needed)
@@ -506,7 +506,7 @@ def init_cmd(
             console.print("[yellow]No backends.toml found. Please run 'pipelex init' first.[/yellow]")
             console.print()
             return
-        prompt_credentials(console, backends_toml_path=backends_toml_path)
+        prompt_credentials(console=console, backends_toml_path=backends_toml_path)
         console.print()
         return
 

@@ -30,7 +30,7 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def is_compatible(self, tested_concept: Concept, *, wanted_concept: Concept, strict: bool = False) -> bool:
+    def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         pass
 
     @abstractmethod

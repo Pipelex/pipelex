@@ -184,7 +184,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         """
         template: dict[str, Any] = {}
         for var_name, stuff_spec in self.root.items():
-            template[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+            template[var_name] = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
         return template
 
     def render_inputs(self, *, indent: int = 2) -> str:
