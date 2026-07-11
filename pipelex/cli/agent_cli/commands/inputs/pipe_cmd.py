@@ -93,7 +93,7 @@ def inputs_pipe_cmd(
 
     except NoInputsRequiredError as exc:
         # Not really an error - just a pipe with no inputs
-        emit_no_inputs_result(pipe_code, message=str(exc), template_format=template_format)
+        emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

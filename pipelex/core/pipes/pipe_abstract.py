@@ -140,7 +140,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
-    def _register_execution_data(self, job_metadata: JobMetadata, *, execution_data: dict[str, Any]) -> None:
+    def _register_execution_data(self, *, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
@@ -445,8 +445,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def validate_before_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -517,8 +517,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _validate_before_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -528,8 +528,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def validate_after_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -541,8 +541,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _validate_after_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -561,7 +561,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Return the stuff specs that are needed for the pipe to run.
 
         Args:
@@ -589,8 +589,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -615,8 +615,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def _run_pipe_traced(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -837,8 +837,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _make_lifted_output(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         liftable: list[AbsentInput],
         pipe_run_params: PipeRunParams,
@@ -908,8 +908,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def live_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -981,8 +981,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def dry_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -1001,8 +1001,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _live_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -1013,8 +1013,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _dry_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -1024,8 +1024,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _start_pipe_span(
         self,
-        parent_otel_context: OtelContext,
         *,
+        parent_otel_context: OtelContext,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:

@@ -70,35 +70,35 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
             return None
         case NativeConceptCode.TEXT:
             return {
-                "text": _text_field("The text", required=True),
+                "text": _text_field(description="The text", required=True),
             }
         case NativeConceptCode.IMAGE:
             return {
-                "url": _text_field("The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL", required=True),
-                "public_url": _text_field("The public URL of the image"),
-                "source_prompt": _text_field("The source prompt of the image"),
-                "source_negative_prompt": _text_field("The source negative prompt of the image"),
-                "caption": _text_field("The caption of the image"),
-                "mime_type": _text_field("The MIME type of the image"),
+                "url": _text_field(description="The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL", required=True),
+                "public_url": _text_field(description="The public URL of the image"),
+                "source_prompt": _text_field(description="The source prompt of the image"),
+                "source_negative_prompt": _text_field(description="The source negative prompt of the image"),
+                "caption": _text_field(description="The caption of the image"),
+                "mime_type": _text_field(description="The MIME type of the image"),
                 "width": ConceptStructureBlueprint(description="The width of the image, in pixels", type=ConceptStructureBlueprintFieldType.INTEGER),
                 "height": ConceptStructureBlueprint(
                     description="The height of the image, in pixels", type=ConceptStructureBlueprintFieldType.INTEGER
                 ),
-                "filename": _text_field("The original filename of the image"),
+                "filename": _text_field(description="The original filename of the image"),
             }
         case NativeConceptCode.DOCUMENT:
             return {
-                "url": _text_field("The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL", required=True),
-                "public_url": _text_field("The public HTTPS URL of the document"),
-                "mime_type": _text_field("The MIME type of the document"),
-                "filename": _text_field("The original filename of the document"),
-                "title": _text_field("The title of the document or source"),
-                "snippet": _text_field("A text snippet or excerpt from the document"),
+                "url": _text_field(description="The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL", required=True),
+                "public_url": _text_field(description="The public HTTPS URL of the document"),
+                "mime_type": _text_field(description="The MIME type of the document"),
+                "filename": _text_field(description="The original filename of the document"),
+                "title": _text_field(description="The title of the document or source"),
+                "snippet": _text_field(description="A text snippet or excerpt from the document"),
             }
         case NativeConceptCode.HTML:
             return {
-                "inner_html": _text_field("The inner HTML of the content", required=True),
-                "css_class": _text_field("The CSS class of the content", required=True),
+                "inner_html": _text_field(description="The inner HTML of the content", required=True),
+                "css_class": _text_field(description="The CSS class of the content", required=True),
             }
         case NativeConceptCode.TEXT_AND_IMAGES:
             return {
@@ -113,7 +113,7 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                     item_type="concept",
                     item_concept_ref=NativeConceptCode.IMAGE.concept_ref,
                 ),
-                "raw_html": _text_field("The raw HTML of the fetched page, if requested"),
+                "raw_html": _text_field(description="The raw HTML of the fetched page, if requested"),
             }
         case NativeConceptCode.NUMBER:
             return {
@@ -175,7 +175,7 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
             }
         case NativeConceptCode.SEARCH_RESULT:
             return {
-                "answer": _text_field("The answer to the search query", required=True),
+                "answer": _text_field(description="The answer to the search query", required=True),
                 "sources": ConceptStructureBlueprint(
                     description="The source documents supporting the answer",
                     type=ConceptStructureBlueprintFieldType.LIST,
@@ -186,5 +186,5 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
             }
 
 
-def _text_field(description: str, *, required: bool = False) -> ConceptStructureBlueprint:
+def _text_field(*, description: str, required: bool = False) -> ConceptStructureBlueprint:
     return ConceptStructureBlueprint(description=description, type=ConceptStructureBlueprintFieldType.TEXT, required=required)

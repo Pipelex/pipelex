@@ -50,7 +50,7 @@ class TestCollectPossibleOutputsCondition:
 
         assert result == [{"concept_ref": "test.Summary", "content": {"text": "summary text"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="make_summary")
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.JSON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
 
     def test_multiple_mapped_pipes_are_ordered_deterministically(self, mocker: MockerFixture) -> None:
         """With several mapped pipes, outputs come back sorted by pipe code regardless of set iteration order."""

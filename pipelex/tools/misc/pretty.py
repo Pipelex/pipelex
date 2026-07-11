@@ -219,7 +219,7 @@ class PrettyPrinter:
         Console(width=console_width).print("", panel, "", sep="\n")
 
     @classmethod
-    def pretty_width(cls, width: int | None = None, *, depth: int | None = None) -> int:
+    def pretty_width(cls, *, width: int | None = None, depth: int | None = None) -> int:
         terminal_width = shutil.get_terminal_size().columns
         absolute_width = width or min(max(PRETTY_WIDTH_MIN, terminal_width // 2), terminal_width)
         if depth is not None:

@@ -31,7 +31,7 @@ def _iter_agent_files(agents_dir: Traversable) -> Iterable[tuple[str, str]]:
             yield child.name, child.read_text(encoding="utf-8")
 
 
-def _front_matter_for(name: str, *, kit_index: KitIndex) -> dict[str, Any]:
+def _front_matter_for(*, name: str, kit_index: KitIndex) -> dict[str, Any]:
     """Build front-matter for a specific file.
 
     Args:
@@ -96,7 +96,7 @@ def update_cursor_rules(repo_root: Path, *, kit_index: KitIndex, agent_set: str)
     for fname, body in _iter_agent_files(agents_dir):
         if fname not in allowed_files:
             continue
-        fm = _front_matter_for(fname, kit_index=kit_index)
+        fm = _front_matter_for(name=fname, kit_index=kit_index)
         yaml_block = "---\n" + yaml.safe_dump(fm, sort_keys=False).rstrip() + "\n---\n"
         mdc = yaml_block + body
         out_path = out_dir / (fname.removesuffix(".md") + ".mdc")

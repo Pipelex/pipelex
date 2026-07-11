@@ -274,7 +274,7 @@ def test_get_root_from_dotted_path(dotted_path: str, expected: str) -> None:
     ],
 )
 def test_pluralize(count: int, singular: str, plural: str | None, expected: str) -> None:
-    assert pluralize(count, singular=singular, plural=plural) == expected
+    assert pluralize(count=count, singular=singular, plural=plural) == expected
 
 
 @pytest.mark.parametrize(
@@ -288,7 +288,7 @@ def test_pluralize(count: int, singular: str, plural: str | None, expected: str)
     ],
 )
 def test_count_with_noun(count: int, singular: str, plural: str | None, expected: str) -> None:
-    assert count_with_noun(count, singular=singular, plural=plural) == expected
+    assert count_with_noun(count=count, singular=singular, plural=plural) == expected
 
 
 @pytest.mark.parametrize(

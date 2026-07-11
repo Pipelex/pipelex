@@ -4,8 +4,8 @@ from rich.panel import Panel
 
 
 def build_initialization_panel(
-    needs_config: bool,
     *,
+    needs_config: bool,
     needs_inference: bool,
     needs_routing: bool,
     needs_telemetry: bool,

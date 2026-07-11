@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 COMMAND = "validate"
 
 
-def _echo_optionality_warnings(pipes: list[PipeAbstract]) -> None:
+def _echo_optionality_warnings(*, pipes: list[PipeAbstract]) -> None:
     """Render the advisory optionality lints (e.g. the useless-`!` lint) in yellow.
 
     Advisory only — a warning never changes the validation verdict or the exit code. Requires
@@ -58,7 +58,7 @@ def _echo_optionality_warnings(pipes: list[PipeAbstract]) -> None:
         typer.secho(f"Warning: {warning.message}", fg=typer.colors.YELLOW)
 
 
-def _format_signatures_summary_suffix(signature_count: int) -> str:
+def _format_signatures_summary_suffix(*, signature_count: int) -> str:
     """Return the suffix appended to lenient-mode validation summaries.
 
     Empty when no signatures were involved so fully-implemented bundles read naturally.
@@ -70,11 +70,7 @@ def _format_signatures_summary_suffix(signature_count: int) -> str:
     return f" ({signature_count} signatures)"
 
 
-def do_validate_all_libraries_and_dry_run(
-    library_dirs: list[Path] | None = None,
-    *,
-    allow_signatures: bool = False,
-) -> None:
+def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> None:
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -93,7 +89,7 @@ def do_validate_all_libraries_and_dry_run(
             pipes = all_pipes if allow_signatures else [pipe for pipe in all_pipes if not pipe.is_signature]
             if library_dirs:
                 dirs_str = ", ".join(f'"{lib_dir}"' for lib_dir in library_dirs)
-                typer.echo(f"Validating {count_with_noun(len(pipes), singular='pipe')} from: {dirs_str}")
+                typer.echo(f"Validating {count_with_noun(count=len(pipes), singular='pipe')} from: {dirs_str}")
 
             # validate_current_library owns the static wiring pass and the single PIPE_DRY_RUN telemetry
             # event — sweeping the library we just loaded, without teardown.
@@ -101,7 +97,7 @@ def do_validate_all_libraries_and_dry_run(
 
             # Advisory optionality lints over the whole loaded library (the lint's cross-flow
             # aggregation needs every flow) — printed even when the signature gate below exits non-zero.
-            _echo_optionality_warnings(all_pipes)
+            _echo_optionality_warnings(pipes=all_pipes)
 
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # library with unsatisfied PipeSignature placeholders is valid yet NOT runnable. `validate
@@ -120,7 +116,9 @@ def do_validate_all_libraries_and_dry_run(
                 raise typer.Exit(1)
 
             signature_count = sum(1 for pipe in all_pipes if pipe.is_signature)
-            typer.echo(f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count)}")
+            typer.echo(
+                f"Setup sequence passed OK, config and pipelines are validated.{_format_signatures_summary_suffix(signature_count=signature_count)}"
+            )
     except PipeOperatorModelAvailabilityError as exc:
         handle_model_availability_error(exc, context=ErrorContext.VALIDATION, exit_code=2)
     except PipeOperatorModelChoiceError as exc:
@@ -128,11 +126,7 @@ def do_validate_all_libraries_and_dry_run(
 
 
 async def _validate_pipe_or_bundle(
-    pipe_code: str | None = None,
-    *,
-    bundle_path: Path | None = None,
-    library_dirs: list[Path] | None = None,
-    allow_signatures: bool = False,
+    *, pipe_code: str | None = None, bundle_path: Path | None = None, library_dirs: list[Path] | None = None, allow_signatures: bool = False
 ) -> None:
     """Core async validation logic shared between method and pipe subcommands."""
     if bundle_path:
@@ -156,12 +150,12 @@ async def _validate_pipe_or_bundle(
                 raise typer.Exit(1)
             signature_count = sum(1 for pipe in bundle_result.pipes if pipe.is_signature)
             typer.secho(
-                f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count)}",
+                f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
                 fg=typer.colors.GREEN,
             )
             # validate_bundle leaves its validation library open on success, so the taint walk
             # behind the advisory lints can still resolve the bundle's pipes.
-            _echo_optionality_warnings(bundle_result.pipes)
+            _echo_optionality_warnings(pipes=bundle_result.pipes)
         except FileNotFoundError as exc:
             get_console().print(Traceback())
             typer.secho(
@@ -193,7 +187,7 @@ async def _validate_pipe_or_bundle(
         )
         signature_count = len(collect_signature_refs(pipe=pipe))
         typer.secho(
-            f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count)}",
+            f"Successfully validated pipe '{pipe_code}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
             fg=typer.colors.GREEN,
         )
     else:
@@ -206,8 +200,8 @@ async def _validate_pipe_or_bundle(
 
 
 def execute_validate(
-    pipe_code: str | None,
     *,
+    pipe_code: str | None,
     bundle_path: Path | None,
     library_dirs: list[Path] | None,
     telemetry_command_label: str = COMMAND,

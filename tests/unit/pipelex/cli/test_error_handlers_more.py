@@ -60,7 +60,7 @@ class TestErrorHandlersExtended:
         """The panel renders title, aligned fields, error, tip and links in order."""
         console = Console(width=120, record=True, color_system=None)
         display_error_panel(
-            console,
+            console=console,
             title="Something failed",
             fields=[("Pipe", "'my_pipe'"), ("Model Choice", "'gpt-5'")],
             error_message="model not found",
@@ -79,7 +79,7 @@ class TestErrorHandlersExtended:
         """A None error_message omits the Error block entirely."""
         console = Console(width=120, record=True, color_system=None)
         display_error_panel(
-            console,
+            console=console,
             title="Soft failure",
             fields=[],
             error_message=None,
@@ -94,7 +94,7 @@ class TestErrorHandlersExtended:
         """Multi-line tips keep their line structure."""
         console = Console(width=120, record=True, color_system=None)
         display_error_panel(
-            console,
+            console=console,
             title="Failure",
             fields=[],
             error_message=None,

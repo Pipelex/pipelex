@@ -1,0 +1,8 @@
+contract = "keyword-only-convention"
+digest = "sha256:2d2a8228601e1fa98d483b5c1d162ddcb8037ac02391d1c0409f8bd48d203571"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-07-11T15:45:25Z"
+rationale = "Phase 5 closed the transitional door: --seed and the seeded field are deleted, the registry schema is strict (param + rationale only). Rewrote the doc's transitional-state section as the post-transitional Registry schema section and fixed the --report description."
+
+[trigger_files]
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c998cfc324c7f1096e974133b75db59c6190c117"

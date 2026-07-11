@@ -15,7 +15,7 @@ from pipelex.hub import get_class_registry
 class StuffContentFactory:
     @classmethod
     def make_content_from_value(
-        cls, stuff_content_subclass: type[StuffContent], *, value: dict[str, Any] | str | bool | datetime.date | datetime.time
+        cls, *, stuff_content_subclass: type[StuffContent], value: dict[str, Any] | str | bool | datetime.date | datetime.time
     ) -> StuffContent:
         # bool must be handled ahead of any future int handling (bool is a subclass of int) and before model_validate,
         # which rejects a bare bool. Covers native YesNoContent and the subclasses generated for concepts refining YesNo.

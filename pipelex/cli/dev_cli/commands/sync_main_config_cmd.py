@@ -74,13 +74,7 @@ def _display_sync_result(
         console.print(table)
 
 
-def sync_main_config_cmd(
-    target: SyncTarget = SyncTarget.ALL,
-    *,
-    dry_run: bool = False,
-    quiet: bool = False,
-    show_diff: bool = True,
-) -> None:
+def sync_main_config_cmd(*, target: SyncTarget = SyncTarget.ALL, dry_run: bool = False, quiet: bool = False, show_diff: bool = True) -> None:
     """Sync values from main config to kit and/or project configs.
 
     Args:

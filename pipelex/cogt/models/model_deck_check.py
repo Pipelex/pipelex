@@ -25,7 +25,9 @@ def _raise_model_choice_not_found(
     available_options: list[str],
 ) -> NoReturn:
     """Compute fuzzy suggestions and raise ModelChoiceNotFoundError."""
-    suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, model_type=model_type, name=name, kind=reference_kind)
+    suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(
+        model_deck=model_deck, model_type=model_type, name=name, kind=reference_kind
+    )
     raise ModelChoiceNotFoundError(
         message=msg,
         model_type=model_type,

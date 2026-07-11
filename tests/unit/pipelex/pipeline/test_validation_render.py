@@ -196,7 +196,7 @@ class TestValidationRender:
     def test_build_fix_command_echoes_library_dirs_and_signatures(self):
         """`build_fix_command` shell-joins the executable, path, each `-L` dir, and `--allow-signatures`."""
         command = build_fix_command(
-            "pipelex-agent",
+            executable="pipelex-agent",
             bundle_path=Path("my bundle.mthds"),
             library_dirs=[Path("libs/a"), Path("libs/b")],
             allow_signatures=True,
@@ -207,6 +207,6 @@ class TestValidationRender:
 
     def test_build_fix_command_minimal_has_no_flags(self):
         """With no library dirs and signatures disabled, only the bare `fix bundle <path>` is emitted."""
-        command = build_fix_command("pipelex", bundle_path=Path("bundle.mthds"))
+        command = build_fix_command(executable="pipelex", bundle_path=Path("bundle.mthds"))
 
         assert command == "pipelex fix bundle bundle.mthds"

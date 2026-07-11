@@ -56,7 +56,7 @@ class ErrorContext(StrEnum):
 _traceback_requested: ContextVar[bool] = ContextVar("pipelex_cli_traceback_requested", default=False)
 
 
-def set_traceback_requested(value: bool) -> None:
+def set_traceback_requested(*, value: bool) -> None:
     """Record whether --traceback was passed, independent of the Click context."""
     _traceback_requested.set(value)
 
@@ -79,20 +79,14 @@ def is_traceback_requested() -> bool:
     return bool(obj.get("traceback", False))
 
 
-def print_traceback_if_requested(console: Console) -> None:
+def print_traceback_if_requested(*, console: Console) -> None:
     """Print a Rich traceback of the current exception when --traceback is active."""
     if is_traceback_requested():
         console.print(Traceback())
 
 
 def display_error_panel(
-    console: Console,
-    *,
-    title: str,
-    fields: list[tuple[str, str]],
-    error_message: str | None,
-    tip: str,
-    links: list[tuple[str, str]],
+    *, console: Console, title: str, fields: list[tuple[str, str]], error_message: str | None, tip: str, links: list[tuple[str, str]]
 ) -> None:
     """Print the canonical CLI error panel.
 
@@ -134,13 +128,13 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
             setup/config error per its 0/1/2 policy); other contexts keep the default 1.
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     report = exc.to_error_report()
     tip = report.user_action_detail() or (
         f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
     )
     display_error_panel(
-        console,
+        console=console,
         title=f"{context} failed because of a model choice could not be interpreted correctly",
         fields=[
             ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
@@ -167,7 +161,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
             setup/config error per its 0/1/2 policy); other contexts keep the default 1.
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     report = exc.to_error_report()
     fields: list[tuple[str, str]] = [
         ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
@@ -183,7 +177,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
         f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
     )
     display_error_panel(
-        console,
+        console=console,
         title=f"{context} failed because a model wasn't available",
         fields=fields,
         error_message=escape(str(exc)),
@@ -204,7 +198,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, contex
         context: Context for the error message
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     report = exc.to_error_report()
     model_handle = exc.model_handle or ""
     fields: list[tuple[str, str]] = [
@@ -238,7 +232,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, contex
         tip = "\n".join(tip_lines)
 
     display_error_panel(
-        console,
+        console=console,
         title=f"{context} failed due to model deck preset validation error",
         fields=fields,
         error_message=escape(exc.message),
@@ -263,7 +257,7 @@ def _validation_category_header(category: ValidationErrorCategory) -> str:
             return "Dry Run Error:"
 
 
-def _display_validation_error_item(console: Console, *, item: ValidationErrorItem, error_index: int) -> None:
+def _display_validation_error_item(*, console: Console, item: ValidationErrorItem, error_index: int) -> None:
     """Render one structured validation-error item: title, identity fields, message, fix, locators."""
     error_type_display = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
     console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
@@ -300,7 +294,7 @@ def _display_validation_error_item(console: Console, *, item: ValidationErrorIte
     console.print()
 
 
-def display_validation_error_items(console: Console, *, items: list[ValidationErrorItem]) -> None:
+def display_validation_error_items(*, console: Console, items: list[ValidationErrorItem]) -> None:
     """Render structured validation-error items grouped by category, with per-item suggested fixes.
 
     The single human renderer for bundle-validation diagnostics — used by ``pipelex validate``
@@ -325,7 +319,7 @@ def display_validation_error_items(console: Console, *, items: list[ValidationEr
                     console.print(f"[yellow]{escape(item.message)}[/yellow]\n")
             case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
                 for error_index, item in enumerate(category_items, 1):
-                    _display_validation_error_item(console, item=item, error_index=error_index)
+                    _display_validation_error_item(console=console, item=item, error_index=error_index)
 
 
 def handle_validate_bundle_error(
@@ -349,13 +343,13 @@ def handle_validate_bundle_error(
     report = exc.to_error_report()
     items = list(report.validation_errors or [])
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
     if bundle_path:
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
-    display_validation_error_items(console, items=items)
+    display_validation_error_items(console=console, items=items)
 
     # The shared items builder projects the dry-run channel only when it is the sole failure
     # channel (the wire's structured-info invariant); the human surface keeps printing it
@@ -369,7 +363,7 @@ def handle_validate_bundle_error(
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs) if bundle_path is not None else 0
     if fixable_count and bundle_path is not None:
         # Shared builder so the human and agent fix-command footers echo -L / --allow-signatures identically.
-        fix_command = build_fix_command("pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+        fix_command = build_fix_command(executable="pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
         console.print(
             f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
         )
@@ -393,7 +387,7 @@ def handle_inference_setup_required_error(exc: InferenceSetupRequiredError) -> N
         exc: The inference setup required error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold yellow]⚠ First-time inference setup required[/bold yellow]\n")
 
     console.print(
@@ -420,7 +414,7 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
         exc: The telemetry config validation error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Telemetry configuration format has changed[/bold red]\n")
 
     console.print(
@@ -450,7 +444,7 @@ def handle_gateway_terms_not_accepted_error(exc: GatewayTermsNotAcceptedError) -
         exc: The gateway terms not accepted error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Pipelex Gateway terms not accepted[/bold red]\n")
 
     console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but you haven't accepted\nthe terms of service yet.\n")
@@ -477,7 +471,7 @@ def handle_gateway_api_key_missing_error(exc: GatewayApiKeyMissingError) -> NoRe
         exc: The gateway API key missing error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Pipelex Gateway API key not set[/bold red]\n")
 
     console.print("[bold yellow]⚠ Action Required:[/bold yellow] Pipelex Gateway is enabled but the API key\nenvironment variable is not set.\n")
@@ -507,7 +501,7 @@ def handle_gateway_do_not_track_conflict_error(exc: GatewayDoNotTrackConflictErr
         exc: The gateway do not track conflict error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Pipelex Gateway requires telemetry[/bold red]\n")
 
     console.print(
@@ -536,7 +530,7 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
         exc: The remote config validation error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Pipelex Gateway configuration is invalid[/bold red]\n")
 
     console.print(
@@ -573,7 +567,7 @@ def handle_remote_config_unavailable_error(exc: RemoteConfigUnavailableError) ->
         exc: The remote config unavailable error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Pipelex Gateway is unreachable and no cached config is available[/bold red]\n")
 
     console.print(
@@ -607,7 +601,7 @@ def handle_gateway_unknown_model_error(exc: GatewayUnknownModelError) -> NoRetur
         exc: The gateway unknown model error exception
     """
     console = get_console()
-    print_traceback_if_requested(console)
+    print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Unknown gateway model handle[/bold red]\n")
 
     console.print(f"[bold cyan]Model handle:[/bold cyan] [yellow]'{escape(exc.model_name)}'[/yellow]")

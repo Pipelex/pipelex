@@ -186,7 +186,7 @@ class PipelexBundleBlueprint(BaseModel):
                     # (offending dotted key + stripped bare key) structurally for the fix planner.
                     raise InvalidPipeCodeSyntaxError(msg, offending_code=pipe_code, stripped_code=stripped)
                 raise ValueError(msg)
-            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section)
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code=pipe_code, pipe_section=pipe_section)
         return normalized
 
     @model_validator(mode="after")

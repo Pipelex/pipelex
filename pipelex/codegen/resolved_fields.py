@@ -84,7 +84,8 @@ def resolve_structure_fields(
 ) -> list[ResolvedField]:
     """Resolve every field of a structure blueprint into the neutral form, preserving field order."""
     return [
-        resolve_field(field_name, blueprint=field_blueprint, local_domain=local_domain) for field_name, field_blueprint in structure_blueprint.items()
+        resolve_field(field_name=field_name, blueprint=field_blueprint, local_domain=local_domain)
+        for field_name, field_blueprint in structure_blueprint.items()
     ]
 
 
@@ -106,12 +107,7 @@ def iter_imprecision_reasons(resolved_type: ResolvedType) -> list[str]:
     return reasons
 
 
-def resolve_field(
-    field_name: str,
-    *,
-    blueprint: ConceptStructureBlueprint,
-    local_domain: str | None = None,
-) -> ResolvedField:
+def resolve_field(*, field_name: str, blueprint: ConceptStructureBlueprint, local_domain: str | None = None) -> ResolvedField:
     """Resolve a single structure-blueprint field into a neutral `ResolvedField`."""
     return ResolvedField(
         name=field_name,

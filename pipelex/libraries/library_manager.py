@@ -276,8 +276,8 @@ class LibraryManager(LibraryManagerAbstract):
     @override
     def load_libraries(
         self,
-        library_id: str,
         *,
+        library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
@@ -337,7 +337,7 @@ class LibraryManager(LibraryManagerAbstract):
         return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
-    def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
@@ -431,7 +431,7 @@ class LibraryManager(LibraryManagerAbstract):
         return all_pipes
 
     @override
-    def load_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
@@ -621,7 +621,7 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_mthds_files_into_library(self, library_id: str, *, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+    def _load_mthds_files_into_library(self, *, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
         This method:
@@ -804,8 +804,8 @@ class LibraryManager(LibraryManagerAbstract):
 
     def _load_dependency_packages(
         self,
-        library_id: str,
         *,
+        library_id: str,
         manifest: MethodsManifest,
         package_root: Path,
     ) -> None:
@@ -1001,8 +1001,8 @@ class LibraryManager(LibraryManagerAbstract):
 
     def _load_address_based_dependencies(
         self,
-        library_id: str,
         *,
+        library_id: str,
         blueprints: list[PipelexBundleBlueprint],
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
@@ -1112,12 +1112,12 @@ class LibraryManager(LibraryManagerAbstract):
             library.concept_library.remove_concepts_by_concept_refs(concept_refs=concept_codes_to_remove)
 
     @override
-    def _remove_from_blueprint(self, library_id: str, *, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, *, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         self._remove_pipes_from_blueprint(blueprint=blueprint)
         self._remove_concepts_from_blueprint(blueprint=blueprint)
 
     @override
-    def _remove_from_blueprints(self, library_id: str, *, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 

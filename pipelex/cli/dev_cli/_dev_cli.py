@@ -16,11 +16,13 @@ from pipelex.cli.dev_cli.commands.check_keyword_only_cmd import check_keyword_on
 from pipelex.cli.dev_cli.commands.check_mthds_schema_cmd import check_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_app
 from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
+from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
@@ -41,11 +43,13 @@ class PipelexDevCLI(TyperGroup):
             "check-mthds-schema",
             "check-rules",
             "check-urls",
+            "drift",
             "generate-error-pages",
             "generate-mthds-schema",
             "kit",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
+            "subject-grant",
             "sync-kit-configs",
             "sync-main-config",
             "update-gateway-models",
@@ -74,6 +78,7 @@ app = typer.Typer(
     cls=PipelexDevCLI,
 )
 
+app.add_typer(drift_app, name="drift", help="Drift contracts: deterministic review obligations between code, docs, and tests")
 app.add_typer(kit_app, name="kit", help="Manage agent rules for the Pipelex repository")
 
 
@@ -268,6 +273,34 @@ def check_keyword_only_command(
     """Enforce the keyword-only-arguments convention across pipelex/ source."""
     try:
         check_keyword_only_cmd(report=report, fix=fix, quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # noqa: BLE001
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="subject-grant", help="Record a subject grant in subject_grants.toml (keyword-only convention)")
+def subject_grant_command(
+    func_key: Annotated[
+        str | None,
+        typer.Argument(help='The def to grant, keyed "<relative_path>::<qualified_name>" (e.g. "pipelex/graph/render.py::render_node")'),
+    ] = None,
+    rationale: Annotated[
+        str | None,
+        typer.Option("--rationale", help="The on-the-record review decision — an honest, def-specific sentence"),
+    ] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Record a subject grant — the explicit permission for a def's positional subject parameter."""
+    try:
+        subject_grant_cmd(func_key=func_key, rationale=rationale, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

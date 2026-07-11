@@ -22,8 +22,8 @@ class TelemetryFactory:
     @classmethod
     def make_telemetry_manager(
         cls,
-        secrets_provider: SecretsProviderAbstract,
         *,
+        secrets_provider: SecretsProviderAbstract,
         integration_mode: IntegrationMode,
         remote_config: RemoteConfig | None,
         is_pipelex_telemetry_enabled: bool = False,

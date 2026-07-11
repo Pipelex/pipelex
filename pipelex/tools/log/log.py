@@ -167,7 +167,7 @@ class Log:
                 raise RuntimeError(msg)
             self.rich_handler.console = Console(file=sys.stderr)
 
-    def set_level_by_int(self, level_int: int):
+    def set_level_by_int(self, *, level_int: int):
         """Set the log level using an integer value.
 
         Args:
@@ -189,7 +189,7 @@ class Log:
             level = LOGGING_LEVEL_OFF
         else:
             level = getattr(logging, level_name.upper())
-        self.set_level_by_int(level)
+        self.set_level_by_int(level_int=level)
 
     def set_level(self, level: LogLevel):
         """Set the default log level for all loggers.

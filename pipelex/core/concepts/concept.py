@@ -227,7 +227,7 @@ class Concept(ConceptAbstract):
 
                 return result, generator.imports_needed
 
-    def _render_schema_representation(self, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+    def _render_schema_representation(self, *, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
         """Render JSON Schema for this concept.
 
         Args:

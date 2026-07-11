@@ -80,7 +80,7 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
     return str(base_dir / inputs_path)
 
 
-def find_default_inputs_file(directory: Path) -> Path | None:
+def find_default_inputs_file(*, directory: Path) -> Path | None:
     """Probe a bundle directory for the default inputs file (JSON or TOML).
 
     Args:

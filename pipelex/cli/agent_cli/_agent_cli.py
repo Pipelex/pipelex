@@ -74,7 +74,7 @@ app = typer.Typer(
 )
 
 
-def version_callback(value: bool) -> None:
+def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
     """Print version and exit when --version is passed."""
     if value:
         package_version = get_package_version()

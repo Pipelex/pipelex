@@ -360,7 +360,7 @@ class ErrorReport(BaseModel):
     # not server internals.
     validation_errors: list[ValidationErrorItem] | None = None
 
-    def to_dict(self, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
+    def to_dict(self, *, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
         """Return a dict with only non-None fields, projected through ``disclosure_mode``.
 
         ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated

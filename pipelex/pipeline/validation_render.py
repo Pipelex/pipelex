@@ -59,7 +59,7 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
 
     validated_pipes: list[dict[str, Any]] = result.get("validated_pipes") or []
     total_pipes = result.get("total_pipes", len(validated_pipes))
-    lines.append(f"Validated {count_with_noun(total_pipes, singular='pipe')}:")
+    lines.append(f"Validated {count_with_noun(count=total_pipes, singular='pipe')}:")
     lines.append("")
     for entry in validated_pipes:
         lines.append(f"- `{entry.get('pipe_ref')}` — {entry.get('status')}")
@@ -253,7 +253,7 @@ def format_validation_error_items_markdown(items: list[ValidationErrorItem]) -> 
     return "\n".join(lines).rstrip()
 
 
-def build_fix_command(executable: str, *, bundle_path: Path, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> str:
+def build_fix_command(*, executable: str, bundle_path: Path, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> str:
     """Build the copy-pasteable ``<executable> fix bundle <path>`` command for a fix-aware footer.
 
     Shared by the human ``validate`` footer (``executable="pipelex"``) and the agent ``validate``

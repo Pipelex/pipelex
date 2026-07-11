@@ -110,7 +110,7 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name, fields=fields_dict)
+                return self._format_as_python(class_name=class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
@@ -296,7 +296,7 @@ class ConceptRepresentationGenerator:
             case ConceptRepresentationFormat.JSON:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
-                return self._format_as_python(class_name, fields=fields_dict)
+                return self._format_as_python(class_name=class_name, fields=fields_dict)
             case ConceptRepresentationFormat.SCHEMA:
                 msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
                 raise ValueError(msg)
@@ -348,7 +348,7 @@ class ConceptRepresentationGenerator:
             type_name = getattr(actual_type, "__name__", str(actual_type))
             return f"{field_name}_{type_name}"
 
-    def _format_as_python(self, class_name: str, *, fields: dict[str, Any]) -> str:
+    def _format_as_python(self, *, class_name: str, fields: dict[str, Any]) -> str:
         """Format a class instantiation as Python code string.
 
         Args:

@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
 
 async def list_anthropic_models(
-    sdk: str,
     *,
+    sdk: str,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,

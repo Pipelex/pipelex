@@ -99,13 +99,13 @@ def validate_artifact_paths(paths: Iterable[str]) -> dict[str, Path]:
     return validated
 
 
-def resolve_artifact_path(root: Path, *, artifact_path: str) -> Path:
+def resolve_artifact_path(*, root: Path, artifact_path: str) -> Path:
     """Resolve a validated artifact beneath `root` without following symbolic links."""
     relative_path = validate_artifact_path(artifact_path)
-    return resolve_output_path(root, relative_path=relative_path)
+    return resolve_output_path(root=root, relative_path=relative_path)
 
 
-def resolve_output_path(root: Path, *, relative_path: Path) -> Path:
+def resolve_output_path(*, root: Path, relative_path: Path) -> Path:
     """Resolve one internal output file beneath `root`, rejecting all symlink components."""
     if relative_path.is_absolute() or not relative_path.parts or any(part in {"", ".", ".."} for part in relative_path.parts):
         _raise_path_error(str(relative_path), reason="internal output path must be a canonical relative path")
@@ -118,7 +118,7 @@ def resolve_output_path(root: Path, *, relative_path: Path) -> Path:
         _raise_path_error(str(normalized_root), reason="output root exists but is not a directory")
 
     destination = normalized_root / relative_path
-    _reject_symlink_components(normalized_root, relative_path=relative_path)
+    _reject_symlink_components(root=normalized_root, relative_path=relative_path)
     resolved_root = normalized_root.resolve(strict=False)
     resolved_destination = destination.resolve(strict=False)
     if not resolved_destination.is_relative_to(resolved_root):
@@ -128,7 +128,7 @@ def resolve_output_path(root: Path, *, relative_path: Path) -> Path:
     return destination
 
 
-def _reject_symlink_components(root: Path, *, relative_path: Path) -> None:
+def _reject_symlink_components(*, root: Path, relative_path: Path) -> None:
     current = root
     for part in relative_path.parts:
         current /= part

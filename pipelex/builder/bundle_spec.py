@@ -107,7 +107,9 @@ class PipelexBundleSpec(StructuredContent):
             if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 raise ValueError(msg)
-            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS)
+            normalized[pipe_code] = normalize_typeless_signature_section(
+                pipe_code=pipe_code, pipe_section=pipe_section, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS
+            )
         return normalized
 
     @model_validator(mode="after")

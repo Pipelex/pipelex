@@ -22,8 +22,8 @@ class LeadingConfig(StrEnum):
 
 
 def check_config_sync_cmd(
-    show_diff: bool = True,
     *,
+    show_diff: bool = True,
     leading: LeadingConfig = LeadingConfig.INSTALLED,
     quiet: bool = False,
 ) -> None:

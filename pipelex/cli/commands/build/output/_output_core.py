@@ -33,8 +33,8 @@ SUB_COMMAND_OUTPUT = "output"
 
 
 async def _generate_output_core(
-    pipe_code: str | None = None,
     *,
+    pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
@@ -128,8 +128,8 @@ async def _generate_output_core(
 
 
 def execute_generate_output(
-    pipe_code: str | None,
     *,
+    pipe_code: str | None,
     bundle_path: Path | None,
     output_path: Path | None,
     output_format: ConceptRepresentationFormat,

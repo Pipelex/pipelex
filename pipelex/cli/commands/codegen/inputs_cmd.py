@@ -73,7 +73,7 @@ def codegen_inputs_cmd(
             combined_dirs: list[Path] = [*(paths or []), *(library_dir or [])]
             crate = load_normalized_crate_or_exit(library_dirs=combined_dirs or None)
 
-            pipe_ref = pipe or _default_main_pipe_ref(crate)
+            pipe_ref = pipe or _default_main_pipe_ref(crate=crate)
             try:
                 the_pipe = get_required_pipe(pipe_code=pipe_ref)
             except PipeLibraryError as exc:
@@ -108,7 +108,7 @@ def _render(*, the_pipe: PipeAbstract, template_format: InputsTemplateFormat, ex
             return render_inputs_toml(the_pipe, explicit=explicit), DEFAULT_INPUTS_TOML_FILE_NAME
 
 
-def _default_main_pipe_ref(crate: LibraryCrate) -> str:
+def _default_main_pipe_ref(*, crate: LibraryCrate) -> str:
     """The closure's single declared `main_pipe` (qualified), or exit 1 if none / ambiguous."""
     candidates = [f"{domain_code}.{domain.main_pipe}" for domain_code, domain in crate.domains.items() if domain.main_pipe]
     if not candidates:

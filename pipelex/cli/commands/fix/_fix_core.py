@@ -40,7 +40,7 @@ if TYPE_CHECKING:
 COMMAND = "fix"
 
 
-def _print_applied_fixes(console: Console, *, fixes: list[SuggestedFix], bundle_path: Path) -> None:
+def _print_applied_fixes(*, console: Console, fixes: list[SuggestedFix], bundle_path: Path) -> None:
     """Numbered list naming every change made — descriptions only, ops stay machine-facing."""
     entry_resolved = bundle_path.resolve()
     for fix_index, fix in enumerate(fixes, 1):
@@ -50,10 +50,10 @@ def _print_applied_fixes(console: Console, *, fixes: list[SuggestedFix], bundle_
         console.print(line)
 
 
-def _print_work_done(console: Console, *, result: FixBundleResult, bundle_path: Path, preview: bool = False) -> None:
+def _print_work_done(*, console: Console, result: FixBundleResult, bundle_path: Path, preview: bool = False) -> None:
     """The applied fixes, files written, and iteration count of one fix run."""
     console.print(f"[bold cyan]{'Fixes that would be applied:' if preview else 'Applied fixes:'}[/bold cyan]")
-    _print_applied_fixes(console, fixes=result.fixes_applied, bundle_path=bundle_path)
+    _print_applied_fixes(console=console, fixes=result.fixes_applied, bundle_path=bundle_path)
     if result.files_written:
         console.print(f"\n[bold cyan]{'Files that would be written:' if preview else 'Files written:'}[/bold cyan]")
         for file_path in result.files_written:
@@ -61,7 +61,7 @@ def _print_work_done(console: Console, *, result: FixBundleResult, bundle_path: 
     console.print(f"\n[bold cyan]Iterations:[/bold cyan] {result.iterations}")
 
 
-def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path: Path, allow_signatures: bool, preview: bool = False) -> None:
+def _render_fix_result(*, console: Console, result: FixBundleResult, bundle_path: Path, allow_signatures: bool, preview: bool = False) -> None:
     """Render a ``FixBundleResult`` for humans and exit per the 0/1 verdict policy.
 
     Valid (fixed or already valid) exits 0; valid-but-not-runnable without
@@ -82,7 +82,7 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]")
         if result.fixes_applied:
             console.print()
-            _print_work_done(console, result=result, bundle_path=bundle_path, preview=preview)
+            _print_work_done(console=console, result=result, bundle_path=bundle_path, preview=preview)
         console.print()
 
         if result.pending_signatures:
@@ -114,7 +114,7 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
 
     # Partial progress is normal: name what WAS applied before the remaining errors.
     if result.fixes_applied:
-        _print_work_done(console, result=result, bundle_path=bundle_path, preview=preview)
+        _print_work_done(console=console, result=result, bundle_path=bundle_path, preview=preview)
         console.print()
 
     if result.bail_reason:
@@ -122,7 +122,7 @@ def _render_fix_result(console: Console, *, result: FixBundleResult, bundle_path
 
     if result.remaining_errors:
         console.print("[bold cyan]Remaining errors:[/bold cyan]\n")
-        display_validation_error_items(console, items=result.remaining_errors)
+        display_validation_error_items(console=console, items=result.remaining_errors)
 
     # A remaining error can still carry a 💡 suggested-fix line — dropped by --select/--ignore,
     # left outside the write scope, or unconverged when the loop bailed. Claiming "no safe fix"
@@ -179,7 +179,7 @@ def _remap_result_to_originals(result: FixBundleResult, *, sandbox: PreviewSandb
     )
 
 
-def _print_preview_diffs(console: Console, *, result: FixBundleResult, sandbox: PreviewSandbox) -> None:
+def _print_preview_diffs(*, console: Console, result: FixBundleResult, sandbox: PreviewSandbox) -> None:
     """Unified diff (original vs sandbox copy) per file the preview run wrote.
 
     Must run while the sandbox still exists — it reads the mutated copies off disk.
@@ -211,8 +211,8 @@ def _print_preview_diffs(console: Console, *, result: FixBundleResult, sandbox: 
 
 
 def _run_fix_preview(
-    console: Console,
     *,
+    console: Console,
     bundle_path: Path,
     library_dirs: list[Path] | None,
     allow_signatures: bool,
@@ -235,9 +235,9 @@ def _run_fix_preview(
             )
         )
         if result.files_written:
-            _print_preview_diffs(console, result=result, sandbox=sandbox)
+            _print_preview_diffs(console=console, result=result, sandbox=sandbox)
         display_result = _remap_result_to_originals(result, sandbox=sandbox)
-        _render_fix_result(console, result=display_result, bundle_path=bundle_path, allow_signatures=allow_signatures, preview=True)
+        _render_fix_result(console=console, result=display_result, bundle_path=bundle_path, allow_signatures=allow_signatures, preview=True)
 
 
 def execute_fix(
@@ -269,7 +269,7 @@ def execute_fix(
 
             if diff:
                 _run_fix_preview(
-                    get_console(),
+                    console=get_console(),
                     bundle_path=bundle_path,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
@@ -289,9 +289,9 @@ def execute_fix(
                     ignore_codes=ignore_codes,
                 )
             )
-            _render_fix_result(get_console(), result=result, bundle_path=bundle_path, allow_signatures=allow_signatures)
+            _render_fix_result(console=get_console(), result=result, bundle_path=bundle_path, allow_signatures=allow_signatures)
     except FileNotFoundError as exc:
-        print_traceback_if_requested(get_console())
+        print_traceback_if_requested(console=get_console())
         typer.secho(f"Failed to fix: bundle file not found: '{bundle_path}'", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
@@ -302,7 +302,7 @@ def execute_fix(
         raise
     except Exception as exc:
         # Human CLI command boundary: an unexpected failure produced no verdict — exit 2.
-        print_traceback_if_requested(get_console())
+        print_traceback_if_requested(console=get_console())
         typer.secho(f"Failed to fix: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     finally:

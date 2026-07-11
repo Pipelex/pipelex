@@ -112,7 +112,7 @@ def inputs_bundle_cmd(
         agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
-        emit_no_inputs_result(pipe_code, message=str(exc), template_format=template_format)
+        emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

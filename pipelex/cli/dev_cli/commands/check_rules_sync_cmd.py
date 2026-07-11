@@ -37,7 +37,7 @@ def _get_preferred_targets_from_toml() -> list[AgentTarget]:
     return parsed_targets or _DEFAULT_TARGETS
 
 
-def check_rules_sync_cmd(show_diff: bool = True, *, quiet: bool = False) -> None:
+def check_rules_sync_cmd(*, show_diff: bool = True, quiet: bool = False) -> None:
     """Verify that installed agent rules match kit templates.
 
     Args:

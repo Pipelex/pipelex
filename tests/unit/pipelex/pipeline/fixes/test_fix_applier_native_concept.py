@@ -40,7 +40,7 @@ class TestFixApplierNativeConcept:
     def test_strip_matches_golden_bytes(self, fixture_stem: str, concept_code: str) -> None:
         """Deleting the redeclared concept then formatting yields the golden bytes, every form."""
         toml_doc = tomlkit.loads((_DATA / f"{fixture_stem}.mthds").read_text(encoding="utf-8"))
-        applications = apply_fix_ops(toml_doc, ops=[_delete_concept_op(key=concept_code)])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key=concept_code)])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         golden = (_DATA / f"{fixture_stem}.golden.mthds").read_text(encoding="utf-8")
         assert serialize_and_format(toml_doc) == golden
@@ -48,7 +48,7 @@ class TestFixApplierNativeConcept:
     def test_delete_removes_table_and_its_structure_subtable(self) -> None:
         """Deleting a ``[concept.Text]`` table also drops its ``[concept.Text.structure]`` sub-table."""
         toml_doc = tomlkit.loads((_DATA / "native_redecl_table.mthds").read_text(encoding="utf-8"))
-        apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Text")])
+        apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Text")])
         dumped = _dumps(toml_doc)
         assert "[concept.Text]" not in dumped
         assert "structure" not in dumped
@@ -59,9 +59,9 @@ class TestFixApplierNativeConcept:
     def test_apply_twice_is_idempotent(self) -> None:
         """Re-applying the delete finds the key already gone — the bytes do not change."""
         toml_doc = tomlkit.loads((_DATA / "native_redecl_inline.mthds").read_text(encoding="utf-8"))
-        apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Text")])
+        apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Text")])
         once = _dumps(toml_doc)
-        applications = apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Text")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Text")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert _dumps(toml_doc) == once
 
@@ -85,7 +85,7 @@ class TestFixApplierNativeConcept:
             'type = "PipeLLM"\n'
         )
         toml_doc = tomlkit.loads(source)
-        apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Text")])
+        apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Text")])
         dumped = _dumps(toml_doc)
         assert "[concept.Text]" not in dumped
         # The comment reflowed onto the successor table — it no longer annotates the deleted concept.
@@ -95,6 +95,6 @@ class TestFixApplierNativeConcept:
         """Stripping a concept absent from the document is reported as skipped, not raised."""
         toml_doc = tomlkit.loads((_DATA / "native_redecl_inline.mthds").read_text(encoding="utf-8"))
         source_bytes = _dumps(toml_doc)
-        applications = apply_fix_ops(toml_doc, ops=[_delete_concept_op(key="Number")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_delete_concept_op(key="Number")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert _dumps(toml_doc) == source_bytes

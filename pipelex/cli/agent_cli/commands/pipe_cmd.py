@@ -64,7 +64,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     pipe_item_table.add("output", pipe_spec.output)
 
     # Add type-specific fields
-    _add_type_specific_fields(pipe_spec, pipe_table=pipe_item_table)
+    _add_type_specific_fields(pipe_spec=pipe_spec, pipe_table=pipe_item_table)
 
     # Build the nested structure: [pipe.pipe_code]
     pipe_section = tomlkit.table()
@@ -73,7 +73,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     return tomlkit.dumps(doc)
 
 
-def _add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
+def _add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
     """Add type-specific fields to the pipe TOML table.
 
     Args:

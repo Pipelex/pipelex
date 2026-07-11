@@ -68,7 +68,7 @@ class PromptDocumentUri(BaseModel):
             return mime_type_to_extension(self.mime_type)
         return UNKNOWN_FILE_TYPE
 
-    def get_content_hash(self, length: int | None = None) -> str:
+    def get_content_hash(self, *, length: int | None = None) -> str:
         """Return a hash of the document content."""
         return hash_sha256(self.uri, length=length)
 
@@ -109,7 +109,7 @@ class PromptDocumentBase64(BaseModel):
         """Get the document type (extension) from the file contents."""
         return self.get_file_type().extension
 
-    def get_content_hash(self, length: int | None = None) -> str:
+    def get_content_hash(self, *, length: int | None = None) -> str:
         """Return a hash of the document content."""
         return hash_sha256(self.base64_data, length=length)
 
@@ -142,7 +142,7 @@ class PromptDocumentBinary(BaseModel):
         """Get the document type (extension) from the file contents."""
         return self.get_file_type().extension
 
-    def get_content_hash(self, length: int | None = None) -> str:
+    def get_content_hash(self, *, length: int | None = None) -> str:
         """Return a hash of the document content."""
         return hash_sha256(self.raw_bytes, length=length)
 

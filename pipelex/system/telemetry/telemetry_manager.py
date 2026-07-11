@@ -191,7 +191,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
 
     @override
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @override
@@ -297,7 +297,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             yield
 
     @override
-    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
             log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
@@ -319,7 +319,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             return False
 
     @override
-    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if (
             not is_debug
@@ -390,7 +390,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         return self._pipelex_telemetry_enabled
 
     @override
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
 
         Emits a trace start event to establish the trace name in PostHog.

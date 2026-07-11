@@ -79,8 +79,8 @@ class ImageContent(StuffContent):
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,  # noqa: ARG002
     ) -> str:
         """Register this image and return a token."""

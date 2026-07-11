@@ -13,11 +13,7 @@ if TYPE_CHECKING:
 
 
 async def inputs_core(
-    pipe_code: str | None = None,
-    *,
-    bundle_path: Path | None = None,
-    library_dirs: list[Path] | None = None,
-    explicit: bool = False,
+    *, pipe_code: str | None = None, bundle_path: Path | None = None, library_dirs: list[Path] | None = None, explicit: bool = False
 ) -> dict[str, Any]:
     """Core logic for generating input JSON for a pipe.
 
@@ -70,7 +66,7 @@ def emit_inputs_result(result: dict[str, Any], *, template_format: InputsTemplat
             print(toml_content, end="" if toml_content.endswith("\n") else "\n")
 
 
-def emit_no_inputs_result(pipe_code: str | None, *, message: str, template_format: InputsTemplateFormat) -> None:
+def emit_no_inputs_result(*, pipe_code: str | None, message: str, template_format: InputsTemplateFormat) -> None:
     """Emit the not-an-error result for a pipe that requires no inputs.
 
     JSON keeps the structured envelope with an empty ``inputs`` dict; TOML

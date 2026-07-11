@@ -12,9 +12,10 @@ It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which its
 
 | Option | Description |
 |--------|-------------|
-| `--log-level` | Set the logging level (e.g., `debug`, `info`, `warning`, `error`) |
-| `--runner` | Select the runner backend to use |
+| `--runner` | Select the runner backend to use (`pipelex` or `api`) |
 | `--version` | Print the version and exit |
+
+There is no `--log-level` flag: `pipelex-agent` is machine-consumed, so logging is cut off process-wide by design.
 
 ## Commands Overview
 
@@ -74,10 +75,10 @@ For `bundle`, additional options are available:
 !!! note "Signature pipes"
     `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
 
-    On a successful `validate bundle` run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). It is a non-blocking nudge: in JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement. The envelope also carries a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown states the runnability verdict in plain English — runnable when complete, NOT yet runnable above the "Pending signatures" section otherwise. Both are scoped to `validate bundle`; `validate all` / `validate pipe` omit them.
+    On a successful run, the envelope also carries `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), each namespaced by `pipe_ref` (`domain.code`). In JSON it is a `pending_signatures` array, in markdown a "Pending signatures" section. A top-down build reads it to see exactly which headers remain to implement. The envelope also carries a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown states the runnability verdict in plain English — runnable when complete, NOT yet runnable above the "Pending signatures" section otherwise. `validate bundle`, `validate method`, and `validate pipe --all` carry them and gate on them: without `--allow-signatures`, the command exits non-zero when `is_runnable` is false. Bare `validate pipe <code>` omits them, and a `--pipe` slice surfaces them for information without gating.
 
 !!! note "Advisory warnings on validate"
-    Whole-bundle validate surfaces (`validate bundle`, `validate method`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
+    Whole-bundle and whole-library validate surfaces (`validate bundle`, `validate method`, `validate pipe --all`) also carry a `warnings` array — advisory optionality lints on a VALID bundle that never flip the verdict or the exit code. Each entry has the **same shape as a validation error item** (`category`, `error_type`, `pipe_code`, `domain_code`, `variable_names`, `message`) — this is a different shape from the `init`/`doctor` setup `warnings` (`{type, message}`) documented under Output Contract below. The first occupant is the useless-`!` lint (`optional_force_redundant`): a `!` (force) input whose slot is guaranteed present in every analyzed flow, so the assertion can never fire. In markdown, warnings render as a "Warnings" section. The array is empty when there is nothing to report; single-pipe `validate pipe` omits it (no flow context to lint in).
 
 ### Fix
 

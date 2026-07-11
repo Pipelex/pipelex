@@ -115,7 +115,7 @@ def write_stamped_projection(
     options: dict[str, str] | None = None,
 ) -> WriteReport:
     """Stamp, write-if-changed, prune de-listed files, and rewrite the lock for one projection run."""
-    lock_path = resolve_output_path(output_dir, relative_path=Path(CODEGEN_LOCK_FILENAME))
+    lock_path = resolve_output_path(root=output_dir, relative_path=Path(CODEGEN_LOCK_FILENAME))
     output_root = lock_path.parent
     previous_paths = _previous_tracked_paths(lock_path)
 
@@ -133,15 +133,15 @@ def write_stamped_projection(
     written: list[str] = []
     unchanged: list[str] = []
     for stamped_file in projection.files:
-        destination = resolve_artifact_path(output_root, artifact_path=stamped_file.filename)
-        if _write_if_changed(destination, content=stamped_file.content):
+        destination = resolve_artifact_path(root=output_root, artifact_path=stamped_file.filename)
+        if _write_if_changed(path=destination, content=stamped_file.content):
             written.append(stamped_file.filename)
         else:
             unchanged.append(stamped_file.filename)
 
     removed = _prune_delisted(output_dir=output_root, previous_paths=previous_paths, current_paths=projection.lock.paths())
 
-    _write_if_changed(lock_path, content=projection.lock_content)
+    _write_if_changed(path=lock_path, content=projection.lock_content)
 
     return WriteReport(written=written, unchanged=unchanged, removed=removed, lock_path=CODEGEN_LOCK_FILENAME)
 
@@ -149,7 +149,7 @@ def write_stamped_projection(
 def _preflight_destinations(*, output_root: Path, projection: StampedProjection, previous_paths: set[str]) -> None:
     """Reject unowned destination collisions before any projection file is written."""
     for stamped_file in projection.files:
-        destination = resolve_artifact_path(output_root, artifact_path=stamped_file.filename)
+        destination = resolve_artifact_path(root=output_root, artifact_path=stamped_file.filename)
         existing_content = failable_load_text_from_path(destination)
         if existing_content is None or existing_content == stamped_file.content:
             continue
@@ -176,7 +176,7 @@ def _previous_tracked_paths(lock_path: Path) -> set[str]:
     return lock.paths() if lock is not None else set()
 
 
-def _write_if_changed(path: Path, *, content: str) -> bool:
+def _write_if_changed(*, path: Path, content: str) -> bool:
     """Write `content` to `path` only if it differs from what is already there. Returns whether it wrote."""
     if failable_load_text_from_path(path) == content:
         return False
@@ -189,7 +189,7 @@ def _prune_delisted(*, output_dir: Path, previous_paths: set[str], current_paths
     """Delete files that were tracked before but are no longer produced — only if they still carry our stamp."""
     removed: list[str] = []
     for relative in sorted(previous_paths - current_paths):
-        stale_path = resolve_artifact_path(output_dir, artifact_path=relative)
+        stale_path = resolve_artifact_path(root=output_dir, artifact_path=relative)
         content = failable_load_text_from_path(stale_path)
         if content is None:
             continue

@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
 
 async def validate_all(
+    *,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:
     """Validate all pipes in all libraries.

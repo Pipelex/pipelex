@@ -596,7 +596,7 @@ class InputShaper:
     @classmethod
     def _render_expected_shape(cls, *, stuff_spec: StuffSpec) -> str:
         """Render the expected input shape from the signature, reused verbatim in D4 error hints."""
-        return json.dumps(stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON), ensure_ascii=False)
+        return json.dumps(stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON), ensure_ascii=False)
 
     @classmethod
     def _describe_value(cls, value: Any) -> str:
