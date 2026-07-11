@@ -174,12 +174,20 @@ def _binder_header() -> str:
 
 
 def _jsdoc(description: str, *, imprecise: str | None, indent: str = "") -> str:
-    parts = [description] if description else []
+    parts = _sanitize_jsdoc_text(description).split("\n") if description else []
     if imprecise:
-        parts.append(f"@imprecise {imprecise}")
+        imprecise_lines = _sanitize_jsdoc_text(imprecise).split("\n")
+        parts.append(f"@imprecise {imprecise_lines[0]}")
+        parts.extend(imprecise_lines[1:])
     if not parts:
         return ""
     if len(parts) == 1 and imprecise is None:
         return f"{indent}/** {parts[0]} */\n"
     body = "".join(f"{indent} * {part}\n" for part in parts)
     return f"{indent}/**\n{body}{indent} */\n"
+
+
+def _sanitize_jsdoc_text(value: str) -> str:
+    """Normalize line endings and neutralize comment terminators in authored JSDoc text."""
+    normalized = value.replace("\r\n", "\n").replace("\r", "\n")
+    return normalized.replace("*/", "* /")

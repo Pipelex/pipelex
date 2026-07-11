@@ -75,8 +75,8 @@ def class_docstring(description: str, *, extra_line: str | None = None, indent: 
     text = description or ""
     if extra_line:
         body = f"{text}\n\n{indent}{extra_line}" if text else extra_line
-        return f'{indent}"""{body}\n{indent}"""'
-    return f'{indent}"""{text}"""'
+        return f"{indent}{escape_py_string(body)}"
+    return f"{indent}{escape_py_string(text)}"
 
 
 def field_line(field: ResolvedField, *, annotation: str) -> str:
