@@ -41,3 +41,5 @@ Three fresh no-context Sonnet agents reviewed the `d58cd847b..` grind commits, s
   - `kit_cmd.py::_cleanup_other_targets(repo_root)` — `repo_root` is a scope param, not the verb's object (the objects are the keyword params); the lone call site already passed it by keyword.
 
 Post-triage: `make agent-check` green; delivery-executor tests green. Grants total 1,743.
+
+The post-triage full-suite run also caught one failure class the reviews missed: dev-new unit tests stubbing `render_stuff_spec` with mocks asserted the pre-demote positional call (`assert_called_once_with(JSON)`). Mock assertions are invisible to pyright, so the wave-B pyright-guided call-site fixer never flagged them. Rewrote the assertions to the keyword form (`output_format=...`); the `side_effect` usages are exception instances, unaffected. This is a known blind spot of mechanical demotes: mock-based tests only fail at runtime — the full test suite is the safety net.

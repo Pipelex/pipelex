@@ -67,7 +67,7 @@ class TestCollectPossibleOutputsSequence:
 
         assert result == [{"concept_ref": "test.Final", "content": {"text": "final output"}}]
         get_pipe_mock.assert_called_once_with(pipe_code="final_step")
-        final_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.JSON)
+        final_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
 
     @pytest.mark.parametrize(
         "render_error",
@@ -111,4 +111,4 @@ class TestCollectPossibleOutputsSequence:
         assert get_pipe_mock.call_count == 2
         get_pipe_mock.assert_any_call(pipe_code="mid_sequence")
         get_pipe_mock.assert_any_call(pipe_code="leaf_step")
-        leaf_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.JSON)
+        leaf_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
