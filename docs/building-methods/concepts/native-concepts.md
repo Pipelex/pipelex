@@ -419,9 +419,11 @@ type = "PipeLLM"
 description = "Analyze image with text context"
 inputs = { image = "Image", context = "Text" }
 output = "Text"
-prompt = "Given this context: $context
+prompt = """
+Given this context: $context
 
-Analyze this image: $image"
+Analyze this image: $image
+"""
 ```
 
 ### Web Search

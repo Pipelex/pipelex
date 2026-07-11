@@ -11,8 +11,8 @@ The `PromptingConfig` class controls how Pipelex handles prompting styles for di
 
 ```python
 class PromptingConfig(ConfigModel):
-    default_prompting_style: PromptingStyle
-    prompting_styles: Dict[str, PromptingStyle]
+    default_prompting_style: TemplatingStyle
+    prompting_styles: dict[str, TemplatingStyle]
 ```
 
 ### Fields
@@ -28,12 +28,13 @@ Each prompting style defines how prompts are formatted and presented to the LLM.
 
 ```toml
 [pipelex.prompting_config]
-default_prompting_style = "chat"
+default_prompting_style = { tag_style = "xml" }
 
 [pipelex.prompting_config.prompting_styles]
-gpt4 = "chat"
-claude = "instruction"
-llama = "completion"
+openai = { tag_style = "ticks" }
+anthropic = { tag_style = "xml" }
+mistral = { tag_style = "square_brackets" }
+gemini = { tag_style = "xml" }
 ```
 
 ## Usage
@@ -41,11 +42,10 @@ llama = "completion"
 The configuration provides a method to get the appropriate prompting style:
 
 ```python
-def get_prompting_style(self, prompting_target: Optional[LLMPromptingTarget] = None) -> Optional[PromptingStyle]:
+def get_prompting_style(self, prompting_target: PromptingTarget | None = None) -> TemplatingStyle | None:
     if prompting_target:
         return self.prompting_styles.get(prompting_target, self.default_prompting_style)
-    else:
-        return None
+    return None
 ```
 
 This allows for:

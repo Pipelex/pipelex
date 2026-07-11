@@ -439,7 +439,7 @@ Pages:
 | File | Purpose |
 |------|---------|
 | `pipelex/pipe_operators/llm/image_reference.py` | `ImageReference` and `ImageReferenceKind` models |
-| `pipelex/pipe_operators/llm/template_image_analyzer.py` | Factory-time template analysis |
+| `pipelex/pipe_operators/shared/template_image_analyzer.py` | Factory-time template analysis |
 | `pipelex/tools/jinja2/image_registry.py` | Runtime image tracking |
 | `pipelex/tools/jinja2/jinja2_with_images_filter.py` | The `with_images` filter implementation |
 
@@ -448,7 +448,7 @@ Pages:
 | File | Purpose |
 |------|---------|
 | `pipelex/tools/jinja2/jinja2_required_variables.py` | `VariableReference` for filter detection |
-| `pipelex/pipe_operators/llm/llm_prompt_spec.py` | Prompt building with image collection |
+| `pipelex/pipe_operators/llm/llm_prompt_blueprint.py` | Prompt building with image collection |
 
 ---
 

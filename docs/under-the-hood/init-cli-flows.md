@@ -13,7 +13,7 @@ description: "Inside the pipelex init command — how focus-based dispatch sets 
 
 The `.pipelex/` directory contains two categories of files with different lifecycles:
 
-1. **Config files** (`pipelex.toml`, `plxt.toml`, `mthds_schema.json`) — static templates, copied once, rarely touched by the user.
+1. **Config files** (`pipelex.toml`, `plxt.toml`) — static templates, copied once, rarely touched by the user.
 2. **Inference files** (`inference/backends.toml`, `inference/routing_profiles.toml`, `inference/backends/*.toml`, `inference/deck/*.toml`) — interactive setup, customized per-project based on which AI backends the user selects.
 
 These two categories are managed by separate steps. `init_config()` copies only config files (skipping the `inference/` directory entirely). The inference step handles its own template copying and then runs interactive backend selection and routing customization. Each file is owned by exactly one step — `init_config()` explicitly skips the `inference/` directory via `INIT_SKIP_DIRS`, and skips `telemetry.toml` and `pipelex_service.toml` via `INIT_SKIP_FILES`. This separation ensures that re-running `pipelex init config` never overwrites a user's carefully tuned inference setup.
@@ -48,7 +48,6 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 |----------|-------------|------------|------|
 | `pipelex.toml` | `init_config()` | Project or global | `.pipelex/pipelex.toml` |
 | `plxt.toml` | `init_config()` | Project or global | `.pipelex/plxt.toml` |
-| `mthds_schema.json` | `init_config()` | Project or global | `.pipelex/mthds_schema.json` |
 | `backends.toml` | Inference step | Project or global | `.pipelex/inference/backends.toml` |
 | `backends/*.toml` | Inference step | Project or global | `.pipelex/inference/backends/` |
 | `deck/*.toml` | Inference step | Project or global | `.pipelex/inference/deck/` |
@@ -259,7 +258,6 @@ Copies a telemetry template and prints instructions. No interactive prompts. Whi
 |-----------------|-----------|---------|
 | `pipelex.toml` | `init_config()` | Main Pipelex configuration |
 | `plxt.toml` | `init_config()` | PLXT tooling configuration |
-| `mthds_schema.json` | `init_config()` | MTHDS JSON Schema for IDE support |
 | `inference/` | Inference step | All inference configuration (see below) |
 | `inference/backends.toml` | Inference step | Backend registry (enabled/disabled flags) |
 | `inference/backends/*.toml` | Inference step | Per-backend settings (API keys, endpoints) |

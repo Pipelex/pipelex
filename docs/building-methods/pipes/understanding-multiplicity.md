@@ -71,8 +71,8 @@ This is the default behavior and represents the most common case.
 Use empty brackets in the output to let the LLM decide how many items to generate:
 
 ```toml
-[concept]
-LineItem = "A single line item from an invoice"
+[concept.LineItem]
+description = "A single line item from an invoice"
 
 [concept.LineItem.structure]
 description = "Description of the item or service"
