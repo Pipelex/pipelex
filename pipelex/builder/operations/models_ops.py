@@ -1,12 +1,12 @@
 """Core operation for listing model presets, aliases, and waterfalls."""
 
+from enum import StrEnum
 from typing import Any
 
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.hub import get_model_deck
-from pipelex.types import StrEnum
 
 
 # TODO: get this from somewhere else, not hardcoded here.

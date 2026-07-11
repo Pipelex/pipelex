@@ -82,13 +82,61 @@ class TestRunCoreExecution:
         graph_spec: Any | None = None,
     ) -> Any:
         working_memory = mocker.MagicMock()
-        working_memory.get_optional_main_stuff.return_value = main_stuff
+        working_memory.get_main_stuff.return_value = main_stuff
+        working_memory.resolve_main_stuff.return_value = main_stuff
         working_memory.smart_dump.return_value = {"stuff": "dump"}
         return SimpleNamespace(
-            optional_main_stuff=main_stuff,
+            main_stuff=main_stuff,
             graph_spec=graph_spec,
             working_memory=working_memory,
         )
+
+    def _make_absent_main_pipe_output(self) -> Any:
+        """A pipe output whose main output resolved absent (real WorkingMemory, recorded absence)."""
+        from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord  # noqa: PLC0415
+        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+
+        memory = WorkingMemory()
+        memory.record_new_main_absence(
+            AbsenceRecord(
+                variable_name="summary",
+                kind=AbsenceKind.SKIPPED,
+                reason="skipped because input 'analysis' is absent",
+                producing_pipe="summarize",
+            )
+        )
+        return SimpleNamespace(graph_spec=None, working_memory=memory)
+
+    @pytest.mark.usefixtures("config_mock")
+    def test_absent_main_output_prints_absence_and_saves_artifact(self, mocker: MockerFixture, console: Console, tmp_path: Path) -> None:
+        """An absent main output is a success: the recap prints the absence (no crash) and
+        --save-main-stuff writes an explicit absence artifact, not value files.
+        """
+        pipe_output = self._make_absent_main_pipe_output()
+        self._mock_runner(mocker, pipe_output)
+
+        _run_async(
+            _call_execute_run(
+                no_pretty_print=False,
+                save_main_stuff=True,
+                output_dir=str(tmp_path),
+            )
+        )
+
+        output = console.export_text()
+        assert "Pipeline execution completed successfully" in output
+        assert "resolved absent" in output
+        assert "skipped because input 'analysis' is absent" in output
+
+        output_dirs = list(tmp_path.glob("test_pipe_output*"))
+        assert len(output_dirs) == 1
+        absence_json = json.loads((output_dirs[0] / "main_stuff.json").read_text(encoding="utf-8"))
+        assert absence_json["absent"] is True
+        assert absence_json["variable_name"] == "summary"
+        assert absence_json["reason"] == "skipped because input 'analysis' is absent"
+        assert (output_dirs[0] / "main_stuff.md").exists()
+        # Nothing to view: the interactive viewer is not produced for an absence.
+        assert not (output_dirs[0] / "main_stuff_viewer.html").exists()
 
     @pytest.mark.usefixtures("config_mock")
     def test_happy_path_prints_recap(self, mocker: MockerFixture, console: Console) -> None:
@@ -181,11 +229,76 @@ class TestRunCoreExecution:
         execute_kwargs = runner_class_mock.return_value.execute.call_args.kwargs
         assert execute_kwargs["inputs"] == {"topic": "dogs", "resolved": True}
 
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_file_inputs_thread_base_dir_to_runner(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """File-loaded inputs hand the file's parent dir to the runner as inputs_base_dir (D3)."""
+        inputs_file = tmp_path / "inputs.json"
+        inputs_file.write_text(json.dumps({"photo": "photo.jpg"}), encoding="utf-8")
+        pipe_output = self._make_pipe_output(mocker)
+        runner_class_mock = self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(inputs=str(inputs_file)))
+
+        ctor_kwargs = runner_class_mock.call_args.kwargs
+        assert ctor_kwargs["inputs_base_dir"] == tmp_path.resolve()
+
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_inline_json_inputs_have_no_base_dir(self, mocker: MockerFixture) -> None:
+        """Inline JSON inputs come from no file — the runner gets inputs_base_dir=None."""
+        pipe_output = self._make_pipe_output(mocker)
+        runner_class_mock = self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(inputs='{"topic": "cats"}'))
+
+        ctor_kwargs = runner_class_mock.call_args.kwargs
+        assert ctor_kwargs["inputs_base_dir"] is None
+
     @pytest.mark.usefixtures("console")
     def test_non_dict_input_file_exits(self, tmp_path: Path) -> None:
         """An input file holding a JSON list (not a dict) is rejected."""
         inputs_file = tmp_path / "inputs.json"
         inputs_file.write_text('["not", "a", "dict"]', encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            _run_async(_call_execute_run(inputs=str(inputs_file)))
+
+        assert exc_info.value.exit_code == 1
+
+    @pytest.mark.usefixtures("config_mock", "console")
+    def test_toml_file_inputs_loaded_and_resolved(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A .toml inputs file is loaded through the TOML parser and run through the path resolver."""
+        inputs_file = tmp_path / "inputs.toml"
+        inputs_file.write_text('[report]\nconcept = "Text"\ncontent = """\nLine one.\nLine two.\n"""\n', encoding="utf-8")
+        loaded_inputs = {"report": {"concept": "Text", "content": "Line one.\nLine two.\n"}}
+        resolver_mock = mocker.patch(
+            "pipelex.cli.commands.run._run_core.resolve_inputs_paths",
+            return_value={**loaded_inputs, "resolved": True},
+        )
+        pipe_output = self._make_pipe_output(mocker)
+        runner_class_mock = self._mock_runner(mocker, pipe_output)
+
+        _run_async(_call_execute_run(inputs=str(inputs_file)))
+
+        resolver_mock.assert_called_once_with(loaded_inputs, base_dir=tmp_path.resolve())
+        execute_kwargs = runner_class_mock.return_value.execute.call_args.kwargs
+        assert execute_kwargs["inputs"] == {**loaded_inputs, "resolved": True}
+
+    @pytest.mark.usefixtures("console")
+    def test_toml_syntax_error_input_file_exits(self, tmp_path: Path) -> None:
+        """A .toml inputs file with invalid TOML syntax is rejected cleanly."""
+        inputs_file = tmp_path / "inputs.toml"
+        inputs_file.write_text("topic = \n", encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            _run_async(_call_execute_run(inputs=str(inputs_file)))
+
+        assert exc_info.value.exit_code == 1
+
+    @pytest.mark.usefixtures("console")
+    def test_invalid_json_input_file_exits(self, tmp_path: Path) -> None:
+        """A .json inputs file with invalid JSON syntax is rejected cleanly."""
+        inputs_file = tmp_path / "inputs.json"
+        inputs_file.write_text("{not valid json", encoding="utf-8")
 
         with pytest.raises(typer.Exit) as exc_info:
             _run_async(_call_execute_run(inputs=str(inputs_file)))
@@ -276,17 +389,6 @@ class TestRunCoreExecution:
         """An unsupported table suffix fails before anything runs."""
         with pytest.raises(typer.Exit) as exc_info:
             _run_async(_call_execute_run(save_csv="out.xlsx"))
-
-        assert exc_info.value.exit_code == 1
-
-    @pytest.mark.usefixtures("config_mock", "console")
-    def test_save_csv_no_main_stuff_exits(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """--save-csv with no main stuff produced is an error after the run."""
-        pipe_output = self._make_pipe_output(mocker, main_stuff=None)
-        self._mock_runner(mocker, pipe_output)
-
-        with pytest.raises(typer.Exit) as exc_info:
-            _run_async(_call_execute_run(save_csv=str(tmp_path / "out.csv")))
 
         assert exc_info.value.exit_code == 1
 

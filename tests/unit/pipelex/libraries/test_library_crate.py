@@ -39,6 +39,27 @@ class TestLibraryCrate:
         assert "scoring" in crate.domains
         assert crate.domains["scoring"].description == "Scoring domain"
 
+    @pytest.mark.parametrize(
+        "blueprints",
+        [
+            [BlueprintSamples.META_MEMBER_BUNDLE, BlueprintSamples.SCORING_BUNDLE],
+            [BlueprintSamples.SCORING_BUNDLE, BlueprintSamples.META_MEMBER_BUNDLE],
+        ],
+    )
+    def test_main_pipe_merges_from_same_domain_sibling(self, blueprints: list[PipelexBundleBlueprint]):
+        """A membership-only file loaded first must not hide a later same-domain main_pipe."""
+        pipeline_bundle = PipelexBundleBlueprint(
+            source="/fake/meta_pipeline.mthds",
+            domain="meta",
+            main_pipe="compute_score",
+            pipe=BlueprintSamples.SCORING_BUNDLE.pipe,
+        )
+        ordered = [pipeline_bundle if blueprint is BlueprintSamples.SCORING_BUNDLE else blueprint for blueprint in blueprints]
+
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=ordered)
+
+        assert crate.domains["meta"].main_pipe == "compute_score"
+
     def test_merge_across_domains(self):
         """Bundles with different domains produce refs qualified with respective domains."""
         crate = LibraryCrateFactory.make_from_blueprints(

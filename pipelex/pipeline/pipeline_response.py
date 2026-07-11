@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 from mthds.protocol.models import RunResultExecute, RunResultStart
 
-from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.types import StrEnum
+from pipelex.runtime_bridge.serialization import resolve_main_stuff_root_key
 
 
 class RunState(StrEnum):
@@ -30,7 +31,10 @@ class PipelexRunResultExecute(RunResultExecute[PipeOutput]):
     created_at: str
     state: RunState
     finished_at: str | None = None
-    main_stuff_name: str | None = None
+    # A completed run always resolves its declared output: a value or a recorded absence. This names
+    # the working-memory root key the value lives under — or, when the output resolved absent, the
+    # declared slot the absence record is keyed by (consumers branch on the record).
+    main_stuff_name: str
 
     @classmethod
     def from_pipe_output(
@@ -48,7 +52,7 @@ class PipelexRunResultExecute(RunResultExecute[PipeOutput]):
             state=state,
             finished_at=finished_at,
             pipe_output=pipe_output,
-            main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
+            main_stuff_name=resolve_main_stuff_root_key(pipe_output=pipe_output),
         )
 
 

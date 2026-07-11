@@ -1,3 +1,4 @@
+import datetime
 from pathlib import Path
 from typing import Any, Callable, ClassVar
 
@@ -7,9 +8,12 @@ from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.exceptions import StuffContentFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class TestCases:
@@ -75,6 +79,95 @@ class TestStuffContentFactory:
         assert isinstance(result, MockStructuredContent)
         assert result.title == "Test Title"
         assert result.description == "Test Description"
+
+    def test_make_content_from_value_yes_no_bool(self):
+        """A bool value builds YesNoContent directly (not via model_validate, which rejects a bare bool)."""
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=YesNoContent, value=True)
+
+        assert isinstance(result, YesNoContent)
+        assert result.yes_no is True
+
+    def test_make_content_from_value_yes_no_refining_subclass_bool(self):
+        """A bool value builds a YesNo-refining subclass directly (the issubclass arm covers generated refinement classes)."""
+
+        class MockUrgencyFlag(YesNoContent):
+            pass
+
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=MockUrgencyFlag, value=False)
+
+        assert isinstance(result, MockUrgencyFlag)
+        assert result.yes_no is False
+
+    def test_make_content_from_value_date_from_date_object(self):
+        """A date object builds a date-only DateContent."""
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=datetime.date(2026, 7, 7))
+
+        assert isinstance(result, DateContent)
+        assert result.date == datetime.date(2026, 7, 7)
+        assert result.time is None
+
+    def test_make_content_from_value_date_from_datetime_object_splits(self):
+        """A datetime object splits into date + time, preserving the UTC offset."""
+        offset = datetime.timezone(datetime.timedelta(hours=2))
+        result = StuffContentFactory.make_content_from_value(
+            stuff_content_subclass=DateContent, value=datetime.datetime(2026, 7, 7, 15, 40, tzinfo=offset)
+        )
+
+        assert isinstance(result, DateContent)
+        assert result.date == datetime.date(2026, 7, 7)
+        assert result.time is not None
+        assert result.time.utcoffset() == datetime.timedelta(hours=2)
+
+    def test_make_content_from_value_date_from_iso_date_string(self):
+        """A date-only ISO string never fabricates a time (parsed date-first)."""
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="2026-07-07")
+
+        assert isinstance(result, DateContent)
+        assert result.date == datetime.date(2026, 7, 7)
+        assert result.time is None
+
+    def test_make_content_from_value_date_from_iso_datetime_string(self):
+        """A datetime ISO string parses into date + time with the offset kept."""
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="2026-07-07T15:40:00+02:00")
+
+        assert isinstance(result, DateContent)
+        assert result.date == datetime.date(2026, 7, 7)
+        assert result.time is not None
+        assert result.time.utcoffset() == datetime.timedelta(hours=2)
+
+    def test_make_content_from_value_date_refining_subclass(self):
+        """A date object builds a Date-refining subclass directly (the issubclass arm covers generated refinement classes)."""
+
+        class MockDueDate(DateContent):
+            pass
+
+        result = StuffContentFactory.make_content_from_value(stuff_content_subclass=MockDueDate, value=datetime.date(2026, 8, 6))
+
+        assert isinstance(result, MockDueDate)
+        assert result.date == datetime.date(2026, 8, 6)
+
+    def test_make_content_from_value_date_rejects_non_iso_string(self):
+        """A non-ISO string under a Date class is rejected (strict ISO, no loose formats)."""
+        with pytest.raises(StuffContentFactoryError):
+            StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="March 7, 2026")
+
+    def test_make_content_from_value_date_rejects_all_digit_string(self):
+        """An all-digit string (basic-ISO/epoch-ambiguous) is rejected here too, matching DateContent's own guard."""
+        with pytest.raises(StuffContentFactoryError):
+            StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value="20260707")
+
+    @pytest.mark.parametrize(
+        "date_string",
+        [
+            "20260707T154000",  # compact/basic datetime — fromisoformat accepts it, but it is not extended ISO
+            "2026-W27-2",  # ISO week-date — fromisoformat silently normalizes it to a calendar date
+            "20260707",  # compact/basic date (regression-lock: was already rejected by the all-digit guard)
+        ],
+    )
+    def test_make_content_from_value_date_rejects_non_extended_iso(self, date_string: str):
+        """Only extended-calendar ISO (YYYY-MM-DD[...]) is accepted; compact/basic and week-date forms are rejected (strict, no loose forms)."""
+        with pytest.raises(StuffContentFactoryError):
+            StuffContentFactory.make_content_from_value(stuff_content_subclass=DateContent, value=date_string)
 
     def test_make_stuffcontent_from_concept_code_required_text_content(self):
         """Test required method with native.Text concept (should work)."""

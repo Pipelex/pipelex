@@ -137,7 +137,7 @@ async def generate_and_store_images(img_gen_assignment):
 ```
 
 !!! info "What crosses the boundary"
-    `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, `size`, `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
+    `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, paired `width`/`height`, and `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
 What gets stored vs. what crosses the boundary, by content type:
 

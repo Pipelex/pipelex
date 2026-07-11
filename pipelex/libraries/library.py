@@ -143,7 +143,7 @@ class Library(BaseModel):
                         # `pipe_validation` item: `pipe_code` is the referencing controller and
                         # `missing_pipe_code` is the dependency that does not resolve, so a machine
                         # consumer can read both without parsing the message. LibraryLoadingError rides
-                        # the existing `except LibraryError` forwarding in _translate_to_validate_bundle_error.
+                        # the existing `except LibraryError` forwarding in translate_to_validate_bundle_error.
                         dependency_error_data = PipesAndConceptValidationErrorData(
                             error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
                             domain_code=pipe.domain_code,

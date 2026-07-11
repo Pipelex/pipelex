@@ -1,0 +1,25 @@
+# Fixture for the strip-namespace applier test: a same-domain over-qualified pipe
+# declaration key and main_pipe, plus a qualified step reference that must survive untouched.
+domain    = "namespacefix"
+main_pipe = "run_seq"
+
+[pipe.first_pipe]
+type        = "PipeLLM"
+description = "First pipe, untouched."
+output      = "Text"
+prompt      = "First"
+
+# This pipe is over-qualified with its own domain prefix.
+[pipe.hello]
+type        = "PipeLLM"
+description = "Say hello."
+output      = "Text"
+prompt      = "Say hello"  # trailing comment stays on this line
+
+[pipe.run_seq]
+type = "PipeSequence"
+description = "Run it."
+output = "Text"
+steps = [
+  { pipe = "namespacefix.hello", result = "greeting" },
+]

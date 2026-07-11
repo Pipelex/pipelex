@@ -32,7 +32,6 @@ output = "Text"
 prompt = "Extract text from $doc."
 
 [pipe.draft_pipe]
-type = "PipeSignature"
 description = "Unrelated draft signature, reached by nothing."
 inputs = { note = "SliceNote" }
 output = "SliceNote"
@@ -59,9 +58,8 @@ prompt = "Summarize $doc"
 type = "PipeParallel"
 description = "Parallel referencing an unloaded cross-package branch."
 inputs = { doc = "XpkgDoc" }
-output = "Text"
+output = "Composite"
 add_each_output = true
-combined_output = "Text"
 branches = [
   { pipe = "ext->otherpkg.missing_pipe", result = "branch_result" },
 ]
@@ -83,7 +81,6 @@ output = "CallerSummary"
 steps = [ { pipe = "summary_sig", result = "summary" } ]
 
 [pipe.summary_sig]
-type = "PipeSignature"
 description = "Signature placeholder for the summary step."
 inputs = { doc = "CallerDoc" }
 output = "CallerSummary"

@@ -1,8 +1,7 @@
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel
-
-from pipelex.types import StrEnum
 
 # Commented stuff below corresponds to untested stuff because Vision models are not available on Bedrock yet
 

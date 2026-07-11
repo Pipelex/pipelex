@@ -53,7 +53,6 @@ from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.content_generation.exceptions import DryRunMockBuildError
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
-from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobReport
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -345,7 +344,8 @@ def _dry_image_content(image_url: str, *, img_gen_assignment: ImgGenAssignment |
         url=image_url,
         public_url=image_url,
         mime_type="image/jpeg",
-        size=ImageSize(width=1024, height=1024),
+        width=1024,
+        height=1024,
     )
     if img_gen_assignment:
         image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text

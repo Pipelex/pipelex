@@ -26,6 +26,8 @@ own page. Classes are grouped by subsystem.
 
 ## Pipeline execution
 
+- [`FixTransactionError`](fix-transaction-error.md) — Fix transaction
+- [`FixWriteConflictError`](fix-write-conflict-error.md) — Fix write conflict
 - [`JobMetadataError`](job-metadata-error.md) — Job metadata
 - [`PipeExecutionError`](pipe-execution-error.md) — Pipe execution
 - [`PipeIOContractError`](pipe-io-contract-error.md) — Pipe IO contract

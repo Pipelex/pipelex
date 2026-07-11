@@ -3,7 +3,7 @@ import pytest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 
 
 class TestStuffSpecToBundleRepresentation:
@@ -83,3 +83,23 @@ class TestStuffSpecToBundleRepresentation:
         assert stuff_spec_single.to_bundle_representation() == "my_domain.MyCustomConcept"
         assert stuff_spec_list.to_bundle_representation() == "my_domain.MyCustomConcept[]"
         assert stuff_spec_fixed.to_bundle_representation() == "my_domain.MyCustomConcept[7]"
+
+    def test_presence_defaults_to_plain(self):
+        """A StuffSpec built without presence is plain (required, always produced)."""
+        concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
+        stuff_spec = StuffSpec(concept=concept)
+        assert stuff_spec.presence == PresenceMarker.PLAIN
+
+    @pytest.mark.parametrize(
+        ("presence", "expected"),
+        [
+            (PresenceMarker.PLAIN, "native.Text"),
+            (PresenceMarker.OPTIONAL, "native.Text?"),
+            (PresenceMarker.FORCE, "native.Text!"),
+        ],
+    )
+    def test_to_bundle_representation_with_presence(self, presence: PresenceMarker, expected: str):
+        """to_bundle_representation renders the presence marker suffix."""
+        concept = ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT)
+        stuff_spec = StuffSpec(concept=concept, presence=presence)
+        assert stuff_spec.to_bundle_representation() == expected

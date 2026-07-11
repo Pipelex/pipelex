@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pipelex.types import StrEnum
+from enum import StrEnum
+
+from pipelex.graph.graphspec import GraphSpecMode
 
 
 class PipeRunMode(StrEnum):
@@ -22,3 +24,11 @@ class PipeRunMode(StrEnum):
                 return True
             case PipeRunMode.DRY:
                 return False
+
+    @property
+    def graphspec_mode(self) -> GraphSpecMode:
+        match self:
+            case PipeRunMode.DRY:
+                return GraphSpecMode.DRY
+            case PipeRunMode.LIVE:
+                return GraphSpecMode.LIVE

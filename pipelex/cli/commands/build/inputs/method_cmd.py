@@ -5,9 +5,10 @@ from typing import Annotated
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
 from pipelex.cli.method_resolver import resolve_method_target
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 
 
 def build_inputs_method_cmd(
@@ -29,15 +30,25 @@ def build_inputs_method_cmd(
     ] = None,
     output_path: Annotated[
         str | None,
-        typer.Option("--output", "-o", help="Path to save the generated JSON file"),
+        typer.Option("--output", "-o", help="Path to save the generated inputs file"),
     ] = None,
+    template_format: Annotated[
+        InputsTemplateFormat,
+        typer.Option("--format", help="Format of the generated inputs template (json or toml)"),
+    ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
-    """Generate example input JSON for an installed method.
+    """Generate an example inputs template for an installed method.
 
     Examples:
         pipelex build inputs method my-method
         pipelex build inputs method my-method --pipe custom_pipe
         pipelex build inputs method my-method --output custom_inputs.json
+        pipelex build inputs method my-method --format toml
+        pipelex build inputs method my-method --explicit
     """
     pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
@@ -53,11 +64,19 @@ def build_inputs_method_cmd(
     if output_path:
         output_path_path = Path(output_path)
     else:
-        output_path_path = Path(method_library_dirs[0]) / "results" / DEFAULT_INPUTS_FILE_NAME
+        default_file_name: str
+        match template_format:
+            case InputsTemplateFormat.JSON:
+                default_file_name = DEFAULT_INPUTS_FILE_NAME
+            case InputsTemplateFormat.TOML:
+                default_file_name = DEFAULT_INPUTS_TOML_FILE_NAME
+        output_path_path = Path(method_library_dirs[0]) / "results" / default_file_name
 
     execute_generate_inputs(
         pipe_code=pipe_code,
         bundle_path=None,
         output_path=output_path_path,
         library_dir=effective_library_dir,
+        template_format=template_format,
+        explicit=explicit,
     )

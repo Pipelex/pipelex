@@ -1,6 +1,6 @@
 """Unit tests for GraphSpec JSON round-trip serialization."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from pipelex.graph.graphspec import (
@@ -8,6 +8,7 @@ from pipelex.graph.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
+    GraphSpecMode,
     IOSpec,
     NodeIOSpec,
     NodeKind,
@@ -65,12 +66,12 @@ class TestGraphSpecRoundtrip:
     def test_roundtrip_complex_graph(self) -> None:
         """Test round-trip for a complex graph with multiple nodes, edges, and timing."""
         timing1 = TimingSpec(
-            started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
-            ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
+            ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=UTC),
         )
         timing2 = TimingSpec(
-            started_at=datetime(2024, 1, 15, 10, 30, 1, tzinfo=timezone.utc),
-            ended_at=datetime(2024, 1, 15, 10, 30, 4, tzinfo=timezone.utc),
+            started_at=datetime(2024, 1, 15, 10, 30, 1, tzinfo=UTC),
+            ended_at=datetime(2024, 1, 15, 10, 30, 4, tzinfo=UTC),
         )
 
         input_io = IOSpec(
@@ -131,7 +132,7 @@ class TestGraphSpecRoundtrip:
             ),
             nodes=[node1, node2],
             edges=[edge],
-            meta={"run_mode": "live"},
+            meta={"mode": GraphSpecMode.LIVE, "extra": "value"},
         )
 
         json_str = graph.to_json()
@@ -163,7 +164,7 @@ class TestGraphSpecRoundtrip:
         assert restored.edges[0].label == "step 1"
 
         # Verify meta
-        assert restored.meta == {"run_mode": "live", "format": "mthds"}
+        assert restored.meta == {"mode": GraphSpecMode.LIVE, "extra": "value", "format": "mthds"}
 
     def test_roundtrip_with_error_spec(self) -> None:
         """Test round-trip for a graph with a failed node containing error info."""
@@ -224,6 +225,15 @@ class TestGraphSpecRoundtrip:
 
         assert restored.graph_id == graph.graph_id
         assert restored.nodes[0].node_id == graph.nodes[0].node_id
+
+    def test_loads_old_fixture_without_mode(self) -> None:
+        """Old GraphSpec JSON without meta.mode remains readable."""
+        fixture_path = Path(__file__).parents[3] / "data" / "graphs" / "cv_batch_old.json"
+
+        restored = GraphSpec.model_validate_json(load_text_from_path(fixture_path))
+
+        assert restored.meta["format"] == "mthds"
+        assert "mode" not in restored.meta
 
     def test_json_is_human_readable(self) -> None:
         """Test that generated JSON is indented and human-readable."""

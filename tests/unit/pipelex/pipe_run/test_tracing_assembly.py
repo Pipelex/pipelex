@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +10,8 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.graph.graphspec import GraphSpecMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.exceptions import MissingDependencyError
@@ -32,7 +34,7 @@ def _make_usage_event(pipeline_run_id: str, node_id: str) -> UsageReportEvent:
     return UsageReportEvent(
         pipeline_run_id=pipeline_run_id,
         workflow_id="direct",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         sequence=0,
         node_id=node_id,
         tokens_usage=tokens_usage,
@@ -110,11 +112,13 @@ class TestTracingAssembly:
             assemble_usage=False,
             domain_code="dom",
             main_pipe_code="main",
+            run_mode=PipeRunMode.DRY,
         )
 
         assert result.graph_spec is sentinel_graph
         assert result.tokens_usages is None
         assemble.assert_called_once()
+        assert assemble.call_args.kwargs["mode"] == GraphSpecMode.DRY
 
     def test_graph_and_usage_both_assembled(self, mocker: MockerFixture) -> None:
         self._enable_tracing(mocker)

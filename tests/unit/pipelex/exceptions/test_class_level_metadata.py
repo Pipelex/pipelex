@@ -17,8 +17,10 @@ from pipelex.cogt.exceptions import (
     SdkTypeError,
 )
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.stuffs.exceptions import DateContentError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
+from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
@@ -102,6 +104,9 @@ class TestClassLevelMetadata:
             ("interpreter", PipelexInterpreterError("boom"), True),
             ("validate_bundle", ValidateBundleError("boom"), True),
             ("csv", CsvError("boom"), True),
+            ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
+            ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"]), True),
+            ("date_content", DateContentError("boom"), True),
             ("config", PipelexConfigError("boom"), False),
             ("pipe_execution", PipeExecutionError("boom"), False),
             ("cogt", CogtError("boom"), False),

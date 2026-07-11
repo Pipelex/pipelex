@@ -156,6 +156,14 @@ number = pipe_output.main_stuff_as_number
 
 This works only if the main_stuff is (or refines) a `NumberContent` concept.
 
+**`main_stuff_as_yes_no`** - Returns `YesNoContent` object:
+
+```python
+verdict = pipe_output.main_stuff_as_yes_no.yes_no  # a bool
+```
+
+This works only if the main_stuff is (or refines) a `YesNoContent` concept.
+
 **`main_stuff_as_html`** - Returns `HtmlContent` object:
 
 ```python

@@ -171,3 +171,16 @@ class TestStuffArtefactIteration:
         assert artefact["_stuff_name"] == "test_list"
         assert artefact["_stuff_code"] == "test_list"
         assert artefact["_content_class"] == "ListContent"
+
+    def test_truthiness_of_present_singular_value(self) -> None:
+        """A present non-list artefact is truthy — Jinja2's `{% if var %}` guard (the optionals
+        guard idiom) must never crash on a present value via the __len__ fallback.
+        """
+        artefact = StuffArtefact(_make_text_stuff("Plain text"))
+
+        assert bool(artefact) is True
+
+    def test_truthiness_of_list_follows_emptiness(self) -> None:
+        """A ListContent artefact follows list emptiness (D4: [] is the absence story for plurals)."""
+        assert bool(StuffArtefact(_make_list_stuff([TextContent(text="Item")]))) is True
+        assert bool(StuffArtefact(_make_list_stuff([]))) is False

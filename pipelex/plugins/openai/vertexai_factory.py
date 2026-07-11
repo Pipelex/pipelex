@@ -1,3 +1,4 @@
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -6,7 +7,6 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.types import StrEnum
 
 
 class VertexAIExtraField(StrEnum):

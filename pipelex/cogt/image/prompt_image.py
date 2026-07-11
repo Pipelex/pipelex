@@ -1,4 +1,5 @@
 import base64
+from enum import StrEnum
 from functools import cached_property
 from typing import Annotated, Literal, Union
 
@@ -16,7 +17,6 @@ from pipelex.tools.misc.filetype_utils import (
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.uri.resolved_uri import ResolvedUri
 from pipelex.tools.uri.uri_resolver import resolve_uri
-from pipelex.types import StrEnum
 
 
 class PromptImageDetail(StrEnum):

@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
@@ -24,7 +24,7 @@ class TestDashedEdgeRendering:
     """Tests for dashed-edge rendering logic across BATCH_ITEM, BATCH_AGGREGATE, and PARALLEL_COMBINE edge kinds."""
 
     GRAPH_ID: ClassVar[str] = "dashed_edge_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
     def _make_graph(
         self,

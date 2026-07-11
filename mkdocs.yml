@@ -249,6 +249,7 @@ plugins:
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
+        - building-methods/pipes/understanding-optionality.md: "Understanding Optionality"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
         - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
@@ -270,6 +271,7 @@ plugins:
         - tools/cli/init.md: "CLI Init"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/validate.md: "CLI Validate"
+        - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
@@ -306,6 +308,7 @@ plugins:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
+        - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
@@ -316,6 +319,8 @@ plugins:
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
         - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
+        - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
+        - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
         - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
@@ -458,6 +463,7 @@ nav:
         - Pipe Output: building-methods/pipes/pipe-output.md
         - CSV Input & Output: building-methods/pipes/csv-input-and-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
+        - Understanding Optionality: building-methods/pipes/understanding-optionality.md
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
@@ -489,6 +495,7 @@ nav:
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
+      - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md
@@ -548,6 +555,8 @@ nav:
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
       - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
       - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
+      - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
+      - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
       - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md

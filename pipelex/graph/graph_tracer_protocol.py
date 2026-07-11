@@ -4,7 +4,7 @@ from typing import Any, Protocol
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
@@ -28,6 +28,7 @@ class GraphTracerProtocol(Protocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -43,6 +44,7 @@ class GraphTracerProtocol(Protocol):
                 Stamped onto the returned TraceContext so it is born with the correct flag.
             emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
                 Stamped onto the returned TraceContext so it is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -132,6 +134,33 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent (D3).
+
+        A skip is a successful outcome (the run continues; the pipe's output is a recorded
+        absence), rendered as its own node state so "why did my workflow produce nothing?"
+        is answerable from the graph.
+
+        Args:
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote, when there is one — a
+                PLURAL output normalizes to an empty list (D4) that downstream pipes consume,
+                so it must register in the producer map for DATA edges. None for a singular
+                output (a recorded absence has no payload).
+            output_concept_data: Optional serialized concept dict for that output's concept.
+        """
+        ...
+
     def add_edge(
         self,
         *,
@@ -141,6 +170,7 @@ class GraphTracerProtocol(Protocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         """Add an edge between two nodes.
 
@@ -151,6 +181,7 @@ class GraphTracerProtocol(Protocol):
             label: Optional label for the edge.
             source_stuff_digest: Optional stuff digest for the source (for batch edges).
             target_stuff_digest: Optional stuff digest for the target (for batch edges).
+            optional: Marker for a data edge fed by a declared-optional (`?`) output.
         """
         ...
 
@@ -263,6 +294,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         return TraceContext(
             graph_id=graph_id,
@@ -329,6 +361,18 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pass
 
     @override
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        pass
+
+    @override
     def add_edge(
         self,
         *,
@@ -338,6 +382,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         pass
 

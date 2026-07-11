@@ -266,7 +266,7 @@ class TestGenerateRunnerCode:
         assert "[DocumentContent(" in runner_code
 
     def test_runner_code_custom_class_import_format(self) -> None:
-        """Test that custom class imports use domain_conceptCode format for standalone scripts."""
+        """Custom classes import from the single-module types projection (structures/structures.py)."""
         # Create a custom concept (non-native)
         custom_concept = ConceptFactory.make(
             domain_code="test_domain",
@@ -282,9 +282,30 @@ class TestGenerateRunnerCode:
         mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=document_concept)})
 
         runner_code = generate_runner_code(mock_pipe)
-        # Custom imports should NOT use relative import (no leading dot) for standalone scripts
-        assert "from structures.test_domain__custom_output import CustomOutput" in runner_code
+        # Custom imports come from the emitted single module; NOT a relative import (standalone script)
+        assert "from structures.structures import CustomOutput" in runner_code
         assert "from .structures" not in runner_code
+
+    def test_runner_code_class_name_overrides_spell_emitted_names(self) -> None:
+        """The overrides map re-spells runtime-qualified class names to the emitted (bare) names."""
+        custom_concept = ConceptFactory.make(
+            domain_code="test_domain",
+            concept_code="CustomOutput",
+            description="A custom output",
+            structure_class_name="test_domain__CustomOutput",
+        )
+        text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+
+        mock_pipe = MagicMock()
+        mock_pipe.code = "custom_pipe"
+        mock_pipe.output = StuffSpec(concept=custom_concept)
+        mock_pipe.inputs = InputStuffSpecs(root={"message": StuffSpec(concept=text_concept)})
+
+        runner_code = generate_runner_code(mock_pipe, class_name_overrides={"test_domain__CustomOutput": "CustomOutput"})
+        assert "from structures.structures import CustomOutput" in runner_code
+        assert "async def run_custom_pipe() -> CustomOutput:" in runner_code
+        assert "pipe_output.main_stuff_as(content_type=CustomOutput)" in runner_code
+        assert "test_domain__CustomOutput" not in runner_code
 
     def test_runner_code_anything_output_uses_any_return_type(self) -> None:
         """Test that Anything output concept uses Any return type and main_stuff instead of main_stuff_as."""

@@ -1,8 +1,10 @@
+from enum import StrEnum
+from typing import Self
+
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.types import Self, StrEnum
 
 
 class TagStyle(StrEnum):

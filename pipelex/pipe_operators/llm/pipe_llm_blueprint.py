@@ -1,4 +1,5 @@
-from typing import Literal
+from enum import StrEnum
+from typing import Literal, Self
 
 from pydantic import model_validator
 from typing_extensions import override
@@ -15,7 +16,6 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import Self, StrEnum
 
 
 class StructuringMethod(StrEnum):

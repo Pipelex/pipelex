@@ -1,10 +1,12 @@
 ---
-description: "Generate example input JSON for any pipe — see the expected input structure based on the pipe's declared input types in .mthds files."
+description: "Generate an example inputs template (JSON or TOML) for any pipe — see the expected input structure based on the pipe's declared input types in .mthds files."
 ---
 
 # Build Inputs
 
-Generate example input JSON for a pipe, showing the expected input structure based on the pipe's input types.
+Generate an example inputs template for a pipe, showing the expected input structure based on the pipe's input types. The template is emitted as JSON by default, or as TOML with `--format toml`.
+
+By default the template is the **light** shape — the values themselves, matching the pipe's declared signature (a bare string for a `Text`-refining input, a bare number for a `Number`-refining one, an object for a structured concept). This is exactly what [`pipelex run`](../run.md) accepts, so a template you generate and fill in runs as-is. Pass `--explicit` to emit the ceremonial `{concept, content}` envelope form instead. See [Providing Inputs](../../../building-methods/pipes/provide-inputs.md) for the full model.
 
 ## Usage
 
@@ -21,7 +23,9 @@ pipelex build inputs pipe <PIPE_CODE> [OPTIONS]
 **Options:**
 
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to `results/`)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to `results/`, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
+- `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
 ### From a bundle
 
@@ -37,7 +41,9 @@ pipelex build inputs bundle <PATH> [OPTIONS]
 
 - `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to bundle's directory)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to the bundle's directory, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
+- `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
 ### From an installed method
 
@@ -53,7 +59,9 @@ pipelex build inputs method <NAME> [OPTIONS]
 
 - `--pipe` - Pipe code (overrides method's `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file
+- `--output`, `-o` - Path to save the generated inputs file (filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--format` - Template format: `json` (default) or `toml`
+- `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
 ## Examples
 
@@ -93,43 +101,101 @@ pipelex build inputs pipe my_domain.my_pipe -L ./my_library/
 pipelex build inputs bundle my_bundle.mthds --output custom_inputs.json
 ```
 
+**Generate a TOML template instead of JSON:**
+
+```bash
+pipelex build inputs bundle my_bundle.mthds --format toml
+```
+
+When `--format toml` is selected and no explicit `--output` is given, the default filename becomes `inputs.toml` (instead of `inputs.json`).
+
+**Generate the explicit envelope form instead of the light values:**
+
+```bash
+pipelex build inputs bundle my_bundle.mthds --explicit
+```
+
 ## Output Format
 
-The generated JSON file contains all inputs required by the pipe, with example values based on each input's concept type:
+The generated file contains all inputs required by the pipe, with example values based on each input's concept type. Both formats carry the same structure — [`pipelex run`](../run.md#input-file-formats) accepts either.
+
+### Light form (default)
+
+The default template is the light shape: each value is what the pipe's signature expects, with no `{concept, content}` envelope. For a pipe declaring a `Text`-refining `question`, a `Number`-refining `priority`, a structured `invoice`, and a `Text`-refining list `tags = "Tag[]"`:
+
+**JSON (`--format json`, default):**
 
 ```json
 {
-  "text_input": {
-    "concept": "native.Text",
-    "content": {
-      "text": "text_value"
-    }
+  "question": "text_value",
+  "priority": 1,
+  "invoice": {
+    "invoice_number": "invoice_number_value",
+    "amount": 0.0
   },
-  "document_input": {
-    "concept": "native.Document",
-    "content": {
-      "url": "url_value"
-    }
-  }
+  "tags": ["text_value"]
 }
 ```
 
-### Multiplicity Support
+**TOML (`--format toml`):** the light TOML template uses inline tables so top-level scalars and structured values coexist, and carries the declared concept for each key as a comment (a declared-multiple input is tagged `[]`):
 
-When an input has multiplicity (accepts multiple items), the content is wrapped in a list:
+```toml
+# concept: my_domain.Question
+question = "text_value"
+# concept: my_domain.Priority
+priority = 1
+# concept: my_domain.Invoice
+invoice = {invoice_number = "invoice_number_value", amount = 0.0}
+# concept: my_domain.Tag[]
+tags = ["text_value"]
+```
+
+### Explicit envelope form (`--explicit`)
+
+Pass `--explicit` to reproduce the ceremonial `{concept, content}` envelope for every input — useful when you want the concept written out inline (JSON has no comments), or when authoring an input meant for the explicit escape hatch:
 
 ```json
 {
-  "documents": {
-    "concept": "native.Document",
-    "content": [
-      {
-        "url": "url_value"
-      }
-    ]
+  "question": {
+    "concept": "my_domain.Question",
+    "content": {"text": "text_value"}
+  },
+  "priority": {
+    "concept": "my_domain.Priority",
+    "content": {"number": 1}
+  },
+  "invoice": {
+    "concept": "my_domain.Invoice",
+    "content": {"invoice_number": "invoice_number_value", "amount": 0.0}
+  },
+  "tags": {
+    "concept": "my_domain.Tag",
+    "content": [{"text": "text_value"}]
   }
 }
 ```
+
+In TOML, `--explicit` renders the all-tables layout; a multiple input keeps a single `[key]` envelope whose `content` is an array-of-tables (`[[key.content]]`):
+
+```toml
+[question]
+concept = "my_domain.Question"
+
+[question.content]
+text = "text_value"
+
+# ... priority and invoice tables omitted ...
+
+[tags]
+concept = "my_domain.Tag"
+
+[[tags.content]]
+text = "text_value"
+```
+
+### Multiplicity
+
+When an input is declared multiple (`Tag[]`), the light form wraps the example value in a list (`["text_value"]`); the explicit form keeps a single `{concept, content}` envelope whose `content` is the list (not an array of separate envelopes). Either way, [`pipelex run`](../run.md) accepts the filled-in template.
 
 ## Use Cases
 

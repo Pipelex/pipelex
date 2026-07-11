@@ -28,7 +28,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_class_registry, get_current_library
+from pipelex.hub import get_class_registry, get_current_library, get_current_library_id_or_none
 from pipelex.libraries.collision_messages import duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
@@ -98,7 +98,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
+        self._pipe_source_maps: dict[str, dict[str, str]] = {}  # library_id -> pipe_ref -> source identifier
         self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
         self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
         self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
@@ -131,11 +131,9 @@ class LibraryManager(LibraryManagerAbstract):
         if library is None:
             return False
         try:
-            # Remove source map entries for pipes in this library
-            for pipe_ref in library.pipe_library.root:
-                self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
         finally:
+            self._pipe_source_maps.pop(library_id, None)
             self._blueprints.pop(library_id, None)
             self._crate_cache.pop(library_id, None)
             self._loaded_fingerprints.pop(library_id, None)
@@ -156,7 +154,7 @@ class LibraryManager(LibraryManagerAbstract):
         # teardown can result from a raising library.
         libraries = list(self._libraries.values())
         self._libraries = {}
-        self._pipe_source_map = {}
+        self._pipe_source_maps = {}
         self._blueprints = {}
         self._crate_cache = {}
         self._loaded_fingerprints = {}
@@ -232,23 +230,29 @@ class LibraryManager(LibraryManagerAbstract):
         return self._libraries[library_id]
 
     @override
-    def get_pipe_source(self, pipe_code: str) -> Path | None:
-        """Get the source file path for a pipe.
+    def get_pipe_source(self, pipe_code: str) -> str | None:
+        """Get the source identifier for a pipe.
 
         Args:
             pipe_code: The pipe code or pipe_ref (domain.code) to look up.
 
         Returns:
-            Path to the .mthds file the pipe was loaded from, or None if unknown.
+            The source the pipe was loaded from — a filesystem path or a logical URI
+            (e.g. ``api://bundle-0.mthds``), preserved verbatim — or None if unknown.
         """
+        library_id = get_current_library_id_or_none()
+        if library_id is None:
+            return None
+        source_map = self._pipe_source_maps.get(library_id, {})
+
         # Direct lookup by pipe_ref
-        result = self._pipe_source_map.get(pipe_code)
+        result = source_map.get(pipe_code)
         if result is not None:
             return result
         # Bare code fallback: search for a key ending with .pipe_code
         if "." not in pipe_code:
             suffix = f".{pipe_code}"
-            matches = [path for key, path in self._pipe_source_map.items() if key.endswith(suffix)]
+            matches = [path for key, path in source_map.items() if key.endswith(suffix)]
             if len(matches) == 1:
                 return matches[0]
         return None
@@ -333,95 +337,6 @@ class LibraryManager(LibraryManagerAbstract):
         return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
-    def load_libraries_concepts_only(
-        self,
-        library_id: str,
-        *,
-        library_dirs: list[Path] | None = None,
-        library_file_paths: list[Path] | None = None,
-    ) -> list["Concept"]:
-        """Load only domains and concepts from library directories, skipping pipes.
-
-        This is a lightweight alternative to load_libraries() that only processes
-        domains and concepts. It does not load pipes, does not perform pipe validation,
-        and does not run library.validate_library().
-
-        Args:
-            library_id: The ID of the library to load into
-            library_dirs: List of directories containing MTHDS files
-            library_file_paths: List of specific MTHDS file paths to load
-
-        Returns:
-            List of all concepts that were loaded
-        """
-        # Ensure libraries exist for this library_id
-        if library_id not in self._libraries:
-            msg = f"Trying to load a library that does not exist: '{library_id}'"
-            raise LibraryError(msg)
-
-        if not library_dirs:
-            library_dirs = []
-
-        all_dirs: list[Path] = []
-        all_mthds_paths: list[Path] = []
-        all_dirs.extend(library_dirs)
-        all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
-
-        if library_file_paths:
-            all_mthds_paths.extend(library_file_paths)
-
-        # Combine and deduplicate
-        seen_absolute_paths: set[str] = set()
-        valid_mthds_paths: list[Path] = []
-        for mthds_path in all_mthds_paths:
-            try:
-                absolute_path = str(mthds_path.resolve())
-            except (OSError, RuntimeError):
-                # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                absolute_path = str(mthds_path)
-
-            if absolute_path not in seen_absolute_paths:
-                valid_mthds_paths.append(mthds_path)
-                seen_absolute_paths.add(absolute_path)
-
-        # Import modules and register in global registries
-        # Import from user directories - still needed for StructuredContent classes
-        for library_dir in all_dirs:
-            # Only import files that contain StructuredContent subclasses (uses AST pre-check)
-            ClassRegistryUtils.import_modules_in_folder(
-                folder_path=library_dir,
-                base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[Path(builder_pkg.__file__).parent],
-            )
-            # NOTE: We skip FuncRegistryUtils.register_funcs_in_folder() since we're not loading pipes
-
-        # Auto-discover and register all StructuredContent classes from sys.modules
-        num_registered = ClassRegistryUtils.auto_register_all_subclasses(
-            base_class=StructuredContent,
-        )
-        log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
-
-        # Load MTHDS files as concepts only (no pipes)
-        log.debug(f"Loading concepts only from MTHDS files: {[str(p) for p in valid_mthds_paths]}")
-        library = self.get_library(library_id=library_id)
-        all_blueprints: list[PipelexBundleBlueprint] = []
-        for mthds_path in valid_mthds_paths:
-            # Track loaded path (resolve if possible)
-            try:
-                resolved_path = mthds_path.resolve()
-            except (OSError, RuntimeError):
-                resolved_path = mthds_path
-            library.loaded_mthds_paths.append(resolved_path)
-
-            all_blueprints.append(PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path))
-
-        # Load all sibling files as a single batch so same-domain concept references resolve against
-        # the merged set regardless of directory iteration order — mirroring load_concepts_only_from_directory.
-        # A one-file-at-a-time loop would make a valid additive concepts library fail based on file order
-        # (e.g. a file whose structure references a concept declared in a sibling that loads later).
-        return self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-
-    @override
     def load_from_crate(self, library_id: str, *, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
@@ -504,7 +419,7 @@ class LibraryManager(LibraryManagerAbstract):
             # Track source file for this pipe (used by get_pipe_source)
             source = crate.source_map.get(pipe_ref)
             if source:
-                self._pipe_source_map[pipe_ref] = Path(source)
+                self._pipe_source_maps.setdefault(library_id, {})[pipe_ref] = source
 
         library.pipe_library.add_pipes(pipes=all_pipes)
 
@@ -555,68 +470,6 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Load from crate (domains, concepts, pipes, validation)
         return self.load_from_crate(library_id=library_id, crate=crate)
-
-    @override
-    def load_concepts_only_from_blueprints(
-        self,
-        library_id: str,
-        *,
-        blueprints: list[PipelexBundleBlueprint],
-    ) -> list["Concept"]:
-        """Load only domains and concepts from blueprints, skipping pipes.
-
-        This is a lightweight alternative to load_from_blueprints() that only processes
-        domains and concepts. It does not load pipes, does not perform pipe validation,
-        and does not run library.validate_library().
-
-        Args:
-            library_id: The ID of the library to load into
-            blueprints: List of parsed MTHDS blueprints to load
-
-        Returns:
-            List of all concepts that were loaded
-        """
-        library = self.get_library(library_id=library_id)
-
-        # Load all domains first
-        all_domains: list[Domain] = []
-        for blueprint in blueprints:
-            domain = DomainFactory.make_from_blueprint(
-                blueprint=DomainBlueprint(
-                    source=blueprint.source,
-                    code=blueprint.domain,
-                    description=blueprint.description or "",
-                    system_prompt=blueprint.system_prompt,
-                    main_pipe=blueprint.main_pipe,
-                ),
-            )
-            all_domains.append(domain)
-        library.domain_library.add_domains(domains=all_domains)
-
-        # Validate same-domain concept references against the live library before adding this batch's
-        # concepts — mirrors load_from_blueprints so the lightweight concepts-only path rejects a
-        # dangling concept_ref / item_concept_ref instead of leaving an invalid schema behind. The
-        # batch's own concepts come from `blueprints` (not yet in the library); concepts loaded by
-        # prior batches resolve via already_loaded_concept_refs.
-        validate_concept_references_in_blueprints(
-            blueprints=blueprints,
-            already_loaded_concept_refs=set(library.concept_library.root.keys()),
-        )
-
-        # Load concepts (forward references resolved after all are loaded)
-        all_concepts = self._load_concepts_from_blueprints(blueprints)
-        library.concept_library.add_concepts(concepts=all_concepts)
-
-        # Resolve forward references in dynamically generated structure classes
-        self._rebuild_models_with_forward_refs(all_concepts)
-
-        # Detect cycles in concept references (A -> B -> A is forbidden)
-        self._detect_concept_cycles(all_concepts)
-
-        library.validate_domain_library_with_libraries()
-        library.validate_concept_library_with_libraries()
-
-        return all_concepts
 
     def _load_concepts_from_blueprints(
         self,
@@ -685,6 +538,13 @@ class LibraryManager(LibraryManagerAbstract):
         """
         ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
         for concept_ref, concept_blueprint in concepts.items():
+            # Native concepts are auto-registered in every library (make_empty_with_native_concepts).
+            # A normalized crate materializes them as explicit `native.<Code>` entries so external
+            # consumers are self-contained; re-adding them here would collide with the pre-registered
+            # natives. Skipping them makes a normalized crate directly loadable (round-trip), and is a
+            # no-op for a transport crate (which never carries native entries).
+            if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref):
+                continue
             parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
             if parsed.domain_path is None:
                 msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
@@ -832,7 +692,7 @@ class LibraryManager(LibraryManagerAbstract):
             # contract mismatches, duplicate refs) carry no structured validation payload — unlike
             # LibraryLoadingError, which must propagate intact so its aggregated errors survive.
             # Add the batch's file list as context, then let the outer
-            # _translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
+            # translate_to_validate_bundle_error LibraryError arm shape it into a ValidateBundleError.
             msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
             raise type(ref_error)(msg) from ref_error
 

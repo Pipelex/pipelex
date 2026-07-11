@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
@@ -7,7 +8,6 @@ from typing_extensions import override
 from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.system.pipelex_service.types import RemoteConfigSource
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType

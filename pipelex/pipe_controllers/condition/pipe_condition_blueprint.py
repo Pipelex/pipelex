@@ -1,4 +1,4 @@
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from pydantic import Field, WithJsonSchema, field_validator, model_validator
 from typing_extensions import override
@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
-from pipelex.types import Self
 
 OutcomeMap = dict[str, str]
 

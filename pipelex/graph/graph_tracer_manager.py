@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
@@ -104,6 +104,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         tracer_key: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -124,6 +125,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
                 (no post-hoc model_copy needed at the call site).
             emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
                 so the returned TraceContext is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -161,6 +163,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             pipeline_run_id=pipeline_run_id,
             emit_graph_events=emit_graph_events,
             emit_usage_events=emit_usage_events,
+            mode=mode,
         )
         # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
@@ -322,6 +325,42 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             return
         tracer.register_execution_data(node_id=node_id, execution_data=execution_data)
 
+    def on_pipe_end_skipped(
+        self,
+        *,
+        lookup_key: str,
+        node_id: str | None,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote (PLURAL outputs normalize
+                to an empty list, D4) — registered in the producer map for DATA edges.
+            output_concept_data: Optional serialized concept dict for that output's concept.
+        """
+        if node_id is None:
+            return
+
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+
+        tracer.on_pipe_end_skipped(
+            node_id=node_id,
+            ended_at=ended_at,
+            skip_reason=skip_reason,
+            output_spec=output_spec,
+            output_concept_data=output_concept_data,
+        )
+
     def on_pipe_end_error(
         self,
         *,
@@ -355,35 +394,6 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             error_type=error_type,
             error_message=error_message,
             error_stack=error_stack,
-        )
-
-    def add_edge(
-        self,
-        *,
-        lookup_key: str,
-        source_node_id: str,
-        target_node_id: str,
-        edge_kind: EdgeKind,
-        label: str | None = None,
-    ) -> None:
-        """Add an edge between two nodes.
-
-        Args:
-            lookup_key: The tracer lookup key.
-            source_node_id: The source node ID.
-            target_node_id: The target node ID.
-            edge_kind: The type of edge.
-            label: Optional label for the edge.
-        """
-        tracer = self._get_tracer(lookup_key)
-        if tracer is None:
-            return
-
-        tracer.add_edge(
-            source_node_id=source_node_id,
-            target_node_id=target_node_id,
-            edge_kind=edge_kind,
-            label=label,
         )
 
     def register_controller_output(

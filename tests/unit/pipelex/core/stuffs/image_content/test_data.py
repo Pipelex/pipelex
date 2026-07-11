@@ -19,7 +19,8 @@ class TestData:
         "source_negative_prompt": None,
         "caption": None,
         "mime_type": None,
-        "size": None,
+        "width": None,
+        "height": None,
         "filename": None,
     }
 
@@ -31,7 +32,8 @@ class TestData:
         "source_negative_prompt": None,
         "caption": "A beautiful sunset",
         "mime_type": "image/png",
-        "size": None,
+        "width": None,
+        "height": None,
         "filename": None,
     }
 
@@ -47,7 +49,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null,
+    "width": null,
+    "height": null,
     "filename": null
 }}"""
     EXPECTED_RENDERED_JSON_WITH_PROMPT = f"""{{
@@ -57,7 +60,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null,
+    "width": null,
+    "height": null,
     "filename": null
 }}"""
     # rendered_for_prompt returns just the URL for images

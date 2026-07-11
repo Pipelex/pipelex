@@ -61,6 +61,8 @@ Each field can specify:
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
 
+Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
+
 ## Supported Field Types
 
 Inline structures support these field types:
@@ -115,13 +117,33 @@ tax_rate = { type = "number", description = "Tax rate as decimal", default_value
 
 ### date
 
-Date and datetime values. Pipelex handles date parsing automatically.
+A calendar date, no time of day. Generates a `datetime.date` field (JSON schema `format: date`). Use it for issue dates, due dates, dates of birth — anything you'd write as `2026-07-07`.
 
 ```toml
 [concept.Event.structure]
-event_date = { type = "date", description = "Event date and time" }
-created_at = { type = "date", description = "Creation timestamp" }
+event_date = { type = "date", description = "The date of the event" }
 ```
+
+### datetime
+
+A timestamp — a date *and* a time of day. Generates a `datetime.datetime` field (JSON schema `format: date-time`). Use it only when the time genuinely matters; a plain calendar date should be `date`, so the LLM is never forced to fabricate a time.
+
+```toml
+[concept.Event.structure]
+created_at = { type = "datetime", description = "Creation timestamp" }
+```
+
+### time
+
+A time of day, optionally with a UTC offset — no date attached. Generates a `datetime.time` field (JSON schema `format: time`). Use it for opening hours, schedules, recurring times — anything you'd write as `09:00:00` or `15:40:00+02:00`.
+
+```toml
+[concept.OpeningHours.structure]
+opens_at = { type = "time", description = "Daily opening time" }
+```
+
+!!! note "Field type vs the native `Date` / `Time` concepts"
+    A structure field's `date` / `datetime` / `time` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional `time` field.
 
 ### list
 
@@ -136,7 +158,7 @@ scores = { type = "list", item_type = "number", description = "Test scores" }
 
 ### dict
 
-Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**.
+Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**. Dictionary keys are text on the JSON wire, so `key_type` must be `"text"` (`"str"` remains accepted as a legacy spelling).
 
 ```toml
 [concept.Configuration.structure]
@@ -262,32 +284,27 @@ pipelex build structures ./my_pipelines/ -o ./generated/
 
 ### Example Output
 
-Given the Invoice example from above, Pipelex generates:
+Given the Invoice example from above, Pipelex generates one stamped `structures.py` module (plus a `codegen.lock` for the offline drift check) containing every concept of the closure:
 
 ```python
-# generated/finance__invoice.py
-from pydantic import Field
-from pipelex.core.stuffs.structured_content import StructuredContent
-from .finance__customer import Customer
-from .finance__line_item import LineItem
-
+# generated/structures.py (below the codegen stamp header)
 class Invoice(StructuredContent):
     """A commercial document issued by a seller to a buyer"""
 
-    invoice_number: str = Field(description="The unique invoice identifier")
-    issue_date: datetime = Field(..., description="The date the invoice was issued")
+    invoice_number: str = Field(..., description="The unique invoice identifier")
+    issue_date: date = Field(..., description="The date the invoice was issued")
     customer: Customer = Field(..., description="The customer for this invoice")
-    line_items: list[LineItem] = Field(..., description="List of line items")
+    line_items: List[LineItem] = Field(..., description="List of line items")
     total_amount: float = Field(..., description="The total invoice amount")
 ```
 
-You can then import and use these classes with full type safety.
+You can then import and use these classes with full type safety. Generated files are never edited in place — to customize a class, subclass it in a sibling module (the generated header shows how).
 
 ## When to Use Inline Structures
 
 **Inline structures are the recommended approach for most use cases.** They support:
 
-- ✅ All basic field types (text, integer, number, boolean, date, list, dict)
+- ✅ All basic field types (text, integer, number, boolean, date, datetime, list, dict)
 - ✅ Nested concepts and complex relationships
 - ✅ Choice fields (enums)
 - ✅ Required/optional fields with defaults
@@ -311,4 +328,3 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
 - [MTHDS Language Tutorial](../../get-started/mthds-language-tutorial.md) - Get started with structured outputs
-

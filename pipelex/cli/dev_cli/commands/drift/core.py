@@ -17,7 +17,7 @@ from pydantic.dataclasses import dataclass
 # Runtime import (not TYPE_CHECKING): pydantic dataclasses resolve their field annotations
 # (DriftAck, DriftContract) against module globals when the class is built.
 from pipelex.cli.dev_cli.commands.drift.models import DriftAck, DriftContract, DriftManifest  # noqa: TC001
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence

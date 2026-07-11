@@ -13,6 +13,8 @@ from pipelex.hub import (
     set_current_library,
 )
 from pipelex.pipeline.bundle_validator import BundleValidator
+from pipelex.pipeline.controller_taint import collect_controller_taint_analyses
+from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_validated_pipes, validate_bundle
 
 if TYPE_CHECKING:
@@ -70,6 +72,8 @@ async def validate_bundle_file(
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
+    # warnings is the advisory lint channel (e.g. the useless-`!` lint) — same item shape as
+    # validation errors, never flips the verdict. Mirrors the agent-CLI validate_bundle_core twin.
     return {
         "success": True,
         "is_valid": True,
@@ -78,6 +82,9 @@ async def validate_bundle_file(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
+        "warnings": [
+            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+        ],
     }
 
 
@@ -107,6 +114,10 @@ async def validate_bundle_content(
         "total_pipes": len(validate_bundle_result.dry_run_result),
         "pending_signatures": validate_bundle_result.pending_signatures,
         "is_runnable": not validate_bundle_result.pending_signatures,
+        "warnings": [
+            warning.model_dump(exclude_none=True)
+            for warning in build_optionality_warnings(collect_controller_taint_analyses(validate_bundle_result.pipes))
+        ],
     }
 
 
@@ -188,6 +199,8 @@ async def validate_pipe_in_bundle(
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs, dry_run_pipe_codes=[pipe_code])
 
+    # warnings aggregates over the whole loaded bundle (the lint's cross-flow aggregation needs
+    # every flow, not just the sliced pipe). Mirrors the agent-CLI validate_pipe_in_bundle_core twin.
     return {
         "success": True,
         "is_valid": True,
@@ -196,4 +209,7 @@ async def validate_pipe_in_bundle(
         "total_pipes": len(result.dry_run_result),
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
+        "warnings": [
+            warning.model_dump(exclude_none=True) for warning in build_optionality_warnings(collect_controller_taint_analyses(result.pipes))
+        ],
     }

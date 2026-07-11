@@ -229,6 +229,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-07-03T20:01:44Z
+> Last updated: 2026-07-06T14:28:01Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

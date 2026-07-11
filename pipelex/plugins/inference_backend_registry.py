@@ -1,11 +1,11 @@
 import importlib.util
 from collections.abc import Callable, Sequence
+from enum import StrEnum
 from typing import TypeAlias
 
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.plugins.exceptions import InferenceBackendNotFoundError
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.types import StrEnum
 
 
 class InferenceFamily(StrEnum):

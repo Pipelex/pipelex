@@ -1,14 +1,17 @@
-from typing import Annotated
+from enum import StrEnum
+from typing import Annotated, Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from pipelex.core.bundles.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
@@ -23,8 +26,32 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
+
+
+def _strippable_same_domain_pipe_code(code: str, *, domain: str | None, existing_pipe_codes: set[str] | None = None) -> str | None:
+    """Return the namespace-stripped bare code when ``code`` is a safely-strippable same-domain
+    over-qualification (``<domain>.<bare>``), else ``None`` — the raise-site gate for
+    ``strip-namespace``.
+
+    Strippable requires: a dotted code whose prefix equals the bundle's own ``domain``, a bare tail
+    that is itself a valid snake_case pipe code, and — for a declaration key, where
+    ``existing_pipe_codes`` is supplied — no bare code already occupying that key (the rename would
+    collide). ``main_pipe`` passes ``existing_pipe_codes=None``: it is a single value, not a table
+    key, and the ``pipe`` field is not yet validated when the ``main_pipe`` validator runs — its
+    safety gate lives in the blueprint categorizer (``_main_pipe_strip_is_safe``), which holds the
+    raw bundle dict and drops the enrichment when stripping would retarget ``main_pipe`` to a
+    different declaration or rewrite it to a pipe that does not exist.
+    """
+    if domain is None or "." not in code:
+        return None
+    prefix, bare = code.rsplit(".", 1)
+    if prefix != domain or not is_pipe_code_valid(bare):
+        return None
+    if existing_pipe_codes is not None and bare in existing_pipe_codes:
+        return None
+    return bare
+
 
 PipeBlueprintUnion = Annotated[
     PipeFuncBlueprint
@@ -109,29 +136,58 @@ class PipelexBundleBlueprint(BaseModel):
                     f"Native concepts are: {', '.join(native_concept_codes)}. "
                     f"See {URLs.native_concepts_docs}"
                 )
-                raise ValueError(msg)
+                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
+                # blueprint categorizer recovers the offending code structurally for the fix planner.
+                raise NativeConceptRedeclarationError(msg, concept_code=concept_code)
         return concept
 
     @field_validator("main_pipe", mode="before")
     @classmethod
-    def validate_main_pipe_syntax(cls, main_pipe: str | None) -> str | None:
+    def validate_main_pipe_syntax(cls, main_pipe: str | None, info: ValidationInfo) -> str | None:
         if main_pipe is None:
             return None
         if not is_pipe_code_valid(main_pipe):
             msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
+            stripped = _strippable_same_domain_pipe_code(main_pipe, domain=cast("str | None", info.data.get("domain")))
+            if stripped is not None:
+                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
+                # blueprint categorizer recovers the strip target structurally for the fix planner.
+                raise InvalidPipeCodeSyntaxError(msg, offending_code=main_pipe, stripped_code=stripped)
             raise ValueError(msg)
         return main_pipe
 
     @field_validator("pipe", mode="before")
     @classmethod
-    def validate_pipe_keys(cls, pipe: dict[str, PipeBlueprintUnion] | None) -> dict[str, PipeBlueprintUnion] | None:
+    def validate_pipe_keys(cls, pipe: Any, info: ValidationInfo) -> Any:
+        """Validate pipe codes and normalize typeless sections before the discriminated union runs.
+
+        A `[pipe.x]` section with no `type` whose keys are exactly the signature contract
+        (`SIGNATURE_ONLY_KEYS`) is normalized by injecting the internal `PipeSignature`
+        discriminator, so the union routes it to `PipeSignatureBlueprint` — the author never writes
+        the tag. A typeless section that declares anything more is describing an implementation
+        without naming its type, which is a hard error. A section that already names a `type` (or is
+        an already-built blueprint instance rather than a raw dict) passes through untouched.
+        """
         if pipe is None:
             return None
-        for pipe_code in pipe:
-            if not is_pipe_code_valid(pipe_code=pipe_code):
+        if not isinstance(pipe, dict):
+            # Let the field type raise its own "should be a dict" error.
+            return pipe
+        typed_pipe = cast("dict[Any, Any]", pipe)
+        domain = cast("str | None", info.data.get("domain"))
+        existing_pipe_codes = {key for key in typed_pipe if isinstance(key, str)}
+        normalized: dict[Any, Any] = {}
+        for pipe_code, pipe_section in typed_pipe.items():
+            if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
+                stripped = _strippable_same_domain_pipe_code(pipe_code, domain=domain, existing_pipe_codes=existing_pipe_codes)
+                if stripped is not None:
+                    # Typed (still a ValueError) so the categorizer recovers the rename target
+                    # (offending dotted key + stripped bare key) structurally for the fix planner.
+                    raise InvalidPipeCodeSyntaxError(msg, offending_code=pipe_code, stripped_code=stripped)
                 raise ValueError(msg)
-        return pipe
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code, pipe_section=pipe_section)
+        return normalized
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
@@ -233,10 +289,5 @@ class PipelexBundleBlueprint(BaseModel):
         # Check output
         local_ref = parse_concept_with_multiplicity(pipe_blueprint.output).concept_ref_or_code
         local_refs.append((local_ref, f"pipe.{pipe_code}.output"))
-
-        # Check combined_output for PipeParallel
-        if isinstance(pipe_blueprint, PipeParallelBlueprint) and pipe_blueprint.combined_output:
-            local_ref = parse_concept_with_multiplicity(pipe_blueprint.combined_output).concept_ref_or_code
-            local_refs.append((local_ref, f"pipe.{pipe_code}.combined_output"))
 
         return local_refs

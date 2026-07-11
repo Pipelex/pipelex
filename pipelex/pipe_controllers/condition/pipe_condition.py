@@ -6,11 +6,13 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
@@ -88,6 +90,7 @@ class PipeCondition(PipeController):
                     variable_name=var_name,
                     concept=stuff_spec.concept,
                     multiplicity=stuff_spec.multiplicity,
+                    presence=stuff_spec.presence,
                 )
 
         # Add the inputs needed by all possible target pipes
@@ -97,21 +100,52 @@ class PipeCondition(PipeController):
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
 
             for input_name, stuff_spec in pipe_needed_inputs.items:
-                needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+                needed_inputs.add_stuff_spec(
+                    variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                )
 
         return needed_inputs
 
     @override
     def validate_inputs_static(self):
-        pass
+        # Guard-lint (D7): a declared-optional input referenced unguarded in the expression
+        # would evaluate over an undefined variable when the value is absent.
+        lint_optional_input_guards(
+            pipe_code=self.code,
+            domain_code=self.domain_code,
+            inputs=self.inputs,
+            template_source=self.expression,
+            template_category=TemplateCategory.EXPRESSION,
+            template_label="expression",
+        )
 
     @override
     def validate_inputs_with_library(self):
         pass
 
+    @property
+    def _continue_reachable(self) -> bool:
+        return SpecialOutcome.is_continue(self.default_outcome) or any(SpecialOutcome.is_continue(outcome) for outcome in self.outcome_map.values())
+
     @override
     def validate_output_static(self):
-        pass
+        # OPTIONAL_OUTPUT_REQUIRED (D5/D6): `continue` resolves the declared output as ABSENT
+        # (design §14), so a `continue`-reachable condition must declare its output optional —
+        # otherwise the no-output path would be invisible to the type system, which is exactly
+        # the invisible-optional wart this feature removes.
+        if self._continue_reachable and not self.output.presence.is_optional:
+            msg = (
+                f"PipeCondition '{self.code}' can resolve to 'continue', which resolves the declared output as absent, "
+                f"but its output '{self.output.concept.concept_ref}' is not declared optional. "
+                f"Declare the output optional ('{self.output.concept.concept_ref}?'), or remove the 'continue' outcome."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+            )
 
     @override
     def validate_output_with_library(self):
@@ -128,6 +162,27 @@ class PipeCondition(PipeController):
         if not mapped_pipe_codes:
             # No actual pipes to validate against (all special outcomes)
             return
+
+        # Boundary taint (D6): a mapped pipe with an optional output makes this condition's own
+        # output maybe-absent, so the condition must declare `?` too — otherwise the taint would
+        # silently escape through the condition boundary.
+        if not self.output.presence.is_optional:
+            for pipe_code in sorted(mapped_pipe_codes):
+                mapped_pipe = get_required_pipe(pipe_code=pipe_code)
+                if mapped_pipe.output.presence.is_optional:
+                    msg = (
+                        f"PipeCondition '{self.code}' maps outcome pipe '{pipe_code}' whose output "
+                        f"'{mapped_pipe.output.concept.concept_ref}' is declared optional, but the condition's own output "
+                        f"'{self.output.concept.concept_ref}' is not. Declare the condition's output optional "
+                        f"('{self.output.concept.concept_ref}?') so the maybe-absent result stays visible downstream."
+                    )
+                    raise PipeValidationError(
+                        message=msg,
+                        error_type=PipeValidationErrorType.OPTIONAL_NOT_HANDLED,
+                        domain_code=self.domain_code,
+                        pipe_code=self.code,
+                        provided_concept_code=self.output.concept.concept_ref,
+                    )
 
         # Collect all unique output concept refs from mapped pipes
         mapped_output_refs: set[str] = set()
@@ -241,11 +296,19 @@ class PipeCondition(PipeController):
             "selected_outcome": str(outcome),
         }
 
-        # Handle continue case
+        # Handle continue case (design §14, phase 1): `continue` resolves the declared output as
+        # ABSENT — a declared-absent record with provenance, memory otherwise unchanged. A previous
+        # main stuff stays under its own name (the migration idiom: consume it explicitly
+        # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-            return PipeOutput(working_memory=working_memory)
+            self._record_declared_absent_output(
+                working_memory=working_memory,
+                output_name=output_name,
+                reason=f"PipeCondition '{self.code}' resolved to 'continue' for evaluated expression '{evaluated_expression}'",
+            )
+            return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
         if SpecialOutcome.is_fail(outcome):
             self._register_execution_data(job_metadata, execution_data=execution_data_dict)
@@ -259,14 +322,22 @@ class PipeCondition(PipeController):
         required_variables = chosen_pipe.required_variables()
         # TODO: Merge `needed_inputs` and `required_variables` methods for cleaner code.
         required_stuff_names = {get_root_from_dotted_path(req_var) for req_var in required_variables if not req_var.startswith("_")}
-        try:
-            working_memory.get_stuffs(names=required_stuff_names)
-        except WorkingMemoryStuffNotFoundError as exc:
+        # A variable declared optional (`?`) on the chosen pipe is never presence-required (the
+        # `@?` fix, D7): the pipe runs with the slot absent and its guarded templates handle it.
+        required_stuff_names = {
+            name
+            for name in required_stuff_names
+            if not ((declared_spec := chosen_pipe.inputs.root.get(name)) is not None and declared_spec.presence.is_optional)
+        }
+        # A recorded absence is not a miss: the chosen pipe's own gate applies the trichotomy
+        # (skip / run / force). Only a name with neither a value nor a record is a hard miss.
+        missing_names = working_memory.list_missing_names(names=required_stuff_names)
+        if missing_names:
             pipe_condition_path = [*pipe_run_params.pipe_layers, self.code]
             pipe_condition_path_str = ".".join(pipe_condition_path)
-            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{exc.variable_name}'"
+            error_details = f"PipeCondition '{pipe_condition_path_str}', required_variables: {required_variables}, missing: '{missing_names[0]}'"
             msg = f"Some required stuff(s) not found: {error_details}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
@@ -337,4 +408,32 @@ class PipeCondition(PipeController):
             "selected_outcome": "all_outcomes",
         }
         self._register_execution_data(job_metadata, execution_data=execution_data_dict)
-        return PipeOutput(working_memory=working_memory)
+        # Dry-run parity with the live `continue` arm: with only special outcomes mapped, no pipe
+        # dry-ran into this memory. When `continue` is reachable the declared output resolves
+        # absent, memory otherwise unchanged (the static rule "continue-reachable ⇒ `?` output" is
+        # Step D's OPTIONAL_OUTPUT_REQUIRED). A fail-only condition has no absent arm — every live
+        # path raises — so fabricating an absence would let dry-run bless a method that can only
+        # fail at runtime.
+        if not self.pipe_dependencies():
+            if not self._continue_reachable:
+                msg = (
+                    f"PipeCondition '{self.code}' maps every outcome (and the default) to 'fail': "
+                    f"every live run of this pipe raises. Map at least one outcome to a pipe or to 'continue'."
+                )
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            self._record_declared_absent_output(
+                working_memory=working_memory,
+                output_name=output_name,
+                reason=f"dry run of PipeCondition '{self.code}': all outcomes are special, the declared output resolves absent",
+            )
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
+
+    def _record_declared_absent_output(self, *, working_memory: WorkingMemory, output_name: str | None, reason: str) -> None:
+        """Resolve this pipe's declared output as a declared-absent record (the `continue` arm)."""
+        record = AbsenceRecord(
+            variable_name=output_name or MAIN_STUFF_NAME,
+            kind=AbsenceKind.DECLARED_ABSENT,
+            reason=reason,
+            producing_pipe=self.code,
+        )
+        working_memory.record_new_main_absence(record)

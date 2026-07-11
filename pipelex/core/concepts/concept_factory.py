@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import NamedTuple, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -18,7 +19,6 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.types import StrEnum
 
 
 def _get_class_registry() -> ClassRegistryAbstract:
@@ -147,6 +147,27 @@ class ConceptFactory:
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.YES_NO:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="The answer to a yes/no question",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.DATE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A calendar date, optionally with a time of day — as precise as its source states.",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.TIME:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A time of day, optionally with a UTC offset — as precise as its source states.",
+                    structure_class_name=structure_class_name,
+                )
             case NativeConceptCode.PAGE:
                 return Concept(
                     code=native_concept_code,
@@ -173,6 +194,13 @@ class ConceptFactory:
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
                     description="A search result with answer and sources",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.COMPOSITE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A named composition of contents",
                     structure_class_name=structure_class_name,
                 )
 

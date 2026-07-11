@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import Any, cast
+from datetime import date, datetime
+from enum import StrEnum
+from typing import Any, Self, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
@@ -16,7 +17,6 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
-from pipelex.types import Self, StrEnum
 
 
 class ConceptStructureSpecFieldType(StrEnum):
@@ -25,6 +25,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    DATETIME = "datetime"
     CONCEPT = "concept"
     LIST = "list"
 
@@ -38,6 +39,7 @@ class ConceptStructureSpecFieldType(StrEnum):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
                 | ConceptStructureSpecFieldType.CONCEPT
                 | ConceptStructureSpecFieldType.LIST
             ):
@@ -131,6 +133,7 @@ class ConceptStructureSpec(StructuredContent):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
             ):
                 pass
 
@@ -155,6 +158,7 @@ class ConceptStructureSpec(StructuredContent):
                 case (
                     ConceptStructureSpecFieldType.BOOLEAN
                     | ConceptStructureSpecFieldType.DATE
+                    | ConceptStructureSpecFieldType.DATETIME
                     | ConceptStructureSpecFieldType.CONCEPT
                     | ConceptStructureSpecFieldType.LIST
                 ):
@@ -186,8 +190,13 @@ class ConceptStructureSpec(StructuredContent):
                 if not isinstance(self.default_value, (int, float)):
                     self._raise_type_mismatch_error("number (int or float)", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.DATE:
-                if not isinstance(self.default_value, datetime):
+                # A calendar date, not a datetime: datetime is a subclass of date, so reject it explicitly
+                # (a datetime default would carry a time the `date` field silently drops).
+                if not isinstance(self.default_value, date) or isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", actual_type_name=type(self.default_value).__name__)
+            case ConceptStructureSpecFieldType.DATETIME:
+                if not isinstance(self.default_value, datetime):
+                    self._raise_type_mismatch_error("datetime", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
@@ -351,6 +360,7 @@ class ConceptSpec(StructuredContent):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
             ):
                 return field_spec.type
 

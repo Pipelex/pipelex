@@ -1,4 +1,4 @@
-from typing import NoReturn
+from typing import NoReturn, Self
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
@@ -37,7 +37,6 @@ from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
-from pipelex.types import Self
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"

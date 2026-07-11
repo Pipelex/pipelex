@@ -6,7 +6,7 @@ all incorporate writer_id correctly.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,7 @@ from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 from pipelex.tracing.trace_events import PipeStartEvent
 
-_TS = datetime(2025, 6, 15, 10, 30, 0, tzinfo=timezone.utc)
+_TS = datetime(2025, 6, 15, 10, 30, 0, tzinfo=UTC)
 _PIPELINE_RUN_ID = "run_writer_id_001"
 _WORKFLOW_ID = "wf_writer_id_xyz"
 

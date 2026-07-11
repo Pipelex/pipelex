@@ -11,6 +11,7 @@ from pipelex.cogt.content_generation.dry_mock import (
 )
 from pipelex.cogt.content_generation.schema_to_model_factory import SchemaToModelFactory
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
+from pipelex.cogt.llm.llm_utils import dump_prompt, dump_response_from_text_gen
 from pipelex.hub import get_llm_worker
 
 
@@ -23,7 +24,9 @@ async def llm_gen_text(llm_assignment: LLMAssignment) -> str:
         llm_prompt=llm_assignment.llm_prompt,
         llm_job_params=llm_assignment.llm_job_params,
     )
+    dump_prompt(llm_prompt=llm_job.llm_prompt)
     generated_text = await llm_worker.gen_text(llm_job=llm_job)
+    dump_response_from_text_gen(response=generated_text)
     log.verbose(generated_text, title="llm_gen_text")
     return generated_text
 
@@ -42,10 +45,12 @@ async def llm_gen_object(object_assignment: ObjectAssignment) -> BaseModel:
         schema=object_assignment.object_class_schema,
         class_name=object_assignment.object_class_name,
     )
+    dump_prompt(llm_prompt=llm_job.llm_prompt)
     generated_object: BaseModel = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=content_class,
     )
+    dump_response_from_text_gen(response=generated_object)
     return generated_object
 
 
@@ -76,9 +81,11 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment) -> list[BaseM
     else:
         ListSchema.__doc__ = f"A list of {item_class_name}."
 
+    dump_prompt(llm_prompt=llm_job.llm_prompt)
     wrapped_list: ListSchema = await llm_worker.gen_object(
         llm_job=llm_job,
         schema=ListSchema,
     )
+    dump_response_from_text_gen(response=wrapped_list)
     generated_list: list[BaseModel] = cast("list[BaseModel]", wrapped_list.items)  # pyright: ignore[reportUnknownMemberType]
     return generated_list

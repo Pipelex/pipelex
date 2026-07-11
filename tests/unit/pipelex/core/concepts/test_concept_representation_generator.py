@@ -1,5 +1,8 @@
 """Unit tests for ConceptRepresentationGenerator."""
 
+import datetime
+from enum import StrEnum
+
 from pydantic import Field
 
 from pipelex.core.concepts.concept import Concept
@@ -10,7 +13,6 @@ from pipelex.core.concepts.concept_representation_generator import (
     generate_python_representation,
 )
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.types import StrEnum
 
 # =============================================================================
 # Test Fixtures - Simple classes for unit testing
@@ -142,6 +144,31 @@ class TestGenerateFieldValueBasicTypes:
         result = generator.generate_field_value(int | float, field_name="number")
         assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
         assert result == 1
+
+    def test_date_field_is_valid_iso_date(self) -> None:
+        """A datetime.date field generates a real ISO date, not a 'field_date' placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(datetime.date, field_name="issued_on")
+        assert isinstance(result, str)
+        assert datetime.date.fromisoformat(result) is not None
+        # Extended ISO (YYYY-MM-DD), not the compact all-digit form DateContent rejects.
+        assert "-" in result, f"Expected extended ISO date (YYYY-MM-DD), got: {result}"
+
+    def test_datetime_field_is_valid_iso_datetime(self) -> None:
+        """A datetime.datetime field generates a real ISO datetime, not a placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(datetime.datetime, field_name="recorded_at")
+        assert isinstance(result, str)
+        assert datetime.datetime.fromisoformat(result) is not None
+        # A real datetime carries the time component — a date-only string would also parse here.
+        assert "T" in result, f"Expected an ISO datetime with a time component, got: {result}"
+
+    def test_time_field_is_valid_iso_time(self) -> None:
+        """A datetime.time field generates a real ISO time, not a placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(datetime.time, field_name="opens_at")
+        assert isinstance(result, str)
+        assert datetime.time.fromisoformat(result) is not None
 
     def test_float_or_int_union_field(self) -> None:
         """Float | int union field generates a numeric value (1), not a string placeholder."""
@@ -427,7 +454,7 @@ class TestIncludeOptionalParameter:
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
         assert isinstance(result, dict)
         assert "url" in result
-        assert result["url"].startswith("https://mock-")
+        assert result["url"] == "https://mock.invalid/url"
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
@@ -438,7 +465,7 @@ class TestIncludeOptionalParameter:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
         assert isinstance(result, str)
-        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock-')
+        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock.invalid/url"')
         assert result.endswith('")')
 
     def test_includes_optional_fields_by_default(self) -> None:
@@ -473,7 +500,7 @@ class TestIncludeOptionalParameter:
         result = generator.generate_class_representation(ImageContent, include_optional=False)
         assert isinstance(result, dict)
         assert "url" in result
-        assert result["url"].startswith("https://mock-")
+        assert result["url"] == "https://mock.invalid/url"
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
@@ -612,3 +639,45 @@ class TestNumberContentRepresentation:
         assert isinstance(result, str)
         assert "number=1" in result, f"Expected 'number=1' in result, got: {result}"
         assert "number_int" not in result, f"Should not contain string placeholder: {result}"
+
+
+# =============================================================================
+# Tests for DateContent (native Date concept)
+# =============================================================================
+
+
+class TestDateContentRepresentation:
+    """Test that DateContent generates a round-trippable ISO date example.
+
+    DateContent has a required 'date: datetime.date' field. With include_optional=False (the
+    `pipelex build inputs` path), only that field is emitted, and its example must parse back
+    into a DateContent so the `build inputs` -> `run` round-trip holds (not a 'date_date' placeholder).
+    """
+
+    def test_date_content_json_representation_round_trips(self) -> None:
+        """The JSON template for a Date input parses back into a DateContent."""
+        from pipelex.core.stuffs.date_content import DateContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_representation("native.Date", structure_class=DateContent, include_optional=False)
+
+        content = result["content"]
+        assert isinstance(content, dict)
+        assert "date" in content
+        # include_optional=False omits the optional `time`: the build-inputs template must never
+        # fabricate a time (the Date concept's source-precision contract).
+        assert "time" not in content
+        # The emitted example must be a real ISO date the DateContent accepts (round-trip).
+        rebuilt = DateContent.model_validate(content)
+        assert isinstance(rebuilt.date, datetime.date)
+
+    def test_date_content_python_representation_has_no_placeholder(self) -> None:
+        """The Python template for a Date input carries no 'date_date' placeholder."""
+        from pipelex.core.stuffs.date_content import DateContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        result = generator.generate_representation("native.Date", structure_class=DateContent, include_optional=False)
+
+        content = result["content"]
+        assert isinstance(content, str)
+        assert "date_date" not in content, f"Should not contain string placeholder: {content}"

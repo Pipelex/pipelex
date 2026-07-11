@@ -5,7 +5,6 @@ main_pipe = "summarize_doc"
 SigDocument = "A document concept used for testing signatures."
 
 [pipe.summarize_doc]
-type        = "PipeSignature"
 description = "Produces a summary of a document (contract only)."
 inputs      = { doc = "SigDocument" }
 output      = "Text"

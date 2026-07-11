@@ -1,0 +1,27 @@
+domain      = "opt_lift_parity"
+description = "Pure lift chain used to pin dry/live absence-ledger and graph parity"
+main_pipe   = "opar_flow"
+
+[pipe.opar_make_analysis]
+type          = "PipeFunc"
+description   = "Analyzes the source (plain input: lifts when source is absent)"
+inputs        = { source = "Text" }
+output        = "Text"
+function_name = "opar_make_analysis"
+
+[pipe.opar_summarize]
+type          = "PipeFunc"
+description   = "Summarizes the analysis (plain input: chained lift)"
+inputs        = { analysis = "Text" }
+output        = "Text"
+function_name = "opar_summarize"
+
+[pipe.opar_flow]
+type = "PipeSequence"
+description = "Whole chain lifts when source is absent"
+inputs = { source = "Text?" }
+output = "Text?"
+steps = [
+  { pipe = "opar_make_analysis", result = "analysis" },
+  { pipe = "opar_summarize", result = "summary" },
+]

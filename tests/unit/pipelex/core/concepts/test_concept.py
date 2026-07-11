@@ -1,8 +1,7 @@
 import pytest
 from kajson.kajson_manager import KajsonManager
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
-from pipelex.cogt.image.image_size import ImageSize
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -25,7 +24,8 @@ class NestedImageInfo(StructuredContent):
     source_negative_prompt: str | None = None
     caption: str | None = None
     mime_type: str | None = None
-    size: ImageSize | None = None
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
     filename: str | None = None
 
 

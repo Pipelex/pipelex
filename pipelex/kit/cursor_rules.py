@@ -1,4 +1,5 @@
 from collections.abc import Iterable
+from importlib.resources.abc import Traversable
 from pathlib import Path
 from typing import Any, cast
 
@@ -9,7 +10,6 @@ from pipelex.kit.exceptions import KitError
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.paths import get_kit_agents_dir
-from pipelex.types import Traversable
 
 # Marker written into the YAML front-matter of every Pipelex-generated .mdc file so the
 # cleanup path can identify and remove stale files even after their source markdown has

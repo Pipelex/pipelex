@@ -2,18 +2,17 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Sequence
 
 from pydantic import BaseModel, ValidationError
 
 # TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
 # field on Python < 3.12, and ValidatedPipeEntry is a field of PipelexValidationReport.
-from typing_extensions import TypedDict, assert_never
+from typing_extensions import TypedDict
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
@@ -91,28 +90,41 @@ def build_pending_signatures(pipes_by_ref: dict[str, PipeAbstract]) -> list[str]
     return sorted(pipe.pipe_ref for ref_key, pipe in pipes_by_ref.items() if pipe.is_signature and not QualifiedRef.has_cross_package_prefix(ref_key))
 
 
+def _backfill_pipe_error_source(pipe_error: PipeValidationError) -> None:
+    """Backfill ``file_path`` on a pipe-channel error from the library manager's pipe-source map.
+
+    Raise sites (``PipeAbstract`` input checks, ``PipeSequence`` output checks) don't know their
+    file — pipes deliberately carry no source; provenance lives in the crate's ``source_map``,
+    mirrored into the current library's source map during load, *before* ``validate_library``
+    runs. Intercepting once at this catch boundary covers every raise site, present and future.
+
+    Lookup is by the full ``domain.pipe_code`` ref only — never the bare-code suffix fallback
+    (bare codes are ambiguous across domains, exactly what the fix loop's cross-file guard
+    defends against). A miss leaves ``file_path`` as ``None``: the fix stays source-less and
+    falls under the conservative single-file rule, which is the safe direction.
+    """
+    if pipe_error.file_path is not None:
+        return
+    if pipe_error.domain_code is None or pipe_error.pipe_code is None:
+        return
+    source = get_library_manager().get_pipe_source(f"{pipe_error.domain_code}.{pipe_error.pipe_code}")
+    if source is not None:
+        # Compatibility boundary: injected managers written against the previous protocol may
+        # still return ``Path``. Normalize before assigning to the string-only error model.
+        pipe_error.file_path = str(source)
+
+
 @contextmanager
-def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) -> Generator[None, None, None]:
+def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     """Translate the bundle-loading exception surface into a single ``ValidateBundleError``.
 
-    Single source of truth for the bundle-loading error cascade, used by all
-    four entry points: ``validate_bundle`` / ``validate_bundles_from_directory``
-    (full pipe + dry-run path, ``category="pipe"``) and ``load_concepts_only`` /
-    ``load_concepts_only_from_directory`` (concepts-only path,
-    ``category="concept"``). A ``PipelexInterpreterError`` becomes a
-    ``ValidateBundleError`` carrying the blueprint validation errors, a
-    ``PipeFactoryError`` carries the categorized factory error, etc. Sharing one
-    source of truth means a new handler only needs to be added once. The
-    pipe-loading / dry-run handlers (``PipeFactoryError``, ``PipeValidationError``,
-    ``PipeRunError``, ``DryRunError``) are dead code in the concepts-only paths
-    (those functions never instantiate pipes or run dry runs), but they are
-    harmless there — they simply never fire.
-
-    ``category`` controls the user-facing framing for the one branch that fires
-    from both paths: the ``except ValidationError`` arm catches pydantic
-    validation errors raised during model construction. A concepts-only path
-    that fails ``Concept`` validation must not be framed as a pipe-validation
-    error — pass ``category="concept"`` to surface concept-aware copy.
+    Single source of truth for the bundle-loading error cascade, shared by the
+    bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
+    and ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``.
+    A ``PipelexInterpreterError`` becomes a ``ValidateBundleError`` carrying the
+    blueprint validation errors, a ``PipeFactoryError`` carries the categorized
+    factory error, etc. Sharing one source of truth means a new handler only
+    needs to be added once.
     """
     try:
         yield
@@ -133,6 +145,7 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
     # ``pydantic.ValidationError``) is pinned by
     # ``tests/unit/pipelex/pipeline/test_validate_bundle_helper.py``.
     except PipeValidationError as pipe_error:
+        _backfill_pipe_error_source(pipe_error)
         pipe_error_data = categorize_pipe_validation_with_libraries_error(pipe_error=pipe_error)
         raise ValidateBundleError(
             message=f"Pipe validation failed: {pipe_error}",
@@ -141,17 +154,7 @@ def _translate_to_validate_bundle_error(category: Literal["pipe", "concept"]) ->
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
         validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
-        match category:
-            case "pipe":
-                msg = f"Could not load blueprints because of: {validation_error_msg}"
-            case "concept":
-                msg = f"Could not load concepts because of: {validation_error_msg}"
-            case _ as unreachable:
-                # ``category`` is ``Literal["pipe", "concept"]`` — pyright catches a
-                # bad call site statically, but the runtime can still receive an
-                # unexpected value via ``# type: ignore`` or dynamic dispatch. Loud
-                # ``AssertionError`` beats silent ``UnboundLocalError`` on ``msg``.
-                assert_never(unreachable)
+        msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
@@ -274,7 +277,7 @@ async def validate_bundle(
         loaded_pipes: list[PipeAbstract] | None = None
         loaded_blueprints: list[PipelexBundleBlueprint] | None = None
         await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
-        with _translate_to_validate_bundle_error(category="pipe"):
+        with translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 library_manager.load_libraries(
@@ -353,7 +356,7 @@ async def validate_bundles_from_directory(directory: Path, *, allow_signatures: 
     prev_library_id = get_current_library_id_or_none()
     try:
         set_current_library(library_id=library_id)
-        with _translate_to_validate_bundle_error(category="pipe"):
+        with translate_to_validate_bundle_error():
             for mthds_file in mthds_files:
                 blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)
@@ -366,145 +369,6 @@ async def validate_bundles_from_directory(directory: Path, *, allow_signatures: 
                 dry_run_result=dry_run_results,
                 pending_signatures=build_pending_signatures(library.pipe_library.get_pipes_dict()),
             )
-        success = True
-        return result
-    finally:
-        if not success:
-            # See ``validate_bundle``: restore the outer current-library before
-            # ``library_manager.teardown`` so the guarantee survives a teardown raise.
-            if prev_library_id is not None:
-                set_current_library(library_id=prev_library_id)
-            else:
-                clear_current_library()
-            library_manager.teardown(library_id=library_id)
-
-
-class LoadConceptsOnlyResult(BaseModel):
-    """Result of loading MTHDS files with concepts only (no pipes)."""
-
-    blueprints: list[PipelexBundleBlueprint]
-    concepts: list[Concept]
-
-
-def load_concepts_only(
-    mthds_file_path: Path | None = None,
-    *,
-    mthds_contents: list[str] | None = None,
-    library_dirs: Sequence[Path] | None = None,
-) -> LoadConceptsOnlyResult:
-    """Load MTHDS files processing only domains and concepts, skipping pipes.
-
-    This is a lightweight alternative to validate_bundle() that only processes
-    domains and concepts. It does not load pipes, does not perform pipe validation,
-    and does not run dry runs.
-
-    Args:
-        mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with mthds_contents)
-        mthds_contents: List of MTHDS content strings to load (mutually exclusive with mthds_file_path)
-        library_dirs: Optional directories containing additional MTHDS library files
-
-    Returns:
-        LoadConceptsOnlyResult with blueprints and loaded concepts
-
-    Raises:
-        ValidateBundleError: If loading fails due to interpreter or validation errors
-    """
-    provided_params = sum([mthds_contents is not None, mthds_file_path is not None])
-    if provided_params == 0:
-        # Programmer error (see validate_bundle's twin guard): the caller must wire exactly one
-        # input. Not a content verdict → PipelexUnexpectedError (→ 500), never ValidateBundleError.
-        msg = "At least one of mthds_contents or mthds_file_path must be provided to load_concepts_only"
-        raise PipelexUnexpectedError(msg)
-    if provided_params > 1:
-        msg = "Only one of mthds_contents or mthds_file_path can be provided to load_concepts_only, not both"
-        raise PipelexUnexpectedError(msg)
-
-    library_manager = get_library_manager()
-    library_id, library = library_manager.open_library()
-    success = False
-    prev_library_id = get_current_library_id_or_none()
-    try:
-        set_current_library(library_id=library_id)
-
-        # Load libraries from resolved directories before loading the bundle
-        effective_dirs, source_label = resolve_library_dirs(library_dirs)
-
-        loaded_concepts: list[Concept] | None = None
-        loaded_blueprints: list[PipelexBundleBlueprint] | None = None
-        with _translate_to_validate_bundle_error(category="concept"):
-            if effective_dirs:
-                log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
-                library_manager.load_libraries_concepts_only(
-                    library_id=library_id,
-                    library_dirs=effective_dirs,
-                )
-            else:
-                log.verbose(f"No library directories to load ({source_label})")
-
-            if mthds_contents is not None:
-                loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
-                loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
-                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-
-            else:
-                assert mthds_file_path is not None
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
-                loaded_blueprints = [blueprint]
-
-                if mthds_file_path.resolve() not in library.loaded_mthds_paths:
-                    # File not yet loaded - load it from the blueprint
-                    loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
-                else:
-                    # File already loaded - get existing concepts from library
-                    # For concepts-only loading, we just return empty list since concepts are already in library
-                    loaded_concepts = []
-
-                result = LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
-        success = True
-        return result
-    finally:
-        if not success:
-            # See ``validate_bundle``: restore the outer current-library before
-            # ``library_manager.teardown`` so the guarantee survives a teardown raise.
-            if prev_library_id is not None:
-                set_current_library(library_id=prev_library_id)
-            else:
-                clear_current_library()
-            library_manager.teardown(library_id=library_id)
-
-
-def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
-    """Load MTHDS files from a directory, processing only domains and concepts, skipping pipes.
-
-    This is a lightweight alternative to validate_bundles_from_directory() that only
-    processes domains and concepts. It does not load pipes, does not perform pipe
-    validation, and does not run dry runs.
-
-    Args:
-        directory: Directory containing MTHDS files to load
-
-    Returns:
-        LoadConceptsOnlyResult with blueprints and loaded concepts
-
-    Raises:
-        ValidateBundleError: If loading fails due to interpreter or validation errors
-    """
-    mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
-    all_blueprints: list[PipelexBundleBlueprint] = []
-
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    success = False
-    prev_library_id = get_current_library_id_or_none()
-    try:
-        set_current_library(library_id=library_id)
-        with _translate_to_validate_bundle_error(category="concept"):
-            for mthds_file in mthds_files:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-                all_blueprints.append(blueprint)
-
-            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
-            result = LoadConceptsOnlyResult(blueprints=all_blueprints, concepts=loaded_concepts)
         success = True
         return result
     finally:

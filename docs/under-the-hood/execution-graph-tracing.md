@@ -173,6 +173,8 @@ class GraphSpec(BaseModel):
         return self.model_dump_json(by_alias=True, indent=2)
 ```
 
+`meta.format` is always `"mthds"` on newly emitted Pipelex graphs. `meta.mode` records provenance for renderers and shared tooling: Pipelex execution graphs emit `"dry"` for dry-run/mock execution and `"live"` for real execution. The shared renderer also accepts `"static"` for graphs produced by a static MTHDS graph builder.
+
 ### Node Types
 
 | NodeKind | Description |
@@ -194,6 +196,8 @@ class GraphSpec(BaseModel):
 | `CONTAINS` | Parent-child containment (controller → children) |
 | `SELECTED_OUTCOME` | Condition outcome selection |
 
+Every `EdgeSpec` also carries an `optional` boolean (default `false`). On a `DATA` edge it marks that the producer's output is declared optional (`?` presence marker) — the value flowed on this run but may be absent on others. Renderers can use it to draw the edge distinctly (e.g. dashed).
+
 ### Node Status
 
 | NodeStatus | Description |
@@ -202,8 +206,10 @@ class GraphSpec(BaseModel):
 | `RUNNING` | Currently executing |
 | `SUCCEEDED` | Completed successfully |
 | `FAILED` | Execution failed |
-| `SKIPPED` | Skipped during execution |
+| `SKIPPED` | Lifted (skipped) because a plain input resolved absent — a successful outcome, not an error |
 | `CANCELED` | Canceled before completion |
+
+A `SKIPPED` node also carries `skip_reason` (a human-readable sentence naming the absent input, e.g. `skipped because input 'source' is absent`). A lifted pipe with a plural output still writes a real empty-list value, so its node registers that output and downstream `DATA` edges resolve normally; a lifted singular output is a recorded absence with no output spec.
 
 ---
 

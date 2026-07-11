@@ -153,7 +153,8 @@ class GeneratedContentFactory:
         return ImageContent(
             url=url,
             public_url=public_url,
-            size=raw_details.size,
+            width=raw_details.size.width if raw_details.size else None,
+            height=raw_details.size.height if raw_details.size else None,
             mime_type=mime_type,
             caption=raw_details.caption,
         )

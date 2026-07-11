@@ -11,7 +11,7 @@ carries it across worker processes. This module pins all three:
 3. ``CostRegistry.aggregate_costs`` prices them into the run totals.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
@@ -34,7 +34,7 @@ def _usage_event(tokens_usage: AnyTokensUsage, sequence: int) -> UsageReportEven
         pipeline_run_id="run-non-llm",
         workflow_id="wf-non-llm",
         writer_id="act_test",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         sequence=sequence,
         node_id=f"g:node_{sequence}",
         tokens_usage=tokens_usage,

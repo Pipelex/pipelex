@@ -1,7 +1,8 @@
+from enum import StrEnum
+
 import pytest
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, error_domain_is_input
-from pipelex.types import StrEnum
 from tests.helpers.error_report import make_error_report
 
 

@@ -28,6 +28,18 @@ class StuffContentTypeError(StuffError):
         super().__init__(message)
 
 
+class DateContentError(StuffError):
+    """Raised when a DateContent operation needs a time of day the value does not carry.
+
+    The only such operation today is ``to_datetime()`` on a date-only value: converting it
+    would invent a time, which the Date concept refuses to do (no silent midnight).
+    """
+
+    # The message describes the caller's own data (a date-only Date has no time to convert) and carries
+    # no server internals, so it must survive STRICT disclosure — like OptionalValueAbsentError.
+    _authors_caller_facing_message = True
+
+
 class StuffContentValidationError(StuffError):
     """Raised when content validation fails during type conversion."""
 

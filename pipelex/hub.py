@@ -53,6 +53,8 @@ if TYPE_CHECKING:
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
     from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+    from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
+    from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
@@ -89,6 +91,8 @@ class PipelexHub:
         self._model_lister_registry: ModelListerRegistry | None = None
         self._orchestrator_registry: OrchestratorRegistry | None = None
         self._bundle_validator_registry: BundleValidatorRegistry | None = None
+        self._storage_provider_registry: StorageProviderRegistry | None = None
+        self._secrets_provider_registry: SecretsProviderRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
@@ -211,6 +215,12 @@ class PipelexHub:
 
     def set_bundle_validator_registry(self, bundle_validator_registry: "BundleValidatorRegistry"):
         self._bundle_validator_registry = bundle_validator_registry
+
+    def set_storage_provider_registry(self, storage_provider_registry: "StorageProviderRegistry"):
+        self._storage_provider_registry = storage_provider_registry
+
+    def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
+        self._secrets_provider_registry = secrets_provider_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -352,6 +362,18 @@ class PipelexHub:
             msg = "BundleValidatorRegistry is not initialized"
             raise RuntimeError(msg)
         return self._bundle_validator_registry
+
+    def get_storage_provider_registry(self) -> "StorageProviderRegistry":
+        if self._storage_provider_registry is None:
+            msg = "StorageProviderRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._storage_provider_registry
+
+    def get_secrets_provider_registry(self) -> "SecretsProviderRegistry":
+        if self._secrets_provider_registry is None:
+            msg = "SecretsProviderRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._secrets_provider_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -532,6 +554,14 @@ def get_orchestrator_registry() -> "OrchestratorRegistry":
 
 def get_bundle_validator_registry() -> "BundleValidatorRegistry":
     return get_pipelex_hub().get_bundle_validator_registry()
+
+
+def get_storage_provider_registry() -> "StorageProviderRegistry":
+    return get_pipelex_hub().get_storage_provider_registry()
+
+
+def get_secrets_provider_registry() -> "SecretsProviderRegistry":
+    return get_pipelex_hub().get_secrets_provider_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:
@@ -724,14 +754,15 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
-def get_pipe_source(pipe_code: str) -> Path | None:
-    """Get the source file path for a pipe.
+def get_pipe_source(pipe_code: str) -> str | None:
+    """Get the source identifier for a pipe.
 
     Args:
         pipe_code: The pipe code to look up.
 
     Returns:
-        Path to the .mthds file the pipe was loaded from, or None if unknown.
+        The source the pipe was loaded from — a filesystem path or a logical URI,
+        preserved verbatim — or None if unknown.
     """
     return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 

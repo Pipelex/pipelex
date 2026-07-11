@@ -1,653 +1,229 @@
 ---
-description: "Prepare and format pipeline inputs for Pipelex using the CLI, Python API, or Client. Generate input templates and pass data to your methods."
+description: "Provide inputs to Pipelex pipelines from the CLI, Python API, or Client. Just provide the values — Pipelex interprets them against the pipe's declared input signature."
 ---
 
 # Providing Inputs to Pipelines
 
-When running Pipelex pipelines, you need to provide input data that matches what your pipeline expects. This guide explains how to prepare and format inputs, whether you're using the CLI, Python API, or Pipelex Client.
+Every pipe declares what it needs: an `inputs` signature mapping each variable name to a concept (and, for lists, a multiplicity). When you run a pipe, **you just provide the values** — Pipelex interprets each one *top-down against that declared signature*, so a bare string becomes the declared concept (a `legal.Question`, not a generic `native.Text`), a bare number satisfies a numeric input, and a plain object validates against a structured concept.
 
-## Preparing Inputs with the CLI
+This is the fast path. There is also an explicit `{"concept": ..., "content": ...}` escape hatch for the rare cases where you need to override or disambiguate the concept — it still works, and it is now compatibility-checked against the declaration. Both are covered below.
 
-The Pipelex CLI can generate a template JSON file with all the required inputs for your pipeline:
+## See what a pipe expects
+
+Generate a template that mirrors the pipe's signature:
 
 ```bash
 pipelex build inputs bundle path/to/my_pipe.mthds
 ```
 
-This creates a `results/inputs.json` file with the structure needed for your pipeline. You can then fill in the values and use it with:
+This writes `inputs.json` (add `--format toml` for TOML) with an example value per input, shaped exactly the way the pipe expects them. Fill in the values and run:
 
 ```bash
-pipelex run bundle path/to/my_pipe.mthds --inputs results/inputs.json
+pipelex run bundle path/to/my_pipe.mthds --inputs inputs.json
 ```
 
-See more about the options of the CLI [here](../../tools/cli/index.md).
+For a pipe declaring `question = "Question"`, `priority = "Priority"`, `invoice = "Invoice"`, and `tags = "Tag[]"`, the template is the **light** shape — the values themselves, not envelopes:
 
-!!! tip "Starting Point for Input Structure"
-    Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
-
-## Understanding PipelineInputs Format
-
-The `inputs` parameter uses **PipelineInputs** format - a smart, flexible way to provide data to your pipelines. Instead of forcing you into a rigid structure, PipelineInputs intelligently interprets your data based on how you provide it.
-
-!!! tip "Working with Lists"
-    When providing multiple items as input (lists) or expecting multiple outputs, understanding multiplicity is essential. See [Understanding Multiplicity](understanding-multiplicity.md) for a comprehensive guide on how Pipelex handles single items versus collections.
-
-### TL;DR: How Input Formatting Works
-
-**Case 1: Direct Content** - Provide the value directly (simplest)
-
-- 1.1: String → `"my text"`
-- 1.2: List of strings → `["text1", "text2"]`
-- 1.3: StructuredContent object → `MyClass(arg1="value")`
-- 1.4: List of StuffContent objects → `[MyClass(...), MyClass(...)]`
-- 1.5: ListContent of StuffContent objects → `ListContent(items=[MyClass(...), MyClass(...)])`
-
-**Case 2: Explicit Format** - Use `{"concept": "...", "content": "..."}` for control
-
-- 2.1: String with concept → `{"concept": "Text", "content": "my text"}`
-- 2.2: List of strings with concept → `{"concept": "Text", "content": ["text1", "text2"]}`
-- 2.3: StructuredContent object with concept → `{"concept": "Invoice", "content": InvoiceObject}`
-- 2.4: List of StructuredContent objects with concept → `{"concept": "Invoice", "content": [...]}`
-- 2.5: Dictionary (structured data) → `{"concept": "Invoice", "content": {"field": "value"}}`
-- 2.6: List of dictionaries → `{"concept": "Invoice", "content": [{...}, {...}]}`
-
-!!! tip "Pro Tip for Text Inputs"
-    For text inputs specifically, skip the verbose format. Just provide the string directly: `"text": "Hello"` instead of `"text": {"concept": "Text", "content": "Hello"}`
-
----
-
-## Case 1: Direct Content Format
-
-When you provide content directly (without the `concept` key), Pipelex intelligently infers the type.
-
-### 1.1: Simple String (Text)
-
-The simplest case - just provide a string directly:
-
-**JSON Format:**
 ```json
 {
-  "inputs": {
-    "my_text": "my text"
+  "question": "text_value",
+  "priority": 1,
+  "invoice": {
+    "invoice_number": "invoice_number_value",
+    "amount": 0.0
+  },
+  "tags": ["text_value"]
+}
+```
+
+The TOML template carries the declared concept for each key as a comment, so you can see what you are filling in (JSON has no comments — use `--explicit` there to see concepts):
+
+```toml
+# concept: my_domain.Question
+question = "text_value"
+# concept: my_domain.Priority
+priority = 1
+# concept: my_domain.Invoice
+invoice = {invoice_number = "invoice_number_value", amount = 0.0}
+# concept: my_domain.Tag[]
+tags = ["text_value"]
+```
+
+!!! tip "Prefer the light template"
+    The light values are exactly what the runner accepts, so a template you generate and fill in runs as-is. Add `--explicit` to `build inputs` if you want the ceremonial `{concept, content}` envelope form instead (see [the escape hatch](#the-explicit-format-escape-hatch)).
+
+## Providing values by concept type
+
+Match the value to the input's declared concept. The declared concept is applied automatically — you never repeat it in the value.
+
+| Declared concept refines… | Provide | Example |
+| --- | --- | --- |
+| `Text` | a string | `"What are the fees?"` |
+| `Number` | a number (not a boolean) | `42` or `3.14` |
+| `YesNo` | a boolean | `true` / `false` |
+| `Date` | an extended ISO 8601 date/datetime string (or a TOML date literal) | `"2026-09-01"` |
+| `Image` / `Document` | a URL or file path | `"photo.jpg"`, `"https://…/a.pdf"` |
+| a structured concept | an object | `{"name": "Alice", "age": 30}` |
+
+```json
+{
+  "question": "What are the late-payment fees?",
+  "priority": 3,
+  "is_urgent": true,
+  "hearing": "2026-09-01",
+  "contract": "contracts/nda.pdf",
+  "client": {
+    "name": "Acme Corp",
+    "country": "France"
   }
 }
 ```
 
-**Python Format:**
-```python
-inputs = {
-    "my_text": "my text"
+Each value is typed as the **declared** concept — `question` becomes a `legal.Question`, not a bare `native.Text` — so downstream steps see the concept the pipe was designed around.
+
+!!! note "Numbers vs. booleans"
+    A boolean is never read as a number, even though `true`/`false` look numeric to some languages. Provide `true`/`false` only for a `YesNo`-refining input; provide `42` for a `Number`-refining one.
+
+!!! note "Concepts the signature can't shape"
+    A handful of concepts carry no single expected value shape — `Dynamic`, `Anything`, and the container/structural natives (`Html`, `JSON`, `Page`, `TextAndImages`, `SearchResult`, `Composite`). For an input declared as one of these, the signature can't guide interpretation, so the value is read by its own shape (a bare string becomes `native.Text`, and so on). Use the explicit format if you need a specific concept there.
+
+## Lists and multiplicity
+
+When an input is declared multiple (`Tag[]`, or a fixed count `Tag[3]`), provide a JSON/TOML list — each element is shaped element-wise into the declared item concept:
+
+```json
+{
+  "tags": ["billing", "urgent", "enterprise"]
 }
 ```
 
-**Result:** Automatically becomes `TextContent` with concept `native.Text`
+- A **single** value auto-wraps into a one-item list, so `"tags": "urgent"` is accepted for a `Tag[]` input.
+- An **empty** list is legal and produces an empty collection.
+- A fixed count `Tag[3]` validates the number of items — too few or too many is a clear error.
+- Providing a list where the signature declares a **single** value is a clear error (Pipelex won't silently pick one).
 
-### 1.2: List of Strings (Text List)
+See [Understanding Multiplicity](understanding-multiplicity.md) for the full model of single items versus collections.
 
-Provide multiple text items as a list:
+### Tabular data for a structured list
 
-**JSON Format:**
+A declared structured list (e.g. `people = "Person[]"`) also accepts a path to a `.csv`/tabular file — each row becomes one item:
+
 ```json
 {
-  "inputs": {
-    "my_texts": ["my text1", "my text2", "my text3"]
+  "people": "team.csv"
+}
+```
+
+The columns map to the concept's fields. See [CSV Input & Output](csv-input-and-output.md).
+
+## Files and relative paths
+
+For `Image`/`Document` inputs, a **relative** path is resolved against the **inputs file's** directory (a leading `~` expands to your home directory; absolute paths, `http(s)://`, and storage URIs are used as-is). So an `inputs.json` sitting next to a `contracts/` folder can say `"contract": "contracts/nda.pdf"` and it resolves correctly regardless of where you launch the command.
+
+Tabular references use the same relative-path resolution, but v1 reads local tabular files only. A `.csv` path must resolve to a local file; download remote or storage-hosted tables before referencing them.
+
+Callers that don't load from a file — the Python API and the hosted client — should pass absolute URLs or storage URIs, since there is no inputs-file directory to resolve against.
+
+## The explicit format (escape hatch)
+
+The explicit envelope `{"concept": "...", "content": ...}` gives you direct control over which concept a value is interpreted as. It is now **compatibility-checked**: the concept you name must be compatible with the input's declared concept, otherwise the run fails with a clear error.
+
+```json
+{
+  "question": {
+    "concept": "legal.Question",
+    "content": "What are the fees?"
   }
 }
 ```
 
-**Python Format:**
-```python
-inputs = {
-    "my_texts": ["my text1", "my text2", "my text3"]
-}
-```
+Reach for it when:
 
-**Result:** Becomes a `ListContent` containing multiple `TextContent` items
+- **You want a more-specific concept than the signature declares.** If an input is declared `native.Text` but you have a `legal.Question`, name it explicitly — a compatible, more-specific concept wins.
+- **A concept name is ambiguous.** When you reference a concept by bare name and it exists in multiple domains, prefix the domain: `"accounting.Invoice"` instead of `"Invoice"`.
+- **You are passing a Python object** (see below).
 
-**Note:** The concept must be compatible with `native.Text` or an error will be raised.
-
-### 1.3: StructuredContent Object
-
-Provide a structured object directly (for Python clients):
-
-```python
-from my_project.domain.domain_struct import MyConcept, MySubClass
-
-inputs = {
-    "invoice_data": MyConcept(
-        arg1="arg1", 
-        arg2=1, 
-        arg3=MySubClass(arg4="arg4")
-    )
-}
-```
-
-**What is StructuredContent?**
-
-- `StructuredContent` is the base class for user-defined data structures in Pipelex
-- You create your own classes by inheriting from `StructuredContent`
-- These classes are defined in your project's Python files
-- Learn more: [Python StructuredContent Classes](../concepts/python-classes.md)
-
-**Concept Resolution:**
-
-- The system searches all available domains for a concept matching the class name
-- If multiple concepts with the same name exist in different domains → **Error**: Must specify domain code
-- If no concept is found → **Error**
-
-### 1.4: List of StuffContent Objects
-
-Provide multiple content objects in a plain Python list:
-
-```python
-inputs = {
-    "invoice_list": [
-        MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")),
-        MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2"))
-    ]
-}
-```
-
-**What it accepts:**
-
-- Lists of `StructuredContent` objects (user-defined classes)
-- Lists of native content objects (`TextContent`, `ImageContent`, etc.)
-
-**Requirements:**
-
-- All items must be of the same type
-- Concept resolution follows the same rules as 1.3
-- Creates a new `ListContent` wrapper internally
-
-### 1.5: ListContent of StuffContent Objects
-
-Provide an existing `ListContent` wrapper object (Python clients):
-
-```python
-from pipelex.core.stuffs.list_content import ListContent
-
-inputs = {
-    "invoice_list": ListContent(items=[
-        MyConcept(arg1="arg1", arg2=1, arg3=MySubClass(arg4="arg4")),
-        MyConcept(arg1="arg1_2", arg2=2, arg3=MySubClass(arg4="arg4_2"))
-    ])
-}
-```
-
-**Key Difference from Case 1.4:**
-
-- Case 1.4: Plain Python list `[item1, item2]` → **Creates** a new `ListContent` wrapper
-- Case 1.5: Already wrapped `ListContent(items=[item1, item2])` → **Uses** the wrapper directly
-
-**Why Case 1.5 is Separate from Case 1.3:**
-
-- `StructuredContent` and `ListContent` are **sibling classes** (both inherit from `StuffContent`)
-- Case 1.3 handles user-defined structured data classes
-- Case 1.5 handles list container wrappers
-- They're at the same inheritance level, not parent-child
-
-**Requirements:**
-
-- All items within the `ListContent` must be `StuffContent` objects
-- All items must be of the same type
-- The `ListContent` cannot be empty
-- Concept is inferred from the first item's class name (not from "ListContent")
-
----
-
-## Case 2: Explicit Format (Concept and Content)
-
-Use the explicit format `{"concept": "...", "content": "..."}` when you need precise control over concept selection or when working with domain-specific concepts.
-
-### 2.1: Explicit String Input
-
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "text": {
-      "concept": "Text",
-      "content": "my text"
-    }
-  }
-}
-```
-
-**Python Format:**
-```python
-inputs = {
-    "text": {
-        "concept": "Text",
-        "content": "my text"
-    }
-}
-```
-
-**Concept Options:**
-
-- `"Text"` or `"native.Text"` for native text
-- Any custom concept that is strictly compatible with `native.Text`
-
-### 2.2: Explicit List of Strings
-
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "documents": {
-      "concept": "Text",
-      "content": ["text1", "text2", "text3"]
-    }
-  }
-}
-```
-
-**Result:** `ListContent` with multiple `TextContent` items
-
-### 2.3: Structured Object with Concept
-
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "invoice_data": {
-      "concept": "Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00,
-        "date": "2025-10-20"
-      }
-    }
-  }
-}
-```
-
-**Python Format:**
-```python
-inputs = {
-    "invoice_data": {
-        "concept": "Invoice",
-        "content": {
-            "invoice_number": "INV-001",
-            "amount": 1250.00,
-            "date": "2025-10-20"
-        }
-    }
-}
-```
-
-**Concept Resolution with Search Domain Codes:**
-
-When you specify a concept name without a domain code prefix:
-
-- ✅ If the concept exists in only one domain → Automatically found
-- ❌ If the concept exists in multiple domains → **Error**: "Multiple concepts found. Please specify domain code as 'domain_code.Concept'"
-- ❌ If the concept doesn't exist → **Error**: "Concept not found"
-
-**Using Domain code prefix:**
+Generate the envelope template with `pipelex build inputs … --explicit`:
 
 ```json
 {
-  "concept": "accounting.Invoice"
+  "question": {"concept": "my_domain.Question", "content": {"text": "text_value"}},
+  "priority": {"concept": "my_domain.Priority", "content": {"number": 1}},
+  "invoice": {"concept": "my_domain.Invoice", "content": {"invoice_number": "invoice_number_value", "amount": 0.0}},
+  "tags": {"concept": "my_domain.Tag", "content": [{"text": "text_value"}]}
 }
 ```
 
-This explicitly tells Pipelex to use the `Invoice` concept from the `accounting` domain.
+### Concept name resolution
 
-### 2.4: List of Structured Objects
+Inside an explicit envelope, the `concept` you write is resolved against your loaded domains:
 
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "invoices": {
-      "concept": "Invoice",
-      "content": [
-        {
-          "invoice_number": "INV-001",
-          "amount": 1250.00
-        },
-        {
-          "invoice_number": "INV-002",
-          "amount": 890.00
-        }
-      ]
-    }
-  }
-}
-```
+- A bare name (`"Invoice"`) found in exactly one domain is used directly.
+- A bare name found in **multiple** domains is an error — prefix the domain (`"accounting.Invoice"`).
+- A name found in **no** domain is an error.
 
-**Result:** `ListContent` with multiple structured content items
+Domain-prefixed names (`"domain_code.ConceptName"`) bypass the search and are always unambiguous.
 
-### 2.5: Dictionary Content
+## Python API and client
 
-Provide structured data as a dictionary:
-
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "person": {
-      "concept": "PersonInfo",
-      "content": {
-        "arg1": "something",
-        "arg2": 1,
-        "arg3": {
-          "arg4": "something else"
-        }
-      }
-    }
-  }
-}
-```
-
-The system will:
-
-1. Find the concept structure (with domain code resolution as explained above)
-2. Validate the dictionary against the concept's structure
-3. Create the appropriate content object
-
-### 2.6: List of Dictionaries
-
-**JSON Format:**
-```json
-{
-  "inputs": {
-    "people": {
-      "concept": "PersonInfo",
-      "content": [
-        {
-          "arg1": "something",
-          "arg2": 1,
-          "arg3": {"arg4": "something else"}
-        },
-        {
-          "arg1": "something else",
-          "arg2": 2,
-          "arg3": {"arg4": "something else else"}
-        }
-      ]
-    }
-  }
-}
-```
-
-### Using DictStuff Instances (Python Clients Only)
-
-For Python clients, you can also pass `DictStuff` instances instead of plain dicts:
-
-```python
-from pipelex.client import PipelexClient
-from pipelex.core.stuffs.stuff import DictStuff
-
-client = PipelexClient(api_token="YOUR_API_KEY")
-
-# Using DictStuff instance with dict content
-response = await client.execute(
-    pipe_code="process_invoice",
-    inputs={
-        "invoice": DictStuff(
-            concept="accounting.Invoice",
-            content={
-                "invoice_number": "INV-001",
-                "amount": 1250.00,
-                "date": "2025-10-20"
-            }
-        )
-    }
-)
-
-# Using DictStuff instance with list of dicts
-response = await client.execute(
-    pipe_code="process_invoices",
-    inputs={
-        "invoices": DictStuff(
-            concept="accounting.Invoice",
-            content=[
-                {"invoice_number": "INV-001", "amount": 1250.00},
-                {"invoice_number": "INV-002", "amount": 890.00}
-            ]
-        )
-    }
-)
-```
-
----
-
-## Search Domains Explained
-
-When you reference a concept by name (like `"Invoice"` or `"PersonInfo"`), Pipelex needs to find it in your loaded domains.
-
-### Automatic Search
-
-```json
-{
-  "concept": "Invoice"
-}
-```
-
-**What happens:**
-
-1. Pipelex searches all available domains for a concept named `"Invoice"`
-2. If found in **exactly one domain** → ✅ Uses that concept
-3. If found in **multiple domains** → ❌ Error: "Ambiguous concept"
-4. If **not found** → ❌ Error: "Concept not found"
-
-### Explicit Domain Specification
-
-To avoid ambiguity, specify the domain code explicitly:
-
-```json
-{
-  "concept": "accounting.Invoice"
-}
-```
-
-**Format:** `"domain_code.ConceptName"`
-
-This tells Pipelex exactly which concept to use, bypassing the search.
-
-### Best Practices
-
-- Use simple names (`"Invoice"`) when you have unique concept names across domains
-- Use domain-prefixed names (`"accounting.Invoice"`) when:
-  - You have concepts with the same name in different domains
-  - You want to be explicit about which concept to use
-  - You're building APIs that need to be unambiguous
-
----
-
-## Common Input Patterns
-
-### Pattern 1: Simple Text Input
-
-```python
-inputs = {
-    "story": "Once upon a time...",
-}
-```
-
-### Pattern 2: Native Content Types (PDF, Image)
+From Python, the same light values work — and you can additionally pass already-built content objects:
 
 ```python
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 
 inputs = {
-    "document": DocumentContent(url="invoice.pdf"),
-    "photo": ImageContent(url="photo.jpg"),
-}
-```
-
-### Pattern 3: Custom Concepts with Explicit Format
-
-```python
-inputs = {
-    "gantt_chart_image": {
-        "concept": "gantt.GanttChartImage",
-        "content": ImageContent(url="gantt.png"),
-    }
-}
-```
-
-### Pattern 4: Structured Data
-
-```python
-inputs = {
-    "character": {
-        "concept": "story.Character",
-        "content": {
-            "name": "Alice",
-            "age": 30,
-            "description": "A brave explorer"
-        }
-    }
-}
-```
-
-### Pattern 5: Multiple Inputs with Mixed Formats
-
-```python
-from pipelex.core.stuffs.text_content import load_text_from_path
-
-inputs = {
-    # Simple string
-    "client_instructions": "Focus on payment terms",
-    
-    # String loaded from file
-    "contract_text": load_text_from_path("contract.txt"),
-    
-    # Explicit concept format
-    "question": {
-        "concept": "legal.Question",
-        "content": "What are the fees?",
-    },
-}
-```
-
----
-
-## Complete Examples
-
-### Example 1: Using JSON Inputs (CLI)
-
-```json
-{
-  "inputs": {
-    "text": "Analyze this contract for risks.",
-    "category": {
-      "concept": "Category",
-      "content": {
-        "name": "legal",
-        "priority": "high"
-      }
-    },
-    "options": ["option1", "option2", "option3"],
-    "invoice": {
-      "concept": "accounting.Invoice",
-      "content": {
-        "invoice_number": "INV-001",
-        "amount": 1250.00
-      }
-    }
-  }
-}
-```
-
-### Example 2: Using Python Inputs
-
-```python
-from pipelex.core.stuffs.image_content import ImageContent
-
-inputs = {
-    # Direct string (Case 1.1)
+    # Light values, shaped against the signature
     "topic": "A robot learning to love",
-    
-    # Native content type (Case 1.3)
+    "priority": 3,
+
+    # Native content objects (typed directly)
     "photo": ImageContent(url="photo.jpg"),
-    
-    # Explicit format with custom concept (Case 2.3)
+    "contract": DocumentContent(url="nda.pdf"),
+
+    # Explicit envelope with a custom concept
     "draft_tweet": {
         "concept": "social.DraftTweet",
-        "content": "Check out this amazing framework!",
+        "content": "Check out this framework!",
     },
-    
-    # List of strings (Case 1.2)
-    "keywords": ["AI", "automation", "future"],
 }
 ```
 
----
+A list of content objects (`[MyConcept(...), MyConcept(...)]`) or an already-wrapped `ListContent(items=[...])` is accepted for a declared-multiple input; a `DictStuff(concept=..., content=...)` is the object form of the explicit envelope. All are compatibility-checked against the declaration.
 
-## Troubleshooting
+!!! note "Bare numbers and booleans from strictly-typed Python"
+    A bare number or boolean (`"priority": 3`) is accepted at runtime, but the `PipelineInputs` protocol type does not yet admit bare scalars, so a strict static type-checker may flag it until that type is widened. If your codebase runs a type-checker, type the inputs dict as `dict[str, Any]`, or pass the value through the explicit envelope (`{"concept": "...", "content": 3}`).
 
-### Error: "Concept not found"
+## Unknown input names are rejected
 
-If you see an error about a concept not being found, use the explicit format:
+If you provide a name the pipe does not declare, the run fails with an error that lists the declared names. This catches typos and stale inputs files early, rather than silently ignoring the extra value.
 
-```python
-# ❌ Won't work if MyType is a custom concept
-inputs = {"data": my_value}
-
-# ✅ Use explicit format
-inputs = {
-    "data": {
-        "concept": "domain.MyType",
-        "content": my_value,
-    }
-}
+```text
+Input 'invoce' is not declared by this pipe. Declared inputs: 'question', 'priority', 'invoice', 'tags'.
 ```
 
-### Error: "Type mismatch"
+## What can go wrong
 
-Make sure the content type matches what your concept expects:
+When a value cannot be shaped against its declared concept, Pipelex raises a typed error that names the input, the declared concept, what you provided, and the **expected shape**. Common cases:
 
-```python
-# ❌ Wrong: passing a string when concept expects structured data
-inputs = {
-    "character": {
-        "concept": "story.Character",
-        "content": "Alice",  # Should be a Character instance or dict
-    }
-}
+- **Wrong kind** — a string where a number is declared, a list where a single value is declared, an object where a scalar is declared.
+- **Count mismatch** — the wrong number of items for a fixed-count `X[N]` input.
+- **Structure validation** — an object missing a required field of a structured concept.
+- **Incompatible explicit concept** — an envelope naming a concept that is not compatible with the declaration.
+- **Null value** — a top-level `null`; absence is expressed by *omitting* the key, not by providing `null`. (An input declared optional with `?` may simply be left out — see [Understanding Optionality](understanding-optionality.md).)
 
-# ✅ Correct: pass the right type
-inputs = {
-    "character": {
-        "concept": "story.Character",
-        "content": {"name": "Alice", "age": 30, "description": "..."},
-    }
-}
-```
+## Input files: JSON or TOML
 
-### Error: "Ambiguous concept"
+An inputs file is a dictionary of input names to values, accepted as **both JSON and TOML**, discriminated by file extension (`.toml` → TOML, everything else → JSON). Both produce the same dictionary, so every shape above applies to either. TOML's multi-line strings (`"""…"""`) make text-heavy inputs far easier to author, and a top-level TOML date/datetime literal (`hearing = 2026-09-01`) maps directly to the native [`Date`](../concepts/native-concepts.md) concept.
 
-When a concept name exists in multiple domains, specify the domain code:
-
-```python
-# ❌ Ambiguous if "Invoice" exists in multiple domains
-inputs = {
-    "invoice": {
-        "concept": "Invoice",
-        "content": {...}
-    }
-}
-
-# ✅ Specify the domain code
-inputs = {
-    "invoice": {
-        "concept": "accounting.Invoice",
-        "content": {...}
-    }
-}
-```
-
----
+See the [run CLI reference](../../tools/cli/run.md#input-file-formats) for the extension rule, auto-detection, and TOML details.
 
 ## Related Documentation
 
-- [Executing Pipelines](./executing-pipelines.md) - Learn how to run pipelines with these inputs
-- [Define Your Concepts](../concepts/define_your_concepts.md) - Understand concepts and their role
-- [Understanding Multiplicity](understanding-multiplicity.md) - Working with single items vs. lists
-- [Inline Structures](../concepts/inline-structures.md) - Create structured data types with inline syntax
-- [Python StructuredContent Classes](../concepts/python-classes.md) - Advanced structured data with Python
+- [Executing Pipelines](./executing-pipelines.md) — run pipelines with these inputs
+- [Understanding Multiplicity](understanding-multiplicity.md) — single items vs. lists
+- [Understanding Optionality](understanding-optionality.md) — optional (`?`) inputs
+- [CSV Input & Output](csv-input-and-output.md) — tabular inputs and outputs
+- [Native Concepts](../concepts/native-concepts.md) — the built-in concept families
+- [Define Your Concepts](../concepts/define_your_concepts.md) — concepts and their role
+- [Build Inputs (CLI)](../../tools/cli/build/inputs.md) — generate an inputs template

@@ -1,8 +1,9 @@
+from enum import StrEnum
+
 from pydantic import Field
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.types import StrEnum
 
 
 class MermaidTheme(StrEnum):

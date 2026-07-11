@@ -1,7 +1,8 @@
+from typing import Self
+
 import tomli
 
 from pipelex.system.exceptions import ToolError
-from pipelex.types import Self
 
 
 class ArgumentTypeError(ToolError):

@@ -6,21 +6,20 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
+    agent_error_validate_bundle,
     agent_success_formatted,
-    extract_validation_errors,
     set_agent_cli_error_format,
 )
+from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
@@ -91,44 +90,7 @@ def validate_bundle_cmd(
     """
     set_agent_cli_error_format(error_format or output_format)
 
-    bundle_path: str | None = None
-    target_path = Path(path)
-
-    if target_path.is_dir():
-        # Directory mode: auto-detect bundle file
-        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
-        if bundle_file.is_file():
-            bundle_path = str(bundle_file)
-        else:
-            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
-            if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError", exit_code=2)
-            if len(mthds_files) > 1:
-                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                agent_error(
-                    f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                    f"Pass the .mthds file directly instead.",
-                    error_type="ArgumentError",
-                    exit_code=2,
-                )
-            bundle_path = str(mthds_files[0])
-
-        # Add directory as library dir
-        target_dir_str = str(target_path)
-        if library_dir is None:
-            library_dir = [target_dir_str]
-        elif target_dir_str not in library_dir:
-            library_dir = [target_dir_str, *library_dir]
-
-    elif is_pipelex_file(target_path):
-        bundle_path = path
-    else:
-        agent_error(
-            f"'{path}' is not a .mthds file or directory. "
-            f"Use 'validate pipe <code>' for pipe codes, or 'validate bundle <path>' for .mthds files/directories.",
-            error_type="ArgumentError",
-            exit_code=2,
-        )
+    bundle_path, library_dir = resolve_bundle_target(path, library_dir=library_dir)
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
@@ -143,20 +105,18 @@ def validate_bundle_cmd(
             result = asyncio.run(
                 validate_pipe_in_bundle_core(
                     bundle_path=Path(bundle_path), pipe_code=pipe, library_dirs=library_dirs, allow_signatures=allow_signatures
-                )  # type: ignore[arg-type]
+                )
             )
         else:
             # Validate the entire bundle
-            result = asyncio.run(
-                validate_bundle_core(bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)  # type: ignore[arg-type]
-            )
+            result = asyncio.run(validate_bundle_core(bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures))
 
         # Generate graph if requested and validation succeeded
         if graph:
             try:
                 graph_result = asyncio.run(
                     generate_graph_for_bundle(
-                        bundle_path=Path(bundle_path),  # type: ignore[arg-type]
+                        bundle_path=Path(bundle_path),
                         graph_format=graph_format,
                         library_dirs=library_dir_strings,
                         pipe_code=pipe,
@@ -186,7 +146,7 @@ def validate_bundle_cmd(
             try:
                 view_result = asyncio.run(
                     generate_view_for_bundle(
-                        bundle_path=Path(bundle_path),  # type: ignore[arg-type]
+                        bundle_path=Path(bundle_path),
                         library_dirs=library_dir_strings,
                         pipe_code=pipe,
                         direction=direction,
@@ -232,18 +192,11 @@ def validate_bundle_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
-        # Invalid verdict: emit the structured failure envelope. validation_errors[] is the shared
-        # builder's output — non-empty on every invalid verdict (a residual dry-run failure rides one
-        # dry_run item, not a separate field). is_valid:false is the discriminant mirroring the success
-        # envelope; signatures never reach here (they are a runnability fact, gated above).
-        agent_error(
-            exc.message,
-            error_type="ValidateBundleError",
-            cause=exc,
-            is_valid=False,
-            bundle_path=str(bundle_path),
-            validation_errors=extract_validation_errors(exc),
-        )
+        # Invalid verdict: emit the format-aware failure surface. JSON keeps the exact structured
+        # envelope (is_valid:false discriminant + validation_errors[], the shared builder's output,
+        # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
+        # footer. Signatures never reach here (they are a runnability fact, gated above).
+        agent_error_validate_bundle(exc, bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

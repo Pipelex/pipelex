@@ -37,7 +37,7 @@ class TestPipeConditionNeededInputs:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with expression variables",
             inputs={"status": "native.Text", "priority": "native.Text"},
-            output="native.Text",
+            output="native.Text?",
             expression="status",  # Uses 'status' variable (gets wrapped in {{ }} internally)
             outcomes={"active": SpecialOutcome.CONTINUE, "inactive": SpecialOutcome.CONTINUE},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -115,7 +115,7 @@ class TestPipeConditionNeededInputs:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition mapping to pipe_a and pipe_b",
             inputs={"selector": "native.Text"},
-            output=analysis_concept.concept_ref,
+            output=f"{analysis_concept.concept_ref}?",
             expression="selector",
             outcomes={"option_a": "pipe_a", "option_b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -182,7 +182,7 @@ class TestPipeConditionNeededInputs:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with list input pipe",
             inputs={"mode": "native.Text"},
-            output=result_concept.concept_ref,
+            output=f"{result_concept.concept_ref}?",
             expression="mode",
             outcomes={"batch": "pipe_with_list"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -267,7 +267,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with matching outputs",
             inputs={"selector": "native.Text"},
-            output=output_concept.concept_ref,
+            output=f"{output_concept.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -335,7 +335,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Dynamic output when not needed",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.DYNAMIC.concept_ref,
+            output=f"{NativeConceptCode.DYNAMIC.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -394,7 +394,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Anything output when not needed",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.ANYTHING.concept_ref,
+            output=f"{NativeConceptCode.ANYTHING.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -470,7 +470,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Dynamic output",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.ANYTHING.concept_ref,
+            output=f"{NativeConceptCode.ANYTHING.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -543,7 +543,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with specific output when Dynamic is required",
             inputs={"selector": "native.Text"},
-            output=output_a.concept_ref,
+            output=f"{output_a.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -620,7 +620,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Anything output when Dynamic is required",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.TEXT.concept_ref,
+            output=f"{NativeConceptCode.TEXT.concept_ref}?",
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -654,7 +654,7 @@ class TestPipeConditionSpecialOutcomes:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with only CONTINUE outcomes",
             inputs={"status": "native.Text"},
-            output="native.Text",
+            output="native.Text?",
             expression="status",
             outcomes={"active": SpecialOutcome.CONTINUE, "inactive": SpecialOutcome.CONTINUE},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -743,7 +743,7 @@ class TestPipeConditionSpecialOutcomes:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with mixed pipe and CONTINUE",
             inputs={"action": "native.Text"},
-            output=output_concept.concept_ref,
+            output=f"{output_concept.concept_ref}?",
             expression="action",
             outcomes={
                 "process": "process_pipe",  # Actual pipe
@@ -839,7 +839,7 @@ class TestPipeConditionSpecialOutcomes:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with only special outcomes",
             inputs={"flag": "native.Text"},
-            output="native.Text",
+            output="native.Text?",
             expression="flag",
             outcomes={
                 "yes": SpecialOutcome.CONTINUE,
@@ -890,7 +890,7 @@ class TestPipeConditionSpecialOutcomes:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with mixed outcomes",
             inputs={"mode": "native.Text"},
-            output=output_concept.concept_ref,
+            output=f"{output_concept.concept_ref}?",
             expression="mode",
             outcomes={
                 "run": "real_pipe",

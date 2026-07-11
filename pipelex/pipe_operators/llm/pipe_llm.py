@@ -22,6 +22,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -92,6 +93,22 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
                 )
 
+        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        for template_blueprint, template_label in [
+            (self.llm_prompt_spec.prompt_blueprint, "prompt"),
+            (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=template_blueprint.template,
+                template_category=template_blueprint.category,
+                template_label=template_label,
+            )
+
     @override
     def validate_inputs_with_library(self):
         pass
@@ -130,7 +147,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for input_name, stuff_spec in self.inputs.items:
-            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            needed_inputs.add_stuff_spec(
+                variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+            )
 
         return needed_inputs
 

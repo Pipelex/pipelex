@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import Field, model_validator
 from rich.text import Text
 from typing_extensions import override
@@ -8,11 +10,10 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri
-from pipelex.types import Self
 
 
 class DocumentContent(StuffContent):
-    url: str = Field(..., description="The document URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+    url: str = Field(..., description="The document URL: a storage URI, an HTTP(S) URL, or a base64 data URL")
 
     public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")
     mime_type: str | None = Field(default=None, description="The MIME type of the document")

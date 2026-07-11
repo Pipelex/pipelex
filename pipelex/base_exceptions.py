@@ -1,11 +1,12 @@
 from collections.abc import Iterator
+from enum import StrEnum
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from pipelex.suggested_fix import SuggestedFix
 from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
-from pipelex.types import StrEnum
 from pipelex.urls import URLs
 
 
@@ -264,6 +265,14 @@ class ValidationErrorCategory(StrEnum):
     PIPE_VALIDATION = "pipe_validation"
     DRY_RUN = "dry_run"
 
+    @property
+    def is_dry_run(self) -> bool:
+        match self:
+            case ValidationErrorCategory.DRY_RUN:
+                return True
+            case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
+                return False
+
 
 class ValidationErrorItem(BaseModel):
     """One structured bundle-validation error, projected onto the error wire.
@@ -303,6 +312,10 @@ class ValidationErrorItem(BaseModel):
     missing_concept_code: str | None = None
     missing_pipe_code: str | None = None
     declared_concepts: list[str] | None = None
+    # Structured, deterministic fix for this error, when the fix planner derived one from the
+    # enriched error data. Optional and additive: non-fixable items serialize unchanged under
+    # ``exclude_none``.
+    suggested_fix: SuggestedFix | None = None
 
 
 class ErrorReport(BaseModel):
