@@ -21,7 +21,7 @@ sibling file), the TS analog of the Python subclassing story; the generated file
 
 import json
 
-from pipelex.codegen.emitters.naming import ts_type_name
+from pipelex.codegen.emitters.naming import allocate_ts_type_names
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
@@ -33,11 +33,13 @@ _BINDER_FILENAME = "binder.ts"
 
 def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     """Emit the pure `types.ts` file and its `binder.ts` companion (wire<->domain parse/serialize)."""
+    concepts = sorted(library.concepts, key=lambda concept: concept.concept_ref)
     by_ref = library.by_ref()
+    type_name_by_ref = allocate_ts_type_names(library)
     header = _ts_header()
-    blocks = [_render_schema(concept, by_ref=by_ref) for concept in library.concepts]
+    blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref) for concept in concepts]
     body = f'{header}import {{ z }} from "zod";\n\n\n' + "\n\n\n".join(blocks) + "\n"
-    return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(library)]
+    return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(concepts, type_name_by_ref=type_name_by_ref)]
 
 
 def _ts_header() -> str:
@@ -56,35 +58,50 @@ def _ts_header() -> str:
     )
 
 
-def _render_schema(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept]) -> str:
-    type_name = ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
+def _render_schema(
+    concept: ResolvedConcept,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
+    type_name = type_name_by_ref[concept.concept_ref]
     doc = _jsdoc(concept.description, imprecise=concept.imprecision_reason if concept.structureless else None)
 
-    schema_expr = _schema_expr(concept, by_ref=by_ref)
+    schema_expr = _schema_expr(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
     return f"{doc}export const {type_name}Schema = {schema_expr};\nexport type {type_name} = z.infer<typeof {type_name}Schema>;"
 
 
-def _schema_expr(concept: ResolvedConcept, *, by_ref: dict[str, ResolvedConcept]) -> str:
+def _schema_expr(
+    concept: ResolvedConcept,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
     if concept.base_ref is not None and not concept.fields:
         base = by_ref.get(concept.base_ref)
         if base is not None:
-            base_name = ts_type_name(domain=base.domain, code=base.code, needs_qualification=base.needs_qualification)
+            base_name = type_name_by_ref[base.concept_ref]
             return f"z.lazy(() => {base_name}Schema)"
         return "z.unknown()"
     if not concept.fields:
         # Structureless / opaque concept: unknown shape, surfaced (never guessed).
         return "z.unknown()"
-    field_lines = "\n".join(_render_field(concept_field, by_ref=by_ref) for concept_field in concept.fields)
+    field_lines = "\n".join(_render_field(concept_field, by_ref=by_ref, type_name_by_ref=type_name_by_ref) for concept_field in concept.fields)
     return f"z.object({{\n{field_lines}\n}})"
 
 
-def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedConcept]) -> str:
+def _render_field(
+    concept_field: ResolvedField,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
     # Wire-native key: the crate's snake_case field name verbatim (D10), so the schema validates the
     # wire payload directly and no key transform can corrupt nested record/opaque data.
     key = concept_field.name
     reasons = list(dict.fromkeys(iter_imprecision_reasons(concept_field.resolved_type)))
     doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
-    expr = _zod_type(concept_field.resolved_type, by_ref=by_ref)
+    expr = _zod_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
     if concept_field.default_value is not None:
         expr = f"{expr}.default({clean_json_dumps(concept_field.default_value)})"
     elif not concept_field.required:
@@ -92,7 +109,12 @@ def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedCon
     return f"{doc}  {key}: {expr},"
 
 
-def _zod_type(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept]) -> str:
+def _zod_type(
+    resolved_type: ResolvedType,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
     match resolved_type.kind:
         case ResolvedTypeKind.TEXT:
             return "z.string()"
@@ -109,37 +131,40 @@ def _zod_type(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept]
             choices = ", ".join(json.dumps(choice) for choice in resolved_type.choices or [])
             return f"z.enum([{choices}])"
         case ResolvedTypeKind.CONCEPT:
-            return _concept_schema(resolved_type, by_ref=by_ref)
+            return _concept_schema(resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
         case ResolvedTypeKind.LIST:
-            item = _zod_type(resolved_type.item, by_ref=by_ref) if resolved_type.item else "z.unknown()"
+            item = _zod_type(resolved_type.item, by_ref=by_ref, type_name_by_ref=type_name_by_ref) if resolved_type.item else "z.unknown()"
             return f"z.array({item})"
         case ResolvedTypeKind.DICT:
-            value = _zod_type(resolved_type.value, by_ref=by_ref) if resolved_type.value else "z.unknown()"
+            value = _zod_type(resolved_type.value, by_ref=by_ref, type_name_by_ref=type_name_by_ref) if resolved_type.value else "z.unknown()"
             return f"z.record(z.string(), {value})"
         case ResolvedTypeKind.ANY:
             return "z.unknown()"
 
 
-def _concept_schema(resolved_type: ResolvedType, *, by_ref: dict[str, ResolvedConcept]) -> str:
+def _concept_schema(
+    resolved_type: ResolvedType,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
     concept_ref = resolved_type.concept_ref
     if concept_ref is None:
         return "z.unknown()"
     concept = by_ref.get(concept_ref)
     if concept is not None:
-        name = ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification)
+        name = type_name_by_ref[concept.concept_ref]
         return f"z.lazy(() => {name}Schema)"
     return "z.unknown()"
 
 
-def _emit_binder(library: ResolvedLibrary) -> EmittedFile:
+def _emit_binder(concepts: list[ResolvedConcept], *, type_name_by_ref: dict[str, str]) -> EmittedFile:
     """Emit `binder.ts`: typed `parse<Name>` / `serialize<Name>` helpers over the `types.ts` schemas.
 
     Keys are wire-native (D10), so parse/serialize are a direct `Schema.parse` — no key remapping, and
     thus no risk of corrupting arbitrary keys inside a `z.record()` / `z.unknown()` value.
     """
-    type_names = [
-        ts_type_name(domain=concept.domain, code=concept.code, needs_qualification=concept.needs_qualification) for concept in library.concepts
-    ]
+    type_names = [type_name_by_ref[concept.concept_ref] for concept in concepts]
     import_lines = "\n".join(f"  {name}Schema,\n  type {name}," for name in type_names)
     pairs = "\n\n".join(_binder_pair(name) for name in type_names)
     prelude = f'import {{\n{import_lines}\n}} from "./types";'

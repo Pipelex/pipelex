@@ -1,5 +1,5 @@
 from pipelex.codegen.emitters.ts_zod import emit_ts_zod
-from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
+from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary, resolve_concepts_from_crate
 from pipelex.libraries.library_crate import LibraryCrate
 
 
@@ -65,6 +65,77 @@ class TestTsZodEmitter:
         content = emit_ts_zod(resolve_concepts_from_crate(edge_crate))[0].content
         assert "export const AlphaResultSchema = z.object({" in content
         assert "export const BetaResultSchema = z.object({" in content
+
+    def test_collision_safe_names_are_shared_by_definitions_references_and_binders(self):
+        concepts = [
+            ResolvedConcept(
+                concept_ref="foo.bar.Result",
+                domain="foo.bar",
+                code="Result",
+                description="Hierarchical result",
+                is_native=False,
+                needs_qualification=True,
+                base_ref="foo_bar.Result",
+                fields=[],
+                structureless=False,
+                imprecision_reason=None,
+                opaque_python_class=None,
+            ),
+            ResolvedConcept(
+                concept_ref="foo_bar.Result",
+                domain="foo_bar",
+                code="Result",
+                description="Underscored result",
+                is_native=False,
+                needs_qualification=True,
+                base_ref=None,
+                fields=[],
+                structureless=True,
+                imprecision_reason="concept declares no structure",
+                opaque_python_class=None,
+            ),
+            ResolvedConcept(
+                concept_ref="alpha.Result",
+                domain="alpha",
+                code="Result",
+                description="Qualified result",
+                is_native=False,
+                needs_qualification=True,
+                base_ref=None,
+                fields=[],
+                structureless=True,
+                imprecision_reason="concept declares no structure",
+                opaque_python_class=None,
+            ),
+            ResolvedConcept(
+                concept_ref="other.AlphaResult",
+                domain="other",
+                code="AlphaResult",
+                description="Bare alpha result",
+                is_native=False,
+                needs_qualification=False,
+                base_ref=None,
+                fields=[],
+                structureless=True,
+                imprecision_reason="concept declares no structure",
+                opaque_python_class=None,
+            ),
+        ]
+        forward = emit_ts_zod(ResolvedLibrary(mthds_version="0.1.0", concepts=concepts))
+        reversed_output = emit_ts_zod(ResolvedLibrary(mthds_version="0.1.0", concepts=list(reversed(concepts))))
+
+        assert forward == reversed_output
+        types_content = forward[0].content
+        binder_content = forward[1].content
+        assert "export const FooBarResultSchema = z.lazy(() => FooBarResult2Schema);" in types_content
+        assert types_content.count("export const FooBarResultSchema") == 1
+        assert types_content.count("export const FooBarResult2Schema") == 1
+        assert types_content.count("export const AlphaResultSchema") == 1
+        assert types_content.count("export const AlphaResult2Schema") == 1
+        assert binder_content.count("export function parseFooBarResult(") == 1
+        assert binder_content.count("export function parseFooBarResult2(") == 1
+        assert binder_content.count("export function parseAlphaResult(") == 1
+        assert binder_content.count("export function parseAlphaResult2(") == 1
 
     def test_dict_fields_render_records_honestly(self, materialized_image_crate: LibraryCrate):
         """The DICT path — an authored unspecified-values dict and an authored typed dict — renders

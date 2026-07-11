@@ -1,4 +1,4 @@
-from pipelex.codegen.emitters.naming import python_class_name, runtime_to_emitted_class_names, snake_to_pascal, ts_type_name
+from pipelex.codegen.emitters.naming import allocate_ts_type_names, python_class_name, runtime_to_emitted_class_names, snake_to_pascal, ts_type_name
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 
 
@@ -47,6 +47,49 @@ class TestNaming:
         # TS cannot use the interpunct; a colliding type PascalCases and joins the domain segments.
         assert ts_type_name(domain="alpha", code="Result", needs_qualification=True) == "AlphaResult"
         assert ts_type_name(domain="legal.contracts", code="Result", needs_qualification=True) == "LegalContractsResult"
+
+    def test_ts_name_allocation_disambiguates_non_injective_domains(self):
+        library = ResolvedLibrary(
+            mthds_version="0.1.0",
+            concepts=[
+                _resolved_concept(domain="foo.bar", code="Result", needs_qualification=True),
+                _resolved_concept(domain="foo_bar", code="Result", needs_qualification=True),
+            ],
+        )
+
+        assert allocate_ts_type_names(library) == {
+            "foo.bar.Result": "FooBarResult",
+            "foo_bar.Result": "FooBarResult2",
+        }
+
+    def test_ts_name_allocation_preserves_bare_name_over_qualified_collision(self):
+        library = ResolvedLibrary(
+            mthds_version="0.1.0",
+            concepts=[
+                _resolved_concept(domain="alpha", code="Result", needs_qualification=True),
+                _resolved_concept(domain="other", code="AlphaResult"),
+                _resolved_concept(domain="other", code="AlphaResult2"),
+            ],
+        )
+
+        assert allocate_ts_type_names(library) == {
+            "alpha.Result": "AlphaResult3",
+            "other.AlphaResult": "AlphaResult",
+            "other.AlphaResult2": "AlphaResult2",
+        }
+
+    def test_ts_name_allocation_is_independent_of_input_order(self):
+        concepts = [
+            _resolved_concept(domain="foo.bar", code="Result", needs_qualification=True),
+            _resolved_concept(domain="foo_bar", code="Result", needs_qualification=True),
+            _resolved_concept(domain="alpha", code="Result", needs_qualification=True),
+            _resolved_concept(domain="other", code="AlphaResult"),
+        ]
+
+        forward = ResolvedLibrary(mthds_version="0.1.0", concepts=concepts)
+        reversed_library = ResolvedLibrary(mthds_version="0.1.0", concepts=list(reversed(concepts)))
+
+        assert allocate_ts_type_names(forward) == allocate_ts_type_names(reversed_library)
 
     def test_runtime_to_emitted_class_names(self):
         """Runtime-qualified spellings map to the emitted names; natives and opaque classes are skipped."""
