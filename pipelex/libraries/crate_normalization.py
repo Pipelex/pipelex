@@ -31,6 +31,8 @@ are not yet applied here, mirroring the spec's own "Specification Status" callou
 [Library Crate Format]: mthds/docs/spec/library-crate.md
 """
 
+from typing import NamedTuple
+
 from pipelex.codegen.native_expansion import collect_native_refs_from_structure, materialize_native_concept
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -49,6 +51,11 @@ from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParall
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 
 _ConceptEntry = ConceptBlueprint | str
+
+
+class _RefinementResolution(NamedTuple):
+    is_native_backed: bool
+    effective_structure: dict[str, ConceptStructureBlueprint] | None
 
 
 def normalize_crate(crate: LibraryCrate, *, mthds_version: str) -> LibraryCrate:
@@ -136,75 +143,68 @@ def _flatten_refinement(concepts: dict[str, _ConceptEntry]) -> None:
       `TextContent`'s specialized rendering;
     - a structureless or cross-package base (nothing to materialize / not resolvable in-crate).
     """
-    effective_cache: dict[str, dict[str, ConceptStructureBlueprint] | None] = {}
+    resolution_cache: dict[str, _RefinementResolution] = {}
     for concept_ref, value in list(concepts.items()):
         if not isinstance(value, ConceptBlueprint) or not value.refines or isinstance(value.structure, dict):
             continue
-        if _base_is_native_backed(value.refines, concepts=concepts):
+        resolution = _resolve_refinement(value.refines, concepts=concepts, cache=resolution_cache)
+        if resolution.is_native_backed:
             continue
-        effective = _effective_structure(value.refines, concepts=concepts, cache=effective_cache, in_progress=set())
-        if effective:
-            concepts[concept_ref] = value.model_copy(update={"refines": None, "structure": dict(effective)})
+        if resolution.effective_structure:
+            concepts[concept_ref] = value.model_copy(update={"refines": None, "structure": dict(resolution.effective_structure)})
 
 
-def _base_is_native_backed(base_ref: str, *, concepts: dict[str, _ConceptEntry]) -> bool:
-    """True when `base_ref`'s effective structure comes from a native ancestor.
-
-    Walks the refinement chain: a native ref is native-backed; an in-crate concept with its own
-    structure dict is a real structured base (not native-backed); an only-refining concept defers to
-    its own base; a cross-package / unknown base is not native-backed (and won't flatten anyway).
-    """
-    seen: set[str] = set()
-    current: str | None = base_ref
-    while current and current not in seen:
-        seen.add(current)
-        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current):
-            return True
-        value = concepts.get(current)
-        if not isinstance(value, ConceptBlueprint):
-            return False
-        if isinstance(value.structure, dict):
-            return False
-        current = value.refines
-    return False
-
-
-def _effective_structure(
+def _resolve_refinement(
     concept_ref: str,
     *,
     concepts: dict[str, _ConceptEntry],
-    cache: dict[str, dict[str, ConceptStructureBlueprint] | None],
-    in_progress: set[str],
-) -> dict[str, ConceptStructureBlueprint] | None:
-    """The complete field set of `concept_ref`, walking refinement bases. None = structureless."""
+    cache: dict[str, _RefinementResolution],
+) -> _RefinementResolution:
+    """Resolve native ancestry and effective structure iteratively, caching each visited ref once."""
     if concept_ref in cache:
         return cache[concept_ref]
-    if concept_ref in in_progress:
-        # A refinement cycle would have been rejected upstream; guard defensively rather than recurse.
-        return None
 
-    if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref):
-        native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref)
-        result = _native_effective_structure(native_ref)
-        cache[concept_ref] = result
-        return result
+    path: list[str] = []
+    path_index_by_ref: dict[str, int] = {}
+    current_ref = concept_ref
+    resolution: _RefinementResolution
+    while current_ref not in cache:
+        if current_ref in path_index_by_ref:
+            cycle = path[path_index_by_ref[current_ref] :]
+            first_ref = min(cycle)
+            first_index = cycle.index(first_ref)
+            ordered_cycle = cycle[first_index:] + cycle[:first_index] + [first_ref]
+            msg = f"Refinement cycle detected: {' -> '.join(ordered_cycle)}"
+            raise CrateNormalizationError(msg)
 
-    value = concepts.get(concept_ref)
-    if not isinstance(value, ConceptBlueprint):
-        # Cross-package or unknown base: not resolvable in-crate.
-        cache[concept_ref] = None
-        return None
+        path_index_by_ref[current_ref] = len(path)
+        path.append(current_ref)
 
-    in_progress.add(concept_ref)
-    if isinstance(value.structure, dict):
-        result = {field_name: field for field_name, field in value.structure.items() if isinstance(field, ConceptStructureBlueprint)}
-    elif value.refines:
-        result = _effective_structure(value.refines, concepts=concepts, cache=cache, in_progress=in_progress)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_ref):
+            native_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=current_ref)
+            resolution = _RefinementResolution(is_native_backed=True, effective_structure=_native_effective_structure(native_ref))
+            break
+
+        value = concepts.get(current_ref)
+        if not isinstance(value, ConceptBlueprint):
+            # Cross-package or unknown base: not resolvable in-crate.
+            resolution = _RefinementResolution(is_native_backed=False, effective_structure=None)
+            break
+        if isinstance(value.structure, dict):
+            effective_structure = {field_name: field for field_name, field in value.structure.items() if isinstance(field, ConceptStructureBlueprint)}
+            resolution = _RefinementResolution(is_native_backed=False, effective_structure=effective_structure)
+            break
+        if value.refines:
+            current_ref = value.refines
+            continue
+        resolution = _RefinementResolution(is_native_backed=False, effective_structure=None)
+        break
     else:
-        result = None
-    in_progress.discard(concept_ref)
-    cache[concept_ref] = result
-    return result
+        resolution = cache[current_ref]
+
+    for visited_ref in reversed(path):
+        cache[visited_ref] = resolution
+    return resolution
 
 
 def _native_effective_structure(native_ref: str) -> dict[str, ConceptStructureBlueprint] | None:

@@ -1,7 +1,9 @@
 import pytest
+from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import CrateNormalizationError
@@ -78,6 +80,19 @@ def _authored_crate() -> LibraryCrate:
         domains={"scoring": DomainBlueprint(code="scoring", description="Scoring domain")},
         source_map={"scoring.WeightedScore": "/fake/scoring.mthds"},
     )
+
+
+def _reverse_refinement_chain_crate(size: int) -> LibraryCrate:
+    concepts: dict[str, ConceptBlueprint | str] = {
+        f"scale.Node{index:04d}": ConceptBlueprint(description=f"Node {index}", refines=f"Node{index + 1:04d}") for index in range(size - 1)
+    }
+    concepts[f"scale.Node{size - 1:04d}"] = ConceptBlueprint(
+        description="Structured base",
+        structure={
+            "value": ConceptStructureBlueprint(description="Value", type=ConceptStructureBlueprintFieldType.TEXT),
+        },
+    )
+    return LibraryCrate(concepts=concepts)
 
 
 class TestCrateNormalization:
@@ -195,6 +210,37 @@ class TestCrateNormalization:
         assert twice.concepts == once.concepts
         assert twice.pipes == once.pipes
         assert twice.domains == once.domains
+
+    def test_deep_reverse_refinement_chain_flattens_without_recursion(self):
+        result = normalize_crate(_reverse_refinement_chain_crate(1_500), mthds_version=MTHDS_TEST_VERSION)
+
+        first = result.concepts["scale.Node0000"]
+        assert isinstance(first, ConceptBlueprint)
+        assert first.refines is None
+        assert isinstance(first.structure, dict)
+        assert set(first.structure) == {"value"}
+
+    def test_refinement_resolution_work_is_linear_in_chain_length(self, mocker: MockerFixture):
+        chain_size = 400
+        native_check = mocker.spy(NativeConceptCode, "is_native_concept_ref_or_code")
+
+        normalize_crate(_reverse_refinement_chain_crate(chain_size), mthds_version=MTHDS_TEST_VERSION)
+
+        assert native_check.call_count < chain_size * 10
+
+    def test_refinement_cycle_has_explicit_diagnostic(self):
+        crate = LibraryCrate(
+            concepts={
+                "cycle.A": ConceptBlueprint(description="A", refines="B"),
+                "cycle.B": ConceptBlueprint(description="B", refines="C"),
+                "cycle.C": ConceptBlueprint(description="C", refines="A"),
+            },
+        )
+
+        with pytest.raises(CrateNormalizationError) as exc_info:
+            normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+        assert str(exc_info.value) == "Refinement cycle detected: cycle.A -> cycle.B -> cycle.C -> cycle.A"
 
     def test_non_domain_qualified_key_raises(self):
         """A crate key that is not domain-qualified is a contract violation, surfaced explicitly."""
