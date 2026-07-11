@@ -58,7 +58,7 @@ def _package_of(key_or_path: str) -> str:
 
 
 def _print_report(violations: list[Violation], *, grants: dict[str, SubjectGrant]) -> None:
-    """Print the full inventory grouped by top-level package, plus the grant/seeded progress meter."""
+    """Print the full inventory grouped by top-level package, plus the per-package grant counts."""
     console = get_console()
     grouped: dict[str, list[Violation]] = {}
     for violation in violations:
@@ -79,21 +79,15 @@ def _print_report(violations: list[Violation], *, grants: dict[str, SubjectGrant
     console.print()
 
     grant_totals: dict[str, int] = {}
-    seeded_totals: dict[str, int] = {}
-    for key, grant in grants.items():
+    for key in grants:
         package = _package_of(key)
         grant_totals[package] = grant_totals.get(package, 0) + 1
-        if grant.seeded:
-            seeded_totals[package] = seeded_totals.get(package, 0) + 1
-    console.print("[bold]Subject grants — review progress by package[/bold] (seeded = awaiting genuine review)")
+    console.print("[bold]Subject grants by package[/bold]")
     console.print()
     for package in sorted(grant_totals):
-        total = grant_totals[package]
-        seeded = seeded_totals.get(package, 0)
-        seeded_note = f"[yellow]{seeded} seeded remaining[/yellow]" if seeded else "[green]fully reviewed[/green]"
-        console.print(f"  [bold cyan]{escape(package)}[/bold cyan]  {total} grant(s), {seeded_note}")
+        console.print(f"  [bold cyan]{escape(package)}[/bold cyan]  {grant_totals[package]} grant(s)")
     console.print()
-    console.print(f"[bold]Grants total:[/bold] {len(grants)}, [bold]seeded remaining:[/bold] {sum(seeded_totals.values())}")
+    console.print(f"[bold]Grants total:[/bold] {len(grants)}")
     console.print()
 
 
@@ -116,8 +110,8 @@ def check_keyword_only_cmd(*, report: bool = False, fix: bool = False, quiet: bo
     (see ``docs/contribute/keyword-only-arguments.md``).
 
     Args:
-        report: If True, print the full inventory grouped by package plus the grant/seeded
-            progress meter (no pass/fail gating).
+        report: If True, print the full inventory grouped by package plus the per-package
+            grant counts (no pass/fail gating).
         fix: If True, auto-fix every mechanically-fixable violation by inserting a bare ``*`` as far
             left as possible (right after ``self``/``cls``) so every non-``self``/``cls`` parameter becomes
             keyword-only, then report what was fixed and what still needs a manual fix. Non-gating — it

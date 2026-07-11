@@ -58,9 +58,9 @@ The grant is a permission, not a requirement — making the subject keyword-only
 
 The guard verifies the registry in both directions on every run: a positional subject without a grant fails, and a grant without a matching def fails (`dead-grant`), as does a grant whose recorded `param` no longer matches the def's subject (`grant-param-mismatch`). Renames, file moves, demotions to all-keyword, and newly added carve-outs (`@override`, framework decorators) all kill the grant — delete the entry or re-grant deliberately. A missing or malformed `subject_grants.toml` is an explicit check error, never treated as an empty registry (that would mass-flag every granted subject in the tree).
 
-### Transitional state (registry rollout)
+### Registry schema
 
-When the registry was introduced, every pre-existing positional subject was **seeded** into it with `seeded = true` and a placeholder rationale — treated as new, not grandfathered. Seeded entries count as grants while the review grind is in progress; each one must be genuinely reviewed (re-granted with a real rationale, demoted to all-keyword, or escape-hatched) before the transition ends, after which the `seeded` field is removed from the schema entirely. `pipelex-dev check-keyword-only --report` shows the per-package seeded-remaining counts — the review progress meter.
+A registry entry carries exactly two keys — `param` and `rationale`; anything else fails the check. When the registry was introduced, every pre-existing positional subject entered a transitional review grind (treated as new, not grandfathered); that transition is over — every grant now carries a genuine, def-specific review rationale. `pipelex-dev check-keyword-only --report` shows the full inventory and the per-package grant counts.
 
 ## Exception 2 — symmetric tuples (explicit allowlist only)
 
@@ -247,7 +247,7 @@ Run the guard directly to see the full picture:
 make check-keyword-only            # alias: make cko — one line on pass, the per-kind violation list on fail
 make fix-keyword-only              # alias: make fko — auto-insert the bare `*`; reports any manual-fix cases
 make subject-grant FUNC="pipelex/….py::qualname" RATIONALE="…"   # alias: make sgr — record a subject grant
-.venv/bin/pipelex-dev check-keyword-only --report   # full inventory by package + grant/seeded progress meter
+.venv/bin/pipelex-dev check-keyword-only --report   # full inventory by package + per-package grant counts
 .venv/bin/pipelex-dev check-keyword-only --fix      # auto-fix (what `make fko` runs)
 
 # Lean single-file check (what the PostToolUse hook runs): stdlib only, invoked by file path so it

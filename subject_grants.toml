@@ -684,10 +684,6 @@ rationale = "Verb–object: extracts the subject param of the def node; the node
 param = "annotation"
 rationale = "Verb–object: flattens the annotation into its union members; single obvious operand."
 
-["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_all_def_infos"]
-param = "root"
-rationale = "Guard/CLI helper: operates on the root; single operand."
-
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::collect_all_violations"]
 param = "root"
 rationale = "Guard/CLI helper: operates on the root; single operand."

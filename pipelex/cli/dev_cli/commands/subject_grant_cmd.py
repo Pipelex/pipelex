@@ -6,11 +6,6 @@ command is the sole WRITER of that registry: it validates the target def (it mus
 positional non-literal-typed subject, and same-qualname defs must agree on the subject name), records
 the subject's param name automatically, and rewrites the file sorted by key so diffs stay stable.
 
-The transitional ``--seed`` mode (Phases 2-4 of the registry rollout only) enters every existing
-positional subject as an unreviewed ``seeded = true`` entry with a placeholder rationale; each seeded
-entry must then be genuinely reviewed — re-granted with a real rationale, demoted to keyword-only, or
-escape-hatched — before the transition ends.
-
 The registry is READ by the stdlib-only ``keyword_only_guard`` (``tomllib``); writes happen only here,
 through ``pipelex.tools.misc.toml_utils`` (tomlkit) — never hand-rolled.
 """
@@ -29,16 +24,12 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     DefInfo,
     SubjectGrant,
     SubjectGrantRegistryError,
-    collect_all_def_infos,
     collect_def_infos_in_source,
     load_subject_grants,
     module_qname_for,
 )
 from pipelex.hub import get_console
 from pipelex.tools.misc.toml_utils import save_toml_to_path
-
-#: Placeholder rationale stamped on every seeded entry — replaced by a real one at review time.
-SEED_RATIONALE = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 
 
 def _fail(message: str) -> None:
@@ -53,10 +44,7 @@ def _write_registry(*, grants: dict[str, SubjectGrant], root: Path) -> None:
     data: dict[str, Any] = {"version": 1}
     for key in sorted(grants):
         grant = grants[key]
-        entry: dict[str, Any] = {"param": grant.param, "rationale": grant.rationale}
-        if grant.seeded:
-            entry["seeded"] = True
-        data[key] = entry
+        data[key] = {"param": grant.param, "rationale": grant.rationale}
     save_toml_to_path(data, path=root / SUBJECT_GRANTS_FILE)
 
 
@@ -100,20 +88,14 @@ def _validated_subject_param(*, func_key: str) -> str:
     return subject_names.pop()
 
 
-def subject_grant_cmd(*, func_key: str | None, rationale: str | None, seed: bool = False, quiet: bool = False) -> None:
-    """Record a subject grant in ``subject_grants.toml`` (or seed the registry with ``seed=True``).
+def subject_grant_cmd(*, func_key: str | None, rationale: str | None, quiet: bool = False) -> None:
+    """Record a subject grant in ``subject_grants.toml``.
 
     Args:
         func_key: The def to grant, keyed ``<relative_path>::<qualified_name>`` (the guard's key format).
         rationale: The on-the-record review decision — an honest, def-specific sentence.
-        seed: TRANSITIONAL — scan the tree and enter every existing ungranted positional subject as an
-            unreviewed ``seeded = true`` entry (placeholder rationale). Ignores ``func_key``/``rationale``.
         quiet: If True, keep the success output to a single line.
     """
-    if seed:
-        _run_seed(quiet=quiet)
-        return
-
     console = get_console()
     if not func_key:
         _fail('a FUNC key is required: subject-grant "<relative_path>::<qualified_name>" --rationale "…"')
@@ -129,60 +111,10 @@ def subject_grant_cmd(*, func_key: str | None, rationale: str | None, seed: bool
         _fail(str(exc))
         return  # unreachable
     previous = grants.get(func_key)
-    grants[func_key] = SubjectGrant(param=subject_param, rationale=rationale.strip(), seeded=False)
+    grants[func_key] = SubjectGrant(param=subject_param, rationale=rationale.strip())
     _write_registry(grants=grants, root=Path.cwd())
 
-    if previous is not None and previous.seeded:
-        action = "reviewed (seeded entry replaced)"
-    elif previous is not None:
-        action = "updated"
-    else:
-        action = "recorded"
+    action = "updated" if previous is not None else "recorded"
     console.print(f"[green]✓ subject-grant {action}[/green]: [cyan]{escape(func_key)}[/cyan] (param [bold]{escape(subject_param)}[/bold])")
     if not quiet:
         console.print(f"  [dim]rationale:[/dim] {escape(rationale.strip())}")
-
-
-def _run_seed(*, quiet: bool) -> None:
-    """Seed the registry: every existing ungranted positional subject enters as ``seeded = true``.
-
-    Idempotent and additive: existing entries (seeded or reviewed) are kept untouched; literal-typed
-    subjects are never seeded (they can never be granted — the sweep must fix the defs instead). When
-    same-qualname defs disagree on the subject name, the first one seen wins and the conflict is
-    reported — the guard will flag the others as mismatches until the overloads are aligned.
-    """
-    console = get_console()
-    root = Path.cwd()
-    grants: dict[str, SubjectGrant] = {}
-    if (root / SUBJECT_GRANTS_FILE).is_file():
-        try:
-            grants = load_subject_grants(root=root)
-        except SubjectGrantRegistryError as exc:
-            _fail(str(exc))
-            return  # unreachable
-
-    added = 0
-    literal_skipped = 0
-    conflicting_keys: list[str] = []
-    for def_info in collect_all_def_infos(SOURCE_ROOT):
-        if def_info.status.is_literal:
-            literal_skipped += 1
-            continue
-        if not def_info.status.is_grantable or def_info.subject_param is None:
-            continue
-        existing = grants.get(def_info.key)
-        if existing is not None:
-            if existing.param != def_info.subject_param:
-                conflicting_keys.append(def_info.key)
-            continue
-        grants[def_info.key] = SubjectGrant(param=def_info.subject_param, rationale=SEED_RATIONALE, seeded=True)
-        added += 1
-
-    _write_registry(grants=grants, root=root)
-    console.print(f"[green]✓ subject-grant --seed[/green]: {added} entry(ies) added, {len(grants)} total in {SUBJECT_GRANTS_FILE}")
-    if literal_skipped and not quiet:
-        console.print(f"  [yellow]{literal_skipped} literal-typed subject(s) NOT seeded[/yellow] — they can never be granted; fix the defs")
-    if conflicting_keys:
-        console.print("  [yellow]same-qualname defs disagree on the subject name for:[/yellow]")
-        for key in sorted(set(conflicting_keys)):
-            console.print(f"    [dim]{escape(key)}[/dim]")

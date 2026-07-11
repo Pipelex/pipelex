@@ -12,9 +12,9 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
 )
 
 
-def _grant(key: str, *, param: str, seeded: bool = False) -> dict[str, SubjectGrant]:
+def _grant(key: str, *, param: str) -> dict[str, SubjectGrant]:
     """A one-entry grants mapping for an inline snippet."""
-    return {key: SubjectGrant(param=param, rationale="test grant", seeded=seeded)}
+    return {key: SubjectGrant(param=param, rationale="test grant")}
 
 
 def _violate(
@@ -123,17 +123,6 @@ class TestCheckKeywordOnly:
         assert _kinds(violations) == {ViolationKind.GRANT_PARAM_MISMATCH}
         assert "node" in violations[0].detail
         assert "new_name" in violations[0].detail
-
-    def test_seeded_grant_accepted_transitionally(self) -> None:
-        """A `seeded = true` entry counts as a grant during the transition (Phases 2-4)."""
-        violations = _violate(
-            """
-            def render(node):
-                ...
-            """,
-            grants=_grant("pipelex/sample/module.py::render", param="node", seeded=True),
-        )
-        assert violations == []
 
     def test_missing_star_dominates_subject_rules(self) -> None:
         """A def with a second positional param reports missing-star, even when its subject is granted."""

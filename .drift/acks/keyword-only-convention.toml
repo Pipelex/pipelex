@@ -1,8 +1,8 @@
 contract = "keyword-only-convention"
-digest = "sha256:48c2f401467eba57d851be970a6f0bb432d82b15a848321b68365a807e56a3d9"
+digest = "sha256:2d2a8228601e1fa98d483b5c1d162ddcb8037ac02391d1c0409f8bd48d203571"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-10T18:35:31Z"
-rationale = "Guard gained the subject-grant registry (ungranted/literal/stale-grant violation kinds, tomllib registry read, DefInfo surface): rewrote docs/contribute/keyword-only-arguments.md accordingly — Exception 1 is now granted subjects with the rubric, literal-subject ban, symmetric staleness, transitional seeding, and the reversal recorded honestly."
+reviewed_at = "2026-07-11T15:45:25Z"
+rationale = "Phase 5 closed the transitional door: --seed and the seeded field are deleted, the registry schema is strict (param + rationale only). Rewrote the doc's transitional-state section as the post-transitional Registry schema section and fixed the --report description."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:b2b10778c88f7efe6e78e805461657b7653cc9ab"
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c998cfc324c7f1096e974133b75db59c6190c117"

@@ -190,12 +190,10 @@ class SubjectGrant(NamedTuple):
     Attributes:
         param: The subject parameter's name — must keep matching the def's first non-``self``/``cls`` param.
         rationale: The on-the-record review decision (an honest, def-specific sentence).
-        seeded: Transitional marker for pre-registry entries awaiting genuine review (Phases 2-4 only).
     """
 
     param: str
     rationale: str
-    seeded: bool = False
 
 
 class SubjectGrantRegistryError(Exception):
@@ -241,7 +239,7 @@ class SubjectStatus(StrEnum):
 
 
 class DefInfo(NamedTuple):
-    """Subject-rule facts about one inspected def — feeds grant freshness, seeding, and the grant command.
+    """Subject-rule facts about one inspected def — feeds grant freshness and the grant command.
 
     Attributes:
         key: Stable identity key, ``<relative_path>::<qualified_name>`` (same format as ``Violation.key``).
@@ -256,8 +254,8 @@ class DefInfo(NamedTuple):
     subject_param: str | None
 
 
-#: The complete set of keys a registry entry may carry (``seeded`` is transitional — Phases 2-4 only).
-_GRANT_ALLOWED_KEYS = frozenset({"param", "rationale", "seeded"})
+#: The complete set of keys a registry entry may carry — anything else fails the check.
+_GRANT_ALLOWED_KEYS = frozenset({"param", "rationale"})
 
 
 def load_subject_grants(*, root: Path | None = None) -> dict[str, SubjectGrant]:
@@ -302,17 +300,13 @@ def load_subject_grants(*, root: Path | None = None) -> dict[str, SubjectGrant]:
             raise SubjectGrantRegistryError(msg)
         param = entry.get("param")
         rationale = entry.get("rationale")
-        seeded = entry.get("seeded", False)
         if not isinstance(param, str) or not param:
             msg = f"Subject-grants registry entry '{key}' must record a non-empty string `param`"
             raise SubjectGrantRegistryError(msg)
         if not isinstance(rationale, str) or not rationale.strip():
             msg = f"Subject-grants registry entry '{key}' must record a non-empty `rationale`"
             raise SubjectGrantRegistryError(msg)
-        if not isinstance(seeded, bool):
-            msg = f"Subject-grants registry entry '{key}': `seeded` must be a boolean"
-            raise SubjectGrantRegistryError(msg)
-        grants[key] = SubjectGrant(param=param, rationale=rationale, seeded=seeded)
+        grants[key] = SubjectGrant(param=param, rationale=rationale)
     return grants
 
 
@@ -702,7 +696,7 @@ def find_violations_in_source(source: str, *, module_qname: str, relative_path: 
 
 
 def collect_def_infos_in_source(source: str, *, module_qname: str, relative_path: str) -> list[DefInfo]:
-    """Collect the per-def subject facts for a single source string (feeds the grant command and seeding).
+    """Collect the per-def subject facts for a single source string (feeds the grant command).
 
     Args:
         source: The Python source text to scan.
@@ -841,15 +835,6 @@ def collect_all_violations(root: Path, *, grants: Mapping[str, SubjectGrant]) ->
                 live_subject_keys.add(def_info.key)
     violations.extend(find_dead_grants(grants=grants, live_subject_keys=live_subject_keys))
     return sorted(violations, key=lambda violation: violation.key)
-
-
-def collect_all_def_infos(root: Path) -> list[DefInfo]:
-    """Collect the per-def subject facts for every source file under ``root`` (feeds seeding and reports)."""
-    def_infos: list[DefInfo] = []
-    for path in iter_source_files(root):
-        source = path.read_text(encoding="utf-8")
-        def_infos.extend(collect_def_infos_in_source(source, module_qname=module_qname_for(path), relative_path=path.as_posix()))
-    return def_infos
 
 
 def fix_all_violations(root: Path, *, grants: Mapping[str, SubjectGrant]) -> tuple[list[Violation], list[Violation]]:

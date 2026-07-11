@@ -296,15 +296,11 @@ def subject_grant_command(
         str | None,
         typer.Option("--rationale", help="The on-the-record review decision — an honest, def-specific sentence"),
     ] = None,
-    seed: Annotated[
-        bool,
-        typer.Option("--seed", help="TRANSITIONAL: seed every existing ungranted positional subject as an unreviewed entry"),
-    ] = False,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
 ) -> None:
     """Record a subject grant — the explicit permission for a def's positional subject parameter."""
     try:
-        subject_grant_cmd(func_key=func_key, rationale=rationale, seed=seed, quiet=quiet)
+        subject_grant_cmd(func_key=func_key, rationale=rationale, quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

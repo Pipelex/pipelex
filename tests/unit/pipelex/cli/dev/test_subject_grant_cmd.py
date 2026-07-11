@@ -1,4 +1,4 @@
-"""Unit tests for the `pipelex-dev subject-grant` command: refusals, sorted writes, and the transitional seed."""
+"""Unit tests for the `pipelex-dev subject-grant` command: refusals and sorted writes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from rich.console import Console
 
-from pipelex.cli.dev_cli.commands.subject_grant_cmd import SEED_RATIONALE, subject_grant_cmd
+from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -77,16 +77,16 @@ class TestSubjectGrantCmd:
         assert data["pipelex/sample/module.py::render"] == {"param": "node", "rationale": "Verb-object; single operand."}
         assert data["pipelex/sample/module.py::build"] == {"param": "spec", "rationale": "Verb-object; builds the spec."}
 
-    def test_grant_replaces_seeded_entry(self, repo: Path) -> None:
-        """Re-granting a seeded entry is the review act: the placeholder and the seeded flag are dropped."""
+    def test_grant_updates_existing_entry(self, repo: Path) -> None:
+        """Re-granting an existing entry replaces its rationale and reports the update."""
         (repo / "subject_grants.toml").write_text(
-            f'version = 1\n\n["pipelex/sample/module.py::render"]\nparam = "node"\nrationale = "{SEED_RATIONALE}"\nseeded = true\n',
+            'version = 1\n\n["pipelex/sample/module.py::render"]\nparam = "node"\nrationale = "Old rationale."\n',
             encoding="utf-8",
         )
         subject_grant_cmd(func_key="pipelex/sample/module.py::render", rationale="Reviewed for real.", quiet=True)
         data = _read_registry(repo)
         assert data["pipelex/sample/module.py::render"] == {"param": "node", "rationale": "Reviewed for real."}
-        assert "reviewed (seeded entry replaced)" in self.console.export_text()
+        assert "subject-grant updated" in self.console.export_text()
 
     def test_refuses_empty_rationale(self, repo: Path) -> None:
         with pytest.raises(SystemExit) as exc_info:
@@ -132,32 +132,13 @@ class TestSubjectGrantCmd:
         assert exc_info.value.code == 1
         assert "disagree" in self.console.export_text()
 
-    def test_seed_enters_every_ungranted_subject(self, repo: Path) -> None:
-        """The transitional seed: grantable subjects enter as seeded=true; literal subjects are never seeded."""
-        subject_grant_cmd(func_key=None, rationale=None, seed=True, quiet=True)
-        data = _read_registry(repo)
-        assert data["pipelex/sample/module.py::render"] == {"param": "node", "rationale": SEED_RATIONALE, "seeded": True}
-        assert data["pipelex/sample/module.py::build"] == {"param": "spec", "rationale": SEED_RATIONALE, "seeded": True}
-        assert data["pipelex/sample/overloads.py::parse"]["seeded"] is True
-        assert "pipelex/sample/module.py::do_doctor_cmd" not in data  # literal — can never be granted
-        assert "pipelex/sample/module.py::all_keyword" not in data  # no positional subject
-        assert "pipelex/sample/module.py::__dunder_like__" not in data  # exempt
-
-    def test_seed_reports_disagreeing_overloads_and_first_seen_wins(self, repo: Path) -> None:
-        """Same-qualname defs disagreeing on the subject name: first one seen is seeded, the conflict is surfaced."""
-        subject_grant_cmd(func_key=None, rationale=None, seed=True, quiet=True)
-        data = _read_registry(repo)
-        assert data["pipelex/sample/overloads.py::parse"]["param"] == "spec"  # source order: parse(spec) precedes parse(data)
-        output = self.console.export_text()
-        assert "disagree" in output
-        assert "pipelex/sample/overloads.py::parse" in output
-
-    def test_seed_is_idempotent_and_keeps_reviewed_entries(self, repo: Path) -> None:
-        """A second seed adds nothing, and a reviewed (non-seeded) entry is never overwritten by seeding."""
-        subject_grant_cmd(func_key="pipelex/sample/module.py::render", rationale="Reviewed for real.", quiet=True)
-        subject_grant_cmd(func_key=None, rationale=None, seed=True, quiet=True)
-        first = _read_registry(repo)
-        subject_grant_cmd(func_key=None, rationale=None, seed=True, quiet=True)
-        second = _read_registry(repo)
-        assert first == second
-        assert second["pipelex/sample/module.py::render"] == {"param": "node", "rationale": "Reviewed for real."}
+    def test_refuses_unknown_registry_key(self, repo: Path) -> None:
+        """The tightened schema: a registry entry carrying any key beyond param/rationale fails the load."""
+        (repo / "subject_grants.toml").write_text(
+            'version = 1\n\n["pipelex/sample/module.py::render"]\nparam = "node"\nrationale = "ok"\nseeded = true\n',
+            encoding="utf-8",
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            subject_grant_cmd(func_key="pipelex/sample/module.py::build", rationale="Verb-object; builds the spec.")
+        assert exc_info.value.code == 1
+        assert "unknown key" in self.console.export_text()

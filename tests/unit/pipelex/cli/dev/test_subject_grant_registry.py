@@ -23,8 +23,7 @@ rationale = "Verb-object; single operand."
 
 ["pipelex/sample/module.py::Builder.build"]
 param = "spec"
-rationale = "SEEDED - review pending"
-seeded = true
+rationale = "Factory from source: builds from the spec."
 """
 
 
@@ -34,12 +33,12 @@ def _write_registry(root: Path, *, content: str) -> None:
 
 class TestSubjectGrantRegistry:
     def test_valid_registry_loads(self, tmp_path: Path) -> None:
-        """A well-formed registry round-trips into typed grants, seeded flag included."""
+        """A well-formed registry round-trips into typed grants."""
         _write_registry(tmp_path, content=_VALID_REGISTRY)
         grants = load_subject_grants(root=tmp_path)
         assert grants == {
-            "pipelex/sample/module.py::render": SubjectGrant(param="node", rationale="Verb-object; single operand.", seeded=False),
-            "pipelex/sample/module.py::Builder.build": SubjectGrant(param="spec", rationale="SEEDED - review pending", seeded=True),
+            "pipelex/sample/module.py::render": SubjectGrant(param="node", rationale="Verb-object; single operand."),
+            "pipelex/sample/module.py::Builder.build": SubjectGrant(param="spec", rationale="Factory from source: builds from the spec."),
         }
 
     def test_missing_registry_is_an_explicit_error(self, tmp_path: Path) -> None:
@@ -83,9 +82,10 @@ class TestSubjectGrantRegistry:
         with pytest.raises(SubjectGrantRegistryError, match="non-empty `rationale`"):
             load_subject_grants(root=tmp_path)
 
-    def test_non_boolean_seeded_raises(self, tmp_path: Path) -> None:
-        _write_registry(tmp_path, content='version = 1\n["pipelex/a.py::f"]\nparam = "x"\nrationale = "y"\nseeded = "yes"\n')
-        with pytest.raises(SubjectGrantRegistryError, match="`seeded` must be a boolean"):
+    def test_transitional_seeded_key_rejected(self, tmp_path: Path) -> None:
+        """The transitional `seeded` field is gone from the schema — any surviving entry fails the load."""
+        _write_registry(tmp_path, content='version = 1\n["pipelex/a.py::f"]\nparam = "x"\nrationale = "y"\nseeded = true\n')
+        with pytest.raises(SubjectGrantRegistryError, match="unknown key"):
             load_subject_grants(root=tmp_path)
 
     def test_dead_grant_for_deleted_def_flagged(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
