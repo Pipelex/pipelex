@@ -57,18 +57,34 @@ def _rich_crate() -> LibraryCrate:
 
 
 def _run_strict_pyright(*, directory: Path) -> tuple[int, str]:
-    """Run strict pyright over `directory` using the test venv, returning (error_count, raw_json)."""
+    """Run strict pyright over `directory` using the test venv, returning (error_count, raw_json).
+
+    Pyright is a node subprocess whose piped stdout has been observed truncated under a fully
+    loaded CI run, so an unparseable report gets one bounded retry; if it happens again, fail
+    with the raw process output so the recurrence is diagnosable.
+    """
     (directory / "pyrightconfig.json").write_text(json.dumps({"typeCheckingMode": "strict", "reportMissingModuleSource": False}), encoding="utf-8")
     pyright = Path(sys.executable).parent / "pyright"
-    completed = subprocess.run(  # noqa: S603 -- fixed, trusted argv (the venv's pyright over a tmp dir)
-        [str(pyright), "--pythonpath", sys.executable, "--project", str(directory), "--outputjson"],
-        capture_output=True,
-        text=True,
-        timeout=180,
-        check=False,
-    )
-    report = json.loads(completed.stdout)
-    return report["summary"]["errorCount"], completed.stdout
+    failures: list[str] = []
+    for attempt_index in range(2):
+        completed = subprocess.run(  # noqa: S603 -- fixed, trusted argv (the venv's pyright over a tmp dir)
+            [str(pyright), "--pythonpath", sys.executable, "--project", str(directory), "--outputjson"],
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+        try:
+            report = json.loads(completed.stdout)
+        except json.JSONDecodeError as decode_error:
+            failures.append(
+                f"attempt {attempt_index + 1}: pyright stdout was not parseable JSON ({decode_error}); "
+                f"returncode={completed.returncode}\nstdout: {completed.stdout!r}\nstderr: {completed.stderr!r}"
+            )
+            continue
+        return report["summary"]["errorCount"], completed.stdout
+    msg = "pyright did not produce a parseable JSON report:\n" + "\n".join(failures)
+    pytest.fail(msg)
 
 
 class TestEmittedPythonTypechecks:
