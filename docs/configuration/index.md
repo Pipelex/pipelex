@@ -22,6 +22,7 @@ pipelex init config --local  # creates the project config at {project_root}/.pip
     1. By default `pipelex init config` targets the **global** `~/.pipelex/` directory; pass `--local` to create the project-level `.pipelex/` instead.
     2. `pipelex init config` creates a **template** configuration file with sample settings. It does not include all possible configuration options - it's meant as a starting point.
     3. Running `pipelex init config` will **overwrite** your existing `pipelex.toml` file without warning. Make sure to backup your configuration before running this command.
+    4. Credentials (`~/.pipelex/.env`) and the Gateway service-agreement file always remain in the global `~/.pipelex/` directory regardless of `--local` — only config, inference, and telemetry files are written to the project `.pipelex/`.
 
 For a complete list of all possible configuration options, refer to the configuration group documentation below.
 
