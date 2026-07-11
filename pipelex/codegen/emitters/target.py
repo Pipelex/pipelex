@@ -23,8 +23,10 @@ class CodegenKind(StrEnum):
 
 
 class CodegenTarget(StrEnum):
-    """A codegen target flavor. `python-structures` is a Pipelex-runtime extension (StructuredContent
-    classes); `python-pydantic` and `ts-zod` are protocol-capability type projections (neutral shapes).
+    """A codegen target flavor. All targets are Pipelex projections — the MTHDS standard specifies no
+    type projection (see `docs/specs/pipelex-codegen.md` → "Ownership"). They differ in audience:
+    `ts-zod` and `python-pydantic` emit idiom-neutral types any consumer can use; `python-structures`
+    emits StructuredContent classes for a Pipelex runtime host.
     """
 
     PYTHON_STRUCTURES = "python-structures"
