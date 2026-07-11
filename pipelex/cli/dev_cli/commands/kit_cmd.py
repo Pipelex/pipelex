@@ -89,8 +89,8 @@ def _sync_agent_rules(
 
 
 def _cleanup_other_targets(
-    repo_root: Path,
     *,
+    repo_root: Path,
     kit_index: KitIndex,
     preferred_targets: list[AgentTarget],
 ) -> None:

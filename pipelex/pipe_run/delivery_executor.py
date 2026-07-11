@@ -106,7 +106,7 @@ class DeliveryExecutor:
                 data=clean_json_dumps(pipe_output.working_memory_raw, indent=2).encode("utf-8"),
                 content_type="application/json",
             )
-            raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
+            raw_main_stuff = self._get_raw_main_stuff_dict(working_memory_raw=pipe_output.working_memory_raw)
             if raw_main_stuff is None:
                 main_absence = self._get_raw_main_absence(working_memory_raw=pipe_output.working_memory_raw)
                 if main_absence is None:
@@ -140,7 +140,7 @@ class DeliveryExecutor:
         return files
 
     @classmethod
-    def _get_raw_main_stuff_dict(cls, working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
+    def _get_raw_main_stuff_dict(cls, *, working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
         """Extract the main stuff dict from a raw working_memory, following aliases."""
         root: dict[str, Any] = working_memory_raw.get("root", {})
         aliases: dict[str, str] = working_memory_raw.get("aliases", {})

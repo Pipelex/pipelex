@@ -450,7 +450,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-    ):
+    ) -> InputPresenceScan:
         # A PipeSignature has no implementation: reject live execution before the input
         # checks below, so callers get the actionable error, not a misleading "missing inputs".
         if self.is_signature and pipe_run_params.run_mode.is_live:

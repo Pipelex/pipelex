@@ -27,4 +27,17 @@ Judgment calls worth spot-checking: the record-vs-registry discriminator — ext
 
 ## Gates
 
-Each wave: `make agent-check` green. Full `make agent-test` green after wave B and after wave C (both waves demote framework-adjacent protocol members). `--report`: seeded remaining 0; grants total 1,746.
+Each wave: `make agent-check` green. Full `make agent-test` green after wave B and after wave C (both waves demote framework-adjacent protocol members). `--report`: seeded remaining 0.
+
+## Checkpoint review (Phase M step 6) — 3-agent fan-out over the merge+grind range
+
+Three fresh no-context Sonnet agents reviewed the `d58cd847b..` grind commits, same shape as checkpoint 3. Findings and triage:
+
+- **Code-correctness** — one real defect: `PipeAbstract.validate_before_run` had lost its `-> InputPresenceScan` return annotation in the wave-B splice (the archive grind itself had dropped it, and the byte-for-byte splice faithfully copied the loss). Restored. Everything else clean: no positional call-site breakage, protocol/implementer pairs in lockstep, no framework callbacks wrongly keyword-only'd.
+- **Mechanical-rewrite-safety** — independent AST audit over all demoted defs: zero parameter/default/decorator/docstring losses, zero missed call sites across the tree, registry consistent with the demoted set. Its only confirmed finding was the same annotation loss.
+- **Grant-judgment** — audited rationale quality and same-file consistency (including a mechanical sibling-diff sweep). Verdict: regrind well-applied; case-law families (console-first, key+payload, lookup-container, entity-keyed getters vs payload setters, positional-Callable protocols, two-candidate demotes) all held up on inspection. Three high-confidence inconsistencies, all triaged as real misses and **demoted** (def + call sites + registry entry removed):
+  - `DeliveryExecutor._get_raw_main_stuff_dict(working_memory_raw)` — structurally identical to its sibling `_get_raw_main_absence` (demoted): a keyed-container lookup, the record's own stated DEMOTE discriminator.
+  - `check_keyword_only_cmd.py::_print_violation_lines(violations)` — three same-shape siblings in the same file (`_print_failure_panel`, `_print_failure_quiet`, `_print_violations_by_kind`) were all demoted; "when in doubt → keyword-only" settles the 3-of-4 split.
+  - `kit_cmd.py::_cleanup_other_targets(repo_root)` — `repo_root` is a scope param, not the verb's object (the objects are the keyword params); the lone call site already passed it by keyword.
+
+Post-triage: `make agent-check` green; delivery-executor tests green. Grants total 1,743.

@@ -181,7 +181,7 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
             f"[green]✓ Auto-fixed {len(fixed)} keyword-only violation(s)[/green] "
             "(inserted a bare `*` after self/cls so every other parameter is keyword-only):"
         )
-        _print_violation_lines(fixed)
+        _print_violation_lines(violations=fixed)
         console.print(
             "[dim]Verify with `make agent-test` — the guard can't see framework-positional callers, "
             "so a wrongly keyword-only'd call site only fails at runtime. If a fixed def deserved its "
@@ -194,7 +194,7 @@ def _run_fix(*, quiet: bool, grants: dict[str, SubjectGrant]) -> None:
             f"[red]✗ {len(unfixable)} violation(s) need a manual fix[/red] "
             "(e.g. `*args` present, an existing keyword-only section, two+ positional-only params, or a stale grant):"
         )
-        _print_violation_lines(unfixable)
+        _print_violation_lines(violations=unfixable)
         console.print(
             "[dim]Fix each by hand (its remedy is shown by `make check-keyword-only`), or add `# kw-only: ignore` "
             "on the def line if justified — `make check-keyword-only` (and CI) will fail until then. "
@@ -259,11 +259,11 @@ def _print_violations_by_kind(*, violations: list[Violation]) -> None:
         kind_violations = grouped[kind_value]
         kind = kind_violations[0].kind
         console.print(f"[bold]{escape(kind_value)}[/bold] ({len(kind_violations)}) — [dim]{escape(kind.remedy)}[/dim]")
-        _print_violation_lines(kind_violations)
+        _print_violation_lines(violations=kind_violations)
     console.print("[dim]See docs/contribute/keyword-only-arguments.md[/dim]")
 
 
-def _print_violation_lines(violations: list[Violation]) -> None:
+def _print_violation_lines(*, violations: list[Violation]) -> None:
     """Print one ``file:line  qualified_name`` row per violation."""
     console = get_console()
     for violation in violations:

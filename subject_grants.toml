@@ -468,10 +468,6 @@ rationale = "Verb–object: derives the report-grouping package of the key/path;
 param = "violations"
 rationale = "Verb–object: prints the inventory report of these violations; options are keyword-only."
 
-["pipelex/cli/dev_cli/commands/check_keyword_only_cmd.py::_print_violation_lines"]
-param = "violations"
-rationale = "Verb–object: prints one line per violation; single operand."
-
 ["pipelex/cli/dev_cli/commands/check_urls_cmd.py::check_all_urls_async"]
 param = "url_pairs"
 rationale = "Verb–object: checks the url_pairs; single operand."
@@ -731,10 +727,6 @@ rationale = "Guard/CLI helper: operates on the path; single operand."
 ["pipelex/cli/dev_cli/commands/keyword_only_guard.py::relative_source_path"]
 param = "path"
 rationale = "Guard/CLI helper: operates on the path; single operand."
-
-["pipelex/cli/dev_cli/commands/kit_cmd.py::_cleanup_other_targets"]
-param = "repo_root"
-rationale = "Cleans up stale kit targets in the repo root; single operand."
 
 ["pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py::_display_summary"]
 param = "availability"
@@ -4315,10 +4307,6 @@ rationale = "Verb-object: renders files from the main stuff; options stay keywor
 ["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._generate_main_stuff_files_from_raw"]
 param = "raw_main_stuff"
 rationale = "Verb-object: renders files from the raw main stuff; options stay keyword."
-
-["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._get_raw_main_stuff_dict"]
-param = "working_memory_raw"
-rationale = "Derivation from the raw working memory; single operand."
 
 ["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._store_results"]
 param = "pipe_output"
