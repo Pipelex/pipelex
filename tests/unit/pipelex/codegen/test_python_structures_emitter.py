@@ -1,3 +1,4 @@
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +31,14 @@ class TestPythonStructuresEmitter:
         report: Any = report_cls(score={"value": 2.0}, label={"text": "hi"}, status="draft")
         assert report.score.value == 2.0
         assert type(report.label).__name__ == "TextContent"
+
+    def test_temporal_defaults_generate_importable_structures(self, temporal_defaults_crate: LibraryCrate, tmp_path: Path):
+        content = emit_python_structures(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_structures_temporal_defaults")
+        event: Any = module.Event()
+        assert event.starts_on == date(2026, 7, 11)
+        assert event.recorded_at == datetime(2026, 7, 11, 9, 30)
+        assert event.starts_at == time(9, 30)
 
     def test_native_concept_is_not_re_emitted(self, pipeline_crate: LibraryCrate):
         content = emit_python_structures(resolve_concepts_from_crate(pipeline_crate))[0].content

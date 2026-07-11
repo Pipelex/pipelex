@@ -25,6 +25,7 @@ from pipelex.codegen.emitters.naming import ts_type_name
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
+from pipelex.tools.misc.json_utils import clean_json_dumps
 
 _FILENAME = "types.ts"
 _BINDER_FILENAME = "binder.ts"
@@ -85,7 +86,7 @@ def _render_field(concept_field: ResolvedField, *, by_ref: dict[str, ResolvedCon
     doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
     expr = _zod_type(concept_field.resolved_type, by_ref=by_ref)
     if concept_field.default_value is not None:
-        expr = f"{expr}.default({json.dumps(concept_field.default_value)})"
+        expr = f"{expr}.default({clean_json_dumps(concept_field.default_value)})"
     elif not concept_field.required:
         expr = f"{expr}.optional()"
     return f"{doc}  {key}: {expr},"

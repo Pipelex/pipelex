@@ -42,6 +42,12 @@ class TestTsZodEmitter:
         assert "score: z.lazy(() => ScoreSchema).optional()" in content
         assert 'status: z.enum(["draft", "final"]).default("draft")' in content
 
+    def test_temporal_defaults_emit_iso_wire_strings(self, temporal_defaults_crate: LibraryCrate):
+        content = emit_ts_zod(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
+        assert 'starts_on: z.string().default("2026-07-11")' in content
+        assert 'recorded_at: z.string().default("2026-07-11T09:30:00")' in content
+        assert 'starts_at: z.string().default("09:30:00")' in content
+
     def test_field_keys_are_wire_native_snake_case(self, edge_crate: LibraryCrate):
         # Keys are the crate's snake_case field names verbatim (D10) — the schema validates the wire
         # directly, with no camelCase remapping layer that could corrupt nested record/opaque data.

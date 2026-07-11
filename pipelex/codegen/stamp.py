@@ -147,6 +147,8 @@ def parse_stamped(text: str, *, comment_prefix: str) -> ParsedStamp | None:
 
     options_raw = fields.get("options", "{}")
     options = _parse_options(options_raw)
+    if options is None:
+        return None
     stamp = CodegenStamp(
         crate_fingerprint=fields.get("crate_fingerprint", ""),
         engine_version=fields.get("engine_version", ""),
@@ -194,9 +196,12 @@ def _target_from_value(value: str) -> CodegenTarget | None:
     return next((member for member in CodegenTarget if member == value), None)
 
 
-def _parse_options(options_raw: str) -> dict[str, str]:
-    loaded = json.loads(options_raw)
+def _parse_options(options_raw: str) -> dict[str, str] | None:
+    try:
+        loaded = json.loads(options_raw)
+    except json.JSONDecodeError:
+        return None
     if not isinstance(loaded, dict):
-        return {}
+        return None
     typed = cast("dict[str, object]", loaded)
     return {str(key): str(value) for key, value in typed.items()}

@@ -60,6 +60,13 @@ class TestCheck:
         report = run_codegen_check(root=tmp_path)
         assert any(d.path == "models.py" and d.category == DriftCategory.HAND_EDITED for d in report.drifts)
 
+    def test_malformed_stamp_options_are_hand_edited_drift(self, tmp_path: Path) -> None:
+        self._generate(tmp_path)
+        target = tmp_path / "models.py"
+        target.write_text(target.read_text(encoding="utf-8").replace("# options: {}", "# options: {bad"), encoding="utf-8")
+        report = run_codegen_check(root=tmp_path)
+        assert any(d.path == "models.py" and d.category == DriftCategory.HAND_EDITED for d in report.drifts)
+
     def test_stale_stamped_file_not_in_lock_is_orphan(self, tmp_path: Path) -> None:
         self._generate(tmp_path)
         # Copy a stamped file under a new name: it carries a stamp but the lock does not track it.

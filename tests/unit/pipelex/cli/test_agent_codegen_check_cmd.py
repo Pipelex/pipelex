@@ -84,3 +84,4 @@ class TestAgentCodegenCheckCmd:
         error = json.loads(capsys.readouterr().err)
         assert error["error_type"] == "CodegenLockError"
         assert "not valid TOML" in error["message"]
+        assert "remove it, then regenerate" in error["hint"]

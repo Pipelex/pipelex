@@ -153,7 +153,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
         "Check 'drifts' in this error response for the drifting artifacts and their categories."
     ),
     "CodegenLockNotFoundError": "Pass the directory that holds codegen.lock, or generate first with 'pipelex-agent codegen types'",
-    "CodegenLockError": "The codegen.lock file is unreadable or malformed — regenerate with 'pipelex-agent codegen types'",
+    "CodegenLockError": ("The codegen.lock file is unreadable or malformed — remove it, then regenerate with 'pipelex-agent codegen types'"),
     # Unknown command
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }

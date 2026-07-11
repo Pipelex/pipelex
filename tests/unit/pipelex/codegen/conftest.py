@@ -1,5 +1,6 @@
 import importlib.util
 import sys
+from datetime import date, datetime, time
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +39,33 @@ def pipeline_crate() -> LibraryCrate:
             "pipeline.Summary": ConceptBlueprint(description="A short summary of a report", refines="Text"),
         },
         domains={"pipeline": DomainBlueprint(code="pipeline", description="Pipeline domain")},
+    )
+    return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
+
+
+@pytest.fixture
+def temporal_defaults_crate() -> LibraryCrate:
+    """A normalized crate carrying valid date, datetime, and time defaults."""
+    authored = LibraryCrate(
+        concepts={
+            "schedule.Event": ConceptBlueprint(
+                description="A scheduled event",
+                structure={
+                    "starts_on": ConceptStructureBlueprint(
+                        description="Start date", type=ConceptStructureBlueprintFieldType.DATE, default_value=date(2026, 7, 11)
+                    ),
+                    "recorded_at": ConceptStructureBlueprint(
+                        description="Recorded timestamp",
+                        type=ConceptStructureBlueprintFieldType.DATETIME,
+                        default_value=datetime(2026, 7, 11, 9, 30),
+                    ),
+                    "starts_at": ConceptStructureBlueprint(
+                        description="Start time", type=ConceptStructureBlueprintFieldType.TIME, default_value=time(9, 30)
+                    ),
+                },
+            ),
+        },
+        domains={"schedule": DomainBlueprint(code="schedule", description="Schedule domain")},
     )
     return normalize_crate(authored, mthds_version=CRATE_TEST_VERSION)
 

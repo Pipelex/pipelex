@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import cast
 
 import pytest
@@ -466,6 +466,22 @@ class TypeMappingTest(StructuredContent):
 
         assert "datetime.datetime(" not in result
         assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
+
+    def test_time_field_with_default_round_trips(self):
+        """A `type = "time"` default evaluates through the same bare-class import as its annotation."""
+        time_default = time(9, 30, 15)
+        structure_blueprint = {
+            "starts_at": ConceptStructureBlueprint(
+                description="Start time", type=ConceptStructureBlueprintFieldType.TIME, default_value=time_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.time(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["starts_at"].default == time_default
 
     def test_list_of_date_field_maps_to_list_of_calendar_date(self):
         """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""

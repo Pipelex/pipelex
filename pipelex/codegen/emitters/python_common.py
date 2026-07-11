@@ -7,7 +7,7 @@ container spelling (`typing.List`/`Optional` for the runtime idiom vs. builtin g
 for plain pydantic) and the concept spelling (runtime content classes vs. generated models) differ.
 """
 
-from datetime import date, datetime
+from datetime import date, datetime, time
 from typing import Any, cast
 
 from pipelex.codegen.resolved_concepts import ResolvedConcept
@@ -58,6 +58,8 @@ def format_default_value(value: Any) -> str:
         return f'datetime.fromisoformat("{value.isoformat()}")'
     if isinstance(value, date):
         return f'date.fromisoformat("{value.isoformat()}")'
+    if isinstance(value, time):
+        return f'time.fromisoformat("{value.isoformat()}")'
     if isinstance(value, list):
         items = cast("list[Any]", value)
         return f"[{', '.join(format_default_value(item) for item in items)}]"

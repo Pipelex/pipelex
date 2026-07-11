@@ -1,3 +1,4 @@
+from datetime import date, datetime, time
 from pathlib import Path
 
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
@@ -29,6 +30,14 @@ class TestPythonPydanticEmitter:
         report = module.Report(score={"value": 4.0}, label={"text": "x"})
         assert report.score.value == 4.0
         assert report.status == "draft"
+
+    def test_temporal_defaults_generate_importable_models(self, temporal_defaults_crate: LibraryCrate, tmp_path: Path):
+        content = emit_python_pydantic(resolve_concepts_from_crate(temporal_defaults_crate))[0].content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_models_temporal_defaults")
+        event = module.Event()
+        assert event.starts_on == date(2026, 7, 11)
+        assert event.recorded_at == datetime(2026, 7, 11, 9, 30)
+        assert event.starts_at == time(9, 30)
 
     def test_serialize_parse_round_trip(self, pipeline_crate: LibraryCrate, tmp_path: Path):
         """The generated pydantic helpers round-trip: model_dump (serialize) then model_validate (parse)

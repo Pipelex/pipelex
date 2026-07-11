@@ -187,6 +187,8 @@ class StructureGenerator:
             return f'datetime.fromisoformat("{value.isoformat()}")'
         if isinstance(value, date):
             return f'date.fromisoformat("{value.isoformat()}")'
+        if isinstance(value, time):
+            return f'time.fromisoformat("{value.isoformat()}")'
         if isinstance(value, list):
             value_list = cast("list[Any]", value)
             formatted_items = [self._format_default_value(item) for item in value_list]
