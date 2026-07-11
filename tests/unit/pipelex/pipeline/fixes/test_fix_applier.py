@@ -35,16 +35,16 @@ class TestFixApplier:
     def test_set_key_matches_golden_bytes(self) -> None:
         """Applying the set_key op then formatting yields output byte-equal to the golden file."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
-        applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_set_output_op()])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert serialize_and_format(toml_doc) == _GOLDEN_PATH.read_text(encoding="utf-8")
 
     def test_apply_twice_is_idempotent(self) -> None:
         """Applying the same op twice yields the same bytes as applying it once."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
-        apply_fix_ops(toml_doc, ops=[_set_output_op()])
+        apply_fix_ops(toml_doc=toml_doc, ops=[_set_output_op()])
         once = _dumps(toml_doc)
-        applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_set_output_op()])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         assert _dumps(toml_doc) == once
 
@@ -52,7 +52,7 @@ class TestFixApplier:
         """An op targeting a table absent from the DOM (e.g. a synthetic pipe) is skipped and reported."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         source_bytes = _dumps(toml_doc)
-        applications = apply_fix_ops(toml_doc, ops=[_set_output_op(pipe_code="synthetic_pipe_not_in_file")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_set_output_op(pipe_code="synthetic_pipe_not_in_file")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert applications[0].detail is not None
         assert "pipe" in applications[0].detail
@@ -62,7 +62,7 @@ class TestFixApplier:
         """delete_key removes exactly the addressed key; everything else survives byte-for-byte."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         delete_op = FixOp(kind=FixOpKind.DELETE_KEY, table_path=["pipe", "gen_ideas"], key="prompt")
-        applications = apply_fix_ops(toml_doc, ops=[delete_op])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)
         assert "Generate ideas about $topic" not in dumped
@@ -73,7 +73,7 @@ class TestFixApplier:
         """delete_key on an absent key is skipped and reported, not raised."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         delete_op = FixOp(kind=FixOpKind.DELETE_KEY, table_path=["pipe", "gen_ideas"], key="not_a_key")
-        applications = apply_fix_ops(toml_doc, ops=[delete_op])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
 
     def test_delete_table_on_scalar_leaf_is_skipped(self) -> None:
@@ -81,7 +81,7 @@ class TestFixApplier:
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         source_bytes = _dumps(toml_doc)
         delete_op = FixOp(kind=FixOpKind.DELETE_TABLE, table_path=["pipe", "gen_ideas", "prompt"])
-        applications = apply_fix_ops(toml_doc, ops=[delete_op])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         assert applications[0].detail is not None
         assert _dumps(toml_doc) == source_bytes
@@ -90,7 +90,7 @@ class TestFixApplier:
         """delete_table removes the addressed table and its keys; sibling tables survive."""
         toml_doc = tomlkit.loads(_FIXTURE_PATH.read_text(encoding="utf-8"))
         delete_op = FixOp(kind=FixOpKind.DELETE_TABLE, table_path=["pipe", "gen_ideas"])
-        applications = apply_fix_ops(toml_doc, ops=[delete_op])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[delete_op])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)
         assert "[pipe.gen_ideas]" not in dumped
@@ -103,7 +103,7 @@ class TestFixApplier:
         """
         source = '[pipe]\nlist_ideas = { type = "PipeSequence", inputs = { topic = "Text" }, output = "Idea" }\n'
         toml_doc = tomlkit.loads(source)
-        applications = apply_fix_ops(toml_doc, ops=[_set_output_op()])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_set_output_op()])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         reloaded = tomlkit.loads(serialize_and_format(toml_doc)).unwrap()["pipe"]["list_ideas"]
         assert reloaded["output"] == "Idea[]"

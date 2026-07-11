@@ -173,7 +173,7 @@ def parse_cli_inputs(
 
     if auto_inputs_dir is not None:
         try:
-            auto_inputs_file = find_default_inputs_file(auto_inputs_dir)
+            auto_inputs_file = find_default_inputs_file(directory=auto_inputs_dir)
         except AmbiguousInputsFilesError as ambiguity_exc:
             agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
         if auto_inputs_file is not None:

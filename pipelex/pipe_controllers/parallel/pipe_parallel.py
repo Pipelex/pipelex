@@ -109,12 +109,12 @@ class PipeParallel(PipeController):
                 for input_name, stuff_spec in pipe_needed_inputs.items:
                     if input_name != sub_pipe.batch_params.input_item_stuff_name:
                         needed_inputs.add_stuff_spec(
-                            input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                            variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
                         )
             else:
                 for input_name, stuff_spec in pipe_needed_inputs.items:
                     needed_inputs.add_stuff_spec(
-                        input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                        variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
                     )
         return needed_inputs
 

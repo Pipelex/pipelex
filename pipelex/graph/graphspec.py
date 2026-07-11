@@ -215,7 +215,7 @@ class IOSpec(BaseModel):
         return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
 
 
-def output_digest_is_optional(output_specs: Sequence[IOSpec], *, digest: str) -> bool:
+def output_digest_is_optional(*, output_specs: Sequence[IOSpec], digest: str) -> bool:
     """Whether a producer registered ``digest`` as a declared-optional (`?`) output.
 
     The optional marker rides the output IOSpec's ``extra`` dict (set at the pipe-run

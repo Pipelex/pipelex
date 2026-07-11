@@ -84,7 +84,7 @@ def _get_structure_class_import(*, class_name: str) -> str | None:
     return f"from {cls.__module__} import {cls.__name__}"
 
 
-def _custom_import_statement(class_name: str, *, emitted_names: set[str]) -> str:
+def _custom_import_statement(*, class_name: str, emitted_names: set[str]) -> str:
     """Build the import statement for a custom (non-native) structure class.
 
     A name the codegen engine emitted comes from the single-module projection. Otherwise, a class
@@ -211,7 +211,7 @@ def generate_runner_code(
     if custom_classes:
         import_lines.append("")
         for class_name in sorted(custom_classes):
-            import_lines.append(_custom_import_statement(class_name, emitted_names=emitted_names))
+            import_lines.append(_custom_import_statement(class_name=class_name, emitted_names=emitted_names))
 
     import_lines.extend(
         [

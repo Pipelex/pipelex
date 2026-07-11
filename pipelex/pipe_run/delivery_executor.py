@@ -108,7 +108,7 @@ class DeliveryExecutor:
             )
             raw_main_stuff = self._get_raw_main_stuff_dict(pipe_output.working_memory_raw)
             if raw_main_stuff is None:
-                main_absence = self._get_raw_main_absence(pipe_output.working_memory_raw)
+                main_absence = self._get_raw_main_absence(working_memory_raw=pipe_output.working_memory_raw)
                 if main_absence is None:
                     msg = (
                         "Delivery of a completed run found neither a main stuff nor a recorded absence in the raw "
@@ -151,7 +151,7 @@ class DeliveryExecutor:
         return None
 
     @classmethod
-    def _get_raw_main_absence(cls, working_memory_raw: dict[str, Any]) -> AbsenceRecord | None:
+    def _get_raw_main_absence(cls, *, working_memory_raw: dict[str, Any]) -> AbsenceRecord | None:
         """Extract the recorded main-output absence from a raw working_memory's ledger, if any.
 
         A malformed record is treated as missing (the caller then fails the delivery loudly as a

@@ -257,7 +257,7 @@ def _validation_category_header(category: ValidationErrorCategory) -> str:
             return "Dry Run Error:"
 
 
-def _display_validation_error_item(console: Console, *, item: ValidationErrorItem, error_index: int) -> None:
+def _display_validation_error_item(*, console: Console, item: ValidationErrorItem, error_index: int) -> None:
     """Render one structured validation-error item: title, identity fields, message, fix, locators."""
     error_type_display = item.error_type.replace("_", " ").title() if item.error_type else "Validation Error"
     console.print(f"[bold yellow]{error_index}. {error_type_display}[/bold yellow]")
@@ -294,7 +294,7 @@ def _display_validation_error_item(console: Console, *, item: ValidationErrorIte
     console.print()
 
 
-def display_validation_error_items(console: Console, *, items: list[ValidationErrorItem]) -> None:
+def display_validation_error_items(*, console: Console, items: list[ValidationErrorItem]) -> None:
     """Render structured validation-error items grouped by category, with per-item suggested fixes.
 
     The single human renderer for bundle-validation diagnostics — used by ``pipelex validate``
@@ -319,7 +319,7 @@ def display_validation_error_items(console: Console, *, items: list[ValidationEr
                     console.print(f"[yellow]{escape(item.message)}[/yellow]\n")
             case ValidationErrorCategory.BLUEPRINT_VALIDATION | ValidationErrorCategory.PIPE_FACTORY | ValidationErrorCategory.PIPE_VALIDATION:
                 for error_index, item in enumerate(category_items, 1):
-                    _display_validation_error_item(console, item=item, error_index=error_index)
+                    _display_validation_error_item(console=console, item=item, error_index=error_index)
 
 
 def handle_validate_bundle_error(
@@ -349,7 +349,7 @@ def handle_validate_bundle_error(
     if bundle_path:
         console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
-    display_validation_error_items(console, items=items)
+    display_validation_error_items(console=console, items=items)
 
     # The shared items builder projects the dry-run channel only when it is the sole failure
     # channel (the wire's structured-info invariant); the human surface keeps printing it
@@ -363,7 +363,7 @@ def handle_validate_bundle_error(
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs) if bundle_path is not None else 0
     if fixable_count and bundle_path is not None:
         # Shared builder so the human and agent fix-command footers echo -L / --allow-signatures identically.
-        fix_command = build_fix_command("pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+        fix_command = build_fix_command(executable="pipelex", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
         console.print(
             f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
         )

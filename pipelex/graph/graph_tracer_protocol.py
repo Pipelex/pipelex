@@ -18,8 +18,8 @@ class GraphTracerProtocol(Protocol):
 
     def setup(
         self,
-        graph_id: str,
         *,
+        graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -284,8 +284,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def setup(
         self,
-        graph_id: str,
         *,
+        graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,

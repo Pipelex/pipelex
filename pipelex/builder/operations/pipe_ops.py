@@ -180,7 +180,9 @@ def parse_pipe_spec(spec_data: Any, *, pipe_type: str | None) -> PipeSpec:
     if pipe_type == PIPE_SIGNATURE_TYPE_TAG:
         raise ValueError(explicit_signature_tag_migration_message(spec_data.get("pipe_code")))
     if pipe_type is None:
-        normalized = normalize_typeless_signature_section(spec_data.get("pipe_code"), pipe_section=spec_data, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS)
+        normalized = normalize_typeless_signature_section(
+            pipe_code=spec_data.get("pipe_code"), pipe_section=spec_data, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS
+        )
         return PipeSignatureSpec.model_validate(normalized)
 
     if pipe_type not in pipe_type_to_spec_class:

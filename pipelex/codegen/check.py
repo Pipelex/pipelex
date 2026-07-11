@@ -79,7 +79,7 @@ class CodegenCheckReport(BaseModel):
 def run_codegen_check(*, root: Path) -> CodegenCheckReport:
     """Run the offline drift check over `root` (the directory holding `codegen.lock`)."""
     try:
-        lock_path = resolve_output_path(root, relative_path=Path(CODEGEN_LOCK_FILENAME))
+        lock_path = resolve_output_path(root=root, relative_path=Path(CODEGEN_LOCK_FILENAME))
         safe_root = lock_path.parent
         lock = load_lock(lock_path)
         if lock is None:
@@ -99,7 +99,7 @@ def run_codegen_check(*, root: Path) -> CodegenCheckReport:
 def _check_locked_artifacts(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
     drifts: list[CodegenDrift] = []
     for path, locked_hash in sorted(lock.hash_by_path().items()):
-        file_path = resolve_artifact_path(root, artifact_path=path)
+        file_path = resolve_artifact_path(root=root, artifact_path=path)
         if not file_path.is_file():
             drifts.append(CodegenDrift(path=path, category=DriftCategory.MISSING, detail="Locked artifact is absent on disk."))
             continue
@@ -127,7 +127,7 @@ def _check_present_artifact(*, path: str, file_path: Path, locked_hash: str) -> 
 def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
     tracked = lock.paths()
     orphans: list[CodegenDrift] = []
-    for file_path in _iter_stampable_files(root):
+    for file_path in _iter_stampable_files(directory=root):
         relative = file_path.relative_to(root).as_posix()
         if relative in tracked:
             continue
@@ -143,14 +143,14 @@ def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
     return orphans
 
 
-def _iter_stampable_files(directory: Path) -> Iterator[Path]:
+def _iter_stampable_files(*, directory: Path) -> Iterator[Path]:
     """Yield stampable files under `directory`, pre-order and deterministic, pruning vendor/VCS dirs."""
     for entry in sorted(directory.iterdir()):
         if entry.is_symlink():
             continue
         if entry.is_dir():
             if entry.name not in _SKIP_DIRS:
-                yield from _iter_stampable_files(entry)
+                yield from _iter_stampable_files(directory=entry)
         elif entry.suffix in STAMPABLE_SUFFIXES:
             yield entry
 

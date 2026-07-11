@@ -220,8 +220,8 @@ class GraphTracer(GraphTracerProtocol):
     @override
     def setup(
         self,
-        graph_id: str,
         *,
+        graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -385,7 +385,7 @@ class GraphTracer(GraphTracerProtocol):
         producer_data = self._nodes.get(producer_node_id)
         if producer_data is None:
             return False
-        return output_digest_is_optional(producer_data.output_specs, digest=digest)
+        return output_digest_is_optional(output_specs=producer_data.output_specs, digest=digest)
 
     def _generate_batch_item_edges(self) -> None:
         """Generate BATCH_ITEM edges for batch fan-out.

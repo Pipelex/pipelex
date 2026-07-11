@@ -479,7 +479,9 @@ def _render_validate_bundle_markdown(
     # "check the validation_errors array" hint that the JSON envelope keeps.
     fixable_count = count_applicable_fixes(items, bundle_path=bundle_path, library_dirs=library_dirs)
     if fixable_count:
-        fix_command = build_fix_command("pipelex-agent", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+        fix_command = build_fix_command(
+            executable="pipelex-agent", bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures
+        )
         lines += ["", f"💡 {fixable_count} of these errors can be fixed automatically — run: `{fix_command}`"]
     else:
         lines += ["", "💡 These errors have no automatic fix — review the messages above and edit the bundle."]

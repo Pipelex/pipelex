@@ -87,8 +87,8 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
 
     def add_stuff_spec(
         self,
-        variable_name: str,
         *,
+        variable_name: str,
         concept: Concept,
         multiplicity: VariableMultiplicity | None = None,
         presence: PresenceMarker = PresenceMarker.PLAIN,

@@ -111,7 +111,7 @@ def scan_taint_triggers(pipe: PipeAbstract, *, slot_taints: dict[str, SlotTaint]
     redundant_force_names: list[str] = []
     for named_stuff_spec in pipe.needed_inputs().named_stuff_specs:
         incoming_taint = slot_taints.get(named_stuff_spec.variable_name)
-        match effective_consumption_presence(pipe, named_stuff_spec=named_stuff_spec):
+        match effective_consumption_presence(pipe=pipe, named_stuff_spec=named_stuff_spec):
             case PresenceMarker.PLAIN:
                 if incoming_taint is not None:
                     trigger_names.append(named_stuff_spec.variable_name)
@@ -144,7 +144,7 @@ def is_plural_step_result(
     return has_batch_params or step_output_multiplicity is not None or pipe.output.multiplicity is not None
 
 
-def effective_consumption_presence(pipe: PipeAbstract, *, named_stuff_spec: NamedStuffSpec) -> PresenceMarker:
+def effective_consumption_presence(*, pipe: PipeAbstract, named_stuff_spec: NamedStuffSpec) -> PresenceMarker:
     """The presence marker governing how `pipe` consumes the given needed input.
 
     The pipe's OWN input declaration wins when it exists — that is the boundary contract

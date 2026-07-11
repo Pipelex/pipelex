@@ -110,7 +110,7 @@ class TestFixApplierStripNamespace:
     def test_strip_matches_golden_bytes(self) -> None:
         """Renaming the dotted declaration + stripping main_pipe, then formatting, yields the golden."""
         toml_doc = tomlkit.loads((_DATA / "strip_namespace_rename.mthds").read_text(encoding="utf-8"))
-        applications = apply_fix_ops(toml_doc, ops=_STRIP_OPS)
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=_STRIP_OPS)
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED, FixOpOutcome.APPLIED]
         golden = (_DATA / "strip_namespace_rename.golden.mthds").read_text(encoding="utf-8")
         assert serialize_and_format(toml_doc) == golden
@@ -118,7 +118,7 @@ class TestFixApplierStripNamespace:
     def test_rename_preserves_position_and_comments(self) -> None:
         """The renamed pipe stays between its siblings, keeping its leading and trailing comments."""
         toml_doc = tomlkit.loads((_DATA / "strip_namespace_rename.mthds").read_text(encoding="utf-8"))
-        apply_fix_ops(toml_doc, ops=_STRIP_OPS)
+        apply_fix_ops(toml_doc=toml_doc, ops=_STRIP_OPS)
         dumped = _dumps(toml_doc)
         assert '[pipe."namespacefix.hello"]' not in dumped
         assert "[pipe.hello]" in dumped
@@ -133,16 +133,16 @@ class TestFixApplierStripNamespace:
     def test_apply_twice_is_idempotent(self) -> None:
         """Re-applying finds the dotted key already renamed / main_pipe already stripped — bytes hold."""
         toml_doc = tomlkit.loads((_DATA / "strip_namespace_rename.mthds").read_text(encoding="utf-8"))
-        apply_fix_ops(toml_doc, ops=_STRIP_OPS)
+        apply_fix_ops(toml_doc=toml_doc, ops=_STRIP_OPS)
         once = serialize_and_format(toml_doc)
-        second = apply_fix_ops(toml_doc, ops=_STRIP_OPS)
+        second = apply_fix_ops(toml_doc=toml_doc, ops=_STRIP_OPS)
         assert [application.outcome for application in second] == [FixOpOutcome.SKIPPED, FixOpOutcome.APPLIED]
         assert serialize_and_format(toml_doc) == once
 
     def test_rename_skips_on_collision(self) -> None:
         """Renaming to a key already declared separately is skipped, not applied (no clobber)."""
         toml_doc = tomlkit.loads(_COLLISION_MTHDS)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="coll.hello", new_key="hello")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="coll.hello", new_key="hello")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         dumped = _dumps(toml_doc)
         # Both declarations survive untouched — nothing was clobbered.
@@ -152,13 +152,13 @@ class TestFixApplierStripNamespace:
     def test_rename_skips_when_key_absent(self) -> None:
         """A rename whose source key is not present is a guarded skip (e.g. a stale op)."""
         toml_doc = tomlkit.loads(_COLLISION_MTHDS)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="coll.ghost", new_key="ghost")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="coll.ghost", new_key="ghost")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
 
     def test_rename_applies_on_interleaved_pipe_sections(self) -> None:
         """Interleaved ``[pipe.*]``/``[concept.*]`` sections (an ``OutOfOrderTableProxy``) rename in place."""
         toml_doc = tomlkit.loads(_INTERLEAVED_MTHDS)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)
         assert '[pipe."inter.hello"]' not in dumped
@@ -172,7 +172,7 @@ class TestFixApplierStripNamespace:
         """A collision with a bare key living in a *different* ``[pipe.*]`` section is still a skip."""
         interleaved_collision = _INTERLEAVED_MTHDS.replace("[pipe.other]", "[pipe.hello]")
         toml_doc = tomlkit.loads(interleaved_collision)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
         assert [application.outcome for application in applications] == [FixOpOutcome.SKIPPED]
         dumped = _dumps(toml_doc)
         assert '[pipe."inter.hello"]' in dumped
@@ -185,7 +185,7 @@ class TestFixApplierStripNamespace:
         sub-table under the still-invalid ``inter.hello`` key while reporting the op as APPLIED.
         """
         toml_doc = tomlkit.loads(_INTERLEAVED_NESTED_MTHDS)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="inter.hello", new_key="hello")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         # Pre-format dump: the dotted key is gone everywhere and BOTH the header and the nested
         # sub-table now sit under the bare name.
@@ -204,7 +204,7 @@ class TestFixApplierStripNamespace:
     def test_rename_applies_on_inline_pipe_table(self) -> None:
         """An inline ``pipe = {...}`` section (an ``InlineTable``) renames in place."""
         toml_doc = tomlkit.loads(_INLINE_MTHDS)
-        applications = apply_fix_ops(toml_doc, ops=[_rename_op(key="inl.hello", new_key="hello")])
+        applications = apply_fix_ops(toml_doc=toml_doc, ops=[_rename_op(key="inl.hello", new_key="hello")])
         assert [application.outcome for application in applications] == [FixOpOutcome.APPLIED]
         dumped = _dumps(toml_doc)
         assert '"inl.hello"' not in dumped

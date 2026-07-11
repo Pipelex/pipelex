@@ -837,8 +837,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _make_lifted_output(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         liftable: list[AbsentInput],
         pipe_run_params: PipeRunParams,

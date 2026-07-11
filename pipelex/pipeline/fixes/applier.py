@@ -63,7 +63,7 @@ class FixOpApplication(BaseModel):
     detail: str | None = None
 
 
-def _resolve_table(toml_doc: TOMLDocument, *, table_path: list[str]) -> dict[str, Any] | None:
+def _resolve_table(*, toml_doc: TOMLDocument, table_path: list[str]) -> dict[str, Any] | None:
     """Walk ``table_path`` down the DOM, returning the addressed table or ``None`` when absent.
 
     Every segment must resolve to a dict-like container (tomlkit tables and inline tables
@@ -78,7 +78,7 @@ def _resolve_table(toml_doc: TOMLDocument, *, table_path: list[str]) -> dict[str
     return node
 
 
-def _rename_key_in_place(parent_table: dict[str, Any], *, key: str, new_key: str) -> None:
+def _rename_key_in_place(*, parent_table: dict[str, Any], key: str, new_key: str) -> None:
     """Rename ``key`` to ``new_key`` in a resolved table node, preserving position and comments.
 
     tomlkit exposes no public position-preserving rename; ``Container._replace`` is its own
@@ -105,7 +105,7 @@ def _rename_key_in_place(parent_table: dict[str, Any], *, key: str, new_key: str
         renamed_in_any = False
         for sub_table in parent_table._tables:  # noqa: SLF001 # pyright: ignore[reportPrivateUsage]
             if key in sub_table:
-                _replace_key_in_container(sub_table.value, key=key, new_key=new_key)
+                _replace_key_in_container(container=sub_table.value, key=key, new_key=new_key)
                 renamed_in_any = True
         if not renamed_in_any:
             # The caller checked ``key in parent_table``, and the proxy's dict-facade is built from
@@ -114,16 +114,16 @@ def _rename_key_in_place(parent_table: dict[str, Any], *, key: str, new_key: str
             raise PipelexUnexpectedError(msg)
         return
     if isinstance(parent_table, AbstractTable):
-        _replace_key_in_container(parent_table.value, key=key, new_key=new_key)
+        _replace_key_in_container(container=parent_table.value, key=key, new_key=new_key)
         return
     if isinstance(parent_table, Container):
-        _replace_key_in_container(parent_table, key=key, new_key=new_key)
+        _replace_key_in_container(container=parent_table, key=key, new_key=new_key)
         return
     msg = f"cannot rename key in unsupported tomlkit node type '{type(parent_table).__name__}' — applier bug"
     raise PipelexUnexpectedError(msg)
 
 
-def _replace_key_in_container(container: Container, *, key: str, new_key: str) -> None:
+def _replace_key_in_container(*, container: Container, key: str, new_key: str) -> None:
     container._replace(key, new_key, cast("Item", container[key]))  # pyright: ignore[reportPrivateUsage]
 
 
@@ -173,7 +173,7 @@ def _render_syntax_diagnostic(diagnostic: "Diagnostic") -> str:
     return f"{diagnostic['message']} (line {diagnostic_range['start_line']}:{diagnostic_range['start_col']})"
 
 
-def apply_fix_ops(toml_doc: TOMLDocument, *, ops: list[FixOp]) -> list[FixOpApplication]:
+def apply_fix_ops(*, toml_doc: TOMLDocument, ops: list[FixOp]) -> list[FixOpApplication]:
     """Apply each op to the DOM in place, returning one application report per op, in order.
 
     Idempotent: re-applying an already-applied op sets the same value / finds the key
@@ -181,18 +181,18 @@ def apply_fix_ops(toml_doc: TOMLDocument, *, ops: list[FixOp]) -> list[FixOpAppl
     """
     applications: list[FixOpApplication] = []
     for fix_op in ops:
-        applications.append(_apply_one_op(toml_doc, fix_op=fix_op))
+        applications.append(_apply_one_op(toml_doc=toml_doc, fix_op=fix_op))
     return applications
 
 
-def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
+def _apply_one_op(*, toml_doc: TOMLDocument, fix_op: FixOp) -> FixOpApplication:
     table_path_str = ".".join(fix_op.table_path)
     match fix_op.kind:
         case FixOpKind.SET_KEY:
             if fix_op.key is None or fix_op.value is None:
                 msg = f"set_key op on '{table_path_str}' requires both key and value — planner bug"
                 raise PipelexUnexpectedError(msg)
-            target_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if target_table is None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             target_table[fix_op.key] = _as_tomlkit_value(fix_op.value)
@@ -201,10 +201,10 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if not fix_op.table_path:
                 msg = "ensure_table op requires a non-empty table_path — planner bug"
                 raise PipelexUnexpectedError(msg)
-            existing_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            existing_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if existing_table is not None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' already exists")
-            parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path[:-1])
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path[:-1])
             table_key = fix_op.table_path[-1]
             if parent_table is None or table_key in parent_table:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"parent of table '{table_path_str}' not found")
@@ -214,7 +214,7 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if fix_op.key is None:
                 msg = f"delete_key op on '{table_path_str}' requires a key — planner bug"
                 raise PipelexUnexpectedError(msg)
-            target_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            target_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if target_table is None:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"table '{table_path_str}' not found in document")
             if fix_op.key not in target_table:
@@ -225,7 +225,7 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if not fix_op.table_path:
                 msg = "delete_table op requires a non-empty table_path — planner bug"
                 raise PipelexUnexpectedError(msg)
-            parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path[:-1])
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path[:-1])
             table_key = fix_op.table_path[-1]
             # The final segment must itself be a table — a scalar there is a drifted target
             # (same guarded-skip contract _resolve_table enforces for every other segment).
@@ -237,7 +237,7 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
             if fix_op.key is None or fix_op.new_key is None:
                 msg = f"rename_table_key op on '{table_path_str}' requires both key and new_key — planner bug"
                 raise PipelexUnexpectedError(msg)
-            parent_table = _resolve_table(toml_doc, table_path=fix_op.table_path)
+            parent_table = _resolve_table(toml_doc=toml_doc, table_path=fix_op.table_path)
             if parent_table is None or fix_op.key not in parent_table:
                 return FixOpApplication(op=fix_op, outcome=FixOpOutcome.SKIPPED, detail=f"key '{fix_op.key}' not found in table '{table_path_str}'")
             if fix_op.new_key in parent_table:
@@ -249,5 +249,5 @@ def _apply_one_op(toml_doc: TOMLDocument, *, fix_op: FixOp) -> FixOpApplication:
                     outcome=FixOpOutcome.SKIPPED,
                     detail=f"cannot rename to '{fix_op.new_key}': already present in table '{table_path_str}'",
                 )
-            _rename_key_in_place(parent_table, key=fix_op.key, new_key=fix_op.new_key)
+            _rename_key_in_place(parent_table=parent_table, key=fix_op.key, new_key=fix_op.new_key)
             return FixOpApplication(op=fix_op, outcome=FixOpOutcome.APPLIED)

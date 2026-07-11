@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 COMMAND = "validate"
 
 
-def _echo_optionality_warnings(pipes: list[PipeAbstract]) -> None:
+def _echo_optionality_warnings(*, pipes: list[PipeAbstract]) -> None:
     """Render the advisory optionality lints (e.g. the useless-`!` lint) in yellow.
 
     Advisory only — a warning never changes the validation verdict or the exit code. Requires
@@ -97,7 +97,7 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
 
             # Advisory optionality lints over the whole loaded library (the lint's cross-flow
             # aggregation needs every flow) — printed even when the signature gate below exits non-zero.
-            _echo_optionality_warnings(all_pipes)
+            _echo_optionality_warnings(pipes=all_pipes)
 
             # Gate-from-report (D-B consumer-decides): signatures are never a validation error, but a
             # library with unsatisfied PipeSignature placeholders is valid yet NOT runnable. `validate
@@ -155,7 +155,7 @@ async def _validate_pipe_or_bundle(
             )
             # validate_bundle leaves its validation library open on success, so the taint walk
             # behind the advisory lints can still resolve the bundle's pipes.
-            _echo_optionality_warnings(bundle_result.pipes)
+            _echo_optionality_warnings(pipes=bundle_result.pipes)
         except FileNotFoundError as exc:
             get_console().print(Traceback())
             typer.secho(

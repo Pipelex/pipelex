@@ -304,15 +304,15 @@ def _collect_referenced_natives(*, concepts: dict[str, _ConceptEntry], pipes: di
         if not isinstance(value, ConceptBlueprint):
             continue
         if value.refines:
-            _add_native_ref(referenced, concept_ref_or_code=value.refines)
+            _add_native_ref(referenced=referenced, concept_ref_or_code=value.refines)
         if isinstance(value.structure, dict):
             for field in value.structure.values():
                 if isinstance(field, ConceptStructureBlueprint):
-                    _add_native_ref(referenced, concept_ref_or_code=field.concept_ref)
-                    _add_native_ref(referenced, concept_ref_or_code=field.item_concept_ref)
+                    _add_native_ref(referenced=referenced, concept_ref_or_code=field.concept_ref)
+                    _add_native_ref(referenced=referenced, concept_ref_or_code=field.item_concept_ref)
     for blueprint in pipes.values():
         for io_ref in [*(blueprint.inputs or {}).values(), blueprint.output]:
-            _add_native_ref(referenced, concept_ref_or_code=_io_ref_concept(io_ref))
+            _add_native_ref(referenced=referenced, concept_ref_or_code=_io_ref_concept(io_ref))
     return referenced
 
 
@@ -322,6 +322,6 @@ def _io_ref_concept(io_ref: str) -> str | None:
     return parse_concept_with_multiplicity(io_ref).concept_ref_or_code
 
 
-def _add_native_ref(referenced: set[str], *, concept_ref_or_code: str | None) -> None:
+def _add_native_ref(*, referenced: set[str], concept_ref_or_code: str | None) -> None:
     if concept_ref_or_code and NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
         referenced.add(NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code))

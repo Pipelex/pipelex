@@ -253,7 +253,7 @@ def format_validation_error_items_markdown(items: list[ValidationErrorItem]) -> 
     return "\n".join(lines).rstrip()
 
 
-def build_fix_command(executable: str, *, bundle_path: Path, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> str:
+def build_fix_command(*, executable: str, bundle_path: Path, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> str:
     """Build the copy-pasteable ``<executable> fix bundle <path>`` command for a fix-aware footer.
 
     Shared by the human ``validate`` footer (``executable="pipelex"``) and the agent ``validate``

@@ -100,7 +100,7 @@ def _read_file_snapshot(path: Path) -> _FileSnapshot:
     )
 
 
-def _write_staged_file(snapshot: _FileSnapshot, *, content: bytes, label: str) -> Path:
+def _write_staged_file(*, snapshot: _FileSnapshot, content: bytes, label: str) -> Path:
     """Write and fsync a same-directory temp file ready for atomic replacement."""
     temp_file = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed before the atomic replace
         mode="wb",
@@ -125,17 +125,17 @@ def _write_staged_file(snapshot: _FileSnapshot, *, content: bytes, label: str) -
 
 
 def _stage_file_update(update: _PendingFileUpdate) -> _StagedFileUpdate:
-    replacement_path = _write_staged_file(update.snapshot, content=update.new_content.encode("utf-8"), label="new")
+    replacement_path = _write_staged_file(snapshot=update.snapshot, content=update.new_content.encode("utf-8"), label="new")
     try:
         replacement_snapshot = _read_file_snapshot(replacement_path)
-        rollback_path = _write_staged_file(update.snapshot, content=update.snapshot.content, label="rollback")
+        rollback_path = _write_staged_file(snapshot=update.snapshot, content=update.snapshot.content, label="rollback")
     except OSError:
         replacement_path.unlink(missing_ok=True)
         raise
     return _StagedFileUpdate(snapshot=update.snapshot, replacement_snapshot=replacement_snapshot, rollback_path=rollback_path)
 
 
-def _file_state_matches(current_snapshot: _FileSnapshot, *, expected_snapshot: _FileSnapshot) -> bool:
+def _file_state_matches(*, current_snapshot: _FileSnapshot, expected_snapshot: _FileSnapshot) -> bool:
     """Whether content, permissions, and filesystem identity still match an observed file."""
     return (
         current_snapshot.content == expected_snapshot.content
@@ -152,7 +152,7 @@ def _assert_snapshot_unchanged(snapshot: _FileSnapshot) -> None:
     except FileNotFoundError as exc:
         msg = f"refusing to overwrite '{snapshot.path}': the file was removed while fixes were being prepared"
         raise FixWriteConflictError(msg) from exc
-    if not _file_state_matches(current_snapshot, expected_snapshot=snapshot):
+    if not _file_state_matches(current_snapshot=current_snapshot, expected_snapshot=snapshot):
         msg = f"refusing to overwrite '{snapshot.path}': the file changed while fixes were being prepared"
         raise FixWriteConflictError(msg)
 
@@ -164,7 +164,7 @@ def _rollback_committed_updates(committed_updates: list[_StagedFileUpdate]) -> l
         target_path = staged_update.snapshot.path
         try:
             current_snapshot = _read_file_snapshot(target_path)
-            if not _file_state_matches(current_snapshot, expected_snapshot=staged_update.replacement_snapshot):
+            if not _file_state_matches(current_snapshot=current_snapshot, expected_snapshot=staged_update.replacement_snapshot):
                 failures.append(f"{target_path}: file changed after the autofix replacement was committed")
                 continue
             staged_update.rollback_path.replace(target_path)
@@ -645,7 +645,7 @@ async def fix_bundle_file(
             toml_doc = tomlkit.loads(snapshot.content.decode("utf-8"))
             any_op_applied = False
             for target_fix in target_fixes:
-                applications = apply_fix_ops(toml_doc, ops=target_fix.ops)
+                applications = apply_fix_ops(toml_doc=toml_doc, ops=target_fix.ops)
                 if any(application.outcome.did_apply for application in applications):
                     round_fixes_applied.append(target_fix)
                     any_op_applied = True
