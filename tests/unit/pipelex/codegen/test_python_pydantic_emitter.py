@@ -40,6 +40,15 @@ class TestPythonPydanticEmitter:
         assert event.recorded_at == datetime(2026, 7, 11, 9, 30)
         assert event.starts_at == time(9, 30)
 
+    def test_dict_defaults_are_canonical(self, reordered_dict_default_crates: tuple[LibraryCrate, LibraryCrate]):
+        first_crate, second_crate = reordered_dict_default_crates
+
+        first_output = emit_python_pydantic(resolve_concepts_from_crate(first_crate))
+        second_output = emit_python_pydantic(resolve_concepts_from_crate(second_crate))
+
+        assert first_output == second_output
+        assert 'default={"alpha": "first", "zeta": "last"}' in first_output[0].content
+
     def test_serialize_parse_round_trip(self, pipeline_crate: LibraryCrate, tmp_path: Path):
         """The generated pydantic helpers round-trip: model_dump (serialize) then model_validate (parse)
         reproduce the value. Wire names are already snake_case Python names, so no binder is needed.

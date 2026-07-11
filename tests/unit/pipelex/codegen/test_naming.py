@@ -91,6 +91,20 @@ class TestNaming:
 
         assert allocate_ts_type_names(forward) == allocate_ts_type_names(reversed_library)
 
+    def test_ts_name_allocation_reserves_derived_schema_symbols(self):
+        library = ResolvedLibrary(
+            mthds_version="0.1.0",
+            concepts=[
+                _resolved_concept(domain="demo", code="Foo"),
+                _resolved_concept(domain="demo", code="FooSchema"),
+            ],
+        )
+
+        assert allocate_ts_type_names(library) == {
+            "demo.Foo": "Foo",
+            "demo.FooSchema": "FooSchema2",
+        }
+
     def test_runtime_to_emitted_class_names(self):
         """Runtime-qualified spellings map to the emitted names; natives and opaque classes are skipped."""
         library = ResolvedLibrary(

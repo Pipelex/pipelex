@@ -64,8 +64,8 @@ def format_default_value(value: Any) -> str:
         items = cast("list[Any]", value)
         return f"[{', '.join(format_default_value(item) for item in items)}]"
     if isinstance(value, dict):
-        pairs = cast("dict[Any, Any]", value)
-        rendered = [f"{format_default_value(key)}: {format_default_value(val)}" for key, val in pairs.items()]
+        pairs = cast("dict[str, Any]", value)
+        rendered = [f"{format_default_value(key)}: {format_default_value(pairs[key])}" for key in sorted(pairs)]
         return f"{{{', '.join(rendered)}}}"
     return repr(value)
 

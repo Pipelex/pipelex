@@ -27,7 +27,7 @@ from pipelex.codegen.lock import (
     resolve_output_path,
     validate_artifact_paths,
 )
-from pipelex.codegen.stamp import apply_stamp, comment_prefix_for, compute_content_hash, has_stamp
+from pipelex.codegen.stamp import apply_stamp, comment_prefix_for, compute_content_hash, has_stamp, parse_stamped
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, failable_load_text_from_path, remove_file, save_text_to_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -128,6 +128,7 @@ def write_stamped_projection(
         pipe_ref=pipe_ref,
         options=options,
     )
+    _preflight_destinations(output_root=output_root, projection=projection, previous_paths=previous_paths)
 
     written: list[str] = []
     unchanged: list[str] = []
@@ -143,6 +144,22 @@ def write_stamped_projection(
     _write_if_changed(lock_path, content=projection.lock_content)
 
     return WriteReport(written=written, unchanged=unchanged, removed=removed, lock_path=CODEGEN_LOCK_FILENAME)
+
+
+def _preflight_destinations(*, output_root: Path, projection: StampedProjection, previous_paths: set[str]) -> None:
+    """Reject unowned destination collisions before any projection file is written."""
+    for stamped_file in projection.files:
+        destination = resolve_artifact_path(output_root, artifact_path=stamped_file.filename)
+        existing_content = failable_load_text_from_path(destination)
+        if existing_content is None or existing_content == stamped_file.content:
+            continue
+        if stamped_file.filename in previous_paths:
+            continue
+        comment_prefix = comment_prefix_for(stamped_file.filename)
+        if parse_stamped(existing_content, comment_prefix=comment_prefix) is not None:
+            continue
+        msg = f"Refusing to overwrite unowned file '{destination}'. Move it or choose a different codegen output directory."
+        raise CodegenError(msg)
 
 
 def _previous_tracked_paths(lock_path: Path) -> set[str]:

@@ -20,12 +20,13 @@ sibling file), the TS analog of the Python subclassing story; the generated file
 """
 
 import json
+from typing import Any
 
 from pipelex.codegen.emitters.naming import allocate_ts_type_names
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, iter_imprecision_reasons
-from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.tools.misc.json_utils import clean_json_content
 
 _FILENAME = "types.ts"
 _BINDER_FILENAME = "binder.ts"
@@ -36,8 +37,9 @@ def emit_ts_zod(library: ResolvedLibrary) -> list[EmittedFile]:
     concepts = sorted(library.concepts, key=lambda concept: concept.concept_ref)
     by_ref = library.by_ref()
     type_name_by_ref = allocate_ts_type_names(library)
+    recursive_refs = _find_recursive_concept_refs(concepts)
     header = _ts_header()
-    blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref) for concept in concepts]
+    blocks = [_render_schema(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref, recursive_refs=recursive_refs) for concept in concepts]
     body = f'{header}import {{ z }} from "zod";\n\n\n' + "\n\n\n".join(blocks) + "\n"
     return [EmittedFile(filename=_FILENAME, content=body), _emit_binder(concepts, type_name_by_ref=type_name_by_ref)]
 
@@ -63,11 +65,15 @@ def _render_schema(
     *,
     by_ref: dict[str, ResolvedConcept],
     type_name_by_ref: dict[str, str],
+    recursive_refs: set[str],
 ) -> str:
     type_name = type_name_by_ref[concept.concept_ref]
     doc = _jsdoc(concept.description, imprecise=concept.imprecision_reason if concept.structureless else None)
 
     schema_expr = _schema_expr(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
+    if concept.concept_ref in recursive_refs:
+        type_expr = _concept_type_expr(concept, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
+        return f"{doc}export type {type_name} = {type_expr};\nexport const {type_name}Schema: z.ZodType<{type_name}> = {schema_expr};"
     return f"{doc}export const {type_name}Schema = {schema_expr};\nexport type {type_name} = z.infer<typeof {type_name}Schema>;"
 
 
@@ -84,8 +90,10 @@ def _schema_expr(
             return f"z.lazy(() => {base_name}Schema)"
         return "z.unknown()"
     if not concept.fields:
-        # Structureless / opaque concept: unknown shape, surfaced (never guessed).
-        return "z.unknown()"
+        if concept.structureless:
+            # Structureless / opaque concept: unknown shape, surfaced (never guessed).
+            return "z.unknown()"
+        return "z.object({})"
     field_lines = "\n".join(_render_field(concept_field, by_ref=by_ref, type_name_by_ref=type_name_by_ref) for concept_field in concept.fields)
     return f"z.object({{\n{field_lines}\n}})"
 
@@ -103,10 +111,117 @@ def _render_field(
     doc = _jsdoc(concept_field.description, imprecise="; ".join(reasons) if reasons else None, indent="  ")
     expr = _zod_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
     if concept_field.default_value is not None:
-        expr = f"{expr}.default({clean_json_dumps(concept_field.default_value)})"
+        expr = f"{expr}.default({_format_default_value(concept_field.default_value)})"
     elif not concept_field.required:
         expr = f"{expr}.optional()"
     return f"{doc}  {key}: {expr},"
+
+
+def _format_default_value(value: Any) -> str:
+    """Render a JSON-safe default canonically so mapping insertion order cannot affect output."""
+    return json.dumps(clean_json_content(value), sort_keys=True)
+
+
+def _concept_type_expr(
+    concept: ResolvedConcept,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
+    """Render the explicit TypeScript type required to break recursive schema inference."""
+    if concept.base_ref is not None and not concept.fields:
+        base = by_ref.get(concept.base_ref)
+        return type_name_by_ref[base.concept_ref] if base is not None else "unknown"
+    if concept.structureless:
+        return "unknown"
+    field_lines = "\n".join(_render_type_field(field, by_ref=by_ref, type_name_by_ref=type_name_by_ref) for field in concept.fields)
+    return f"{{\n{field_lines}\n}}"
+
+
+def _render_type_field(
+    concept_field: ResolvedField,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
+    optional_marker = "?" if not concept_field.required and concept_field.default_value is None else ""
+    type_expr = _ts_type(concept_field.resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
+    return f"  {concept_field.name}{optional_marker}: {type_expr};"
+
+
+def _ts_type(
+    resolved_type: ResolvedType,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
+    """Render one neutral resolved type as an explicit TypeScript type expression."""
+    match resolved_type.kind:
+        case ResolvedTypeKind.TEXT | ResolvedTypeKind.DATE | ResolvedTypeKind.DATETIME | ResolvedTypeKind.TIME:
+            return "string"
+        case ResolvedTypeKind.NUMBER | ResolvedTypeKind.INTEGER:
+            return "number"
+        case ResolvedTypeKind.BOOLEAN:
+            return "boolean"
+        case ResolvedTypeKind.LITERAL:
+            return " | ".join(json.dumps(choice) for choice in resolved_type.choices or [])
+        case ResolvedTypeKind.CONCEPT:
+            return _concept_type(resolved_type, by_ref=by_ref, type_name_by_ref=type_name_by_ref)
+        case ResolvedTypeKind.LIST:
+            item = _ts_type(resolved_type.item, by_ref=by_ref, type_name_by_ref=type_name_by_ref) if resolved_type.item else "unknown"
+            return f"Array<{item}>"
+        case ResolvedTypeKind.DICT:
+            value = _ts_type(resolved_type.value, by_ref=by_ref, type_name_by_ref=type_name_by_ref) if resolved_type.value else "unknown"
+            return f"Record<string, {value}>"
+        case ResolvedTypeKind.ANY:
+            return "unknown"
+
+
+def _concept_type(
+    resolved_type: ResolvedType,
+    *,
+    by_ref: dict[str, ResolvedConcept],
+    type_name_by_ref: dict[str, str],
+) -> str:
+    concept_ref = resolved_type.concept_ref
+    if concept_ref is None:
+        return "unknown"
+    concept = by_ref.get(concept_ref)
+    return type_name_by_ref[concept.concept_ref] if concept is not None else "unknown"
+
+
+def _find_recursive_concept_refs(concepts: list[ResolvedConcept]) -> set[str]:
+    """Find concepts that can reach themselves through an in-crate type reference."""
+    graph = {concept.concept_ref: _concept_dependencies(concept) for concept in concepts}
+    recursive_refs: set[str] = set()
+    for origin_ref, dependencies in graph.items():
+        pending_refs = list(dependencies)
+        visited_refs: set[str] = set()
+        while pending_refs:
+            current_ref = pending_refs.pop()
+            if current_ref == origin_ref:
+                recursive_refs.add(origin_ref)
+                break
+            if current_ref in visited_refs:
+                continue
+            visited_refs.add(current_ref)
+            pending_refs.extend(graph.get(current_ref, set()))
+    return recursive_refs
+
+
+def _concept_dependencies(concept: ResolvedConcept) -> set[str]:
+    dependencies: set[str] = {concept.base_ref} if concept.base_ref is not None else set()
+    for concept_field in concept.fields:
+        dependencies.update(_resolved_type_concept_refs(concept_field.resolved_type))
+    return dependencies
+
+
+def _resolved_type_concept_refs(resolved_type: ResolvedType) -> set[str]:
+    concept_refs: set[str] = {resolved_type.concept_ref} if resolved_type.concept_ref is not None else set()
+    for child_type in (resolved_type.item, resolved_type.key, resolved_type.value):
+        if child_type is not None:
+            concept_refs.update(_resolved_type_concept_refs(child_type))
+    return concept_refs
 
 
 def _zod_type(

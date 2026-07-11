@@ -45,7 +45,8 @@ def allocate_ts_type_names(library: ResolvedLibrary) -> dict[str, str]:
     A bare concept keeps its authored code when it collides with a generated qualified candidate.
     Other ties are settled by qualified ref, independent of input order. Numeric suffix allocation
     reserves every unsuffixed candidate first, so a disambiguated name cannot steal another
-    concept's natural candidate.
+    concept's natural candidate. Each allocated type also reserves its derived `<Type>Schema`
+    identifier because both names are imported together by the binder.
     """
     concepts_by_candidate: dict[str, list[ResolvedConcept]] = {}
     for concept in library.concepts:
@@ -53,25 +54,34 @@ def allocate_ts_type_names(library: ResolvedLibrary) -> dict[str, str]:
         concepts_by_candidate.setdefault(candidate, []).append(concept)
 
     reserved_names = set(concepts_by_candidate)
-    used_names: set[str] = set()
+    used_symbols: set[str] = set()
     allocated_by_ref: dict[str, str] = {}
     for candidate, concepts in sorted(concepts_by_candidate.items()):
         ordered_concepts = sorted(concepts, key=lambda concept: (concept.needs_qualification, concept.concept_ref))
-        first_concept = ordered_concepts[0]
-        allocated_by_ref[first_concept.concept_ref] = candidate
-        used_names.add(candidate)
-
         suffix = 2
-        for concept in ordered_concepts[1:]:
-            allocated_name = f"{candidate}{suffix}"
-            while allocated_name in reserved_names or allocated_name in used_names:
-                suffix += 1
+        for concept_index, concept in enumerate(ordered_concepts):
+            if concept_index == 0 and _ts_symbols_are_free(candidate, used_symbols=used_symbols):
+                allocated_name = candidate
+            else:
                 allocated_name = f"{candidate}{suffix}"
+                while (
+                    not _ts_symbols_are_free(allocated_name, used_symbols=used_symbols)
+                    or allocated_name in reserved_names
+                    or f"{allocated_name}Schema" in reserved_names
+                ):
+                    suffix += 1
+                    allocated_name = f"{candidate}{suffix}"
+                suffix += 1
             allocated_by_ref[concept.concept_ref] = allocated_name
-            used_names.add(allocated_name)
-            suffix += 1
+            used_symbols.add(allocated_name)
+            used_symbols.add(f"{allocated_name}Schema")
 
     return allocated_by_ref
+
+
+def _ts_symbols_are_free(type_name: str, *, used_symbols: set[str]) -> bool:
+    """Whether a type and its derived schema identifier are both unclaimed."""
+    return type_name not in used_symbols and f"{type_name}Schema" not in used_symbols
 
 
 def runtime_to_emitted_class_names(library: ResolvedLibrary) -> dict[str, str]:

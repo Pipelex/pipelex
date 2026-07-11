@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from pipelex.codegen.emission import WriteReport, build_stamped_projection, write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
+from pipelex.codegen.exceptions import CodegenError
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, load_lock
 from pipelex.codegen.stamp import has_stamp
 
@@ -38,6 +41,17 @@ class TestEmission:
         assert lock is not None
         assert lock.crate_fingerprint == "fp1"
         assert lock.paths() == {"models.py", "types.ts"}
+
+    def test_first_write_refuses_unowned_destination_without_partial_writes(self, tmp_path: Path) -> None:
+        hand_authored = "// hand-authored module\n"
+        (tmp_path / "types.ts").write_text(hand_authored, encoding="utf-8")
+
+        with pytest.raises(CodegenError, match="Refusing to overwrite unowned file"):
+            self._write(tmp_path)
+
+        assert (tmp_path / "types.ts").read_text(encoding="utf-8") == hand_authored
+        assert not (tmp_path / "models.py").exists()
+        assert not (tmp_path / CODEGEN_LOCK_FILENAME).exists()
 
     def test_body_is_preserved_below_the_stamp(self, tmp_path: Path) -> None:
         self._write(tmp_path)

@@ -71,6 +71,32 @@ def temporal_defaults_crate() -> LibraryCrate:
 
 
 @pytest.fixture
+def reordered_dict_default_crates() -> tuple[LibraryCrate, LibraryCrate]:
+    """Equivalent crates whose dictionary defaults differ only by insertion order."""
+
+    def make_crate(default_value: dict[str, str]) -> LibraryCrate:
+        return LibraryCrate(
+            mthds_version=CRATE_TEST_VERSION,
+            concepts={
+                "settings.Options": ConceptBlueprint(
+                    description="Options",
+                    structure={
+                        "labels": ConceptStructureBlueprint(
+                            description="Labels by key",
+                            type=ConceptStructureBlueprintFieldType.DICT,
+                            key_type="text",
+                            value_type="text",
+                            default_value=default_value,
+                        )
+                    },
+                )
+            },
+        )
+
+    return make_crate({"zeta": "last", "alpha": "first"}), make_crate({"alpha": "first", "zeta": "last"})
+
+
+@pytest.fixture
 def edge_crate() -> LibraryCrate:
     """A crate exercising the honest edges: cross-domain code collision, an imprecise (untyped) list, a
     multi-word field (snake<->camel), a structureless concept, and a Python-class-backed opaque concept.
