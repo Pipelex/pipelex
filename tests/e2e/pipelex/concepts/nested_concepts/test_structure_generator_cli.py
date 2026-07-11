@@ -26,7 +26,7 @@ from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
-from pipelex.hub import get_library_manager
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 
@@ -47,11 +47,18 @@ class TestStructureGeneratorCLI:
         assert (bundle_dir / "nested_concepts.mthds").exists()
 
         library_manager = get_library_manager()
+        previous_library_id = get_current_library_id_or_none()
         resolve_library_id = load_libraries_and_activate([bundle_dir])
-        crate = library_manager.get_crate(resolve_library_id)
-        assert crate is not None
-        normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
-        library_manager.teardown(library_id=resolve_library_id)
+        try:
+            crate = library_manager.get_crate(resolve_library_id)
+            assert crate is not None
+            normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+        finally:
+            if previous_library_id is not None:
+                set_current_library(library_id=previous_library_id)
+            else:
+                clear_current_library()
+            library_manager.teardown(library_id=resolve_library_id)
 
         with tempfile.TemporaryDirectory() as temp_dir:
             output_directory = Path(temp_dir)

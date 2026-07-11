@@ -9,6 +9,7 @@ layer runs for real against tmp_path.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,8 +23,6 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_crate import LibraryCrate
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 CMD_MODULE = "pipelex.cli.agent_cli.commands.codegen.types_cmd"
@@ -143,3 +142,25 @@ class TestAgentCodegenTypesCmd:
 
         assert boot.call_args.kwargs["needs_inference"] is False
         assert boot.call_args.kwargs["needs_model_specs"] is True
+
+    def test_expands_home_relative_output(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        self._neutralize_boot(mocker)
+        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{CMD_MODULE}.emit_types", return_value=[])
+        write_projection = mocker.patch(f"{CMD_MODULE}.write_stamped_projection")
+        write_projection.return_value.written = []
+        write_projection.return_value.unchanged = []
+        write_projection.return_value.removed = []
+        write_projection.return_value.lock_path = CODEGEN_LOCK_FILENAME
+
+        agent_codegen_types_cmd(
+            target=CodegenTarget.PYTHON_PYDANTIC,
+            paths=None,
+            output_dir="~/generated",
+            library_dir=None,
+            output_format=CliOutputFormat.JSON,
+            error_format=None,
+        )
+
+        assert write_projection.call_args.kwargs["output_dir"] == Path.home() / "generated"
+        capsys.readouterr()

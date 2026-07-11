@@ -95,6 +95,9 @@ class ConceptStructureBlueprint(BaseModel):
                 if not self.key_type:
                     msg = f"When type is 'dict', key_type must not be empty. Actual key_type: {self.key_type}"
                     raise ValueError(msg)
+                if self.key_type not in {"text", "str"}:
+                    msg = f"When type is 'dict', key_type must be 'text'. Actual key_type: {self.key_type}"
+                    raise ValueError(msg)
                 if not self.value_type:
                     msg = f"When type is 'dict', value_type must not be empty. Actual value_type: {self.value_type}"
                     raise ValueError(msg)

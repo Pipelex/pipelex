@@ -12,6 +12,8 @@ from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, build_lock, encode_lock,
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pytest_mock import MockerFixture
+
 
 class TestLock:
     def test_build_sorts_artifacts_by_path(self) -> None:
@@ -43,4 +45,12 @@ class TestLock:
         lock_path = tmp_path / CODEGEN_LOCK_FILENAME
         lock_path.write_bytes(b"\xff\xfe not valid utf-8")
         with pytest.raises(CodegenLockError):
+            load_lock(lock_path)
+
+    def test_unreadable_lock_raises_clean_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        lock_path = tmp_path / CODEGEN_LOCK_FILENAME
+        lock_path.write_text("crate_fingerprint = 'fp'", encoding="utf-8")
+        mocker.patch("pipelex.codegen.lock.load_text_from_path", side_effect=PermissionError("permission denied"))
+
+        with pytest.raises(CodegenLockError, match="permission denied"):
             load_lock(lock_path)

@@ -46,7 +46,7 @@ def agent_codegen_check_cmd(
         pipelex-agent codegen check ./generated/ --format json
     """
     set_agent_cli_error_format(error_format or output_format)
-    root_path = Path(root)
+    root_path = Path(root).expanduser()
 
     try:
         report = run_codegen_check(root=root_path)

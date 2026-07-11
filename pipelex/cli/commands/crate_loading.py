@@ -33,7 +33,8 @@ def load_normalized_crate(*, library_dirs: list[Path] | None) -> LibraryCrate:
         PipeLibraryError: A pipe conflict across bundles (a negative verdict).
         FileNotFoundError: The closure could not be assembled, or it holds no .mthds bundles (no verdict).
     """
-    library_id = load_libraries_and_activate(library_dirs)
+    expanded_library_dirs = [library_dir.expanduser() for library_dir in library_dirs] if library_dirs is not None else None
+    library_id = load_libraries_and_activate(expanded_library_dirs)
     crate = get_library_manager().get_crate(library_id)
     if crate is None:
         msg = "no .mthds bundles found in the closure."

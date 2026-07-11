@@ -9,11 +9,13 @@ The real end-to-end exit codes against the binary are pinned by the conformance 
 from __future__ import annotations
 
 import contextlib
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 import typer
 
+from pipelex.cli.commands.crate_loading import load_normalized_crate
 from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.codegen.crate_encoding import CrateEncoding
 from pipelex.libraries.exceptions import LibraryLoadingError
@@ -98,3 +100,13 @@ class TestResolveExitCodes:
         resolve_cmd(paths=None, output_format=CrateEncoding.JSON, library_dir=None)
         assert boot.call_args.kwargs["needs_inference"] is False
         assert boot.call_args.kwargs["needs_model_specs"] is True
+
+    def test_home_relative_library_dirs_are_expanded(self, mocker: MockerFixture) -> None:
+        activate = mocker.patch(f"{CRATE_LOADING}.load_libraries_and_activate", return_value="lib-1")
+        library_manager = mocker.patch(f"{CRATE_LOADING}.get_library_manager").return_value
+        library_manager.get_crate.return_value = mocker.MagicMock()
+        mocker.patch(f"{CRATE_LOADING}.normalize_crate", return_value=mocker.MagicMock())
+
+        load_normalized_crate(library_dirs=[Path("~/bundles")])
+
+        activate.assert_called_once_with([Path.home() / "bundles"])

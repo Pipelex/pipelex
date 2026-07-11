@@ -8,6 +8,7 @@ agent-CLI wiring: an up-to-date verdict is a success envelope, drift is a struct
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -19,8 +20,6 @@ from pipelex.codegen.check import CodegenCheckReport, CodegenDrift, DriftCategor
 from pipelex.codegen.exceptions import CodegenLockError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 CMD_MODULE = "pipelex.cli.agent_cli.commands.codegen.check_cmd"
@@ -46,6 +45,14 @@ class TestAgentCodegenCheckCmd:
 
         stdout = capsys.readouterr().out
         assert stdout.startswith("# Generated artifacts up to date")
+
+    def test_expands_home_relative_root(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        check = mocker.patch(f"{CMD_MODULE}.run_codegen_check", return_value=CodegenCheckReport(lock_found=True))
+
+        agent_codegen_check_cmd(root="~/generated", output_format=CliOutputFormat.JSON, error_format=None)
+
+        assert check.call_args.kwargs["root"] == Path.home() / "generated"
+        capsys.readouterr()
 
     def test_drift_is_structured_negative_verdict_exit_1(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """Drift is a produced negative verdict: exit 1 with the drifting artifacts enumerated in the envelope."""

@@ -16,6 +16,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
+from pipelex.codegen.exceptions import CodegenError, CodegenLockError
 from pipelex.codegen.lock import (
     CODEGEN_LOCK_FILENAME,
     CodegenLock,
@@ -145,7 +146,16 @@ def write_stamped_projection(
 
 
 def _previous_tracked_paths(lock_path: Path) -> set[str]:
-    lock = load_lock(lock_path)
+    try:
+        lock = load_lock(lock_path)
+    except CodegenLockError as exc:
+        if isinstance(exc.__cause__, CodegenError):
+            # Unsafe tracked paths are not corrupt state to overwrite: they are a security
+            # violation, and suppressing them would weaken the containment boundary.
+            raise
+        # A new projection is authoritative and can replace a corrupt prior lock. Without a
+        # trustworthy artifact set there is nothing safe to prune, so recover with an empty set.
+        return set()
     return lock.paths() if lock is not None else set()
 
 

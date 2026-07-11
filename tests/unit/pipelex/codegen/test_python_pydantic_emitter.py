@@ -3,6 +3,7 @@ from pathlib import Path
 
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.libraries.library_crate import LibraryCrate
 from tests.unit.pipelex.codegen.conftest import load_generated_module
 
@@ -90,6 +91,16 @@ class TestPythonPydanticEmitter:
         assert legacy.model_dump() == payload
         blob = module.Blob.model_validate(payload)
         assert blob.model_dump() == payload
+
+    def test_unresolved_refinement_passes_content_through(self, tmp_path: Path):
+        crate = LibraryCrate(concepts={"consumer.ExternalReport": ConceptBlueprint(description="External report", refines="vendor->reports.Report")})
+        content = emit_python_pydantic(resolve_concepts_from_crate(crate))[0].content
+        module = load_generated_module(content, tmp_path=tmp_path, name="gen_models_external_refinement")
+        payload = {"kind": "external", "nested": {"score": 3}}
+
+        report = module.ExternalReport.model_validate(payload)
+
+        assert report.model_dump() == payload
 
     def test_collision_qualifies_class_names(self, edge_crate: LibraryCrate):
         content = emit_python_pydantic(resolve_concepts_from_crate(edge_crate))[0].content

@@ -9,6 +9,7 @@ unit tests). End-to-end behavior against the binary is pinned by the conformance
 from __future__ import annotations
 
 import contextlib
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -24,7 +25,6 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
-    from pathlib import Path
     from unittest.mock import MagicMock
 
     from pytest_mock import MockerFixture
@@ -94,6 +94,20 @@ class TestCodegenCli:
         with pytest.raises(typer.Exit) as exc_info:
             codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir=str(tmp_path), library_dir=None)
         assert exc_info.value.exit_code == 1
+
+    def test_types_expands_home_relative_output(self, mocker: MockerFixture) -> None:
+        self._neutralize_boot(mocker, module=TYPES)
+        mocker.patch(f"{TYPES}.load_normalized_crate_or_exit", return_value=LibraryCrate(fingerprint="deadbeef"))
+        mocker.patch(f"{TYPES}.emit_types", return_value=[])
+        write_projection = mocker.patch(f"{TYPES}.write_stamped_projection")
+        write_projection.return_value.written = []
+        write_projection.return_value.unchanged = []
+        write_projection.return_value.removed = []
+        write_projection.return_value.lock_path = CODEGEN_LOCK_FILENAME
+
+        codegen_types_cmd(target=CodegenTarget.TS_ZOD, paths=None, output_dir="~/generated", library_dir=None)
+
+        assert write_projection.call_args.kwargs["output_dir"] == Path.home() / "generated"
 
     def test_inputs_defaults_to_the_single_main_pipe(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._neutralize_boot(mocker, module=INPUTS)

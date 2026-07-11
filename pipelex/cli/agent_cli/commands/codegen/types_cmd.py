@@ -71,7 +71,7 @@ def agent_codegen_types_cmd(
         pipelex-agent codegen types --target python-structures -L ./shared_pipes/ --format json
     """
     set_agent_cli_error_format(error_format or output_format)
-    output_root = Path(output_dir)
+    output_root = Path(output_dir).expanduser()
     # needs_model_specs=True (like `validate`): library validation checks pipe model pins
     # against the deck, so the specs must be loaded even though codegen needs no inference.
     make_pipelex_for_agent_cli(needs_inference=False, needs_model_specs=True)

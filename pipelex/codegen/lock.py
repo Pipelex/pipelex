@@ -169,8 +169,9 @@ def load_lock(lock_path: Path) -> CodegenLock | None:
         lock = CodegenLock.model_validate(data)
         validate_artifact_paths(entry.path for entry in lock.artifacts)
         return lock
-    except (CodegenError, TomlError, ValueError, TypeError) as exc:
+    except (CodegenError, TomlError, OSError, ValueError, TypeError) as exc:
         # TomlError = malformed TOML; UnicodeDecodeError/ValueError = non-UTF-8 bytes or a pydantic
-        # ValidationError on a shape mismatch (UnicodeDecodeError is a ValueError subclass).
+        # ValidationError on a shape mismatch (UnicodeDecodeError is a ValueError subclass);
+        # OSError = the lock exists but cannot be read.
         msg = f"Malformed or unsafe codegen lock at '{lock_path}': {exc}"
         raise CodegenLockError(msg) from exc

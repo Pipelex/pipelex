@@ -86,7 +86,7 @@ def codegen_inputs_cmd(
                 typer.secho(str(exc), fg=typer.colors.YELLOW)
                 raise typer.Exit(0) from exc
 
-            destination = Path(output) if output else Path("results") / default_file_name
+            destination = Path(output).expanduser() if output else Path("results") / default_file_name
             # Write-if-changed, like `codegen types`: no mtime churn and a truthful console verdict
             # when the committed template is already current.
             if destination.is_file() and destination.read_text(encoding="utf-8") == content:

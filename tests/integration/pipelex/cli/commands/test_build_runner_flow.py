@@ -13,7 +13,7 @@ import pytest
 
 from pipelex.cli.commands.build.runner._runner_core import _prepare_runner_core  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
-from pipelex.hub import clear_current_library, get_current_library, get_library_manager
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 
 _BUNDLE_MTHDS = """\
 domain = "runnerflow"
@@ -54,9 +54,10 @@ class TestBuildRunnerFlow:
             finally:
                 # validate_bundle leaves its library open and current (loaded-on-success); the CLI
                 # wrapper tears the whole Pipelex down, so the test cleans up the library itself.
-                library_id = get_current_library()
-                clear_current_library()
-                get_library_manager().teardown(library_id=library_id)
+                library_id = get_current_library_id_or_none()
+                if library_id is not None:
+                    clear_current_library()
+                    get_library_manager().teardown(library_id=library_id)
 
             structures_file = bundle_dir / "structures" / "structures.py"
             assert structures_file.is_file()

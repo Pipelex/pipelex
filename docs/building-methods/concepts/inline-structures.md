@@ -61,6 +61,8 @@ Each field can specify:
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
 
+Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
+
 ## Supported Field Types
 
 Inline structures support these field types:
@@ -156,7 +158,7 @@ scores = { type = "list", item_type = "number", description = "Test scores" }
 
 ### dict
 
-Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**.
+Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**. Dictionary keys are text on the JSON wire, so `key_type` must be `"text"` (`"str"` remains accepted as a legacy spelling).
 
 ```toml
 [concept.Configuration.structure]
@@ -326,4 +328,3 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
 - [MTHDS Language Tutorial](../../get-started/mthds-language-tutorial.md) - Get started with structured outputs
-

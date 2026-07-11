@@ -85,3 +85,13 @@ class TestEmission:
         report = self._write(tmp_path, fingerprint="fp2", files=[_FILES[0]])
         assert report.removed == []
         assert (tmp_path / "types.ts").exists()
+
+    def test_regeneration_recovers_from_a_malformed_previous_lock(self, tmp_path: Path) -> None:
+        (tmp_path / CODEGEN_LOCK_FILENAME).write_text("not = valid = toml [[", encoding="utf-8")
+
+        report = self._write(tmp_path)
+
+        assert set(report.written) == {"models.py", "types.ts"}
+        lock = load_lock(tmp_path / CODEGEN_LOCK_FILENAME)
+        assert lock is not None
+        assert lock.paths() == {"models.py", "types.ts"}

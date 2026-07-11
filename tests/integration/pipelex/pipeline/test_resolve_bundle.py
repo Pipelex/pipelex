@@ -64,6 +64,17 @@ output = "Text"
 prompt = "Do something with $doc"
 """
 
+ADDRESS_DEPENDENCY_MTHDS = """\
+domain = "host"
+
+[pipe.run_host]
+type = "PipeSequence"
+description = "Run an installed dependency"
+inputs = { doc = "Text" }
+output = "Text"
+steps = [{ pipe = "github.com/org/pkg->remote.process", result = "result" }]
+"""
+
 
 class TestResolveCrateFromContents:
     def test_multi_bundle_contents_resolve_to_normalized_crate(self, load_empty_library: Callable[[], str]):
@@ -124,3 +135,15 @@ class TestResolveCrateFromContents:
     def test_sources_length_mismatch_is_a_host_wiring_error(self):
         with pytest.raises(PipelexUnexpectedError):
             resolve_crate_from_contents(mthds_contents=[MAIN_MTHDS], mthds_sources=["a.mthds", "b.mthds"])
+
+    def test_address_dependency_is_rejected_without_filesystem_discovery(self, load_empty_library: Callable[[], str], mocker: MockerFixture) -> None:
+        load_empty_library()
+        discovery = mocker.patch(
+            "pipelex.libraries.library_manager.find_method_by_full_address",
+            side_effect=AssertionError("in-memory resolve must not discover installed methods"),
+        )
+
+        with pytest.raises(ValidateBundleError, match="address-based dependency"):
+            resolve_crate_from_contents(mthds_contents=[ADDRESS_DEPENDENCY_MTHDS], mthds_sources=["host.mthds"])
+
+        discovery.assert_not_called()

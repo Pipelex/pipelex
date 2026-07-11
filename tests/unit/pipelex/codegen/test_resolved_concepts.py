@@ -1,5 +1,6 @@
 from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.codegen.resolved_fields import ResolvedTypeKind, iter_imprecision_reasons
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.libraries.library_crate import LibraryCrate
 
 
@@ -62,3 +63,13 @@ class TestResolvedConcepts:
         assert thumbnail.base_ref == "native.Image"
         assert thumbnail.structureless is False
         assert thumbnail.fields == []
+
+    def test_unresolved_refinement_is_opaque(self):
+        crate = LibraryCrate(concepts={"consumer.ExternalReport": ConceptBlueprint(description="External report", refines="vendor->reports.Report")})
+
+        report = resolve_concepts_from_crate(crate).by_ref()["consumer.ExternalReport"]
+
+        assert report.base_ref == "vendor->reports.Report"
+        assert report.structureless is True
+        assert report.fields == []
+        assert "not available in this crate" in (report.imprecision_reason or "")

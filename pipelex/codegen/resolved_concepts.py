@@ -76,18 +76,26 @@ def resolve_concepts_from_crate(crate: LibraryCrate) -> ResolvedLibrary:
     definition and every reference agree on the spelling.
     """
     code_counts = Counter(QualifiedRef.parse(concept_ref).local_code for concept_ref in crate.concepts)
+    available_refs = set(crate.concepts)
     concepts = [
         _resolve_concept(
             concept_ref,
             value=value,
             needs_qualification=code_counts[QualifiedRef.parse(concept_ref).local_code] > 1,
+            available_refs=available_refs,
         )
         for concept_ref, value in sorted(crate.concepts.items())
     ]
     return ResolvedLibrary(mthds_version=crate.mthds_version, concepts=concepts)
 
 
-def _resolve_concept(concept_ref: str, *, value: ConceptBlueprint | str, needs_qualification: bool) -> ResolvedConcept:
+def _resolve_concept(
+    concept_ref: str,
+    *,
+    value: ConceptBlueprint | str,
+    needs_qualification: bool,
+    available_refs: set[str],
+) -> ResolvedConcept:
     parsed = QualifiedRef.parse(concept_ref)
     domain = parsed.domain_path or ""
     code = parsed.local_code
@@ -119,8 +127,10 @@ def _resolve_concept(concept_ref: str, *, value: ConceptBlueprint | str, needs_q
         fields = resolve_structure_fields(normalize_structure_blueprint(value.structure), local_domain=domain)
     elif value.refines:
         description = value.description
-        structureless = False
         base_ref = value.refines
+        structureless = not (NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=value.refines) or value.refines in available_refs)
+        if structureless:
+            imprecision_reason = f"refinement base '{value.refines}' is not available in this crate"
     else:
         description = value.description
         structureless = True

@@ -17,7 +17,9 @@ from typing import Sequence
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import (
     clear_current_library,
     get_current_library_id_or_none,
@@ -26,6 +28,7 @@ from pipelex.hub import (
 )
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
 
 
@@ -74,6 +77,7 @@ def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Seq
                 PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source)
                 for content, source in zip(mthds_contents, content_sources, strict=True)
             ]
+            _reject_address_based_dependencies(blueprints=blueprints)
             # load_from_blueprints ends in load_from_crate, whose last step is
             # library.validate_library() — so a crate read after it satisfies the D6
             # "built only from a valid library" contract.
@@ -96,3 +100,18 @@ def resolve_crate_from_contents(*, mthds_contents: list[str], mthds_sources: Seq
             else:
                 clear_current_library()
             library_manager.teardown(library_id=library_id)
+
+
+def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprint]) -> None:
+    """Keep contents-only resolution independent from installed methods on the host filesystem."""
+    for blueprint in blueprints:
+        for pipe_ref, _context in blueprint.collect_pipe_references():
+            if not QualifiedRef.has_cross_package_prefix(pipe_ref):
+                continue
+            alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref)
+            if QualifiedRef.is_address_based_alias(alias):
+                msg = (
+                    f"In-memory resolve cannot load address-based dependency '{alias}' from the host filesystem; "
+                    "provide the dependency contents in the request or use directory-based resolution."
+                )
+                raise PipeLibraryError(msg)

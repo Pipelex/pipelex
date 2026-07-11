@@ -15,6 +15,7 @@ from typing import Annotated
 import typer
 
 from pipelex.codegen.check import CodegenCheckReport, run_codegen_check
+from pipelex.codegen.exceptions import CodegenLockError
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 
 
@@ -25,8 +26,12 @@ def codegen_check_cmd(
     ] = ".",
 ) -> None:
     """Verify generated artifacts are current, offline — no engine, no network, no API key."""
-    root_path = Path(root)
-    report = run_codegen_check(root=root_path)
+    root_path = Path(root).expanduser()
+    try:
+        report = run_codegen_check(root=root_path)
+    except CodegenLockError as exc:
+        typer.secho(exc.message, fg=typer.colors.RED, err=True)
+        raise typer.Exit(2) from exc
     if not report.lock_found:
         typer.secho(f"No {CODEGEN_LOCK_FILENAME} found in '{root_path}' — nothing to check.", fg=typer.colors.YELLOW, err=True)
         raise typer.Exit(2)
