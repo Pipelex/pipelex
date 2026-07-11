@@ -100,6 +100,11 @@ param = "categories"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/builder/operations/pipe_ops.py::_normalize_output"]
+param = "data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/builder/operations/pipe_ops.py::_normalize_pipe_code_aliases"]
 param = "data"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -160,13 +165,13 @@ param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/builder/runner_code.py::_collect_concept_info"]
-param = "concept"
+["pipelex/builder/runner_code.py::_collect_imports_for_inputs"]
+param = "inputs"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/builder/runner_code.py::_collect_imports_for_inputs"]
-param = "inputs"
+["pipelex/builder/runner_code.py::_custom_import_statement"]
+param = "class_name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -215,6 +220,11 @@ param = "payload"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cli/agent_cli/commands/agent_output.py::_render_validate_bundle_markdown"]
+param = "items"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -222,6 +232,11 @@ seeded = true
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_markdown"]
 param = "message"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_validate_bundle"]
+param = "exc"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -250,7 +265,32 @@ param = "error_format"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::_handle_resolution_error"]
+param = "error"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::_stringify_library_dirs"]
+param = "library_dirs"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::resolve_bundle_target"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cli/agent_cli/commands/check_model_cmd.py::_format_check_markdown"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/codegen/check_cmd.py::_format_codegen_check_markdown"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/codegen/types_cmd.py::_format_codegen_types_markdown"]
 param = "result"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -261,6 +301,21 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/cli/agent_cli/commands/doctor_cmd.py::_format_doctor_markdown"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/fix/bundle_cmd.py::_failure_message"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/fix/bundle_cmd.py::_normalize_rule_codes"]
+param = "codes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/fix/bundle_cmd.py::_result_payload"]
 param = "result"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -287,6 +342,16 @@ seeded = true
 
 ["pipelex/cli/agent_cli/commands/init_cmd.py::_parse_config_arg"]
 param = "config_arg"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/inputs/_inputs_core.py::emit_inputs_result"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/agent_cli/commands/inputs/_inputs_core.py::emit_no_inputs_result"]
+param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -370,6 +435,11 @@ param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cli/bundle_target_resolution.py::resolve_bundle_target_core"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cli/commands/build/inputs/_inputs_core.py::_generate_inputs_core"]
 param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -400,18 +470,28 @@ param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cli/commands/build/structures_cmd.py::_build_concept_ref_to_class_info"]
-param = "blueprints"
+["pipelex/cli/commands/bundle_path_resolver.py::_handle_resolution_error"]
+param = "error"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cli/commands/build/structures_cmd.py::_compute_relative_path_from_output_dir"]
-param = "output_directory"
+["pipelex/cli/commands/bundle_path_resolver.py::_stringify_library_dirs"]
+param = "library_dirs"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cli/commands/build/structures_cmd.py::generate_structures_from_blueprints"]
-param = "blueprints"
+["pipelex/cli/commands/bundle_path_resolver.py::resolve_bundle_target"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/codegen/check_cmd.py::_print_report"]
+param = "report"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/codegen/inputs_cmd.py::_default_main_pipe_ref"]
+param = "crate"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -457,6 +537,56 @@ seeded = true
 
 ["pipelex/cli/commands/doctor_cmd.py::setup_doctor_runtime"]
 param = "log_config_overrides"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_diff_sandbox.py::PreviewSandbox.to_original"]
+param = "path_str"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_diff_sandbox.py::mirror_bundle_for_preview"]
+param = "entry_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_print_applied_fixes"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_print_preview_diffs"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_print_work_done"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_remap_result_to_originals"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_remap_validation_error_to_original"]
+param = "item"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_render_fix_result"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::_run_fix_preview"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/fix/_fix_core.py::execute_fix"]
+param = "bundle_path"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -620,8 +750,23 @@ param = "server"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cli/commands/run/_inputs_path_resolver.py::is_relative_local_path"]
-param = "uri"
+["pipelex/cli/commands/run/_inputs_file_loader.py::_convert_temporal_inputs"]
+param = "inputs_dict"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/run/_inputs_file_loader.py::find_default_inputs_file"]
+param = "directory"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/run/_inputs_file_loader.py::load_inputs_dict_from_path"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/run/_inputs_file_loader.py::resolve_inputs_arg_against_dir"]
+param = "inputs_arg"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -667,6 +812,11 @@ seeded = true
 
 ["pipelex/cli/commands/update_cmd.py::_summary_panel"]
 param = "message"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/commands/validate/_validate_core.py::_echo_optionality_warnings"]
+param = "pipes"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -1157,12 +1307,22 @@ param = "reference_files"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cli/error_handlers.py::_display_validation_error_details"]
+["pipelex/cli/error_handlers.py::_display_validation_error_item"]
 param = "console"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cli/error_handlers.py::_validation_category_header"]
+param = "category"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cli/error_handlers.py::display_error_panel"]
+param = "console"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cli/error_handlers.py::display_validation_error_items"]
 param = "console"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -1294,6 +1454,456 @@ seeded = true
 
 ["pipelex/cli/method_resolver.py::resolve_pipe_from_exports"]
 param = "pipe_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/check.py::_iter_stampable_files"]
+param = "directory"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/check.py::_read_text_or_none"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/crate_encoding.py::_dump_object"]
+param = "obj"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/crate_encoding.py::_encoding_payload"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/crate_encoding.py::encode_crate"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/crate_encoding.py::encode_crate_json"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/crate_encoding.py::encode_crate_toml"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emission.py::_previous_tracked_paths"]
+param = "lock_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emission.py::_write_if_changed"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emission.py::build_stamped_projection"]
+param = "emitted"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emission.py::write_stamped_projection"]
+param = "emitted"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/naming.py::_ts_symbols_are_free"]
+param = "type_name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/naming.py::allocate_ts_type_names"]
+param = "library"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/naming.py::runtime_to_emitted_class_names"]
+param = "library"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/naming.py::snake_to_pascal"]
+param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::class_docstring"]
+param = "description"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::escape_py_string"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::field_line"]
+param = "field"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::format_default_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::order_by_base"]
+param = "concepts"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_common.py::order_by_base.visit"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::_annotation"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::_base_class"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::_concept_annotation"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::_render_class"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::_render_field"]
+param = "concept_field"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_pydantic.py::emit_python_pydantic"]
+param = "library"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_annotation"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_base_class"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_concept_annotation"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_native_class"]
+param = "concept_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_render_class"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::_render_field"]
+param = "concept_field"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/python_structures.py::emit_python_structures"]
+param = "library"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_binder_pair"]
+param = "type_name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_concept_dependencies"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_concept_schema"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_concept_type"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_concept_type_expr"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_emit_binder"]
+param = "concepts"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_find_recursive_concept_refs"]
+param = "concepts"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_format_default_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_jsdoc"]
+param = "description"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_render_field"]
+param = "concept_field"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_render_schema"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_render_type_field"]
+param = "concept_field"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_resolved_type_concept_refs"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_sanitize_jsdoc_text"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_schema_expr"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_ts_type"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::_zod_type"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/ts_zod.py::emit_ts_zod"]
+param = "library"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/emitters/types_emitter.py::emit_types"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::_raise_path_error"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::_reject_symlink_components"]
+param = "root"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::encode_lock"]
+param = "lock"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::load_lock"]
+param = "lock_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::resolve_artifact_path"]
+param = "root"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::resolve_output_path"]
+param = "root"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::validate_artifact_path"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/lock.py::validate_artifact_paths"]
+param = "paths"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_annotation_to_blueprint"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_is_nested_model"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_is_number_union"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_list_blueprint"]
+param = "list_annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_native_code_for_content_class"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_scalar_field_type"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::_strip_optional"]
+param = "annotation"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::collect_native_refs_from_structure"]
+param = "structure"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::materialize_native_concept"]
+param = "native_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/native_expansion.py::reflect_native_structure"]
+param = "native_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_concepts.py::_resolve_concept"]
+param = "concept_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_concepts.py::resolve_concepts_from_crate"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::_resolve_concept"]
+param = "concept_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::_resolve_list_item"]
+param = "blueprint"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::_resolve_scalar_type_name"]
+param = "type_name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::_resolve_type"]
+param = "blueprint"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::iter_imprecision_reasons"]
+param = "resolved_type"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::resolve_field"]
+param = "field_name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/resolved_fields.py::resolve_structure_fields"]
+param = "structure_blueprint"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::_kind_from_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::_parse_fields"]
+param = "header_region"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::_parse_options"]
+param = "options_raw"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::_parse_projection"]
+param = "projection"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::_target_from_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::apply_stamp"]
+param = "body"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::comment_prefix_for"]
+param = "filename"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::compute_content_hash"]
+param = "body"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::has_stamp"]
+param = "text"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/codegen/stamp.py::parse_stamped"]
+param = "text"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -2067,11 +2677,6 @@ param = "llm_handle"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/cogt/inference/inference_manager_protocol.py::InferenceManagerProtocol.set_llm_worker_from_external_plugin"]
-param = "llm_handle"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/cogt/inference/transport_retry.py::_make_retry_predicate.should_retry"]
 param = "exc"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -2152,12 +2757,27 @@ param = "response"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._apply_constraints"]
+param = "llm_job"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._before_job"]
 param = "llm_job"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._check_can_perform_job"]
+param = "llm_job"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._check_document_support"]
+param = "llm_job"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._check_vision_support"]
 param = "llm_job"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -2192,6 +2812,11 @@ param = "llm_job"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract._validate_no_reasoning_for_structured_gen"]
+param = "job_params"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/cogt/llm/llm_worker_abstract.py::LLMWorkerAbstract.gen_object"]
 param = "llm_job"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -2204,26 +2829,6 @@ seeded = true
 
 ["pipelex/cogt/llm/llm_worker_factory.py::LLMWorkerFactory.make_llm_worker"]
 param = "inference_model"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._apply_constraints"]
-param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._check_document_support"]
-param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._check_vision_support"]
-param = "llm_job"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/cogt/llm/llm_worker_internal_abstract.py::LLMWorkerInternalAbstract._validate_no_reasoning_for_structured_gen"]
-param = "job_params"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -2727,6 +3332,11 @@ param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/bundles/pipelex_bundle_blueprint.py::_strippable_same_domain_pipe_code"]
+param = "code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/concepts/concept.py::Concept.is_native_concept"]
 param = "concept"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -2877,7 +3487,7 @@ param = "structure_dict"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/core/concepts/helpers.py::strip_multiplicity_from_concept_ref_or_code"]
+["pipelex/core/concepts/helpers.py::strip_markers_from_concept_ref_or_code"]
 param = "concept_ref_or_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -2922,6 +3532,26 @@ param = "concept_ref_or_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/concepts/native/pinned_blueprints.py::_pinned_description"]
+param = "native_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/concepts/native/pinned_blueprints.py::_pinned_structure"]
+param = "native_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/concepts/native/pinned_blueprints.py::_text_field"]
+param = "description"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_blueprint"]
+param = "native_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/concepts/structure_generation/exceptions.py::SyntaxErrorData.from_syntax_error"]
 param = "syntax_error"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -2952,28 +3582,18 @@ param = "class_name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field"]
-param = "field_name"
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_line"]
+param = "resolved_field"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_from_blueprint"]
-param = "field_name"
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_for_concept"]
+param = "resolved_type"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._get_python_type"]
-param = "field_type"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._get_python_type_from_blueprint"]
-param = "field_blueprint"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._resolve_concept_ref_to_type"]
-param = "concept_ref"
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_from_resolved"]
+param = "resolved_type"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3087,8 +3707,23 @@ param = "message"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/interpreter/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
+param = "message"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/interpreter/validation_error_categorizer.py::_extract_variable_names_from_message"]
 param = "message"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/interpreter/validation_error_categorizer.py::_extract_wrapped_invalid_pipe_code_syntax_error"]
+param = "error"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/interpreter/validation_error_categorizer.py::_extract_wrapped_native_concept_redeclaration_error"]
+param = "error"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3099,6 +3734,101 @@ seeded = true
 
 ["pipelex/core/interpreter/validation_error_categorizer.py::categorize_blueprint_validation_error"]
 param = "error"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/absence_render.py::build_absence_html"]
+param = "absence_record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/absence_render.py::build_absence_json"]
+param = "absence_record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/absence_render.py::build_absence_markdown"]
+param = "absence_record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/absence_render.py::build_absence_payload"]
+param = "absence_record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._build_item_content"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._check_input_names"]
+param = "pipeline_inputs"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._describe_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._is_explicit"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._make_content"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._peel_multiplicity"]
+param = "multiplicity"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._reconcile_explicit_multiplicity"]
+param = "stuff"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._resolve_local_path"]
+param = "url"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._shape_explicit"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._shape_list"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._shape_one"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._shape_with_multiplicity"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper._try_shape_csv"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper.resolve_input_kind"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/input_shaper.py::InputShaper.shape"]
+param = "pipeline_inputs"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3127,6 +3857,11 @@ param = "name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_optional_absence"]
+param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_optional_stuff"]
 param = "name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3138,6 +3873,11 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as"]
+param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_date"]
 param = "name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -3187,6 +3927,11 @@ param = "name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuff_as_yes_no"]
+param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/memory/working_memory.py::WorkingMemory.get_stuffs"]
 param = "names"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3199,6 +3944,11 @@ seeded = true
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.is_stuff_exists"]
 param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.list_missing_names"]
+param = "names"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3217,12 +3967,32 @@ param = "item_type"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/memory/working_memory.py::WorkingMemory.record_absence"]
+param = "record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.record_new_main_absence"]
+param = "record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.record_resolved_absence"]
+param = "record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/memory/working_memory.py::WorkingMemory.remove_alias"]
 param = "alias"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.remove_stuff"]
+param = "name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::WorkingMemory.resolve_stuff"]
 param = "name"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -3234,6 +4004,16 @@ seeded = true
 
 ["pipelex/core/memory/working_memory.py::WorkingMemory.set_new_main_stuff"]
 param = "stuff"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::_encode_composite_for_transport"]
+param = "composite"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/memory/working_memory.py::_encode_content_with_class_markers"]
+param = "content"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3307,8 +4087,53 @@ param = "error"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/pipes/inputs/input_renderer.py::_delighten_entry"]
+param = "entry"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::_delighten_template"]
+param = "envelope_template"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::_substitute_none_values"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::_to_toml_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::_unwrap_scalar_content"]
+param = "content"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::build_concept_comments"]
+param = "input_specs"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::build_inputs_template"]
+param = "the_pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/pipes/inputs/input_renderer.py::render_inputs"]
 param = "the_pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::render_inputs_toml"]
+param = "the_pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/inputs/input_renderer.py::serialize_inputs_template_to_toml"]
+param = "template"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3377,12 +4202,22 @@ param = "span"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._expected_inputs_for_fix"]
+param = "needed_inputs"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._format_pipe_run_info"]
 param = "pipe_run_params"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
 ["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._live_run_pipe"]
+param = "job_metadata"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/pipe_abstract.py::PipeAbstract._make_lifted_output"]
 param = "job_metadata"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -3452,6 +4287,16 @@ param = "category_str"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/pipes/pipe_blueprint.py::explicit_signature_tag_migration_message"]
+param = "pipe_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/pipe_blueprint.py::normalize_typeless_signature_section"]
+param = "pipe_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/pipes/pipe_factory.py::PipeFactoryProtocol.make"]
 param = "pipe_category"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3499,6 +4344,11 @@ seeded = true
 
 ["pipelex/core/pipes/validation.py::validate_input_name"]
 param = "input_name"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/pipes/variable_multiplicity.py::PresenceMarker.from_symbol"]
+param = "symbol"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3562,6 +4412,16 @@ param = "raw"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/stuffs/date_content.py::_is_numeric_string"]
+param = "text"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/stuffs/html_rendering.py::render_value_html"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/stuffs/image_content.py::ImageContent.render_with_images"]
 param = "registry"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3584,11 +4444,6 @@ seeded = true
 
 ["pipelex/core/stuffs/list_content.py::ListContent.render_with_images"]
 param = "registry"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_html"]
-param = "value"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -3657,6 +4512,21 @@ param = "text_format"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory._make_date_content"]
+param = "date_subclass"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory._make_time_content"]
+param = "time_subclass"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory._parse_iso_temporal"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/core/stuffs/stuff_content_factory.py::StuffContentFactory.make_content_from_value"]
 param = "stuff_content_subclass"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3708,6 +4578,11 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/core/stuffs/stuff_factory.py::StuffFactory.make_stuff_name"]
+param = "concept"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/core/stuffs/stuff_factory.py::StuffFactory.try_make_csv_list_content"]
 param = "concept"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -3932,6 +4807,11 @@ param = "node_id"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.on_pipe_end_skipped"]
+param = "node_id"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/graph/graph_tracer_protocol.py::GraphTracerProtocol.on_pipe_end_success"]
 param = "node_id"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -3974,6 +4854,11 @@ seeded = true
 
 ["pipelex/graph/graphspec.py::_truncate_string"]
 param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/graph/graphspec.py::output_digest_is_optional"]
+param = "output_specs"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -4242,8 +5127,18 @@ param = "secrets_provider"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/hub.py::PipelexHub.set_secrets_provider_registry"]
+param = "secrets_provider_registry"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/hub.py::PipelexHub.set_storage_provider"]
 param = "storage_provider"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/hub.py::PipelexHub.set_storage_provider_registry"]
+param = "storage_provider_registry"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -4472,6 +5367,11 @@ param = "node"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/language/mthds_schema_generator.py::_normalize_type_on_pipe_definitions"]
+param = "schema"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/language/mthds_schema_generator.py::_patch_construct_schema"]
 param = "schema"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -4488,11 +5388,6 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/language/mthds_schema_generator.py::_remove_internal_fields"]
-param = "schema"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/language/mthds_schema_generator.py::_require_type_on_pipe_definitions"]
 param = "schema"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -4577,6 +5472,76 @@ param = "spec"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/libraries/crate_normalization.py::_add_native_ref"]
+param = "referenced"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_domain_of"]
+param = "qualified_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_flatten_refinement"]
+param = "concepts"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_io_ref_concept"]
+param = "io_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_native_effective_structure"]
+param = "native_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_normalize_concept"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_normalize_pipe"]
+param = "blueprint"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_qualify_concept_ref"]
+param = "concept_ref_or_code"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_qualify_io_ref"]
+param = "io_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_qualify_pipe_ref"]
+param = "pipe_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_qualify_structure_field"]
+param = "field_blueprint"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_render_ref_with_markers"]
+param = "concept_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::_resolve_refinement"]
+param = "concept_ref"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/crate_normalization.py::normalize_crate"]
+param = "crate"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/libraries/domain/domain_library.py::DomainLibrary.add_domain"]
 param = "domain"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -4619,6 +5584,11 @@ seeded = true
 
 ["pipelex/libraries/library.py::Library.set_class_registry"]
 param = "class_registry"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/libraries/library_crate.py::_strip_source"]
+param = "dumped"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -4772,11 +5742,6 @@ param = "pipe_code"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.load_concepts_only_from_blueprints"]
-param = "library_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.load_from_blueprints"]
 param = "library_id"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -4788,11 +5753,6 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.load_libraries"]
-param = "library_id"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/libraries/library_manager_abstract.py::LibraryManagerAbstract.load_libraries_concepts_only"]
 param = "library_id"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -4869,6 +5829,21 @@ seeded = true
 
 ["pipelex/observer/observer_protocol.py::ObserverProtocol.observe_before_run"]
 param = "payload"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipe_controllers/absence_taint.py::effective_consumption_presence"]
+param = "pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipe_controllers/absence_taint.py::is_plural_step_result"]
+param = "pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipe_controllers/absence_taint.py::scan_taint_triggers"]
+param = "pipe"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -5152,6 +6127,11 @@ param = "pipe_run_params"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._generate_absence_files"]
+param = "absence_record"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._generate_graph_files"]
 param = "graph_spec"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -5164,6 +6144,11 @@ seeded = true
 
 ["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._generate_main_stuff_files_from_raw"]
 param = "raw_main_stuff"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipe_run/delivery_executor.py::DeliveryExecutor._get_raw_main_absence"]
+param = "working_memory_raw"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -5297,6 +6282,11 @@ param = "pipes"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/pipeline/controller_taint.py::collect_controller_taint_analyses"]
+param = "pipes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/pipeline/dry_run_pipeline.py::dry_run_pipeline"]
 param = "mthds_contents"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -5314,6 +6304,201 @@ seeded = true
 
 ["pipelex/pipeline/execution_seams.py::prepare_pipe_job"]
 param = "pipe"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applicability.py::is_safe_fix_for_load_scope"]
+param = "fix"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applicability.py::is_target_in_write_scope"]
+param = "target_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_apply_one_op"]
+param = "toml_doc"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_as_tomlkit_value"]
+param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_rename_key_in_place"]
+param = "parent_table"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_render_syntax_diagnostic"]
+param = "diagnostic"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_replace_key_in_container"]
+param = "container"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::_resolve_table"]
+param = "toml_doc"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::apply_fix_ops"]
+param = "toml_doc"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/applier.py::serialize_and_format"]
+param = "toml_doc"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_absolute_source_path"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_assert_snapshot_unchanged"]
+param = "snapshot"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_bind_fixes_to_snapshots"]
+param = "fixes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_cleanup_staged_updates"]
+param = "staged_updates"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_colliding_op_name"]
+param = "fix_op"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_commit_file_updates"]
+param = "updates"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_commit_staged_updates"]
+param = "staged_updates"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_file_state_matches"]
+param = "current_snapshot"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_fix_fingerprint"]
+param = "fix"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_is_signature_pipe_section"]
+param = "pipe_section"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_partition_by_write_scope"]
+param = "fixes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_pending_signatures_from_validation_result"]
+param = "validation_result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_read_file_snapshot"]
+param = "path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_rollback_committed_updates"]
+param = "committed_updates"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_safe_fixes"]
+param = "items"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_split_cross_file_collisions"]
+param = "fixes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_stage_file_update"]
+param = "update"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_validation_error_items"]
+param = "exc"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::_write_staged_file"]
+param = "snapshot"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_loop.py::fix_bundle_file"]
+param = "mthds_file_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_render.py::_format_fix_file"]
+param = "fix_payload"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_render.py::format_fix_markdown"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/fix_render.py::format_fix_still_invalid_markdown"]
+param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::_plan_match_sequence_output"]
+param = "error_data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::_plan_strip_namespace"]
+param = "error_data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::_plan_strip_native_concept_redecl"]
+param = "error_data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::_plan_sync_controller_inputs"]
+param = "error_data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::plan_fix_for_blueprint_validation_error"]
+param = "error_data"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/fixes/planner.py::plan_fix_for_pipe_validation_error"]
+param = "error_data"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -5344,6 +6529,16 @@ seeded = true
 
 ["pipelex/pipeline/input_normalizer.py::normalize_data_urls_to_storage"]
 param = "working_memory"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/liftable_pipes.py::build_liftable_pipes"]
+param = "taint_analyses"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/optionality_warnings.py::build_optionality_warnings"]
+param = "taint_analyses"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -5397,13 +6592,13 @@ param = "extra"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run"]
-param = "loaded_pipes"
+["pipelex/pipeline/validate_bundle.py::_backfill_pipe_error_source"]
+param = "pipe_error"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/pipeline/validate_bundle.py::_translate_to_validate_bundle_error"]
-param = "category"
+["pipelex/pipeline/validate_bundle.py::_pipes_to_dry_run"]
+param = "loaded_pipes"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -5417,16 +6612,6 @@ param = "dry_run_result"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/pipeline/validate_bundle.py::load_concepts_only"]
-param = "mthds_file_path"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
-["pipelex/pipeline/validate_bundle.py::load_concepts_only_from_directory"]
-param = "directory"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/pipeline/validate_bundle.py::validate_bundle"]
 param = "mthds_file_path"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -5437,8 +6622,33 @@ param = "directory"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/pipeline/validation_render.py::_markdown_category_header"]
+param = "category"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/validation_render.py::_render_error_item_markdown"]
+param = "item"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/validation_render.py::build_fix_command"]
+param = "executable"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/validation_render.py::count_applicable_fixes"]
+param = "items"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/pipeline/validation_render.py::format_validate_markdown"]
 param = "result"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/pipeline/validation_render.py::format_validation_error_items_markdown"]
+param = "items"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -6237,6 +7447,41 @@ param = "model_handle"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/plugins/secrets/secrets_plugin.py::SecretsPlugin.register"]
+param = "registrar"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/secrets/secrets_plugin.py::_make_env_secrets_provider"]
+param = "config"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/storage/storage_plugin.py::StoragePlugin.register"]
+param = "registrar"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/storage/storage_plugin.py::_make_gcp_storage_provider"]
+param = "config"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/storage/storage_plugin.py::_make_in_memory_storage_provider"]
+param = "config"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/storage/storage_plugin.py::_make_local_storage_provider"]
+param = "config"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/plugins/storage/storage_plugin.py::_make_s3_storage_provider"]
+param = "config"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/reporting/cost_report_renderer.py::render_cost_report_for_output"]
 param = "pipe_output"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -6294,6 +7539,11 @@ seeded = true
 
 ["pipelex/runtime_bridge/bootstrap.py::ensure_pipelex_booted"]
 param = "config_overrides"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/runtime_bridge/primitives/hydration.py::_hydrate_composite_component"]
+param = "raw_value"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -6864,6 +8114,46 @@ seeded = true
 
 ["pipelex/tools/jinja2/jinja2_filters.py::escape_script_tag"]
 param = "value"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._assign_target_names"]
+param = "target"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._guard_vars"]
+param = "test_node"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._is_unguarded_optional"]
+param = "full_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._record"]
+param = "full_path"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_body"]
+param = "body_nodes"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker._walk_test"]
+param = "test_node"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_GuardWalker.walk"]
+param = "node"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/jinja2/jinja2_optional_guards.py::_build_full_path"]
+param = "node"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
@@ -7992,11 +9282,6 @@ param = "data"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
-["pipelex/tools/storage/storage_provider_factory.py::make_storage_provider_from_config"]
-param = "storage_provider_config"
-rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
-seeded = true
-
 ["pipelex/tools/tabular/csv_codec.py::_annotation_allows_none"]
 param = "annotation"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
@@ -8242,7 +9527,17 @@ param = "uri"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
 
+["pipelex/tools/uri/uri_resolver.py::is_relative_local_path"]
+param = "uri"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
 ["pipelex/tools/uri/uri_resolver.py::make_base64_url_from_any_uri"]
+param = "uri"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tools/uri/uri_resolver.py::resolve_local_path_reference"]
 param = "uri"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true
@@ -8333,6 +9628,11 @@ rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pendin
 seeded = true
 
 ["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_error"]
+param = "event"
+rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
+seeded = true
+
+["pipelex/tracing/graphspec_assembler.py::_AssemblerState._handle_pipe_end_skipped"]
 param = "event"
 rationale = "SEEDED 2026-07 — pre-registry tree, treated as new, review pending"
 seeded = true

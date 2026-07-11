@@ -10,7 +10,7 @@ from __future__ import annotations
 import shlex
 import subprocess  # noqa: S404
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Annotated
 
 import typer
@@ -237,7 +237,7 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
         contract=contract_id,
         digest=digest_result.digest,
         reviewed_by=reviewed_by,
-        reviewed_at=datetime.now(tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        reviewed_at=datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         rationale=rationale,
         trigger_files=digest_result.trigger_files,
     )
