@@ -438,7 +438,7 @@ Pages:
 
 | File | Purpose |
 |------|---------|
-| `pipelex/pipe_operators/llm/image_reference.py` | `ImageReference` and `ImageReferenceKind` models |
+| `pipelex/pipe_operators/shared/image_reference.py` | `ImageReference` and `ImageReferenceKind` models |
 | `pipelex/pipe_operators/shared/template_image_analyzer.py` | Factory-time template analysis |
 | `pipelex/tools/jinja2/image_registry.py` | Runtime image tracking |
 | `pipelex/tools/jinja2/jinja2_with_images_filter.py` | The `with_images` filter implementation |
