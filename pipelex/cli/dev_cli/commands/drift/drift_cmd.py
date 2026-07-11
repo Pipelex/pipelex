@@ -32,6 +32,7 @@ from pipelex.cli.dev_cli.commands.drift.git_adapter import (
     read_staged_files,
     read_unstaged_modified,
     read_untracked,
+    stage_file,
 )
 from pipelex.cli.dev_cli.commands.drift.models import (
     ACKS_DIR_RELATIVE,
@@ -197,8 +198,17 @@ def _run_verify_commands(commands: Sequence[str], *, repo_root: Path, console: C
             raise DriftAckError(msg)
 
 
-def _warn_uncovered_working_tree(contract: DriftContract, *, repo_root: Path, console: Console) -> None:
-    """Warn when working-tree state lags the index: the ack covers staged content only."""
+def _check_working_tree_coverage(contract: DriftContract, *, repo_root: Path, console: Console) -> None:
+    """Warn when working-tree state lags the index: the ack covers staged content only.
+
+    For a contract with verify commands the warn escalates to a hard failure: verify
+    commands run on the working tree, so a matching unstaged edit or untracked file
+    means they would certify content the ack digest does not cover.
+
+    Raises:
+        DriftAckError: If the contract has verify commands and a matching trigger
+            file is unstaged-modified or untracked.
+    """
     unstaged_matched = match_files(read_unstaged_modified(repo_root), patterns=contract.triggers, exclude=contract.exclude)
     for path in unstaged_matched:
         console.print(f"[yellow]⚠[/yellow] trigger file has unstaged modifications: {escape(path)}")
@@ -207,6 +217,13 @@ def _warn_uncovered_working_tree(contract: DriftContract, *, repo_root: Path, co
     for path in untracked_matched:
         console.print(f"[yellow]⚠[/yellow] untracked file matches triggers: {escape(path)}")
         console.print("  Untracked files are not covered until staged (`git add`).")
+    if contract.verify_commands and (unstaged_matched or untracked_matched):
+        msg = (
+            "This contract has verify commands, and trigger files differ between the working tree and the index "
+            "(see warnings above): the verify commands would run on content the ack digest does not cover. "
+            "Stage the files (`git add`) or drop the edits, then re-run — ack aborted, nothing written"
+        )
+        raise DriftAckError(msg)
 
 
 def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str | None = None, repo_root: Path | None = None) -> None:
@@ -227,11 +244,11 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
         msg = "Cannot resolve the reviewer identity: set `git config user.name` or pass --by"
         raise DriftAckError(msg)
 
+    _check_working_tree_coverage(contract, repo_root=resolved_root, console=console)
     _run_verify_commands(contract.verify_commands, repo_root=resolved_root, console=console)
 
     staged_oids = read_staged_files(resolved_root)
     digest_result = compute_current_digest(contract, contract_id=contract_id, staged_oids=staged_oids)
-    _warn_uncovered_working_tree(contract, repo_root=resolved_root, console=console)
 
     ack = DriftAck(
         contract=contract_id,
@@ -243,7 +260,8 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
     )
     save_ack(ack, repo_root=resolved_root)
     ack_path = ack_file_path(resolved_root, contract_id=contract_id)
-    console.print(f"[green]✓[/green] Ack recorded for [cyan]{contract_id}[/cyan] at {ack_path.relative_to(resolved_root)}")
+    stage_file(ack_path, repo_root=resolved_root)
+    console.print(f"[green]✓[/green] Ack recorded and staged for [cyan]{contract_id}[/cyan] at {ack_path.relative_to(resolved_root)}")
     console.print("  Commit the ack file together with the change it covers.")
 
 

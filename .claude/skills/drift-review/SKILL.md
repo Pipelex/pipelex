@@ -39,7 +39,7 @@ Work from the trigger diff to the review targets:
 
 ### 3. Stage, then ack
 
-The digest is computed from the **git index**, not the working tree: `git add` the trigger files (and any doc fixes you made). Staging is enough — no commit needed first, and unrelated unstaged changes elsewhere are fine. Take `drift ack`'s warnings about untracked or unstaged-modified matched files seriously: an unstaged edit is invisible to the ack.
+The digest is computed from the **git index**, not the working tree: `git add` the trigger files (and any doc fixes you made). Staging is enough — no commit needed first, and unrelated unstaged changes elsewhere are fine. Take `drift ack`'s warnings about untracked or unstaged-modified matched files seriously: an unstaged edit is invisible to the ack. For a contract with verify commands, a matched unstaged or untracked file is a hard error (the verify run would certify content the digest does not cover) — stage the files, then re-run.
 
 ```bash
 make drift-ack CONTRACT=<id> RATIONALE="<honest sentence>" BY="<your identity>"
@@ -55,7 +55,7 @@ As an agent, always pass `BY` with your **own actual identity** — the model yo
 
 ### 4. Verify and commit
 
-`make drift-check` must pass. Commit the ack file(s) under `.drift/acks/` **together with the change they cover** — the rationale lands in the PR diff next to the change, which is the audit trail. Never hand-edit files under `.drift/acks/`.
+`make drift-check` must pass. `drift ack` stages the ack file it writes; commit the ack file(s) under `.drift/acks/` **together with the change they cover** — the rationale lands in the PR diff next to the change, which is the audit trail. Never hand-edit files under `.drift/acks/`.
 
 ## Mandatory: log the dogfood observation
 
