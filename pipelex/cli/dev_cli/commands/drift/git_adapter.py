@@ -84,6 +84,11 @@ def read_untracked(repo_root: Path) -> list[str]:
     return sorted(path for path in output.split("\0") if path)
 
 
+def stage_file(path: Path, *, repo_root: Path) -> None:
+    """Stage one file into the index (`drift ack` auto-stages the ack file it writes)."""
+    _run_git(["add", "--", str(path)], cwd=repo_root)
+
+
 def get_git_user_name(repo_root: Path) -> str | None:
     """The configured git user.name, or None when unset (callers must then require --by)."""
     try:

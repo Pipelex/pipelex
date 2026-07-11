@@ -141,3 +141,28 @@ class TestDriftAckCmd:
         output = drift_console.export_text()
         assert "untracked file matches triggers" in output
         assert "src/brand_new.py" not in load_all_acks(git_repo.root)["demo-docs"].trigger_files
+
+    def test_ack_file_is_auto_staged(self, git_repo: GitRepo) -> None:
+        """The ack lands in the same index `drift check` reads — no forgot-to-add false green."""
+        _seed_repo(git_repo)
+        drift_ack_cmd("demo-docs", rationale="Initial review.", repo_root=git_repo.root)
+        staged_paths = git_repo.git("diff", "--cached", "--name-only").splitlines()
+        assert ".drift/acks/demo-docs.toml" in staged_paths
+
+    def test_verify_contract_with_unstaged_trigger_fails_before_verify(self, git_repo: GitRepo) -> None:
+        """With verify commands, a dirty matching trigger is a hard error and the verify commands never run."""
+        marker = git_repo.root / "verify_ran.txt"
+        marker_command = f'{PYTHON} -c \'open("verify_ran.txt", "w").write("ran")\''
+        _seed_repo(git_repo, verify_commands=[marker_command])
+        git_repo.write("src/demo.py", content="x = 2  # unstaged\n")
+        with pytest.raises(DriftAckError, match="verify commands"):
+            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+        assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
+        assert not marker.exists()
+
+    def test_verify_contract_with_untracked_trigger_fails(self, git_repo: GitRepo) -> None:
+        _seed_repo(git_repo, verify_commands=[PASSING_VERIFY])
+        git_repo.write("src/brand_new.py", content="new = True\n")
+        with pytest.raises(DriftAckError, match="verify commands"):
+            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+        assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
