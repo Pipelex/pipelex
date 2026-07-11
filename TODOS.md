@@ -4,11 +4,13 @@ A campaign, not a feature: sweep every hand-written doc page for code↔doc drif
 
 ## Cold-start context (update at every checkpoint)
 
-- **Status:** TRACKER SET UP — next = Phase H (hardening pass on the drift tool).
-- **Branch / worktree:** `docs/Drift-hunt` off `dev`, in the `_drift` worktree (treat as repo root). Do NOT push unless Louis asks.
-- **Working artifacts:** everything the hunt produces (pre-screen script, inventory, suspect list, findings) lives under `wip/drift-hunt/`.
-- **Decisions taken:** D1–D6 below, plus H-A2 (see Phase H).
-- **Open questions:** scope of three sections D2 didn't name (see Stage 0 note) — for Louis at Checkpoint 0.
+- **Status:** AT CHECKPOINT 0 — STOPPED for Louis' review (2026-07-12). Phase H (hardening: A1 auto-stage + A2 warn→fail, tests, docs) DONE; Phase B (dogfood backfill) DONE; Stage 0 DONE (inventory: 119 in-scope pages + 4 pending-confirmation; prescreen: ~1,880 claims checked, 45 raw hits triaged → 5 confirmed defects ALL FIXED and re-verified against the live parser/CLI, 3 judgment seeds, 8 FP patterns recorded). Sonnet-5 `/code-review` fan-outs: hardening commit clean (2 low tracker-hygiene findings, both applied); Stage-0 fix commit reviewed at checkpoint.
+- **Next:** Louis rules on (a) `suspects.md` + FP patterns, (b) the D2 scope note (4 pending pages + root `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`), (c) Stage 1 shape (full fan-out vs worst-sections-first) against the cost estimate (~123 pages · ~855 words avg → est. 8–15M tokens for review+verify fleet). NO Stage 1 fleet before that go-ahead.
+- **Branch / worktree:** `docs/Drift-hunt` off `dev`, in the `_drift` worktree (treat as repo root). Do NOT push unless Louis asks. Commits so far: tracker `5e3699c64`, hardening `8c7413afc`, backfill `4093b1628`, then Stage 0 artifacts + fixes (see git log).
+- **Working artifacts:** `wip/drift-hunt/` — `inventory.md` (the denominator), `prescreen.py` (re-runnable), `prescreen-raw.md` (raw hits), `suspects.md` (the triage — read this first).
+- **Decisions taken:** D1–D6 below, plus H-A2 implemented (narrow warn→fail escalation — see Phase H).
+- **Key learning (D6 vindicated):** `pipelex validate --all` was initially "confirmed dead" from `--help` (no group-level `--all`) and a fix was drafted — live execution proved a shortcut layer forwards it to `validate pipe`; fix reverted. Never conclude a CLI form is dead from `--help` alone; run it.
+- **Open questions:** scope of sections D2 didn't name (see Stage 0 note) — for Louis at Checkpoint 0.
 
 ## Decisions
 
@@ -41,18 +43,18 @@ In scope per page: statements the code can contradict — commands, flags, confi
 
 ## Phase H — hardening pass (drift tool, from PR #1040 review notes)
 
-- [ ] **H-A1 — `drift ack` auto-stages the ack file it writes.** `git add .drift/acks/<id>.toml` right after `save_ack`, via a new `stage_file` git-adapter function (subject grant recorded BEFORE running checks). Makes the local gate honest: the ack lands in the same index `drift check` reads. Temp-repo test: ack path appears in `git diff --cached --name-only` after `drift ack`.
-- [ ] **H-A2 — DECISION: implement the narrow warn→fail escalation.** When a contract has `verify_commands` AND an unstaged-modified or untracked file matches its triggers, `drift ack` fails instead of warning — that is the one case where the verify guarantee is meaningfully weakened (verify ran on working-tree content the digest does not cover). Check runs BEFORE the verify commands (fail fast, don't burn a `make tb`). No-verify contracts keep the warn-only behavior. Tests: verify-contract + dirty trigger → `DriftAckError`, ack not written, verify not run; no-verify contract keeps warning + writing.
-- [ ] Update `docs/contribute/drift-contracts.md` + `.claude/skills/drift-review/SKILL.md` (ack now auto-stages; warn→fail rule) + `CHANGELOG.md` [Unreleased].
-- [ ] Gates: `make agent-check`, targeted tests (`tests/unit/pipelex/cli/dev/`), `make docs-check`.
+- [x] **H-A1 — `drift ack` auto-stages the ack file it writes.** `git add .drift/acks/<id>.toml` right after `save_ack`, via a new `stage_file` git-adapter function (subject grant recorded BEFORE running checks). Makes the local gate honest: the ack lands in the same index `drift check` reads. Temp-repo test: ack path appears in `git diff --cached --name-only` after `drift ack`.
+- [x] **H-A2 — DECISION: implement the narrow warn→fail escalation.** When a contract has `verify_commands` AND an unstaged-modified or untracked file matches its triggers, `drift ack` fails instead of warning — that is the one case where the verify guarantee is meaningfully weakened (verify ran on working-tree content the digest does not cover). Check runs BEFORE the verify commands (fail fast, don't burn a `make tb`). No-verify contracts keep the warn-only behavior. Tests: verify-contract + dirty trigger → `DriftAckError`, ack not written, verify not run; no-verify contract keeps warning + writing.
+- [x] Update `docs/contribute/drift-contracts.md` + `.claude/skills/drift-review/SKILL.md` (ack now auto-stages; warn→fail rule) + `CHANGELOG.md` [Unreleased].
+- [x] Gates: `make agent-check`, targeted tests (`tests/unit/pipelex/cli/dev/`), `make docs-check`.
 
 ## Phase B — dogfood-log backfill
 
-- [ ] Backfill the missing mandatory entry in `wip/drift-contracts/dogfood-log.md` for the `config-docs` ack recorded 2026-07-11 during the subject-grants regrind (ack rationale: Python-3.10 drop / StrEnum swap in `img_gen_job_components.py` via the Phase-M dev merge — clean-pass). Mark it honestly as a backfill.
+- [x] Backfill the missing mandatory entry in `wip/drift-contracts/dogfood-log.md` for the `config-docs` ack recorded 2026-07-11 during the subject-grants regrind (ack rationale: Python-3.10 drop / StrEnum swap in `img_gen_job_components.py` via the Phase-M dev merge — clean-pass). Mark it honestly as a backfill.
 
 ### CHECKPOINT H — verify + review (no user stop)
 
-- [ ] Checkpoint protocol steps 1–4 (commit Phase H + B; `/code-review` fan-out on the hardening commit only — Phase B is a log entry). Apply surviving findings, then proceed.
+- [x] Checkpoint protocol steps 1–4 (commit Phase H + B; `/code-review` fan-out on the hardening commit only — Phase B is a log entry). Apply surviving findings, then proceed.
 
 ---
 
@@ -60,19 +62,19 @@ In scope per page: statements the code can contradict — commands, flags, confi
 
 Deterministic checks that need no judgment, to make the semantic pass sharper and cheaper. The seed-ack dogfood showed this class is rich (dead config section, phantom CLI flag, dead config field — all mechanically detectable).
 
-- [ ] Build the inventory: every in-scope `.md` page (per D2), grouped by section, committed as `wip/drift-hunt/inventory.md` with a page count per section — the denominator for defect density later. **Scope note for Checkpoint 0:** D2's list doesn't name `docs/agents/`, `docs/analytics/`, `docs/distributed-execution/`, nor root-level `changelog.md` / `contributing.md` / `CODE_OF_CONDUCT.md` — inventory them as in-scope-pending-confirmation (hand-written, not generated, not freshly reviewed) and let Louis rule at Checkpoint 0.
-- [ ] Write the pre-screen script at `wip/drift-hunt/prescreen.py` (throwaway campaign tooling — self-contained, stdlib + repo venv only). Checks, each producing `(page, claim, verdict, evidence)` rows:
+- [x] Build the inventory: every in-scope `.md` page (per D2), grouped by section, committed as `wip/drift-hunt/inventory.md` with a page count per section — the denominator for defect density later. **Scope note for Checkpoint 0:** D2's list doesn't name `docs/agents/`, `docs/analytics/`, `docs/distributed-execution/`, nor root-level `changelog.md` / `contributing.md` / `CODE_OF_CONDUCT.md` — inventory them as in-scope-pending-confirmation (hand-written, not generated, not freshly reviewed) and let Louis rule at Checkpoint 0.
+- [x] Write the pre-screen script at `wip/drift-hunt/prescreen.py` (throwaway campaign tooling — self-contained, stdlib + repo venv only). Checks, each producing `(page, claim, verdict, evidence)` rows:
     - Referenced repo file paths exist in the tree (special-case `docs/cookbook/` → resolve against `../pipelex-cookbook`, per D3).
     - Mentioned config keys exist in `pipelex/pipelex.toml` / the `configs.py` model tree.
     - Mentioned `pipelex` / `pipelex-dev` CLI commands and flags exist in the actual `--help` surfaces.
     - Fenced `toml` blocks parse; fenced `python` blocks compile (`ast.parse`).
     - Internal doc links resolve (complementing, not re-implementing, the mkdocs strict build).
-- [ ] Run it; triage the raw hits into `wip/drift-hunt/suspects.md` — per section: confirmed-mechanical defects vs needs-judgment flags vs false positives (note false-positive patterns; they tune Stage 1 prompts).
-- [ ] Fix the confirmed mechanical defects immediately (they need no Stage 1) — one commit, gate: `make docs-check` green.
+- [x] Run it; triage the raw hits into `wip/drift-hunt/suspects.md` — per section: confirmed-mechanical defects vs needs-judgment flags vs false positives (note false-positive patterns; they tune Stage 1 prompts).
+- [x] Fix the confirmed mechanical defects immediately (they need no Stage 1) — one commit, gate: `make docs-check` green.
 
 ### CHECKPOINT 0 — STOP (suspect list in hand)
 
-- [ ] Checkpoint protocol steps 1–4: full `make agent-test`, commit Stage 0 outputs + fixes, update Cold-start context, `/code-review` fan-out on the mechanical-fix commit(s).
+- [x] Checkpoint protocol steps 1–4: full `make agent-test` green, Stage 0 outputs + fixes committed, Cold-start context updated, `/code-review` fan-out on the fix commit came back clean (all five fixes verified accurate; one adjacent staleness found in the same table — image_reference.py → shared/ — applied as a follow-up commit).
 - [ ] **STOP for Louis:** review `suspects.md` + false-positive patterns; rule on the D2 scope note; decide the Stage 1 shape (full fan-out vs worst-sections-first) against a concrete cost estimate from observed page sizes. **No Stage 1 fleet before this go-ahead.**
 
 ---

@@ -1,5 +1,7 @@
 # PR #1040 review notes — deferred drift-tooling findings
 
+> **RESOLVED 2026-07-12** — both findings were implemented on `docs/Drift-hunt` (commit `8c7413afc`): A1's auto-staging verbatim, A2 as the narrow warn→fail escalation recorded below (not codex's blanket fail). The "why deferred" rationales underneath are the historical record of the original triage, no longer current.
+
 Two codex findings on `pipelex/cli/dev_cli/commands/drift/drift_cmd.py` from the PR #1040 review pass. Both describe real code behavior (verified against the code), but neither is worth hardening now: the drift tool is an internal dev CLI, CI backstops the first, and the second is a documented design choice with a narrow failure mode. Captured here so the candidate fixes aren't lost.
 
 ## A1 — `drift ack` does not stage the ack file, so local `drift check` can false-green
