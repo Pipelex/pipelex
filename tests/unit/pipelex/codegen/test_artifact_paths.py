@@ -95,6 +95,17 @@ class TestArtifactPaths:
 
         assert not (actual_root / "models.py").exists()
 
+    def test_symlinked_ancestor_is_canonicalized_above_the_output_boundary(self, tmp_path: Path) -> None:
+        actual_parent = tmp_path / "actual"
+        actual_parent.mkdir()
+        alias_parent = tmp_path / "alias"
+        self._make_symlink(alias_parent, target=actual_parent, target_is_directory=True)
+        output_root = alias_parent / "output"
+
+        self._write(output_root)
+
+        assert (actual_parent / "output" / "models.py").is_file()
+
     def test_codegen_check_does_not_read_a_symlinked_locked_artifact(self, tmp_path: Path) -> None:
         self._write(tmp_path)
         (tmp_path / "models.py").unlink()

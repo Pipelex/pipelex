@@ -110,13 +110,15 @@ def resolve_output_path(root: Path, *, relative_path: Path) -> Path:
     if relative_path.is_absolute() or not relative_path.parts or any(part in {"", ".", ".."} for part in relative_path.parts):
         _raise_path_error(str(relative_path), reason="internal output path must be a canonical relative path")
 
-    normalized_root = Path(os.path.normpath(root.absolute()))
-    _reject_symlink_components(normalized_root)
+    requested_root = Path(os.path.normpath(root.absolute()))
+    if requested_root.is_symlink():
+        _raise_path_error(str(requested_root), reason="output root must not be a symbolic link")
+    normalized_root = requested_root.resolve(strict=False)
     if normalized_root.exists() and not normalized_root.is_dir():
         _raise_path_error(str(normalized_root), reason="output root exists but is not a directory")
 
     destination = normalized_root / relative_path
-    _reject_symlink_components(destination)
+    _reject_symlink_components(normalized_root, relative_path=relative_path)
     resolved_root = normalized_root.resolve(strict=False)
     resolved_destination = destination.resolve(strict=False)
     if not resolved_destination.is_relative_to(resolved_root):
@@ -126,12 +128,12 @@ def resolve_output_path(root: Path, *, relative_path: Path) -> Path:
     return destination
 
 
-def _reject_symlink_components(path: Path) -> None:
-    current = Path(path.anchor)
-    for part in path.parts[1:]:
+def _reject_symlink_components(root: Path, *, relative_path: Path) -> None:
+    current = root
+    for part in relative_path.parts:
         current /= part
         if current.is_symlink():
-            _raise_path_error(str(path), reason=f"symbolic link component is not allowed: '{current}'")
+            _raise_path_error(str(root / relative_path), reason=f"symbolic link component is not allowed: '{current}'")
 
 
 def _raise_path_error(path: str, *, reason: str) -> NoReturn:
