@@ -16,7 +16,16 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget, EmittedFile
-from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, CodegenLock, build_lock, encode_lock, load_lock
+from pipelex.codegen.lock import (
+    CODEGEN_LOCK_FILENAME,
+    CodegenLock,
+    build_lock,
+    encode_lock,
+    load_lock,
+    resolve_artifact_path,
+    resolve_output_path,
+    validate_artifact_paths,
+)
 from pipelex.codegen.stamp import apply_stamp, comment_prefix_for, compute_content_hash, has_stamp
 from pipelex.tools.misc.file_utils import ensure_directory_for_file_path, failable_load_text_from_path, remove_file, save_text_to_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -54,6 +63,7 @@ def build_stamped_projection(
     options: dict[str, str] | None = None,
 ) -> StampedProjection:
     """Stamp each emitted body and assemble the matching lock — pure, no filesystem access."""
+    validate_artifact_paths(emitted_file.filename for emitted_file in emitted)
     resolved_options = options or {}
     stamped_files: list[EmittedFile] = []
     artifact_hashes: dict[str, str] = {}
@@ -104,7 +114,8 @@ def write_stamped_projection(
     options: dict[str, str] | None = None,
 ) -> WriteReport:
     """Stamp, write-if-changed, prune de-listed files, and rewrite the lock for one projection run."""
-    lock_path = output_dir / CODEGEN_LOCK_FILENAME
+    lock_path = resolve_output_path(output_dir, relative_path=Path(CODEGEN_LOCK_FILENAME))
+    output_root = lock_path.parent
     previous_paths = _previous_tracked_paths(lock_path)
 
     projection = build_stamped_projection(
@@ -120,13 +131,13 @@ def write_stamped_projection(
     written: list[str] = []
     unchanged: list[str] = []
     for stamped_file in projection.files:
-        destination = output_dir / stamped_file.filename
+        destination = resolve_artifact_path(output_root, artifact_path=stamped_file.filename)
         if _write_if_changed(destination, content=stamped_file.content):
             written.append(stamped_file.filename)
         else:
             unchanged.append(stamped_file.filename)
 
-    removed = _prune_delisted(output_dir=output_dir, previous_paths=previous_paths, current_paths=projection.lock.paths())
+    removed = _prune_delisted(output_dir=output_root, previous_paths=previous_paths, current_paths=projection.lock.paths())
 
     _write_if_changed(lock_path, content=projection.lock_content)
 
@@ -151,7 +162,7 @@ def _prune_delisted(*, output_dir: Path, previous_paths: set[str], current_paths
     """Delete files that were tracked before but are no longer produced — only if they still carry our stamp."""
     removed: list[str] = []
     for relative in sorted(previous_paths - current_paths):
-        stale_path = output_dir / relative
+        stale_path = resolve_artifact_path(output_dir, artifact_path=relative)
         content = failable_load_text_from_path(stale_path)
         if content is None:
             continue

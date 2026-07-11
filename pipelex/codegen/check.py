@@ -23,7 +23,8 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, CodegenLock, load_lock
+from pipelex.codegen.exceptions import CodegenError, CodegenLockError
+from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME, CodegenLock, load_lock, resolve_artifact_path, resolve_output_path
 from pipelex.codegen.stamp import STAMPABLE_SUFFIXES, comment_prefix_for, compute_content_hash, has_stamp, parse_stamped
 from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -77,20 +78,28 @@ class CodegenCheckReport(BaseModel):
 
 def run_codegen_check(*, root: Path) -> CodegenCheckReport:
     """Run the offline drift check over `root` (the directory holding `codegen.lock`)."""
-    lock = load_lock(root / CODEGEN_LOCK_FILENAME)
-    if lock is None:
-        return CodegenCheckReport(lock_found=False)
+    try:
+        lock_path = resolve_output_path(root, relative_path=Path(CODEGEN_LOCK_FILENAME))
+        safe_root = lock_path.parent
+        lock = load_lock(lock_path)
+        if lock is None:
+            return CodegenCheckReport(lock_found=False)
 
-    drifts: list[CodegenDrift] = []
-    drifts += _check_locked_artifacts(root=root, lock=lock)
-    drifts += _find_orphans(root=root, lock=lock)
-    return CodegenCheckReport(lock_found=True, drifts=drifts)
+        drifts: list[CodegenDrift] = []
+        drifts += _check_locked_artifacts(root=safe_root, lock=lock)
+        drifts += _find_orphans(root=safe_root, lock=lock)
+        return CodegenCheckReport(lock_found=True, drifts=drifts)
+    except CodegenLockError:
+        raise
+    except CodegenError as exc:
+        msg = f"Unsafe codegen artifact tree at '{root}': {exc}"
+        raise CodegenLockError(msg) from exc
 
 
 def _check_locked_artifacts(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
     drifts: list[CodegenDrift] = []
     for path, locked_hash in sorted(lock.hash_by_path().items()):
-        file_path = root / path
+        file_path = resolve_artifact_path(root, artifact_path=path)
         if not file_path.is_file():
             drifts.append(CodegenDrift(path=path, category=DriftCategory.MISSING, detail="Locked artifact is absent on disk."))
             continue
@@ -137,6 +146,8 @@ def _find_orphans(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:
 def _iter_stampable_files(directory: Path) -> Iterator[Path]:
     """Yield stampable files under `directory`, pre-order and deterministic, pruning vendor/VCS dirs."""
     for entry in sorted(directory.iterdir()):
+        if entry.is_symlink():
+            continue
         if entry.is_dir():
             if entry.name not in _SKIP_DIRS:
                 yield from _iter_stampable_files(entry)
