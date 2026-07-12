@@ -21,7 +21,7 @@ The key idea: global personal preferences layer **under** project-specific setti
 
 ## Where defaults live (Pipelex repository)
 
-- **Default values** (baseline): repo root `pipelex.toml`
+- **Default values** (baseline): `pipelex/pipelex.toml`, shipped inside the package
 - **User-facing templates** copied into `.pipelex/` by the init flow: `pipelex/kit/configs/…`
 
 ## Merge order (runtime)
@@ -48,11 +48,11 @@ Load order:
 ## Where to change things in code
 
 - **Config merge logic**: `pipelex/system/configuration/config_loader.py`
-- **Override lists** (`local` / `super`): `pipelex/system/configuration/config_root.py`
+- **Override file sequences**: `ConfigLoader._override_files_for_dir` and `ConfigLoader._plugin_override_files_for_dir` in that same file
 
 ## Contributor guidelines for config changes
 
-- If you change **defaults**, update the repo root `pipelex.toml` (and consider whether templates in `pipelex/kit/configs/…` should also be updated).
+- If you change **defaults**, update `pipelex/pipelex.toml` (and consider whether templates in `pipelex/kit/configs/…` should also be updated).
 - If you change **templates**, keep them user-focused and stable; avoid adding internal-only details.
 - If you change **merge order or override semantics**, treat it as a potentially breaking change and document it (changelog + migration notes if needed).
 

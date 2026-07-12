@@ -38,7 +38,7 @@ Package manifest management is currently exposed through the lowercase `mthds` C
 ## Execution Options
 
 - **Dry run** — `--dry-run` executes with mocked LLM responses to test pipeline logic without API calls
-- **Mock inputs** — `--mock-inputs` generates synthetic inputs so you can test a pipeline without preparing real data
+- **Mock inputs** — `--mock-inputs` generates synthetic inputs so you can test a pipeline without preparing real data (requires `--dry-run`)
 - **Graph generation** — `--graph`, `--graph-full-data`, `--graph-no-data` for visual execution inspection
 
 ## Agent CLI

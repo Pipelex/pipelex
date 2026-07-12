@@ -9,7 +9,7 @@ Full transparency into pipeline execution with interactive visualizations.
 
 ## Overview
 
-Every pipeline execution can be visualized as an interactive graph, giving developers full transparency into what happened, in what order, and with what data at each step. Graphs are generated automatically when using the `--graph` flag and open in a browser.
+Every pipeline execution can be visualized as an interactive graph, giving developers full transparency into what happened, in what order, and with what data at each step. Running with the `--graph` flag writes the graph outputs (graph spec JSON, Mermaid chart, interactive HTML) to the run's output directory. To render a saved graph spec and open it in your browser, use `pipelex graph render <graph.json> --open`.
 
 ## Interactive HTML Visualization
 

@@ -29,15 +29,26 @@ The observer extracts data at three critical moments during pipe execution:
 
 The data extraction location depends on your observer implementation:
 
-### LocalObserver (Default)
+### LocalObserver (opt-in)
+
+Pipelex ships a `LocalObserver` that writes each event to JSONL files on the local filesystem, but it is not registered by default: out of the box, setup wires a no-op observer and a telemetry observer, so no JSONL files are written. To enable JSONL extraction, construct a `LocalObserver` and pass it through the `observers` parameter of `Pipelex.make()` (a mapping of name to observer — note that providing it replaces the default observers):
+
+```python
+from pipelex.observer.local_observer import LocalObserver
+from pipelex.pipelex import Pipelex
+
+Pipelex.make(observers={"local": LocalObserver()})
+```
+
+Once registered:
 
 - **Location**: Local filesystem in JSONL format
 - **Default Directory**: Configured in your Pipelex settings under `observer_config.observer_dir`
 - **Files Created**:
 
 - `before_run.jsonl` - Pre-execution snapshots
-- `successful_run.jsonl` - Success events and results
-- `failing_run.jsonl` - Failure events and error context
+- `after_successful_run.jsonl` - Success events and results
+- `after_failing_run.jsonl` - Failure events and error context
 
 ### Custom Observers
 You can implement custom data extraction to:

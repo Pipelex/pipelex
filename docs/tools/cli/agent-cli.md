@@ -35,7 +35,7 @@ pipelex-agent run method <NAME> [OPTIONS]
 
 - `--inputs`, `-i` - Path to a JSON or TOML inputs file (discriminated by file extension: `.toml` → TOML, everything else → JSON). Inline JSON (a value starting with `{`) stays JSON-only.
 - `--dry-run` - Dry-run without calling AI providers
-- `--mock-inputs` - Use mock inputs
+- `--mock-inputs` - Use mock inputs (requires `--dry-run`)
 - `--graph` / `--no-graph` - Enable/disable execution graph (enabled by default)
 - `--library-dir`, `-L` - Additional library directory
 - `--with-memory` - Include full working memory in output
