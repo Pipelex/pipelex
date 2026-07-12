@@ -46,8 +46,25 @@ CLI_NAMES = ["pipelex", "pipelex-agent", "pipelex-dev", "plxt"]
 VENV_BIN = REPO_ROOT / ".venv" / "bin"
 
 PATHY_EXTENSIONS = (
-    ".py", ".md", ".toml", ".mthds", ".json", ".txt", ".yml", ".yaml",
-    ".csv", ".html", ".css", ".sh", ".plx", ".lock", ".png", ".jpg", ".jpeg", ".svg", ".webp",
+    ".py",
+    ".md",
+    ".toml",
+    ".mthds",
+    ".json",
+    ".txt",
+    ".yml",
+    ".yaml",
+    ".csv",
+    ".html",
+    ".css",
+    ".sh",
+    ".plx",
+    ".lock",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".svg",
+    ".webp",
 )
 PATHY_PREFIXES = ("pipelex/", "docs/", "tests/", ".pipelex/", "wip/", ".drift/", ".claude/", "derived/")
 PLACEHOLDER_MARKERS = ("<", ">", "{", "}", "*", "…", "path/to", "your_", "my_", "...")
@@ -109,7 +126,11 @@ OPTION_TOKEN_RE = re.compile(r"(--[A-Za-z0-9][A-Za-z0-9-]*|-[A-Za-z])\b")
 def run_help(argv: list[str]) -> str:
     try:
         result = subprocess.run(  # noqa: S603
-            [*argv, "--help"], capture_output=True, text=True, timeout=60, check=False,
+            [*argv, "--help"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
             env={"PATH": f"{VENV_BIN}:/usr/bin:/bin", "TERM": "dumb", "NO_COLOR": "1", "COLUMNS": "200", "HOME": str(Path.home())},
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -195,6 +216,7 @@ def load_config_paths() -> tuple[set[str], set[str]]:
 
 
 # ---------- checks ----------
+
 
 class Row:
     def __init__(self, page: str, check: str, claim: str, evidence: str) -> None:
