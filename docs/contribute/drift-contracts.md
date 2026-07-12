@@ -28,6 +28,20 @@ The validity rule is a single equality, with no base ref, no git diff, and no ti
 
 The digest covers both the contract's own definition and the `(path, blob OID)` pairs of every tracked file matching its triggers — so editing a trigger file, adding or deleting a matched file, *or editing the contract itself* all open the contract. A brand-new contract has no ack, so it is open until its targets are reviewed once and acked: adoption is explicit, contract by contract.
 
+## Where the gate acts
+
+One view of every surface the contract system touches, from the working tree to the merge:
+
+| Surface | What happens there |
+|---|---|
+| **Make targets** | `make drift-check` (alias `dc`) is the pass/fail gate; `make drift-plan` (`dp`) is the read-only diagnosis; `make drift-ack CONTRACT=… RATIONALE="…"` (`da`, optional `BY=` for agents) records the review. All three wrap `pipelex-dev drift`. |
+| **Quality checks** | `drift-check` runs inside the `make check` aggregate, alongside the other repo gates — a full local check cannot pass with an open contract or a rotten manifest. |
+| **Commits** | The digest is computed from the **git index**, and `drift ack` stages the ack file it writes — so the ack, the code change, and any doc fix land in the same commit, reviewed as one diff. |
+| **Branches / merges** | After a merge, `drift check` recomputes the digest over the merged tree. An ack that was valid on either side but does not cover the merged trigger content fails the check until the merged state is reviewed and re-acked (see [Merges](#merges)). |
+| **PRs / CI** | The `lint-drift` CI job runs `make drift-check` on every PR — currently advisory (visible, not merge-blocking; promotion to a required check is planned). The committed ack file appears in the PR diff, so the reviewer sees the rationale next to the change it covers. |
+
+The gate acts on *content*, never on *time*: there is no base ref, no diff against a branch, no timestamp freshness — only the digest equality below.
+
 ## The ack workflow
 
 When `make drift-check` fails (locally or in CI), run:
