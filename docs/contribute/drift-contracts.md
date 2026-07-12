@@ -39,14 +39,14 @@ make drift-plan
 It prints one Markdown packet per open contract: the description, exactly which trigger files were added/removed/modified since the last ack, the review targets, the verify commands, and the previous reviewer's rationale. To fulfill a contract:
 
 1. **Review the targets against the trigger changes.** Actually read them. Update whatever is stale. "Nothing to update" is a legitimate outcome — say so in the rationale.
-2. **Stage the trigger files:** `git add` them (staging is enough; you don't need to commit first, and other unstaged changes elsewhere are fine). **The digest is computed from the git index, not the working tree** — an unstaged edit or an untracked file is invisible to the ack, and `drift ack` warns when it sees one that matches the triggers. For a contract with `verify_commands` that warning escalates to a hard error: the verify commands run on the working tree, so a matching unstaged edit or untracked file means they would certify content the digest does not cover.
+2. **Stage the trigger files:** `git add` them (staging is enough; you don't need to commit first, and other unstaged changes elsewhere are fine). **The digest is computed from the git index, not the working tree** — an unstaged edit or an untracked file is invisible to the ack, and `drift ack` warns when it sees one that matches the triggers. For a contract with `verify_commands` that warning escalates to a hard error: the verify commands run on the working tree, so a matching unstaged edit or untracked file means they certify content the digest does not cover. This coverage check runs both **before** the verify commands (so an already-dirty tree fails fast) and **after** them (so a trigger the verify commands themselves format or generate is caught too, not silently left out of the digest).
 3. **Record the ack:**
 
     ```bash
     make drift-ack CONTRACT=config-docs RATIONALE="Documented the new activity_queues setting; other config pages unaffected."
     ```
 
-    This first runs the contract's `verify_commands` (each one `shlex`-split and run without a shell, from the repo root; the first failure aborts the ack), then recomputes the digest from the index, writes the ack file, and stages it — the ack lands in the same index the check reads, so the local gate and the commit you are building agree.
+    This first runs the contract's `verify_commands` (each one `shlex`-split and run without a shell, from the repo root; the first failure aborts the ack), then recomputes the digest from the index, writes the ack file, and stages it — the ack lands in the same index the check reads, so the local gate and the commit you are building agree. If staging the written ack fails (e.g. a locked git index), the ack file is removed rather than left unstaged, so a later `drift check` reports a missing ack instead of a false green.
 
 4. **Commit the ack file together with the change it covers** (it is already staged). The ack surfaces in the PR diff, so the reviewer sees the rationale next to the change — that is the audit trail.
 

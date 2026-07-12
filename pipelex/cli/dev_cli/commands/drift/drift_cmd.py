@@ -25,7 +25,7 @@ from pipelex.cli.dev_cli.commands.drift.core import (
     find_issues,
     match_files,
 )
-from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError, DriftError
+from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError, DriftError, DriftGitError
 from pipelex.cli.dev_cli.commands.drift.git_adapter import (
     get_git_user_name,
     get_repo_toplevel,
@@ -220,7 +220,7 @@ def _check_working_tree_coverage(contract: DriftContract, *, repo_root: Path, co
     if contract.verify_commands and (unstaged_matched or untracked_matched):
         msg = (
             "This contract has verify commands, and trigger files differ between the working tree and the index "
-            "(see warnings above): the verify commands would run on content the ack digest does not cover. "
+            "(see warnings above): the verify commands run on content the ack digest does not cover. "
             "Stage the files (`git add`) or drop the edits, then re-run — ack aborted, nothing written"
         )
         raise DriftAckError(msg)
@@ -246,6 +246,11 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
 
     _check_working_tree_coverage(contract, repo_root=resolved_root, console=console)
     _run_verify_commands(contract.verify_commands, repo_root=resolved_root, console=console)
+    if contract.verify_commands:
+        # Verify commands run on the working tree and can format or generate a trigger
+        # file. Re-check afterward so the ack (digest hashed from the index below) cannot
+        # certify index content that differs from what the verify commands just ran against.
+        _check_working_tree_coverage(contract, repo_root=resolved_root, console=console)
 
     staged_oids = read_staged_files(resolved_root)
     digest_result = compute_current_digest(contract, contract_id=contract_id, staged_oids=staged_oids)
@@ -260,7 +265,18 @@ def drift_ack_cmd(contract_id: str, *, rationale: str, reviewed_by_override: str
     )
     save_ack(ack, repo_root=resolved_root)
     ack_path = ack_file_path(resolved_root, contract_id=contract_id)
-    stage_file(ack_path, repo_root=resolved_root)
+    try:
+        stage_file(ack_path, repo_root=resolved_root)
+    except DriftGitError as exc:
+        # save_ack atomically overwrote any prior ack, so there is no ack to roll back to.
+        # Remove the unstaged ack so `drift check` (which reads acks from disk but hashes
+        # triggers from the index) reports a missing ack instead of a false green.
+        ack_path.unlink(missing_ok=True)
+        msg = (
+            f"Ack written but staging it failed ({exc}). Removed the unstaged ack file so a local "
+            "`drift check` reports a missing ack instead of a false green — re-run once the git index is writable"
+        )
+        raise DriftAckError(msg) from exc
     console.print(f"[green]✓[/green] Ack recorded and staged for [cyan]{contract_id}[/cyan] at {ack_path.relative_to(resolved_root)}")
     console.print("  Commit the ack file together with the change it covers.")
 
