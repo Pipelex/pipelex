@@ -42,7 +42,7 @@ A branch result may legitimately be **absent** at run time: the branch pipe decl
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |
 | `type`            | string        | The type of the pipe: `PipeParallel`                                                                          | Yes      |
 | `description`     | string        | A description of the parallel operation.                                                                           | Yes      |
-| `inputs`    | dictionary  | The input concept(s) for the parallel operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `inputs`    | dictionary  | The input concept(s) for the parallel operation, as a dictionary mapping input names to concept codes.                                                     | No       |
 | `output`   | string          | The concept the branch results are combined into: `Composite` or a structured concept whose fields match the branch `result` names.                                                | Yes      |
 | `branches`        | array of tables| An array defining the pipes to run in parallel. Each table is a sub-pipe definition.                                                                                           | Yes      |
 | `add_each_output` | boolean       | If `true`, also adds the output of each parallel pipe to the working memory individually under its `result` name. Defaults to `false`.                                                                       | No       |
@@ -61,12 +61,24 @@ Each entry in the `branches` array is a table with the following keys:
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
 
 ```toml
+[concept.ProductDescription]
+description = "A product description"
+refines = "Text"
+
+[concept.ProductFeatures]
+description = "The features of a product"
+refines = "Text"
+
+[concept.ProductSentiment]
+description = "The sentiment expressed about a product"
+refines = "Text"
+
 [concept.ProductAnalysis]
 description = "Combined product analysis"
 
 [concept.ProductAnalysis.structure]
-features  = { type = "text", description = "Product features", required = true }
-sentiment = { type = "text", description = "Product sentiment", required = true }
+features  = { type = "concept", concept_ref = "ProductFeatures", description = "Product features", required = true }
+sentiment = { type = "concept", concept_ref = "ProductSentiment", description = "Product sentiment", required = true }
 
 [pipe.extract_features]
 type = "PipeLLM"

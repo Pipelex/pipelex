@@ -73,11 +73,11 @@ The tagline should be memorable, concise, and highlight the key benefit.
 """
 ```
 
-This defines a single-step pipeline. The pipe `generate_tagline` takes a `ProductDescription` as input and outputs a `Tagline` (both are native Text concepts, see more about native concepts [here](../concepts/native-concepts.md)).
+This defines a single-step pipeline. The pipe `generate_tagline` takes a `ProductDescription` as input and outputs a `Tagline` (both are custom concepts defined by a simple description, so they are Text-based by default — see more about native concepts [here](../concepts/native-concepts.md)).
 
 The inputs specified will be required before the pipe is executed. Those inputs should be stored in the [Working Memory](working-memory.md).
 
-The output concept is very important. Indeed, the output of your pipe will be corresponding to the concept you specify. If the concept is structured, the output will be a structured object. If the concept is native, the output will be a string.
+The output concept is very important. Indeed, the output of your pipe will be corresponding to the concept you specify. If the concept is structured, the output will be a structured object. If the concept is Text-based — like `Tagline` here — the output is text. Other native concepts produce their corresponding content type (an `Image` output is an image, a `Number` output is a number, and so on).
 
 ### Understanding the Pipe Contract
 
@@ -103,6 +103,7 @@ description = "Marketing content generation domain"
 [concept]
 ProductDescription = "A description of a product's features and benefits"
 Tagline = "A catchy marketing tagline"
+Keyword = "A marketing keyword extracted from text"
 
 # 2. Define the first step of your pipe
 [pipe.generate_tagline]
@@ -132,11 +133,11 @@ Extract the most relevant keywords from the following tagline. Focus on features
 """
 
 # 4. Define the controller that orchestrates the two steps
-[pipe.description_to_tagline]
+[pipe.description_to_keywords]
 type = "PipeSequence"
-description = "From product description to tagline"
+description = "From product description to tagline keywords"
 inputs = { description = "ProductDescription" }
-output = "Tagline"
+output = "Keyword[]"
 steps = [
     { pipe = "generate_tagline", result = "tagline" },
     { pipe = "extract_keywords_from_tagline", result = "keywords" },
@@ -147,7 +148,7 @@ steps = [
     The `[]` bracket notation in `output = "Keyword[]"` allows the LLM to generate as many keywords as it finds relevant. For a comprehensive guide on controlling how many items pipes produce or accept, see [Understanding Multiplicity](./understanding-multiplicity.md).
 
 
-This defines a two-step pipeline. The `PipeSequence` controller `description_to_tagline` takes a `ProductDescription` as input and outputs a `Tagline`. The first step is `generate_tagline` which generates a `Tagline` from the `ProductDescription`. The second step is `extract_keywords_from_tagline` which extracts keywords from the `Tagline`.
+This defines a two-step pipeline. The `PipeSequence` controller `description_to_keywords` takes a `ProductDescription` as input and outputs a list of `Keyword`s — a sequence's declared `output` must match what its last step yields. The first step is `generate_tagline` which generates a `Tagline` from the `ProductDescription`. The second step is `extract_keywords_from_tagline` which extracts keywords from the `Tagline`.
 
 See here all the different operators, see [Pipe Operators](./pipe-operators/index.md).
 See here all the different controllers, see [Pipe Controllers](./pipe-controllers/index.md).
