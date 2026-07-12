@@ -163,7 +163,7 @@ pipelex run bundle using_inputs.mthds -i inputs.json
 Key concepts:
 
 - **`inputs = { topic = "Text" }`** — declares what the pipe expects as input
-- **`$topic`** — references an input variable in the prompt (as opposed to `@variable` which references data from working memory)
+- **`$topic`** — inserts the variable inline, right inside a sentence. The difference from `@variable` is rendering shape, not where the data comes from: `@variable` is the block form — it must sit alone on its own line and inserts the content as a tagged block (which is why `@story_idea` stood on its own line in Step 2) — while `$variable` is the inline form for weaving a value into surrounding text. Both resolve against the pipe's declared inputs
 - **`@@` and `$$`** — write a literal `@` or `$` without triggering interpolation. Use `@@font-face` or `@@media` inside `<style>` blocks, `$$10` for a literal dollar amount before a word, and so on. The escape is per-occurrence.
 - **`-i inputs.json`** — provides input data at runtime
 

@@ -60,7 +60,7 @@ The `[formatting]` section in `plxt.toml` controls the global formatting behavio
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `align_entries` | `true` | Align consecutive `key = value` entries so `=` signs line up |
+| `align_entries` | `false` | Align consecutive `key = value` entries so `=` signs line up |
 | `align_comments` | `true` | Align end-of-line comments on consecutive lines |
 | `array_trailing_comma` | `true` | Add a trailing comma after the last element in multiline arrays |
 | `array_auto_expand` | `true` | Expand arrays to multiple lines when exceeding `column_width` |
@@ -85,7 +85,6 @@ include = ["**/*.toml"]
 include = ["**/*.mthds", "**/*.plx"]
 [rule.formatting]
 align_entries = true
-array_auto_collapse = true
 # ... more MTHDS/PLX-specific overrides
 ```
 

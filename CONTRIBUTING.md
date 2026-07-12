@@ -42,8 +42,8 @@ We are open to contributions in all areas of our core Pipelex library:
 - Run `make install` to set up virtualenv and dependencies
 - Copy `.env.example` to `.env` and configure API keys
 - Use uv for dependency management:
-  - Runtime deps: `uv pip install <package>`
-  - Dev deps: `uv pip install --extra dev <package>`
+  - Runtime deps: `uv add <package>`
+  - Dev deps: `uv add --optional dev <package>`
   - Keep dependencies alphabetically ordered in pyproject.toml
 
 ## Pull Request Process
