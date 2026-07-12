@@ -33,7 +33,7 @@ Standard mock generators (like Polyfactory) produce random strings like `"uygNji
 
 ```mermaid
 flowchart TD
-    A[pipelex validate --all] --> B[dry_run_pipes]
+    A[pipelex validate --all] --> B[BundleValidator.validate_pipes]
     B --> C[WorkingMemoryFactory.make_mock_inputs]
     C --> D[DryRunFactory.make_dry_run_factory]
     D --> E[Polyfactory with custom providers]
@@ -98,6 +98,7 @@ class DryRunFactory:
     def make_dry_run_factory(
         cls,
         object_class: type[BaseModelTypeVar],
+        *,
         snake_case_field_names: set[str] | None = None,
         pascal_case_field_names: set[str] | None = None,
     ) -> type[ModelFactory[BaseModelTypeVar]]:
@@ -163,11 +164,12 @@ class ConceptSpec(StructuredContent):
         examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
     )
 
-class PipeSpec(StructuredContent):
-    # Extract talent should be a valid ExtractTalent value
-    extract_talent: ExtractTalent | str = Field(
-        description="Select extraction model talent",
-        examples=list(ExtractTalent),  # Polyfactory picks randomly from these
+class PipeComposeSpec(PipeSpec):
+    # Target format should be a valid TargetFormat value
+    target_format: TargetFormat | str | None = Field(
+        default=None,
+        description="Target format for the output (template mode)",
+        examples=list(TargetFormat),  # Polyfactory picks randomly from these
     )
 ```
 
