@@ -88,6 +88,10 @@ own page. Classes are grouped by subsystem.
 ## CLI
 
 - [`AmbiguousInputsFilesError`](ambiguous-inputs-files-error.md) — Ambiguous inputs files
+- [`DriftAckError`](drift-ack-error.md) — Drift ack
+- [`DriftError`](drift-error.md) — Drift
+- [`DriftGitError`](drift-git-error.md) — Drift git
+- [`DriftManifestError`](drift-manifest-error.md) — Drift manifest
 - [`PipelexCLIError`](pipelex-cli-error.md) — Pipelex CLI
 - [`ReadinessCheckError`](readiness-check-error.md) — Readiness check
 

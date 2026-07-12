@@ -508,6 +508,10 @@ rationale = "Guard/CLI helper: operates on the files; single operand."
 param = "path"
 rationale = "Guard/CLI helper: operates on the path; single operand."
 
+["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_check_working_tree_coverage"]
+param = "contract"
+rationale = "Checks the contract's working-tree coverage; single operand."
+
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_issue_message"]
 param = "issue"
 rationale = "Operates on the issue; single operand."
@@ -523,10 +527,6 @@ rationale = "Operates on the repo_root; single operand."
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_run_verify_commands"]
 param = "commands"
 rationale = "Guard/CLI helper: operates on the commands; single operand."
-
-["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::_warn_uncovered_working_tree"]
-param = "contract"
-rationale = "Warns about the contract's uncovered working tree; single operand."
 
 ["pipelex/cli/dev_cli/commands/drift/drift_cmd.py::drift_ack_cmd"]
 param = "contract_id"
@@ -555,6 +555,10 @@ rationale = "File op keyed by the repo_root path; single operand."
 ["pipelex/cli/dev_cli/commands/drift/git_adapter.py::read_untracked"]
 param = "repo_root"
 rationale = "File op keyed by the repo_root path; single operand."
+
+["pipelex/cli/dev_cli/commands/drift/git_adapter.py::stage_file"]
+param = "path"
+rationale = "Stages the file at that path; verb-object with a single obvious operand, repo_root is keyword context."
 
 ["pipelex/cli/dev_cli/commands/drift/models.py::ack_file_path"]
 param = "repo_root"
