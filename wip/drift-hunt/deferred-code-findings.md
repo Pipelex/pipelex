@@ -2,6 +2,8 @@
 
 Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkpoint 0 ruling, 2026-07-12: doc-side these are fine; code-side issues get deferred here rather than fixed mid-campaign). One entry per finding; pick these up as ordinary follow-ups after the campaign (or sooner if one becomes pressing).
 
+> **Campaign closed 2026-07-12 — this file is the live handoff.** The per-section findings files and prescreen artifacts referenced below (`suspects.md`, the findings files) were pruned at close-out; they live in git history at `git show 9a6201a5e:wip/drift-hunt/<path>`. The campaign record is `findings/SUMMARY.md` + `inventory.md`.
+
 ## 1. `pipelex validate` shortcut forms are invisible in `--help`
 
 **Found:** Stage 0, via the CLI pre-screen near-miss (see `suspects.md` FP pattern 8).

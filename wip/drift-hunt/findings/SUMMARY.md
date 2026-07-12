@@ -1,6 +1,8 @@
-# Drift Hunt — findings SUMMARY (running scoreboard)
+# Drift Hunt — findings SUMMARY (campaign record)
 
-Accumulates as each Stage 1 part lands. Per-section defect density is the campaign's headline metric; the rejected-findings column tracks how much the adversarial-verify pass (D6) filtered. Denominators come from `wip/drift-hunt/inventory.md`.
+**CAMPAIGN COMPLETE (2026-07-12).** This file and `inventory.md` are the surviving record; the per-section findings files (with every finding's `file:line` evidence and fix-time resolution records) and the prescreen artifacts were pruned at close-out and live in git history — `git show 9a6201a5e:wip/drift-hunt/findings/<file>` on the `docs/Drift-hunt` branch. The close-out section at the bottom is the handoff: coverage disclosure, Stage-2 resolution totals, the drift-contract shortlist for the Phase 3 verdict, and the deferred code findings.
+
+Per-section defect density is the campaign's headline metric; the rejected-findings column tracks how much the adversarial-verify pass (D6) filtered. Denominators come from `wip/drift-hunt/inventory.md`.
 
 ## Per-section scoreboard
 
@@ -8,11 +10,11 @@ Counts are **drift** findings (after the authoring-convention carve-out, below).
 
 | Section | Pages | Claims checked | Drift | Convention | Rejected (D6) | Density | 🔴 breaks | 🟠 wrong | 🟡 misleading | ⚪ stale | Findings file |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| building-methods | 35 | 452 | 44 | 3 | 0 | 1.26 | 25 | 11 | 6 | 2 | [building-methods.md](building-methods.md) |
-| under-the-hood + advanced | 26 | 435 | 42 | 0 | 0 | 1.62 | 10 | 23 | 4 | 5 | [under-the-hood-advanced.md](under-the-hood-advanced.md) |
-| features + reliability | 25 | 308 | 10 | 0 | 0 | **0.40** | 2 | 7 | 1 | 0 | [features-reliability.md](features-reliability.md) |
-| the tail (get-started, contribute, tools non-CLI, setup, viewpoint, root, D9 adds) | 18 | 244 | 13 | 0 | 0 | 0.72 | 2 | 9 | 2 | 0 | [the-tail.md](the-tail.md) |
-| cookbook | 21 | — | — | — | — | — | — | — | — | — | *(Stage C — greenlight-gated, D7)* |
+| building-methods | 35 | 452 | 44 | 3 | 0 | 1.26 | 25 | 11 | 6 | 2 | `building-methods.md` (pruned — git history) |
+| under-the-hood + advanced | 26 | 435 | 42 | 0 | 0 | 1.62 | 10 | 23 | 4 | 5 | `under-the-hood-advanced.md` (pruned — git history) |
+| features + reliability | 25 | 308 | 10 | 0 | 0 | **0.40** | 2 | 7 | 1 | 0 | `features-reliability.md` (pruned — git history) |
+| the tail (get-started, contribute, tools non-CLI, setup, viewpoint, root, D9 adds) | 18 | 244 | 13 | 0 | 0 | 0.72 | 2 | 9 | 2 | 0 | `the-tail.md` (pruned — git history) |
+| cookbook | 21 | — | — | — | — | — | — | — | — | — | *(NEVER SWEPT — deferred, D12)* |
 | **Total (STAGE 1 COMPLETE)** | **104** | **1439** | **109** | **3** | **0** | **1.05** | 39 | 50 | 13 | 7 | |
 
 > **Part 2 density caveat:** 42/26 = 1.62, but 5 of the 26 pages are 8-line "Under Construction" stubs (`advanced/*-injection.md`, nothing checkable). Against the 21 *substantive* pages, density is 2.0 (14 dirty / 7 clean).
@@ -67,4 +69,57 @@ A ruling that shapes both the fix triage and the check design. Omitting *scaffol
 
 ## Cookbook-repo defects (handoff, not fixed here)
 
-- *(none yet — Stage C not run)*
+- *(none — Stage C never ran; see the coverage disclosure below, D12)*
+
+---
+
+# Campaign close-out (Checkpoint 2, 2026-07-12)
+
+## Coverage — stated honestly
+
+Stage 1 swept **104 of the 125 in-scope hand-written pages** (denominator: `inventory.md`). The **21 `docs/cookbook/` pages were never swept** — Stage C was deferred out of the campaign entirely (D12), so no claim about cookbook-page accuracy can be made either way. Also excluded by design (D2): generated docs (`docs/errors/`, gateway models) and the freshly-reviewed sections (`docs/configuration/`, the CLI docs) — re-sweeping those would have measured nothing.
+
+## Stage 2 resolution — all four PRs merged to dev (2026-07-12)
+
+| Batch | Scope | PR → dev (squash) | Stage-1 findings | Fix-time drift (D16) | Refuted at fix time |
+|---|---|---|---|---|---|
+| S2-3 | under-the-hood + advanced | #1042 `9814e2f4c` | 42 fixed, 0 rejected | +4 (F43–F46) | 2 |
+| S2-1 | building-methods `pipes/` | #1043 `126616a88` | 30 fixed, 0 rejected | +10 (F45–F54) | 2 |
+| S2-2 | building-methods concepts + top-level | #1044 `46511ce9c` | 14 fixed, 0 rejected | +7 (F55–F61) + 1 stale pointer | 6 |
+| S2-4 | features + reliability + the tail + all cross-cutting sweeps | #1045 `cb13e5b33` | 23 fixed, 0 rejected | +10 (F11, F14–F22) | 3 |
+
+- **Every one of the 109 Stage-1 findings was fixed; 0 were rejected at fix time** — each reproduced exactly as recorded when the fixer re-verified it against the code (D6). Combined with 0 rejections at verify time, the pipeline's precision across the whole campaign is unblemished; its known error mode is false *negatives* (see the Stage-1 note above).
+- **Fix-time drift (D16) added 31 confirmed findings + 1 stale section pointer, all fixed in-batch; 13 candidates were refuted** — the refutations cluster on omission/scope/equivalence claims (a scoped list is not incomplete; an intentionally-narrower command is not wrong), the confirmations on checkable facts. Fix agents over-flag; the D6 verify gate is what keeps D16 honest.
+- **Every changed example re-validated against the real parser** (incl. dry-run execution for the load-bearing ones); blind no-context post-fix reviews ran on every batch commit — they caught 2 defects in S2-1's own new text and 3 in S2-3's (folded in pre-PR); S2-2 and S2-4 came back clean.
+- **Cross-cutting sweeps all landed:** the `PipeStructure` roster on all three pages (incl. the docs landing page), `agent-cli.md`'s `--mock-inputs` qualifier, and the D13 `agent-test` heartbeat claim everywhere — including the `pipelex/kit/agent_rules/` source templates (repo-root `CLAUDE.md`/`AGENTS.md` are generated from them) and the workspace-root `CLAUDE.md` in its own repo (commit `cc2b68c` on `feature/Follow-ups` there).
+- **Gates on the final reconciled branch:** `make docs-check` strict, `make check`, and full **`make agent-test` — all green** (the agent-test run itself displayed the start-line + 20 s heartbeats the D13 fixes now document).
+
+Counting Stage 0's mechanical fixes (dead paths/keys/links, committed at Checkpoint 0), the campaign fixed **~140 confirmed code↔doc drift defects** across the docs tree, plus the two instruction-file sweeps outside `docs/`.
+
+## Correction to the record: the observer-page "partial fix" was a stale-base artifact
+
+The tracker and S2-4's out-of-batch note recorded `docs/advanced/observer-provider-injection.md` as only partially fixed (pre-rename hook names and a broken `from pipelex import Pipelex` import "remaining"). **Verified at close-out: the page is fully fixed and byte-identical to dev.** Part 2's F38–F42 covered exactly those defects and S2-3 (PR #1042) fixed them; S2-4's session was reading a base that predated #1042's merge, so it re-reported already-fixed defects as outstanding. Close-out verification against live code: hook names match `observer_protocol.py:17-31`, payload keys match `pipe_router_protocol.py:18-47`, JSONL filenames match `LocalObserverEventType` (`local_observer.py:11-14`), the import and `Pipelex.make(...)`/`hub.set_observer(...)` calls are correct (`hub.py:263`), and `docs/advanced/index.md`'s `Pipelex.make` kwargs all exist on the real signature. **No follow-up needed.** (Lesson for future multi-PR batch campaigns: an out-of-batch "still broken" record made while sibling PRs are in flight must name the base SHA it was checked against.)
+
+## Handoff 1 — drift-contract shortlist for the Phase 3 verdict (per D5/D17)
+
+The candidates are detailed in the section above ("Drift-contract candidates"); this is the ranked verdict-ready shortlist, with the campaign's evidence base:
+
+1. **`doc-enumerations-vs-registry`** (derived check) — highest value-per-effort. Stale closed lists appeared in every part and dominate the capability pages; the diff is trivial and the sources of truth are registries/StrEnums/deck/config files. The one design cost: encode the exhaustive-vs-illustrative rule (only hedge-free lists are checked; a scope qualifier like "from PDFs and images" is part of the claim — two S2-4 refutations prove skipping scoped lists is correct, not lenient).
+2. **`validate-doc-bundle-examples`** (derived check) — kills the single biggest breaks-a-user class (~18 findings in building-methods). Needs D11 placeholder injection (`description`/`domain`, tolerated-omitted prompt) and D19 sub-pipe scaffolding for sequence sketches. **Known limit (F13): it verifies the snippet, never the sentence beside it** — a green run must not be read as a clean page.
+3. **`doc-python-snippets-import`** (derived check) — import-and-`getattr` on doc-referenced Python symbols. Catches the campaign's #1 cross-part class (renamed API never propagated into docs), which produced the worst silent failure found anywhere (the observer page's mis-named hooks silently no-op).
+4. **`make-targets-and-tooling`** (a CONTRACT, not a check) — Part 4's distinctive class is un-mechanizable: every documented target exists; what drifts is behavior under a stable name (`agent-test`'s heartbeat). Trigger: `Makefile`; review targets: the pages describing make targets (`docs/agents/debugging-hanging-pytest-runs.md`, `docs/contribute/*`, `CONTRIBUTING.md`, the kit agent-rules templates). This is the campaign's strongest evidence for the drift-contracts mechanism itself — and the finding that docs edited in the same commit as their code never drifted (`d3550330a`, `15e0a94ea`) is the mechanism observed working in the wild.
+5. Weaker / harder candidates, in descending order: `doc-python-signatures-vs-live` (keyword-only drift in snippets; needs signature resolution), `doc-toml-config-vs-shipped` (diff doc-embedded `pipelex.toml` blocks against the shipped file), `operator-param-table-vs-blueprint` (needs a Markdown table parser).
+
+**Where to spend contract budget — the campaign's headline correlation:** drift follows *audience*, not complexity. Author-is-the-reader pages (drift-contracts, keyword-only, telemetry setup, reliability) came back clean; explain-it-to-someone-else pages (onboarding, contributor setup, agent playbook, internals) drifted at up to 2.0 findings/page. Put contracts on reader-facing pages; maintainer-facing pages stay current by use.
+
+## Handoff 2 — deferred code findings (D8)
+
+**`wip/drift-hunt/deferred-code-findings.md` (kept, not pruned) carries the 10 code-side defects** the hunt surfaced but did not fix (Stage 2 was docs-only, D17). Highlights by user impact: item 3 (`GatewayTelemetryManagerInjectedError`'s remediation message names five config fields that don't exist — the one moment an error message is load-bearing, and every key it offers is wrong), item 8 (the `tomli>=2.3.0` floor admits a tomli that cannot parse documented `.mthds` deck syntax), item 9 (`pipelex build structures` can silently shadow a hand-written class after the documented migration), item 2 (cross-repo: `plxt lint` doesn't detect invalid concept references, contradicting what the docs promised). Each entry has `file:line` evidence and a candidate fix.
+
+## Lessons that outlive the campaign
+
+- **The code is the authority — even over the finding's own Reality text.** S2-3's blind review caught a Stage-1 finding whose *correction* was itself wrong (F36's fallback claim). Fixers must re-derive, not transcribe.
+- **Validate the whole snippet, not just the finding's clause.** A finding scoped to a kwarg hid a non-running example around it (S2-1's `bundle_uris` snippets, inherited from the original docs).
+- **A blind, no-context post-fix review earns its keep** — it caught defects in three of five reviewed batches (incl. Stage 1's own record), precisely because it inherits none of the batch's assumptions.
+- **The FN spot-check is a standing step.** With 0 rejections across 109 verify passes and ~140 fixes, the pipeline demonstrably under-reports rather than over-reports; the only Stage-1 defect that escaped both reviewer and verifier (F13) was caught by hand-checking a "clean" high-risk page.
+- **Run it, don't guess.** Twice, live execution reversed a wrong conclusion reached by reading (`pipelex validate --all` at Stage 0; the tomli TOML 1.1 refutation at S2-2) — and two Part-4 findings were reachable *only* by executing.
