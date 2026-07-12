@@ -304,7 +304,11 @@ type = "PipeLLM"
 description = "Analyze a document"
 inputs = { document = "Document" }
 output = "Text"
-prompt = "Analyze this document and provide a summary"
+prompt = """
+Analyze this document and provide a summary:
+
+@document
+"""
 ```
 
 ### In Pipe Outputs
@@ -315,7 +319,7 @@ type = "PipeLLM"
 description = "Describe an image"
 inputs = { photo = "Image" }
 output = "Text"
-prompt = "Describe what you see in this image"
+prompt = "Describe what you see in this image: $photo"
 ```
 
 ### With Page Content
@@ -327,7 +331,7 @@ The `Page` concept is particularly useful with `PipeExtract`:
 type = "PipeExtract"
 description = "Extract content from a document"
 inputs = { document = "Document" }
-output = "Page"
+output = "Page[]"
 ```
 
 This extracts each page with both its text/images and a visual representation.
@@ -379,7 +383,11 @@ type = "PipeLLM"
 description = "Summarize any text"
 inputs = { content = "Text" }
 output = "Text"
-prompt = "Summarize this content: @content"
+prompt = """
+Summarize this content:
+
+@content
+"""
 ```
 
 ### Document Extraction
@@ -391,10 +399,10 @@ description = "Extract content from a document"
 inputs = { document = "Document" }
 output = "Page[]"
 
-[pipe.analyze_page]
+[pipe.analyze_pages]
 type = "PipeLLM"
-description = "Analyze a page"
-inputs = { page = "Page[]" }
+description = "Analyze pages"
+inputs = { pages = "Page[]" }
 output = "Text"
 prompt = """Analyze those pages: 
 @pages
@@ -419,9 +427,11 @@ type = "PipeLLM"
 description = "Analyze image with text context"
 inputs = { image = "Image", context = "Text" }
 output = "Text"
-prompt = "Given this context: $context
+prompt = """
+Given this context: $context
 
-Analyze this image: $image"
+Analyze this image: $image
+"""
 ```
 
 ### Web Search
