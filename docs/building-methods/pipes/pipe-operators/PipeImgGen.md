@@ -58,9 +58,11 @@ PipeImgGen uses the unified inference backend system to manage image generation 
 
 Common image generation model handles:
 
-- `base-img-gen`: Base image generation model (alias for flux-pro/v1.1)
-- `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)
-- `fast-img-gen`: Fast image generation model (alias for fast-lightning-sdxl)
+- `default-general`: General-purpose image generation model (alias for nano-banana)
+- `default-premium`: Premium image generation model (alias for nano-banana-2)
+- `default-small`: Small, fast image generation model (alias for gpt-image-1-mini)
+- `best-gpt`: Best OpenAI image generation model (alias for gpt-image-2)
+- `best-gemini`: Best Gemini image generation model (alias for nano-banana-2)
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 

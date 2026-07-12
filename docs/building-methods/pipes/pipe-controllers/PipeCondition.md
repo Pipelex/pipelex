@@ -31,7 +31,7 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 | `expression_template`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
 | `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail`.                                  | Yes                            |
 | `default_outcome`            | string         | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`.                                                             | Yes                             |
-| `add_alias_from_expression_to` | string         | An advanced feature. If provided, the string result of the expression evaluation is added to the working memory as an alias with this name.               | No                             |
+| `add_alias_from_expression_to` | string         | An advanced feature. If provided, an alias named after the string result of the expression evaluation is added to the working memory, pointing to the existing entry named by this value (which must already be in the working memory).               | No                             |
 
 !!! important "Output Concept Matching"
     The output concept of the `PipeCondition` has to match the output of all the pipes in the `outcomes`.
@@ -44,8 +44,11 @@ Here's a basic example showing how PipeCondition routes based on input data:
 domain = "routing_example"
 description = "Example of PipeCondition routing"
 
-[concept]
-CategoryInput = "Input with a category field"
+[concept.CategoryInput]
+description = "Input with a category field"
+
+[concept.CategoryInput.structure]
+category = "The category of the input"
 
 # Define the PipeCondition first
 [pipe.route_by_category]

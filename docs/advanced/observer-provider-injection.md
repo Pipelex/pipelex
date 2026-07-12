@@ -21,20 +21,20 @@ This data collection is designed for later analysis and is still a work in progr
 All observers must implement the `ObserverProtocol`:
 
 ```python
-from typing import Any, Dict, Protocol
+from typing import Any, Protocol
 
-PayloadType = Dict[str, Any]
+PayloadType = dict[str, Any]
 
 class ObserverProtocol(Protocol):
-    async def before_run(self, payload: PayloadType) -> None:
+    async def observe_before_run(self, payload: PayloadType) -> None:
         """Process and store the payload before the run"""
         ...
 
-    async def successful_run(self, payload: PayloadType) -> None:
+    async def observe_after_successful_run(self, payload: PayloadType) -> None:
         """Process and store the payload after the run is successful"""
         ...
 
-    async def failing_run(self, payload: PayloadType) -> None:
+    async def observe_after_failing_run(self, payload: PayloadType) -> None:
         """Process and store the payload after the run fails"""
         ...
 ```
@@ -46,6 +46,7 @@ The payload contains different information depending on the execution phase:
 ### Before Run
 ```python
 payload = {
+    "pipeline_run_id": str,  # Identifier of the pipeline run
     "pipe_job": PipeJob,  # Contains pipe metadata and working memory
 }
 ```
@@ -53,6 +54,7 @@ payload = {
 ### Successful Run
 ```python
 payload = {
+    "pipeline_run_id": str,  # Identifier of the pipeline run
     "pipe_job": PipeJob,     # Initial job information
     "pipe_output": PipeOutput, # Results and final working memory
 }
@@ -61,8 +63,9 @@ payload = {
 ### Failing Run
 ```python
 payload = {
+    "pipeline_run_id": str,  # Identifier of the pipeline run
     "pipe_job": PipeJob,  # Initial job information
-    # Note: error details are handled separately by the pipe router
+    "error": Exception,   # The exception that caused the failure
 }
 ```
 
@@ -80,24 +83,24 @@ class MyCustomObserver(ObserverProtocol):
         self.config_param = config_param
         # Initialize your storage/logging mechanism here
 
-    async def before_run(self, payload: PayloadType) -> None:
+    async def observe_before_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
         # Process pipe_job data before execution
         # Example: Log pipe code, inputs, parameters
-        print(f"Starting pipe: {pipe_job.pipe_code}")
+        print(f"Starting pipe: {pipe_job.pipe.code}")
 
-    async def successful_run(self, payload: PayloadType) -> None:
+    async def observe_after_successful_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
         pipe_output = payload["pipe_output"]
         # Process successful execution data
         # Example: Log execution time, output size, tokens used
-        print(f"Completed pipe: {pipe_job.pipe_code}")
+        print(f"Completed pipe: {pipe_job.pipe.code}")
 
-    async def failing_run(self, payload: PayloadType) -> None:
+    async def observe_after_failing_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
         # Process failure data
         # Example: Log error context, partial results
-        print(f"Failed pipe: {pipe_job.pipe_code}")
+        print(f"Failed pipe: {pipe_job.pipe.code}")
 ```
 
 ### Step 2: Register Your Observer with Dependency Injection
@@ -119,9 +122,9 @@ hub.set_observer(my_observer)
 
 The observer is automatically called by the PipeRouterProtocol during pipe execution:
 
-1. `before_run()` is called before any pipe execution
-2. `successful_run()` is called after successful completion
-3. `failing_run()` is called when an exception occurs
+1. `observe_before_run()` is called before any pipe execution
+2. `observe_after_successful_run()` is called after successful completion
+3. `observe_after_failing_run()` is called when an exception occurs
 
 ## Built-in LocalObserver Example
 
@@ -143,8 +146,8 @@ get_pipelex_hub().set_observer(local_observer)
 The LocalObserver creates separate JSONL files for each event type:
 
 - `before_run.jsonl` - Pre-execution data
-- `successful_run.jsonl` - Success events
-- `failing_run.jsonl` - Failure events
+- `after_successful_run.jsonl` - Success events
+- `after_failing_run.jsonl` - Failure events
 
 ## Advanced Use Cases
 
@@ -159,15 +162,15 @@ class DatabaseObserver(ObserverProtocol):
         self.db_connection = db_connection_string
         # Initialize database connection
 
-    async def before_run(self, payload: PayloadType) -> None:
+    async def observe_before_run(self, payload: PayloadType) -> None:
         # Store in database
         await self._store_event("before_run", payload)
 
-    async def successful_run(self, payload: PayloadType) -> None:
-        await self._store_event("successful_run", payload)
+    async def observe_after_successful_run(self, payload: PayloadType) -> None:
+        await self._store_event("after_successful_run", payload)
 
-    async def failing_run(self, payload: PayloadType) -> None:
-        await self._store_event("failing_run", payload)
+    async def observe_after_failing_run(self, payload: PayloadType) -> None:
+        await self._store_event("after_failing_run", payload)
 
     async def _store_event(self, event_type: str, payload: PayloadType):
         # Your database storage logic here
@@ -180,17 +183,17 @@ class MetricsObserver(ObserverProtocol):
     def __init__(self, metrics_client):
         self.metrics = metrics_client
 
-    async def before_run(self, payload: PayloadType) -> None:
+    async def observe_before_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
-        self.metrics.increment(f"pipe.{pipe_job.pipe_code}.started")
+        self.metrics.increment(f"pipe.{pipe_job.pipe.code}.started")
 
-    async def successful_run(self, payload: PayloadType) -> None:
+    async def observe_after_successful_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
-        self.metrics.increment(f"pipe.{pipe_job.pipe_code}.success")
+        self.metrics.increment(f"pipe.{pipe_job.pipe.code}.success")
 
-    async def failing_run(self, payload: PayloadType) -> None:
+    async def observe_after_failing_run(self, payload: PayloadType) -> None:
         pipe_job = payload["pipe_job"]
-        self.metrics.increment(f"pipe.{pipe_job.pipe_code}.failed")
+        self.metrics.increment(f"pipe.{pipe_job.pipe.code}.failed")
 ```
 
 ## Best Practices
@@ -206,7 +209,9 @@ class MetricsObserver(ObserverProtocol):
 For automatic observer setup, integrate with your Pipelex initialization:
 
 ```python
-from pipelex import Pipelex
+from pipelex.hub import get_pipelex_hub
+from pipelex.pipelex import Pipelex
+
 from my_project.observers import MyCustomObserver
 
 def setup_pipelex():

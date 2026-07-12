@@ -244,7 +244,7 @@ Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thin
 ```toml
 [cogt.llm_config.google_config.effort_to_level_map]
 none = "disabled"
-minimal = "low"
+minimal = "minimal"
 low = "low"
 medium = "medium"
 high = "high"
@@ -260,7 +260,7 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 **ADAPTIVE mode** (Gemini 3) sends a `thinking_level` value (e.g., `ThinkingLevel.LOW`, `ThinkingLevel.MEDIUM`, `ThinkingLevel.HIGH`) mapped from the `effort_to_level_map`. The Google SDK dynamically adjusts reasoning depth based on this level. No `thinking_budget` is set in adaptive mode.
 
 !!! note
-    `MINIMAL` and `LOW` both map to `"low"` in the level map. In ADAPTIVE mode they both produce `ThinkingLevel.LOW`. In MANUAL mode they are differentiated by the budget map (512 vs 1024 tokens).
+    `MINIMAL` and `LOW` map to distinct levels in the level map (`"minimal"` and `"low"`). In ADAPTIVE mode they produce different results — `ThinkingLevel.MINIMAL` vs `ThinkingLevel.LOW`. In MANUAL mode they are further differentiated by the budget map (512 vs 1024 tokens).
 
 **MANUAL mode** (Gemini 2.5) resolves effort to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
 

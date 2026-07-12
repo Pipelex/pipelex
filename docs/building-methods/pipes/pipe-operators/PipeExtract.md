@@ -58,7 +58,7 @@ Extraction presets are defined in your model deck configuration and can include 
 | `output`                    | string  | The output concept produced by the extraction operation. Use `Page[]`.                                  | Yes      |
 | `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
-| `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
+| `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `72`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
 | `render_js`                 | boolean | For web-page extraction: if `true`, the extraction backend renders JavaScript before fetching the page content. Defaults to `false`. *Note: Only honored by backends that support headless rendering.* | No       |
 | `include_raw_html`          | boolean | For web-page extraction: if `true`, the extracted `Page` populates its `raw_html` field with the fetched page's HTML. Defaults to `false`. | No       |
@@ -102,7 +102,7 @@ output      = "Page[]"
 model       = "@default-extract-web-page"
 ```
 
-Pass a web URL as the `document_uri` when running the pipe. PipeExtract fetches the page and extracts its content into `Page` objects, following the same pattern as document extraction.
+Pass a web URL as the `article_url` input when running the pipe. PipeExtract fetches the page and extracts its content into `Page` objects, following the same pattern as document extraction.
 
 ## Related Documentation
 

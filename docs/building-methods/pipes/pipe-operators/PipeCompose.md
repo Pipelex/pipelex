@@ -32,8 +32,8 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 | --------------- | ----------------- | --------------------------------------------------------------------------- | -------- |
 | `type`          | string            | The type of the pipe: `PipeCompose`                                         | Yes      |
 | `description`   | string            | A description of the operation                                              | Yes      |
-| `inputs`        | table             | Input variables needed for the template                                     | Yes      |
-| `output`        | string            | The concept for the output                                                  | No       |
+| `inputs`        | table             | Input variables needed for the template                                     | No       |
+| `output`        | string            | The concept for the output                                                  | Yes      |
 | `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
 *Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
@@ -121,7 +121,7 @@ Instead of rendering a template, construct mode creates a structured object by s
 | ------------- | ------ | --------------------------------------------------------- | -------- |
 | `type`        | string | The type of the pipe: `PipeCompose`                       | Yes      |
 | `description` | string | A description of the operation                            | Yes      |
-| `inputs`      | table  | Input variables needed for the construct                  | Yes      |
+| `inputs`      | table  | Input variables needed for the construct                  | No       |
 | `output`      | string | The structured concept to output                          | Yes      |
 | `construct`   | section| Field mappings (see below)                                | Yes*     |
 
