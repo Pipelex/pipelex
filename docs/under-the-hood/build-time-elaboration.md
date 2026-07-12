@@ -79,7 +79,7 @@ The elaborator additionally:
 
 - Verifies that the synthetic codes (`<pipe_code>__draft_text`, `<pipe_code>__structure`) don't already exist in the bundle.
 - Verifies that the synthetic codes pass `is_pipe_code_valid` (snake_case).
-- After producing the new bundle, re-runs `PipelexBundleBlueprint.model_validate(elaborated.model_dump(...))` so bundle-level validators (concept refs, pipe refs, `main_pipe`) re-check the synthetic pipes. Any `ValidationError` here is wrapped in `PipelexUnexpectedError`, with a message naming the bundle's `domain` and the sorted list of synthetic pipe codes (`BundleElaboratorError` is used only for the earlier synthesis-time checks in the same method).
+- After producing the new bundle, re-runs `PipelexBundleBlueprint.model_validate(elaborated.model_dump(...))` so bundle-level validators (concept refs, pipe refs, `main_pipe`) re-check the synthetic pipes. Any `ValidationError` here is wrapped in `PipelexUnexpectedError`, with a message naming the bundle's `domain` and the sorted list of synthetic pipe codes (`BundleElaboratorError` is used only for the earlier synthesis-time checks during the same `elaborate()` call).
 - Asserts that no synthesized blueprint itself carries `structuring_method = "preliminary_text"` — a recursive-elaboration guard. Today's synthesis explicitly sets `None`; the guard protects against future elaboration kinds copying fields wholesale.
 
 ## Cost and runtime semantics

@@ -36,7 +36,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
-    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, `error_stack_traces`, and `pipe_and_concept_registry` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
+    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, `error_stack_traces`, and `pipe_and_concept_registry` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings — the flags toggle the first four; `pipe_and_concept_registry` is set only via config.
 
 ---
 

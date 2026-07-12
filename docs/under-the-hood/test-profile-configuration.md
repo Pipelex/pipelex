@@ -181,7 +181,7 @@ extract_models = ["@from_pdf"]
 
 The preprocessing command discovers available models from:
 
-- **Backend TOML files** in `inference/backends/*.toml`, resolved from the project `.pipelex/` override directory or the packaged `pipelex/kit/configs/` directory
+- **Backend TOML files** in `inference/backends/*.toml`, resolved from the project `.pipelex/` directory if present there, otherwise from the global `~/.pipelex/` directory
 - **Pipelex Gateway** remote configuration
 
 ### 2. Profile Resolution

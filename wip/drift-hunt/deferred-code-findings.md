@@ -43,3 +43,13 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Why it matters:** the docstring is the first thing a contributor reads when implementing the protocol; it steers them to override the wrong base class — exactly the mistake the doc page used to teach before F33 was fixed.
 
 **Candidate fix (code):** correct the docstring line to name `StructuredContent`. One-line comment fix; deferred only because Stage 2 is docs-only (D17).
+
+## 5. Two docstrings still name `OrchestratorProtocol.run` after the `execute` rename
+
+**Found:** Stage 2, batch S2-3, by the blind post-fix review of the batch commit (the doc-side rename — finding F27 — is fully applied; these are the same stale name living in code comments).
+
+**Behavior:** `pipelex/runtime_bridge/delivery_mode.py:6` ("Delivery is passed as a parameter to ``OrchestratorProtocol.run``") and `pipelex/plugins/bundle_validator_registry.py:54` ("unlike ``OrchestratorProtocol.run``") both reference the protocol's blocking method by its old name; the method is `execute` (`pipelex/plugins/orchestrator_registry.py:38`).
+
+**Why it matters:** these docstrings describe the SPI seam an out-of-tree orchestrator plugin compiles against — the exact audience the F27 page-wide doc rename was fixed for.
+
+**Candidate fix (code):** rename both references to `OrchestratorProtocol.execute`. Two one-line comment fixes; deferred only because Stage 2 is docs-only (D17).
