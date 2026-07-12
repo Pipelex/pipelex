@@ -66,7 +66,7 @@ main_pipe = "extract_and_validate_invoice"
 - **`domain`** (required) - The unique identifier for this bundle's namespace
 - **`description`** (Optional) - A human-readable description of what this bundle does
 - **`system_prompt`** (Optional) - A system prompt that applies to all `PipeLLM` operators in this bundle
-- **`main_pipe`** (Optional) - The default pipe to execute when no specific pipe is requested when running the bundle (covered in section 2)
+- **`main_pipe`** (Optional) - The default pipe to execute when no specific pipe is requested when running the bundle (see "About `main_pipe`" below)
 
 **Why domains matter:**
 
@@ -84,12 +84,21 @@ When you define a `system_prompt` at the bundle level, it automatically applies 
 domain = "medical_records"
 system_prompt = "You are a medical records specialist with expertise in HIPAA compliance and clinical documentation."
 
+[concept]
+MedicalRecord = "A patient's medical record"
+Diagnosis = "A medical diagnosis extracted from a record"
+
 [pipe.extract_diagnosis]
 type = "PipeLLM"
 # This pipe will automatically use the bundle's system_prompt
+description = "Extract the primary diagnosis from a medical record"
 inputs = { record = "MedicalRecord" }
 output = "Diagnosis"
-prompt = "Extract the primary diagnosis from this medical record: @record"
+prompt = """
+Extract the primary diagnosis from this medical record:
+
+@record
+"""
 ```
 
 Individual pipes can override the bundle's system prompt by defining their own `system_prompt` field.
@@ -147,7 +156,7 @@ Pipes are the processing units that transform data. Like concepts, they're optio
 type = "PipeExtract"
 description = "Extract text and images from an invoice PDF"
 inputs = { document = "Document" }
-output = "Page"
+output = "Page[]"
 ```
 See more about designing pipes in [Designing Pipelines](./pipes/index.md).
 
@@ -171,7 +180,7 @@ type = "PipeLLM"
 description = "Validate invoice data"
 inputs = { invoice = "Invoice" }          # ✅ No prefix needed
 output = "ValidationResult"               # ✅ No prefix needed
-prompt = "Validate this invoice: @invoice"
+prompt = "Validate this invoice: $invoice"
 ```
 
 This is the most common case and keeps your code clean.
@@ -198,7 +207,11 @@ inputs = {
 }
 output = "ReconciliationReport"
 prompt = """
-Reconcile this payment with the invoice...
+Reconcile this payment with the invoice:
+
+@invoice
+
+@payment
 """
 ```
 
