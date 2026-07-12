@@ -130,7 +130,9 @@ description = "Summarize a document"
 inputs = { document = "Document" }
 output = "DocumentSummary"
 prompt = """
-Summarize the key points from this document: @document
+Summarize the key points from this document:
+
+@document
 """
 ```
 
