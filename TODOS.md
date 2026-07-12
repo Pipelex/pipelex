@@ -5,12 +5,13 @@ A campaign, not a feature: sweep every hand-written doc page for code↔doc drif
 ## Cold-start context (update at every checkpoint)
 
 - **Status:** CHECKPOINT 0 CLOSED (2026-07-12) — all rulings received & recorded (D7–D10): judgment seeds resolved (presets = deck file, accurate; codegen-projections cross-repo refs fixed per D8; cookbook → greenlight-gated Stage C per D7), all 8 FP patterns confirmed (TOML 1.1 basis; validate-shortcut `--help` invisibility deferred as a CODE defect → `wip/drift-hunt/deferred-code-findings.md`), scope edges all in (D9), Stage 1 shaped as 4 cold-start parts (D10). Earlier: Phase H DONE, Phase B DONE, Stage 0 DONE (5 confirmed defects fixed + 1 review-found adjacent fix), all gates green, per-phase Sonnet-5 `/code-review` fan-outs clean. **Stage 1 Part 1 NOT started — awaits Louis' explicit go.**
-- **Next:** Checkpoint 0 decisions are ALL settled (D7–D10). Stage 1 is fully shaped — 4 parts, worst-first, one cold-start session each, 104 pages, est. ~2–3M tokens/part — but **Part 1 is NOT yet greenlit**: Louis starts it explicitly (fresh session in `_drift`, "resume the Drift Hunt from TODOS.md — run Stage 1 Part 1"). Alternative next job (also awaiting Louis' word): carve the Phase H drift-tool hardening into its own PR to `dev`.
+- **Next:** Checkpoint 0 decisions are ALL settled (D7–D10). Stage 1 is fully shaped — 4 parts, worst-first, one cold-start session each, 104 pages, est. ~2–3M tokens/part — but **Part 1 is NOT yet greenlit**: Louis starts it explicitly (fresh session in `_drift`, "resume the Drift Hunt from TODOS.md — run Stage 1 Part 1").
+- **Phase H carved out (2026-07-12, Louis-approved):** the drift-tool hardening ships separately as **PR #1041 → dev OPEN** (branch `fix/Drift-ack-hardening`: cherry-picks of `8c7413afc` + `4093b1628`, the review-notes resolution header byte-identical to this branch, and the regenerated error index; agent-check + full agent-test + docs-check green). When #1041 merges, a later dev merge into this branch is content-identical on those files — no conflict expected.
 - **Branch / worktree:** `docs/Drift-hunt` off `dev`, in the `_drift` worktree (treat as repo root). Do NOT push unless Louis asks. Commits so far: tracker `5e3699c64`, hardening `8c7413afc`, backfill `4093b1628`, then Stage 0 artifacts + fixes (see git log).
 - **Working artifacts:** `wip/drift-hunt/` — `inventory.md` (the denominator), `prescreen.py` (re-runnable), `prescreen-raw.md` (raw hits), `suspects.md` (the triage — read this first).
 - **Decisions taken:** D1–D10 below, plus H-A2 implemented (narrow warn→fail escalation — see Phase H).
 - **Key learning (D6 vindicated):** `pipelex validate --all` was initially "confirmed dead" from `--help` (no group-level `--all`) and a fix was drafted — live execution proved a shortcut layer forwards it to `validate pipe`; fix reverted. Never conclude a CLI form is dead from `--help` alone; run it.
-- **Open questions:** none blocking — only the explicit go for Stage 1 Part 1 (and, separately, whether to PR the Phase H hardening to `dev` now).
+- **Open questions:** none blocking — only the explicit go for Stage 1 Part 1.
 
 ## Decisions
 
