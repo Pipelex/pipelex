@@ -9,7 +9,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format generate-mthds-schema lint pyright mypy check-keyword-only)
    ```
 
    This runs multiple code quality tools:
@@ -49,12 +49,12 @@
    ```bash
    make agent-test
    # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
-   # Zero output on success; full output on failure.
+   # Heartbeat progress lines while running; full output only on failure.
    ```
 
 ### When `make agent-test` hangs or fails opaquely
 
-   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure or timeout it prints the failed tests, the log path, and a grep hint.
+   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure it prints the failed tests, the log path, and a grep hint; on timeout, the tail of the log and the log path.
 
    For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
 
@@ -78,7 +78,7 @@
    # or
    make tp TEST=test_function_name
    ```
-   Note: Matches names starting with the provided string.
+   Note: Matches names containing the provided string (pytest `-k` substring matching).
 
 ### Running Last Failed Tests
 
