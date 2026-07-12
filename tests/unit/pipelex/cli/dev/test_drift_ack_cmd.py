@@ -10,11 +10,12 @@ import pytest
 from typer.testing import CliRunner
 
 from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_ack_cmd, drift_app, drift_check_cmd
-from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError
+from pipelex.cli.dev_cli.commands.drift.exceptions import DriftAckError, DriftGitError
 from pipelex.cli.dev_cli.commands.drift.git_adapter import read_staged_files
 from pipelex.cli.dev_cli.commands.drift.models import ack_file_path, load_all_acks
 
 if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
     from rich.console import Console
 
     from tests.unit.pipelex.cli.dev.conftest import GitRepo
@@ -166,3 +167,25 @@ class TestDriftAckCmd:
         with pytest.raises(DriftAckError, match="verify commands"):
             drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
         assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
+
+    def test_verify_that_dirties_a_trigger_fails_after_verify(self, git_repo: GitRepo) -> None:
+        """A verify command that rewrites a trigger is caught by the post-verify recheck — the ack never certifies stale index bytes."""
+        rewrite_trigger = f'{PYTHON} -c \'open("src/demo.py", "w").write("x = 2")\''
+        _seed_repo(git_repo, verify_commands=[rewrite_trigger])
+        # The tree is clean before verify (pre-check passes); the verify command then dirties the trigger.
+        with pytest.raises(DriftAckError, match="verify commands"):
+            drift_ack_cmd("demo-docs", rationale="Should not be written.", repo_root=git_repo.root)
+        assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
+
+    def test_stage_failure_removes_written_ack(self, git_repo: GitRepo, mocker: MockerFixture) -> None:
+        """If staging the written ack fails, the ack file is removed so a later check reports a missing ack, not a false green."""
+        _seed_repo(git_repo)
+        mocker.patch(
+            "pipelex.cli.dev_cli.commands.drift.drift_cmd.stage_file",
+            side_effect=DriftGitError("git index locked"),
+        )
+        with pytest.raises(DriftAckError, match="staging"):
+            drift_ack_cmd("demo-docs", rationale="Staging will fail.", repo_root=git_repo.root)
+        assert not ack_file_path(git_repo.root, contract_id="demo-docs").exists()
+        with pytest.raises(SystemExit):
+            drift_check_cmd(repo_root=git_repo.root)
