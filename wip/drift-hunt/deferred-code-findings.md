@@ -23,3 +23,13 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Doc-side (in scope, Stage 2):** drop "or invalid concept references" from `docs/features/plxt.md:24` — the claim is currently false. That fix stands on its own and does **not** depend on the code side.
 
 **Candidate fix (code, other repo — `vscode-pipelex`):** add a concept cross-reference resolution pass to the lint path, reusing the resolution logic that already exists for the LSP, and surface it as a diagnostic in both `plxt lint` and the LSP. Out of scope for this campaign (D8: another repo's code); hand off to the toolchain owner. If the team decides `plxt lint` should stay purely structural, then the doc fix is the *whole* fix — and that is a legitimate outcome.
+
+## 3. `GatewayTelemetryManagerInjectedError`'s message names config fields that do not exist
+
+**Found:** Stage 1 Part 4, as a byproduct of the false-negative hand-check on `docs/setup/telemetry.md` (the page itself is clean — this defect is in an error string, not in the docs).
+
+**Behavior:** `pipelex/system/pipelex_service/exceptions.py:126-134` builds a remediation message telling the user to configure `host`, `project_api_key`, `langfuse_enabled`, `otlp_endpoint` and `otlp_headers`. **None of those field names exist** in the telemetry config models. The real names are `endpoint` and `api_key` (`PostHogConfig`, `telemetry_config.py:77-96`), `enabled` (`LangfuseConfig`, `:107-115`), and `endpoint` / `headers` on the `[[otlp]]` table.
+
+**Why it matters:** this is the error a user hits when telemetry is misconfigured — the one moment the message is load-bearing. Every key it hands them is wrong, so following it verbatim cannot work. It is the mirror image of doc drift (the docs are right; the *code's own* user-facing text is stale), and no docs fix can reach it.
+
+**Candidate fix (code):** rewrite the message against the current field names, and ideally derive them from the pydantic models rather than restating them, so the message cannot drift again.
