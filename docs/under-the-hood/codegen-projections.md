@@ -2,7 +2,7 @@
 
 Codegen turns one **normalized library crate** — the flat, fully-qualified, self-contained, fingerprinted snapshot of a resolved library (see [`pipelex resolve`](../tools/cli/build/structures.md) and the [Library Crate Format](https://mthds.ai)) — into typed, documented artifacts for each consumer. The crate is the single authority: codegen never re-derives meaning from raw bundles and never calls a model.
 
-This page describes the projection engine in `pipelex/codegen/`. The formal contract lives in `docs/specs/pipelex-codegen.md` (workspace root).
+This page describes the projection engine in `pipelex/codegen/` and the contract it implements: deterministic projections off the crate, stamped generated files, a sibling `codegen.lock`, and an offline drift check whose verdict rides the exit code.
 
 ## Two resolved layers, then emitters
 
@@ -37,7 +37,7 @@ Native materialization itself is faithful-or-absent per native: a content-class 
 
 ## The CLI surface
 
-Two command families drive the engine (formal contract: `docs/specs/pipelex-codegen.md`, workspace root):
+Two command families drive the engine:
 
 - **`pipelex resolve [PATH]… [-f json|toml] [-L DIR]…`** — assembles the closure (working bundles + the local `.mthds/methods/` cache), requires it to be **valid**, and emits the normalized crate to stdout. The verdict rides the exit code, mirroring the bare `validate` group: `0` resolved, `1` the library is invalid (a negative verdict — no crate), `2` no verdict (empty closure / not found).
 - **`pipelex codegen <kind> …`** — the two-axis projection family (`kind` × `--target`):
@@ -89,7 +89,7 @@ The verdict rides the exit code (mirroring `resolve` / `validate`): `0` current,
 
 ## Serving the engine over HTTP
 
-The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen`, and the re-pointed `/v1/build/*` — see `docs/specs/pipelex-codegen.md` → "Route envelopes" at the workspace root). Two host-facing cores make that possible without any CLI plumbing:
+The same engine backs the `pipelex-api` routes (`POST /v1/resolve`, `POST /v1/codegen`, and the re-pointed `/v1/build/*` — the route envelopes are documented in `pipelex-api`'s `docs/codegen.md`). Two host-facing cores make that possible without any CLI plumbing:
 
 - **`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`** resolves **in-memory** MTHDS contents (strings, with optional per-content sources) into the normalized crate. It mirrors `validate_bundle`'s in-memory arm — the same `translate_to_validate_bundle_error` cascade, so an invalid library raises the one shared `ValidateBundleError` and a resolve verdict cannot drift from a validate verdict — and the same **loaded-on-success contract**: the library is left loaded and current for the host to read live pipes from, and the host owns its teardown. Resolution is static (no dry-run sweep), matching `pipelex resolve`.
 - **`build_stamped_projection`** (above) gives the host the stamped artifact set plus the lock as pure content. A client that writes the served files and lock verbatim reproduces a local run byte-for-byte — the offline `codegen check` passes on the written tree exactly as it would locally. There is deliberately no server-side check route: the check is offline by design.

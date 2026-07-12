@@ -101,7 +101,8 @@ description = "Read the invoice PDF and produce a faithful textual transcript"
 inputs = { invoice_pdf = "Document" }
 output = "Text"
 prompt = """
-Read this invoice and produce a faithful textual transcript of every line item, total, and metadata: @invoice_pdf
+Read this invoice and produce a faithful textual transcript of every line item, total, and metadata:
+@invoice_pdf
 """
 
 [pipe.structure_invoice]

@@ -106,7 +106,7 @@ This generates a single stamped `structures.py` module from your inline definiti
 
 If you need custom validation or computed properties, you have two options:
 
-1. **Generate then copy**: Run `pipelex build structures`, then copy the generated class into your own module and customize it there
+1. **Generate then subclass**: Run `pipelex build structures`, then subclass the generated class in a sibling module and add your custom logic there — never copy or edit the generated file; a subclass survives regeneration and stays in sync with the source concept
 2. **Write from scratch**: Create a Python class manually with your custom logic
 
 ### Example: Adding Custom Validation
@@ -129,21 +129,21 @@ age = { type = "integer", description = "User's age", required = false }
 pipelex build structures ./my_pipeline.mthds -o ./structures/
 ```
 
-**Step 3: Add custom validation**
+**Step 3: Subclass the generated class in a sibling module**
 
-Copy the generated class into your own module (never edit the generated file — it is overwritten on regeneration) and add your validation:
+Never copy or edit the generated file — it is overwritten on regeneration. A subclass in a sibling module survives regeneration and inherits all the generated fields, so you only write the custom logic:
 
 ```python
-from pipelex.core.stuffs.structured_content import StructuredContent
-from pydantic import Field, field_validator
+# structures/user_profile_ext.py
 import re
 
-class UserProfile(StructuredContent):
-    """A user profile with validation."""
+from pydantic import field_validator
 
-    username: str = Field(description="The user's username")
-    email: str = Field(description="The user's email address")
-    age: int | None = Field(default=None, description="User's age")
+from .structures import UserProfile
+
+
+class ValidatedUserProfile(UserProfile):
+    """A user profile with email validation."""
 
     @field_validator('email')
     @classmethod
@@ -155,20 +155,15 @@ class UserProfile(StructuredContent):
         return v
 ```
 
-**Step 4: Update your .mthds file**
+**Step 4: Keep the inline structure in your `.mthds` file**
 
-```toml
-[concept]
-UserProfile = "A user profile"  # Structure now defined in Python
-```
-
-The Python class is automatically discovered and registered.
+The inline structure remains the source of truth: on the next regeneration the base class is rewritten from it and your subclass picks up the changes automatically. At pipeline time the concept still resolves to the structure declared inline — apply your custom logic by validating with the subclass wherever your own code consumes the result (e.g. `ValidatedUserProfile.model_validate(profile.model_dump())`). If Pipelex itself must enforce the validation when producing the concept, move the structure to a hand-written class instead (see the [Migration Guide](#migration-guide) below).
 
 ## Migration Guide
 
 ### From Inline Structure to Python Class
 
-The easiest migration path is to use `pipelex build structures` to generate the Python class, then copy it into your own module and customize it there:
+Before migrating, check whether you need to migrate at all: if you only want custom logic on top of the structure, subclass the generated class in a sibling module (see above) and keep the inline structure as the source of truth. Migrate only when Pipelex itself must enforce your custom validation when producing the concept. In that case, write the Python class by hand — it becomes the source of truth:
 
 **1. You have this inline structure:**
 
@@ -185,13 +180,7 @@ price = { type = "number", description = "Product price", required = true }
 in_stock = { type = "boolean", description = "Stock availability", default_value = true }
 ```
 
-**2. Generate the Python class:**
-
-```bash
-pipelex build structures ./ecommerce.mthds -o ./structures/
-```
-
-**3. Copy the generated class into your own module** and add your custom logic:
+**2. Write the Python class in your own module** with your custom logic:
 
 ```python
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -221,7 +210,7 @@ class Product(StructuredContent):
         return f"${self.price:.2f}"
 ```
 
-**4. Update your `.mthds` file:**
+**3. Update your `.mthds` file:**
 
 ```toml
 domain = "ecommerce"
@@ -232,7 +221,7 @@ Product = "A product in the catalog"
 # Structure section removed - now defined in Python
 ```
 
-**5. Test your pipeline** - The behavior should be identical, plus your custom validation.
+**4. Test your pipeline** - The behavior should be identical, plus your custom validation.
 
 ## Recommendations
 

@@ -159,7 +159,7 @@ Invoice = "A commercial document"
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }    # Same domain, no prefix
 output = "Text"
-prompt = "Process this invoice: @invoice"
+prompt = "Process this invoice: $invoice"
 ```
 
 **Cross-domain references** (prefix required):
@@ -171,7 +171,7 @@ domain = "accounting"
 type = "PipeLLM"
 inputs = { invoice = "finance.Invoice" }    # Different domain, needs prefix
 output = "Report"
-prompt = "Reconcile this invoice: @invoice"
+prompt = "Reconcile this invoice: $invoice"
 ```
 
 ### In Python Code
@@ -201,7 +201,7 @@ type = "PipeLLM"
 # Automatically inherits the domain's system_prompt
 inputs = { record = "MedicalRecord" }
 output = "Diagnosis"
-prompt = "Extract the primary diagnosis: @record"
+prompt = "Extract the primary diagnosis: $record"
 ```
 
 Individual pipes can override the domain system prompt by defining their own `system_prompt` field.

@@ -21,12 +21,12 @@ For complete details about the inference backend configuration system, see the [
 An LLM handle can be either:
 
 1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
-2. **An alias** - user-defined shortcuts that map to model names, defined in the `[aliases]` section:
+2. **An alias** - user-defined shortcuts that map to model names, defined in the `[llm.aliases]` section:
 
 ### Example Alias Configurations
 
 ```toml
-[aliases]
+[llm.aliases]
 best-claude = "claude-4.1-opus"
 best-gemini = "gemini-2.5-pro"
 best-mistral = "mistral-large"
@@ -112,6 +112,8 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
 - `1_llm_deck.toml`: LLM aliases and presets
 - `2_img_gen_deck.toml`: Image generation configuration
 - `3_extract_deck.toml`: Document extraction configuration
+- `4_search_deck.toml`: Search configuration
+- `x_custom_extract_deck.toml`: Custom extraction waterfalls/overrides (loaded last)
 - `x_custom_llm_deck.toml`: Custom LLM waterfalls/overrides (loaded last)
 
 ### Directory Structure
@@ -126,10 +128,12 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
     │   ├── anthropic.toml
     │   └── ...
     └── deck/                      # Model deck configurations
-        ├── 1_llm_deck.toml           # LLM aliases & presets
-        ├── 2_img_gen_deck.toml       # Image generation config
-        ├── 3_extract_deck.toml       # Document extraction config
-        └── x_custom_llm_deck.toml    # Custom waterfalls/overrides
+        ├── 1_llm_deck.toml            # LLM aliases & presets
+        ├── 2_img_gen_deck.toml        # Image generation config
+        ├── 3_extract_deck.toml        # Document extraction config
+        ├── 4_search_deck.toml         # Search config
+        ├── x_custom_extract_deck.toml # Custom extraction waterfalls/overrides
+        └── x_custom_llm_deck.toml     # Custom LLM waterfalls/overrides
 ```
 
 
