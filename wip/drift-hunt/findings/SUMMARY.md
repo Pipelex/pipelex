@@ -1,6 +1,6 @@
 # Drift Hunt — findings SUMMARY (campaign record)
 
-**CAMPAIGN COMPLETE (2026-07-12).** This file and `inventory.md` are the surviving record; the per-section findings files (with every finding's `file:line` evidence and fix-time resolution records) and the prescreen artifacts were pruned at close-out and live in git history — `git show 9a6201a5e:wip/drift-hunt/findings/<file>` on the `docs/Drift-hunt` branch. The close-out section at the bottom is the handoff: coverage disclosure, Stage-2 resolution totals, the drift-contract shortlist for the Phase 3 verdict, and the deferred code findings.
+**CAMPAIGN COMPLETE (2026-07-12).** This file and `inventory.md` are the surviving record; the per-section findings files (with every finding's `file:line` evidence and fix-time resolution records) and the prescreen artifacts were pruned at close-out and live in git history under the pushed **`drift-hunt-archive` tag** — `git show drift-hunt-archive:wip/drift-hunt/findings/<file>` (the tag pins commit `9a6201a5e` and survives squash-merges and branch deletion). The close-out section at the bottom is the handoff: coverage disclosure, Stage-2 resolution totals, the drift-contract shortlist for the Phase 3 verdict, and the deferred code findings.
 
 Per-section defect density is the campaign's headline metric; the rejected-findings column tracks how much the adversarial-verify pass (D6) filtered. Denominators come from `wip/drift-hunt/inventory.md`.
 
