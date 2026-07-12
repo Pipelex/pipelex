@@ -48,7 +48,7 @@ StuffArtefact wraps Stuff → delegates to StuffContent → Protocol enables tra
 | `ImageContent` | Self-registers, returns `[Image N]` |
 | `ListContent` | Iterates items, recurses into nested |
 | `TextAndImagesContent` | Renders text first, then images |
-| `StuffContent` (base) | Iterates Pydantic model fields recursively |
+| `StructuredContent` | Iterates model fields, recurses into nested lists/tuples/dicts |
 | `StuffArtefact` | Delegates to underlying content |
 
 ---
@@ -64,7 +64,7 @@ flowchart TB
     subgraph FILTER["with_images Filter"]
         direction TB
         CHECK["isinstance(value, ImageRenderable)?"]
-        CALL["value.render_with_images(registry, text_format=format)"]
+        CALL["value.render_with_images(registry=registry, text_format=text_format)"]
         CHECK --> CALL
     end
 
@@ -77,7 +77,7 @@ flowchart TB
         IMG["ImageContent: register + return token"]
         LIST["ListContent: iterate items"]
         TEXT["TextAndImagesContent: text then images"]
-        BASE["StuffContent: iterate model_fields"]
+        STRUCT["StructuredContent: iterate model_fields"]
     end
 
     subgraph REGISTRY["ImageRegistry"]
@@ -88,7 +88,7 @@ flowchart TB
 
     VAR --> CHECK
     CALL --> DELEGATE
-    DELEGATE --> IMG & LIST & TEXT & BASE
+    DELEGATE --> IMG & LIST & TEXT & STRUCT
     IMG --> STORE
     STORE --> DEDUP
 ```
@@ -155,8 +155,8 @@ class ImageRenderable(Protocol):
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
         """Render to string, registering images to the registry.
@@ -182,7 +182,7 @@ class ImageRenderable(Protocol):
 Self-registers and returns a token:
 
 ```python
-def render_with_images(self, registry, *, text_format) -> str:
+def render_with_images(self, *, registry, text_format) -> str:
     image_index = registry.register_image(self)
     return f"[Image {image_index + 1}]"
 ```
@@ -192,13 +192,13 @@ def render_with_images(self, registry, *, text_format) -> str:
 Iterates items, delegating to nested ImageRenderable objects:
 
 ```python
-def render_with_images(self, registry, *, text_format) -> str:
+def render_with_images(self, *, registry, text_format) -> str:
     parts: list[str] = []
     for item in self.items:
         if isinstance(item, ImageRenderable):
-            rendered = item.render_with_images(registry, text_format=text_format)
+            rendered = item.render_with_images(registry=registry, text_format=text_format)
         else:
-            rendered = str(item)
+            rendered = item.rendered_markdown()
         if rendered:
             parts.append(rendered)
     return "\n".join(parts)
@@ -209,10 +209,10 @@ def render_with_images(self, registry, *, text_format) -> str:
 Renders text first, then registers each image:
 
 ```python
-def render_with_images(self, registry, *, text_format) -> str:
+def render_with_images(self, *, registry, text_format) -> str:
     parts: list[str] = []
     if self.text:
-        parts.append(self.text.rendered_plain())
+        parts.append(self.text.rendered_for_prompt(text_format=text_format))
     if self.images:
         for image in self.images:
             image_index = registry.register_image(image)
@@ -220,25 +220,24 @@ def render_with_images(self, registry, *, text_format) -> str:
     return "\n".join(parts)
 ```
 
-### StuffContent (Base)
+### StructuredContent
 
-Default implementation iterates Pydantic model fields:
+Default implementation for structured models iterates Pydantic model fields:
 
 ```python
-def render_with_images(self, registry, *, text_format) -> str:
+def render_with_images(self, *, registry, text_format) -> str:
     parts: list[str] = []
     for field_name in type(self).model_fields:
         field_value = getattr(self, field_name)
         if field_value is None:
             continue
-        if isinstance(field_value, ImageRenderable):
-            rendered = field_value.render_with_images(registry, text_format=text_format)
-        else:
-            rendered = str(field_value)
+        rendered = self._render_value_with_images(field_value, registry=registry, text_format=text_format)
         if rendered:
             parts.append(f"{field_name}: {rendered}")
     return "\n".join(parts)
 ```
+
+The `_render_value_with_images` helper recurses: a nested `ImageRenderable` gets `render_with_images(...)`, plain lists/tuples/dicts are traversed item by item, a non-renderable `StuffContent` falls back to `rendered_for_prompt(text_format=text_format)`, and anything else to `str(value)`. A plain `StuffContent` subclass that is not a `StructuredContent` does not implement the protocol.
 
 ---
 
@@ -284,15 +283,15 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
         registry = ImageRegistry()
 
     # 3. Get text format
-    text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT))
+    text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
     # 4. Protocol-based rendering
     if isinstance(value, ImageRenderable):
-        return value.render_with_images(registry, text_format=text_format)
+        return value.render_with_images(registry=registry, text_format=text_format)
 
     # 5. Handle plain sequences
     if isinstance(value, (list, tuple)):
-        return _render_sequence_with_images(value, registry, text_format)
+        return _render_sequence_with_images(value, registry=registry, text_format=text_format)
 
     # 6. Reject unsupported types
     raise Jinja2ContextError(f"{type(value).__name__} does not implement ImageRenderable")
@@ -332,7 +331,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `pipelex/tools/jinja2/jinja2_with_images_filter.py` | `with_images` filter |
 | `pipelex/tools/jinja2/jinja2_filters.py` | `tag` and `format` filters |
 | `pipelex/tools/jinja2/image_registry.py` | Image tracking with deduplication |
-| `pipelex/core/stuffs/stuff_content.py` | Base `render_with_images()` |
+| `pipelex/core/stuffs/structured_content.py` | Field-iterating `render_with_images()` for structured models |
 | `pipelex/core/stuffs/image_content.py` | Self-registering image token |
 | `pipelex/core/stuffs/list_content.py` | List iteration for images |
 | `pipelex/core/stuffs/text_and_images_content.py` | Text + images rendering |
