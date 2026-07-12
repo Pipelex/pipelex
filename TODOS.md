@@ -56,7 +56,7 @@ In scope per page: statements the code can contradict — commands, flags, confi
 
 ## Deferred drift-contracts items (track here, do NOT do during the hunt)
 
-- [ ] **Phase 3 — pilot verdict:** per-contract keep / narrow / mechanize / drop decision, driven by `wip/drift-contracts/dogfood-log.md`. Gated on the dogfood period verdict; the hunt feeds it evidence (Stage 1 logs observations; Checkpoint 2 hands over the contract-candidate shortlist). Original phase breakdown: `git show origin/docs/Update:TODOS.md`.
+- [ ] **Phase 3 — pilot verdict:** per-contract keep / narrow / mechanize / drop decision, driven by `wip/drift-contracts/dogfood-log.md`. Gated on the dogfood period verdict; the hunt feeds it evidence (Stage 1 logs observations; Checkpoint 2 hands over the contract-candidate shortlist). **Working doc drafted 2026-07-13: `wip/drift-contracts/phase-3-verdict.md` — awaiting Louis' rulings on its decision boxes.** (Original phase breakdown: the `docs/Update` branch is gone; the surviving source is `wip/drift-contracts-design.md` → Rollout plan.)
 - [ ] **lint-drift promotion into lint-all / required CI check:** gated on the open-PR backlog landing (a required check would fail every open PR that predates its acks). Track only.
 - [x] **PR #1040 hardening findings (A1/A2, `wip/drift-contracts/pr-1040-review-notes.md`):** resolved in Phase H below.
 
