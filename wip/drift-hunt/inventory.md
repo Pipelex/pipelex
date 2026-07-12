@@ -18,19 +18,19 @@ Every hand-written `.md` page under `docs/` in scope for the hunt, grouped by se
 | tools (non-CLI) | 2 | `logging.md`, `plxt.md` |
 | setup | 1 | `telemetry.md` (`gateway-models.md` excluded as generated) |
 | viewpoint | 1 | |
-| **Total (explicit in-scope)** | **119** | |
-| pending confirmation | 4 | see below — for Louis at Checkpoint 0 |
+| D9 additions (agents, analytics, distributed-execution, docs/CLAUDE.md) | 4 | ruled IN at Checkpoint 0 |
+| D9 additions (root `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`) | 2 | ruled IN at Checkpoint 0; live outside `docs/`, no Stage 0 seed rows |
+| **Total campaign scope** | **125** | = 104 in Stage 1 (four parts, per D10) + 21 cookbook in Stage C (D7) |
 
-## Pending confirmation (Checkpoint 0)
+## Scope-edge additions — ruled IN at Checkpoint 0 (D9, Louis 2026-07-12)
 
-Hand-written, not generated, not freshly reviewed — but not named by D2's section list. Default proposal: include all four.
+Hand-written, not generated, not freshly reviewed — not named by D2's original section list; all included by ruling. They run in Stage 1 Part 4.
 
 - `docs/agents/debugging-hanging-pytest-runs.md` — agent-facing debugging guide
 - `docs/analytics/data-extraction.md`
 - `docs/distributed-execution/index.md` — the single public distributed-execution capability page
 - `docs/CLAUDE.md` — docs-site architecture notes for agents (not in the mkdocs nav, but rich in code-contradictable claims)
-
-Also for the same ruling: the root-level `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` are include-targets of docs stubs (see Excluded) and live outside `docs/` — swept only if Louis says so.
+- Root-level `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` — the include-targets of the docs stubs; live outside `docs/`, so the Stage 0 pre-screen (docs/-only) produced no seed rows for them.
 
 ## Excluded (with reasons)
 
