@@ -143,8 +143,8 @@ get_pipelex_hub().set_observer(local_observer)
 The LocalObserver creates separate JSONL files for each event type:
 
 - `before_run.jsonl` - Pre-execution data
-- `successful_run.jsonl` - Success events
-- `failing_run.jsonl` - Failure events
+- `after_successful_run.jsonl` - Success events
+- `after_failing_run.jsonl` - Failure events
 
 ## Advanced Use Cases
 

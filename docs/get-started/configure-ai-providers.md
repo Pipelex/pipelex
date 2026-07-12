@@ -91,10 +91,10 @@ When using your own keys, enable the corresponding backends:
 1. Initialize configuration:
 
     ```bash
-    pipelex init config
+    pipelex init
     ```
 
-2. Edit `~/.pipelex/inference/backends.toml`:
+2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one):
 
     ```toml
     [google]
@@ -140,7 +140,7 @@ Configure these in `~/.pipelex/inference/backends.toml`. See our [Inference Back
 To set up Pipelex configuration files, run:
 
 ```bash
-pipelex init config
+pipelex init
 ```
 
 By default, this creates the global `~/.pipelex/` directory with:
@@ -149,6 +149,7 @@ By default, this creates the global `~/.pipelex/` directory with:
 ~/.pipelex/
 ├── pipelex.toml              # Feature flags, logging, cost reporting
 ├── plxt.toml                 # MTHDS/TOML formatting and linting configuration
+├── telemetry.toml            # AI trace destinations (PostHog, Langfuse, OTLP)
 └── inference/                # LLM configuration and model presets
     ├── backends.toml         # Enable/disable model providers
     ├── backends/             # Per-provider model catalogs (anthropic.toml, openai.toml, ...)
@@ -162,7 +163,7 @@ By default, this creates the global `~/.pipelex/` directory with:
     └── routing_profiles.toml # Model routing configuration
 ```
 
-To keep the configuration inside a project instead, run `pipelex init config --local`: it creates the same structure in a `.pipelex/` directory at your project root, which takes precedence over the global `~/.pipelex/`.
+To keep the configuration inside a project instead, run `pipelex init --local`: it creates the same structure in a `.pipelex/` directory at your project root, which takes precedence over the global `~/.pipelex/`.
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 
