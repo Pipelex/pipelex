@@ -36,7 +36,7 @@ Pipelex.make()
 
 # Run the bundle's main_pipe
 runner = PipelexMTHDSProtocol(
-    bundle_uri="path/to/my_bundle.mthds",
+    bundle_uris=["path/to/my_bundle.mthds"],
 )
 response = await runner.execute(
     # Provide values directly — each is interpreted against the pipe's declared input signature.
@@ -48,7 +48,7 @@ pipe_output = response.pipe_output
 
 # Or run a specific pipe from the bundle
 runner = PipelexMTHDSProtocol(
-    bundle_uri="path/to/my_bundle.mthds",
+    bundle_uris=["path/to/my_bundle.mthds"],
 )
 response = await runner.execute(
     pipe_code="my_specific_pipe",
@@ -60,7 +60,7 @@ pipe_output = response.pipe_output
 !!! info "How `main_pipe` Works"
     When you run a bundle without specifying a `pipe_code`, Pipelex executes the bundle's `main_pipe` (declared at the top of the `.mthds` file). If no `main_pipe` is defined and no `pipe_code` is provided, an error is raised.
 
-    If you provide both `bundle_uri` and `pipe_code`, the explicit `pipe_code` takes priority over `main_pipe`.
+    If you provide both `bundle_uris` and `pipe_code`, the explicit `pipe_code` takes priority over `main_pipe`.
 
 See the [Pipelex Bundle Specification](../pipelex-bundle-specification.md) for more about the `main_pipe` property.
 
@@ -84,9 +84,9 @@ When using `PipelexMTHDSProtocol`, you can control library behavior with these p
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
-- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
+- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the default library directories passed to `Pipelex.make(library_dirs=...)`, then to the `PIPELEXPATH` environment variable; if none of these are set, no library directories are loaded.
 
-- **`mthds_contents`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_contents`**: When provided to `PipelexMTHDSProtocol.execute()`, Pipelex parses these strings and loads them into the library in addition to any resolved library directories (bundles already loaded from directories are deduplicated). To run with only this content, disable directory loading explicitly (e.g. `library_dirs=[]`). This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -101,14 +101,15 @@ When using `PipelexMTHDSProtocol`, you can control library behavior with these p
 
 This approach loads pipe definitions from directories and executes a specific pipe by its code.
 
-**Basic usage** (loads from current working directory):
+**Basic usage** (default library directories set at initialization):
 
 ```python
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
-# First, initialize Pipelex (this loads all pipeline definitions)
-Pipelex.make()
+# First, initialize Pipelex with default library directories
+# (used by every run unless overridden per call)
+Pipelex.make(library_dirs=["./pipelines"])
 
 # Execute the pipeline and wait for the result
 runner = PipelexMTHDSProtocol()
@@ -165,7 +166,7 @@ You can directly pass MTHDS content as a string to `PipelexMTHDSProtocol.execute
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
-my_pipe_content = """
+my_pipe_content = '''
 domain = "marketing"
 description = "Marketing content generation domain"
 main_pipe = "generate_tagline"
@@ -179,12 +180,12 @@ type = "PipeLLM"
 description = "Generate a catchy tagline for a product"
 inputs = { description = "ProductDescription" }
 output = "Tagline"
-prompt = "
+prompt = """
 Product Description: $description
 
 Generate a catchy tagline based on the above description. The tagline should be memorable, concise, and highlight the key benefit.
-"
 """
+'''
 
 Pipelex.make()
 
@@ -199,7 +200,7 @@ pipe_output = response.pipe_output
 ```
 
 !!! note "Pipe Code Resolution"
-    When using `mthds_content`:
+    When using `mthds_contents`:
 
     - If the content has a `main_pipe` property and you don't provide `pipe_code`, the `main_pipe` is executed
     - If you provide `pipe_code`, it overrides `main_pipe`

@@ -53,3 +53,23 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Why it matters:** these docstrings describe the SPI seam an out-of-tree orchestrator plugin compiles against — the exact audience the F27 page-wide doc rename was fixed for.
 
 **Candidate fix (code):** rename both references to `OrchestratorProtocol.execute`. Two one-line comment fixes; deferred only because Stage 2 is docs-only (D17).
+
+## 6. CSV codec accepts `datetime` fields but its own error message, docstring, and tests omit the type
+
+**Found:** Stage 2, batch S2-1, as the code side of fix-time finding F52 on `docs/building-methods/pipes/csv-input-and-output.md` (the doc-side fix — adding `datetime` to the accepted flat types — is applied; it was verified to round-trip live).
+
+**Behavior:** the flatness classifier accepts `datetime` — `pipelex/tools/tabular/csv_codec.py:52` `_FLAT_SCALAR_TYPES = frozenset({str, int, float, bool, date, datetime})` — and a `datetime`-typed field round-trips end-to-end (ISO string in via pydantic lax coercion at `:364`, identical ISO string out via `model_dump(mode="json")` at `:402`). But the `CsvFlatnessError` message (`:104-108`) and the `flat_field_names` docstring (`:97`) both enumerate only text/integer/number/boolean/date, and `tests/unit/pipelex/tools/tabular/test_csv_codec.py` has zero `datetime` coverage (only `date`).
+
+**Why it matters:** the codec's own user-facing error text contradicts what the codec accepts, and the doc page's "contract is pinned by tests" claim is not yet true for `datetime` — the coercion table on that page deliberately omits a `datetime` row until tests pin it.
+
+**Candidate fix (code):** decide whether `datetime` is intended-supported. If yes (the classifier comment "Scalar python types a CSV cell can round-trip" suggests so): add it to the error message + docstring enumerations and pin the round trip with tests (then the doc's coercion table can gain its row). If no: remove `datetime` from `_FLAT_SCALAR_TYPES` — and revert the doc bullet.
+
+## 7. String-declared concepts drop their `refines` while basic-blueprint concepts keep `refines="native.Text"`
+
+**Found:** Stage 2, batch S2-1, by the adversarial verifier of fix-time finding F53 while pinning down accurate replacement wording for "native Text concepts" on `docs/building-methods/pipes/index.md`.
+
+**Behavior:** a concept declared as a plain string goes through `ConceptDeclarationType.STRING` → `_handle_basic_blueprint`, which generates a Text-based structure class — but the STRING branch discards the returned refine string and builds the `Concept` with `refines=None` (`pipelex/core/concepts/concept_factory.py:511-523`), whereas the BASIC_BLUEPRINT branch keeps `refines="native.Text"` (`:527-537`). Two spellings of the same declaration produce concepts with different `refines` metadata.
+
+**Why it matters:** anything that branches on `refines` (compatibility checks, tooling, future docs) sees an inconsistency between equivalent declarations. No doc claim currently hinges on it — recorded so the asymmetry is a decision, not an accident.
+
+**Candidate fix (code):** make the STRING branch keep the same `refines` the BASIC_BLUEPRINT branch records (or document why the asymmetry is intended).

@@ -23,7 +23,7 @@ For a function to be automatically registered and available to `PipeFunc`, it **
 !!! warning "Function Eligibility Requirements"
 
 - **Must be decorated with** `@pipe_func()` (required since v0.12.0)
-- **Must be an async function** (defined with `async def`)
+- **Can be async or sync**: `async def` functions are awaited directly; plain `def` functions run in a worker thread (via `asyncio.to_thread`) so they don't block the pipeline
 - **Must have exactly 1 parameter** named `working_memory`
 - **Parameter type must be** `WorkingMemory`
 - **Return type must be** a subclass of `StuffContent` (or a generic type like `ListContent[SomeType]`)
@@ -31,7 +31,7 @@ For a function to be automatically registered and available to `PipeFunc`, it **
 
 ### Return values
 
-Your async Python function can return:
+Your Python function can return:
 
 -   A `StuffContent` object (e.g., `TextContent`, `ImageContent`, or a custom `StructuredContent` model).
 -   A `ListContent` containing `StuffContent` objects.
