@@ -73,3 +73,23 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Why it matters:** anything that branches on `refines` (compatibility checks, tooling, future docs) sees an inconsistency between equivalent declarations. No doc claim currently hinges on it — recorded so the asymmetry is a decision, not an accident.
 
 **Candidate fix (code):** make the STRING branch keep the same `refines` the BASIC_BLUEPRINT branch records (or document why the asymmetry is intended).
+
+## 8. `tomli>=2.3.0` floor permits a tomli that rejects the TOML 1.1 syntax the docs and kit rely on
+
+**Found:** Stage 2, batch S2-2, by the adversarial verifier while refuting a fix-time candidate against `docs/building-methods/configure-ai-llm-to-optimize-methods.md` (the doc's multi-line inline tables turned out to be VALID under the shipped loader — this is the code-side residue of that refutation).
+
+**Behavior:** all deck/bundle TOML goes through `load_toml_from_path` → `tomli` (`pipelex/tools/misc/toml_utils.py:40`, `pipelex/core/interpreter/interpreter.py:43,46`). The installed tomli 2.4.1 accepts TOML 1.1 features (newlines and trailing commas in inline tables), and both the docs' snippets and real `.mthds` content use them. But the pin is `tomli>=2.3.0` (`pyproject.toml:55`), and tomli 2.3.0 empirically REJECTS the same content ("Invalid initial character for a key part") — 2.4.0 is the first version that accepts it.
+
+**Why it matters:** any environment resolving tomli to exactly 2.3.0 (permitted by the constraint) fails to parse documented deck syntax and multi-line inline tables in `.mthds` bundles generally — a version-dependent parse surface for the language itself.
+
+**Candidate fix (code):** bump the floor to `tomli>=2.4.0`. Also worth a decision: whether TOML 1.1 inline-table syntax is officially part of the MTHDS surface (the docs and examples already assume it).
+
+## 9. Re-running `pipelex build structures` over a migrated concept silently emits an opaque same-named class that can shadow the hand-written one
+
+**Found:** Stage 2, batch S2-2, by the adversarial verifier while refuting a missing-warning candidate on `docs/building-methods/concepts/python-classes.md` (the page's own migration procedure makes no false claim — the hazard lives outside it, so it was ruled out of drift scope and recorded here).
+
+**Behavior:** after the documented migration (hand-written class, concept's inline structure removed from the `.mthds`), regenerating with `pipelex build structures` over a scope that includes the migrated bundle emits `class <Name>(StructuredContent)` — an opaque `extra="allow"` placeholder docstringed "Imprecise: concept declares no structure" — with the SAME bare name as the hand-written class. Class registration is name-keyed and first-registered-wins (`pipelex/system/registries/class_registry_utils.py:169-171`), so whichever class is discovered first silently wins.
+
+**Why it matters:** a user who keeps generated output inside a discovered library dir can have the opaque placeholder silently shadow (or race) their hand-written class — no error, just wrong structure at runtime.
+
+**Candidate fix:** either skip emitting placeholder classes for structureless concepts whose name is already registered, or make registration collisions loud; docs-side, the Migration Guide could gain a warning to exclude migrated bundles from `build structures` scope (deferred with the rest — D17 keeps Stage 2 docs-only, and adding a new warning admonition is new content).

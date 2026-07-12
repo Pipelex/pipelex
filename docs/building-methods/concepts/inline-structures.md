@@ -81,9 +81,9 @@ email = { type = "text", description = "Email address" }
     
     - **type**: `text`
     - **description**: The string you provided
+    - **required**: `true`
     
-    This is a shorthand for the most common case: text fields.
-    This will put the field as optional by default, and not required.
+    This is a shorthand for the most common case: required text fields. To make a text field optional, use the explicit form instead, e.g. `email = { type = "text", description = "Email address" }`.
 
 ### integer
 
@@ -250,7 +250,7 @@ status = { choices = ["todo", "in_progress", "done"], description = "Current sta
 
 ## Required Fields
 
-By default, **all fields are optional** (`required = false`). To make a field mandatory, explicitly set `required = true`:
+Fields declared with the explicit inline-table form are **optional by default** (`required = false`). To make one mandatory, explicitly set `required = true`. Note that fields declared with the shorthand string syntax (`field_name = "description"`) are **required**:
 
 ```toml
 [concept.User.structure]
