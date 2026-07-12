@@ -93,3 +93,13 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Why it matters:** a user who keeps generated output inside a discovered library dir can have the opaque placeholder silently shadow (or race) their hand-written class — no error, just wrong structure at runtime.
 
 **Candidate fix:** either skip emitting placeholder classes for structureless concepts whose name is already registered, or make registration collisions loud; docs-side, the Migration Guide could gain a warning to exclude migrated bundles from `build structures` scope (deferred with the rest — D17 keeps Stage 2 docs-only, and adding a new warning admonition is new content).
+
+## 10. The shipped `plxt.toml` template's "built-in default" comment contradicts one of the values it labels
+
+**Found:** Stage 2, batch S2-4, by a fix agent's whole-page scan while fixing `docs/tools/plxt.md` (the `align_entries` default finding), confirmed at fix time against the taplo source.
+
+**Behavior:** `pipelex/kit/configs/plxt.toml:34-35` (and its `.pipelex/plxt.toml` mirror) introduces the global `[formatting]` section with "Every option is shown at its built-in default", yet sets `array_auto_collapse = false` while the actual built-in default is `true` (`vscode-pipelex/crates/taplo/src/formatter/mod.rs:161`, `impl Default for Options`).
+
+**Why it matters:** the comment is the template's contract with the reader — the docs page (`docs/tools/plxt.md`) and this very campaign's verification both leaned on it as ground truth for defaults. One mislabeled value poisons that trust: either the value should flip to `true`, or the comment should stop claiming universality (and if `false` is a deliberate Pipelex-preferred override, it belongs in a differently-labeled line).
+
+**Candidate fix (code):** decide intent for `array_auto_collapse` in the shipped template: if the built-in default is wanted, set it to `true`; if the override is wanted, move it out of the "shown at built-in default" block or reword the comment. Same edit in both the kit template and the repo's own `.pipelex/plxt.toml`.
