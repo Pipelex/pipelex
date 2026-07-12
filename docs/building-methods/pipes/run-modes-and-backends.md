@@ -57,14 +57,15 @@ pipelex run bundle my_bundle.mthds --orchestrator temporal --dry-run --mock-inpu
 From Python, the same knobs live on the runner — the backend comes from config:
 
 ```python
+from pathlib import Path
+
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
-runner = PipelexMTHDSProtocol(
-    bundle_uris=["path/to/my_bundle.mthds"],
-    pipe_run_mode=PipeRunMode.DRY,
+runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY)
+response = await runner.execute(
+    mthds_contents=[Path("path/to/my_bundle.mthds").read_text(encoding="utf-8")],
 )
-response = await runner.execute()
 ```
 
 ## Validation Sweeps
