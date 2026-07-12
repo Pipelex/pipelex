@@ -179,11 +179,12 @@ Every inference worker's SDK-exception handler collapses to a three-step pipelin
 except (APIError, APIConnectionError, APITimeoutError) as exc:
     metadata = extract_openai_metadata(exc)
     classification = classify_inference_error(metadata)
-    raise render_llm_error(
-        family=InferenceErrorFamily.LLM_COMPLETION,
+    raise render_inference_error(
         metadata=metadata,
         classification=classification,
+        family=InferenceErrorFamily.LLM,
         model_desc=self.inference_model.desc,
+        model_handle=self.inference_model.name,
     ) from exc
 ```
 
@@ -193,7 +194,7 @@ The three steps live in three modules. Only the per-provider Extract functions s
 |--------|------|--------------|
 | `pipelex/cogt/inference/error_classification.py` | Extract | `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, the 12 `extract_*_metadata` functions, plus pure discriminators (`is_quota_exhaustion`, `is_content_policy_violation`, `is_network_error`) exposed as `@property` on the metadata |
 | `pipelex/cogt/inference/error_classify.py` | Classify | `classify_inference_error()` — provider-blind mapping from `ProviderErrorMetadata` → `ClassificationResult(category, user_action_kind, is_model_not_found)` |
-| `pipelex/cogt/inference/error_render.py` | Render | `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
+| `pipelex/cogt/inference/error_render.py` | Render | `render_inference_error()` — picks the `CogtError` subclass from `InferenceErrorFamily` plus `is_model_not_found` (e.g. `LLMModelNotFoundError` vs `LLMCompletionError`) |
 
 Provider-specific nuance is normalized away in Extract (e.g. Google's `code` becomes `status_code`; AWS Bedrock error codes are mapped to HTTP statuses), so Classify has no provider branching. HTTP status drives classification; status-less errors dispatch on the SDK exception type name. The `tests/unit/pipelex/cogt/inference/test_provider_classification_parity.py` meta-test walks every `ProviderName` against the extract-fn registry so adding a new provider without wiring it fails fast.
 
@@ -226,7 +227,7 @@ On structured-generation paths, `instructor` wraps the real SDK exception in an 
 Inference-failure leaf errors (`LLMCompletionError`, `ImgGenGenerationError`, …) are raised deep inside a plugin and do not know which model handle invoked them. Each worker family fills that in at its public-method chokepoint:
 
 ```python
-def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
     """Fill model_handle / backend_name from the worker, only when still unset."""
 ```
 
@@ -415,7 +416,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable   # True — only TRANSIENT
 | `pipelex/cogt/exceptions.py` | `CogtError`, `InferenceErrorCategory` |
 | `pipelex/cogt/inference/error_classification.py` | Extract — `ProviderErrorMetadata`, `SDKErrorEnvelope`, `UserAction`, `UserActionKind`, per-provider `extract_*_metadata` functions, pure discriminators |
 | `pipelex/cogt/inference/error_classify.py` | Classify — `classify_inference_error()`, `ClassificationResult` |
-| `pipelex/cogt/inference/error_render.py` | Render — `render_llm_error()` / `render_img_gen_error()` / `render_extract_error()` / `render_search_error()`, `InferenceErrorFamily` |
+| `pipelex/cogt/inference/error_render.py` | Render — `render_inference_error()`, `InferenceErrorFamily` |
 | `pipelex/cogt/inference/provider_name.py` | `ProviderName` enum keying the extract-fn registry |
 | `pipelex/plugins/*/` | Per-provider inference workers — Layer 0 → 1 classification |
 | `pipelex/pipeline/exceptions.py` | `PipelineExecutionError`, `PipeExecutionError` |

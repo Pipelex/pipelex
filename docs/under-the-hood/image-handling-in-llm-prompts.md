@@ -148,9 +148,8 @@ PageContent(
 The filter produces:
 
 ```
-text_and_images:
-  text: Welcome to the guide
-  images: [Image 1]
+text_and_images: Welcome to the guide
+[Image 1]
 page_view: [Image 2]
 ```
 
@@ -278,21 +277,22 @@ The `ImageRegistry` manages image numbering during prompt construction.
 
 ### Key Properties
 
-- **1-indexed** - Numbers start at 1 for readability
+- **0-based indices, 1-based display** - `register_image` returns a 0-based index; the 1-based `[Image N]` display number is produced at render time
 - **Sequential** - Images numbered in order of registration
-- **Deduplicated** - Same URL gets same number
+- **Deduplicated** - Same URL gets same index
 
 ```python
 class ImageRegistry:
-    def register_image(self, image: ImageContent) -> int:
-        """Returns image number. Same URL = same number."""
-        if image.url in self._url_to_number:
-            return self._url_to_number[image.url]
-
-        number = len(self._images) + 1
+    def register_image(self, image: Any) -> int:
+        """Register an image and return its 0-based index. Same URL = same index."""
+        if image.url in self._image_urls:
+            # Find existing index
+            for index, existing in enumerate(self._images):
+                if existing.url == image.url:
+                    return index
         self._images.append(image)
-        self._url_to_number[image.url] = number
-        return number
+        self._image_urls.add(image.url)
+        return len(self._images) - 1
 ```
 
 ### Deduplication Example
@@ -301,13 +301,13 @@ If the same image appears in multiple places:
 
 ```python
 # First registration
-registry.register_image(img_a)  # Returns 1
+registry.register_image(img_a)  # Returns 0
 
 # Second registration of same URL
-registry.register_image(img_a)  # Returns 1 (not 2)
+registry.register_image(img_a)  # Returns 0 (not 1)
 
 # Different image
-registry.register_image(img_b)  # Returns 2
+registry.register_image(img_b)  # Returns 1
 ```
 
 ---
@@ -332,11 +332,11 @@ The `with_images` filter uses the `ImageRenderable` protocol to handle StuffArte
 ```python
 # StuffArtefact implements ImageRenderable
 if isinstance(value, ImageRenderable):
-    return value.render_with_images(registry, text_format=text_format)
+    return value.render_with_images(registry=registry, text_format=text_format)
 
 # StuffArtefact.render_with_images() delegates to content
-def render_with_images(self, registry, *, text_format) -> str:
-    return self._stuff.content.render_with_images(registry, text_format=text_format)
+def render_with_images(self, *, registry, text_format) -> str:
+    return self._stuff.content.render_with_images(registry=registry, text_format=text_format)
 ```
 
 !!! note "ImageRenderable Protocol"
@@ -354,15 +354,14 @@ The system validates image usage at both factory time and runtime:
 
 | Condition | Error |
 |-----------|-------|
-| `\| with_images` on `Image` type | "Cannot use with_images on direct Image" |
-| `\| with_images` on type with no nested images | "Type X has no nested image fields" |
+| `\| with_images` on a type with no nested images (including a direct `Image`) | `WithImagesFilterError`: "Filter '\| with_images' used on variable 'X' but the type has no nested images. Remove the filter or use a type with nested images." |
 
 ### Runtime
 
 | Condition | Error |
 |-----------|-------|
 | `with_images` on undefined value | "Cannot use with_images filter on undefined value" |
-| `with_images` on non-ImageRenderable type (e.g., string) | "X does not implement the ImageRenderable protocol" |
+| `with_images` on non-ImageRenderable type (e.g., string) | "The with_images filter received a X which does not implement the ImageRenderable protocol. This filter requires StuffArtefact, StuffContent subclasses, or lists containing such types. Did you accidentally apply another filter first that converted to string?" |
 
 The runtime check catches cases where filter chaining converts structured data to a string before `with_images` runs (e.g., `{{ pages | tag | with_images }}`).
 

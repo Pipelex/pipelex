@@ -33,3 +33,13 @@ Defects the hunt surfaced whose fix belongs in **code**, not docs (Louis' Checkp
 **Why it matters:** this is the error a user hits when telemetry is misconfigured — the one moment the message is load-bearing. Every key it hands them is wrong, so following it verbatim cannot work. It is the mirror image of doc drift (the docs are right; the *code's own* user-facing text is stale), and no docs fix can reach it.
 
 **Candidate fix (code):** rewrite the message against the current field names, and ideally derive them from the pydantic models rather than restating them, so the message cannot drift again.
+
+## 4. `ImageRenderable` docstring attributes the field-iterating implementation to the wrong class
+
+**Found:** Stage 2, batch S2-3, while fixing finding F33 of `docs/under-the-hood/stuffartefact-and-image-rendering.md` (the doc-side fix is applied; this is the same stale attribution living in code).
+
+**Behavior:** the docstring in `pipelex/tools/jinja2/image_renderable.py:29` still says "StuffContent (base): iterates model fields" — but `StuffContent` has no `render_with_images`; the field-iterating implementation lives on `StructuredContent` (`pipelex/core/stuffs/structured_content.py:52-71`), and a plain `StuffContent` subclass does not satisfy the protocol.
+
+**Why it matters:** the docstring is the first thing a contributor reads when implementing the protocol; it steers them to override the wrong base class — exactly the mistake the doc page used to teach before F33 was fixed.
+
+**Candidate fix (code):** correct the docstring line to name `StructuredContent`. One-line comment fix; deferred only because Stage 2 is docs-only (D17).

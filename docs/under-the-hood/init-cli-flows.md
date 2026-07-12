@@ -306,7 +306,9 @@ The `ConfigLoader` (singleton: `config_manager`) resolves where configuration fi
 
 `find_project_root()` walks up from `cwd` looking for marker files:
 
-- `.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `package.json`, `.hg`
+- `.pipelex`, `.git`, `pyproject.toml`, `setup.py`, `setup.cfg`, `package.json`, `.hg`
+
+A directory containing only a `.pipelex/` directory is therefore itself a valid project root.
 
 The home directory (`~`) is explicitly excluded — even if it contains a `package.json`, it is never treated as a project root.
 
@@ -400,8 +402,7 @@ If no project root is found and `--global` is not set, the command fails with an
 |-------|------|---------|
 | `backends` | `list[str]` | Backend keys to enable (e.g. `"openai"`, `"anthropic"`, `"pipelex_gateway"`) |
 | `primary_backend` | `str` | Required when 2+ backends selected and `pipelex_gateway` is not among them |
-| `accept_gateway_terms` | `bool` | Sets gateway terms acceptance (defaults to `false` if omitted) |
-| `telemetry_mode` | `str` | `"off"` (default), `"anonymous"`, or `"identified"` |
+| `accept_gateway_terms` | `bool` | Sets gateway terms acceptance; when omitted, nothing is written and any existing acceptance state is left untouched |
 
 ### Flow
 
@@ -411,13 +412,15 @@ flowchart TD
     PARSE --> RESOLVE["Resolve target dir<br/>(project or --global)"]
     RESOLVE --> STEP1["Step 1: init_config()<br/>Copy config templates (skips inference/)"]
     STEP1 --> STEP15["Step 1.5: Copy inference templates<br/>(backends.toml, backends/*, deck/*, routing_profiles.toml)"]
-    STEP15 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
+    STEP15 --> STEP16["Step 1.6: Copy telemetry template<br/>(global: active defaults; project: commented-out)"]
+    STEP16 --> STEP2["Step 2: Configure backends<br/>Enable requested backends in backends.toml"]
     STEP2 --> GW{pipelex_gateway<br/>in backends?}
-    GW -- Yes --> TERMS["Write gateway terms to ~/.pipelex/<br/>(always global)"]
+    GW -- Yes --> TERMS["Write gateway terms to ~/.pipelex/<br/>(always global; skipped if accept_gateway_terms omitted)"]
     GW -- No --> STEP3
     TERMS --> STEP3["Step 3: Configure routing<br/>Auto-derive routing profile"]
-    STEP3 --> STEP4["Step 4: Configure telemetry<br/>Copy template + apply mode"]
-    STEP4 --> OUTPUT["Output structured JSON result"]
+    STEP3 --> STEP4["Step 4: Mark inference setup completed<br/>(written to ~/.pipelex/)"]
+    STEP4 --> STEP5["Step 5: Prime remote-config cache<br/>(no-op if gateway disabled or terms not accepted)"]
+    STEP5 --> OUTPUT["Output result<br/>(Markdown, or JSON via --format json)"]
 ```
 
 !!! note "No credentials step"
@@ -429,7 +432,7 @@ flowchart TD
 |--------|---------------|---------------------|
 | Prompts | Interactive (Rich prompts) | None — all input from `--config` JSON |
 | Gateway terms | Prompted interactively | From `accept_gateway_terms` field in config |
-| Output | Rich console output | Structured JSON via `agent_success()` / `agent_error()` |
+| Output | Rich console output | Markdown by default (`agent_success_formatted()` / `agent_error()`), structured JSON via `--format json` |
 | Credentials | Prompted interactively | Not configured — use `pipelex-agent doctor` or `pipelex init credentials` |
 | Focus dispatch | Supports individual focus (`config`, `inference`, etc.) | Runs config, inference, routing, telemetry (no credentials) |
 | Target dir default | Global (`~/.pipelex/`), use `--local` for project | Project (`{project_root}/.pipelex/`), use `--global` for global |

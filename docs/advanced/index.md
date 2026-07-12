@@ -31,7 +31,7 @@ pipelex = Pipelex.make(
 from pipelex.hub import PipelexHub
 
 hub = PipelexHub()
-hub.set_reporting_delegate(MyReportingDelegate())
+hub.set_report_delegate(MyReportingDelegate())
 # ... and so on for other components
 ```
 

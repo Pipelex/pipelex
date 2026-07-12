@@ -181,7 +181,7 @@ extract_models = ["@from_pdf"]
 
 The preprocessing command discovers available models from:
 
-- **Backend TOML files** in `pipelex/backends/*.toml`
+- **Backend TOML files** in `inference/backends/*.toml`, resolved from the project `.pipelex/` override directory or the packaged `pipelex/kit/configs/` directory
 - **Pipelex Gateway** remote configuration
 
 ### 2. Profile Resolution
@@ -208,14 +208,17 @@ tests/integration/pipelex/fixtures/_generated_model_sets.py
 This file contains:
 
 ```python
-LLM_MODEL_BACKEND_PAIRS: list[tuple[str, str]] = [
-    ("claude-4.5-haiku", "pipelex_gateway"),
-    ("gpt-4o-mini", "pipelex_gateway"),
-    ...
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
+
+LLM_COMBOS: list[ModelCombo] = [
+    ModelCombo('claude-4.5-haiku', 'pipelex_gateway'),
+    ModelCombo('gemini-2.5-flash-lite', 'pipelex_gateway'),
+    ModelCombo('gpt-4o-mini', 'pipelex_gateway'),
 ]
 
-IMG_GEN_MODEL_BACKEND_PAIRS: list[tuple[str, str]] = [...]
-EXTRACT_MODEL_BACKEND_PAIRS: list[tuple[str, str]] = [...]
+IMG_GEN_COMBOS: list[ModelCombo] = [...]
+EXTRACT_COMBOS: list[ModelCombo] = [...]
+SEARCH_COMBOS: list[ModelCombo] = [...]
 ```
 
 ---
