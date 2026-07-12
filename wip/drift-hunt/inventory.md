@@ -7,7 +7,7 @@ Every hand-written `.md` page under `docs/` in scope for the hunt, grouped by se
 | Section | Pages | Notes |
 |---|---|---|
 | building-methods | 35 | MTHDS language reference (blueprint layer) |
-| cookbook | 21 | ground truth = `../pipelex-cookbook` (D3) |
+| cookbook | 21 | ground truth = `../pipelex-cookbook` (D3); swept in greenlight-gated Stage C, not Stage 1 (D7) |
 | features | 21 | |
 | under-the-hood | 19 | |
 | advanced | 7 | provider-injection pages |

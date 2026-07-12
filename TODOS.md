@@ -4,13 +4,13 @@ A campaign, not a feature: sweep every hand-written doc page for code↔doc drif
 
 ## Cold-start context (update at every checkpoint)
 
-- **Status:** AT CHECKPOINT 0 — STOPPED for Louis' review (2026-07-12). Phase H (hardening: A1 auto-stage + A2 warn→fail, tests, docs) DONE; Phase B (dogfood backfill) DONE; Stage 0 DONE (inventory: 119 in-scope pages + 4 pending-confirmation; prescreen: ~1,880 claims checked, 45 raw hits triaged → 5 confirmed defects ALL FIXED and re-verified against the live parser/CLI, 3 judgment seeds, 8 FP patterns recorded). Sonnet-5 `/code-review` fan-outs: hardening commit clean (2 low tracker-hygiene findings, both applied); Stage-0 fix commit reviewed at checkpoint.
-- **Next:** Louis rules on (a) `suspects.md` + FP patterns, (b) the D2 scope note (4 pending pages + root `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`), (c) Stage 1 shape (full fan-out vs worst-sections-first) against the cost estimate (~123 pages · ~855 words avg → est. 8–15M tokens for review+verify fleet). NO Stage 1 fleet before that go-ahead.
+- **Status:** AT CHECKPOINT 0 — Louis' triage rulings RECEIVED & RECORDED (2026-07-12): all 3 judgment seeds resolved (presets = deck file, accurate; codegen-projections cross-repo refs fixed per D8; cookbook cross-check carved into greenlight-gated Stage C per D7), all 8 FP patterns confirmed (TOML 1.1 is the real basis of pattern 1; validate-shortcut `--help` invisibility deferred as a CODE defect → `wip/drift-hunt/deferred-code-findings.md`). Earlier: Phase H DONE, Phase B DONE, Stage 0 DONE (5 confirmed defects fixed + 1 review-found adjacent fix), all gates green, per-phase Sonnet-5 `/code-review` fan-outs clean.
+- **Next (still open — Stage 1 NOT authorized):** Louis rules on (a) the D2 scope note (4 pending pages + root `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`), (b) Stage 1 shape (full fan-out vs worst-sections-first) + budget — estimate ~8–15M tokens for the full review+verify fleet, now MINUS cookbook (Stage C), so ~102 pages. See `wip/drift-hunt/checkpoint-0-decision-brief.md` Decisions 2–3.
 - **Branch / worktree:** `docs/Drift-hunt` off `dev`, in the `_drift` worktree (treat as repo root). Do NOT push unless Louis asks. Commits so far: tracker `5e3699c64`, hardening `8c7413afc`, backfill `4093b1628`, then Stage 0 artifacts + fixes (see git log).
 - **Working artifacts:** `wip/drift-hunt/` — `inventory.md` (the denominator), `prescreen.py` (re-runnable), `prescreen-raw.md` (raw hits), `suspects.md` (the triage — read this first).
-- **Decisions taken:** D1–D6 below, plus H-A2 implemented (narrow warn→fail escalation — see Phase H).
+- **Decisions taken:** D1–D8 below, plus H-A2 implemented (narrow warn→fail escalation — see Phase H).
 - **Key learning (D6 vindicated):** `pipelex validate --all` was initially "confirmed dead" from `--help` (no group-level `--all`) and a fix was drafted — live execution proved a shortcut layer forwards it to `validate pipe`; fix reverted. Never conclude a CLI form is dead from `--help` alone; run it.
-- **Open questions:** scope of sections D2 didn't name (see Stage 0 note) — for Louis at Checkpoint 0.
+- **Open questions:** D2 scope edges (4 pending pages, root CONTRIBUTING/CODE_OF_CONDUCT) and Stage 1 shape + budget — both awaiting Louis.
 
 ## Decisions
 
@@ -20,6 +20,8 @@ A campaign, not a feature: sweep every hand-written doc page for code↔doc drif
 - **D4 — fixes land in reviewable batches.** One commit per docs section at minimum; separate PRs per section if a batch grows beyond comfortable review size. Default base: `dev`.
 - **D5 — no manifest growth during the hunt.** The drift-contracts dogfood freeze stays in force: the hunt produces *evidence* for which sections might earn a contract later; it does not add contracts to `drift.toml`.
 - **D6 — findings must survive adversarial verification before anything is fixed.** No finding is acted on unless a second, independent agent confirms it against the code with `file:line` evidence. Fix agents re-verify at fix time; a finding that doesn't hold up gets recorded as rejected, not silently dropped.
+- **D7 — cookbook cross-check is its own greenlight-gated stage (Louis, 2026-07-12).** Comparing `docs/cookbook/` pages against `../pipelex-cookbook`'s actual files runs as Stage C, separate from Stage 1 and ONLY on Louis' explicit greenlight — the cookbook may change soon. Cookbook pages are out of the Stage 1 fleet.
+- **D8 — cross-repo references: minimal only; code defects get deferred, not fixed (Louis, 2026-07-12).** A short, named pointer to another repo's own docs is fine; workspace-relative paths a docs-site reader can't resolve, or restating another repo's content at length, is drift — inline the short essence here, leave the detail in its home repo. Code defects surfaced by the hunt are not fixed mid-campaign: record them in `wip/drift-hunt/deferred-code-findings.md`.
 
 ## What "drift" means here (and what it doesn't)
 
@@ -75,15 +77,16 @@ Deterministic checks that need no judgment, to make the semantic pass sharper an
 ### CHECKPOINT 0 — STOP (suspect list in hand)
 
 - [x] Checkpoint protocol steps 1–4: full `make agent-test` green, Stage 0 outputs + fixes committed, Cold-start context updated, `/code-review` fan-out on the fix commit came back clean (all five fixes verified accurate; one adjacent staleness found in the same table — image_reference.py → shared/ — applied as a follow-up commit).
-- [ ] **STOP for Louis:** review `suspects.md` + false-positive patterns; rule on the D2 scope note; decide the Stage 1 shape (full fan-out vs worst-sections-first) against a concrete cost estimate from observed page sizes. **No Stage 1 fleet before this go-ahead.**
+- [x] **Louis' triage rulings (2026-07-12):** judgment seeds resolved and FP patterns confirmed — recorded as D7/D8, in `suspects.md`, and in `deferred-code-findings.md`.
+- [ ] **STOP for Louis (remaining):** rule on the D2 scope note (4 pending pages + root `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`); decide the Stage 1 shape + budget. **No Stage 1 fleet before this go-ahead.**
 
 ---
 
 ## Stage 1 — semantic review fan-out (gated on Checkpoint 0 go-ahead)
 
-A multi-agent Workflow over the in-scope pages — fleet-scale token spend, estimated concretely at Checkpoint 0.
+A multi-agent Workflow over the in-scope pages — fleet-scale token spend, estimated concretely at Checkpoint 0. Cookbook pages are excluded (Stage C, per D7).
 
-- [ ] Per page, a review agent: read the page, extract its checkable claims, verify each against the current code (cookbook pages → `../pipelex-cookbook`, per D3), report findings with severity (`breaks-a-user` / `wrong` / `misleading` / `stale-detail`) and `file:line` evidence for both the doc claim and the contradicting code. Seed each agent with the page's Stage 0 suspect rows.
+- [ ] Per page, a review agent: read the page, extract its checkable claims, verify each against the current code, report findings with severity (`breaks-a-user` / `wrong` / `misleading` / `stale-detail`) and `file:line` evidence for both the doc claim and the contradicting code. Seed each agent with the page's Stage 0 suspect rows and the Checkpoint-0-blessed do-not-flag list (`suspects.md` FP patterns).
 - [ ] Adversarial verify pass (D6): every finding independently re-derived by a verifier agent prompted to refute it; only confirmed findings survive. Run as a pipeline (page-review → verify per finding), not a barrier.
 - [ ] Aggregate into `wip/drift-hunt/findings/<section>.md` (findings ranked by severity) plus `findings/SUMMARY.md`: per-section counts, defect density (findings / pages), rejected-findings list with reasons.
 - [ ] Log observations relevant to the drift-contracts dogfood (e.g. "this section's drift is all mechanically detectable → derived-check candidate") — they feed the Phase 3 verdict, per D5.
@@ -92,6 +95,17 @@ A multi-agent Workflow over the in-scope pages — fleet-scale token spend, esti
 
 - [ ] Checkpoint protocol steps 1–4 (commit findings; review fan-out n/a for findings files unless code/tooling changed).
 - [ ] **STOP for Louis:** confirm severity ranking, kill editorial creep, agree the fix order (default: by severity, then by section). Natural session handoff — Stage 2 needs only the findings files.
+
+---
+
+## Stage C — cookbook cross-check (SEPARATE — runs ONLY on Louis' explicit greenlight, per D7)
+
+Compare each `docs/cookbook/` page against the current `../pipelex-cookbook` files it documents (read-only ground truth, per D3): do the doc's TOML blocks, described flows, and referenced files still match the actual examples? Deliberately decoupled from Stage 1 because the cookbook may change soon — running it early would measure a moving target.
+
+- [ ] **GATE: Louis' explicit greenlight** (not implied by the Stage 1 go-ahead).
+- [ ] Per cookbook page: match doc snippets/claims against the actual example files; findings with `file:line` evidence on both sides; D6 adversarial verify; aggregate into `wip/drift-hunt/findings/cookbook.md`.
+- [ ] Cookbook-repo-side defects are NOT fixed (out of scope) — listed in `findings/SUMMARY.md` as a handoff.
+- [ ] Fixes to `docs/cookbook/` pages follow the Stage 2 batch protocol.
 
 ---
 
