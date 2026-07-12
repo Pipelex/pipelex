@@ -35,7 +35,7 @@ Each entry in the `steps` array is a table with the following keys:
 | Key      | Type   | Description                                                        | Required |
 | -------- | ------ | ------------------------------------------------------------------ | -------- |
 | `pipe`   | string | The name of the pipe to execute for this step.                     | Yes      |
-| `result` | string | The name to give to the output of this step in the working memory. When omitted, the step's output is stored only as the anonymous main stuff, so subsequent steps cannot refer to it by a dedicated name. | No       |
+| `result` | string | The name to give to this step's output in the working memory. When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
 | `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
 | `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
 | `batch_over` | string | The name of a list in the working memory to batch this step over, running the pipe once per item. Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
@@ -59,7 +59,7 @@ model = "@default-extract-image"
 [pipe.summarize_text]
 type = "PipeLLM"
 description = "Summarize text"
-inputs = { extracted_text = "Page" }
+inputs = { extracted_text = "Page[]" }
 output = "Text"
 
 [pipe.translate_to_french]
