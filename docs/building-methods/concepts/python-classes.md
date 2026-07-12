@@ -157,7 +157,7 @@ class ValidatedUserProfile(UserProfile):
 
 **Step 4: Keep the inline structure in your `.mthds` file**
 
-The inline structure remains the source of truth: on the next regeneration the base class is rewritten from it and your subclass picks up the changes automatically. The subclass is discovered and registered like any other `StructuredContent` class. At pipeline time the concept still resolves to the structure declared inline — apply your custom logic by validating with the subclass wherever your own code consumes the result (e.g. `ValidatedUserProfile.model_validate(profile.model_dump())`). If Pipelex itself must enforce the validation when producing the concept, move the structure to a hand-written class instead (see the [Migration Guide](#migration-guide) below).
+The inline structure remains the source of truth: on the next regeneration the base class is rewritten from it and your subclass picks up the changes automatically. At pipeline time the concept still resolves to the structure declared inline — apply your custom logic by validating with the subclass wherever your own code consumes the result (e.g. `ValidatedUserProfile.model_validate(profile.model_dump())`). If Pipelex itself must enforce the validation when producing the concept, move the structure to a hand-written class instead (see the [Migration Guide](#migration-guide) below).
 
 ## Migration Guide
 
