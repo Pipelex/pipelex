@@ -13,7 +13,7 @@ description: "Inside the pipelex init command — how focus-based dispatch sets 
 
 The `.pipelex/` directory contains two categories of files with different lifecycles:
 
-1. **Config files** (`pipelex.toml`, `plxt.toml`) — static templates, copied once, rarely touched by the user.
+1. **Config files** (`pipelex.toml`, `plxt.toml`) — static templates copied verbatim from the kit (no interactive customization); re-running init overwrites them (full reset).
 2. **Inference files** (`inference/backends.toml`, `inference/routing_profiles.toml`, `inference/backends/*.toml`, `inference/deck/*.toml`) — interactive setup, customized per-project based on which AI backends the user selects.
 
 These two categories are managed by separate steps. `init_config()` copies only config files (skipping the `inference/` directory entirely). The inference step handles its own template copying and then runs interactive backend selection and routing customization. Each file is owned by exactly one step — `init_config()` explicitly skips the `inference/` directory via `INIT_SKIP_DIRS`, and skips `telemetry.toml` and `pipelex_service.toml` via `INIT_SKIP_FILES`. This separation ensures that re-running `pipelex init config` never overwrites a user's carefully tuned inference setup.

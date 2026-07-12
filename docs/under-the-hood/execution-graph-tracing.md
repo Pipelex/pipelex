@@ -32,7 +32,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 |----------|-----|-----|--------|
 | Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexMTHDSProtocol(execution_config=...).execute(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
-| Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
+| Force exclude data | `--graph --graph-no-data` | The four stuff/error `data_inclusion` flags → `False` (`pipe_and_concept_registry` unaffected) | Previews only |
 | Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
@@ -434,6 +434,7 @@ reactflow_html = true           # Generate ReactFlow HTML
 | `direction` | Flowchart direction (`top_down`, `left_to_right`) |
 | `is_include_data_edges` | Show data flow edges |
 | `is_include_contains_edges` | Show containment edges |
+| `is_include_selected_outcome_edges` | Show condition-result (selected outcome) edges |
 | `is_show_stuff_codes` | Show digest in stuff labels |
 | `style.theme` | Mermaid theme (default, base, dark, forest, neutral) |
 
@@ -441,12 +442,17 @@ reactflow_html = true           # Generate ReactFlow HTML
 
 | Option | Description |
 |--------|-------------|
+| `is_use_cdn` | Load the graph viewer assets from a CDN (jsDelivr) instead of inlining them |
 | `layout_direction` | Flowchart layout direction (`top_down`, `left_to_right`), converted internally to Dagre's TB/LR |
 | `nodesep` | Node separation in pixels |
 | `ranksep` | Rank separation in pixels |
 | `edge_type` | Edge style (bezier, smoothstep, step, straight) |
 | `initial_zoom` | Initial viewport zoom |
+| `pan_to_top` | Pan the viewport to the top on load |
+| `default_title` | Title of the generated HTML page |
+| `show_batch_controller` | Render controller pipes as grouping containers |
 | `style.theme` | UI theme (light, dark, system) |
+| `style.palette` | Node color palette (`yellow_blue`, `dracula`) |
 
 ---
 
