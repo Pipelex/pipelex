@@ -58,6 +58,9 @@ response = await runner.execute(
 pipe_output = response.pipe_output
 ```
 
+!!! tip "Already loading libraries elsewhere?"
+    If a `PIPELEXPATH` environment variable or `Pipelex.make(library_dirs=...)` already loads this same bundle from disk, passing its content again via `mthds_contents` loads it twice and raises a duplicate-declaration error. See [Advanced: Using Library Directories](#advanced-using-library-directories) for `bundle_uris` (deduplication) and `library_dirs=[]` (run with only the provided content).
+
 !!! info "How `main_pipe` Works"
     When you run a bundle without specifying a `pipe_code`, Pipelex executes the bundle's `main_pipe` (declared at the top of the `.mthds` file). If no `main_pipe` is defined and no `pipe_code` is provided, an error is raised.
 

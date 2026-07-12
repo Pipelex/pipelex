@@ -37,13 +37,15 @@ Pipelex ships a `LocalObserver` that writes each event to JSONL files on the loc
 from pipelex.observer.local_observer import LocalObserver
 from pipelex.pipelex import Pipelex
 
-Pipelex.make(observers={"local": LocalObserver()})
+Pipelex.make(observers={"local": LocalObserver(storage_dir="results/observer")})
 ```
+
+Pass an explicit `storage_dir`: the observer is constructed before `Pipelex.make()` boots the runtime, so it cannot read the configured default at that point.
 
 Once registered:
 
 - **Location**: Local filesystem in JSONL format
-- **Default Directory**: Configured in your Pipelex settings under `observer_config.observer_dir`
+- **Default Directory**: if you omit `storage_dir`, the directory comes from `observer_config.observer_dir` in your Pipelex settings — but that fallback only works once Pipelex is booted, not in the pre-boot construction shown above
 - **Files Created**:
 
 - `before_run.jsonl` - Pre-execution snapshots
