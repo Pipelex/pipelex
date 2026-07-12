@@ -77,7 +77,7 @@ When a `.mthds` file declares a concept like `RawText = "Raw input text..."`, th
 These dynamically-generated classes become the `content` type of `Stuff` objects in `WorkingMemory`.
 
 !!! info "Why Dynamic Classes Matter"
-    When a PipeJob is serialized (e.g., for Temporal transport), Kajson embeds `__class__` and `__module__` metadata. The receiving process must have these classes registered in its class registry to deserialize the payload.
+    When `WorkingMemory` crosses to a Temporal worker, `dump_for_transport()` stamps content with pipelex-private `__pipelex_class__` / `__pipelex_module__` markers instead of Kajson's `__class__` / `__module__` — deliberately keeping Kajson's universal decoder out of the loop at the data-converter boundary. Pipelex's hydrator resolves those markers against the per-workflow `ClassRegistry`, the only place these dynamic concept classes are registered.
 
 ---
 
@@ -125,12 +125,13 @@ effective_pipe_router = self._resolve_hub_slot(
 `PipeRouter` implements `PipeRouterProtocol` with a minimal `_run_pipe_job()`:
 
 ```python
-async def _run_pipe_job(self, pipe_job, wfid=None):
+async def _run_pipe_job(self, pipe_job: PipeJob) -> PipeOutput:
     return await pipe_job.pipe.run_pipe(
         job_metadata=pipe_job.job_metadata,
-        working_memory=pipe_job.working_memory,
+        working_memory=pipe_job.get_working_memory(),
         output_name=pipe_job.output_name,
         pipe_run_params=pipe_job.pipe_run_params,
+        library_crate=pipe_job.library_crate,
     )
 ```
 

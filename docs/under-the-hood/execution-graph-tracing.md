@@ -36,7 +36,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 | Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
-    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
+    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, `error_stack_traces`, and `pipe_and_concept_registry` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings — the flags toggle the first four; `pipe_and_concept_registry` is set only via config.
 
 ---
 
@@ -89,10 +89,10 @@ graph_spec = response.pipe_output.graph_spec
 
 | Output | File | Purpose |
 |--------|------|---------|
-| `graphspec_json` | `_graphspec.json` | Canonical graph representation |
-| `mermaidflow_mmd` | `_mermaid.mmd` | Mermaid flowchart code |
-| `mermaidflow_html` | `_mermaid.html` | Standalone Mermaid viewer |
-| `reactflow_html` | `_reactflow.html` | Interactive ReactFlow viewer |
+| `graphspec_json` | `graphspec.json` | Canonical graph representation |
+| `mermaidflow_mmd` | `mermaidflow.mmd` | Mermaid flowchart code |
+| `mermaidflow_html` | `mermaidflow.html` | Standalone Mermaid viewer |
+| `reactflow_html` | `reactflow.html` | Interactive ReactFlow viewer |
 
 ---
 
@@ -195,6 +195,9 @@ class GraphSpec(BaseModel):
 | `DATA` | Data flow (stuff passed between pipes) |
 | `CONTAINS` | Parent-child containment (controller → children) |
 | `SELECTED_OUTCOME` | Condition outcome selection |
+| `BATCH_ITEM` | Batch fan-out: input list → item extracted for each batch iteration |
+| `BATCH_AGGREGATE` | Batch fan-in: item outputs → aggregated output list |
+| `PARALLEL_COMBINE` | Branch outputs → combined output in PipeParallel |
 
 Every `EdgeSpec` also carries an `optional` boolean (default `false`). On a `DATA` edge it marks that the producer's output is declared optional (`?` presence marker) — the value flowed on this run but may be absent on others. Renderers can use it to draw the edge distinctly (e.g. dashed).
 
@@ -245,7 +248,7 @@ node_id, child_context = manager.on_pipe_start(
 
 # 4. On completion, report success with output
 manager.on_pipe_end_success(
-    graph_id=trace_context.graph_id,
+    lookup_key=trace_context.lookup_key,
     node_id=node_id,
     ended_at=datetime.now(timezone.utc),
     output_spec=IOSpec(...),
@@ -266,7 +269,7 @@ from pipelex.hub import scoped_event_log
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 
 with scoped_event_log(InMemoryEventLog()):
-    response = await runner.execute_pipeline(...)  # graph assembles in memory
+    response = await runner.execute(...)  # graph assembles in memory
 ```
 
 Semantics:
@@ -288,7 +291,7 @@ class TraceContext(BaseModel):
     node_sequence: int                      # Counter for generating node IDs
     data_inclusion: DataInclusionConfig     # What data to capture
 
-    def copy_for_child(self, child_node_id: str, next_sequence: int) -> TraceContext:
+    def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
         return TraceContext(
             graph_id=self.graph_id,
@@ -415,6 +418,7 @@ stuff_json_content = true       # Include full serialized data
 stuff_text_content = true       # Include ASCII text representation
 stuff_html_content = true       # Include HTML representation
 error_stack_traces = true       # Include full stack traces
+pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true           # Generate GraphSpec JSON
@@ -427,17 +431,17 @@ reactflow_html = true           # Generate ReactFlow HTML
 
 | Option | Description |
 |--------|-------------|
-| `direction` | Flowchart direction (TB, LR, BT, RL) |
+| `direction` | Flowchart direction (`top_down`, `left_to_right`) |
 | `is_include_data_edges` | Show data flow edges |
 | `is_include_contains_edges` | Show containment edges |
 | `is_show_stuff_codes` | Show digest in stuff labels |
-| `style.theme` | Mermaid theme (default, dark, forest, neutral) |
+| `style.theme` | Mermaid theme (default, base, dark, forest, neutral) |
 
 ### ReactFlowRenderingConfig
 
 | Option | Description |
 |--------|-------------|
-| `layout_direction` | Dagre layout direction (TB, LR) |
+| `layout_direction` | Flowchart layout direction (`top_down`, `left_to_right`), converted internally to Dagre's TB/LR |
 | `nodesep` | Node separation in pixels |
 | `ranksep` | Rank separation in pixels |
 | `edge_type` | Edge style (bezier, smoothstep, step, straight) |
@@ -458,9 +462,10 @@ class IOSpec(BaseModel):
     preview: str | None          # Truncated preview (max 200 chars)
     size: int | None             # Content size
     digest: str | None           # Unique identifier for data flow
-    data: Any | None             # Full serialized content
+    data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
     data_text: str | None        # ASCII text representation
     data_html: str | None        # HTML representation
+    extra: dict[str, Any]        # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
 
 !!! warning "Preview Truncation"
