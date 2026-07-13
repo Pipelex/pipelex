@@ -226,7 +226,7 @@ async def validate_bundle(
     mthds_file_path: Path | None = None,
     *,
     mthds_contents: list[str] | None = None,
-    mthds_sources: list[str] | None = None,
+    mthds_sources: Sequence[str | None] | None = None,
     library_dirs: Sequence[Path] | None = None,
     allow_signatures: bool = False,
     dry_run_pipe_codes: list[str] | None = None,
