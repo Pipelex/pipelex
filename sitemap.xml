@@ -2,1702 +2,1786 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://docs.pipelex.com/latest/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/CLAUDE/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/CODE_OF_CONDUCT/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/changelog/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/contributing/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/license/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/content-generator-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/observer-provider-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/pipe-router-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/reporting-delegate-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/secrets-provider-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/advanced/storage-provider-injection/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/agents/debugging-hanging-pytest-runs/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/analytics/data-extraction/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/configure-ai-llm-to-optimize-methods/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/domain/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/kick-off-a-methods-project/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/libraries/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/packages/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipelex-bundle-specification/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/concepts/define_your_concepts/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/concepts/inline-structures/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/concepts/python-classes/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/concepts/refining-concepts/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/csv-input-and-output/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/executing-pipelines/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-output/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/provide-inputs/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/run-modes-and-backends/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/signature-pipes/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/understanding-multiplicity/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/understanding-optionality/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/working-memory/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-controllers/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-controllers/PipeBatch/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-controllers/PipeCondition/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-controllers/PipeParallel/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-controllers/PipeSequence/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeCompose/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeExtract/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeFunc/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeImgGen/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeLLM/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeSearch/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeStructure/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-pipeline-validation/dry-run-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-practical/logging-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-practical/pipe-run-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-practical/reporting-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-practical/telemetry-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-technical/aws-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-technical/cogt-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-technical/inference-backend-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/configuration/config-technical/library-config/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/contribute/configuration-defaults-and-overrides/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/contribute/drift-contracts/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/contribute/keyword-only-arguments/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/advisory-board/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/blog-article-generator/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/design-slides/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/discord-newsletter/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-dpe/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-gantt/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-generic/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-invoice/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-markdown/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-proof-of-purchase/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-slides/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/extract-table/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/gen-expense-data/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/gen-synthetic-data/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/generate-image/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/hello-world/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/summarize/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/using-inference-plugins/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/validate-expense-data/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/cookbook/write-tweet/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/distributed-execution/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/ambiguous-inputs-files-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/anthropic-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/anthropic-model-listing-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/anthropic-sdk-unsupported-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/anthropic-worker-configuration-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/argument-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/async-execution-not-enabled-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/authoring-and-language/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/aws-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/azure-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/batch-params-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/bedrock-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/bedrock-worker-configuration-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/broken-plugin-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/bundle-elaborator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/codegen-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/codegen-lock-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/codegen-stamp-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/cogt-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-code-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-library-concept-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-loading-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-refine-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-string-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-structure-generator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/concept-structure-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/config-model-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/config-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/construct-field-blueprint-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/construct-field-blueprint-value-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/context-provider-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/core-unconditional-plugin-disabled-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/cost-registry-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/crate-normalization-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/csv-coercion-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/csv-column-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/csv-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/csv-flatness-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/csv-read-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/date-content-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/delivery-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/domain-code-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/domain-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/domain-library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/domain-loading-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/drift-ack-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/drift-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/drift-git-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/drift-manifest-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/dry-run-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/dry-run-graph-not-produced-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/dry-run-mock-build-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/dry-run-object-fidelity-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-bundle-validator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-http-error-mapper-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-inference-backend-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-model-lister-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-orchestrator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-secrets-provider-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/duplicate-storage-provider-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/env-var-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/event-log-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/event-log-read-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/event-log-setup-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/execution-and-runtime/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/explicit-concept-incompatible-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-capability-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-handle-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-input-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-job-failure-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-model-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/extract-output-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/fal-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/fatal-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/file-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/fix-transaction-error/</loc>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/fix-write-conflict-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/func-registry-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-api-key-missing-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-config-merge-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-deck-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-do-not-track-conflict-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-extract-response-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-search-response-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-telemetry-manager-injected-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-terms-not-accepted-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/gateway-unknown-model-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/generated-image-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/google-img-gen-worker-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/google-llm-worker-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/graph-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/graph-spec-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/hub-slot-already-claimed-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/image-content-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-generated-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-generation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-handle-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-model-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-parameter-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-prompt-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/img-gen-settings-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-and-providers/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-backend-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-backend-library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-backend-library-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-backend-library-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-backend-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-model-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/inference-setup-required-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/input-shaping-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/input-stuff-spec-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/input-stuff-specs-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/input-stuff-specs-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.pipelex.com/latest/errors/inputs-datetime-not-supported-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/jinja2-context-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/jinja2-detect-variables-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/jinja2-stuff-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/jinja2-template-render-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/jinja2-template-syntax-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/job-metadata-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/json-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/kit-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/kit-index-loading-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/langfuse-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/library-loading-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/list-where-singular-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-assignment-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-capability-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-completion-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-config-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-handle-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-model-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-prompt-parameter-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-prompt-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-prompt-template-inputs-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/llm-settings-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/missing-bundle-validator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/missing-dependency-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/missing-orchestrator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/mistral-extract-response-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/mistral-model-listing-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/mistral-plugin-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/mistral-worker-configuration-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-choice-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-deck-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-deck-preset-validaton-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-deck-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-deck-validaton-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-listing-unsupported-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-manager-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-reference-parse-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/model-waterfall-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/module-file-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/multiplicity-count-mismatch-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/native-concept-definition-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/neither-url-nor-data-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/nested-key-conflict-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/null-input-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/open-ai-client-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/optional-value-absent-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-batch-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-compose-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-compose-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-condition-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-controller-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-controller-output-concept-mismatch-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-execution-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-img-gen-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-img-gen-run-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-input-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-inputs-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-io-contract-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-job-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-llm-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-loading-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-operator-model-availability-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-operator-model-choice-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-parallel-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-router-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-run-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-run-inputs-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-run-params-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-search-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-search-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-sequence-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-signature-not-executable-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipe-stack-overflow-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-bridge-dispatch-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-bundle-spec-blueprint-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-cli-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-config-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-runtime-bridge-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-service-config-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-service-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-setup-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex-unexpected-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipeline-execution-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipeline-input-content-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipeline-manager-already-exists-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipeline-manager-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/platform-and-tooling/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/plugin-api-version-mismatch-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/plugin-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/portkey-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/portkey-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/portkey-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/prompt-document-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/prompt-image-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/prompt-image-format-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/py-pdfium2-renderer-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/readiness-check-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/remote-config-fetch-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/remote-config-unavailable-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/remote-config-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/reporting-manager-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/routing-profile-blueprint-value-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/routing-profile-disabled-backend-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/routing-profile-library-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/routing-profile-library-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/sdk-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/search-handle-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/search-job-failure-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/search-model-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/secret-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/security-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/ssrf-blocked-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-config-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-delivery-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-file-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-gcp-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-gcp-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-invalid-key-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-invalid-uri-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-local-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/storage-s3-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/structure-class-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/structure-validation-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/structured-content-composer-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/structured-content-composer-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/structured-content-composer-value-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-artefact-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-artefact-reserved-field-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-content-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-content-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-content-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-spec-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/stuff-spec-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/telemetry-config-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/telemetry-config-validation-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/template-sigil-syntax-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/toml-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/tool-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/traceback-message-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unknown-boot-orchestrator-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/unknown-input-name-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unknown-secrets-method-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unknown-storage-method-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unknown-var-prefix-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unsafe-schema-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/unused-input-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/validate-bundle-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/var-fallback-pattern-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/var-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/vertex-ai-config-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/vertex-ai-credentials-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/webhook-delivery-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/with-images-filter-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-consistency-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-factory-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-stuff-attribute-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-stuff-not-found-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-type-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/working-memory-variable-error/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/wrong-scalar-kind-error/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/advanced-customizations/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/claude-code-skills-plugin/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/cli/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/cloud-storage/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/concepts/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/configuration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/cost-tracking/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/distributed-execution/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/document-extraction/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/execution-graph/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/gateway/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/image-generation/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/llm-integration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/mthds-language/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/pipe-operators/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/pipeline-orchestration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/plxt/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/telemetry/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/validation-dry-run/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/features/web-search/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/get-started/build-with-claude-code/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/get-started/configure-ai-providers/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/get-started/mthds-language-tutorial/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/reliability/automatic-retries/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/reliability/durable-execution/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/reliability/failure-classification/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/reliability/retries-and-resilience/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/setup/gateway-models/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/setup/telemetry/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/logging/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/plxt/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/agent-cli/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/tools/cli/fix/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/init/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/pkg/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/run/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/show/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/update/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/validate/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/build/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/build/inputs/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/build/output/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/build/runner/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/tools/cli/build/structures/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/architecture-overview/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/build-time-elaboration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/under-the-hood/codegen-projections/</loc>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/distributed-content-generation/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/dry-run-mock-generation/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/error-model/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/execution-graph-tracing/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/image-handling-in-llm-prompts/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/inference-backend-plugins/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/init-cli-flows/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/orchestrator-plugins/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/pipe-routing-and-execution/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/reasoning-controls/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/runtime-bridge-and-transport/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/secrets-provider-plugins/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/storage-provider-plugins/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/stuffartefact-and-image-rendering/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/under-the-hood/test-profile-configuration/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/viewpoint/viewpoint/</loc>
-         <lastmod>2026-07-06</lastmod>
+         <lastmod>2026-07-14</lastmod>
     </url>
 </urlset>
