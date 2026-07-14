@@ -30,6 +30,17 @@ model = "$quick-reasoning"
 prompt = "Compute a score from $data"
 """
 
+INTAKE_MTHDS = """\
+domain = "intake"
+description = "Document intake domain"
+
+[pipe.extract_pages]
+type = "PipeExtract"
+description = "Extract the pages of a document"
+inputs = { doc = "Document" }
+output = "Page[]"
+"""
+
 
 class TestCrateNormalizationRoundTrip:
     """Integration: a normalized crate (natives materialized) loads back into a live library."""
@@ -65,3 +76,33 @@ class TestCrateNormalizationRoundTrip:
             assert "report.make_score" in library.pipe_library.root
             # Natives remain singly-registered (pre-registered natives, not the crate's copies).
             assert "native.Text" in library.concept_library.root
+
+    def test_extract_pipe_survives_normalization(self, load_empty_library: Callable[[], str]):
+        """A PipeExtract declares `output = "Page[]"`, which normalization qualifies to
+        `native.Page[]` before rebuilding the blueprints — which re-runs PipeExtractBlueprint's own
+        output validator on the normalized spelling. A validator that only accepted the authoring
+        spelling rejected its own normalized output, raising a raw pydantic ValidationError out of
+        normalize_crate and 500-ing every static-core API route.
+        """
+        library_manager = get_library_manager()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            intake_path = Path(tmp_dir) / "intake.mthds"
+            intake_path.write_text(INTAKE_MTHDS, encoding="utf-8")
+            blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=intake_path)]
+
+            crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+            normalized = normalize_crate(crate, mthds_version=MTHDS_TEST_VERSION)
+
+            assert normalized.pipes["intake.extract_pages"].output == "native.Page[]"
+
+            # Normalization is idempotent: re-normalizing re-validates the already-normalized
+            # blueprints, which is exactly the round trip the authoring-only validator broke.
+            renormalized = normalize_crate(normalized, mthds_version=MTHDS_TEST_VERSION)
+            assert renormalized.pipes["intake.extract_pages"].output == "native.Page[]"
+            assert renormalized.fingerprint == normalized.fingerprint
+
+            library_id = load_empty_library()
+            library_manager.load_from_crate(library_id=library_id, crate=normalized)
+            library = library_manager.get_library(library_id=library_id)
+            assert "intake.extract_pages" in library.pipe_library.root
