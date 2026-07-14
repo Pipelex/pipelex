@@ -7,7 +7,7 @@ import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
-from pipelex.hub import get_library_manager, set_current_library
+from pipelex.hub import clear_current_library, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -144,6 +144,9 @@ def load_test_library() -> Generator[Callable[[list[Path]], None], None, None]:
     if library_id is not None:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
+        # The setup set the current-library ContextVar; clear it so a torn-down
+        # library id can never dangle into whatever runs next in this process.
+        clear_current_library()
         log.verbose(f"Torn down library: {library_id}")
 
 
@@ -165,6 +168,9 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
     if library_id is not None:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
+        # The setup set the current-library ContextVar; clear it so a torn-down
+        # library id can never dangle into whatever runs next in this process.
+        clear_current_library()
         log.verbose(f"Torn down library: {library_id}")
 
 

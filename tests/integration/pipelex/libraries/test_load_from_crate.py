@@ -3,7 +3,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import clear_current_library, get_library_manager, set_current_library
+from pipelex.hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 
 SCORING_MTHDS = """\
@@ -130,3 +130,36 @@ class TestLoadFromCrate:
             clear_current_library()
             library_manager.teardown(library_id=first_library_id)
             library_manager.teardown(library_id=second_library_id)
+
+    def test_load_into_non_current_library(self, tmp_path: Path) -> None:
+        """Loading must target the given library_id even when a different library is current.
+
+        States the loader invariant directly: once load_from_blueprints is handed a library_id,
+        everything beneath it resolves against that library — the ambient current-library binding
+        is neither consulted for resolution nor clobbered by the load.
+        """
+        bundle_path = tmp_path / "scoring.mthds"
+        bundle_path.write_text(SCORING_MTHDS, encoding="utf-8")
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=bundle_path)
+        library_manager = get_library_manager()
+        current_library_id, _ = library_manager.open_library()
+        target_library_id, _ = library_manager.open_library()
+
+        try:
+            set_current_library(library_id=current_library_id)
+            library_manager.load_from_blueprints(library_id=target_library_id, blueprints=[blueprint])
+
+            # The load went into the target library, not the ambient current one
+            target_library = library_manager.get_library(library_id=target_library_id)
+            assert target_library.pipe_library.get_optional_pipe(pipe_code="scoring.compute_score") is not None
+            assert target_library.concept_library.is_concept_exists(concept_ref="scoring.ScoreResult")
+            current_library = library_manager.get_library(library_id=current_library_id)
+            assert current_library.pipe_library.get_optional_pipe(pipe_code="scoring.compute_score") is None
+            assert not current_library.concept_library.is_concept_exists(concept_ref="scoring.ScoreResult")
+
+            # The ambient binding survived the load untouched
+            assert get_current_library() == current_library_id
+        finally:
+            clear_current_library()
+            library_manager.teardown(library_id=current_library_id)
+            library_manager.teardown(library_id=target_library_id)
