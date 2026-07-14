@@ -90,6 +90,8 @@ own page. Classes are grouped by subsystem.
 - [`DuplicateInferenceBackendError`](duplicate-inference-backend-error.md) — Duplicate inference backend
 - [`DuplicateModelListerError`](duplicate-model-lister-error.md) — Duplicate model lister
 - [`DuplicateOrchestratorError`](duplicate-orchestrator-error.md) — Duplicate orchestrator
+- [`DuplicateSecretsProviderError`](duplicate-secrets-provider-error.md) — Duplicate secrets provider
+- [`DuplicateStorageProviderError`](duplicate-storage-provider-error.md) — Duplicate storage provider
 - [`GatewayCredentialsError`](gateway-credentials-error.md) — Gateway credentials
 - [`GatewayDeckError`](gateway-deck-error.md) — Gateway deck
 - [`GatewayError`](gateway-error.md) — Gateway
@@ -111,6 +113,8 @@ own page. Classes are grouped by subsystem.
 - [`PortkeyError`](portkey-error.md) — Portkey
 - [`PortkeyFactoryError`](portkey-factory-error.md) — Portkey factory
 - [`UnknownBootOrchestratorError`](unknown-boot-orchestrator-error.md) — Unknown boot orchestrator
+- [`UnknownSecretsMethodError`](unknown-secrets-method-error.md) — Unknown secrets method
+- [`UnknownStorageMethodError`](unknown-storage-method-error.md) — Unknown storage method
 - [`VertexAIConfigError`](vertex-ai-config-error.md) — VertexAI configuration error
 - [`VertexAICredentialsError`](vertex-ai-credentials-error.md) — VertexAI credentials error
 

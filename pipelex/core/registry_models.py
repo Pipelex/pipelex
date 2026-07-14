@@ -3,6 +3,7 @@ from typing import Any, ClassVar
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -17,6 +18,8 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -92,6 +95,9 @@ class CoreRegistryModels(RegistryModels):
     STUFF: ClassVar[list[ModelType]] = [
         TextContent,
         NumberContent,
+        YesNoContent,
+        DateContent,
+        TimeContent,
         ImageContent,
         Stuff,
         StuffContent,

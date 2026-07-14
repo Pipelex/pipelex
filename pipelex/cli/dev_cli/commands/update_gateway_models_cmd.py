@@ -62,7 +62,7 @@ def _all_references_up_to_date(
     return True
 
 
-def update_gateway_models_cmd(quiet: bool = False) -> None:
+def update_gateway_models_cmd(*, quiet: bool = False) -> None:
     """Update the Pipelex Gateway models reference files.
 
     Fetches the current model specifications from the remote config and

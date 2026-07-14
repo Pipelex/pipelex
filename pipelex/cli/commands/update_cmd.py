@@ -32,8 +32,8 @@ from pipelex.system.configuration.config_loader import config_manager
 
 
 def update_cmd(
-    local: bool = False,
     *,
+    local: bool = False,
     yes: bool = False,
     dry_run: bool = False,
     no_backup: bool = False,
@@ -88,7 +88,7 @@ def update_cmd(
     console.print()
 
 
-def _resolve_deck_dir(local: bool) -> Path:
+def _resolve_deck_dir(*, local: bool) -> Path:
     """Pick the deck directory to operate on, mirroring the ``--local`` semantics of ``pipelex init``."""
     if local:
         project_root = config_manager.project_root

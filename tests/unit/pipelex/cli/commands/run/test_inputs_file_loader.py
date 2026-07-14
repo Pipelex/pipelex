@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 from typing import TYPE_CHECKING
 
 import pytest
 
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-from pipelex.cli.commands.run.exceptions import InputsDatetimeNotSupportedError
+from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 if TYPE_CHECKING:
@@ -81,43 +83,69 @@ class TestInputsFileLoader:
         with pytest.raises(FileNotFoundError):
             load_inputs_dict_from_path(tmp_path / "absent.json")
 
-    @pytest.mark.parametrize(
-        "toml_value",
-        [
-            "2026-07-06T12:30:00Z",
-            "2026-07-06T12:30:00",
-            "2026-07-06",
-            "12:30:00",
-        ],
-        ids=["offset_datetime", "local_datetime", "local_date", "local_time"],
-    )
-    def test_datetime_rejected_at_top_level(self, tmp_path: Path, toml_value: str) -> None:
-        """Every TOML datetime flavor is rejected with the not-supported error."""
+    def test_top_level_local_date_becomes_date_content(self, tmp_path: Path) -> None:
+        """A top-level TOML local date maps to a date-only DateContent."""
         inputs_file = tmp_path / "inputs.toml"
-        inputs_file.write_text(f"deadline = {toml_value}\n", encoding="utf-8")
+        inputs_file.write_text("hearing = 2026-09-01\n", encoding="utf-8")
 
-        with pytest.raises(InputsDatetimeNotSupportedError) as exc_info:
-            load_inputs_dict_from_path(inputs_file)
-        assert "not supported yet" in exc_info.value.message
-        assert "deadline" in exc_info.value.message
+        loaded = load_inputs_dict_from_path(inputs_file)
 
-    def test_datetime_rejected_nested(self, tmp_path: Path) -> None:
-        """A datetime nested dict-in-list-in-dict is rejected, with its key path in the message."""
+        assert loaded["hearing"] == DateContent(date=datetime.date(2026, 9, 1))
+        assert loaded["hearing"].time is None
+
+    def test_top_level_local_datetime_becomes_naive_date_content(self, tmp_path: Path) -> None:
+        """A top-level TOML local datetime maps to a DateContent with a naive time (no invented offset)."""
+        inputs_file = tmp_path / "inputs.toml"
+        inputs_file.write_text("start = 2026-07-07T09:00:00\n", encoding="utf-8")
+
+        loaded = load_inputs_dict_from_path(inputs_file)
+
+        content = loaded["start"]
+        assert isinstance(content, DateContent)
+        assert content.date == datetime.date(2026, 7, 7)
+        assert content.time is not None
+        assert content.time == datetime.time(9, 0)
+        assert content.time.tzinfo is None
+
+    def test_top_level_offset_datetime_preserves_offset(self, tmp_path: Path) -> None:
+        """A top-level TOML offset datetime maps to a DateContent whose time keeps the stated UTC offset."""
+        inputs_file = tmp_path / "inputs.toml"
+        inputs_file.write_text("departure = 2026-07-07T15:40:00+02:00\n", encoding="utf-8")
+
+        loaded = load_inputs_dict_from_path(inputs_file)
+
+        content = loaded["departure"]
+        assert isinstance(content, DateContent)
+        assert content.time is not None
+        assert content.time.utcoffset() == datetime.timedelta(hours=2)
+
+    def test_top_level_local_time_becomes_time_content(self, tmp_path: Path) -> None:
+        """A top-level bare TOML time-of-day maps to a TimeContent (native Time), never a Date."""
+        inputs_file = tmp_path / "inputs.toml"
+        inputs_file.write_text("opening = 09:00:00\n", encoding="utf-8")
+
+        loaded = load_inputs_dict_from_path(inputs_file)
+
+        assert loaded["opening"] == TimeContent(time=datetime.time(9, 0))
+        assert loaded["opening"].time.tzinfo is None
+
+    def test_nested_time_left_in_place(self, tmp_path: Path) -> None:
+        """A time-of-day nested in an envelope's content is left for the factory/pydantic to consume."""
         inputs_file = tmp_path / "inputs.toml"
         inputs_file.write_text(
-            '[record]\nconcept = "Event"\n[[record.entries]]\nlabel = "kickoff"\nwhen = 2026-07-06T09:00:00Z\n',
+            '[record]\nconcept = "Event"\n[[record.entries]]\nlabel = "kickoff"\nat = 09:00:00\n',
             encoding="utf-8",
         )
 
-        with pytest.raises(InputsDatetimeNotSupportedError) as exc_info:
-            load_inputs_dict_from_path(inputs_file)
-        assert "record.entries[0].when" in exc_info.value.message
+        loaded = load_inputs_dict_from_path(inputs_file)
 
-    def test_datetime_message_suggests_quoting(self, tmp_path: Path) -> None:
-        """The rejection message tells the user to quote the value as a string meanwhile."""
+        assert loaded["record"]["entries"][0]["at"] == datetime.time(9, 0)
+
+    def test_nested_datetime_left_in_place(self, tmp_path: Path) -> None:
+        """A date/datetime nested in an envelope's content is left for the factory/pydantic to consume."""
         inputs_file = tmp_path / "inputs.toml"
-        inputs_file.write_text("deadline = 2026-07-06\n", encoding="utf-8")
+        inputs_file.write_text('[due]\nconcept = "billing.DueDate"\ncontent = 2026-08-06\n', encoding="utf-8")
 
-        with pytest.raises(InputsDatetimeNotSupportedError) as exc_info:
-            load_inputs_dict_from_path(inputs_file)
-        assert "quote the value as a string" in exc_info.value.message
+        loaded = load_inputs_dict_from_path(inputs_file)
+
+        assert loaded["due"]["content"] == datetime.date(2026, 8, 6)

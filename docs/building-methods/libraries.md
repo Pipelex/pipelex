@@ -31,12 +31,11 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 | Component | Uniqueness Scope | Example |
 |-----------|-----------------|---------|
 | **Domains** | Unique per library | Each library can have one `marketing` domain |
-| **Pipes** | Unique per library* | Each library can have one `generate_tagline` pipe |
+| **Pipes** | Unique per domain | Each domain can have one `generate_tagline` pipe |
 | **Concepts** | Unique per domain | Each domain can have one `ProductDescription` concept |
 | **Domain.Concept** | Unique per library | `marketing.ProductDescription` is unique within a library |
 
-!!! info "Future Change"
-    *Pipe uniqueness will soon be scoped per domain instead of per library, allowing different domains within the same library to have pipes with the same code.
+Pipes are identified by their domain-qualified reference (e.g. `marketing.generate_tagline`), so different domains within the same library can have pipes with the same code.
 
 ## Local vs Remote Libraries
 
@@ -112,12 +111,14 @@ domain = "marketing"
 
 [concept]
 ProductDescription = "A product description"
+Tagline = "A catchy tagline for a product"
 
 [pipe.my_pipe]
 type = "PipeLLM"
+description = "Generate a tagline for a product"
 inputs = { desc = "ProductDescription" }
 output = "Tagline"
-prompt = "Generate a tagline for: @desc"
+prompt = "Generate a tagline for: $desc"
 """
 
 runner = PipelexMTHDSProtocol()
@@ -184,7 +185,7 @@ response = await runner.execute(
 )
 ```
 
-A temporary library will be created holding the Pipelex bundle, and the library_id will be pipeline_run_id.
+A temporary library will be created holding the Pipelex bundle, and the library_id will be pipeline_run_id. Since no `pipe_code` is passed, the generated content must declare `main_pipe` at the top of the bundle (e.g. `main_pipe = "my_pipe"`) so the runner knows which pipe to execute — otherwise pass `pipe_code=` explicitly.
 
 ### 3. Reuse Library IDs for Related Executions
 

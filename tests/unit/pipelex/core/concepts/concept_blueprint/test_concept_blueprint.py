@@ -1,9 +1,11 @@
 """Tests for ConceptStructureBlueprint validation logic."""
 
+from datetime import date, datetime
+
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.concepts.concept_blueprint import ConceptStructureBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 
 
@@ -96,6 +98,32 @@ class TestConceptStructureBlueprintValidation:
                 default_value="not a dict",
             )
 
+    def test_date_and_datetime_default_values(self):
+        """A `date` field accepts a calendar date; a `datetime` field accepts a timestamp."""
+        date_blueprint = ConceptStructureBlueprint(
+            description="A date field", type=ConceptStructureBlueprintFieldType.DATE, default_value=date(2026, 7, 7)
+        )
+        assert date_blueprint.default_value == date(2026, 7, 7)
+
+        datetime_blueprint = ConceptStructureBlueprint(
+            description="A datetime field", type=ConceptStructureBlueprintFieldType.DATETIME, default_value=datetime(2026, 7, 7, 15, 40)
+        )
+        assert datetime_blueprint.default_value == datetime(2026, 7, 7, 15, 40)
+
+    def test_date_field_rejects_datetime_default(self):
+        """A `date` field rejects a datetime default — a datetime carries a time the field would silently drop."""
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected date"):
+            ConceptStructureBlueprint(
+                description="A date field", type=ConceptStructureBlueprintFieldType.DATE, default_value=datetime(2026, 7, 7, 15, 40)
+            )
+
+    def test_datetime_field_rejects_non_datetime_default(self):
+        """A `datetime` field rejects a non-datetime default (e.g. a bare date or a string)."""
+        with pytest.raises(ValidationError, match="default_value type mismatch: expected datetime"):
+            ConceptStructureBlueprint(
+                description="A datetime field", type=ConceptStructureBlueprintFieldType.DATETIME, default_value=date(2026, 7, 7)
+            )
+
     def test_missing_type_with_default_value(self):
         """Test that missing type when default_value is provided (except for choices) is caught."""
         # Missing type with default_value (no choices) - this will trigger the "type is None (array)" validation first
@@ -129,6 +157,21 @@ class TestConceptStructureBlueprintValidation:
         # Dict type without value_type
         with pytest.raises(ValidationError, match="value_type must not be empty"):
             ConceptStructureBlueprint(description="Dict field without value_type", type=ConceptStructureBlueprintFieldType.DICT, key_type="text")
+
+    @pytest.mark.parametrize("key_type", ["integer", "boolean", "date"])
+    def test_dict_rejects_non_text_key_type(self, key_type: str):
+        with pytest.raises(ValidationError, match="key_type must be 'text'"):
+            ConceptStructureBlueprint(
+                description="Unsupported map key",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type=key_type,
+                value_type="text",
+            )
+
+    @pytest.mark.parametrize("field_name", ["not-valid", "2fast", "class"])
+    def test_concept_rejects_field_names_that_are_not_python_identifiers(self, field_name: str):
+        with pytest.raises(ValidationError, match="valid Python identifiers"):
+            ConceptBlueprint(description="Invalid field name", structure={field_name: "A value"})
 
     def test_edge_cases(self):
         """Test edge cases for validation."""

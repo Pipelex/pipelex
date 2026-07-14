@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mthds.protocol.pipeline_inputs import PipelineInputs
@@ -41,8 +42,8 @@ if TYPE_CHECKING:
 
 
 async def pipeline_run_setup(
-    execution_config: PipelineExecutionConfig,
     *,
+    execution_config: PipelineExecutionConfig,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
@@ -58,6 +59,7 @@ async def pipeline_run_setup(
     user_id: str | None = None,
     pipeline_run_id: str | None = None,
     request_id: str | None = None,
+    inputs_base_dir: Path | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -129,6 +131,11 @@ async def pipeline_run_setup(
         ``ErrorReport`` back to its originating request). Threaded onto
         :class:`pipelex.pipeline.job_metadata.JobMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
+    inputs_base_dir:
+        Directory that bare *relative local* file paths in ``inputs`` resolve against (Smart
+        Inputs D3) — the inputs file's parent when a CLI file-loaded the inputs. ``None`` for
+        API/SDK callers (they pass absolute urls / storage uris). Only the shaper's file-ish /
+        CSV arms consult it.
 
     Returns:
     -------
@@ -141,6 +148,13 @@ async def pipeline_run_setup(
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
+
+    # TODO: rethink this, it's not forcing
+    if pipe_run_mode is None:
+        if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
+            pipe_run_mode = PipeRunMode(run_mode_from_env)
+        else:
+            pipe_run_mode = PipeRunMode.LIVE
 
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
@@ -224,14 +238,8 @@ async def pipeline_run_setup(
                 pipeline_run_id=pipeline_run_id,
                 emit_graph_events=is_generate_graph,
                 emit_usage_events=is_generate_usage,
+                mode=pipe_run_mode.graphspec_mode,
             )
-
-        # TODO: rethink this, it's not forcing
-        if pipe_run_mode is None:
-            if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
-                pipe_run_mode = PipeRunMode(run_mode_from_env)
-            else:
-                pipe_run_mode = PipeRunMode.LIVE
 
         # Register the event log on the report delegate for usage event emission — only when cost reporting
         # is on. In graph-only mode (--graph --no-costs) the tracer owns the event_log for graph events, but
@@ -278,6 +286,7 @@ async def pipeline_run_setup(
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             request_id=request_id,
+            inputs_base_dir=inputs_base_dir,
         )
 
         properties = {

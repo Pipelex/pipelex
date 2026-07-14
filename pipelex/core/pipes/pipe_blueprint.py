@@ -53,7 +53,7 @@ def explicit_signature_tag_migration_message(pipe_code: Any) -> str:
     )
 
 
-def normalize_typeless_signature_section(pipe_code: Any, *, pipe_section: Any, allowed_keys: frozenset[str] = SIGNATURE_ONLY_KEYS) -> Any:
+def normalize_typeless_signature_section(*, pipe_code: Any, pipe_section: Any, allowed_keys: frozenset[str] = SIGNATURE_ONLY_KEYS) -> Any:
     """Inject the internal `PipeSignature` tag on a typeless contract-only section, reject a typeless
     section that declares more than the contract, and reject a section that still writes the retired
     explicit `type = "PipeSignature"` tag. Non-dict values (already-built pipe instances) and sections

@@ -39,4 +39,4 @@ class TestLogLevels:
         ],
     )
     def test_from_int_converts_to_enum(self, raw_level: int, expected_enum: LogLevel) -> None:
-        assert LogLevel.from_int(raw_level) == expected_enum
+        assert LogLevel.from_int(logging_level=raw_level) == expected_enum

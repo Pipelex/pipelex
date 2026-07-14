@@ -150,7 +150,7 @@ def run_bundle_cmd(
         # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
         if not inputs:
             try:
-                inputs_file = find_default_inputs_file(target_path)
+                inputs_file = find_default_inputs_file(directory=target_path)
             except AmbiguousInputsFilesError as ambiguity_exc:
                 typer.secho(f"Failed to run: {ambiguity_exc.message}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from ambiguity_exc

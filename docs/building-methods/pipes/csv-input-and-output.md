@@ -16,7 +16,8 @@ A concept used with CSV must be **flat**: every field is a scalar. The accepted 
 - `integer` → `int`
 - `number` → `float`
 - `boolean` → `bool`
-- `date` → `datetime.datetime` (an ISO `YYYY-MM-DD` value is accepted and parsed as midnight)
+- `date` → `datetime.date` (an ISO `YYYY-MM-DD` value)
+- `datetime` → `datetime.datetime` (an ISO `YYYY-MM-DDTHH:MM:SS` value)
 
 Optional fields are allowed, and so are choice-constrained scalars — but only **string-valued** ones (a `text`-typed `choices` field, a string `Literal`, or a `StrEnum`). A non-string choice such as `Literal[1, 2, 3]` or an `IntEnum` is rejected: it would serialize to a CSV string but cannot coerce back from one, so accepting it would break the round trip. Any nested concept, list, dict, union, or `Any`-typed field is likewise rejected with a clear error that names the offending field — a CSV cell has no room for nested structure, so you must project to a flat concept first.
 
@@ -43,6 +44,17 @@ Reference the file from `inputs.json` with a `url` whose path ends in a tabular 
   }
 }
 ```
+
+!!! tip "When the input is a declared list, just give the path"
+    If the pipe declares the input as a structured list (`people = "Person[]"`), you can skip the envelope entirely and provide the tabular path directly — Pipelex reads it against the declared row concept. Both forms below are equivalent, and a relative path resolves against the inputs file's directory (see [Providing Inputs](provide-inputs.md)):
+
+    ```json
+    { "people": "people.csv" }
+    ```
+
+    ```json
+    { "people": { "url": "people.csv" } }
+    ```
 
 Given a `people.csv`:
 

@@ -15,7 +15,7 @@ There are two main ways to inject custom implementations:
 ### 1. During Initialization
 
 ```python
-from pipelex import Pipelex
+from pipelex.pipelex import Pipelex
 
 pipelex = Pipelex.make(
     reporting_delegate=MyReportingDelegate(),
@@ -31,7 +31,7 @@ pipelex = Pipelex.make(
 from pipelex.hub import PipelexHub
 
 hub = PipelexHub()
-hub.set_reporting_delegate(MyReportingDelegate())
+hub.set_report_delegate(MyReportingDelegate())
 # ... and so on for other components
 ```
 

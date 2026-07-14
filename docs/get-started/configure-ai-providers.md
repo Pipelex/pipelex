@@ -91,10 +91,10 @@ When using your own keys, enable the corresponding backends:
 1. Initialize configuration:
 
     ```bash
-    pipelex init config
+    pipelex init
     ```
 
-2. Edit `.pipelex/inference/backends.toml`:
+2. Edit `~/.pipelex/inference/backends.toml` (or `.pipelex/inference/backends.toml` in your project root if you have a project-local config — the project file fully overrides the global one):
 
     ```toml
     [google]
@@ -122,8 +122,8 @@ Run AI models locally without any API keys. This is perfect if you:
 **Ollama** (Recommended):
 
 1. Install [Ollama](https://ollama.ai/)
-2. Pull a model: `ollama pull llama2`
-3. No API key needed! Configure Ollama backend in `.pipelex/inference/backends.toml`
+2. Pull a model from Pipelex's Ollama catalog: `ollama pull gemma3:4b`
+3. No API key needed! Configure Ollama backend in `~/.pipelex/inference/backends.toml`
 
 **Other Local Providers:**
 
@@ -131,7 +131,7 @@ Run AI models locally without any API keys. This is perfect if you:
 - **LM Studio**: User-friendly local model interface
 - **llama.cpp**: Lightweight C++ inference
 
-Configure these in `.pipelex/inference/backends.toml`. See our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for details.
+Configure these in `~/.pipelex/inference/backends.toml`. See our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) for details.
 
 ---
 
@@ -140,24 +140,30 @@ Configure these in `.pipelex/inference/backends.toml`. See our [Inference Backen
 To set up Pipelex configuration files, run:
 
 ```bash
-pipelex init config
+pipelex init
 ```
 
-This creates a `.pipelex/` directory with:
+By default, this creates the global `~/.pipelex/` directory with:
 
 ```
-.pipelex/
+~/.pipelex/
 ├── pipelex.toml              # Feature flags, logging, cost reporting
-├── telemetry.toml            # Custom telemetry configuration
+├── plxt.toml                 # MTHDS/TOML formatting and linting configuration
+├── telemetry.toml            # AI trace destinations (PostHog, Langfuse, OTLP)
 └── inference/                # LLM configuration and model presets
     ├── backends.toml         # Enable/disable model providers
+    ├── backends/             # Per-provider model catalogs (anthropic.toml, openai.toml, ...)
     ├── deck/
-    │   ├── 1_llm_deck.toml           # LLM presets and aliases
-    │   ├── 2_img_gen_deck.toml       # Image generation config
-    │   ├── 3_extract_deck.toml       # Document extraction config
-    │   └── x_custom_llm_deck.toml    # Custom waterfalls/overrides
+    │   ├── 1_llm_deck.toml            # LLM presets and aliases
+    │   ├── 2_img_gen_deck.toml        # Image generation config
+    │   ├── 3_extract_deck.toml        # Document extraction config
+    │   ├── 4_search_deck.toml         # Search config
+    │   ├── x_custom_llm_deck.toml     # Custom LLM configurations
+    │   └── x_custom_extract_deck.toml # Custom extract configurations
     └── routing_profiles.toml # Model routing configuration
 ```
+
+To keep the configuration inside a project instead, run `pipelex init --local`: it creates the same structure in a `.pipelex/` directory at your project root, which takes precedence over the global `~/.pipelex/`.
 
 Learn more in our [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md) guide.
 

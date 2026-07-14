@@ -434,15 +434,15 @@ Define user-friendly names that map to model names. Aliases are defined in the d
 ```toml
 [llm.aliases]
 # Simple aliases map to a single model
-best-claude = "claude-4.5-opus"
-best-gpt = "gpt-5.2"
-best-gemini = "gemini-3.1-pro"
+best-claude = "claude-4.8-opus"
+best-gpt = "gpt-5.5"
+best-gemini = "gemini-pro-latest"
 
 # Default aliases (used in presets)
-default-general = "claude-4.5-sonnet"
-default-premium = "claude-4.5-opus"
-default-large-context-text = "gemini-2.5-flash"
-default-small = "gemini-2.5-flash-lite"
+default-general = "claude-4.6-sonnet"
+default-premium = "claude-4.8-opus"
+default-large-context-text = "gemini-flash-latest"
+default-small = "gpt-4o-mini"
 ```
 
 When using aliases in `.mthds` files or other configurations, prefix them with `@`:
@@ -624,9 +624,9 @@ The system loads configurations in this order:
 Common error types:
 
 - `ModelDeckNotFoundError`: Missing LLM deck configuration files
-- `ModelsManagerError`: Issues with model management
+- `ModelNotFoundError`: Referenced model not found in the deck
 - `LLMHandleNotFoundError`: Referenced model or alias not found
-- `LLMPresetNotFoundError`: Referenced preset not found
+- `ModelChoiceNotFoundError`: Referenced preset/choice not found
 
 ## Best Practices
 
@@ -654,7 +654,7 @@ Common error types:
    - Document custom presets and their use cases in your team documentation
 
 5. **Customization**:
-   - Use `overrides.toml` for project-specific settings
+   - Use `x_custom_*.toml` deck files for project-specific settings
    - Keep base configurations unchanged to make upgrades easier
    - Version control your custom configurations
    - Share routing profiles and presets across your team

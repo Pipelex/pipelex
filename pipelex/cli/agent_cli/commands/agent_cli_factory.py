@@ -161,10 +161,7 @@ def apply_agent_cli_output_discipline() -> None:
 
 
 def make_pipelex_for_agent_cli(
-    library_dirs: list[str] | list[Path] | None = None,
-    *,
-    needs_inference: bool = True,
-    needs_model_specs: bool | None = None,
+    *, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True, needs_model_specs: bool | None = None
 ) -> Pipelex:
     """Initialize Pipelex for agent CLI commands with JSON error output.
 

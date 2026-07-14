@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, InputsDatetimeNotSupportedError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -30,23 +32,24 @@ def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
             parser; every other suffix (including none) is parsed as JSON.
 
     Returns:
-        The loaded inputs dictionary.
+        The loaded inputs dictionary. Any top-level TOML date/datetime literal is
+        converted to a ``DateContent`` and any top-level TOML time-of-day literal to
+        a ``TimeContent`` (each enters the pipeline-inputs seam as a bare content
+        instance); nested temporal values are left in place for the
+        envelope/structure factory arms to consume.
 
     Raises:
         FileNotFoundError: If the file does not exist.
         TomlError: If a ``.toml`` file has invalid TOML syntax.
         json.JSONDecodeError: If a JSON file has invalid JSON syntax.
         JsonTypeError: If a JSON file does not hold a dictionary.
-        InputsDatetimeNotSupportedError: If a loaded value is a TOML
-            datetime/date/time instance (no native concept support yet).
     """
     inputs_dict: dict[str, Any]
     if path.suffix.lower() == TOML_SUFFIX:
         inputs_dict = load_toml_from_path(path)
     else:
         inputs_dict = load_json_dict_from_path(path)
-    _assert_no_datetime_values(inputs_dict, source_path=path, key_path="")
-    return inputs_dict
+    return _convert_temporal_inputs(inputs_dict)
 
 
 def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) -> str | None:
@@ -77,7 +80,7 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
     return str(base_dir / inputs_path)
 
 
-def find_default_inputs_file(directory: Path) -> Path | None:
+def find_default_inputs_file(*, directory: Path) -> Path | None:
     """Probe a bundle directory for the default inputs file (JSON or TOML).
 
     Args:
@@ -108,33 +111,35 @@ def find_default_inputs_file(directory: Path) -> Path | None:
     return None
 
 
-def _assert_no_datetime_values(value: Any, *, source_path: Path, key_path: str) -> None:
-    """Recursively reject datetime/date/time instances in a loaded inputs value.
+def _convert_temporal_inputs(inputs_dict: dict[str, Any]) -> dict[str, Any]:
+    """Map top-level TOML temporal literals to native ``Date`` / ``Time`` inputs.
 
-    Only TOML can produce such values (JSON has no datetime type), but the walk
-    is format-agnostic and harmless to run on both.
+    Only TOML can produce temporal Python objects (JSON has no temporal type), but the
+    walk is format-agnostic and harmless on JSON (which yields none).
+
+    - A **top-level** ``datetime.datetime`` / ``datetime.date`` becomes a ``DateContent``
+      (a datetime keeps its time and offset; a bare date has ``time=None``). It then enters
+      the pipeline-inputs seam as a bare content instance, inferred as ``native.Date``.
+    - A **top-level** ``datetime.time`` becomes a ``TimeContent`` (offset kept when stated),
+      inferred as ``native.Time``. A time never silently becomes a ``Date`` — shaping a
+      ``Time`` into a ``Date`` slot fails the concept-compatibility check downstream.
+    - A **nested** temporal value (inside an envelope's ``content`` or a structured dict) is
+      left in place for the factory arms and pydantic validation to consume.
 
     Args:
-        value: The loaded value to inspect (dict, list, scalar, ...).
-        source_path: The inputs file the value was loaded from, for the error message.
-        key_path: Dotted/indexed path to ``value`` inside the inputs dict, empty at the root.
+        inputs_dict: The loaded top-level inputs dictionary.
 
-    Raises:
-        InputsDatetimeNotSupportedError: On the first datetime-typed value found.
+    Returns:
+        A new dict with top-level temporal literals converted.
     """
-    if isinstance(value, (datetime.datetime, datetime.date, datetime.time)):
-        located = f" at '{key_path}'" if key_path else ""
-        msg = (
-            f"Inputs file '{source_path}' holds a TOML datetime value{located} ({value!r}). "
-            "TOML datetime inputs are not supported yet: quote the value as a string in the meantime."
-        )
-        raise InputsDatetimeNotSupportedError(msg)
-    if isinstance(value, dict):
-        value_dict = cast("dict[str, Any]", value)
-        for key, sub_value in value_dict.items():
-            sub_key_path = f"{key_path}.{key}" if key_path else str(key)
-            _assert_no_datetime_values(sub_value, source_path=source_path, key_path=sub_key_path)
-    elif isinstance(value, list):
-        value_list = cast("list[Any]", value)
-        for index_item, sub_value in enumerate(value_list):
-            _assert_no_datetime_values(sub_value, source_path=source_path, key_path=f"{key_path}[{index_item}]")
+    converted: dict[str, Any] = {}
+    for key, value in inputs_dict.items():
+        if isinstance(value, datetime.datetime):
+            converted[key] = DateContent(date=value.date(), time=value.timetz())
+        elif isinstance(value, datetime.date):
+            converted[key] = DateContent(date=value)
+        elif isinstance(value, datetime.time):
+            converted[key] = TimeContent(time=value)
+        else:
+            converted[key] = value
+    return converted

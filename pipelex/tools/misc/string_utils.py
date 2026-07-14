@@ -332,7 +332,7 @@ def get_root_from_dotted_path(dotted_path: str) -> str:
     return dotted_path.split(".", 1)[0]
 
 
-def pluralize(count: int, *, singular: str, plural: str | None = None) -> str:
+def pluralize(*, count: int, singular: str, plural: str | None = None) -> str:
     """Pick the singular or plural form of a word based on a count.
 
     Returns ``singular`` when ``count == 1``, otherwise ``plural`` (defaulting to
@@ -348,15 +348,15 @@ def pluralize(count: int, *, singular: str, plural: str | None = None) -> str:
         The grammatically-agreed form of the word.
 
     Examples:
-        >>> pluralize(1, singular="pipe")
+        >>> pluralize(count=1, singular="pipe")
         'pipe'
-        >>> pluralize(2, singular="pipe")
+        >>> pluralize(count=2, singular="pipe")
         'pipes'
-        >>> pluralize(0, singular="pipe")
+        >>> pluralize(count=0, singular="pipe")
         'pipes'
-        >>> pluralize(1, singular="is", plural="are")
+        >>> pluralize(count=1, singular="is", plural="are")
         'is'
-        >>> pluralize(3, singular="entry", plural="entries")
+        >>> pluralize(count=3, singular="entry", plural="entries")
         'entries'
 
     """
@@ -365,7 +365,7 @@ def pluralize(count: int, *, singular: str, plural: str | None = None) -> str:
     return plural or f"{singular}s"
 
 
-def count_with_noun(count: int, *, singular: str, plural: str | None = None) -> str:
+def count_with_noun(*, count: int, singular: str, plural: str | None = None) -> str:
     """Format a count together with its grammatically-agreed noun.
 
     Produces "1 pipe" / "2 pipes" so messages stay clean instead of resorting to
@@ -380,15 +380,15 @@ def count_with_noun(count: int, *, singular: str, plural: str | None = None) -> 
         The count followed by a space and the agreed noun form.
 
     Examples:
-        >>> count_with_noun(1, singular="pipe")
+        >>> count_with_noun(count=1, singular="pipe")
         '1 pipe'
-        >>> count_with_noun(2, singular="pipe")
+        >>> count_with_noun(count=2, singular="pipe")
         '2 pipes'
-        >>> count_with_noun(0, singular="entry", plural="entries")
+        >>> count_with_noun(count=0, singular="entry", plural="entries")
         '0 entries'
 
     """
-    return f"{count} {pluralize(count, singular=singular, plural=plural)}"
+    return f"{count} {pluralize(count=count, singular=singular, plural=plural)}"
 
 
 def matches_wildcard_pattern(text: str, *, pattern: str) -> bool:

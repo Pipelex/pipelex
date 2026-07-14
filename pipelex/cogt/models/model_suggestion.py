@@ -73,11 +73,7 @@ def get_collection_keys(
 
 
 def suggest_model_alternatives(
-    model_deck: ModelDeck,
-    *,
-    model_type: ModelType,
-    name: str,
-    kind: ModelReferenceKind,
+    *, model_deck: ModelDeck, model_type: ModelType, name: str, kind: ModelReferenceKind
 ) -> tuple[list[str], list[str], list[str]]:
     """Find fuzzy matches and detect wrong-sigil usage for a model name.
 

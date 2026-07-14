@@ -138,7 +138,7 @@ def validate_concept_references_in_blueprints(
             + f"\nNative concepts: {sorted(native_codes)}."
         )
         # ConceptLibraryError now extends LibraryLoadingError, so the structured per-reference items
-        # ride the existing `except LibraryError` forwarding in _translate_to_validate_bundle_error and
+        # ride the existing `except LibraryError` forwarding in translate_to_validate_bundle_error and
         # surface as categorized items (not a bare residual): pipe-owned refs as `pipe_validation`,
         # concept-owned refs as `blueprint_validation`.
         raise ConceptLibraryError(

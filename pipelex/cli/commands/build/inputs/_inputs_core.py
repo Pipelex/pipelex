@@ -33,12 +33,13 @@ SUB_COMMAND_INPUTS = "inputs"
 
 
 async def _generate_inputs_core(
-    pipe_code: str | None = None,
     *,
+    pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
     library_dir: list[str] | None = None,
     template_format: InputsTemplateFormat = InputsTemplateFormat.JSON,
+    explicit: bool = False,
 ) -> None:
     """Core logic for generating an inputs template file for a pipe."""
     # Set up library so pipes can be found
@@ -91,10 +92,10 @@ async def _generate_inputs_core(
     try:
         match template_format:
             case InputsTemplateFormat.JSON:
-                inputs_template_str = render_inputs(the_pipe, indent=2)
+                inputs_template_str = render_inputs(the_pipe, indent=2, explicit=explicit)
                 default_file_name = DEFAULT_INPUTS_FILE_NAME
             case InputsTemplateFormat.TOML:
-                inputs_template_str = render_inputs_toml(the_pipe)
+                inputs_template_str = render_inputs_toml(the_pipe, explicit=explicit)
                 default_file_name = DEFAULT_INPUTS_TOML_FILE_NAME
     except NoInputsRequiredError as exc:
         typer.secho(str(exc), fg=typer.colors.YELLOW)
@@ -123,12 +124,13 @@ async def _generate_inputs_core(
 
 
 def execute_generate_inputs(
-    pipe_code: str | None,
     *,
+    pipe_code: str | None,
     bundle_path: Path | None,
     output_path: Path | None,
     library_dir: list[str] | None = None,
     template_format: InputsTemplateFormat = InputsTemplateFormat.JSON,
+    explicit: bool = False,
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_INPUTS}",
 ) -> None:
     """Synchronous entry point wrapping the async inputs generation with Pipelex setup/teardown."""
@@ -149,6 +151,7 @@ def execute_generate_inputs(
                     output_path=output_path,
                     library_dir=library_dir,
                     template_format=template_format,
+                    explicit=explicit,
                 )
             )
 

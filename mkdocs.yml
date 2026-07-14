@@ -271,6 +271,7 @@ plugins:
         - tools/cli/init.md: "CLI Init"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/validate.md: "CLI Validate"
+        - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
@@ -307,6 +308,7 @@ plugins:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
+        - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
@@ -326,6 +328,7 @@ plugins:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
         - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
+        - contribute/drift-contracts.md: "Drift Contracts"
         - changelog.md: "Changelog"
 
 markdown_extensions:
@@ -492,6 +495,7 @@ nav:
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
+      - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md
@@ -541,6 +545,7 @@ nav:
       - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
       - Build-time Elaboration: under-the-hood/build-time-elaboration.md
+      - Codegen Projections: under-the-hood/codegen-projections.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
@@ -560,6 +565,7 @@ nav:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Keyword-Only Arguments: contribute/keyword-only-arguments.md
+    - Drift Contracts: contribute/drift-contracts.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md

@@ -85,7 +85,7 @@ def _format_init_markdown(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _resolve_target_dir(global_: bool) -> Path:
+def _resolve_target_dir(*, global_: bool) -> Path:
     """Resolve the target directory for initialization.
 
     Args:
@@ -380,7 +380,7 @@ def agent_init_cmd(
         parsed_config = _parse_config_arg(config)
 
         # Resolve target directory
-        target_dir = _resolve_target_dir(global_)
+        target_dir = _resolve_target_dir(global_=global_)
 
         # Step 1: Copy config files (skips inference/ directory)
         config_files_copied = init_config(reset=True, target_dir=target_dir)

@@ -10,7 +10,7 @@ import pytest
 from pipelex.config import get_config
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
-from pipelex.graph.graphspec import GraphSpec, NodeStatus
+from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, NodeStatus
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_response import RunState
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -60,6 +60,8 @@ class TestLiftedChainDryLiveParity:
         dry_graph = dry_response.pipe_output.graph_spec
         assert live_graph is not None
         assert dry_graph is not None
+        assert live_graph.meta["mode"] == GraphSpecMode.LIVE
+        assert dry_graph.meta["mode"] == GraphSpecMode.DRY
         live_skips = _skipped_nodes(live_graph)
         dry_skips = _skipped_nodes(dry_graph)
         assert set(live_skips.keys()) == set(dry_skips.keys()) == {"opar_make_analysis", "opar_summarize"}

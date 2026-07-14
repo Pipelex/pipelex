@@ -1,3 +1,4 @@
+import keyword
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
@@ -47,6 +48,15 @@ class ConceptBlueprint(BaseModel):
         cls, structure: str | dict[str, ConceptStructureBlueprintType] | None
     ) -> str | dict[str, ConceptStructureBlueprintType] | None:
         if isinstance(structure, dict):
+            invalid_identifier_fields = [field_name for field_name in structure if not field_name.isidentifier() or keyword.iskeyword(field_name)]
+            if invalid_identifier_fields:
+                invalid_list = ", ".join(f"'{name}'" for name in sorted(invalid_identifier_fields))
+                msg = (
+                    "Concept structure field names must be valid Python identifiers and cannot be Python keywords. "
+                    f"Problematic fields: {invalid_list}."
+                )
+                raise ValueError(msg)
+
             # Check for reserved field names
             reserved_fields_used = [field_name for field_name in structure if field_name in RESERVED_FIELD_NAMES]
             if reserved_fields_used:

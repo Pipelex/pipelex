@@ -198,7 +198,7 @@ class RemoteConfigFetcher:
         return RemoteConfigUnavailableError(msg)
 
     @classmethod
-    def fetch_remote_config(cls, require_fresh: bool = False) -> RemoteConfigResult:
+    def fetch_remote_config(cls, *, require_fresh: bool = False) -> RemoteConfigResult:
         """Fetch the Pipelex Service remote configuration.
 
         Args:

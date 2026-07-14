@@ -6,7 +6,9 @@ import textwrap
 from typing import TYPE_CHECKING
 
 from pipelex.cli.dev_cli.commands.keyword_only_guard import (
+    SubjectGrant,
     Violation,
+    ViolationKind,
     find_violations_in_source,
     fix_all_violations,
     fix_source,
@@ -17,19 +19,31 @@ if TYPE_CHECKING:
 
 
 def _fix(
-    source: str, *, module_qname: str = "pipelex.sample.module", relative_path: str = "pipelex/sample/module.py"
+    source: str,
+    *,
+    module_qname: str = "pipelex.sample.module",
+    relative_path: str = "pipelex/sample/module.py",
+    grants: dict[str, SubjectGrant] | None = None,
 ) -> tuple[str, list[Violation], list[Violation]]:
     """Run the auto-fixer over an inline snippet, returning (new_source, fixed, unfixable)."""
-    return fix_source(textwrap.dedent(source), module_qname=module_qname, relative_path=relative_path)
+    return fix_source(textwrap.dedent(source), module_qname=module_qname, relative_path=relative_path, grants=grants or {})
+
+
+def _grant(key: str, *, param: str) -> dict[str, SubjectGrant]:
+    """A one-entry grants mapping for an inline snippet."""
+    return {key: SubjectGrant(param=param, rationale="test grant")}
 
 
 def _names(violations: list[Violation]) -> list[str]:
     return [violation.qualified_name for violation in violations]
 
 
-def _is_compliant(source: str) -> bool:
+def _is_compliant(source: str, *, grants: dict[str, SubjectGrant] | None = None) -> bool:
     """Whether a (rewritten) source has no remaining violations."""
-    return find_violations_in_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py") == []
+    violations = find_violations_in_source(
+        source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants=grants or {}
+    )
+    return violations == []
 
 
 class TestKeywordOnlyGuardFix:
@@ -132,26 +146,91 @@ class TestKeywordOnlyGuardFix:
         assert "def h(*, x, y, z):" in new_source
         assert _is_compliant(new_source)
 
-    def test_compliant_source_unchanged(self) -> None:
+    def test_compliant_source_with_grant_unchanged(self) -> None:
+        grants = _grant("pipelex/sample/module.py::g", param="subject")
         source = textwrap.dedent(
             """
             def g(subject, *, opt):
                 return opt
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(
+            source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants=grants
+        )
         assert (fixed, unfixable) == ([], [])
         assert new_source == source
 
-    def test_lone_subject_unchanged(self) -> None:
+    def test_granted_lone_subject_unchanged(self) -> None:
+        grants = _grant("pipelex/sample/module.py::render", param="node")
         source = textwrap.dedent(
             """
             def render(node):
                 return node
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(
+            source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants=grants
+        )
         assert (fixed, unfixable) == ([], [])
+        assert new_source == source
+
+    def test_ungranted_lone_subject_fixed_to_all_keyword(self) -> None:
+        """The fixer's reach covers the new violation kind: an ungranted subject is mechanically keyword-only'd."""
+        new_source, fixed, unfixable = _fix(
+            """
+            def render(node):
+                return node
+            """
+        )
+        assert _names(fixed) == ["render"]
+        assert fixed[0].kind is ViolationKind.UNGRANTED_SUBJECT
+        assert unfixable == []
+        assert "def render(*, node):" in new_source
+        assert _is_compliant(new_source)
+
+    def test_ungranted_literal_subject_fixed_to_all_keyword(self) -> None:
+        """A banned literal-typed subject is mechanically fixable too (call sites are pyright's job)."""
+        new_source, fixed, unfixable = _fix(
+            """
+            def do_doctor_cmd(fix: bool):
+                return fix
+            """
+        )
+        assert _names(fixed) == ["do_doctor_cmd"]
+        assert fixed[0].kind is ViolationKind.LITERAL_SUBJECT
+        assert unfixable == []
+        assert "def do_doctor_cmd(*, fix: bool):" in new_source
+        assert _is_compliant(new_source)
+
+    def test_ungranted_subject_with_keyword_only_section_needs_manual_fix(self) -> None:
+        """An ungranted subject ahead of an existing `*` can't take a second bare `*` — reported for a manual fix."""
+        source = textwrap.dedent(
+            """
+            def g(subject, *, opt):
+                return opt
+            """
+        )
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
+        assert fixed == []
+        assert _names(unfixable) == ["g"]
+        assert unfixable[0].kind is ViolationKind.UNGRANTED_SUBJECT
+        assert new_source == source
+
+    def test_grant_param_mismatch_never_rewritten(self) -> None:
+        """A stale grant is a registry decision, not a signature to silently rewrite — reported unfixable."""
+        grants = _grant("pipelex/sample/module.py::render", param="node")
+        source = textwrap.dedent(
+            """
+            def render(new_name):
+                return new_name
+            """
+        )
+        new_source, fixed, unfixable = fix_source(
+            source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants=grants
+        )
+        assert fixed == []
+        assert _names(unfixable) == ["render"]
+        assert unfixable[0].kind is ViolationKind.GRANT_PARAM_MISMATCH
         assert new_source == source
 
     def test_varargs_reported_unfixable_and_unchanged(self) -> None:
@@ -162,7 +241,7 @@ class TestKeywordOnlyGuardFix:
                 return a
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert fixed == []
         assert _names(unfixable) == ["f"]
         assert new_source == source
@@ -175,13 +254,17 @@ class TestKeywordOnlyGuardFix:
                 return a
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert fixed == []
         assert _names(unfixable) == ["f"]
         assert new_source == source
 
     def test_positional_only_subject_fixed_after_slash(self) -> None:
-        """A single positional-only subject (before `/`) stays positional; the `*` goes right after the `/`."""
+        """A single positional-only subject (before `/`) stays positional; the `*` goes right after the `/`.
+
+        The `/` means the subject cannot be keyword-only'd by the fixer, so the rewritten def still needs
+        a grant (or the `/` removed by hand) — the re-check flags exactly that residue.
+        """
         new_source, fixed, unfixable = _fix(
             """
             def f(a, /, b, c):
@@ -191,7 +274,8 @@ class TestKeywordOnlyGuardFix:
         assert _names(fixed) == ["f"]
         assert unfixable == []
         assert "def f(a, /, *, b, c):" in new_source
-        assert _is_compliant(new_source)
+        assert not _is_compliant(new_source)  # the positional-only subject is still ungranted
+        assert _is_compliant(new_source, grants=_grant("pipelex/sample/module.py::f", param="a"))
 
     def test_multiple_positional_only_reported_unfixable(self) -> None:
         """Two+ positional-only params can't be made keyword-only by a bare `*` (it can't precede `/`) — manual fix."""
@@ -201,7 +285,7 @@ class TestKeywordOnlyGuardFix:
                 return a
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert fixed == []
         assert _names(unfixable) == ["f"]
         assert new_source == source
@@ -226,7 +310,7 @@ class TestKeywordOnlyGuardFix:
                 ...
             """
         )
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert (fixed, unfixable) == ([], [])
         assert new_source == source
 
@@ -240,7 +324,7 @@ class TestKeywordOnlyGuardFix:
         """
         suppressed = "def suppressed(spec, dry_run):  # kw-only: ignore"
         source = f'BANNER = "page1\x0cpage2"\n{suppressed}\n    return spec\n\ndef real(alpha, beta):\n    return alpha\n'
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert _names(fixed) == ["real"]
         assert unfixable == []
         assert suppressed in new_source  # the escape-hatched def is untouched
@@ -257,7 +341,9 @@ class TestKeywordOnlyGuardFix:
         )
         assert _names(fixed) == ["f"]
         assert unfixable == []
-        twice, fixed_again, unfixable_again = fix_source(once, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        twice, fixed_again, unfixable_again = fix_source(
+            once, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={}
+        )
         assert (fixed_again, unfixable_again) == ([], [])
         assert twice == once
 
@@ -272,7 +358,7 @@ class TestKeywordOnlyGuardFix:
         """
         literal = '"""\naaaa\x0cbbbb\nxxxxxxxxxxxxxxxxxxxx"""'
         source = f"page = {literal}\ndef f(a, b):\n    return a\n"
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert _names(fixed) == ["f"]
         assert unfixable == []
         assert "def f(*, a, b):" in new_source
@@ -288,7 +374,7 @@ class TestKeywordOnlyGuardFix:
         touches — most dangerously by emitting bare ``\n`` where the source had ``\r\n``.
         """
         source = "X = 1\r\ndef f(a, b):\r\n    return a\r\n"
-        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py")
+        new_source, fixed, unfixable = fix_source(source, module_qname="pipelex.sample.module", relative_path="pipelex/sample/module.py", grants={})
         assert _names(fixed) == ["f"]
         assert unfixable == []
         # The `*` lands on the def line and every CRLF separator is preserved byte-for-byte.
@@ -303,11 +389,11 @@ class TestKeywordOnlyGuardFix:
         sample.mkdir(parents=True)
         bad = sample / "bad.py"
         good = sample / "good.py"
-        good_text = "def g(subject, *, opt):\n    return opt\n"
+        good_text = "def g(*, subject, opt):\n    return opt\n"
         bad.write_text("def f(a, b):\n    return a\n", encoding="utf-8")
         good.write_text(good_text, encoding="utf-8")
 
-        fixed, unfixable = fix_all_violations(tmp_path / "pipelex")
+        fixed, unfixable = fix_all_violations(tmp_path / "pipelex", grants={})
 
         assert _names(fixed) == ["f"]
         assert unfixable == []

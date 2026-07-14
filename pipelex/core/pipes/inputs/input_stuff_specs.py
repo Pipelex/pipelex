@@ -87,8 +87,8 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
 
     def add_stuff_spec(
         self,
-        variable_name: str,
         *,
+        variable_name: str,
         concept: Concept,
         multiplicity: VariableMultiplicity | None = None,
         presence: PresenceMarker = PresenceMarker.PLAIN,
@@ -159,7 +159,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
-    def format_for_display(self, indent: int = 6) -> str:
+    def format_for_display(self, *, indent: int = 6) -> str:
         """Format input stuff specs as a human-readable multi-line string.
 
         Args:
@@ -184,10 +184,10 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         """
         template: dict[str, Any] = {}
         for var_name, stuff_spec in self.root.items():
-            template[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+            template[var_name] = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
         return template
 
-    def render_inputs(self, indent: int = 2) -> str:
+    def render_inputs(self, *, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:

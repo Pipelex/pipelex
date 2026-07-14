@@ -231,7 +231,7 @@ class PipelexHub:
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
 
-    def set_dry_run_forced(self, is_forced: bool) -> None:
+    def set_dry_run_forced(self, *, is_forced: bool) -> None:
         self._is_dry_run_forced = is_forced
 
     def is_dry_run_forced(self) -> bool:
@@ -754,14 +754,15 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
-def get_pipe_source(pipe_code: str) -> Path | None:
-    """Get the source file path for a pipe.
+def get_pipe_source(pipe_code: str) -> str | None:
+    """Get the source identifier for a pipe.
 
     Args:
         pipe_code: The pipe code to look up.
 
     Returns:
-        Path to the .mthds file the pipe was loaded from, or None if unknown.
+        The source the pipe was loaded from — a filesystem path or a logical URI,
+        preserved verbatim — or None if unknown.
     """
     return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 

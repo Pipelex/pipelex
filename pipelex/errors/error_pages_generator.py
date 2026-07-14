@@ -251,8 +251,8 @@ def render_error_page(cls: type[PipelexError]) -> str:
 
 
 def generate_error_pages(
-    output_dir: Path,
     *,
+    output_dir: Path,
     classes: Iterable[type[PipelexError]] | None = None,
 ) -> ErrorPagesReport:
     """Write one markdown page per :class:`PipelexError` subclass into ``output_dir``.
@@ -308,7 +308,7 @@ def generate_error_pages(
     expected_stems: set[str] = {page_slug(cls) for cls in target_classes} | {INDEX_STEM}
     for cls in target_classes:
         target = output_dir / f"{page_slug(cls)}.md"
-        _commit_page(target, new_content=render_error_page(cls), report=report)
+        _commit_page(target=target, new_content=render_error_page(cls), report=report)
 
     # Macro listing pages — one per non-empty macro area. Their stems join
     # ``expected_stems`` so a macro that still has classes is never treated as an
@@ -316,14 +316,16 @@ def generate_error_pages(
     # falls through to ``_remove_orphans`` and is deleted like any stale page.
     by_subsystem = _group_by_subsystem(target_classes)
     for macro_slug, macro_heading in _MACRO_SECTIONS:
-        sections = _subsystems_for_macro(macro_slug, by_subsystem=by_subsystem)
+        sections = _subsystems_for_macro(macro_slug=macro_slug, by_subsystem=by_subsystem)
         if not sections:
             continue
-        _commit_page(output_dir / f"{macro_slug}.md", new_content=render_macro_page(macro_heading, sections=sections), report=report)
+        _commit_page(
+            target=output_dir / f"{macro_slug}.md", new_content=render_macro_page(macro_heading=macro_heading, sections=sections), report=report
+        )
         expected_stems.add(macro_slug)
 
     index_target = output_dir / f"{INDEX_STEM}.md"
-    _commit_page(index_target, new_content=render_index_page(by_subsystem), report=report)
+    _commit_page(target=index_target, new_content=render_index_page(by_subsystem), report=report)
 
     _remove_orphans(output_dir=output_dir, expected_stems=expected_stems, report=report)
 
@@ -352,7 +354,7 @@ def _remove_orphans(output_dir: Path, *, expected_stems: set[str], report: Error
         report.removed.append(path)
 
 
-def _commit_page(target: Path, *, new_content: str, report: ErrorPagesReport) -> None:
+def _commit_page(*, target: Path, new_content: str, report: ErrorPagesReport) -> None:
     """Apply the write / unchanged / preserved classification to one target path."""
     if target.exists():
         existing = target.read_text(encoding="utf-8")
@@ -445,8 +447,8 @@ def _group_by_subsystem(classes: Iterable[type[PipelexError]]) -> dict[str, list
 
 
 def _subsystems_for_macro(
-    macro_slug: str,
     *,
+    macro_slug: str,
     by_subsystem: dict[str, list[type[PipelexError]]],
 ) -> list[tuple[str, list[type[PipelexError]]]]:
     """Return the ``(heading, classes)`` subsystem sections that belong on a macro page.
@@ -469,7 +471,7 @@ def _subsystems_for_macro(
     return sections
 
 
-def render_macro_page(macro_heading: str, *, sections: list[tuple[str, list[type[PipelexError]]]]) -> str:
+def render_macro_page(*, macro_heading: str, sections: list[tuple[str, list[type[PipelexError]]]]) -> str:
     """Render one macro listing page: a ``## subsystem`` block per section, class links beneath.
 
     ``sections`` is the output of :func:`_subsystems_for_macro` — already ordered
@@ -530,7 +532,7 @@ def render_index_page(by_subsystem: dict[str, list[type[PipelexError]]]) -> str:
         "",
     ]
     for macro_slug, macro_heading in _MACRO_SECTIONS:
-        sections = _subsystems_for_macro(macro_slug, by_subsystem=by_subsystem)
+        sections = _subsystems_for_macro(macro_slug=macro_slug, by_subsystem=by_subsystem)
         if not sections:
             continue
         covered = ", ".join(heading for heading, _ in sections)

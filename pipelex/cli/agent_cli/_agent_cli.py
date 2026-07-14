@@ -12,8 +12,10 @@ from pipelex.cli.agent_cli.commands.accept_gateway_terms_cmd import agent_accept
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
+from pipelex.cli.agent_cli.commands.codegen.app import codegen_app
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
+from pipelex.cli.agent_cli.commands.fix.app import fix_app
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
 from pipelex.cli.agent_cli.commands.init_cmd import agent_init_cmd
 from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
@@ -35,9 +37,11 @@ class PipelexAgentCLI(TyperGroup):
             "init",
             "run",
             "validate",
+            "fix",
             "fmt",
             "lint",
             "inputs",
+            "codegen",
             "concept",
             "pipe",
             "models",
@@ -70,7 +74,7 @@ app = typer.Typer(
 )
 
 
-def version_callback(value: bool) -> None:
+def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
     """Print version and exit when --version is passed."""
     if value:
         package_version = get_package_version()
@@ -133,9 +137,11 @@ def app_callback(
 app.command(name="init", help="Initialize Pipelex configuration (non-interactive)")(agent_init_cmd)
 app.add_typer(run_app, name="run", help="Execute a pipeline and output JSON results")
 app.add_typer(validate_app, name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
+app.add_typer(fix_app, name="fix", help="Fix a bundle file or pipeline directory in place")
 app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)
 app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
 app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a pipe")
+app.add_typer(codegen_app, name="codegen", help="Project the crate into typed artifacts (types) and check drift offline (check)")
 app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
 app.command(name="models", help="List available model presets, aliases, and waterfalls")(agent_models_cmd)

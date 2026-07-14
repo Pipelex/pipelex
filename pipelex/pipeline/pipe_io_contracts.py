@@ -104,7 +104,7 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> dict[str, PipeIOCo
                     # Indexing (not .get with a default) is deliberate: a render-shape drift
                     # must surface as the structured error below, never ship a silently
                     # empty schema on the wire.
-                    json_schema = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)["content"]
+                    json_schema = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.SCHEMA)["content"]
                 except (ConceptValueError, KeyError, PydanticUserError, PydanticUndefinedAnnotation) as exc:
                     msg = (
                         f"Failed to render the JSON Schema for input '{var_name}' of pipe "

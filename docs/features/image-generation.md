@@ -15,17 +15,14 @@ PipeImgGen generates images from text prompts using state-of-the-art models. Gen
 
 Via **Pipelex Gateway**:
 
-- **GPT-Image-1.5** — OpenAI's latest image generation model
-- **GPT-Image-1** — OpenAI image generation
-- **GPT-Image-1-mini** — Smaller, faster variant for quick generations
-- **FLUX-2-pro** — Black Forest Labs' high-quality generation model
-- **Nano Banana / Nano Banana Pro / Nano Banana 2** — Google Gemini-based image generation
+- **GPT-Image-2 / GPT-Image-1.5 / GPT-Image-1 / GPT-Image-1-mini** — OpenAI image generation models
+- **Nano Banana / Nano Banana Pro / Nano Banana 2 / Nano Banana 2 Lite** — Google Gemini-based image generation
 
 Via **direct provider SDKs**:
 
 - **OpenAI** — Direct OpenAI API for GPT Image models
 - **Google Gemini** — Native Google image generation
-- **fal** — FLUX and other models via the fal platform
+- **fal** — FLUX models (Black Forest Labs) and others via the fal platform
 - **Hugging Face Inference** — Open-source models like qwen-image
 - **BlackboxAI** — Via completions-based image generation
 - **Azure REST** — Azure-hosted image generation

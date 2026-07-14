@@ -51,11 +51,11 @@ The schema is a plain `dict` — fully serializable, inspectable on the wire, an
 
 ### Schema-to-model reconstruction
 
-On the worker, `model_class_from_json_schema()` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
+On the worker, `SchemaToModelFactory.make_from_json_schema(schema, *, class_name)` (`pipelex/cogt/content_generation/schema_to_model_factory.py`) rebuilds a live Pydantic class from the embedded schema:
 
 ```python
-source_code = _generate_source_from_schema(schema)        # datamodel-code-generator
-reconstructed_class = _exec_and_extract_class(source_code, class_name)  # exec()
+source_code = cls._generate_source_from_schema(schema)        # datamodel-code-generator
+reconstructed_class = cls._exec_and_extract_class(source_code, class_name=class_name)  # exec()
 reconstructed_class.__kajson_class_source__ = source_code  # attached for downstream use
 ```
 
@@ -63,7 +63,7 @@ The reconstruction pipeline:
 
 1. **Generate** — `datamodel-code-generator` converts the JSON schema into Python source code defining a `BaseModel` subclass.
 2. **Execute** — `exec()` compiles the source in an isolated namespace and extracts the named class.
-3. **Cache** — A thread-safe SHA-256 hash cache (with double-check locking) avoids redundant generation for the same schema.
+3. **Cache** — A thread-safe SHA-256 hash cache is guarded by a single lock held across the entire check-then-generate sequence, not double-check locking: the lock is acquired once, the cache is checked, and — on a miss — generation and exec happen before the lock is released. This kills same-schema thundering herds (concurrent first-misses each paying a full codegen+exec round) at the cost of serializing cache hits on other schemas behind any in-flight miss, an acceptable trade-off given real workloads use a small bounded set of distinct schemas cached for the process lifetime.
 4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through the transport.
 
 !!! warning "Class name normalization"
@@ -137,7 +137,7 @@ async def generate_and_store_images(img_gen_assignment):
 ```
 
 !!! info "What crosses the boundary"
-    `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, `size`, `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
+    `ImageContent` carries `url` (storage URI), `public_url`, `mime_type`, paired `width`/`height`, and `caption` — but never raw bytes. The `url` can be an S3 URI, HTTP URL, or local file path depending on storage configuration.
 
 What gets stored vs. what crosses the boundary, by content type:
 

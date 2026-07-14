@@ -14,7 +14,6 @@ The Cogt configuration manages all cognitive tools in Pipelex, including LLM (La
 transport_max_retries = 2
 
 # Main Cogt configuration sections
-[cogt.inference_manager_config]
 [cogt.llm_config]
 [cogt.img_gen_config]
 [cogt.extract_config]
@@ -35,17 +34,6 @@ This is "Tier 1" of the retry model. It is wired uniformly into every inference 
 
 It is distinct from `llm_config.schema_reask_max_attempts`, which is `instructor`'s schema re-ask count for structured-output validation failures — a different concern.
 
-## Inference Manager Configuration
-
-Controls automatic setup of various cognitive tools:
-
-```toml
-[cogt.inference_manager_config]
-is_auto_setup_preset_llm = true
-is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_extract = true
-```
-
 ## LLM Configuration
 
 Configuration for all Language Model interactions:
@@ -53,7 +41,7 @@ Configuration for all Language Model interactions:
 ```toml
 [cogt.llm_config]
 default_max_images = 100  # Maximum number of images in prompts
-is_structure_prompt_enabled = false
+is_structure_prompt_enabled = true
 schema_reask_max_attempts = 3  # instructor schema re-ask attempts, between 1 and 10
 ```
 
@@ -80,19 +68,20 @@ aspect_ratio = "square"  # Options: square, landscape_4_3, landscape_3_2, landsc
 background = "auto"     # Options: transparent, opaque, auto
 # size is optional and has no default key: when unset, no size intent is sent and the provider's
 # default size applies (Gemini jobs omit image_size; OpenAI models use their fixed 1K-class preset
-# for the aspect ratio). Set it to a size tier ("1k", "2k", "4k") or an exact size like "2048x1152"
+# for the aspect ratio). Set it to a size tier ("0.5k", "1k", "2k", "4k") or an exact size like "2048x1152"
 # to apply a default size to every PipeImgGen that doesn't set its own. A tier default composes
 # with any aspect_ratio; an exact-size default implies its own ratio, so it is not applied to
 # pipes that explicitly set aspect_ratio (the pipe's ratio wins).
 quality = "low"        # Options: low, medium, high
-# nb_steps = 1          # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
-guidance_scale = 3.5    # Controls adherence to prompt
+nb_steps = 28           # Number of diffusion steps (28 is good for Flux, [1,2,4,8] for SDXL Lightning)
+guidance_scale = 2.5    # Controls adherence to prompt
 is_moderated = true    # Enable content moderation
 safety_tolerance = 5    # Safety level (1-6)
 is_raw = false         # Raw output mode
-output_format = "jpeg"  # Options: png, jpeg, webp
 seed = "auto"          # "auto" or specific integer
 ```
+
+Note: `output_format` is a per-job parameter (set on the pipe), not a valid key under `img_gen_param_defaults`.
 
 ### ImageGen Job Parameters
 
@@ -101,7 +90,7 @@ Image generation jobs support these parameters:
 - **Dimensions**:
 
     - `aspect_ratio`: Predefined ratios for image dimensions
-    - `size` (optional): Portable size intent — a size tier (`"1k"`, `"2k"`, `"4k"`) or an exact pixel size like `"2048x1152"`. Unset means the provider's default size. See [PipeImgGen — Image size and portability](../../building-methods/pipes/pipe-operators/PipeImgGen.md#image-size-and-portability)
+    - `size` (optional): Portable size intent — a size tier (`"0.5k"`, `"1k"`, `"2k"`, `"4k"`) or an exact pixel size like `"2048x1152"`. Unset means the provider's default size. See [PipeImgGen — Image size and portability](../../building-methods/pipes/pipe-operators/PipeImgGen.md#image-size-and-portability)
     - `background`: Background handling mode
 
 - **Quality Control**:
@@ -128,6 +117,7 @@ Configuration for Optical Character Recognition:
 ```toml
 [cogt.extract_config]
 default_page_views_dpi = 72
+```
 
 ## Unified Backend Integration
 
@@ -178,7 +168,6 @@ All model types support the same routing, aliasing, and preset systems.
 
 3. **General**:
 
-     - Enable auto-setup for easier initialization
      - Use platform preferences to ensure consistent model selection
      - Configure OCR handles based on your accuracy needs
 
@@ -188,14 +177,9 @@ All model types support the same routing, aliasing, and preset systems.
 [cogt]
 transport_max_retries = 2
 
-[cogt.inference_manager_config]
-is_auto_setup_preset_llm = true
-is_auto_setup_preset_img_gen = true
-is_auto_setup_preset_extract = true
-
 [cogt.llm_config]
 default_max_images = 100
-is_structure_prompt_enabled = false
+is_structure_prompt_enabled = true
 schema_reask_max_attempts = 3
 
 [cogt.img_gen_config.img_gen_job_config]
@@ -205,12 +189,11 @@ is_sync_mode = false
 aspect_ratio = "square"
 background = "auto"
 quality = "low"
-# nb_steps = 1
-guidance_scale = 3.5
+nb_steps = 28
+guidance_scale = 2.5
 is_moderated = true
 safety_tolerance = 5
 is_raw = false
-output_format = "jpeg"
 seed = "auto"
 
 [cogt.extract_config]

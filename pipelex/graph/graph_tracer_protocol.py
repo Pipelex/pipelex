@@ -4,7 +4,7 @@ from typing import Any, Protocol
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
 from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
@@ -18,8 +18,8 @@ class GraphTracerProtocol(Protocol):
 
     def setup(
         self,
-        graph_id: str,
         *,
+        graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -28,6 +28,7 @@ class GraphTracerProtocol(Protocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
@@ -43,6 +44,7 @@ class GraphTracerProtocol(Protocol):
                 Stamped onto the returned TraceContext so it is born with the correct flag.
             emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
                 Stamped onto the returned TraceContext so it is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
             Initial TraceContext to pass through JobMetadata.
@@ -185,8 +187,8 @@ class GraphTracerProtocol(Protocol):
 
     def register_controller_output(
         self,
-        node_id: str,
         *,
+        node_id: str,
         output_spec: IOSpec,
     ) -> None:
         """Register an additional output for a controller node.
@@ -202,8 +204,8 @@ class GraphTracerProtocol(Protocol):
 
     def register_batch_item_extraction(
         self,
-        list_stuff_code: str,
         *,
+        list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -221,8 +223,8 @@ class GraphTracerProtocol(Protocol):
 
     def register_batch_aggregation(
         self,
-        output_list_stuff_code: str,
         *,
+        output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -241,8 +243,8 @@ class GraphTracerProtocol(Protocol):
 
     def register_parallel_combine(
         self,
-        combined_stuff_code: str,
         *,
+        combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
     ) -> None:
@@ -260,8 +262,8 @@ class GraphTracerProtocol(Protocol):
 
     def register_execution_data(
         self,
-        node_id: str,
         *,
+        node_id: str,
         execution_data: dict[str, Any],
     ) -> None:
         """Register execution metadata for a node.
@@ -282,8 +284,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def setup(
         self,
-        graph_id: str,
         *,
+        graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -292,6 +294,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pipeline_run_id: str | None = None,
         emit_graph_events: bool = True,
         emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
     ) -> TraceContext:
         return TraceContext(
             graph_id=graph_id,
@@ -339,8 +342,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_execution_data(
         self,
-        node_id: str,
         *,
+        node_id: str,
         execution_data: dict[str, Any],
     ) -> None:
         pass
@@ -386,8 +389,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_controller_output(
         self,
-        node_id: str,
         *,
+        node_id: str,
         output_spec: IOSpec,
     ) -> None:
         pass
@@ -395,8 +398,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_batch_item_extraction(
         self,
-        list_stuff_code: str,
         *,
+        list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -406,8 +409,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_batch_aggregation(
         self,
-        output_list_stuff_code: str,
         *,
+        output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
@@ -417,8 +420,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_parallel_combine(
         self,
-        combined_stuff_code: str,
         *,
+        combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
     ) -> None:

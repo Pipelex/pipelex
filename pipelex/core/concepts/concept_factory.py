@@ -85,7 +85,7 @@ class DomainAndConceptCode(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def make(cls, concept_code: str, *, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
+    def make(cls, *, concept_code: str, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
             domain_code=domain_code,
@@ -145,6 +145,27 @@ class ConceptFactory:
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
                     description="A number",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.YES_NO:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="The answer to a yes/no question",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.DATE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A calendar date, optionally with a time of day — as precise as its source states.",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.TIME:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A time of day, optionally with a UTC offset — as precise as its source states.",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.PAGE:
@@ -344,8 +365,8 @@ class ConceptFactory:
     @classmethod
     def _handle_basic_blueprint(
         cls,
-        concept_code: str,
         *,
+        concept_code: str,
         domain_code: str,
         description: str,
     ) -> StructureNameAndRefine:

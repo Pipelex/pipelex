@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any
 
-from pipelex.core.pipes.inputs.input_renderer import render_inputs
+from pipelex.core.pipes.inputs.input_renderer import build_concept_comments, render_inputs
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.hub import (
     get_library_manager,
@@ -21,11 +21,12 @@ if TYPE_CHECKING:
 
 
 async def build_inputs_for_pipe(
-    pipe_code: str | None = None,
     *,
+    pipe_code: str | None = None,
     mthds_contents: list[str] | None = None,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
+    explicit: bool = False,
 ) -> dict[str, Any]:
     """Generate example input JSON for a pipe.
 
@@ -37,6 +38,7 @@ async def build_inputs_for_pipe(
         mthds_contents: List of raw .mthds contents to parse and load.
         bundle_path: Path to the bundle file (.mthds).
         library_dirs: List of library directories to search for pipe definitions.
+        explicit: When True, emit the ceremonial envelope form; when False (default), the light shape.
 
     Returns:
         Dictionary with inputs suitable for JSON serialization.
@@ -82,11 +84,15 @@ async def build_inputs_for_pipe(
         raise ValueError(msg)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    inputs_json_str = render_inputs(the_pipe, indent=2)
+    inputs_json_str = render_inputs(the_pipe, indent=2, explicit=explicit)
     inputs_dict = json.loads(inputs_json_str)
 
+    # concept_comments is internal plumbing for the light-TOML emitter (stripped before the JSON
+    # envelope is printed); it lets the agent-CLI TOML surface carry the same `# concept:` hints
+    # the human `build inputs --format toml` does.
     return {
         "success": True,
         "pipe_code": pipe_code,
         "inputs": inputs_dict,
+        "concept_comments": build_concept_comments(the_pipe.inputs),
     }

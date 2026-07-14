@@ -30,7 +30,7 @@ from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Python: run the bundle's main_pipe
 runner = PipelexMTHDSProtocol(
-    bundle_uri="path/to/my_bundle.mthds",
+    bundle_uris=["path/to/my_bundle.mthds"],
 )
 response = await runner.execute(
     inputs={...},
@@ -39,7 +39,7 @@ pipe_output = response.pipe_output
 
 # Python: run a specific pipe from the bundle
 runner = PipelexMTHDSProtocol(
-    bundle_uri="path/to/my_bundle.mthds",
+    bundle_uris=["path/to/my_bundle.mthds"],
 )
 response = await runner.execute(
     pipe_code="my_pipe",
@@ -81,7 +81,7 @@ Pipelex resolves library directories using this priority order (highest to lowes
 | **3 (Fallback)** | `PIPELEXPATH` environment variable | System-wide or shell session default |
 
 !!! info "Empty List is Valid"
-    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `mthds_content` directly without needing files from the filesystem.
+    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `mthds_contents` directly without needing files from the filesystem.
 
 ### Using the PIPELEXPATH Environment Variable
 
@@ -196,12 +196,12 @@ response2 = await runner2.execute(
 )
 pipe_output2 = response2.pipe_output
 
-# Disable directory loading (use only mthds_content)
+# Disable directory loading (use only mthds_contents)
 runner3 = PipelexMTHDSProtocol(
     library_dirs=[],  # Empty list disables directory-based loading
 )
 response3 = await runner3.execute(
-    mthds_content=my_mthds_string,
+    mthds_contents=[my_mthds_string],
     inputs={"input": "value"},
 )
 pipe_output3 = response3.pipe_output
@@ -273,7 +273,7 @@ pipe_output = response.pipe_output
 
 3. **Use per-call `library_dirs` for exceptions**: Override only when a specific execution needs different directories.
 
-4. **Use empty list `[]` for isolated execution**: When you want to execute only from `mthds_content` without loading any file-based definitions.
+4. **Use empty list `[]` for isolated execution**: When you want to execute only from `mthds_contents` without loading any file-based definitions.
 
 5. **Include structure class directories**: Remember that `library_dirs` must contain both `.mthds` files AND Python files defining `StructuredContent` classes.
 
@@ -281,7 +281,7 @@ pipe_output = response.pipe_output
 
 To improve performance and avoid loading unnecessary files, Pipelex automatically excludes common directories from discovery:
 
-- `.venv` - Virtual environments
+- `.venv`, `venv`, `env`, `virtualenv`, `.virtualenv` - Virtual environments
 - `.git` - Git repository data
 - `__pycache__` - Python bytecode cache
 - `.pytest_cache` - Pytest cache

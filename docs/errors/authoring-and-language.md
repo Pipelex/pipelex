@@ -21,12 +21,18 @@ own page. Classes are grouped by subsystem.
 - [`ConceptStringError`](concept-string-error.md) — Concept string
 - [`ConceptStructureGeneratorError`](concept-structure-generator-error.md) — Concept structure generator
 - [`ConceptStructureValidationError`](concept-structure-validation-error.md) — Concept structure validation
+- [`DateContentError`](date-content-error.md) — Date content
 - [`DomainCodeError`](domain-code-error.md) — Domain code
 - [`DomainFactoryError`](domain-factory-error.md) — Domain factory
+- [`ExplicitConceptIncompatibleError`](explicit-concept-incompatible-error.md) — Explicit concept incompatible
+- [`InputShapingError`](input-shaping-error.md) — Input shaping
 - [`InputStuffSpecNotFoundError`](input-stuff-spec-not-found-error.md) — Input stuff spec not found
 - [`InputStuffSpecsError`](input-stuff-specs-error.md) — Input stuff specs
 - [`InputStuffSpecsFactoryError`](input-stuff-specs-factory-error.md) — Input stuff specs factory
+- [`ListWhereSingularError`](list-where-singular-error.md) — List where singular
+- [`MultiplicityCountMismatchError`](multiplicity-count-mismatch-error.md) — Multiplicity count mismatch
 - [`NativeConceptDefinitionError`](native-concept-definition-error.md) — Native concept definition
+- [`NullInputError`](null-input-error.md) — Null input
 - [`OptionalValueAbsentError`](optional-value-absent-error.md) — Optional value absent
 - [`PipeFactoryError`](pipe-factory-error.md) — Pipe factory
 - [`PipeInputError`](pipe-input-error.md) — Pipe input
@@ -35,6 +41,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeRunInputsError`](pipe-run-inputs-error.md) — Pipe run inputs
 - [`PipelexInterpreterError`](pipelex-interpreter-error.md) — Pipelex interpreter
 - [`StructureClassError`](structure-class-error.md) — Structure class
+- [`StructureValidationError`](structure-validation-error.md) — Structure validation
 - [`StuffArtefactError`](stuff-artefact-error.md) — Stuff artefact
 - [`StuffArtefactReservedFieldError`](stuff-artefact-reserved-field-error.md) — Stuff artefact reserved field
 - [`StuffContentFactoryError`](stuff-content-factory-error.md) — Stuff content factory
@@ -44,6 +51,7 @@ own page. Classes are grouped by subsystem.
 - [`StuffFactoryError`](stuff-factory-error.md) — Stuff factory
 - [`StuffSpecError`](stuff-spec-error.md) — Stuff spec
 - [`StuffSpecFactoryError`](stuff-spec-factory-error.md) — Stuff spec factory
+- [`UnknownInputNameError`](unknown-input-name-error.md) — Unknown input name
 - [`WorkingMemoryConsistencyError`](working-memory-consistency-error.md) — Working memory consistency
 - [`WorkingMemoryError`](working-memory-error.md) — Working memory
 - [`WorkingMemoryFactoryError`](working-memory-factory-error.md) — Working memory factory
@@ -51,6 +59,7 @@ own page. Classes are grouped by subsystem.
 - [`WorkingMemoryStuffNotFoundError`](working-memory-stuff-not-found-error.md) — Working memory stuff not found
 - [`WorkingMemoryTypeError`](working-memory-type-error.md) — Working memory type
 - [`WorkingMemoryVariableError`](working-memory-variable-error.md) — Working memory variable
+- [`WrongScalarKindError`](wrong-scalar-kind-error.md) — Wrong scalar kind
 
 ## Pipe operators
 
@@ -94,6 +103,7 @@ own page. Classes are grouped by subsystem.
 
 - [`ConceptLibraryError`](concept-library-error.md) — Concept library
 - [`ConceptLoadingError`](concept-loading-error.md) — Concept loading
+- [`CrateNormalizationError`](crate-normalization-error.md) — Crate normalization error
 - [`DomainLibraryError`](domain-library-error.md) — Domain library
 - [`DomainLoadingError`](domain-loading-error.md) — Domain loading
 - [`LibraryError`](library-error.md) — Library error

@@ -72,8 +72,9 @@ class LibraryCrateFactory:
             else:
                 # Fold this file's domain metadata into the established blueprint: an omitted field
                 # defers to whichever same-domain file declared it, so the root's header wins over
-                # membership-only siblings regardless of load order. `main_pipe` is intentionally not
-                # merged — it is dropped when the runtime Domain is built, so first-write-wins is inert.
+                # membership-only siblings regardless of load order. `main_pipe` is crate metadata
+                # too: codegen consumers use it to select the default pipe, even though the runtime
+                # Domain currently drops it.
                 existing = domains[domain_code]
                 existing.description = (
                     merge_domain_metadata_field(
@@ -91,6 +92,13 @@ class LibraryCrateFactory:
                     established=existing.system_prompt,
                     incoming=blueprint.system_prompt,
                     show_values_on_conflict=False,
+                )
+                existing.main_pipe = merge_domain_metadata_field(
+                    domain_code=domain_code,
+                    field_label="main_pipe",
+                    established=existing.main_pipe,
+                    incoming=blueprint.main_pipe,
+                    show_values_on_conflict=True,
                 )
 
             # Concepts

@@ -22,9 +22,13 @@ Pre-built universal concepts available in every Pipelex project:
 - **Html** — HTML content
 - **TextAndImages** — Combined text and image content in a single structure
 - **Number** — Numeric value
+- **YesNo** — The answer to a yes/no question
+- **Date** — A calendar date, optionally with a time of day
+- **Time** — A time of day, optionally with a UTC offset
 - **Page** — A single page extracted from a document, with markdown text and optional images
 - **JSON** — Arbitrary JSON data
 - **SearchResult** — Web search result with source citations
+- **Composite** — A named composition of contents
 - **Anything** — Universal type that accepts any content
 
 ## Custom Concepts
@@ -33,7 +37,7 @@ Define your own concepts with natural language descriptions and optional structu
 
 ## Inline Structures
 
-Define structured fields directly in `.mthds` files without writing Python. Inline structures support typed fields (text, integer, boolean, number, list) and nested concepts for complex data shapes — making it possible to build fully structured methods without leaving the MTHDS language.
+Define structured fields directly in `.mthds` files without writing Python. Inline structures support typed fields (text, integer, boolean, number, date, datetime, time, list, dict) and nested concepts for complex data shapes — making it possible to build fully structured methods without leaving the MTHDS language.
 
 ## Python StructuredContent Classes
 

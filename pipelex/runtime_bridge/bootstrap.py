@@ -22,6 +22,7 @@ _boot_lock = threading.Lock()
 
 
 def ensure_pipelex_booted(
+    *,
     config_overrides: dict[str, Any] | None = None,
 ) -> None:
     """Boot Pipelex on first call; no-op if already initialized.

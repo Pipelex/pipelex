@@ -120,8 +120,8 @@ class BatchParams(BaseModel):
     @classmethod
     def make_batch_params(
         cls,
-        input_list_name: str,
         *,
+        input_list_name: str,
         input_item_name: str,
     ) -> BatchParams:
         return BatchParams(

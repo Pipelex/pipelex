@@ -130,7 +130,7 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml_path=backends_toml)
+        prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
         mock_prompt.assert_not_called()
@@ -152,7 +152,7 @@ class TestInitCredentials:
             return_value="sk-test-value",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml_path=backends_toml)
+        prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was written
         env_path = tmp_path / ".env"
@@ -182,7 +182,7 @@ class TestInitCredentials:
             return_value="",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml_path=backends_toml)
+        prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was NOT written (no values entered)
         env_path = tmp_path / ".env"
@@ -207,7 +207,7 @@ class TestInitCredentials:
             return_value="sk-new",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml_path=backends_toml)
+        prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         result = read_env_file(env_path)
         assert result["EXISTING_KEY"] == "existing_value"
@@ -226,5 +226,5 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, backends_toml_path=backends_toml)
+        prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
         mock_prompt.assert_not_called()

@@ -6,10 +6,10 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 Two independent options control the two output streams:
 
-- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `init`, `models`, `check-model`, `doctor`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
+- `--format markdown|json` — **success/useful output**. Defaults to markdown. Accepted by `run`, `validate`, `fix`, `init`, `models`, `check-model`, `doctor`, `codegen types`, `codegen check`. Goes to stdout. Threaded explicitly to `agent_success_formatted()` from each command function — no hidden state.
 - `--error-format markdown|json` — **error reporting** (stderr). Optional. When omitted, **inherits the value of `--format`**, so `--format json` still flips both as it did historically. Accepted by the same commands as `--format`.
 
-Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, log-level/runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
+Only the error format is backed by a module-level `ContextVar` in `agent_output.py` (`_agent_cli_error_format`). The reason: `agent_error()` is called from sites that don't see the Typer option — factory init failures (`agent_cli_factory.py`), the unknown-command handler in `PipelexAgentCLI.get_command`, runner validation in the app callback, and any future site in shared library/runtime code. The ContextVar lets all of them honor `--error-format` (or `--format`'s inherited value) for free. JSON is the default so errors raised before any command opts in stay machine-parseable.
 
 `concept`, `pipe`, `fmt`, `lint`, `accept-gateway-terms` are **always JSON / raw passthrough** — they have neither `--format` nor `--error-format`. Their errors keep flowing through the ContextVar's JSON default.
 
@@ -19,6 +19,7 @@ Markdown structure per command:
 
 - `run`: `# Pipeline run complete`, a `## Result` section (the rendered `main_stuff` markdown with `--with-memory`, otherwise the concept JSON in a fenced block), and output / graph file paths. Cost is machine-first: on the local runner, when costs are on (`--costs`, the default) and the run did reportable work (any tokens or any cost), a best-effort `cost_report` object (`{total_cost, by_model: [...]}`, real USD) rides the JSON `--with-memory` envelope — there is **no** Rich cost table on stderr (unlike the human `pipelex run` CLI). The markdown renderer ignores the `cost_report` key, so it is JSON-only. A free/zero-price model still reports its token usage (with `total_cost` 0). The `cost_report` is **absent** when the run did no reportable work (dry runs), when `--no-costs` is passed, on the API-runner path (which does not assemble local usage), or if cost-summary aggregation fails (caught and skipped so it never fails an otherwise-successful run) — so consumers must treat it as optional.
 - `validate`: `# Validation passed`, the bundle path when relevant, and a list of validated pipes with their status. Every entry in `validated_pipes` (markdown and JSON) identifies its pipe by the namespaced `pipe_ref` (`domain.code`) — the same unambiguous identity across `validate all`, `validate bundle`, and `validate pipe`, so the same pipe is never reported under two identifiers. `validate bundle`, `validate method`, and `validate all` carry `pending_signatures` — the library-wide list of pipes still declared as `PipeSignature` (unimplemented forward declarations), namespaced by `pipe_ref` — rendered as a "Pending signatures" section in markdown. They also carry a derived `is_runnable` boolean (`true` ⇔ `pending_signatures` is empty), and the markdown adds an explicit plain-English runnability verdict on those surfaces: a complete bundle/library states it is runnable, while one with pending signatures states it is NOT yet runnable immediately above the verbatim "Pending signatures" heading. These whole-bundle/whole-library surfaces are **strict by default**: they exit non-zero on `not is_runnable` unless `--allow-signatures` is passed (which both tolerates the placeholders for the exit code and mock-runs the signature pipes in the sweep). Single-pipe surfaces make no library-wide runnability claim and never gate the exit code on it: bare `validate pipe <code>` omits the key and emits no verdict, while `validate bundle`/`validate method` with `--pipe` still surface the library-wide `pending_signatures` for information but do not gate on it (the requested slice can be fully implemented even when unrelated placeholders remain elsewhere).
+- `fix`: `# Fix applied - bundle is valid` after one or more fixes, `# Bundle already valid` when the loop had nothing to apply, or `# Bundle valid but not runnable` when pending `PipeSignature` placeholders remain. The JSON success envelope carries `is_valid`, `bundle_path`, `iterations`, `fixes_applied`, `files_written`, `remaining_errors`, and, on successful validation, `pending_signatures` plus `is_runnable`. Whole-bundle fix runs are strict by default: they emit the success envelope but exit 1 on `not is_runnable` unless `--allow-signatures` is passed. A still-invalid verdict exits 1 via `FixBundleError` on stderr with the same structured result fields plus any `bail_reason`.
 - `init`: `# Pipelex initialized` with target directory, enabled backends, and routing profile.
 - error path: `# Error: <error_type>`, the message, the hint as a `> 💡` callout, and a `## Details` section. `error_source` (internal stack frames) is omitted from markdown — it remains in the JSON envelope (`--error-format json`) for programmatic consumers.
 
@@ -26,19 +27,17 @@ Markdown structure per command:
 
 The CLI is consumed by a set of Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
 
-- Skills repo: `../skills/skills/` (relative to project root)
-- Skills: `mthds-build`, `mthds-check`, `mthds-edit`, `mthds-explain`, `mthds-fix`, `mthds-inputs`, `mthds-install`, `mthds-pkg`, `mthds-run`
+- Skills location: `../mthds-plugins/mthds/skills/` (relative to project root) — one `mthds-*` directory per skill
 - Each skill is a `SKILL.md` with optional `references/` dir
-- Shared reference docs: `../skills/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`)
+- Shared reference docs: `../mthds-plugins/mthds/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`, …)
 
 When changing CLI command signatures, output schemas, or error types, check whether the affected skills need updating.
 
 ## Code Layout
 
 ```
-_agent_cli.py                  # Typer app setup, version callback
+_agent_cli.py                  # Typer app setup, version callback, PipelexAgentCLI(TyperGroup) — command registration, ordering
 commands/
-  _agent_cli.py                # PipelexAgentCLI(TyperGroup) — command registration, ordering
   agent_output.py              # agent_success(), agent_error(), error hints/domains
   agent_cli_factory.py         # make_pipelex_for_agent_cli() — init with JSON errors
   run/                         # run — execute pipeline (pipe|bundle|method subcommands)
@@ -56,12 +55,19 @@ commands/
     bundle_cmd.py              # validate bundle — validate bundle file/directory (+ --graph)
     method_cmd.py              # validate method — validate installed method
     _validate_core.py          # Shared validation logic
+  fix/                         # fix — deterministic in-place bundle fixes
+    app.py                     # fix_app Typer, subcommand registration
+    bundle_cmd.py              # fix bundle — run validate/fix/re-validate loop
   inputs/                      # inputs — generate example input JSON
     app.py                     # inputs_app Typer, subcommand registration
     pipe_cmd.py                # inputs pipe — inputs for a pipe by code
     bundle_cmd.py              # inputs bundle — inputs from bundle file/directory
     method_cmd.py              # inputs method — inputs for installed method
     _inputs_core.py            # Shared inputs logic
+  codegen/                     # codegen — crate projections + offline drift check
+    app.py                     # codegen_app Typer, subcommand registration
+    types_cmd.py               # codegen types — project the crate's concept set (stamped files + codegen.lock)
+    check_cmd.py               # codegen check — offline drift check (pure hashing, no Pipelex boot)
   fmt_cmd.py                   # fmt — format file via plxt passthrough
   lint_cmd.py                  # lint — lint file via plxt passthrough
   plxt_passthrough.py          # Shared helper for plxt subprocess delegation
@@ -77,12 +83,14 @@ commands/
 
 | Command | Does |
 |---------|------|
-| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
+| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing (via `primary_backend`), and gateway terms; telemetry is seeded from a template, not `--config`. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization (with `--graph-format` for the graph renderer). `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
+| `fix` | Applies deterministic safe fixes to a bundle file or directory (`fix bundle`) and re-validates until valid, out of fixes, or max iterations. Supports `--allow-signatures`, `--select`, `--ignore`, `--max-iterations`, and `-L/--library-dir`. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
 | `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates an example inputs template for a pipe/bundle/method (pipe\|bundle\|method subcommands). `--format json\|toml` (template serialization, default: json — NOT the markdown\|json pair); `toml` prints raw TOML to stdout |
+| `codegen` | Agent mirror of the bare `pipelex codegen` family (types\|check subcommands). `types --target <flavor>` resolves the closure into the normalized crate and writes stamped typed artifacts + `codegen.lock` (write-if-changed); `check` is the offline drift check (pure hashing, no Pipelex boot — exit 0 current, 1 drift as a structured `CodegenDriftError` with `drifts[]`, 2 no/unreadable lock). Both: `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value). |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Converts a JSON pipe spec into raw TOML (stdout). A spec with a `type` (via `--type` or a `type` key) is that concrete pipe; a **typeless** spec (no `type`) is a signature and renders a `[pipe.x]` section with no type line. An explicit `type = "PipeSignature"` is rejected with a migration error — `PipeSignature` is not a type. |
 | `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (success, default: markdown) + `--error-format markdown\|json` (errors, defaults to `--format`'s value) |
@@ -91,7 +99,7 @@ commands/
 
 ## Key Patterns
 
-- **Output contract**: Commands with `--format` emit success via `agent_success_formatted(result, markdown_renderer, output_format)` — JSON or a markdown renderer per the explicit `output_format` argument. `agent_error(message, error_type, cause)` dispatches JSON or markdown by reading the `_agent_cli_error_format` ContextVar, which each `--format`-aware command sets via `set_agent_cli_error_format(error_format or output_format)` at function entry. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML). Markdown renderers: `format_run_markdown` (`run/_output_helpers.py`), `format_validate_markdown` (lifted to the non-CLI `pipelex/pipeline/validation_render.py` so `pipelex-api` can import it without CLI/Typer deps), `_format_init_markdown` (`init_cmd.py`).
+- **Output contract**: Commands with `--format` emit success via `agent_success_formatted(result, markdown_renderer, output_format)` — JSON or a markdown renderer per the explicit `output_format` argument. `agent_error(message, error_type, cause)` dispatches JSON or markdown by reading the `_agent_cli_error_format` ContextVar, which each `--format`-aware command sets via `set_agent_cli_error_format(error_format or output_format)` at function entry. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML). Markdown renderers: `format_run_markdown` (`run/_output_helpers.py`), `format_validate_markdown` (lifted to the non-CLI `pipelex/pipeline/validation_render.py` so `pipelex-api` can import it without CLI/Typer deps), `format_fix_markdown` (non-CLI `pipelex/pipeline/fixes/fix_render.py`), `_format_init_markdown` (`init_cmd.py`).
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`. The `error_domain` also drives the HTTP-status mapping for downstream APIs — see `error_domain_to_http_status()` in `pipelex/base_exceptions.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.

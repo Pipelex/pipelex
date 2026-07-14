@@ -35,8 +35,8 @@ class ImageRenderable(Protocol):
 
     def render_with_images(
         self,
-        registry: ImageRegistry,
         *,
+        registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
         """Render to string, registering images to the registry.
