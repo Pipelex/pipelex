@@ -24,6 +24,10 @@ class TestPythonPydanticEmitter:
         assert "from typing import Optional" not in content
         assert "from typing import List" not in content
 
+    def test_class_docstrings_are_triple_quoted(self, pipeline_crate: LibraryCrate):
+        content = emit_python_pydantic(resolve_concepts_from_crate(pipeline_crate))[0].content
+        assert '"""A report with a score and a label"""' in content
+
     def test_generated_module_compiles_and_validates(self, pipeline_crate: LibraryCrate, tmp_path: Path):
         content = emit_python_pydantic(resolve_concepts_from_crate(pipeline_crate))[0].content
         module = load_generated_module(content, tmp_path=tmp_path, name="gen_models")

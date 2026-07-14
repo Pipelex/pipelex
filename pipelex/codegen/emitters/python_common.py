@@ -71,12 +71,16 @@ def format_default_value(value: Any) -> str:
 
 
 def class_docstring(description: str, *, extra_line: str | None = None, indent: str = "    ") -> str:
-    """Render a class docstring; append `extra_line` (e.g. an imprecision caveat) on its own line."""
+    """Render a triple-quoted class docstring; append `extra_line` (e.g. an imprecision caveat) on its own line.
+
+    The body goes through `escape_py_string`, which escapes every `"` (and backslashes, newlines, control
+    chars), so a hostile description can never form a bare `\"\"\"` and break out of the docstring.
+    """
     text = description or ""
     if extra_line:
-        body = f"{text}\n\n{indent}{extra_line}" if text else extra_line
-        return f"{indent}{escape_py_string(body)}"
-    return f"{indent}{escape_py_string(text)}"
+        text = f"{text}\n\n{indent}{extra_line}" if text else extra_line
+    quoted = escape_py_string(text)
+    return f'{indent}"""{quoted[1:-1]}"""'
 
 
 def field_line(field: ResolvedField, *, annotation: str) -> str:
