@@ -262,15 +262,27 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        function = func_registry.get_required_function(self.function_name)
         log.info(
             f"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function \
             but only validating the inputs and return type."
         )
-        return_type = get_type_hints(function).get("return")
-        if return_type is None:
-            msg = f"Dry run of {self.type} '{self.code}' failed: The return type of the function is None. It should be a subclass of StuffContent."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+        # Sandbox-hosted mode: the customer function is not registered in THIS process (its source only
+        # travels on the crate to the sandbox), so its return type cannot be inspected here. Build the
+        # mock output from the DECLARED output concept's structure class instead — mirroring PipeLLM's
+        # dry run — and let the sandbox validate the real function's return type when it registers it.
+        function = None if is_pipe_func_sandbox_hosted() else func_registry.get_required_function(self.function_name)
+        return_type: type[StuffContent]
+        if function is None:
+            return_type = get_class_registry().get_required_subclass(
+                name=self.output.concept.structure_class_name,
+                base_class=StuffContent,
+            )
+        else:
+            hinted_return_type = get_type_hints(function).get("return")
+            if hinted_return_type is None:
+                msg = f"Dry run of {self.type} '{self.code}' failed: function return type is None; it must be a subclass of StuffContent."
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            return_type = hinted_return_type
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
         stuff_spec = TypedNamedStuffSpec(
