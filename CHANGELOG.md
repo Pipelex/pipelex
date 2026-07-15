@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.39.1] - 2026-07-15
+
+### Changed
+
+- Bumped the `pipelex-tools-py` runtime dependency to `>=0.1.3` and the `pipelex-tools` dev dependency to `>=0.7.2`, picking up the latest MTHDS schema updates for `plxt` formatting and linting.
+
 ## [v0.39.0] - 2026-07-14
 
 ### Highlights
