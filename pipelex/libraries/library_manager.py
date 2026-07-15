@@ -326,43 +326,49 @@ class LibraryManager(LibraryManagerAbstract):
                     valid_mthds_paths.append(mthds_path)
                     seen_absolute_paths.add(absolute_path)
 
-        # Import modules and register in global registries
-        # Import from user directories
-        is_sandbox_hosted = is_pipe_func_sandbox_hosted()
-        for library_dir in all_dirs:
-            # Only import files that contain StructuredContent subclasses (uses AST pre-check).
-            # Kept in hosted mode too: concepts declared as `structure = "ClassName"` resolve that
-            # class from the registry at load time, so the structure classes must be present. These
-            # are pydantic data classes, not the arbitrary PipeFunc bodies the hosted invariant guards.
-            ClassRegistryUtils.import_modules_in_folder(
-                folder_path=library_dir,
-                base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[Path(builder_pkg.__file__).parent],
-            )
-            if is_sandbox_hosted:
-                # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
-                # process. Capture every .py as source text (no import) so it can travel to the
-                # sandbox, where it is registered and executed instead. Accumulate across dirs, but
-                # fail loud on a relpath collision: the sandbox writes sources flat by relpath, so two
-                # dirs sharing a path would otherwise silently clobber one customer's code and run the
-                # wrong PipeFunc body.
-                captured_sources = self._library_sources.setdefault(library_id, {})
-                for relpath, source in FuncRegistryUtils.read_py_sources(folder_path=library_dir).items():
-                    if relpath in captured_sources and captured_sources[relpath] != source:
-                        msg = (
-                            f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "
-                            f"'{library_id}'. Sandbox sources are keyed by relative path, so two dirs sharing a path "
-                            f"would clobber each other — give them distinct relative paths."
-                        )
-                        raise LibraryError(msg)
-                    captured_sources[relpath] = source
-            else:
-                # Local/direct mode (unchanged): import files that contain @pipe_func decorated
-                # functions (uses AST pre-check) and register them in the process-global func_registry.
-                FuncRegistryUtils.register_funcs_in_folder(
+            # Import modules and register in global registries
+            # Import from user directories
+            is_sandbox_hosted = is_pipe_func_sandbox_hosted()
+            for library_dir in all_dirs:
+                # Only import files that contain StructuredContent subclasses (uses AST pre-check).
+                # Kept in hosted mode too: concepts declared as `structure = "ClassName"` resolve that
+                # class from the registry at load time, so the structure classes must be present. These
+                # are pydantic data classes, not the arbitrary PipeFunc bodies the hosted invariant guards.
+                ClassRegistryUtils.import_modules_in_folder(
                     folder_path=library_dir,
+                    base_class_names=[StructuredContent.__name__],
                     force_include_dirs=[Path(builder_pkg.__file__).parent],
                 )
+                if is_sandbox_hosted:
+                    # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
+                    # process. Capture every .py as source text (no import) so it can travel to the
+                    # sandbox, where it is registered and executed instead. Accumulate across dirs, but
+                    # fail loud on a relpath collision: the sandbox writes sources flat by relpath, so two
+                    # dirs sharing a path would otherwise silently clobber one customer's code and run the
+                    # wrong PipeFunc body.
+                    captured_sources = self._library_sources.setdefault(library_id, {})
+                    for relpath, source in FuncRegistryUtils.read_py_sources(folder_path=library_dir).items():
+                        if relpath in captured_sources and captured_sources[relpath] != source:
+                            msg = (
+                                f"Duplicate PipeFunc source path '{relpath}' across library dirs while loading library "
+                                f"'{library_id}'. Sandbox sources are keyed by relative path, so two dirs sharing a path "
+                                f"would clobber each other — give them distinct relative paths."
+                            )
+                            raise LibraryError(msg)
+                        captured_sources[relpath] = source
+                else:
+                    # Local/direct mode (unchanged): import files that contain @pipe_func decorated
+                    # functions (uses AST pre-check) and register them in the process-global func_registry.
+                    FuncRegistryUtils.register_funcs_in_folder(
+                        folder_path=library_dir,
+                        force_include_dirs=[Path(builder_pkg.__file__).parent],
+                    )
+
+            # Auto-discover and register all StructuredContent classes from sys.modules
+            num_registered = ClassRegistryUtils.auto_register_all_subclasses(
+                base_class=StructuredContent,
+            )
+            log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
             # Load MTHDS files into the specific library
             log.verbose(f"Loading MTHDS files from: {[str(p) for p in valid_mthds_paths]}")
@@ -387,21 +393,25 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded, or empty list if already loaded
         """
-        # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
-        # workflow, which never populates _blueprints). This lets get_crate() hand the crate — with
-        # its python_sources — to the sandbox executor. The blueprint-derived path (load_libraries ->
-        # load_from_blueprints) leaves _blueprints populated and rebuilds from it instead, so it must
-        # NOT be shadowed by a cached crate here.
-        if library_id not in self._blueprints:
-            self._crate_cache[library_id] = crate
+        # Bind the target library as current for the whole load: PipeFactory and the concept
+        # factories resolve concepts and the class registry through the ambient current library,
+        # so a load into a non-current library must not read the caller's binding.
+        with scoped_current_library(library_id=library_id):
+            # Cache the crate for a DIRECT crate-load (the transported-crate path used by the Temporal
+            # workflow, which never populates _blueprints). This lets get_crate() hand the crate — with
+            # its python_sources — to the sandbox executor. The blueprint-derived path (load_libraries ->
+            # load_from_blueprints) leaves _blueprints populated and rebuilds from it instead, so it must
+            # NOT be shadowed by a cached crate here.
+            if library_id not in self._blueprints:
+                self._crate_cache[library_id] = crate
 
-        # Fingerprint idempotency: skip if this crate was already loaded into this library
-        fingerprint = crate.fingerprint
-        loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
-        if fingerprint in loaded_set:
-            log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
-            return []
-        library = self.get_library(library_id=library_id)
+            # Fingerprint idempotency: skip if this crate was already loaded into this library
+            fingerprint = crate.fingerprint
+            loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
+            if fingerprint in loaded_set:
+                log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
+                return []
+            library = self.get_library(library_id=library_id)
 
             # Load domains from crate metadata
             all_domains: list[Domain] = []

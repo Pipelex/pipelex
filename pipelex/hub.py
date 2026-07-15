@@ -241,7 +241,7 @@ class PipelexHub:
     def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
         self._pipe_func_executor = pipe_func_executor
 
-    def set_dry_run_forced(self, is_forced: bool) -> None:
+    def set_dry_run_forced(self, *, is_forced: bool) -> None:
         self._is_dry_run_forced = is_forced
 
     def is_dry_run_forced(self) -> bool:
