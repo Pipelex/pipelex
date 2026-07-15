@@ -454,7 +454,7 @@ class TestIncludeOptionalParameter:
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
         assert isinstance(result, dict)
         assert "url" in result
-        assert result["url"].startswith("https://mock-")
+        assert result["url"] == "https://mock.invalid/url"
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
@@ -465,7 +465,7 @@ class TestIncludeOptionalParameter:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
         assert isinstance(result, str)
-        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock-')
+        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock.invalid/url"')
         assert result.endswith('")')
 
     def test_includes_optional_fields_by_default(self) -> None:
@@ -500,7 +500,7 @@ class TestIncludeOptionalParameter:
         result = generator.generate_class_representation(ImageContent, include_optional=False)
         assert isinstance(result, dict)
         assert "url" in result
-        assert result["url"].startswith("https://mock-")
+        assert result["url"] == "https://mock.invalid/url"
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result

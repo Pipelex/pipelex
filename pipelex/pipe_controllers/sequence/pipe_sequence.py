@@ -9,7 +9,8 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
@@ -67,11 +68,36 @@ class PipeSequence(PipeController):
         The output of the pipe sequence should match the output of the last step,
         both in terms of concept compatibility and multiplicity.
         """
-        last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
+        last_sub_pipe = self.sequential_sub_pipes[-1]
+        last_step_pipe_code = last_sub_pipe.pipe_code
         # Skip output validation if the last step is an unresolved cross-package ref
         if QualifiedRef.has_cross_package_prefix(last_step_pipe_code) and get_optional_pipe(pipe_code=last_step_pipe_code) is None:
             return
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
+
+        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
+        if not effective_last_step_output_multiplicity:
+            effective_last_step_output_multiplicity = last_step_pipe.output.multiplicity
+
+        taint_analysis = self.analyze_taint()
+
+        # The last step's effective output in bundle representation — what the sequence's declared
+        # output should be. This is the enriched semantic fact the fix planner needs, rendered the
+        # way an author in the sequence's domain would write it, with the effective multiplicity
+        # (sub-pipe override wins) and boundary presence. A singular sequence boundary remains
+        # optional when its declaration, last step, or taint propagation says it may be absent.
+        # Plural outputs must stay plain because the grammar forbids combining multiplicity with
+        # a presence marker and represents an absent plural result as an empty list.
+        expected_output_presence = PresenceMarker.PLAIN
+        if effective_last_step_output_multiplicity is None and (
+            self.output.presence.is_optional or last_step_pipe.output.presence.is_optional or taint_analysis.output_taint is not None
+        ):
+            expected_output_presence = PresenceMarker.OPTIONAL
+        expected_output_ref = StuffSpec(
+            concept=last_step_pipe.output.concept,
+            multiplicity=effective_last_step_output_multiplicity,
+            presence=expected_output_presence,
+        ).to_bundle_representation(relative_to_domain=self.domain_code)
 
         # Check concept compatibility
         if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):
@@ -87,23 +113,19 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
+                expected_output_ref=expected_output_ref,
             )
-
-        last_sub_pipe = self.sequential_sub_pipes[-1]
-        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
-        if not effective_last_step_output_multiplicity:
-            effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
 
         # Check multiplicity compatibility
         if not is_multiplicity_compatible(
             source_multiplicity=effective_last_step_output_multiplicity,
             target_multiplicity=self.output.multiplicity,
         ):
+            declared_output_ref = self.output.to_bundle_representation(relative_to_domain=self.domain_code)
             msg = (
-                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
-                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
-                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible. "
-                "Update one of them to match the other."
+                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares its output as "
+                f"'{declared_output_ref}', but its last step '{last_step_pipe.code}' yields '{expected_output_ref}'. "
+                f"Update the sequence's output to '{expected_output_ref}' (or change the last step)."
             )
             raise PipeValidationError(
                 message=msg,
@@ -112,11 +134,11 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=last_step_pipe.output.concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
+                expected_output_ref=expected_output_ref,
             )
 
         # The absence-taint boundary check (D6): a maybe-absent slot ending the sequence must be
         # matched by an optional (`?`) declared output, or the taint silently escapes the boundary.
-        taint_analysis = self.analyze_taint()
         if taint_analysis.output_taint is not None and not self.output.presence.is_optional:
             msg = (
                 f"PipeSequence '{self.code}' output '{self.output.concept.concept_ref}' may resolve absent at run time, "
@@ -259,7 +281,7 @@ class PipeSequence(PipeController):
         )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
@@ -282,7 +304,7 @@ class PipeSequence(PipeController):
             else:
                 sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
             # Use the centralized recursion detection
-            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
+            sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
             if isinstance(sub_pipe, PipeParallel) and sub_pipe.add_each_output:
                 for sub_parallel_pipe in sub_pipe.parallel_sub_pipes:
@@ -311,13 +333,16 @@ class PipeSequence(PipeController):
                     for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
                             needed_inputs.add_stuff_spec(
-                                input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                                variable_name=input_name,
+                                concept=stuff_spec.concept,
+                                multiplicity=stuff_spec.multiplicity,
+                                presence=stuff_spec.presence,
                             )
             else:
                 for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
                         needed_inputs.add_stuff_spec(
-                            input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+                            variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
                         )
 
             # Add this step's output to generated outputs
@@ -360,7 +385,7 @@ class PipeSequence(PipeController):
         execution_data_dict: dict[str, Any] = {
             "step_count": len(self.sequential_sub_pipes),
         }
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=evolving_memory,
@@ -387,12 +412,12 @@ class PipeSequence(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

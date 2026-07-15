@@ -19,18 +19,18 @@ class TestFindDefaultInputsFile:
         json_file = tmp_path / "inputs.json"
         json_file.write_text("{}", encoding="utf-8")
 
-        assert find_default_inputs_file(tmp_path) == json_file
+        assert find_default_inputs_file(directory=tmp_path) == json_file
 
     def test_toml_only_is_found(self, tmp_path: Path) -> None:
         """With only inputs.toml present, the probe returns it."""
         toml_file = tmp_path / "inputs.toml"
         toml_file.write_text("", encoding="utf-8")
 
-        assert find_default_inputs_file(tmp_path) == toml_file
+        assert find_default_inputs_file(directory=tmp_path) == toml_file
 
     def test_neither_returns_none(self, tmp_path: Path) -> None:
         """With neither default file present, the probe returns None."""
-        assert find_default_inputs_file(tmp_path) is None
+        assert find_default_inputs_file(directory=tmp_path) is None
 
     def test_both_present_raises_ambiguity_error(self, tmp_path: Path) -> None:
         """With both default files present, the probe hard-errors telling the user to pass --inputs."""
@@ -38,7 +38,7 @@ class TestFindDefaultInputsFile:
         (tmp_path / "inputs.toml").write_text("", encoding="utf-8")
 
         with pytest.raises(AmbiguousInputsFilesError) as exc_info:
-            find_default_inputs_file(tmp_path)
+            find_default_inputs_file(directory=tmp_path)
         assert "--inputs" in exc_info.value.message
         assert "inputs.json" in exc_info.value.message
         assert "inputs.toml" in exc_info.value.message

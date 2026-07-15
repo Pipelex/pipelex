@@ -32,6 +32,7 @@ Here are all the native concepts you can use out of the box:
 | `Number` | A number | `NumberContent` |
 | `YesNo` | The answer to a yes/no question | `YesNoContent` |
 | `Date` | A calendar date, optionally with a time of day | `DateContent` |
+| `Time` | A time of day, optionally with a UTC offset | `TimeContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
@@ -62,16 +63,25 @@ Represents an image with optional metadata:
 ```python
 class ImageContent(StuffContent):
     url: str
-    source_prompt: Optional[str] = None
-    caption: Optional[str] = None
-    base_64: Optional[str] = None
+    public_url: str | None = None
+    source_prompt: str | None = None
+    source_negative_prompt: str | None = None
+    caption: str | None = None
+    mime_type: str | None = None
+    width: int | None = None
+    height: int | None = None
+    filename: str | None = None
 ```
 
 **Fields:**
-- `url`: Location of the image (file path or URL)
-- `source_prompt`: The prompt used to generate the image (if applicable)
+
+- `url`: Location of the image (a storage URI, an HTTP(S) URL, or a base64 data URL)
+- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
+- `source_prompt` / `source_negative_prompt`: The prompts used to generate the image (if applicable)
 - `caption`: Descriptive text for the image
-- `base_64`: Base64-encoded image data (alternative to URL)
+- `mime_type`: Optional MIME type of the image
+- `width` / `height`: Pixel dimensions — present together or not at all
+- `filename`: Optional original filename
 
 **Use for:** Photos, generated images, diagrams, screenshots.
 
@@ -157,6 +167,19 @@ prompt = "Extract the scheduled departure from this ticket: $ticket"
 ```
 
 As a pipeline input, a top-level TOML date or datetime literal maps to `Date` directly (`departure = 2026-07-07T15:40:00+02:00`); read it from a Python caller via `pipe_output.main_stuff_as_date`.
+
+### TimeContent
+
+Represents a time of day, as precise as its source states — never attached to an invented date:
+
+```python
+class TimeContent(StuffContent):
+    time: datetime.time
+```
+
+The UTC offset is kept on the `time` when the source states one, exactly as `Date` handles its optional time. It renders as ISO 8601 (`15:40:00`, or `15:40:00+02:00`) when injected into a prompt. As a pipeline input, a top-level TOML time-of-day literal maps to `Time` directly (`opening = 09:00:00`).
+
+**Use for:** Opening hours, schedules, times of day with no specific date.
 
 **Use for:** Issue dates, due dates, dates of birth, departures, effective/termination dates — any date found on a document. For a date value without any date attached (a bare time of day), degrade to `Text`.
 
@@ -281,7 +304,11 @@ type = "PipeLLM"
 description = "Analyze a document"
 inputs = { document = "Document" }
 output = "Text"
-prompt = "Analyze this document and provide a summary"
+prompt = """
+Analyze this document and provide a summary:
+
+@document
+"""
 ```
 
 ### In Pipe Outputs
@@ -292,7 +319,7 @@ type = "PipeLLM"
 description = "Describe an image"
 inputs = { photo = "Image" }
 output = "Text"
-prompt = "Describe what you see in this image"
+prompt = "Describe what you see in this image: $photo"
 ```
 
 ### With Page Content
@@ -304,7 +331,7 @@ The `Page` concept is particularly useful with `PipeExtract`:
 type = "PipeExtract"
 description = "Extract content from a document"
 inputs = { document = "Document" }
-output = "Page"
+output = "Page[]"
 ```
 
 This extracts each page with both its text/images and a visual representation.
@@ -356,7 +383,11 @@ type = "PipeLLM"
 description = "Summarize any text"
 inputs = { content = "Text" }
 output = "Text"
-prompt = "Summarize this content: @content"
+prompt = """
+Summarize this content:
+
+@content
+"""
 ```
 
 ### Document Extraction
@@ -368,10 +399,10 @@ description = "Extract content from a document"
 inputs = { document = "Document" }
 output = "Page[]"
 
-[pipe.analyze_page]
+[pipe.analyze_pages]
 type = "PipeLLM"
-description = "Analyze a page"
-inputs = { page = "Page[]" }
+description = "Analyze pages"
+inputs = { pages = "Page[]" }
 output = "Text"
 prompt = """Analyze those pages: 
 @pages
@@ -396,9 +427,11 @@ type = "PipeLLM"
 description = "Analyze image with text context"
 inputs = { image = "Image", context = "Text" }
 output = "Text"
-prompt = "Given this context: $context
+prompt = """
+Given this context: $context
 
-Analyze this image: $image"
+Analyze this image: $image
+"""
 ```
 
 ### Web Search

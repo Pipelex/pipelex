@@ -9,7 +9,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format generate-mthds-schema lint pyright mypy check-keyword-only)
    ```
 
    This runs multiple code quality tools:
@@ -22,14 +22,15 @@
 
 ### Keyword-only arguments check
 
-   Non-subject function parameters across `pipelex/` source must be keyword-only (a bare `*` after the subject). The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+   Non-subject function parameters across `pipelex/` source must be keyword-only, and a positional subject is legal only under a grant recorded in `subject_grants.toml`. The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
 
    ```bash
    make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
    make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"   # alias: make sgr — grant a positional subject
    ```
 
-   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can (including ungranted subjects — grant BEFORE running checks if the subject should stay positional) and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
 
 ### Cleaning Derived Files
 
@@ -48,12 +49,12 @@
    ```bash
    make agent-test
    # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
-   # Zero output on success; full output on failure.
+   # Heartbeat progress lines while running; full output only on failure.
    ```
 
 ### When `make agent-test` hangs or fails opaquely
 
-   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure or timeout it prints the failed tests, the log path, and a grep hint.
+   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure it prints the failed tests, the log path, and a grep hint; on timeout, the tail of the log and the log path.
 
    For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
 
@@ -77,7 +78,7 @@
    # or
    make tp TEST=test_function_name
    ```
-   Note: Matches names starting with the provided string.
+   Note: Matches names containing the provided string (pytest `-k` substring matching).
 
 ### Running Last Failed Tests
 
@@ -136,6 +137,13 @@
      .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3 --elkjs-version 0.11.1
      ```
 
+   - **`drift`**: Drift contracts — deterministic review obligations between code and docs, declared in the root `drift.toml` (see `docs/contribute/drift-contracts.md`). When `make drift-check` (part of `make check` and CI) reports an open contract: run `make drift-plan` to see what changed and what to review, actually review the targets and fix what is stale, `git add` the trigger files (the digest reads the git index, not the working tree), then record the review with `make drift-ack CONTRACT=<id> RATIONALE="…"`. The rationale is the on-the-record review decision — write an honest sentence. There is no bypass flag; "reviewed, no doc change needed" is a legitimate rationale.
+
+     ```bash
+     make drift-plan
+     make drift-ack CONTRACT=config-docs RATIONALE="Documented the new setting; other config pages unaffected."
+     ```
+
 ## Standards related to developing the Pipelex codebase
 
 ### Spec vs Blueprint Architecture
@@ -157,14 +165,16 @@ When adding validation or fields, decide which layer they belong to. Language ru
 
 ### Keyword-only arguments
 
-Non-subject function parameters across `pipelex/` source must be **keyword-only**, so call sites are self-documenting: `do_thing(retries=3, timeout=30)` over the opaque `do_thing(3, 30)`. The compliant shape places a bare `*` after the subject:
+Non-subject function parameters across `pipelex/` source must be **keyword-only**, so call sites are self-documenting: `do_thing(retries=3, timeout=30)` over the opaque `do_thing(3, 30)`. The compliant shapes:
 
-- `def f(subject, *, opt1, opt2): ...` — the first non-`self`/`cls` parameter (the subject) may stay positional; everything after it must be keyword-only. Making the subject keyword-only too (`def f(*, a, b)`) is always allowed and often preferable.
-- A lone subject (`def render(node)`) is compliant; a second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is a violation.
+- `def f(*, opt1, opt2): ...` — fully keyword-only. Always compliant, needs nothing.
+- `def f(subject, *, opt1, opt2): ...` — a positional subject (including a lone one, `def render(node)`) is legal ONLY under a **subject grant** recorded in `subject_grants.toml` at the repo root: `make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"` (alias `sgr`). Grant when the call reads as a verb–object sentence with a single obvious operand; when in doubt, go keyword-only.
+- A second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is always a violation, grant or not.
+- A `bool`/`int`/`float` subject (incl. `Optional`/union-with-`None` forms) is banned outright — grants are impossible; `f(True)` call sites are never acceptable.
 
-The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation. Carve-outs (dunders, pydantic validators/serializers, Typer/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net.
+The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation, and staleness is symmetric (a grant whose def was renamed, moved, demoted, or deleted fails the check until the registry is cleaned up). Carve-outs (dunders, pydantic validators/serializers, Typer/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net. ⚠ `make agent-check` runs the auto-fixer, which will silently keyword-only an ungranted subject — record the grant BEFORE running checks if the subject should stay positional.
 
-The full specification — the two exceptions, the carve-out list, the symmetric-tuple allowlist, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
+The full specification — the grant registry and rubric, the symmetric-tuple allowlist, the carve-out list, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
 
 ## Writing Docs
 

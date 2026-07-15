@@ -33,7 +33,7 @@ One job type deliberately opts out of this fan-out: a **validation sweep** submi
 
 ## The Matrix
 
-All cells below describe **pipeline runs** — `pipelex run ...` or `PipelexRunner.execute_pipeline()`. Validation sweeps have their own distribution shape, covered in the next section.
+All cells below describe **pipeline runs** — `pipelex run ...` or `PipelexMTHDSProtocol.execute()`. Validation sweeps have their own distribution shape, covered in the next section.
 
 | Run mode \ Backend | Direct (in-process) | Temporal |
 |---|---|---|
@@ -57,14 +57,15 @@ pipelex run bundle my_bundle.mthds --orchestrator temporal --dry-run --mock-inpu
 From Python, the same knobs live on the runner — the backend comes from config:
 
 ```python
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pathlib import Path
 
-runner = PipelexRunner(
-    bundle_uri="path/to/my_bundle.mthds",
-    pipe_run_mode=PipeRunMode.DRY,
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
+
+runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY)
+response = await runner.execute(
+    mthds_contents=[Path("path/to/my_bundle.mthds").read_text(encoding="utf-8")],
 )
-response = await runner.execute_pipeline()
 ```
 
 ## Validation Sweeps

@@ -25,7 +25,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Pipe Operators](pipe-operators.md)**
 
-    The workers that do the actual processing: PipeLLM, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
+    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
 
 -   **[Pipeline Orchestration](pipeline-orchestration.md)**
 

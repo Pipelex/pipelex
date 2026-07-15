@@ -65,7 +65,7 @@ class TestRenderOutputAnythingFormats:
                 "content": {"text": "summary text"},
             }
         }
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.JSON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.JSON)
 
     def test_anything_python_renders_option_lines(self, mocker: MockerFixture) -> None:
         """PYTHON format lists each possible output as a commented option with an output_N assignment."""
@@ -84,7 +84,7 @@ class TestRenderOutputAnythingFormats:
         assert result_lines[1] == "# The actual output will be one of the following:"
         assert "# Option 1: test.Summary" in result_lines
         assert 'output_1 = SummaryContent(text="hello")' in result_lines
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.PYTHON)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.PYTHON)
 
     def test_anything_schema_renders_schema_options(self, mocker: MockerFixture) -> None:
         """SCHEMA format wraps each possible output under a schema_option_N key with concept and content."""
@@ -106,4 +106,4 @@ class TestRenderOutputAnythingFormats:
                 "content": schema_content,
             }
         }
-        mapped_pipe.output.render_stuff_spec.assert_called_once_with(ConceptRepresentationFormat.SCHEMA)
+        mapped_pipe.output.render_stuff_spec.assert_called_once_with(output_format=ConceptRepresentationFormat.SCHEMA)

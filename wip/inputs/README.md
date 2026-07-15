@@ -37,6 +37,10 @@ Each deferred note was re-verified against the landed shaper and given an outcom
 - **Decided leave-it** — `d4-hint-still-envelope.md` (the D4 error hint keeps rendering the envelope shape; option 1, it is a valid unambiguous fallback and making it light is a layer/cycle refactor unjustified by a fallback string).
 - **Still out of scope (structure-field codegen / URI-tools / release-wave authoring)** — `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md` (both structure-field codegen, untouched by Smart Inputs), `uri-scheme-classification-stopgap.md` (a `tools/uri` `resolve_uri` refactor; no live bug, tested), `refines-hint-native-list-drift.md` (the release-wave authoring-guidance sweep).
 
+## Open regression — `envelope-chaining-vs-d8.md` (2026-07-14)
+
+Unlike the notes above, this one is **not a tradeoff — it is a live regression that v0.39.0 ships**, found by Codex on the release PR #1048 and knowingly deferred out of the release. D8 makes the agent CLI reject its own `--with-memory` output: the stdin envelope carries every `working_memory.root` entry, so chaining into a downstream pipe that declares only a subset now dies with `UnknownInputNameError`. It worked in v0.38.0 (no name check existed), and the chained `run … --with-memory | run …` pattern is taught in the shipped `mthds-plugins` skills. The note carries the repro, the three fix options (recommended: an ignore-extras policy for envelope-derived inputs only, threaded like `inputs_base_dir`), and the open `--runner api` parity question. **Pick this up first when the inputs track reopens.**
+
 ## Documents
 
 **Design (source of truth for decisions):**
@@ -55,3 +59,5 @@ Each deferred note was re-verified against the landed shaper and given an outcom
 - `yesno-pr-reviewers-guide.md` — the former YesNo PR reading guide. Historical.
 
 **Deferred design notes** (triage outcomes above): `case1-bare-date-arm-gap.md`, `bare-file-path-cli-resolution-gap.md`, `scalar-envelope-arm-asymmetry.md`, `loader-vs-factory-date-split-duplication.md`, `input-shaper-multiplicity-gaps.md`, `d4-hint-still-envelope.md`, `container-default-temporal-codegen-gap.md`, `structure-field-fidelity-guard.md`, `uri-scheme-classification-stopgap.md`, `refines-hint-native-list-drift.md`.
+
+**Open regression** (section above): `envelope-chaining-vs-d8.md` — the one item here that is a bug rather than a tradeoff.

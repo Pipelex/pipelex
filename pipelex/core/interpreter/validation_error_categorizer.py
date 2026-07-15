@@ -5,6 +5,8 @@ from pydantic_core import ErrorDetails
 
 from pipelex import log
 from pipelex.core.bundles.exceptions import (
+    InvalidPipeCodeSyntaxError,
+    NativeConceptRedeclarationError,
     PipelexBundleBlueprintValidationErrorData,
 )
 from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
@@ -13,6 +15,8 @@ from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validatio
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
+PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD = "main_pipe"
+PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD = "pipe"
 
 # Distinctive fragments of the two type-tag errors raised by the `pipe` before-validators (via
 # `normalize_typeless_signature_section` in `pipe_blueprint.py`, shared by the blueprint and spec
@@ -22,6 +26,70 @@ PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
 # recoverable from the message. See `_categorize_typeless_pipe_error`.
 _MISSING_PIPE_TYPE_MARKER = "has no `type` but declares"
 _EXPLICIT_SIGNATURE_TAG_MARKER = "is no longer a pipe type"
+
+
+def _extract_wrapped_native_concept_redeclaration_error(error: ErrorDetails) -> NativeConceptRedeclarationError | None:
+    """Extract a ``NativeConceptRedeclarationError`` wrapped by pydantic, or ``None``.
+
+    ``validate_concept_keys`` raises it (a ``ValueError`` subclass) from a ``mode="before"``
+    field validator, so pydantic reports a ``value_error`` and keeps the original in
+    ``ctx["error"]`` — the same wrapping ``extract_wrapped_pipe_validation_error`` unwraps for
+    pipe errors. Structural, never message-matched: the offending ``concept_code`` rides the
+    exception itself.
+    """
+    if error["type"] != "value_error":
+        return None
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        original_error = ctx.get("error")
+        if isinstance(original_error, NativeConceptRedeclarationError):
+            return original_error
+    return None
+
+
+def _extract_wrapped_invalid_pipe_code_syntax_error(error: ErrorDetails) -> InvalidPipeCodeSyntaxError | None:
+    """Extract an ``InvalidPipeCodeSyntaxError`` wrapped by pydantic, or ``None``.
+
+    Raised (a ``ValueError`` subclass) from the ``main_pipe`` / ``pipe`` ``mode="before"`` field
+    validators only when the over-qualified code is safely strippable, so pydantic reports a
+    ``value_error`` and keeps the original in ``ctx["error"]`` — the same wrapping the native-concept
+    and pipe-error unwraps rely on. Structural, never message-matched: the offending + stripped codes
+    ride the exception itself.
+    """
+    if error["type"] != "value_error":
+        return None
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        original_error = ctx.get("error")
+        if isinstance(original_error, InvalidPipeCodeSyntaxError):
+            return original_error
+    return None
+
+
+def _main_pipe_strip_is_safe(*, offending_code: str, stripped_code: str, blueprint_dict: dict[str, Any]) -> bool:
+    """Whether stripping ``main_pipe`` is provably safe at the document level.
+
+    The ``main_pipe`` raise site runs before the ``pipe`` field validates, so it cannot see the
+    declarations — this categorizer can (it holds the raw bundle dict), making it the document-level
+    gate the raise site cannot be. The strip is safe iff EXACTLY ONE of the two codes exists as a
+    declaration key:
+
+    - Only the bare tail exists: ``main_pipe`` is an over-qualified *reference* (a same-domain
+      qualified ref resolves to the bare pipe), so stripping just normalizes the spelling.
+    - Only the dotted code exists: its paired strip-namespace rename will materialize the bare
+      target, so the strip converges with it (the loop's cross-file collision split still drops
+      the pair together when a sibling file blocks the rename).
+    - Both exist: the dotted declaration's own rename is collision-blocked, and stripping
+      ``main_pipe`` would silently retarget it from the dotted declaration the author referenced
+      to the unrelated bare one — suppressed, ambiguity left to a human.
+    - Neither exists (typo'd tail): stripping would rewrite ``main_pipe`` to a pipe that does not
+      exist — a SAFE-labeled fix mutating the file while the bundle stays invalid — suppressed.
+    """
+    raw_pipe = blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_PIPE_FIELD)
+    if not isinstance(raw_pipe, dict):
+        return False
+    pipe_keys = {key for key in cast("dict[Any, Any]", raw_pipe) if isinstance(key, str)}
+    return (offending_code in pipe_keys) != (stripped_code in pipe_keys)
 
 
 def _extract_variable_names_from_message(message: str) -> list[str] | None:
@@ -274,6 +342,52 @@ def categorize_blueprint_validation_error(
             pipe_code=wrapped_pipe_error.pipe_code or pipe_code,
             message=wrapped_pipe_error.explanation or str(wrapped_pipe_error),
             variable_names=wrapped_pipe_error.variable_names,
+        )
+
+    # A native-concept redeclaration: ``validate_concept_keys`` raised a typed ``ValueError``
+    # carrying the offending code (which the pydantic ``loc`` — ``("concept",)`` — cannot). Recover
+    # it structurally so the fix planner can strip exactly that concept key.
+    wrapped_native_redeclaration = _extract_wrapped_native_concept_redeclaration_error(error)
+    if wrapped_native_redeclaration is not None:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION,
+            domain_code=domain,
+            source=source,
+            concept_code=wrapped_native_redeclaration.concept_code,
+            # The exception's own clean message, not the pydantic ``msg`` (which carries a
+            # "Value error, " prefix) — same choice as the wrapped-pipe-error path above.
+            message=str(wrapped_native_redeclaration),
+        )
+
+    # A strippable same-domain over-qualified pipe code: ``validate_pipe_keys`` /
+    # ``validate_main_pipe_syntax`` raised a typed ``ValueError`` carrying the stripped bare code
+    # (which the message text and pydantic ``loc`` — ``("pipe",)`` / ``("main_pipe",)`` — cannot).
+    # ``pipe_code`` discriminates the two raise sites for the planner: the offending dotted code for
+    # a declaration-key rename, ``None`` for a ``main_pipe`` value strip (loc's first element names
+    # the field). The bare ``ValueError`` path (malformed codes, cross-package refs) still falls
+    # through to the message-matching ``_categorize_syntax_validation_error`` → unfixable.
+    #
+    # The ``main_pipe`` raise site cannot see the declarations (the ``pipe`` field validates after
+    # it), so the safety gate lives here, on the raw bundle dict: a strip that would retarget
+    # ``main_pipe`` to a different declaration, or rewrite it to a pipe that does not exist,
+    # keeps its category but loses the enrichment → no fix is planned.
+    wrapped_invalid_pipe_code = _extract_wrapped_invalid_pipe_code_syntax_error(error)
+    if wrapped_invalid_pipe_code is not None:
+        is_main_pipe = bool(loc) and loc[0] == PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD
+        stripped_pipe_code: str | None = wrapped_invalid_pipe_code.stripped_code
+        if is_main_pipe and not _main_pipe_strip_is_safe(
+            offending_code=wrapped_invalid_pipe_code.offending_code,
+            stripped_code=wrapped_invalid_pipe_code.stripped_code,
+            blueprint_dict=blueprint_dict,
+        ):
+            stripped_pipe_code = None
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+            domain_code=domain,
+            source=source,
+            pipe_code=None if is_main_pipe else wrapped_invalid_pipe_code.offending_code,
+            stripped_pipe_code=stripped_pipe_code,
+            message=str(wrapped_invalid_pipe_code),
         )
 
     error_scope = get_error_scope(loc)

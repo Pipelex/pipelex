@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import cast
 
 import pytest
@@ -414,6 +414,24 @@ class TypeMappingTest(StructuredContent):
         assert 'recorded_at: datetime = Field(..., description="Record timestamp")' in result
         assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["recorded_at"]["format"] == "date-time"
 
+    def test_time_field_maps_to_time_of_day(self):
+        """`type = "time"` generates a `datetime.time` field that survives exec-validation.
+
+        Regression: `_validate_execution`'s exec_globals seeded `date`/`datetime` but not `time`,
+        so any bundle with a `time` field crashed library loading with `NameError: name 'time'`.
+        """
+        structure_blueprint = {
+            "issued_at": ConceptStructureBlueprint(description="Issue time", type=ConceptStructureBlueprintFieldType.TIME, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TimeFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import time" in result
+        assert 'issued_at: time = Field(..., description="Issue time")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["issued_at"]["format"] == "time"
+
     def test_date_field_with_default_round_trips(self):
         """A `type = "date"` field with a date default generates code that evaluates.
 
@@ -448,6 +466,22 @@ class TypeMappingTest(StructuredContent):
 
         assert "datetime.datetime(" not in result
         assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
+
+    def test_time_field_with_default_round_trips(self):
+        """A `type = "time"` default evaluates through the same bare-class import as its annotation."""
+        time_default = time(9, 30, 15)
+        structure_blueprint = {
+            "starts_at": ConceptStructureBlueprint(
+                description="Start time", type=ConceptStructureBlueprintFieldType.TIME, default_value=time_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.time(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["starts_at"].default == time_default
 
     def test_list_of_date_field_maps_to_list_of_calendar_date(self):
         """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""

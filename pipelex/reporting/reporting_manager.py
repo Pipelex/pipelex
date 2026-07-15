@@ -71,8 +71,8 @@ class ReportingManager(ReportingProtocol):
     @override
     def set_event_log(
         self,
-        context_key: str,
         *,
+        context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
@@ -102,7 +102,7 @@ class ReportingManager(ReportingProtocol):
         )
 
     @override
-    def clear_event_log(self, context_key: str) -> None:
+    def clear_event_log(self, *, context_key: str) -> None:
         """Remove event log configuration for a completed workflow/run."""
         self._event_log_contexts.pop(context_key, None)
 
@@ -199,7 +199,7 @@ class ReportingManager(ReportingProtocol):
         if not is_in_isolated_execution():
             context = self._event_log_contexts.get(trace_context.lookup_key)
             if context is not None:
-                self._emit_via_registered_context(context, trace_context=trace_context, tokens_usage=tokens_usage)
+                self._emit_via_registered_context(context=context, trace_context=trace_context, tokens_usage=tokens_usage)
                 return
 
         self._emit_usage_event_runner_fallback(
@@ -210,8 +210,8 @@ class ReportingManager(ReportingProtocol):
 
     @staticmethod
     def _emit_via_registered_context(
-        context: _EventLogContext,
         *,
+        context: _EventLogContext,
         trace_context: TraceContext,
         tokens_usage: AnyTokensUsage,
     ) -> None:

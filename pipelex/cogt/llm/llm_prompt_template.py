@@ -57,8 +57,8 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
 
     async def _make_llm_prompt(
         self,
-        system_text: str | None = None,
         *,
+        system_text: str | None = None,
         user_text: str | None = None,
         user_images: list[PromptImage] | None = None,
         is_user_images_append: bool | None = None,

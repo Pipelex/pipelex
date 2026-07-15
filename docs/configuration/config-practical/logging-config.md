@@ -114,7 +114,7 @@ is_link_path_enabled = true
 
 ```toml
 highlighter_name = "json"  # or "repr"
-is_markup_enabled = false
+is_markup_enabled = true
 ```
 
 - `highlighter_name`: Choose between JSON or repr highlighting
@@ -168,7 +168,7 @@ is_show_time = false
 is_show_level = true
 is_link_path_enabled = true
 highlighter_name = "json"
-is_markup_enabled = false
+is_markup_enabled = true
 is_rich_tracebacks = true
 is_tracebacks_word_wrap = true
 is_tracebacks_show_locals = false

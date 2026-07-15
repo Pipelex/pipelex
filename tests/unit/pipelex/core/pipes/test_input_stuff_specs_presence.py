@@ -47,7 +47,7 @@ class TestInputStuffSpecsPresence:
 
     def test_add_stuff_spec_carries_presence(self):
         specs = InputStuffSpecs(root={})
-        specs.add_stuff_spec("maybe_var", concept=_text_concept(), presence=PresenceMarker.OPTIONAL)
+        specs.add_stuff_spec(variable_name="maybe_var", concept=_text_concept(), presence=PresenceMarker.OPTIONAL)
         assert specs.root["maybe_var"].presence == PresenceMarker.OPTIONAL
 
     def test_root_validator_preserves_presence(self):

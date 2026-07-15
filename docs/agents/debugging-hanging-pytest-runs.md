@@ -11,7 +11,7 @@
 
 ## The anti-patterns (concrete, in order)
 
-1. **`make agent-test` is silent on success.** Backgrounding it and waiting for a harness notification gives no progress signal — the output file can stay 0 bytes for many minutes. → No way to tell hung from slow.
+1. **`make agent-test` shows liveness, not progress.** Its heartbeat lines (`• agent-test still running (Ns elapsed)`) only prove the process is alive — pytest's own output is buffered to a temp file and shown only on failure, so a hung run looks identical to a slow one. → No way to tell hung from slow.
 
 2. **`-q` buffers harder.** It holds output until session-end. Use `-v` for debug runs.
 

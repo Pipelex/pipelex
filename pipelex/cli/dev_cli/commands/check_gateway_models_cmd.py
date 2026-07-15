@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def check_gateway_models_cmd(show_diff: bool = True, *, quiet: bool = False) -> None:
+def check_gateway_models_cmd(*, show_diff: bool = True, quiet: bool = False) -> None:
     """Verify that the Pipelex Gateway models reference files are up-to-date.
 
     Compares the existing reference files — both the .pipelex/ copies and the

@@ -41,8 +41,8 @@ class InstalledMethod(BaseModel):
 
 
 def discover_installed_methods(
-    include_global: bool = True,
     *,
+    include_global: bool = True,
     include_project: bool = True,
     extra_search_dirs: list[Path] | None = None,
 ) -> list[InstalledMethod]:

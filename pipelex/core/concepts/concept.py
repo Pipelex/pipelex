@@ -196,12 +196,15 @@ class Concept(ConceptAbstract):
         *,
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
+        class_name_overrides: dict[str, str] | None = None,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.
 
         Args:
             output_format: The format to generate (JSON, PYTHON, or SCHEMA)
             is_multiple: If True, wrap content in a list/array schema
+            class_name_overrides: Optional runtime-class-name -> rendered-name mapping applied to
+                Python instantiation code and imports (see ConceptRepresentationGenerator)
 
         Returns:
             Tuple of (representation dict, imports_needed set)
@@ -213,7 +216,7 @@ class Concept(ConceptAbstract):
             case ConceptRepresentationFormat.SCHEMA:
                 return self._render_schema_representation(is_multiple=is_multiple)
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
-                generator = ConceptRepresentationGenerator(output_format)
+                generator = ConceptRepresentationGenerator(output_format, class_name_overrides=class_name_overrides)
                 # For inputs, we only want required fields (not optional ones)
                 result = generator.generate_representation(self.concept_ref, structure_class=self.get_structure_class(), include_optional=False)
 
@@ -224,7 +227,7 @@ class Concept(ConceptAbstract):
 
                 return result, generator.imports_needed
 
-    def _render_schema_representation(self, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+    def _render_schema_representation(self, *, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
         """Render JSON Schema for this concept.
 
         Args:

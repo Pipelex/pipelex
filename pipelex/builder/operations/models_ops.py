@@ -183,8 +183,8 @@ def _build_waterfalls_for_category(
 
 
 def list_models(
-    categories: list[ModelCategory] | None = None,
     *,
+    categories: list[ModelCategory] | None = None,
     backend: str | None = None,
 ) -> dict[str, Any]:
     """List available model presets, aliases, and waterfalls.

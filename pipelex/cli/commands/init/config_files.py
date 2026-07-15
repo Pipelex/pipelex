@@ -17,7 +17,7 @@ INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_F
 INIT_SKIP_DIRS: frozenset[str] = frozenset({"inference"})
 
 
-def init_config(reset: bool = False, *, dry_run: bool = False, target_dir: Path | None = None) -> int:
+def init_config(*, reset: bool = False, dry_run: bool = False, target_dir: Path | None = None) -> int:
     """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
 
     Args:

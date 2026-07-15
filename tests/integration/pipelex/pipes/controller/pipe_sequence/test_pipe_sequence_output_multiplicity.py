@@ -67,8 +67,15 @@ class TestPipeSequenceOutputMultiplicity:
         with pytest.raises(PipeValidationError) as exc_info:
             sequence_pipe.validate_with_libraries()
 
-        error_message = str(exc_info.value).lower()
+        error_str = str(exc_info.value)
+        error_message = error_str.lower()
         assert "multiplicity" in error_message, f"Error should mention multiplicity mismatch, got: {exc_info.value}"
+        # The message must speak author syntax (Text vs Text[3]) and name the concrete fix, never the
+        # internal repr (`multiplicity=None/True`).
+        assert "multiplicity=" not in error_str, f"Message leaks internal repr: {error_str}"
+        assert "declares its output as 'Text'" in error_str, error_str
+        assert "yields 'Text[3]'" in error_str, error_str
+        assert "Update the sequence's output to 'Text[3]'" in error_str, error_str
 
     def test_no_multiplicity_matching_passes(
         self,

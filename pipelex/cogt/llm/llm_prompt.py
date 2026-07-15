@@ -51,7 +51,7 @@ class LLMPrompt(BaseModel):
     def __format__(self, format_spec: str) -> str:
         return self.desc()
 
-    def desc(self, truncate_text_length: int | None = None) -> str:
+    def desc(self, *, truncate_text_length: int | None = None) -> str:
         description = "LLM Prompt:"
         if truncate_text_length:
             if self.system_text:

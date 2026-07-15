@@ -42,7 +42,7 @@ Built-in emoji indicators for different components:
 - 🌀 Google-related logs
 - ⚡️ Network connections
 - *️⃣ JSON processing
-- 🧿 Sandbox operations
+- 🧿 Poor-log channel (`#poor-log`, the simplified fallback logger)
 
 ### 3. Caller Information
 
@@ -68,7 +68,7 @@ Smart routing of log messages:
 
 - Automatic detection of log origin
 - Separate handlers for different logging needs
-- Sandbox-aware logging behavior
+- Configurable rich or poor log modes
 - Support for poor loggers (simplified logging)
 
 ## Using the Logger
@@ -96,7 +96,7 @@ log.warning("API rate limit approaching", problem_id="rate_limit_warning")
 log.error("Failed to process", include_exception=True)
 
 # Development logging
-log.verbose("Testing new feature")
+log.dev("Testing new feature")
 
 # Verbose logging
 log.verbose("Detailed debug information")

@@ -16,6 +16,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
@@ -29,6 +30,7 @@ class NativeConceptCode(StrEnum):
     NUMBER = "Number"
     YES_NO = "YesNo"
     DATE = "Date"
+    TIME = "Time"
     PAGE = "Page"
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
@@ -55,6 +57,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
                 | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
@@ -96,6 +99,8 @@ class NativeConceptCode(StrEnum):
                 return YesNoContent
             case NativeConceptCode.DATE:
                 return DateContent
+            case NativeConceptCode.TIME:
+                return TimeContent
             case NativeConceptCode.PAGE:
                 return PageContent
             case NativeConceptCode.JSON:
@@ -157,6 +162,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
                 | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
@@ -182,6 +188,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.YES_NO
                 | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON

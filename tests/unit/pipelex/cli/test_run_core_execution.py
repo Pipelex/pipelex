@@ -295,24 +295,6 @@ class TestRunCoreExecution:
         assert exc_info.value.exit_code == 1
 
     @pytest.mark.usefixtures("console")
-    def test_toml_time_only_input_file_exits(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """A .toml inputs file holding a bare TOML time-of-day is rejected during loading.
-
-        Top-level date/datetime literals are now accepted (converted to a native Date); only a bare
-        time-of-day has no date to attach to, so the loader raises InputsTimeOnlyNotSupportedError,
-        surfaced as a clean exit 1 before any runner is constructed. Asserting the "Failed to load
-        input file" framing pins that the exit comes from that catch site, not a downstream failure.
-        """
-        inputs_file = tmp_path / "inputs.toml"
-        inputs_file.write_text("deadline = 12:00:00\n", encoding="utf-8")
-
-        with pytest.raises(typer.Exit) as exc_info:
-            _run_async(_call_execute_run(inputs=str(inputs_file)))
-
-        assert exc_info.value.exit_code == 1
-        assert "Failed to load input file" in capsys.readouterr().err
-
-    @pytest.mark.usefixtures("console")
     def test_invalid_json_input_file_exits(self, tmp_path: Path) -> None:
         """A .json inputs file with invalid JSON syntax is rejected cleanly."""
         inputs_file = tmp_path / "inputs.json"

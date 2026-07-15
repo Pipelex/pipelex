@@ -65,6 +65,7 @@ class InputKind(StrEnum):
     NUMBER = "number"
     YES_NO = "yes_no"
     DATE = "date"
+    TIME = "time"
     IMAGE = "image"
     DOCUMENT = "document"
     STRUCTURED = "structured"
@@ -76,7 +77,16 @@ class InputKind(StrEnum):
         match self:
             case InputKind.STRUCTURED:
                 return True
-            case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.IMAGE | InputKind.DOCUMENT | InputKind.DYNAMIC:
+            case (
+                InputKind.TEXT
+                | InputKind.NUMBER
+                | InputKind.YES_NO
+                | InputKind.DATE
+                | InputKind.TIME
+                | InputKind.IMAGE
+                | InputKind.DOCUMENT
+                | InputKind.DYNAMIC
+            ):
                 return False
 
 
@@ -173,7 +183,16 @@ class InputShaper:
                     name=variable_name,
                     search_domain_codes=search_domain_codes,
                 )
-            case InputKind.TEXT | InputKind.NUMBER | InputKind.YES_NO | InputKind.DATE | InputKind.IMAGE | InputKind.DOCUMENT | InputKind.STRUCTURED:
+            case (
+                InputKind.TEXT
+                | InputKind.NUMBER
+                | InputKind.YES_NO
+                | InputKind.DATE
+                | InputKind.TIME
+                | InputKind.IMAGE
+                | InputKind.DOCUMENT
+                | InputKind.STRUCTURED
+            ):
                 content = cls._shape_with_multiplicity(
                     value,
                     stuff_spec=stuff_spec,
@@ -198,6 +217,7 @@ class InputShaper:
         ordered_natives: list[tuple[NativeConceptCode, InputKind]] = [
             (NativeConceptCode.YES_NO, InputKind.YES_NO),
             (NativeConceptCode.DATE, InputKind.DATE),
+            (NativeConceptCode.TIME, InputKind.TIME),
             (NativeConceptCode.NUMBER, InputKind.NUMBER),
             (NativeConceptCode.IMAGE, InputKind.IMAGE),
             (NativeConceptCode.DOCUMENT, InputKind.DOCUMENT),
@@ -425,6 +445,15 @@ class InputShaper:
                         value=value,
                     )
                 return cls._make_content(concept, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
+            case InputKind.TIME:
+                if not isinstance(value, (datetime.time, str)):
+                    raise cls._wrong_kind(
+                        stuff_spec=stuff_spec,
+                        variable_name=variable_name,
+                        expected_kind="an ISO time-of-day string or a time object",
+                        value=value,
+                    )
+                return cls._make_content(concept, value=value, stuff_spec=stuff_spec, variable_name=variable_name)
             case InputKind.IMAGE | InputKind.DOCUMENT:
                 canonical: dict[str, Any]
                 if isinstance(value, str):
@@ -458,7 +487,7 @@ class InputShaper:
         cls,
         concept: Concept,
         *,
-        value: dict[str, Any] | str | bool | datetime.date,
+        value: dict[str, Any] | str | bool | datetime.date | datetime.time,
         stuff_spec: StuffSpec,
         variable_name: str,
     ) -> StuffContent:
@@ -567,7 +596,7 @@ class InputShaper:
     @classmethod
     def _render_expected_shape(cls, *, stuff_spec: StuffSpec) -> str:
         """Render the expected input shape from the signature, reused verbatim in D4 error hints."""
-        return json.dumps(stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON), ensure_ascii=False)
+        return json.dumps(stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON), ensure_ascii=False)
 
     @classmethod
     def _describe_value(cls, value: Any) -> str:

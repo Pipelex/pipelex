@@ -16,6 +16,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 SHAPER_TEST_DOMAIN = "shaper_test"
@@ -35,6 +36,10 @@ class Verdict(YesNoContent):
 
 class Deadline(DateContent):
     """Refines native Date."""
+
+
+class OpeningTime(TimeContent):
+    """Refines native Time."""
 
 
 class Photo(ImageContent):
@@ -68,7 +73,7 @@ class ShaperWeird(StructuredContent):
 
 # Non-StructuredContent refinements — registered explicitly (the refinement machinery would register
 # a subclass like these for a `refines = "<native>"` concept).
-REFINING_CLASSES = [Question, Priority, Verdict, Deadline, Photo, Exhibit]
+REFINING_CLASSES = [Question, Priority, Verdict, Deadline, OpeningTime, Photo, Exhibit]
 
 # (concept_code, structure_class_name, refines) for every test concept.
 CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
@@ -76,6 +81,7 @@ CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
     ("Priority", "Priority", "native.Number"),
     ("Verdict", "Verdict", "native.YesNo"),
     ("Deadline", "Deadline", "native.Date"),
+    ("OpeningTime", "OpeningTime", "native.Time"),
     ("Photo", "Photo", "native.Image"),
     ("Exhibit", "Exhibit", "native.Document"),
     ("ShaperInvoice", "ShaperInvoice", None),

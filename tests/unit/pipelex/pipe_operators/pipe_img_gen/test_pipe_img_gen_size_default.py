@@ -25,4 +25,4 @@ class TestResolveDefaultSize:
         expected: SizeTier | ImageSize | None,
     ):
         """An exact-size deck default must not silently defeat a pipe's explicit aspect_ratio; tiers always compose."""
-        assert resolve_default_size(explicit_aspect_ratio, default_size=default_size) == expected
+        assert resolve_default_size(explicit_aspect_ratio=explicit_aspect_ratio, default_size=default_size) == expected

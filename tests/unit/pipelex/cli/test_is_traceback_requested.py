@@ -20,7 +20,7 @@ class TestIsTracebackRequested:
         subcommand dispatch, which silently disabled --traceback when the flag was read
         through click.get_current_context().
         """
-        set_traceback_requested(True)
+        set_traceback_requested(value=True)
         assert is_traceback_requested() is True
 
     def test_returns_false_when_no_click_context(self) -> None:

@@ -69,6 +69,53 @@ class PipelineManagerAlreadyExistsError(PipelexError):
     pass
 
 
+class FixWriteConflictError(PipelexError):
+    """A bundle changed after autofix read it but before the atomic commit."""
+
+
+class FixTransactionError(PipelexUnexpectedError):
+    """An autofix multi-file commit failed and could not be fully rolled back."""
+
+
+def _summarize_bundle_validation_message(
+    *,
+    blueprint_errors: list[PipelexBundleBlueprintValidationErrorData],
+    factory_errors: list[PipeFactoryErrorData],
+    pipe_validation_errors: list[PipesAndConceptValidationErrorData],
+    dry_run_error_message: str | None,
+    raw_message: str,
+) -> str:
+    """Compose a clean, author-facing top-line summary of a bundle-validation failure (disease C).
+
+    The pydantic / interpreter path builds ``raw_message`` by ``str()``-ing a pydantic
+    ``ValidationError``, leaking a ``Validation error(s): … Value errors: '<field>': Value error, …``
+    dump (and prefixes like ``Pipe validation failed:`` / ``Could not load MTHDS bundle from '…'
+    because of:``) into every surface that shows the top-line — the agent JSON ``message`` and the
+    API report ``message`` / ``detail``. The per-error item messages are already clean and
+    author-facing, so summarize from them instead of the raw pydantic string: the lone item
+    message when there is one categorized error, or ``N validation errors (first: …)`` when there
+    are several.
+
+    Falls back to ``raw_message`` only when there is no categorized data at all — a parse-level
+    failure (TOML syntax, an empty blueprint, a bundle elaborator) whose raw message is the
+    authoritative description and the sole diagnostic. Reads only the ``message`` field off each
+    error-data model — no fix planning — so it is cheap enough to run in ``__init__``. Ordering
+    mirrors ``build_validation_error_items`` (blueprint → factory → pipe/concept → dry-run residual)
+    so the "first" message is the same item the structured surfaces list first.
+    """
+    item_messages = [error.message for error in blueprint_errors]
+    item_messages += [error.message for error in factory_errors]
+    item_messages += [error.message for error in pipe_validation_errors]
+    if not item_messages and dry_run_error_message:
+        item_messages = [dry_run_error_message]
+    if not item_messages:
+        return raw_message
+    first_message = item_messages[0]
+    if len(item_messages) == 1:
+        return first_message
+    return f"{len(item_messages)} validation errors (first: {first_message})"
+
+
 class ValidateBundleError(PipelexError):
     """Raised when bundle validation fails.
 
@@ -114,7 +161,22 @@ class ValidateBundleError(PipelexError):
 
         self.dry_run_error_message = dry_run_error_message
 
-        super().__init__(message)
+        # Disease C: the top-line ``message`` is often a leaky ``str(pydantic ValidationError)``
+        # (``Value errors: '<field>': Value error, …``). Replace it at the source with a clean
+        # summary derived from the already-clean per-error item messages, so EVERY surface that
+        # shows the top-line — the agent JSON ``message`` and the API report — benefits (one
+        # engine), not just the CLI markdown. The raw ``message`` still rides ``to_error_report``'s
+        # ``fallback_message`` residual, which only fires when there is no categorized data (the
+        # summary is the raw message in that same case, so the two stay consistent).
+        super().__init__(
+            _summarize_bundle_validation_message(
+                blueprint_errors=self.pipelex_bundle_blueprint_validation_errors,
+                factory_errors=self.pipe_factory_errors,
+                pipe_validation_errors=self.pipe_validation_error_data,
+                dry_run_error_message=self.dry_run_error_message,
+                raw_message=message,
+            )
+        )
 
     @property
     def pipe_validation_error_data(self) -> list[PipesAndConceptValidationErrorData]:

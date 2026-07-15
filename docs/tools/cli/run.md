@@ -198,8 +198,8 @@ name = "Acme Corp"
 country = "France"
 ```
 
-!!! tip "TOML date and datetime literals are native `Date` inputs"
-    A top-level TOML date or datetime literal (e.g. `hearing = 2026-09-01` or `departure = 2026-07-07T15:40:00+02:00`) maps directly to the native [`Date`](../../building-methods/concepts/native-concepts.md) concept — the offset is kept when stated. A bare *time-of-day* literal (`opening = 09:00:00`) is still rejected: a time alone has no date to attach to, so include the date or quote it as a string.
+!!! tip "TOML temporal literals are native `Date` / `Time` inputs"
+    A top-level TOML date or datetime literal (e.g. `hearing = 2026-09-01` or `departure = 2026-07-07T15:40:00+02:00`) maps directly to the native [`Date`](../../building-methods/concepts/native-concepts.md) concept — the offset is kept when stated. A bare *time-of-day* literal (`opening = 09:00:00`) maps to the native `Time` concept; it never silently becomes a `Date` (a time alone has no date to attach to, so shaping a `Time` into a `Date` slot fails the compatibility check).
 
 ### Auto-detection and ambiguity
 

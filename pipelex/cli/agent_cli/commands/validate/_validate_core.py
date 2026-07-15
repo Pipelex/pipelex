@@ -23,11 +23,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-async def validate_all_core(
-    library_dirs: list[Path] | None = None,
-    *,
-    allow_signatures: bool = False,
-) -> dict[str, Any]:
+async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> dict[str, Any]:
     """Validate all pipes in all libraries.
 
     Args:

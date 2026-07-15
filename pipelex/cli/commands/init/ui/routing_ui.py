@@ -124,7 +124,7 @@ def build_fallback_order_panel(remaining_backends: list[str], *, backend_options
     )
 
 
-def prompt_fallback_order(console: Console, *, remaining_backends: list[str], backend_options: list[tuple[str, str]]) -> list[str]:
+def prompt_fallback_order(*, console: Console, remaining_backends: list[str], backend_options: list[tuple[str, str]]) -> list[str]:
     """Prompt user to order the remaining backends for fallback.
 
     Args:
@@ -195,7 +195,7 @@ def prompt_fallback_order(console: Console, *, remaining_backends: list[str], ba
     return fallback_order
 
 
-def display_routing_profile_result(console: Console, *, profile_name: str, created: bool = False) -> None:
+def display_routing_profile_result(*, console: Console, profile_name: str, created: bool = False) -> None:
     """Display confirmation of routing profile configuration.
 
     Args:

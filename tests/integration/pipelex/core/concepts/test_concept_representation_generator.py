@@ -78,7 +78,7 @@ class TestComplexNestedStructuresJson:
         result = generator.generate_representation("test.Attachment", structure_class=Attachment)
         assert result["concept"] == "test.Attachment"
         assert result["content"]["name"] == "name_value"
-        assert result["content"]["url"].startswith("https://mock-")
+        assert result["content"]["url"].startswith("https://mock.invalid/")
 
     def test_embed_json(self) -> None:
         """Test Embed with multiple string fields generates correct JSON."""
@@ -104,7 +104,7 @@ class TestComplexNestedStructuresJson:
         assert content["link"] == "link_value"
         assert len(content["attachments"]) == 1
         assert content["attachments"][0]["name"] == "name_value"
-        assert content["attachments"][0]["url"].startswith("https://mock-")
+        assert content["attachments"][0]["url"].startswith("https://mock.invalid/")
         assert content["embeds"] == [{"title": "title_value", "description": "description_value", "embed_type": "embed_type_value"}]
 
     def test_channel_json_deeply_nested(self) -> None:
@@ -118,7 +118,7 @@ class TestComplexNestedStructuresJson:
         message = content["messages"][0]
         assert message["author"] == "author_value"
         assert len(message["attachments"]) == 1
-        assert message["attachments"][0]["url"].startswith("https://mock-")
+        assert message["attachments"][0]["url"].startswith("https://mock.invalid/")
 
     def test_newsletter_json_multiple_lists(self) -> None:
         """Test Newsletter with multiple list fields generates correct JSON."""
@@ -148,7 +148,7 @@ class TestComplexNestedStructuresPython:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_representation("test.Attachment", structure_class=Attachment)
         assert result["concept"] == "test.Attachment"
-        assert 'Attachment(name="name_value", url="https://mock-' in result["content"]
+        assert 'Attachment(name="name_value", url="https://mock.invalid/' in result["content"]
 
     def test_message_python_recursive(self) -> None:
         """Test Message with nested structures generates correct Python."""
@@ -156,7 +156,7 @@ class TestComplexNestedStructuresPython:
         result = generator.generate_representation("test.Message", structure_class=Message)
         content = result["content"]
         assert content.startswith(
-            'Message(author="author_value", content="content_value", attachments=[Attachment(name="name_value", url="https://mock-'
+            'Message(author="author_value", content="content_value", attachments=[Attachment(name="name_value", url="https://mock.invalid/'
         )
         assert 'embeds=[Embed(title="title_value"' in content
         assert 'link="link_value")' in content
@@ -167,7 +167,7 @@ class TestComplexNestedStructuresPython:
         result = generator.generate_representation("test.Channel", structure_class=Channel)
         content = result["content"]
         assert content.startswith('Channel(name="name_value", position=0, messages=[Message(')
-        assert 'Attachment(name="name_value", url="https://mock-' in content
+        assert 'Attachment(name="name_value", url="https://mock.invalid/' in content
 
 
 class TestImportsTrackingIntegration:
@@ -200,7 +200,7 @@ class TestConvenienceFunctionsIntegration:
         assert "attachments" in result["content"]
         assert len(result["content"]["attachments"]) == 1
         assert result["content"]["attachments"][0]["name"] == "name_value"
-        assert result["content"]["attachments"][0]["url"].startswith("https://mock-")
+        assert result["content"]["attachments"][0]["url"].startswith("https://mock.invalid/")
 
     def test_generate_python_representation_complex(self) -> None:
         """Test generate_python_representation with complex structure."""

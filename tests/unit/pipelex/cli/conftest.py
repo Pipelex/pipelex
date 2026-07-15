@@ -21,9 +21,9 @@ def reset_traceback_requested() -> Iterator[None]:
     this flag; without a reset a leaked ``True`` would make a sibling test's "no flag"
     assertion order-dependent.
     """
-    set_traceback_requested(False)
+    set_traceback_requested(value=False)
     yield
-    set_traceback_requested(False)
+    set_traceback_requested(value=False)
 
 
 @pytest.fixture(autouse=True)

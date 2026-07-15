@@ -91,7 +91,7 @@ def build_gateway_terms_panel() -> Panel:
     )
 
 
-def prompt_gateway_acceptance(console: Console) -> bool:
+def prompt_gateway_acceptance(*, console: Console) -> bool:
     """Prompt the user to accept Pipelex Gateway terms.
 
     Args:
@@ -111,7 +111,7 @@ def prompt_gateway_acceptance(console: Console) -> bool:
     )
 
 
-def display_gateway_declined_message(console: Console) -> None:
+def display_gateway_declined_message(*, console: Console) -> None:
     """Display message when user declines gateway terms.
 
     Args:
@@ -133,7 +133,7 @@ def display_gateway_declined_message(console: Console) -> None:
     console.print(f"[dim]Need help? Visit {URLs.documentation} or join {URLs.discord}[/dim]")
 
 
-def display_gateway_accepted_message(console: Console) -> None:
+def display_gateway_accepted_message(*, console: Console) -> None:
     """Display confirmation message when user accepts gateway terms.
 
     Args:

@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_path  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
-from pipelex.cli.commands.run.exceptions import InputsTimeOnlyNotSupportedError
 from pipelex.core.stuffs.date_content import DateContent
+from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 if TYPE_CHECKING:
@@ -119,27 +119,27 @@ class TestInputsFileLoader:
         assert content.time is not None
         assert content.time.utcoffset() == datetime.timedelta(hours=2)
 
-    def test_top_level_local_time_rejected(self, tmp_path: Path) -> None:
-        """A bare TOML time-of-day is still rejected — it has no date to attach to."""
+    def test_top_level_local_time_becomes_time_content(self, tmp_path: Path) -> None:
+        """A top-level bare TOML time-of-day maps to a TimeContent (native Time), never a Date."""
         inputs_file = tmp_path / "inputs.toml"
         inputs_file.write_text("opening = 09:00:00\n", encoding="utf-8")
 
-        with pytest.raises(InputsTimeOnlyNotSupportedError) as exc_info:
-            load_inputs_dict_from_path(inputs_file)
-        assert "opening" in exc_info.value.message
-        assert "time of day alone" in exc_info.value.message
+        loaded = load_inputs_dict_from_path(inputs_file)
 
-    def test_nested_time_rejected_with_key_path(self, tmp_path: Path) -> None:
-        """A time-of-day nested in an envelope's content is rejected, with its key path in the message."""
+        assert loaded["opening"] == TimeContent(time=datetime.time(9, 0))
+        assert loaded["opening"].time.tzinfo is None
+
+    def test_nested_time_left_in_place(self, tmp_path: Path) -> None:
+        """A time-of-day nested in an envelope's content is left for the factory/pydantic to consume."""
         inputs_file = tmp_path / "inputs.toml"
         inputs_file.write_text(
             '[record]\nconcept = "Event"\n[[record.entries]]\nlabel = "kickoff"\nat = 09:00:00\n',
             encoding="utf-8",
         )
 
-        with pytest.raises(InputsTimeOnlyNotSupportedError) as exc_info:
-            load_inputs_dict_from_path(inputs_file)
-        assert "record.entries[0].at" in exc_info.value.message
+        loaded = load_inputs_dict_from_path(inputs_file)
+
+        assert loaded["record"]["entries"][0]["at"] == datetime.time(9, 0)
 
     def test_nested_datetime_left_in_place(self, tmp_path: Path) -> None:
         """A date/datetime nested in an envelope's content is left for the factory/pydantic to consume."""

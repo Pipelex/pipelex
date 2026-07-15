@@ -1,7 +1,8 @@
 """Unit tests for the `pipelex build runner` core logic (_prepare_runner_core).
 
-The registry getters are mocked at the module namespace so the real class/func
-registries of the module-scoped Pipelex are never torn down by these tests.
+The library plumbing and the codegen engine seams are mocked at the module namespace, so these
+tests pin the runner-core wiring (pipe selection, output paths, the structures projection hand-off,
+and the exit codes), not the engine itself (covered by the codegen unit tests).
 """
 
 from __future__ import annotations
@@ -27,21 +28,25 @@ MODULE = "pipelex.cli.commands.build.runner._runner_core"
 class TestPrepareRunnerCore:
     @pytest.fixture
     def core_mocks(self, mocker: MockerFixture) -> dict[str, Any]:
-        """Stub library plumbing, registries, structure generation and runner codegen."""
+        """Stub library plumbing, the codegen engine seams, and runner codegen."""
         library_manager = mocker.MagicMock()
-        library_manager.open_library.return_value = ("lib_id", mocker.MagicMock())
+        library_manager.get_crate.return_value = None  # default: no crate -> no structures projection
         mocker.patch(f"{MODULE}.get_library_manager", return_value=library_manager)
-        mocker.patch(f"{MODULE}.set_current_library")
-        mocker.patch(f"{MODULE}.resolve_library_dirs", return_value=([], "defaults"))
-        mocker.patch(f"{MODULE}.get_class_registry", return_value=mocker.MagicMock())
-        mocker.patch(f"{MODULE}.get_func_registry", return_value=mocker.MagicMock())
-        mocker.patch(f"{MODULE}.ClassRegistryUtils")
+        mocker.patch(f"{MODULE}.get_current_library_id_or_none", return_value="lib_id")
         blueprint = SimpleNamespace(main_pipe="bundle_main", pipe=None)
         validate_result = SimpleNamespace(blueprints=[blueprint])
         return {
+            "library_manager": library_manager,
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
             "get_required_pipe": mocker.patch(f"{MODULE}.get_required_pipe", return_value=SimpleNamespace(code="bundle_main")),
-            "generate_structures": mocker.patch(f"{MODULE}.generate_structures_from_blueprints", return_value=[]),
+            "normalize_crate": mocker.patch(f"{MODULE}.normalize_crate"),
+            "emit_types": mocker.patch(f"{MODULE}.emit_types", return_value=[]),
+            "write_stamped_projection": mocker.patch(
+                f"{MODULE}.write_stamped_projection",
+                return_value=SimpleNamespace(written=["structures.py"], unchanged=[], removed=[]),
+            ),
+            "resolve_concepts": mocker.patch(f"{MODULE}.resolve_concepts_from_crate"),
+            "runtime_to_emitted": mocker.patch(f"{MODULE}.runtime_to_emitted_class_names", return_value={"demo__Invoice": "Invoice"}),
             "generate_runner_code": mocker.patch(f"{MODULE}.generate_runner_code", return_value="# runner code\n"),
         }
 
@@ -56,15 +61,26 @@ class TestPrepareRunnerCore:
         assert codegen_kwargs["output_multiplicity"] is False
         assert codegen_kwargs["library_dir"] == str(tmp_path.resolve())
 
-    def test_structures_generated_into_output_dir(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
-        """Structure files are generated into a structures/ dir next to the runner."""
-        core_mocks["generate_structures"].return_value = [("demo", "Invoice")]
+    def test_structures_projection_emitted_into_structures_dir(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
+        """With a crate available, the types projection is written into structures/ next to the
+        runner and the emitted-name mapping is handed to the runner-code generator.
+        """
+        core_mocks["library_manager"].get_crate.return_value = SimpleNamespace()
 
         asyncio.run(_prepare_runner_core(pipe_code=None, bundle_path=tmp_path / "demo.mthds"))
 
-        structures_kwargs = core_mocks["generate_structures"].call_args.kwargs
-        assert structures_kwargs["output_directory"] == tmp_path / "structures"
-        assert structures_kwargs["target_path"] == tmp_path
+        write_kwargs = core_mocks["write_stamped_projection"].call_args.kwargs
+        assert write_kwargs["output_dir"] == tmp_path / "structures"
+        codegen_kwargs = core_mocks["generate_runner_code"].call_args.kwargs
+        assert codegen_kwargs["class_name_overrides"] == {"demo__Invoice": "Invoice"}
+
+    def test_no_crate_skips_structures_projection(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
+        """Without a crate (nothing loaded), the runner is still generated with no overrides."""
+        asyncio.run(_prepare_runner_core(pipe_code=None, bundle_path=tmp_path / "demo.mthds"))
+
+        core_mocks["write_stamped_projection"].assert_not_called()
+        codegen_kwargs = core_mocks["generate_runner_code"].call_args.kwargs
+        assert codegen_kwargs["class_name_overrides"] == {}
 
     @pytest.mark.usefixtures("core_mocks")
     def test_explicit_output_path_wins(self, tmp_path: Path) -> None:

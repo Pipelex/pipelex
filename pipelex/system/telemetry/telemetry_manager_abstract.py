@@ -86,7 +86,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return instance.is_langfuse_enabled
 
     @abstractmethod
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @abstractmethod
@@ -103,7 +103,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Safe context manager for telemetry that works whether telemetry is enabled or not."""
 
     @abstractmethod
-    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         pass
 
     @abstractmethod
@@ -111,7 +111,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         pass
 
     @abstractmethod
-    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         pass
 
     @abstractmethod
@@ -153,7 +153,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         """Whether Pipelex internal telemetry is enabled (for gateway usage)."""
 
     @abstractmethod
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         """Hook to do something when a trace starts.
 
         Args:
@@ -165,7 +165,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
 
 class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @override
-    def setup(self, integration_mode: IntegrationMode):
+    def setup(self, *, integration_mode: IntegrationMode):
         pass
 
     @override
@@ -184,7 +184,7 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         yield
 
     @override
-    def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_custom_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         return False
 
     @override
@@ -192,7 +192,7 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def is_pipelex_gateway_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
+    def is_pipelex_gateway_portkey_logging_enabled(self, *, is_debug_configured: bool) -> bool:
         return False
 
     @override
@@ -234,5 +234,5 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def handle_trace_start(self, trace_name: str, *, trace_name_redacted: str, trace_id: int) -> None:
+    def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int) -> None:
         pass

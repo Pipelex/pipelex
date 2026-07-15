@@ -180,7 +180,9 @@ def parse_pipe_spec(spec_data: Any, *, pipe_type: str | None) -> PipeSpec:
     if pipe_type == PIPE_SIGNATURE_TYPE_TAG:
         raise ValueError(explicit_signature_tag_migration_message(spec_data.get("pipe_code")))
     if pipe_type is None:
-        normalized = normalize_typeless_signature_section(spec_data.get("pipe_code"), pipe_section=spec_data, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS)
+        normalized = normalize_typeless_signature_section(
+            pipe_code=spec_data.get("pipe_code"), pipe_section=spec_data, allowed_keys=SIGNATURE_ONLY_SPEC_KEYS
+        )
         return PipeSignatureSpec.model_validate(normalized)
 
     if pipe_type not in pipe_type_to_spec_class:
@@ -224,7 +226,7 @@ def parse_pipe_spec(spec_data: Any, *, pipe_type: str | None) -> PipeSpec:
     return spec_class.model_validate(spec_data)
 
 
-def add_type_specific_fields(pipe_spec: PipeSpec, *, pipe_table: Table) -> None:
+def add_type_specific_fields(*, pipe_spec: PipeSpec, pipe_table: Table) -> None:
     """Add type-specific fields to the pipe TOML table.
 
     Args:
@@ -371,7 +373,7 @@ def pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     pipe_item_table.add("output", pipe_spec.output)
 
     # Add type-specific fields
-    add_type_specific_fields(pipe_spec, pipe_table=pipe_item_table)
+    add_type_specific_fields(pipe_spec=pipe_spec, pipe_table=pipe_item_table)
 
     # Build the nested structure: [pipe.pipe_code]
     pipe_section = tomlkit.table()

@@ -1,3 +1,5 @@
+import datetime
+
 import pytest
 
 from pipelex import log, pretty_print
@@ -9,7 +11,8 @@ from pipelex.core.memory.exceptions import (
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
-from tests.unit.pipelex.core.memory.input_shaper.data import Question, ShaperInvoice, ShaperWeird, build_input_specs
+from pipelex.core.stuffs.time_content import TimeContent
+from tests.unit.pipelex.core.memory.input_shaper.data import OpeningTime, Question, ShaperInvoice, ShaperWeird, build_input_specs
 
 
 class TestInputShaperExplicitForms:
@@ -37,6 +40,29 @@ class TestInputShaperExplicitForms:
         # The declared lower bound is native.Text, but the caller volunteered the more specific Question.
         assert stuff.concept.concept_ref == "shaper_test.Question"
         assert stuff.content == TextContent(text="What are the fees?")
+
+    @pytest.mark.parametrize(
+        ("concept_ref", "expected_type"),
+        [("native.Time", TimeContent), ("shaper_test.OpeningTime", OpeningTime)],
+    )
+    def test_time_envelope_accepts_iso_string(self, concept_ref: str, expected_type: type[TimeContent]) -> None:
+        """Explicit envelopes use the shared temporal factory for native Time and refinements."""
+        input_specs = build_input_specs([("opening", "native.Time", None)])
+        provided = {"concept": concept_ref, "content": "15:40:00+02:00"}
+
+        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs)
+
+        stuff = working_memory.root["opening"]
+        assert stuff.concept.concept_ref == concept_ref
+        assert stuff.content == expected_type(time=datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2))))
+
+    def test_time_envelope_accepts_time_object(self) -> None:
+        input_specs = build_input_specs([("opening", "native.Time", None)])
+        provided = {"concept": "native.Time", "content": datetime.time(15, 40)}
+
+        working_memory = InputShaper.shape({"opening": provided}, input_specs=input_specs)
+
+        assert working_memory.root["opening"].content == TimeContent(time=datetime.time(15, 40))
 
     def test_prebuilt_stuff_content_object(self) -> None:
         """D6: a directly-provided StuffContent keeps today's behavior, plus the compat check."""

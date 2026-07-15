@@ -129,7 +129,7 @@ class TestOptionalsShowcaseE2E:
         also auto-registers the co-located @pipe_func implementations.
         """
         await _execute_run(
-            "oshow_lift_only_flow",
+            pipe_code="oshow_lift_only_flow",
             bundle_path=None,
             inputs=None,
             save_working_memory=True,

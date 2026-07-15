@@ -424,7 +424,7 @@ class _AssemblerState:
         producer_data = self._nodes.get(producer_node_id)
         if producer_data is None:
             return False
-        return output_digest_is_optional(producer_data.output_specs, digest=digest)
+        return output_digest_is_optional(output_specs=producer_data.output_specs, digest=digest)
 
     def _generate_data_edges(self) -> None:
         """Generate DATA edges by correlating input digests with producer nodes.

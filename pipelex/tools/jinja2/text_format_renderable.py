@@ -29,7 +29,7 @@ class TextFormatRenderable(Protocol):
     - StuffArtefact: delegates to underlying content
     """
 
-    async def rendered_for_template_async(self, text_format: TextFormat) -> str:
+    async def rendered_for_template_async(self, *, text_format: TextFormat) -> str:
         """Render content for templates in the specified text format.
 
         Args:

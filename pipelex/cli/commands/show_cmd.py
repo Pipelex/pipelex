@@ -69,7 +69,7 @@ def do_show_pipe(pipe_code: str) -> None:
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
 
-def do_show_backends(show_all: bool = False) -> None:
+def do_show_backends(*, show_all: bool = False) -> None:
     """Display all backends and the active routing profile."""
     try:
         secrets_provider = get_secrets_provider()

@@ -20,6 +20,9 @@ class LibraryCrate(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    mthds_version: str = ""
+    """MTHDS standard version the crate was normalized against (empty for a non-normalized transport crate)."""
+
     concepts: dict[str, ConceptBlueprint | str] = Field(default_factory=dict)
     """concept_ref (domain.ConceptCode) -> ConceptBlueprint or string description"""
 
@@ -67,3 +70,38 @@ class LibraryCrate(BaseModel):
     def compute_fingerprint(self) -> str:
         """Compute SHA-256 fingerprint from this crate's concepts and pipes."""
         return self.compute_fingerprint_from_content(concepts=self.concepts, pipes=self.pipes)
+
+    @staticmethod
+    def compute_normalized_fingerprint(
+        *,
+        concepts: dict[str, "ConceptBlueprint | str"],
+        pipes: dict[str, PipeBlueprintUnion],
+        domains: dict[str, DomainBlueprint],
+    ) -> str:
+        """Compute the semantic fingerprint of a normalized crate (D2 scope: concepts + pipes + domains).
+
+        The hashed payload is `{concepts, pipes, domains}` with each object's provenance `source`
+        removed (a change of file location must not change the digest); `source_map`, `mthds_version`,
+        and the `fingerprint` member itself are excluded. Serialization is canonical — keys sorted at
+        every level, no inter-token whitespace, non-ASCII as literal UTF-8 — so two producers agree
+        byte-for-byte. This matches RFC 8785 (JSON Canonicalization Scheme) for the object / array /
+        string / bool / integer payload a crate contains; full JCS number canonicalization is the
+        forward contract for the rare float default value.
+        """
+        concepts_json: dict[str, object] = {}
+        for ref, value in sorted(concepts.items()):
+            concepts_json[ref] = value if isinstance(value, str) else _strip_source(value.model_dump(mode="json"))
+        pipes_json = {ref: _strip_source(blueprint.model_dump(mode="json")) for ref, blueprint in sorted(pipes.items())}
+        domains_json = {code: _strip_source(domain.model_dump(mode="json")) for code, domain in sorted(domains.items())}
+        payload = {"concepts": concepts_json, "pipes": pipes_json, "domains": domains_json}
+        serialized = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+    def compute_normalized(self) -> str:
+        """Compute the normalized (D2-scope) fingerprint from this crate's concepts, pipes, and domains."""
+        return self.compute_normalized_fingerprint(concepts=self.concepts, pipes=self.pipes, domains=self.domains)
+
+
+def _strip_source(dumped: dict[str, object]) -> dict[str, object]:
+    """Drop the provenance `source` member from a dumped blueprint before hashing (it is not semantic)."""
+    return {key: value for key, value in dumped.items() if key != "source"}

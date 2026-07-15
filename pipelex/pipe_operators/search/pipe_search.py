@@ -42,7 +42,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     is_structured_output: bool
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override
@@ -84,8 +84,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -163,7 +163,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             "is_structured_output": self.is_structured_output,
         }
 
-        self._register_execution_data(job_metadata, execution_data=execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeSearchOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -171,12 +171,12 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

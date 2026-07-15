@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
 
 def list_bedrock_models(
-    sdk: str,
     *,
+    sdk: str,
     backend_name: str,
     backend: InferenceBackend,
     flat: bool,

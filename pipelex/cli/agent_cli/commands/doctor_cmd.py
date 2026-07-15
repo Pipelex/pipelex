@@ -24,7 +24,7 @@ from pipelex.cli.commands.doctor_cmd import (
 from pipelex.system.configuration.config_loader import config_manager
 
 
-def _status_icon(healthy: bool) -> str:
+def _status_icon(*, healthy: bool) -> str:
     """Return a status emoji: checkmark for healthy, warning for unhealthy."""
     return "\u2705" if healthy else "\u26a0\ufe0f"
 
@@ -35,7 +35,7 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     config_location: dict[str, Any] = result["config_location"]
     checks: dict[str, Any] = result["checks"]
 
-    status_text = f"All healthy {_status_icon(True)}" if all_healthy else f"Issues found {_status_icon(False)}"
+    status_text = f"All healthy {_status_icon(healthy=True)}" if all_healthy else f"Issues found {_status_icon(healthy=False)}"
     location_type = "project-local" if config_location.get("is_project_local") else "global"
 
     lines: list[str] = [
@@ -47,17 +47,17 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
 
     # Config Files
     config_check = checks["config_files"]
-    lines.append(f"\n## Config Files \u2014 {_status_icon(config_check['healthy'])}\n")
+    lines.append(f"\n## Config Files \u2014 {_status_icon(healthy=config_check['healthy'])}\n")
     lines.append(config_check["message"])
 
     # Telemetry
     telemetry_check = checks["telemetry"]
-    lines.append(f"\n## Telemetry \u2014 {_status_icon(telemetry_check['healthy'])}\n")
+    lines.append(f"\n## Telemetry \u2014 {_status_icon(healthy=telemetry_check['healthy'])}\n")
     lines.append(telemetry_check["message"])
 
     # Backend Credentials
     creds_check = checks["backend_credentials"]
-    lines.append(f"\n## Backend Credentials \u2014 {_status_icon(creds_check['healthy'])}\n")
+    lines.append(f"\n## Backend Credentials \u2014 {_status_icon(healthy=creds_check['healthy'])}\n")
     lines.append(creds_check["message"])
     for backend_entry in creds_check.get("backends", []):
         name = backend_entry["backend_name"]
@@ -78,7 +78,7 @@ def _format_doctor_markdown(result: dict[str, Any]) -> str:
     models_skipped_flag = models_check.get("skipped", False)
     # Skipped state renders with the warn icon so consumers don't confuse "deferred until
     # config is fixed" with a genuine models failure.
-    models_icon = "\u26a0\ufe0f" if models_skipped_flag else _status_icon(models_check["healthy"])
+    models_icon = "\u26a0\ufe0f" if models_skipped_flag else _status_icon(healthy=models_check["healthy"])
     lines.append(f"\n## Models \u2014 {models_icon}\n")
     lines.append(models_check["message"])
     for file_entry in models_check.get("backend_files", []):

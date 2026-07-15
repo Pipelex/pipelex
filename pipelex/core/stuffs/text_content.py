@@ -2,6 +2,7 @@ import html
 import json
 import re
 
+from pydantic import Field
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from typing_extensions import override
@@ -13,7 +14,7 @@ HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 
 
 class TextContent(StuffContent):
-    text: str
+    text: str = Field(description="The text")
 
     @property
     @override

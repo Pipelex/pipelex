@@ -61,6 +61,8 @@ Each field can specify:
 - **item_type**: For `list` fields, the type of list items
 - **key_type** and **value_type**: For `dict` fields, the types of keys and values
 
+Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
+
 ## Supported Field Types
 
 Inline structures support these field types:
@@ -79,9 +81,9 @@ email = { type = "text", description = "Email address" }
     
     - **type**: `text`
     - **description**: The string you provided
+    - **required**: `true`
     
-    This is a shorthand for the most common case: text fields.
-    This will put the field as optional by default, and not required.
+    This is a shorthand for the most common case: required text fields. To make a text field optional, use the explicit form instead, e.g. `email = { type = "text", description = "Email address" }`.
 
 ### integer
 
@@ -131,8 +133,17 @@ A timestamp — a date *and* a time of day. Generates a `datetime.datetime` fiel
 created_at = { type = "datetime", description = "Creation timestamp" }
 ```
 
-!!! note "Field type vs the native `Date` concept"
-    A structure field's `date` / `datetime` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional time.
+### time
+
+A time of day, optionally with a UTC offset — no date attached. Generates a `datetime.time` field (JSON schema `format: time`). Use it for opening hours, schedules, recurring times — anything you'd write as `09:00:00` or `15:40:00+02:00`.
+
+```toml
+[concept.OpeningHours.structure]
+opens_at = { type = "time", description = "Daily opening time" }
+```
+
+!!! note "Field type vs the native `Date` / `Time` concepts"
+    A structure field's `date` / `datetime` / `time` type is a plain machine type — you pick one up front. If a field should keep *document fidelity* (a time only when the source states one), model it as `type = "concept", concept_ref = "Date"` instead: the native `Date` concept carries a required date plus an optional `time` field.
 
 ### list
 
@@ -147,7 +158,7 @@ scores = { type = "list", item_type = "number", description = "Test scores" }
 
 ### dict
 
-Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**.
+Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**. Dictionary keys are text on the JSON wire, so `key_type` must be `"text"` (`"str"` remains accepted as a legacy spelling).
 
 ```toml
 [concept.Configuration.structure]
@@ -239,7 +250,7 @@ status = { choices = ["todo", "in_progress", "done"], description = "Current sta
 
 ## Required Fields
 
-By default, **all fields are optional** (`required = false`). To make a field mandatory, explicitly set `required = true`:
+Fields declared with the explicit inline-table form are **optional by default** (`required = false`). To make one mandatory, explicitly set `required = true`. Note that fields declared with the shorthand string syntax (`field_name = "description"`) are **required**:
 
 ```toml
 [concept.User.structure]
@@ -273,27 +284,21 @@ pipelex build structures ./my_pipelines/ -o ./generated/
 
 ### Example Output
 
-Given the Invoice example from above, Pipelex generates:
+Given the Invoice example from above, Pipelex generates one stamped `structures.py` module (plus a `codegen.lock` for the offline drift check) containing every concept of the closure:
 
 ```python
-# generated/finance__invoice.py
-from datetime import date
-from pydantic import Field
-from pipelex.core.stuffs.structured_content import StructuredContent
-from .finance__customer import Customer
-from .finance__line_item import LineItem
-
+# generated/structures.py (below the codegen stamp header)
 class Invoice(StructuredContent):
     """A commercial document issued by a seller to a buyer"""
 
-    invoice_number: str = Field(description="The unique invoice identifier")
+    invoice_number: str = Field(..., description="The unique invoice identifier")
     issue_date: date = Field(..., description="The date the invoice was issued")
     customer: Customer = Field(..., description="The customer for this invoice")
-    line_items: list[LineItem] = Field(..., description="List of line items")
+    line_items: List[LineItem] = Field(..., description="List of line items")
     total_amount: float = Field(..., description="The total invoice amount")
 ```
 
-You can then import and use these classes with full type safety.
+You can then import and use these classes with full type safety. Generated files are never edited in place — to customize a class, subclass it in a sibling module (the generated header shows how).
 
 ## When to Use Inline Structures
 
@@ -323,4 +328,3 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
 - [MTHDS Language Tutorial](../../get-started/mthds-language-tutorial.md) - Get started with structured outputs
-

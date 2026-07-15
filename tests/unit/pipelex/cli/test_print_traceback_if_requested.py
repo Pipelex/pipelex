@@ -24,7 +24,7 @@ class TestPrintTracebackIfRequested:
         console = mocker.MagicMock()
         ctx = click.Context(click.Command("test"), obj={"traceback": False})
         with ctx:
-            print_traceback_if_requested(console)
+            print_traceback_if_requested(console=console)
         console.print.assert_not_called()
 
     def test_prints_traceback_when_flag_set(self, mocker: MockerFixture) -> None:
@@ -36,7 +36,7 @@ class TestPrintTracebackIfRequested:
                 msg = "test error"
                 raise ValueError(msg)
             except ValueError:
-                print_traceback_if_requested(console)
+                print_traceback_if_requested(console=console)
         console.print.assert_called_once()
         arg = console.print.call_args[0][0]
         assert isinstance(arg, Traceback)

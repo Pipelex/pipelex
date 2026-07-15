@@ -140,7 +140,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
-    def _register_execution_data(self, job_metadata: JobMetadata, *, execution_data: dict[str, Any]) -> None:
+    def _register_execution_data(self, *, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
@@ -260,6 +260,49 @@ class PipeAbstract(ABC, BaseModel):
     def generic_validate_output_static(self):
         self.validate_output_static()
 
+    def _expected_inputs_for_fix(self, needed_inputs: InputStuffSpecs) -> dict[str, str] | None:
+        """Render the full needed-inputs mapping a fix would write, or ``None`` for operators.
+
+        Controller-gated: only a controller's ``needed_inputs()`` is a trustworthy ground truth
+        for its declared ``inputs`` table (operators re-emit their own declaration). The
+        author's declared representation is preserved (keeping their presence marker — presence
+        is deliberately not part of the drift contract) whenever the validator would accept it:
+        either its concept + multiplicity already match the needed spec, or the needed spec is a
+        flexible type (``Dynamic``/``Anything``), which the validator accepts against any concrete
+        declaration. This mirrors the flexible-type carve-out in ``generic_validate_inputs_with_library``
+        so a co-occurring drift on another input never rewrites a valid concrete declaration back
+        to ``Dynamic``/``Anything``. Refs are derived from the needed spec only for variables being
+        added or whose concept/multiplicity genuinely changes against a non-flexible need.
+        """
+        if not self.is_controller:
+            return None
+        expected_inputs: dict[str, str] = {}
+        for named_stuff_spec in needed_inputs.named_stuff_specs:
+            var_name = named_stuff_spec.variable_name
+            declared_stuff_spec = self.inputs.root.get(var_name)
+            if declared_stuff_spec is not None and (
+                named_stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+                or (declared_stuff_spec.concept == named_stuff_spec.concept and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity)
+            ):
+                spec_to_render: StuffSpec = declared_stuff_spec
+            else:
+                spec_to_render = named_stuff_spec
+            expected_inputs[var_name] = spec_to_render.to_bundle_representation(relative_to_domain=self.domain_code)
+        return expected_inputs
+
+    def _declared_inputs_for_fix(self) -> dict[str, str] | None:
+        """Render the currently declared inputs the same way, or ``None`` for operators.
+
+        Carried alongside ``expected_inputs`` so the fix planner (pure, no file access) can
+        emit a minimal diff against the declaration instead of a table rewrite.
+        """
+        if not self.is_controller:
+            return None
+        return {
+            var_name: declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+            for var_name, declared_stuff_spec in self.inputs.root.items()
+        }
+
     @final
     def generic_validate_inputs_with_library(self):
         # First validate required variables are in the inputs (using prefix-based matching)
@@ -293,6 +336,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[var_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
@@ -310,21 +355,14 @@ class PipeAbstract(ABC, BaseModel):
                 if needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING} and (
                     declared_stuff_spec.concept != needed_stuff_spec.concept or declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity
                 ):
-                    # Identify the specific mismatched field(s)
-                    mismatch_details: list[str] = []
-                    if declared_stuff_spec.concept != needed_stuff_spec.concept:
-                        mismatch_details.append(f"concept: declared='{declared_stuff_spec.concept}' vs required='{needed_stuff_spec.concept}'")
-                    if declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity:
-                        mismatch_details.append(
-                            f"multiplicity: declared='{declared_stuff_spec.multiplicity}' vs required='{needed_stuff_spec.multiplicity}'"
-                        )
-
-                    mismatch_summary = ", ".join(mismatch_details)
+                    # Render both specs the way an author would write them in this pipe's domain
+                    # (bare `Number` / `Text[]`, qualified only for foreign domains) — never the
+                    # Python repr of the Concept/StuffSpec objects.
+                    declared_ref = declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+                    required_ref = needed_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
                     msg = (
-                        f"In the pipe '{self.code}', the input variable '{var_name}' has a stuff spec mismatch.\n"
-                        f"Mismatched field(s): {mismatch_summary}\n"
-                        f"Declared: {declared_stuff_spec}\n"
-                        f"Required: {needed_stuff_spec}"
+                        f"In pipe '{self.code}', input '{var_name}' is declared as '{declared_ref}' "
+                        f"but its step needs '{required_ref}'. Update the input to '{required_ref}'."
                     )
                     raise PipeValidationError(
                         message=msg,
@@ -332,6 +370,8 @@ class PipeAbstract(ABC, BaseModel):
                         domain_code=self.domain_code,
                         pipe_code=self.code,
                         variable_names=[var_name],
+                        expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                        declared_inputs=self._declared_inputs_for_fix(),
                     )
 
         # Check that all declared inputs are actually needed
@@ -344,6 +384,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
         self.validate_inputs_with_library()
@@ -403,8 +445,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def validate_before_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -475,8 +517,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _validate_before_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -486,8 +528,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def validate_after_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -499,8 +541,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _validate_after_run(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -519,7 +561,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Return the stuff specs that are needed for the pipe to run.
 
         Args:
@@ -547,8 +589,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -573,8 +615,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def _run_pipe_traced(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -795,8 +837,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _make_lifted_output(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         liftable: list[AbsentInput],
         pipe_run_params: PipeRunParams,
@@ -866,8 +908,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def live_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -939,8 +981,8 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def dry_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -959,8 +1001,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _live_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -971,8 +1013,8 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _dry_run_pipe(
         self,
-        job_metadata: JobMetadata,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
@@ -982,8 +1024,8 @@ class PipeAbstract(ABC, BaseModel):
 
     def _start_pipe_span(
         self,
-        parent_otel_context: OtelContext,
         *,
+        parent_otel_context: OtelContext,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
     ) -> tuple[Span | None, bool]:

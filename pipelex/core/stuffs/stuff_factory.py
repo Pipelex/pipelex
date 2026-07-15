@@ -270,6 +270,7 @@ class StuffFactory:
             2.1d: {"concept": "YesNo"/"domain.Concept", "content": bool} → YesNoContent (if YesNo-compatible)
             2.1e: {"concept": "Date"/"domain.Concept", "content": date/datetime obj} → DateContent (if Date-compatible)
             2.1f: {"concept": "Date"/"domain.Concept", "content": ISO str} → DateContent (if Date-compatible, checked after Text)
+            2.1g: {"concept": "Time"/"domain.Concept", "content": time obj or ISO str} → TimeContent (if Time-compatible)
             2.2/2.2b: {"concept": "...", "content": list[str]} → ListContent[TextContent]
             2.3: {"concept": "...", "content": StuffContent} → Use the StuffContent
             2.4: {"concept": "...", "content": list[StuffContent]} → ListContent[StuffContent]
@@ -525,15 +526,23 @@ class StuffFactory:
                     name=name,
                     code=code,
                 )
+            # Case 2.1g: a strict-ISO time string under a Time-compatible concept builds a TimeContent.
+            time_concept = get_native_concept(native_concept=NativeConceptCode.TIME)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
-                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text' or 'native.Date'"
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Text', 'native.Date', or 'native.Time'"
             )
             raise StuffFactoryError(msg)
 
         # Case 2.1e: content is a bare date/datetime object (a TOML temporal literal used as envelope content)
-        # → DateContent for a Date-compatible concept. isinstance(date) covers datetime (its subclass); a bare
-        # time never reaches here — the inputs loader rejects it, and a time is not a date anyway.
+        # → DateContent for a Date-compatible concept. isinstance(date) covers datetime (its subclass).
         if isinstance(content, datetime.date):
             date_concept = get_native_concept(native_concept=NativeConceptCode.DATE)
             if concept_library.is_compatible(tested_concept=concept, wanted_concept=date_concept, strict=True):
@@ -546,6 +555,22 @@ class StuffFactory:
             msg = (
                 f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
                 f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Date' (the content is a date/datetime)"
+            )
+            raise StuffFactoryError(msg)
+
+        # Case 2.1g: content is a bare time object (a TOML time literal used as envelope content).
+        if isinstance(content, datetime.time):
+            time_concept = get_native_concept(native_concept=NativeConceptCode.TIME)
+            if concept_library.is_compatible(tested_concept=concept, wanted_concept=time_concept, strict=True):
+                return cls.make_stuff(
+                    concept=concept,
+                    content=StuffContentFactory.make_stuff_content_from_concept_required(concept=concept, value=content),
+                    name=name,
+                    code=code,
+                )
+            msg = (
+                f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+                f"but the concept of name '{concept_ref}' is not compatible with native concept 'native.Time' (the content is a time)"
             )
             raise StuffFactoryError(msg)
 

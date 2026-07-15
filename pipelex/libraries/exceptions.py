@@ -7,6 +7,12 @@ class LibraryError(PipelexError):
     _declared_title = "Library error"
 
 
+class CrateNormalizationError(LibraryError):
+    """Raised when a library crate cannot be normalized (e.g. a crate key that is not domain-qualified)."""
+
+    _declared_title = "Crate normalization error"
+
+
 class LibraryLoadingError(LibraryError):
     """Error raised when loading library components fails.
 

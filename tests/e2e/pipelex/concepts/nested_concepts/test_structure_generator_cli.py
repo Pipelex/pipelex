@@ -1,13 +1,14 @@
 # pyright: reportUnknownMemberType=false
 # pyright: reportUnknownVariableType=false
 # pyright: reportUnknownArgumentType=false
-"""E2E test for the structure generator CLI with nested concepts.
+"""E2E test for structures codegen (the `build structures` engine) with nested concepts.
 
 This test verifies that:
-1. `pipelex build structures` generates valid Python files for nested concepts
-2. The generated files are importable
+1. The codegen engine (`codegen types --target python-structures`, which `pipelex build structures`
+   aliases) emits a single importable module for nested concepts
+2. The generated module is importable as-is (no manual forward-ref plumbing)
 3. The generated classes can be instantiated and used
-4. Forward references between nested concepts are properly handled
+4. Concept-to-concept references (nested and list-nested) resolve correctly
 
 Note: pyright checks are disabled for this file because we dynamically import
 and instantiate generated classes at runtime.
@@ -19,147 +20,105 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-import pytest
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
-from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.codegen.emission import write_stamped_projection
+from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
+from pipelex.codegen.emitters.types_emitter import emit_types
+from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.crate_normalization import normalize_crate
+from pipelex.pipeline.execution_seams import load_libraries_and_activate
 
 
-@pytest.mark.asyncio
 class TestStructureGeneratorCLI:
-    """E2E tests for structure generation CLI with nested concepts."""
+    """E2E: the structures projection over a real bundle with nested concept references."""
 
-    async def test_generate_and_import_nested_concept_structures(self):
-        """Test that generated structure files for nested concepts are importable and usable.
+    def test_generate_and_import_nested_concept_structures(self):
+        """The emitted structures.py imports cleanly and its nested classes compose.
 
         This test:
-        1. Uses the existing nested_concepts.mthds file with concept-to-concept references
-        2. Generates Python structure files via the CLI helper function
-        3. Dynamically imports the generated modules
-        4. Instantiates the generated classes
-        5. Verifies nested concept references work correctly
+        1. Resolves the existing nested_concepts.mthds bundle into a normalized crate
+        2. Emits the python-structures projection through the stamped write path
+        3. Dynamically imports the generated module
+        4. Instantiates the generated classes, nesting Customer and LineItem inside Invoice
         """
-        # Path to the MTHDS file with nested concepts
-        mthds_file_path = Path("tests/e2e/pipelex/concepts/nested_concepts/nested_concepts.mthds").resolve()
-        assert mthds_file_path.exists(), f"MTHDS file not found: {mthds_file_path}"
+        bundle_dir = Path("tests/e2e/pipelex/concepts/nested_concepts").resolve()
+        assert (bundle_dir / "nested_concepts.mthds").exists()
 
-        # Create a temporary directory for generated structures
+        library_manager = get_library_manager()
+        previous_library_id = get_current_library_id_or_none()
+        resolve_library_id = load_libraries_and_activate([bundle_dir])
+        try:
+            crate = library_manager.get_crate(resolve_library_id)
+            assert crate is not None
+            normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+        finally:
+            if previous_library_id is not None:
+                set_current_library(library_id=previous_library_id)
+            else:
+                clear_current_library()
+            library_manager.teardown(library_id=resolve_library_id)
+
         with tempfile.TemporaryDirectory() as temp_dir:
             output_directory = Path(temp_dir)
-
-            # Validate the MTHDS file to get blueprints
-            validate_result = await validate_bundle(mthds_file_path=mthds_file_path)
-            blueprints = validate_result.blueprints
-
-            # Generate structure files
-            generated_files = generate_structures_from_blueprints(
-                blueprints=blueprints,
-                output_directory=output_directory,
-                skip_existing_check=True,
+            emitted = emit_types(normalized, target=CodegenTarget.PYTHON_STRUCTURES)
+            report = write_stamped_projection(
+                emitted,
+                output_dir=output_directory,
+                crate_fingerprint=normalized.fingerprint,
+                engine_version="test",
+                kind=CodegenKind.TYPES,
+                target=CodegenTarget.PYTHON_STRUCTURES,
             )
+            assert report.written == ["structures.py"]
+            assert (output_directory / CODEGEN_LOCK_FILENAME).is_file()
 
-            # Verify files were generated
-            assert len(generated_files) >= 3, f"Expected at least 3 generated files, got {len(generated_files)}"
+            structures_file = output_directory / "structures.py"
+            structures_code = structures_file.read_text(encoding="utf-8")
 
-            # Find the generated files
-            line_item_file = output_directory / "nested_concepts_test__line_item.py"
-            customer_file = output_directory / "nested_concepts_test__customer.py"
-            invoice_file = output_directory / "nested_concepts_test__invoice.py"
+            # Bare-when-unique class names (no cross-domain collision in this closure)
+            assert "class LineItem(StructuredContent):" in structures_code
+            assert "class Customer(StructuredContent):" in structures_code
+            assert "class Invoice(StructuredContent):" in structures_code
 
-            assert line_item_file.exists(), f"LineItem structure file not generated: {line_item_file}"
-            assert customer_file.exists(), f"Customer structure file not generated: {customer_file}"
-            assert invoice_file.exists(), f"Invoice structure file not generated: {invoice_file}"
+            # The single module imports as-is: forward references resolve within it.
+            # It must stay in sys.modules while in use — pydantic resolves the
+            # `from __future__ import annotations` forward refs lazily at first instantiation.
+            module = self._import_module_from_file(structures_file)
+            try:
+                self._exercise_generated_classes(module)
+            finally:
+                sys.modules.pop(module.__name__, None)
 
-            # Read and verify the generated code contains proper structure.
-            # Class names are domain-qualified (e.g. "nested_concepts_test__LineItem") so
-            # they match what ConceptFactory registers in the class registry.
-            line_item_code = line_item_file.read_text()
-            customer_code = customer_file.read_text()
-            invoice_code = invoice_file.read_text()
+    def _exercise_generated_classes(self, module: Any) -> None:
+        line_item_class: Any = module.LineItem
+        customer_class: Any = module.Customer
+        invoice_class: Any = module.Invoice
 
-            line_item_class_name = "nested_concepts_test__LineItem"
-            customer_class_name = "nested_concepts_test__Customer"
-            invoice_class_name = "nested_concepts_test__Invoice"
+        line_item = line_item_class(product_name="Widget", quantity=3, unit_price=10.0)
+        assert line_item.product_name == "Widget"
+        assert line_item.quantity == 3
+        assert line_item.unit_price == 10.0
 
-            assert f"class {line_item_class_name}(StructuredContent):" in line_item_code
-            assert f"class {customer_class_name}(StructuredContent):" in customer_code
-            assert f"class {invoice_class_name}(StructuredContent):" in invoice_code
+        customer = customer_class(name="John Smith", email="john@example.com")
+        assert customer.name == "John Smith"
+        assert customer.email == "john@example.com"
 
-            # Verify Invoice has forward references to the qualified Customer and LineItem names
-            assert customer_class_name in invoice_code
-            assert line_item_class_name in invoice_code
+        invoice = invoice_class(
+            invoice_number="INV-001",
+            customer=customer,
+            line_items=[line_item],
+            total_amount=30.0,
+        )
+        assert invoice.invoice_number == "INV-001"
+        assert invoice.customer.name == "John Smith"
+        assert len(invoice.line_items) == 1
+        assert invoice.line_items[0].product_name == "Widget"
+        assert invoice.total_amount == 30.0
 
-            # Dynamically import the generated modules
-            # Import order matters: dependencies first
-            line_item_class = self._import_class_from_file(line_item_file, line_item_class_name)
-            customer_class = self._import_class_from_file(customer_file, customer_class_name)
-
-            # Now import Invoice - it has forward references to LineItem and Customer
-            # We need to add LineItem and Customer to the namespace for forward reference resolution
-            invoice_spec = importlib.util.spec_from_file_location("invoice_module", invoice_file)
-            assert invoice_spec is not None
-            assert invoice_spec.loader is not None
-            invoice_module = importlib.util.module_from_spec(invoice_spec)
-
-            # Add the dependencies to the module's globals for forward reference resolution
-            invoice_module.__dict__[line_item_class_name] = line_item_class
-            invoice_module.__dict__[customer_class_name] = customer_class
-
-            sys.modules["invoice_module"] = invoice_module
-            invoice_spec.loader.exec_module(invoice_module)
-            invoice_class: Any = getattr(invoice_module, invoice_class_name)
-
-            # Rebuild the model to resolve forward references
-            invoice_class.model_rebuild(
-                _types_namespace={
-                    line_item_class_name: line_item_class,
-                    customer_class_name: customer_class,
-                }
-            )
-
-            # Instantiate the classes to verify they work
-            line_item = line_item_class(
-                product_name="Widget",
-                quantity=3,
-                unit_price=10.0,
-            )
-            assert line_item.product_name == "Widget"
-            assert line_item.quantity == 3
-            assert line_item.unit_price == 10.0
-
-            customer = customer_class(
-                name="John Smith",
-                email="john@example.com",
-            )
-            assert customer.name == "John Smith"
-            assert customer.email == "john@example.com"
-
-            # Create Invoice with nested concepts
-            invoice = invoice_class(
-                invoice_number="INV-001",
-                customer=customer,
-                line_items=[line_item],
-                total_amount=30.0,
-            )
-            assert invoice.invoice_number == "INV-001"
-            assert invoice.customer.name == "John Smith"
-            assert len(invoice.line_items) == 1
-            assert invoice.line_items[0].product_name == "Widget"
-            assert invoice.total_amount == 30.0
-
-            # Clean up imported modules
-            sys.modules.pop("invoice_module", None)
-
-    def _import_class_from_file(self, file_path: Path, class_name: str) -> Any:
-        """Dynamically import a class from a Python file.
-
-        Args:
-            file_path: Path to the Python file
-            class_name: Name of the class to import
-
-        Returns:
-            The imported class
-        """
+    def _import_module_from_file(self, file_path: Path) -> Any:
+        """Dynamically import a module from a Python file (left in sys.modules — caller cleans up)."""
         module_name = f"test_module_{file_path.stem}"
         spec = importlib.util.spec_from_file_location(module_name, file_path)
         assert spec is not None, f"Could not load spec for {file_path}"
@@ -167,7 +126,9 @@ class TestStructureGeneratorCLI:
 
         module = importlib.util.module_from_spec(spec)
         sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-
-        the_class: Any = getattr(module, class_name)
-        return the_class
+        try:
+            spec.loader.exec_module(module)
+        except BaseException:
+            sys.modules.pop(module_name, None)
+            raise
+        return module

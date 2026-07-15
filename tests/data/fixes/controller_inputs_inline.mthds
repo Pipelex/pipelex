@@ -1,0 +1,25 @@
+# Golden fixture for the sync-controller-inputs applier test (inline `inputs = {...}` form).
+# The sequence's inputs table drifts in all three ways at once: a wrong concept to update,
+# a needed variable to add, and an extraneous one to remove.
+domain    = "inputsfix_golden_inline"
+main_pipe = "make_summary"
+
+[concept]
+Summary = "A summary of a text." # inline concept declaration
+
+[pipe.write_summary]
+type        = "PipeLLM"
+description = "Summarize the text."
+inputs      = { text = "Text", style = "Text" } # inline table style
+output      = "Summary"
+prompt      = "Summarize $text in style $style"
+
+# The sequence below declares drifted inputs on purpose.
+[pipe.make_summary]
+type = "PipeSequence"
+description = "Sequence with drifted inputs."
+inputs = { text = "Number", note = "Text" } # drifted on purpose
+output = "Summary"
+steps = [
+  { pipe = "write_summary", result = "summary" },
+]

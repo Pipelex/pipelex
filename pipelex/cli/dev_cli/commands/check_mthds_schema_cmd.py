@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from rich.console import Console
 
 
-def check_mthds_schema_cmd(show_diff: bool = True, *, quiet: bool = False) -> None:
+def check_mthds_schema_cmd(*, show_diff: bool = True, quiet: bool = False) -> None:
     """Verify that the MTHDS JSON Schema file is up-to-date.
 
     Regenerates the schema in memory and compares it against the on-disk file.
