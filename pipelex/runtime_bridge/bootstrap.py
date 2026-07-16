@@ -40,9 +40,7 @@ def ensure_pipelex_booted(
     ``_boot_lock``, so within its setup window ``is_fully_booted()`` is False and
     this helper would attempt its own ``make`` and hit
     ``PipelexSetupError("Pipelex is already initialized")``. Standard hosts boot
-    before bringing up concurrent bridge callers, so this is not reached; the
-    residual race and a bounded-wait fix are written up in
-    ``wip/runtime-bridge/bridge-bootstrap-external-race.md``.
+    before bringing up concurrent bridge callers, so this is not reached.
     """
     if Pipelex.is_fully_booted():
         return

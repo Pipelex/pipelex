@@ -1,8 +1,8 @@
 """JSON-safe boundary payloads for the runtime bridge.
 
 The SPI boundary contract between core's ``DirectOrchestrator`` (and the open
-``pipelex-api`` runner) and the cross-process dispatch entry-point that now lives
-in the closed ``pipelex-transport`` library. Kept import-light and separate from
+``pipelex-api`` runner) and the cross-process dispatch entry-point that lives
+out of tree with the orchestration plugins. Kept import-light and separate from
 any dispatch logic so they can be referenced (e.g. by the orchestrator SPI /
 ``OrchestratorProtocol``) without pulling the bootstrap path — which would form an
 import cycle: pydantic, the orchestration/delivery types, stdlib typing only.
@@ -17,7 +17,7 @@ from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 
 
 class PipelexPipeRunInput(BaseModel):
-    """JSON-safe input crossing the host-runtime / Temporal boundary."""
+    """JSON-safe input crossing the host-runtime boundary."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -37,7 +37,7 @@ class PipelexPipeRunInput(BaseModel):
 
 
 class PipelexPipeRunOutput(BaseModel):
-    """JSON-safe output of a COMPLETED run crossing the host-runtime / Temporal boundary.
+    """JSON-safe output of a COMPLETED run crossing the host-runtime boundary.
 
     This is the return shape of a blocking dispatch (``OrchestratorProtocol.execute``); a
     fire-and-forget dispatch returns a ``PipelexPipeDispatchAck`` instead — which is why

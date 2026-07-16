@@ -251,8 +251,8 @@ class PluginRegistrar:
     def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
         """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.
 
-        The built-in ``PipeFuncPlugin`` registers ``direct`` (in-process) and ``local_sandbox`` (local
-        subprocess); an external sandbox plugin (``pipelex-daytona-sandbox``) registers its own token
+        The built-in ``PipeFuncPlugin`` registers ``direct`` (in-process); an external sandbox plugin
+        (e.g. our Daytona plugin) registers its own token
         (e.g. ``"daytona"``). Boot reads ``pipe_func_config.execution_mode`` and calls the looked-up
         factory to produce the one PipeFunc executor set on the hub. ``factory`` is invoked at that boot
         apply-point, never here — so a factory may do heavy work (SDK import, config self-load) while

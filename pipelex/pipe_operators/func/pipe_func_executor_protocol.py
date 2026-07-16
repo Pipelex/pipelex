@@ -59,7 +59,7 @@ class PipeFuncExecutorProtocol(Protocol):
         The transported sibling of ``run_pipe_func``: it takes a ``PipeFuncExecutionRequest`` (crate +
         transported working memory) instead of live objects, and returns a ``PipeFuncExecutionResponse``
         (the output as a transported working memory, preserving dynamic-class identity). This is the
-        seam a serialized boundary crosses — a Temporal activity (``act_pipe_func``) resolves an
+        seam a serialized boundary crosses — a distributed orchestrator's worker-side step resolves an
         executor by ``execution_mode`` and calls this, so it never needs live objects. ``direct`` runs
         it in-process (also what a sandbox box runs internally); a sandbox executor forwards the
         request to its box and returns the box's response.

@@ -31,7 +31,7 @@ def is_pipe_func_sandbox_hosted() -> bool:
     """Whether PipeFunc runs out-of-process in this process (non-raising; defaults to local).
 
     Derived from the selected execution mode: core owns ``direct`` as the one in-process mode, and by
-    the seam's invariant every other mode (``local_sandbox``, ``daytona``, …) is a remote/sandbox
+    the seam's invariant every other mode (``daytona``, …) is a remote/sandbox
     backend that transports the customer's source rather than importing it here. So library loading
     and the PipeFunc validators gate on this: ``True`` ⇒ capture source + skip callable inspection.
     """

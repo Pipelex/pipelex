@@ -667,11 +667,11 @@ _pipe_func_executor_override: ContextVar[PipeFuncExecutorProtocol | None] = Cont
 def scoped_pipe_func_executor(pipe_func_executor: PipeFuncExecutorProtocol) -> Generator[None, None, None]:
     """Set ``pipe_func_executor`` as the active executor for the scope, then restore the prior value on exit.
 
-    The PipeFunc counterpart of :func:`scoped_content_generator`: an in-process run nested inside a
-    Temporal activity (e.g. the sandbox entrypoint replaying the pipe, or the dry-validate activity)
-    wraps itself in this scope with an in-process executor so its PipeFunc steps run locally instead
-    of recursively dispatching another ``act_pipe_func``. ContextVar-scoped so concurrent runs never
-    cross-contaminate.
+    The PipeFunc counterpart of :func:`scoped_content_generator`: in a process whose hub default
+    executor dispatches PipeFunc steps out-of-process (a distributed-orchestrator worker), this scope
+    lets an in-process run force a specific executor — e.g. the local one, so its PipeFunc steps run
+    here instead of being re-dispatched. ContextVar-scoped like :func:`scoped_pipe_router`, so
+    concurrent runs never cross-contaminate.
     """
     prev = _pipe_func_executor_override.get()
     _pipe_func_executor_override.set(pipe_func_executor)
@@ -868,7 +868,7 @@ def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, Non
     Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
     pair internally: the raw teardown unconditionally resets the override to
     ``None`` and so does not restore an outer override. The raw pair is kept
-    because the external ``pipelex-mistralai-workflows`` plugin depends on it.
+    because our Mistral Workflows plugin depends on it.
     """
     prev = _current_pipe_router.get()
     _current_pipe_router.set(pipe_router)

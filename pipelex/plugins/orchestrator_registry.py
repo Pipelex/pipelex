@@ -13,8 +13,8 @@ class OrchestratorProtocol(Protocol):
     """How a pipe job runs under one orchestration mode.
 
     An orchestrator plugin registers one of these per ``orchestration_mode`` token it
-    serves (``"direct"`` in core; ``"temporal"`` from ``pipelex-temporal``,
-    ``"mistral-workflows"`` from ``pipelex-mistralai-workflows``). The runtime bridge
+    serves (``"direct"`` in core; ``"temporal"`` from our Temporal plugin,
+    ``"mistral-workflows"`` from our Mistral Workflows plugin). The runtime bridge
     dispatches by token through the ``OrchestratorRegistry`` instead of branching on a
     ``match``.
 

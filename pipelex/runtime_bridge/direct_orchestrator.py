@@ -1,8 +1,7 @@
 """The core, always-on DIRECT orchestrator.
 
-Runs a pipe in-process. Extracted verbatim from the bridge's old ``_run_direct``
-arm so the bridge dispatches by mode through the ``OrchestratorRegistry`` instead
-of a ``match``. Registered unconditionally by the core ``direct`` plugin.
+Runs a pipe in-process. Registered unconditionally by the core ``direct``
+plugin; dispatch reaches it by mode through the ``OrchestratorRegistry``.
 
 Import-light: core pipe-run + the shared serialization helpers; no host-runtime SDK.
 """

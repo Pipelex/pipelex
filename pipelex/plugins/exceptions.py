@@ -240,8 +240,8 @@ class UnknownPipeFuncExecutionModeError(PluginError):
     """A configured PipeFunc execution mode has no registered executor factory.
 
     ``pipe_func_config.execution_mode`` selects a PipeFunc executor from the registry the built-in
-    ``PipeFuncPlugin`` (``direct`` + ``local_sandbox``) and any external sandbox plugin (e.g.
-    ``pipelex-daytona-sandbox`` → ``daytona``) populate. When the token names no registered factory —
+    ``PipeFuncPlugin`` (``direct``) and any external sandbox plugin (e.g.
+    our Daytona plugin → ``daytona``) populate. When the token names no registered factory —
     a typo, or a sandbox-backend plugin that is not installed or was disabled via ``plugins.disabled`` —
     boot fails loud here rather than starting with no PipeFunc executor. The message lists the
     registered modes so the fix is obvious.
