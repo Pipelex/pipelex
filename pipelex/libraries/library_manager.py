@@ -375,6 +375,18 @@ class LibraryManager(LibraryManagerAbstract):
             return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
+    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
+        """Whether a crate with this fingerprint was already loaded into this library.
+
+        Backed by the same per-library fingerprint bookkeeping that makes load_from_crate
+        idempotent, so a True answer means the library's ClassRegistry already holds the
+        crate's dynamic classes. Callers can use this to hydrate within an existing scope
+        instead of opening a fresh one — preserving dynamic-class identity with instances
+        the scope already produced.
+        """
+        return fingerprint in self._loaded_fingerprints.get(library_id, set())
+
+    @override
     def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 

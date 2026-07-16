@@ -93,7 +93,7 @@ A host runtime's data converter deserializes a payload (a job input, a return va
 Both `PipeJob` and `PipeOutput` carry a `working_memory_raw` field — a plain JSON dict — alongside the typed `working_memory`. The raw dict needs no class resolution to cross a boundary, which decouples transport from class registration.
 
 - **Input dehydration** — before dispatch, the working memory is moved into `working_memory_raw` (a plain dict produced by `WorkingMemory.dump_for_transport()`, which stays in open core at `pipelex/core/memory/working_memory.py`). After the worker loads the crate, the job's entry point hydrates the raw dict back to a typed `WorkingMemory`, inside the job's scope.
-- **Output dehydration** — before a nested job returns, its working memory is dehydrated to `working_memory_raw`. The raw dict then flows **end-to-end** — nested job → parent → delivery — without intermediate rehydration, because parents and delivery workers generally have not loaded the crate. Only the **top-level submitter** rehydrates.
+- **Output dehydration** — before a nested job returns, its working memory is dehydrated to `working_memory_raw`. A **parent job** that consumes the nested output (a controller combining branch results — PipeParallel, PipeBatch) rehydrates it on receive, inside its **own already-loaded scope**: the parent's library carries the same crate (checked by fingerprint via `is_crate_loaded`), so hydration rebinds the nested output to the parent's own dynamic classes — the identity the parent's models reference. **Delivery** workers never rehydrate — they render from the raw dict, staying crate-free. The **top-level submitter** rehydrates too, opening a fresh scoped library when it hasn't loaded the crate itself.
 
 The worker-side hydration helper (`pipelex/runtime_bridge/primitives/hydration.py`) is open core: it iterates the raw dict, uses `StuffContentFactory` to rebuild typed content from the registered classes, and preserves aliases. It also guards against cross-exec class-identity mismatches (`_validate_as_known_class` round-trips items through `model_dump()`): the dynamic classes a worker re-execs from the crate are new Python identities sharing a name with whatever a data converter eagerly rebuilt, and a naive `model_validate` would reject the older instance.
 
@@ -103,7 +103,7 @@ The worker-side hydration helper (`pipelex/runtime_bridge/primitives/hydration.p
 |----------|-----------|--------------|----------------------|
 | Submitter → top worker job | input | `PipeJob` (`working_memory_raw` + `library_crate`) | Yes — worker loads crate, then hydrates in scope |
 | Parent job → nested job | input | Same `PipeJob` shape (crate re-loaded idempotently) | Yes — in the nested job's own scope |
-| Nested job → parent | output | `PipeOutput` (`working_memory_raw`) | **No** — parent forwards the raw dict |
+| Nested job → parent | output | `PipeOutput` (`working_memory_raw`) | Yes — in the parent's own scope, whose library already carries the crate (fingerprint match), so branch instances rebind to the parent's class identities |
 | Parent job → delivery | result arg | `PipeOutput` (`working_memory_raw`, no crate) | **No** — delivery renders from raw, best-effort local hydration of the main stuff using only globally registered classes |
 | Top worker job → submitter | output | `PipeOutput` (`working_memory_raw`) | Yes — the submitter rehydrates, opening a fresh scoped library if a crate is available |
 

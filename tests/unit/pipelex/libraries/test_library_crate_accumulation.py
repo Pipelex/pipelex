@@ -97,6 +97,33 @@ class TestLibraryCrateAccumulation:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
 
+    def test_is_crate_loaded_tracks_fingerprint_lifecycle(self):
+        """is_crate_loaded() is False before load, True after, and False again after teardown."""
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        try:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.SCORING_BUNDLE])
+
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+
+            second_library_id = "is-crate-loaded-test-lib"
+            library_manager.open_library(library_id=second_library_id)
+
+            assert library_manager.is_crate_loaded(library_id="nonexistent", fingerprint=crate.fingerprint) is False
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is False
+
+            library_manager.load_from_crate(library_id=second_library_id, crate=crate)
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is True
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint="some-other-fingerprint") is False
+
+            library_manager.teardown(library_id=second_library_id)
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is False
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
     def test_teardown_clears_blueprints_for_library_id(self):
         """teardown(library_id) clears accumulated blueprints for that library_id."""
         library_manager = get_library_manager()

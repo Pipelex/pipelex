@@ -67,6 +67,23 @@ class LibraryManagerAbstract(ABC):
         """
         return None
 
+    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:  # noqa: ARG002
+        """Whether a crate with this fingerprint was already loaded into this library.
+
+        Returns False by default (managers that don't track crate fingerprints report
+        nothing as loaded). Overridden by LibraryManager, which keeps per-library
+        fingerprint bookkeeping for load idempotency.
+
+        Args:
+            library_id: The library to query.
+            fingerprint: The crate fingerprint to look up.
+
+        Returns:
+            True when the crate is already loaded into the library, False otherwise
+            (including when the library_id is unknown).
+        """
+        return False
+
     @abstractmethod
     def get_crate(self, library_id: str) -> LibraryCrate | None:
         """Build a LibraryCrate from all accumulated blueprints for a given library_id.
