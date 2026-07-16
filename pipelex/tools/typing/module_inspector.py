@@ -49,6 +49,16 @@ def import_module_from_file(file_path: Path) -> Any:
     # Add the module to sys.modules to ensure proper imports within the module
     sys.modules[module_name] = module
 
+    # Put the file's OWN directory on sys.path so a module imported by path can import its siblings
+    # (e.g. `from helpers import ...` between files in the same bundle). Importing via
+    # spec_from_file_location does NOT do this automatically — unlike running a script, where the
+    # script's directory lands on sys.path[0]. Without it, a top-level sibling import raises
+    # ModuleNotFoundError and the module never finishes importing. Deduped, so repeated scans don't
+    # grow sys.path unbounded.
+    module_dir = str(file_path.resolve().parent)
+    if module_dir not in sys.path:
+        sys.path.insert(0, module_dir)
+
     # Execute the module
     spec.loader.exec_module(module)
 

@@ -286,6 +286,17 @@ gemini = { tag_style = "xml" }
 pipe_stack_limit = 20
 
 ####################################################################################################
+# PipeFunc config
+####################################################################################################
+
+[pipelex.pipe_func_config]
+# PipeFunc execution mode, selected from the PipeFuncExecutorRegistry the plugins populate. "direct"
+# (core) imports and runs customer functions in this process; "daytona" (our Daytona sandbox plugin)
+# runs them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
+# executes it only inside an isolated sandbox, never imported here.
+execution_mode = "direct"
+
+####################################################################################################
 # Pipeline execution config
 ####################################################################################################
 

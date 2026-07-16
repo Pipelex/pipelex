@@ -29,6 +29,7 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.sdk_client_manager import SdkClientManager
@@ -53,6 +54,7 @@ if TYPE_CHECKING:
     from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
     from pipelex.plugins.model_lister_registry import ModelListerRegistry
     from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+    from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
     from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
     from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
     from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -93,9 +95,11 @@ class PipelexHub:
         self._bundle_validator_registry: BundleValidatorRegistry | None = None
         self._storage_provider_registry: StorageProviderRegistry | None = None
         self._secrets_provider_registry: SecretsProviderRegistry | None = None
+        self._pipe_func_executor_registry: PipeFuncExecutorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
+        self._pipe_func_executor: PipeFuncExecutorProtocol | None = None
         # Keyless boot (``Pipelex.make(needs_inference=False)``) forces every run to DRY (eng
         # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
         # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
@@ -222,6 +226,9 @@ class PipelexHub:
     def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
         self._secrets_provider_registry = secrets_provider_registry
 
+    def set_pipe_func_executor_registry(self, pipe_func_executor_registry: "PipeFuncExecutorRegistry"):
+        self._pipe_func_executor_registry = pipe_func_executor_registry
+
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
 
@@ -230,6 +237,9 @@ class PipelexHub:
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
+
+    def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
+        self._pipe_func_executor = pipe_func_executor
 
     def set_dry_run_forced(self, *, is_forced: bool) -> None:
         self._is_dry_run_forced = is_forced
@@ -375,6 +385,12 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._secrets_provider_registry
 
+    def get_pipe_func_executor_registry(self) -> "PipeFuncExecutorRegistry":
+        if self._pipe_func_executor_registry is None:
+            msg = "PipeFuncExecutorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor_registry
+
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
 
@@ -386,6 +402,12 @@ class PipelexHub:
             msg = "ContentGenerator is not initialized"
             raise RuntimeError(msg)
         return self._content_generator
+
+    def get_required_pipe_func_executor(self) -> PipeFuncExecutorProtocol:
+        if self._pipe_func_executor is None:
+            msg = "PipeFuncExecutor is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor
 
     # pipelex
 
@@ -491,6 +513,10 @@ def get_required_config() -> ConfigRoot:
     return get_pipelex_hub().get_required_config()
 
 
+def get_optional_config() -> ConfigRoot | None:
+    return get_pipelex_hub().get_optional_config()
+
+
 def get_secrets_provider() -> SecretsProviderAbstract:
     return get_pipelex_hub().get_required_secrets_provider()
 
@@ -564,6 +590,10 @@ def get_secrets_provider_registry() -> "SecretsProviderRegistry":
     return get_pipelex_hub().get_secrets_provider_registry()
 
 
+def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
+    return get_pipelex_hub().get_pipe_func_executor_registry()
+
+
 def get_inference_manager() -> InferenceManagerProtocol:
     return get_pipelex_hub().get_inference_manager()
 
@@ -628,6 +658,34 @@ def get_content_generator() -> ContentGeneratorProtocol:
     if override is not None:
         return override
     return get_pipelex_hub().get_required_content_generator()
+
+
+_pipe_func_executor_override: ContextVar[PipeFuncExecutorProtocol | None] = ContextVar("pipe_func_executor_override", default=None)
+
+
+@contextmanager
+def scoped_pipe_func_executor(pipe_func_executor: PipeFuncExecutorProtocol) -> Generator[None, None, None]:
+    """Set ``pipe_func_executor`` as the active executor for the scope, then restore the prior value on exit.
+
+    The PipeFunc counterpart of :func:`scoped_content_generator`: in a process whose hub default
+    executor dispatches PipeFunc steps out-of-process (a distributed-orchestrator worker), this scope
+    lets an in-process run force a specific executor — e.g. the local one, so its PipeFunc steps run
+    here instead of being re-dispatched. ContextVar-scoped like :func:`scoped_pipe_router`, so
+    concurrent runs never cross-contaminate.
+    """
+    prev = _pipe_func_executor_override.get()
+    _pipe_func_executor_override.set(pipe_func_executor)
+    try:
+        yield
+    finally:
+        _pipe_func_executor_override.set(prev)
+
+
+def get_pipe_func_executor() -> PipeFuncExecutorProtocol:
+    override = _pipe_func_executor_override.get()
+    if override is not None:
+        return override
+    return get_pipelex_hub().get_required_pipe_func_executor()
 
 
 # pipelex
@@ -810,7 +868,7 @@ def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, Non
     Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
     pair internally: the raw teardown unconditionally resets the override to
     ``None`` and so does not restore an outer override. The raw pair is kept
-    because the external ``pipelex-mistralai-workflows`` plugin depends on it.
+    because our Mistral Workflows plugin depends on it.
     """
     prev = _current_pipe_router.get()
     _current_pipe_router.set(pipe_router)

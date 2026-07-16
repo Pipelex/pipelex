@@ -32,7 +32,7 @@ from pipelex.cogt.model_backends.backend_credentials import (
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import get_config
+from pipelex.config import get_config, get_pipe_func_execution_mode
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
@@ -43,6 +43,7 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -54,6 +55,7 @@ from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.model_lister_registry import ModelListerRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
 from pipelex.plugins.registrar import HubSlot, PluginRegistrar
 from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
@@ -187,6 +189,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManagerAbstract | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -423,6 +426,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
         storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)
         self.pipelex_hub.set_storage_provider_registry(storage_provider_registry)
+        pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
+        self.pipelex_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
         # Storage provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in StoragePlugin supplies every method, so there is no separate core default.
         # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
@@ -441,6 +446,21 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 default=lambda: ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=storage_provider)),
             )
         self.pipelex_hub.set_content_generator(content_generator)
+
+        # Injection precedence: explicit setup() param > plugin slot-claim thunk > config-selected
+        # registry factory. The PipeFunc execution axis is orthogonal to orchestration: a Temporal
+        # worker claims the PIPE_FUNC_EXECUTOR slot to wrap execution in an activity, and inside that
+        # activity resolves the real executor through this same registry by execution_mode. Every
+        # non-worker boot resolves directly here — pipe_func_config.execution_mode selects the mode
+        # ("direct" in-process by default; a sandbox mode like "daytona" runs it out-of-process).
+        if pipe_func_executor is None:
+            pipe_func_config = get_config().pipelex.pipe_func_config
+            execution_mode = get_pipe_func_execution_mode()
+            pipe_func_executor = self._resolve_hub_slot(
+                slot=HubSlot.PIPE_FUNC_EXECUTOR,
+                default=lambda: pipe_func_executor_registry.get_required(mode=execution_mode)(pipe_func_config),
+            )
+        self.pipelex_hub.set_pipe_func_executor(pipe_func_executor)
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
@@ -587,6 +607,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManager | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -625,6 +646,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             models_manager: Custom model configuration manager
             inference_manager: Custom inference routing manager
             content_generator: Custom content generation implementation
+            pipe_func_executor: Custom PipeFunc execution seam. Defaults to the in-process executor;
+                the Temporal worker claims this slot to dispatch PipeFunc runs to a sandbox activity.
             pipeline_manager: Custom pipeline management
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
@@ -663,6 +686,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 models_manager=models_manager,
                 inference_manager=inference_manager,
                 content_generator=content_generator,
+                pipe_func_executor=pipe_func_executor,
                 pipeline_manager=pipeline_manager,
                 pipe_router=pipe_router,
                 reporting_delegate=reporting_delegate,

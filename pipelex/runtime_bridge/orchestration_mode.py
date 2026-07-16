@@ -2,8 +2,8 @@
 
 ``orchestration_mode`` is an **open string token**, not a closed enum. Core owns
 only ``"direct"`` (its single built-in, in-process orchestrator); every other token
-is contributed by the plugin that owns the orchestrator — ``pipelex-temporal`` owns
-``"temporal"``, ``pipelex-mistralai-workflows`` owns ``"mistral-workflows"``. The
+is contributed by the plugin that owns the orchestrator — our Temporal plugin owns
+``"temporal"``, our Mistral Workflows plugin owns ``"mistral-workflows"``. The
 orchestrator/validator registries are keyed by this token and validation is a
 registry lookup (*is this mode registered?* → ``MissingOrchestratorError`` on a miss),
 never an enum-membership check.
@@ -13,8 +13,7 @@ that standard exists to make the linter scream when a *closed* value is added an
 branch forgotten, but a plugin-contributed set is genuinely open — exhaustive matching
 is impossible, and the dict-lookup-or-raise *is* the correct unknown-handling. It is
 also the only choice faithful to "the public base names no orchestrator": a closed
-``{DIRECT, TEMPORAL, MISTRAL}`` enum would re-introduce the very core→plugin coupling
-the plugin-system externalization removed.
+``{DIRECT, TEMPORAL, MISTRAL}`` enum would couple core to its plugins.
 
 ``OrchestrationMode`` is a plain ``str`` alias (not a ``NewType``) so plugins pass raw
 string tokens with no casts at the registry boundary — the registry is the validator,

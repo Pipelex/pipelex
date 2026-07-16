@@ -19,12 +19,12 @@ from pipelex.pipe_run.exceptions import PipeJobError
 def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
     """Validate raw_item into item_class, tolerating cross-exec instances.
 
-    The Temporal hot path now ships ListContent items as plain dicts with
+    The transport format ships ListContent items as plain dicts with
     pipelex-private ``__pipelex_class__`` / ``__pipelex_module__`` markers
     (see ``WorkingMemory.dump_for_transport``), so kajson never eagerly rehydrates
     them — the ``isinstance(raw_item, StuffContent)`` branch below is defensive,
-    kept for direct (non-Temporal) callers and for any future path where kajson
-    might still produce an instance whose class identity drifted across execs.
+    kept for callers that pass already-typed instances and for any path where
+    kajson might produce an instance whose class identity drifted across execs.
     In that drift case, ``model_validate`` would reject the old instance because
     ``type(raw_item) is not item_class``, so we round-trip through
     ``smart_dump()`` (serialize_as_any) to let nested subclass fields survive.
@@ -49,7 +49,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
     if isinstance(raw_item, str):
         return TextContent(text=raw_item)
 
-    # Already hydrated by kajson via the Temporal data converter. The instance
+    # Already hydrated by kajson via a transport data converter. The instance
     # may come from a previous exec of the dynamic source — normalize through
     # the registry's current class so downstream type checks stay consistent.
     if isinstance(raw_item, StuffContent):
@@ -65,8 +65,7 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffCo
         clean_item = {key: val for key, val in raw_item.items() if key not in {"__pipelex_class__", "__pipelex_module__"}}
         return cast("StuffContent", item_class.model_validate(clean_item))
 
-    # No __class__ metadata — fall back to TextContent for simple text dicts.
-    # This handles legacy payloads serialized before __class__ metadata was added.
+    # No __class__ metadata — fall back to TextContent for marker-less simple text dicts.
     if "text" in raw_item:
         return TextContent.model_validate(raw_item)
 
@@ -98,7 +97,7 @@ def _hydrate_composite_component(raw_value: Any) -> Any:
 def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: Concept) -> StuffContent:
     """Hydrate a single StuffContent from a raw value.
 
-    Handles both plain content and ListContent.  The Temporal serialization
+    Handles both plain content and ListContent.  The transport serialization
     format (produced by ``WorkingMemory.dump_for_transport()``) encodes
     ListContent as a plain JSON list and single StuffContent as a dict,
     so the type check is unambiguous — no heuristic required.  ListContent
@@ -114,7 +113,7 @@ def hydrate_content(raw_content: list[Any] | dict[str, Any] | str, *, concept: C
         if item_class_or_none is not None and issubclass(item_class_or_none, StuffContent):
             # Known content class (e.g. TextContent, PageContent, or a dynamic
             # structured concept class). Use _validate_as_known_class so that
-            # cross-exec instances rebuilt by kajson during Temporal transit
+            # cross-exec instances rebuilt by kajson during cross-process transit
             # get normalized through a dict round-trip.
             items = [_validate_as_known_class(item_class=item_class_or_none, raw_item=raw_item) for raw_item in raw_content]
         else:

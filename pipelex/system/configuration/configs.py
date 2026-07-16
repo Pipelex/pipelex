@@ -12,6 +12,7 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
+from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
@@ -208,6 +209,7 @@ class Pipelex(ConfigModel):
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
+    pipe_func_config: PipeFuncConfig
     pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
     tracing_config: TracingConfig
