@@ -124,6 +124,27 @@ class TestLibraryCrateAccumulation:
             library_manager.teardown(library_id=library_id)
             clear_current_library()
 
+    def test_is_crate_loaded_matches_aggregate_crate_after_multi_batch_load(self):
+        """is_crate_loaded() recognizes the aggregate crate fingerprint after multi-batch loads.
+
+        get_crate() rebuilds a single crate from all accumulated blueprints, so once a library
+        is populated in more than one load batch its fingerprint differs from every per-batch
+        fingerprint. A caller transporting that aggregate crate must still get True.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        try:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.SCORING_BUNDLE])
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.ANALYTICS_BUNDLE])
+
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+            assert library_manager.is_crate_loaded(library_id=library_id, fingerprint=crate.fingerprint) is True
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
     def test_teardown_clears_blueprints_for_library_id(self):
         """teardown(library_id) clears accumulated blueprints for that library_id."""
         library_manager = get_library_manager()

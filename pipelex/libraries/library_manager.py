@@ -535,7 +535,17 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
             # Load from crate (domains, concepts, pipes, validation)
-            return self.load_from_crate(library_id=library_id, crate=crate)
+            all_pipes = self.load_from_crate(library_id=library_id, crate=crate)
+
+            # Also record the aggregate crate fingerprint: get_crate() rebuilds one crate from
+            # ALL accumulated blueprints, so once the library holds more than one batch its
+            # fingerprint differs from every per-batch fingerprint recorded by load_from_crate.
+            # Recorded only after the load succeeds, so a failed batch (whose blueprints were
+            # already accumulated above) never registers a phantom fingerprint.
+            if aggregate_crate := self.get_crate(library_id=library_id):
+                self._loaded_fingerprints.setdefault(library_id, set()).add(aggregate_crate.fingerprint)
+
+            return all_pipes
 
     def _load_concepts_from_blueprints(
         self,
