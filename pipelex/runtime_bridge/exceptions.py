@@ -44,7 +44,7 @@ class MissingBundleValidatorError(PipelexRuntimeBridgeError):
 
 
 def _build_missing_message(*, noun: str, mode: OrchestrationMode) -> str:
-    """Generic, plugin-decoupled message shared by both Missing* errors (D-F).
+    """Generic, plugin-decoupled message shared by both Missing* errors.
 
     A plain string compare on ``"direct"`` (not an enum ``match``) — core's one built-in
     token — singles out the boot/discovery fault from the missing-plugin case.

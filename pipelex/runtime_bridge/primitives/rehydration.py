@@ -17,10 +17,11 @@ def rehydrate_library_and_memory(
 ) -> WorkingMemory | None:
     """Open a fresh library from a transported crate and hydrate a transported working memory.
 
-    This is the shared rehydration sequence used on the far side of any transport boundary — the
-    Temporal workflow (``wf_pipe_router``) and the in-sandbox entrypoint both need to reconstruct a
-    live library + typed working memory from the same ``(crate, working_memory_raw)`` payload.
-    Extracting it keeps the two in lockstep (decision 7 / DRY) instead of hand-copying the sequence.
+    This is the canonical rehydration sequence for the far side of a transport boundary: any
+    process that receives a ``(crate, working_memory_raw)`` payload — such as the in-sandbox
+    PipeFunc entrypoint — must rebuild a live library and typed working memory this way.
+    Out-of-tree orchestration backends need the same sequence; keeping it as a core primitive
+    gives them one function to call instead of hand-copying the steps.
 
     Steps, in order (order matters):
 
