@@ -375,6 +375,18 @@ class LibraryManager(LibraryManagerAbstract):
             return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
+    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
+        """Whether a crate with this fingerprint was already loaded into this library.
+
+        Backed by the same per-library fingerprint bookkeeping that makes load_from_crate
+        idempotent, so a True answer means the library's ClassRegistry already holds the
+        crate's dynamic classes. Callers can use this to hydrate within an existing scope
+        instead of opening a fresh one — preserving dynamic-class identity with instances
+        the scope already produced.
+        """
+        return fingerprint in self._loaded_fingerprints.get(library_id, set())
+
+    @override
     def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
@@ -523,7 +535,17 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
             # Load from crate (domains, concepts, pipes, validation)
-            return self.load_from_crate(library_id=library_id, crate=crate)
+            all_pipes = self.load_from_crate(library_id=library_id, crate=crate)
+
+            # Also record the aggregate crate fingerprint: get_crate() rebuilds one crate from
+            # ALL accumulated blueprints, so once the library holds more than one batch its
+            # fingerprint differs from every per-batch fingerprint recorded by load_from_crate.
+            # Recorded only after the load succeeds, so a failed batch (whose blueprints were
+            # already accumulated above) never registers a phantom fingerprint.
+            if aggregate_crate := self.get_crate(library_id=library_id):
+                self._loaded_fingerprints.setdefault(library_id, set()).add(aggregate_crate.fingerprint)
+
+            return all_pipes
 
     def _load_concepts_from_blueprints(
         self,
