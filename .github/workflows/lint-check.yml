@@ -115,12 +115,19 @@ jobs:
 # --------------------------------------------------------------------------
   lint-keyword-only:
     name: Lint (keyword-only)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      PYTHON_VERSION: "3.11"
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -136,12 +143,19 @@ jobs:
 # --------------------------------------------------------------------------
   lint-drift:
     name: Lint (drift-contracts)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      PYTHON_VERSION: "3.11"
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
