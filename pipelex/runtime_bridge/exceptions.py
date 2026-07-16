@@ -11,7 +11,7 @@ class MissingOrchestratorError(PipelexRuntimeBridgeError):
 
     ``orchestration_mode`` is an open token: ``"direct"`` is contributed by core, and every
     other token by the plugin that owns its orchestrator (``"temporal"`` →
-    ``pipelex-temporal``, ``"mistral-workflows"`` → ``pipelex-mistralai-workflows``). A
+    our Temporal plugin, ``"mistral-workflows"`` → our Mistral Workflows plugin). A
     lookup miss therefore means *that mode's plugin is not installed* — the message is
     generic and names no orchestrator, so core stays fully decoupled from its plugins. The
     one special case is ``"direct"``: its orchestrator is core and always present, so a miss

@@ -452,7 +452,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # worker claims the PIPE_FUNC_EXECUTOR slot to wrap execution in an activity, and inside that
         # activity resolves the real executor through this same registry by execution_mode. Every
         # non-worker boot resolves directly here — pipe_func_config.execution_mode selects the mode
-        # ("direct" in-process by default; "local_sandbox"/"daytona" run it out-of-process).
+        # ("direct" in-process by default; a sandbox mode like "daytona" runs it out-of-process).
         if pipe_func_executor is None:
             pipe_func_config = get_config().pipelex.pipe_func_config
             execution_mode = get_pipe_func_execution_mode()

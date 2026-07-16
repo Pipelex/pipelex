@@ -7,8 +7,7 @@ class PipeFuncConfig(ConfigModel):
     # Which PipeFunc execution mode this process runs, selected from the PipeFuncExecutorRegistry the
     # plugins populate (the config-selected-singleton seam, sibling of storage_config.method). An open
     # string token: "direct" (core, in-process — imports and runs the customer function here) is the
-    # default; "local_sandbox" (core, subprocess isolation) and "daytona" (out-of-tree
-    # pipelex-daytona-sandbox plugin) run it out-of-process. Any non-"direct" mode is a remote/sandbox
+    # default; "daytona" (our Daytona sandbox plugin) runs it out-of-process. Any non-"direct" mode is a remote/sandbox
     # backend: library loading captures the customer .py source as text (onto the crate) instead of
     # registering it in the func_registry, and the PipeFunc validators skip the func_registry lookup +
     # return-type checks — the real function is registered and validated inside the sandbox, not here.
