@@ -36,7 +36,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install uv (with cache)
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v6
         with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
@@ -51,3 +51,16 @@ jobs:
 
       - name: Run mypy merge check (Python ${{ matrix.python-version }}, fresh)
         run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-mypy
+
+      # Seed the base-branch cache for PRs. Actions caches are scoped by ref: a
+      # PR can restore from its own ref or from the base/default branch, and
+      # `lint-check.yml` is pull_request-only — so nothing ever wrote an entry
+      # PRs could read, and every PR's first run type-checked from cold. This
+      # workflow runs on dev/main and produces a *fresh* cache, which is the
+      # ideal seed. Save only (no restore) keeps this run honest.
+      - name: Seed mypy cache for PR runs
+        if: github.event_name == 'push'
+        uses: actions/cache/save@v4
+        with:
+          path: .mypy_cache
+          key: mypy-py${{ matrix.python-version }}-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-${{ github.sha }}
