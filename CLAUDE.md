@@ -9,7 +9,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format generate-mthds-schema lint pyright mypy check-keyword-only)
    ```
 
    This runs multiple code quality tools:
@@ -19,6 +19,18 @@
    - plxt: Format and lint TOML, MTHDS, and PLX files
 
    Always fix any issues reported by these tools before proceeding.
+
+### Keyword-only arguments check
+
+   Non-subject function parameters across `pipelex/` source must be keyword-only, and a positional subject is legal only under a grant recorded in `subject_grants.toml`. The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+
+   ```bash
+   make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
+   make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"   # alias: make sgr — grant a positional subject
+   ```
+
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can (including ungranted subjects — grant BEFORE running checks if the subject should stay positional) and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
 
 ### Cleaning Derived Files
 
@@ -37,8 +49,14 @@
    ```bash
    make agent-test
    # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
-   # Zero output on success; full output on failure.
+   # Heartbeat progress lines while running; full output only on failure.
    ```
+
+### When `make agent-test` hangs or fails opaquely
+
+   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure it prints the failed tests, the log path, and a grep hint; on timeout, the tail of the log and the log path.
+
+   For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
 
 ### Running Tests with Prints
 
@@ -60,7 +78,7 @@
    # or
    make tp TEST=test_function_name
    ```
-   Note: Matches names starting with the provided string.
+   Note: Matches names containing the provided string (pytest `-k` substring matching).
 
 ### Running Last Failed Tests
 
@@ -75,30 +93,6 @@
    make t TEST=LF
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
-
-### Temporal Integration Test Options
-
-   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
-
-   - `--temporal-server`: Which Temporal server to use
-     - `none` (default): in-process test server — no external dependencies, used in CI
-     - `time-skipping`: in-process server with deterministic time control
-     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
-
-   ```bash
-   # CI default: in-process server
-   .venv/bin/pytest tests/integration/pipelex/temporal/
-
-   # Dev with local Temporal server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server local
-
-   # Dev with cloud/testing server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server testing
-   ```
-
----
 
 ### Prerequisites for running command lines: use virtual environment
 
@@ -129,6 +123,12 @@
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
 
+   - **`generate-error-pages`**: Regenerate the per-class error reference pages under `docs/errors/` — one Markdown page per `PipelexError` subclass, which is what each error's `type_uri` dereferences to. Run after adding or renaming an error class. Pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs. Also available as `make generate-error-pages` (alias `make gep`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-pages
+     ```
+
    - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
 
      ```bash
@@ -137,173 +137,12 @@
      .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3 --elkjs-version 0.11.1
      ```
 
-## Coding Standards & Best Practices for Python Code
+   - **`drift`**: Drift contracts — deterministic review obligations between code and docs, declared in the root `drift.toml` (see `docs/contribute/drift-contracts.md`). When `make drift-check` (part of `make check` and CI) reports an open contract: run `make drift-plan` to see what changed and what to review, actually review the targets and fix what is stale, `git add` the trigger files (the digest reads the git index, not the working tree), then record the review with `make drift-ack CONTRACT=<id> RATIONALE="…"`. The rationale is the on-the-record review decision — write an honest sentence. There is no bypass flag; "reviewed, no doc change needed" is a legitimate rationale.
 
-This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
-
-### Python Version Compatibility
-
-    - The project supports Python 3.10+ (`requires-python = ">=3.10,<3.15"`). Never use features introduced after Python 3.10 without a compatibility fallback.
-    - Common pitfalls:
-      - `datetime.UTC` was added in Python 3.11. Use `datetime.timezone.utc` instead.
-      - `StrEnum` was added in Python 3.11. Always import it from `pipelex.types` which handles retrocompatibility.
-      - `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
-      - `ExceptionGroup` / `except*` was added in Python 3.11. Avoid unless using the `exceptiongroup` backport.
-
-### Variables, loops and indexes
-
-    - Variable names should have a minimum length of 3 characters. No exceptions: name your `for` loop indexes like `index_foobar`, your exceptions `exc` or more specific like `validation_error` when there are several layers of exceptions, and use `for key, value in ...` for key/value pairs.
-    - When looping on the keys of a dict, use `for key in the_dict` rather than `for key in the_dict.keys()` otherwise you won't pass linting.
-    - Avoid inline for loops, unless it's ultra-simple and holds on oneline.
-    - If you have a variable that will get its value differently through different code paths, declare it first with a type, e.g. `pipe_code: str` but DO NOT give it a default value like `pipe_code: str = ""` unless it's really justified. We want the variable to be unbound until all paths are covered, and the linters will help us avoid bugs this way.
-
-### Enums and tests
-
-    - When defining enums related to string values, always inherit from `StrEnum`
-    - When you need the enum value as a string, don't use `str(enum_var)` or `enum_var.value`, just use `enum_var` itself, that is the point of using StrEnum!
-    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add @property methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
-    - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
-    - `StrEnum` must be imported from `pipelex.types` (handles python retrocompatibility):
-    ```python
-    from pipelex.types import StrEnum
-    ```
-
-### Optionals
-
-- Don't write things like `a = b if b else c`, write `a = b or c` instead.
-
-### Imports
-
-#### **Imports at the top of the file**
-
-    - Avoid as much as possible import statements outside of a module's top-level scope.
-    - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
-    - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
-
-#### **Removing unused imports**
-
-    - To remove unused imports, run `make fix-unused-imports` or `make fui` (shorthand). This is faster and cheaper than rewriting with LLM.
-
-#### **No re-exports in `__init__.py`**
-
-    - Do NOT fill `__init__.py` files with re-exports.
-    - Always use direct full-path imports everywhere. For example:
-
-- **Logging and Pretty Printing**:
-
-    - Both `log()` and `pretty_print()` can be imported from `pipelex` directly:
-    ```python
-    from pipelex import log, pretty_print
-
-    log.info("Hello, world!")
-    ```
-    - Both have a title arg which is handy when logging/printing objects:
-
-    ```python
-    log.verbose("Hello, world!", title="Your first Pipelex log")
-    pretty_print(output_object, title="Your first Pipelex output")
-    ```
-    - Both handle formatting json using Rich, pretty_print makes it prettier.
-
-- **StrEnum and Self type**:
-
-    - Both `StrEnum` and `Self` must be imported from `pipelex.types` (handles python retrocompatibility):
-    ```python
-    from pipelex.types import Self, StrEnum
-    ```
-
-### Typing
-
-#### **Always Use Type Hints**
-
-    - Every function parameter must be typed
-    - Every function return must be typed
-    - Use type hints for all variables where type is not obvious
-    - Use dict, list, tuple types with lowercase first letter: dict[], list[], tuple[]
-    - Use type hints for all fields
-    - Use Field(default_factory=...) for mutable defaults
-    - Use `# pyright: ignore[specificError]` or `# type: ignore` only as a last resort. In particular, if you are sure about the type, you often solve issues by using cast() or creating a new typed variable.
-
-#### **BaseModel / Pydantic Standards**
-
-    - Use `BaseModel` and respect Pydantic v2 standards
-    - Use the modern `ConfigDict` when needed, e.g. `model_config = ConfigDict(extra="forbid", strict=True)`
-    - Keep models focused and single-purpose
-    - For list fields with non-string items in BaseModels, use `empty_list_factory_of()` to avoid linter complaints:
-      ```python
-      from pydantic import BaseModel, Field
-      from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-      
-      class MyModel(BaseModel):
-          names: list[str] = Field(default_factory=list)  # OK for strings
-          numbers: list[int] = Field(default_factory=empty_list_factory_of(int), description="A list of numbers")
-          items: list[MyItem] = Field(default_factory=empty_list_factory_of(MyItem), description="A list of items")
-      ```
-
-### Factory Pattern
-
-    - Use factory pattern for object creation when dealing with multiple implementations
-    - Our factory methods are named `make_from_...` and such
-
-### Protocols and Interfaces
-
-    - When a getter (e.g. `get_report_delegate()`, `get_library_manager()`) returns a `Protocol` type, callers must only rely on methods declared on that `Protocol`. If you need to call a method that lives on a concrete implementation, **extend the `Protocol`** — do not work around it with `isinstance(...)` checks, `cast(...)`, or inline imports of the concrete class.
-    - When extending the `Protocol`, also update every implementation (including no-op / null implementations) so structural typing is satisfied. For implementations where the method has nothing to do, give it a `pass` body — that is the whole point of having a `Protocol` rather than a concrete base class.
-    - Smell to watch for: an inline `from ... import ConcreteImpl  # noqa: PLC0415` followed by `if isinstance(delegate, ConcreteImpl): delegate.some_method(...)`. This is almost always a missing method on the `Protocol`. Promote it.
-    - Use `@override` (from `typing_extensions`) on every implementation of a `Protocol` method, so that signature drift between the `Protocol` and its implementations is caught by the type checker.
-
-### Error Handling
-
-    - Always catch exceptions at the place where you can add useful context to it.
-    - Use try/except blocks with specific exceptions
-    - Convert third-party exceptions to our custom ones except in pydantic validators where you can raise a ValueError or a TypeError
-    - **NEVER write `except Exception:` (or bare `except:`).** Catching the generic `Exception` is FORBIDDEN except in two cases, each of which REQUIRES a one-line comment directly under the `except` naming which case applies: **(1)** the absolute root of a CLI command or an API endpoint handler; **(2)** the wrapped call invokes genuinely unbounded code whose exception surface cannot be enumerated — a user-registered callback or function, dynamic plugin dispatch, or a third-party SDK with no documented exception types (this is only for genuinely open-ended surfaces; "I didn't look the exceptions up" does NOT qualify). There are NO other exceptions to this rule. The following are NOT valid justifications and the agent must reject them when tempted:
-        - "I want to log and re-raise" → just let it propagate; logging happens at the root.
-        - "I want to swallow it just in case" → don't. Unknown failures must surface.
-        - "I want to convert it to our error type" → only if you know which specific exception(s) the call can raise; catch those explicitly. Catching a project base class (`PipelexError`) or a package base (`CogtError`, `ToolError`) is acceptable when the operation legitimately fails in many domain-specific ways — that is still specific. Catching `Exception` is not.
-        - "The third-party lib isn't well typed" → look up the actual exceptions it raises and catch those by name.
-        - "It's safer this way" → it isn't. It hides bugs. Crashing loudly on an unexpected exception is the desired behavior.
-        If you find yourself writing `except Exception` outside the two cases above, STOP and ask the user before proceeding.
-    - **Do NOT add try/except speculatively.** Only add a `try`/`except` when (a) a specific exception type is documented or known to be raised by the call, AND (b) you have a concrete recovery path or a meaningful context to attach. Otherwise, let the error bubble up — that is the correct behavior, not a gap to fill.
-    - **Use `try`/`finally` (without `except`) for required cleanup.** When a piece of code MUST run on the way out — releasing a resource, closing a tracer, tearing down a library, clearing per-context state on a manager — put it in a `finally` block (or a `with`/context manager). This is the correct way to guarantee cleanup on both the happy path and the error path: it does NOT suppress the exception, it just ensures cleanup happens before the exception propagates. Do not invent an `except Exception` just to attach cleanup; use `finally` instead. Conversely, do not move cleanup into the success path "to keep things simple" — if it must run on errors too, it belongs in `finally`.
-    - When reviewing existing code, treat any `except Exception` you encounter as a bug to fix (replace it with the specific exception(s) actually raised, or remove the try/except entirely), not as a precedent to follow.
-    - Always add `from exc` to the exception raise statements
-    - Always write the error message as a variable before raising it, for cleaner error traces
-   
-   ```python
-   try:
-       self.models_manager.setup()
-   except RoutingProfileLibraryNotFoundError as exc:
-       msg = "The routing library could not be found, please call `pipelex init config` to create it"
-       raise PipelexSetupError(msg) from exc
-   ```
-
-### Documentation
-
-1. **Docstring Format**
-   ```python
-   def process_image(image_path: str, size: tuple[int, int]) -> bytes:
-       """Process and resize an image.
-       
-       Args:
-           image_path: Path to the source image
-           size: Tuple of (width, height) for resizing
-           
-       Returns:
-           Processed image as bytes
-       """
-       pass
-   ```
-
-2. **Class Documentation**
-   ```python
-   class ImageProcessor:
-       """Handles image processing operations.
-       
-       Provides methods for resizing, converting, and optimizing images.
-       """
-   ```
+     ```bash
+     make drift-plan
+     make drift-ack CONTRACT=config-docs RATIONALE="Documented the new setting; other config pages unaffected."
+     ```
 
 ## Standards related to developing the Pipelex codebase
 
@@ -324,87 +163,18 @@ When adding validation or fields, decide which layer they belong to. Language ru
 - If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml`. NEVER add them commented out: commented-out TOML is never parsed or validated, so it rots silently when keys are refactored. Instead, write the actual default values (matching `pipelex/pipelex.toml`, even empty ones like `activity_queues = {}`) so the override file stays valid and behaves like setting nothing. Plain prose comments explaining the setting are fine — it's commented-out keys/values that are forbidden.
 - The different `pipelex.toml` files and the python model `configs.py` must be up to date with each other in terms of structure and attributes, otherwise the loading of teh config fails. To check quickly that you're good, just run `make tb` which tests the boot sequence, which includes the config loading.
 
-## Writing tests
+### Keyword-only arguments
 
-### Unit test generalities
+Non-subject function parameters across `pipelex/` source must be **keyword-only**, so call sites are self-documenting: `do_thing(retries=3, timeout=30)` over the opaque `do_thing(3, 30)`. The compliant shapes:
 
-NEVER USE unittest.mock. Instead YOU MUST USE pytest-mock: `from pytest_mock import MockerFixture`.
-NEVER EVER put more than one TestClass into a test module.
+- `def f(*, opt1, opt2): ...` — fully keyword-only. Always compliant, needs nothing.
+- `def f(subject, *, opt1, opt2): ...` — a positional subject (including a lone one, `def render(node)`) is legal ONLY under a **subject grant** recorded in `subject_grants.toml` at the repo root: `make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"` (alias `sgr`). Grant when the call reads as a verb–object sentence with a single obvious operand; when in doubt, go keyword-only.
+- A second bare positional (`def f(a, b)`, `def truncate(text, max_length=80)`) is always a violation, grant or not.
+- A `bool`/`int`/`float` subject (incl. `Optional`/union-with-`None` forms) is banned outright — grants are impossible; `f(True)` call sites are never acceptable.
 
-#### Test file structure
+The rule is mechanically enforced by the `check-keyword-only` AST guard, which runs in `make agent-check`, in the `make check` aggregate, and in CI; the tree is fully compliant, so it hard-blocks on **any** violation, and staleness is symmetric (a grant whose def was renamed, moved, demoted, or deleted fails the check until the registry is cleaned up). Carve-outs (dunders, pydantic validators/serializers, Typer/pytest/Jinja2 framework entrypoints, `@override` impls) are skipped automatically. A genuinely justified one-off uses an inline `# kw-only: ignore` comment on the `def` line (place it right after the open paren so `ruff format` keeps it on the header line). Watch for functions a framework or the interpreter invokes positionally (callbacks, `__import__` hooks, route handlers): the type checker is blind to those, so `make agent-test` is the safety net. ⚠ `make agent-check` runs the auto-fixer, which will silently keyword-only an ungranted subject — record the grant BEFORE running checks if the subject should stay positional.
 
-- Name test files with `test_` prefix
-- Place test files in the appropriate test category directory:
-    - `tests/unit/` - for unit tests that test individual functions/classes in isolation
-    - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete methods
-- Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
-- Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
-- Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
-- Always put tests inside Test classes: 1 TestClass per module.
-- NEVER EVER put more than one TestClass into a test module.
-- Put fixtures into conftest.py files for easy sharing.
-
-#### Markers
-
-Apply the appropriate markers:
-- "gha_disabled: will not be able to run properly on GitHub Actions"
-- "llm: uses an LLM to generate text or objects"
-- "img_gen: uses an image generation AI"
-- "extract: uses text/image extraction from documents"
-- "inference: uses either an LLM or an image generation AI"
-- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
-
-Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
-
-#### Important rules
-
-- Never use the unittest.mock. Use pytest-mock.
-
-#### Test Class Structure
-
-- Always group the tests of a module into a test class:
-
-```python
-@pytest.mark.llm
-@pytest.mark.inference
-@pytest.mark.asyncio(loop_scope="class")
-class TestFooBar:
-    @pytest.mark.parametrize(
-        "topic, test_case_blueprint",
-        [
-            TestCases.CASE_1,
-            TestCases.CASE_2,
-        ],
-    )
-    async def test_pipe_processing(
-        self,
-        request: FixtureRequest,
-        topic: str,
-        test_case_blueprint: StuffBlueprint,
-    ):
-        # Test implementation
-```
-
-- Never more than 1 class per test module.
-- When testing one method, if possible, limit the number of test functions, but with different test cases in parameters
-
-#### Test Data Organization
-
-- If it's not already there, create a `test_data.py` file in the proper test directory
-- Note how we avoid initializing a default mutable value within a class instance, instead we use ClassVar.
-- Also note that we provide a topic for the test case, which is purely for convenience.
-
-### Best Practices for Testing
-
-- Use strong asserts: test value, not just type and presence.
-- Use parametrize for multiple test cases
-- Test both success and failure cases
-- Verify working memory state
-- Check output structure and content
-- Use meaningful test case names
-- Include concise docstrings explaining test purpose but not on top of the file and not on top of the class.
-- Log outputs for debugging
+The full specification — the grant registry and rubric, the symmetric-tuple allowlist, the carve-out list, the escape hatch, and worked examples — is in [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md).
 
 ## Writing Docs
 
@@ -413,22 +183,3 @@ We use Material for MkDocs. All markdown in our docs must be compatible with Mat
 ### MkDocs Markdown Requirements
 
 - Always add a blank line before any bullet lists or numbered lists in MkDocs markdown.
-
-## Test-Driven Development Guide
-
-This document outlines our test-driven development (TDD) process and the tools available for testing.
-
-### TDD Cycle
-
-1. **Write a Test First**
-
-2. **Write the Code**
-   - Implement the minimum amount of code needed to pass the test
-   - Follow the project's coding standards
-   - Keep it simple - don't write more than needed
-
-3. **Run Linting and Type Checking**
-
-4. **Validate tests**
-
-Remember: The key to TDD is writing the test first and letting it drive your implementation. Then, always run the full test suite and quality checks before considering a feature complete.

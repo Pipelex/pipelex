@@ -1,5 +1,5 @@
 # =============================================================================
-# Pipelex TOML Configuration for pipelex-demo
+# PLXT Configuration
 # =============================================================================
 # Configures MTHDS/TOML formatting and linting behaviour for this project.
 # Powered by the Pipelex extension (plxt / taplo engine).
@@ -98,6 +98,13 @@ include = ["**/*.toml"]
 [[rule]]
 # Which files this rule applies to (relative globs).
 include = ["**/*.mthds", "**/*.plx"]
+
+# This repo is the source of truth for the MTHDS language: validate .mthds files
+# against the locally generated schema, not the released one bundled with plxt
+# (which lags behind whenever a language surface changes here).
+# Generate it with: .venv/bin/pipelex-dev generate-mthds-schema
+[rule.schema]
+path = "derived/mthds_schema.json"
 
 # Per-rule formatting overrides — all at defaults so you can tweak them
 # independently of .toml files.

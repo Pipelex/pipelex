@@ -1,8 +1,9 @@
 import traceback
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, final
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, final
 
+import shortuuid
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -10,17 +11,24 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
-from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
-from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
+from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
+from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
+from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.system.telemetry.otel_constants import (
@@ -34,13 +42,46 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import Self
 
 if TYPE_CHECKING:
-    from pipelex.graph.graph_context import GraphContext
-    from pipelex.libraries.library_crate import LibraryCrate
+    from pipelex.graph.trace_context import TraceContext
 
 PipeAbstractType = type["PipeAbstract"]
+
+
+class AbsentInput(NamedTuple):
+    """One needed input that is absent from working memory, with its ledger record when one exists."""
+
+    named_stuff_spec: NamedStuffSpec
+    absence_record: AbsenceRecord
+
+
+class CompanionSlot(NamedTuple):
+    """One extra slot a pipe would have written into working memory besides its main output
+    (e.g. an `add_each_output` parallel's branch result slots). When the pipe is lifted, each
+    companion slot must be resolved too — a recorded absence for a singular slot, an empty
+    list for a plural one (D4) — or downstream consumers would hit a hard neither-value-nor-record miss.
+    """
+
+    slot_name: str
+    concept: Concept
+    is_plural: bool
+    producing_pipe_code: str
+
+
+class InputPresenceScan(NamedTuple):
+    """The runtime trichotomy (D3) applied to a pipe's needed inputs against working memory.
+
+    - ``missing_names``: absent with NO absence record and not optional — never produced, a hard error.
+    - ``forced_absent``: `!` inputs fed a recorded absence — typed failure with provenance.
+    - ``liftable``: plain inputs fed a recorded absence — the pipe is lifted (skipped).
+
+    Absent optional (`?`) inputs appear nowhere: the pipe runs and handles absence itself.
+    """
+
+    missing_names: list[str]
+    forced_absent: list[AbsentInput]
+    liftable: list[AbsentInput]
 
 
 class PipeAbstract(ABC, BaseModel):
@@ -68,6 +109,20 @@ class PipeAbstract(ABC, BaseModel):
         return PipeCategory.is_controller_by_str(self.pipe_category)
 
     @property
+    def is_signature(self) -> bool:
+        # Identity by class, not by enum field: the base is never a signature; `PipeSignature`
+        # overrides this to True. (`pipe_category` no longer encodes signature-ness.)
+        return False
+
+    def pipe_dependencies(self) -> set[str]:
+        """Return the set of pipe codes that this pipe depends on.
+
+        Operators and signatures have no sub-pipe dependencies by default. Controllers
+        override this to return the codes of pipes they orchestrate.
+        """
+        return set()
+
+    @property
     def concept_dependencies(self) -> list[Concept]:
         """Return all unique concept dependencies (output + inputs) without duplicates."""
         seen_concept_refs: set[str] = set()
@@ -85,36 +140,49 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
-    def _register_execution_data(self, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
+    def _register_execution_data(self, *, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
         """Register execution metadata with the graph tracer.
 
         Called by pipe subclasses during execution to capture runtime-resolved data
         (rendered prompts, resolved models, etc.) for the GraphSpec.
         """
-        graph_context = job_metadata.graph_context
-        if graph_context is None:
+        trace_context = job_metadata.trace_context
+        if trace_context is None:
             return
         tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is None or graph_context.parent_node_id is None:
+        if tracer_manager is None or trace_context.parent_node_id is None:
             return
         tracer_manager.register_execution_data(
-            lookup_key=graph_context.lookup_key,
-            node_id=graph_context.parent_node_id,
+            lookup_key=trace_context.lookup_key,
+            node_id=trace_context.parent_node_id,
             execution_data=execution_data,
         )
 
-    def _make_single_concept_data_for_registry(self, concept: Concept) -> dict[str, Any]:
+    def _make_pipe_data_for_registry(self, *, library_crate: LibraryCrate | None) -> dict[str, Any]:
+        """Serialize this pipe for the graph registry, including declaration source when known."""
+        pipe_data = self.model_dump(mode="json", serialize_as_any=True)
+        if library_crate is not None:
+            source = library_crate.source_map.get(self.pipe_ref)
+            if source:
+                pipe_data["source"] = source
+        return pipe_data
+
+    def _make_single_concept_data_for_registry(self, concept: Concept, *, library_crate: LibraryCrate | None) -> dict[str, Any]:
         """Serialize a single concept for the graph registry, including its JSON Schema."""
-        concept_dict = concept.model_dump(mode="json")
+        concept_dict = concept.model_dump(mode="json", serialize_as_any=True)
+        if library_crate is not None:
+            source = library_crate.source_map.get(concept.concept_ref)
+            if source:
+                concept_dict["source"] = source
         try:
             concept_dict["json_schema"] = concept.get_structure_class().model_json_schema()
         except (TypeError, ValueError):
             concept_dict["json_schema"] = None
         return concept_dict
 
-    def _make_concept_data_for_registry(self) -> list[dict[str, Any]]:
+    def _make_concept_data_for_registry(self, *, library_crate: LibraryCrate | None) -> list[dict[str, Any]]:
         """Serialize all unique concepts from this pipe for the graph registry."""
-        return [self._make_single_concept_data_for_registry(concept) for concept in self.concept_dependencies]
+        return [self._make_single_concept_data_for_registry(concept, library_crate=library_crate) for concept in self.concept_dependencies]
 
     @field_validator("code", mode="before")
     @classmethod
@@ -134,21 +202,29 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("type", mode="after")
     @classmethod
     def validate_pipe_type(cls, value: Any) -> Any:
-        if value not in PipeType.value_list():
-            msg = f"Invalid pipe type '{value}' for pipe '{cls.code}'. Must be one of: {PipeType.value_list()}"
+        allowed = valid_pipe_type_tags()
+        if value not in allowed:
+            msg = f"Invalid pipe type '{value}'. Must be one of: {allowed}"
             raise ValueError(msg)
         return value
 
     @field_validator("pipe_category", mode="after")
     @classmethod
     def validate_pipe_category(cls, value: Any) -> Any:
-        if value not in PipeCategory.value_list():
-            msg = f"Invalid pipe category '{value}' for pipe '{cls.code}'. Must be one of: {PipeCategory.value_list()}"
+        # A signature carries `pipe_category = None` (no executable category); every executable pipe
+        # pins a `Literal["PipeOperator"|"PipeController"]`, so `None` unambiguously means "signature".
+        if value is not None and value not in PipeCategory.value_list():
+            msg = f"Invalid pipe category '{value}'. Must be one of: {PipeCategory.value_list()}"
             raise ValueError(msg)
         return value
 
     @model_validator(mode="after")
     def validate_pipe_category_based_on_type(self) -> Self:
+        if self.is_signature:
+            # Signatures sit outside the executable taxonomy: `type` is the signature tag (not a
+            # `PipeType`) and `pipe_category` is None, so the type↔category consistency check below
+            # (which coerces `PipeType(self.type)`) does not apply.
+            return self
         try:
             pipe_type = PipeType(self.type)
         except ValueError as exc:
@@ -184,12 +260,55 @@ class PipeAbstract(ABC, BaseModel):
     def generic_validate_output_static(self):
         self.validate_output_static()
 
+    def _expected_inputs_for_fix(self, needed_inputs: InputStuffSpecs) -> dict[str, str] | None:
+        """Render the full needed-inputs mapping a fix would write, or ``None`` for operators.
+
+        Controller-gated: only a controller's ``needed_inputs()`` is a trustworthy ground truth
+        for its declared ``inputs`` table (operators re-emit their own declaration). The
+        author's declared representation is preserved (keeping their presence marker — presence
+        is deliberately not part of the drift contract) whenever the validator would accept it:
+        either its concept + multiplicity already match the needed spec, or the needed spec is a
+        flexible type (``Dynamic``/``Anything``), which the validator accepts against any concrete
+        declaration. This mirrors the flexible-type carve-out in ``generic_validate_inputs_with_library``
+        so a co-occurring drift on another input never rewrites a valid concrete declaration back
+        to ``Dynamic``/``Anything``. Refs are derived from the needed spec only for variables being
+        added or whose concept/multiplicity genuinely changes against a non-flexible need.
+        """
+        if not self.is_controller:
+            return None
+        expected_inputs: dict[str, str] = {}
+        for named_stuff_spec in needed_inputs.named_stuff_specs:
+            var_name = named_stuff_spec.variable_name
+            declared_stuff_spec = self.inputs.root.get(var_name)
+            if declared_stuff_spec is not None and (
+                named_stuff_spec.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
+                or (declared_stuff_spec.concept == named_stuff_spec.concept and declared_stuff_spec.multiplicity == named_stuff_spec.multiplicity)
+            ):
+                spec_to_render: StuffSpec = declared_stuff_spec
+            else:
+                spec_to_render = named_stuff_spec
+            expected_inputs[var_name] = spec_to_render.to_bundle_representation(relative_to_domain=self.domain_code)
+        return expected_inputs
+
+    def _declared_inputs_for_fix(self) -> dict[str, str] | None:
+        """Render the currently declared inputs the same way, or ``None`` for operators.
+
+        Carried alongside ``expected_inputs`` so the fix planner (pure, no file access) can
+        emit a minimal diff against the declaration instead of a table rewrite.
+        """
+        if not self.is_controller:
+            return None
+        return {
+            var_name: declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+            for var_name, declared_stuff_spec in self.inputs.root.items()
+        }
+
     @final
     def generic_validate_inputs_with_library(self):
         # First validate required variables are in the inputs (using prefix-based matching)
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
-            if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
+            if not is_variable_satisfied_by_inputs(required_variable_path, input_names=input_names):
                 msg = (
                     f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
                     f"Current inputs: {self.inputs.format_for_display()}"
@@ -217,6 +336,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[var_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
@@ -226,26 +347,22 @@ class PipeAbstract(ABC, BaseModel):
                 declared_stuff_spec = self.inputs.root[var_name]
                 needed_stuff_spec = the_needed_inputs.root[named_stuff_spec.requirement_expression or var_name]
 
-                # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything)
-                if (
-                    needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}
-                    and declared_stuff_spec != needed_stuff_spec
+                # Allow mismatch if the needed stuff_spec is a flexible type (Dynamic or Anything).
+                # Presence markers are deliberately NOT compared: a controller's boundary marker may
+                # legitimately differ from a child's need (e.g. a sequence declares `X?` while a step
+                # needs `X` plain — that is exactly the lift-skip case, D3). Only concept and
+                # multiplicity define the spec contract here.
+                if needed_stuff_spec.concept.code not in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING} and (
+                    declared_stuff_spec.concept != needed_stuff_spec.concept or declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity
                 ):
-                    # Identify the specific mismatched field(s)
-                    mismatch_details: list[str] = []
-                    if declared_stuff_spec.concept != needed_stuff_spec.concept:
-                        mismatch_details.append(f"concept: declared='{declared_stuff_spec.concept}' vs required='{needed_stuff_spec.concept}'")
-                    if declared_stuff_spec.multiplicity != needed_stuff_spec.multiplicity:
-                        mismatch_details.append(
-                            f"multiplicity: declared='{declared_stuff_spec.multiplicity}' vs required='{needed_stuff_spec.multiplicity}'"
-                        )
-
-                    mismatch_summary = ", ".join(mismatch_details)
+                    # Render both specs the way an author would write them in this pipe's domain
+                    # (bare `Number` / `Text[]`, qualified only for foreign domains) — never the
+                    # Python repr of the Concept/StuffSpec objects.
+                    declared_ref = declared_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
+                    required_ref = needed_stuff_spec.to_bundle_representation(relative_to_domain=self.domain_code)
                     msg = (
-                        f"In the pipe '{self.code}', the input variable '{var_name}' has a stuff spec mismatch.\n"
-                        f"Mismatched field(s): {mismatch_summary}\n"
-                        f"Declared: {declared_stuff_spec}\n"
-                        f"Required: {needed_stuff_spec}"
+                        f"In pipe '{self.code}', input '{var_name}' is declared as '{declared_ref}' "
+                        f"but its step needs '{required_ref}'. Update the input to '{required_ref}'."
                     )
                     raise PipeValidationError(
                         message=msg,
@@ -253,11 +370,13 @@ class PipeAbstract(ABC, BaseModel):
                         domain_code=self.domain_code,
                         pipe_code=self.code,
                         variable_names=[var_name],
+                        expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                        declared_inputs=self._declared_inputs_for_fix(),
                     )
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
-            if input_name not in the_needed_inputs.required_names:
+            if input_name not in the_needed_inputs.declared_names:
                 msg = f"Extraneous input '{input_name}' found in the inputs of pipe {self.code}"
                 raise PipeValidationError(
                     message=msg,
@@ -265,6 +384,8 @@ class PipeAbstract(ABC, BaseModel):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
+                    expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
+                    declared_inputs=self._declared_inputs_for_fix(),
                 )
 
         self.validate_inputs_with_library()
@@ -289,29 +410,85 @@ class PipeAbstract(ABC, BaseModel):
     def validate_output_static(self):
         pass
 
+    def _scan_input_presence(self, *, working_memory: WorkingMemory) -> InputPresenceScan:
+        """Apply the runtime trichotomy (D3) to this pipe's needed inputs.
+
+        The presence marker is read from this pipe's OWN input declaration when it exists —
+        that is the boundary contract (D5: boundaries explicit). A controller's aggregated
+        ``needed_inputs()`` carries the children's markers, and e.g. a sequence declaring
+        ``X?`` over a step that needs ``X`` plain must run (its steps lift), not lift wholesale.
+        """
+        missing_names: list[str] = []
+        forced_absent: list[AbsentInput] = []
+        liftable: list[AbsentInput] = []
+        for named_stuff_spec in self.needed_inputs().named_stuff_specs:
+            if working_memory.get_optional_stuff(named_stuff_spec.variable_name):
+                continue
+            absence_record = working_memory.get_optional_absence(named_stuff_spec.variable_name)
+            declared_stuff_spec = self.inputs.root.get(named_stuff_spec.variable_name)
+            presence = declared_stuff_spec.presence if declared_stuff_spec else named_stuff_spec.presence
+            match presence:
+                case PresenceMarker.OPTIONAL:
+                    continue
+                case PresenceMarker.FORCE:
+                    if absence_record:
+                        forced_absent.append(AbsentInput(named_stuff_spec=named_stuff_spec, absence_record=absence_record))
+                    else:
+                        missing_names.append(named_stuff_spec.variable_name)
+                case PresenceMarker.PLAIN:
+                    if absence_record:
+                        liftable.append(AbsentInput(named_stuff_spec=named_stuff_spec, absence_record=absence_record))
+                    else:
+                        missing_names.append(named_stuff_spec.variable_name)
+        return InputPresenceScan(missing_names=missing_names, forced_absent=forced_absent, liftable=liftable)
+
     @final
     async def validate_before_run(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-    ):
-        # Check that all the needed inputs are actually in the working memory
-        missing_input_names: list[str] = []
+    ) -> InputPresenceScan:
+        # A PipeSignature has no implementation: reject live execution before the input
+        # checks below, so callers get the actionable error, not a misleading "missing inputs".
+        if self.is_signature and pipe_run_params.run_mode.is_live:
+            raise PipeSignatureNotExecutableError(pipe_ref=self.pipe_ref)
 
-        for named_stuff_spec in self.needed_inputs().named_stuff_specs:
-            if not working_memory.get_optional_stuff(named_stuff_spec.variable_name):
-                missing_input_names.append(named_stuff_spec.variable_name)
+        # The runtime trichotomy (D3): a recorded absence on a `!` input is a typed failure with
+        # provenance; absent with no record (and not optional) is a hard miss — the bug case.
+        presence_scan = self._scan_input_presence(working_memory=working_memory)
 
-        if missing_input_names:
-            msg = f"Dry run of {self.type} '{self.code}': missing required inputs: {', '.join(missing_input_names)}"
+        if presence_scan.forced_absent:
+            forced = presence_scan.forced_absent[0]
+            raise OptionalValueAbsentError.make(
+                run_mode=pipe_run_params.run_mode,
+                pipe_code=self.code,
+                variable_name=forced.named_stuff_spec.variable_name,
+                concept_ref=forced.named_stuff_spec.concept.concept_ref,
+                absence_record=forced.absence_record,
+            )
+
+        if presence_scan.missing_names:
+            run_label = "Dry run" if pipe_run_params.run_mode.is_dry else "Live run"
+            msg = f"{run_label} of {self.type} '{self.code}': missing required inputs: {', '.join(presence_scan.missing_names)}."
+            optional_input_names = [
+                named_stuff_spec.variable_name for named_stuff_spec in self.needed_inputs().named_stuff_specs if named_stuff_spec.presence.is_optional
+            ]
+            if optional_input_names:
+                msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
             raise PipeRunInputsError(
                 message=msg,
                 run_mode=pipe_run_params.run_mode,
                 pipe_code=self.code,
-                missing_inputs=missing_input_names,
+                missing_inputs=presence_scan.missing_names,
             )
+
+        # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
+        # moot — they would inspect inputs the pipe will never consume.
+        if presence_scan.liftable:
+            return presence_scan
 
         # Validate external resources (URLs, file paths) referenced by input contents.
         # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
@@ -335,10 +512,12 @@ class PipeAbstract(ABC, BaseModel):
         await self._validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
+        return presence_scan
 
     @abstractmethod
     async def _validate_before_run(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -349,6 +528,7 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def validate_after_run(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -361,6 +541,7 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _validate_after_run(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -380,7 +561,7 @@ class PipeAbstract(ABC, BaseModel):
         """
 
     @abstractmethod
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Return the stuff specs that are needed for the pipe to run.
 
         Args:
@@ -408,11 +589,12 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         # Push the pipe's frame onto the stack, run it, and always pop it — even on failure —
         # so a failed pipe never leaves a stale frame behind on the shared pipe_stack, where it
@@ -433,11 +615,12 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def _run_pipe_traced(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         """Run the pipe with graph tracing — the inner body of `run_pipe()`.
 
@@ -446,41 +629,53 @@ class PipeAbstract(ABC, BaseModel):
         """
         # Handle graph tracing if enabled
         graph_node_id: str | None = None
-        child_graph_context: GraphContext | None = None
+        child_trace_context: TraceContext | None = None
         tracer_manager = None
 
-        parent_graph_context = job_metadata.graph_context
-        if parent_graph_context is not None:
+        parent_trace_context = job_metadata.trace_context
+        if parent_trace_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                started_at = datetime.now(timezone.utc)
+                started_at = datetime.now(UTC)
                 node_kind = NodeKind.CONTROLLER if self.is_controller else NodeKind.OPERATOR
 
                 # Capture input specs from working memory for data flow tracking
                 input_specs: list[IOSpec] = []
-                for var_name in self.needed_inputs().required_names:
+                for var_name in self.needed_inputs().declared_names:
                     stuff = working_memory.get_optional_stuff(var_name)
                     if stuff is not None:
+                        # E1: gate the expensive payload serialization on emit_graph_events too — in
+                        # costs-only mode the GraphSpec is never assembled, so these dumps would be built
+                        # then discarded. The lightweight IOSpec (name/concept/content_type/digest) is kept
+                        # so node ids and usage-event correlation are unaffected.
+                        include_graph_data = parent_trace_context.emit_graph_events
                         input_spec = IOSpec(
                             name=var_name,
                             concept=stuff.concept.code,
                             content_type=stuff.content.content_type,
                             digest=stuff.stuff_code,
-                            data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
-                            data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                            data_html=stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                            data=stuff.content.smart_dump()
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content)
+                            else None,
+                            data_text=stuff.content.rendered_pretty_text()
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
+                            else None,
+                            data_html=stuff.content.rendered_pretty_html()
+                            if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
+                            else None,
                         )
                         input_specs.append(input_spec)
 
-                # Serialize pipe and concept data for registries if enabled
+                # Serialize pipe and concept data for registries if enabled (E1: also gated on
+                # emit_graph_events — the registries only feed the GraphSpec).
                 pipe_data: dict[str, Any] | None = None
                 concept_data: list[dict[str, Any]] | None = None
-                if parent_graph_context.data_inclusion.pipe_and_concept_registry:
-                    pipe_data = self.model_dump(mode="json")
-                    concept_data = self._make_concept_data_for_registry()
+                if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry:
+                    pipe_data = self._make_pipe_data_for_registry(library_crate=library_crate)
+                    concept_data = self._make_concept_data_for_registry(library_crate=library_crate)
 
-                graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
-                    graph_context=parent_graph_context,
+                graph_node_id, child_trace_context = tracer_manager.on_pipe_start(
+                    trace_context=parent_trace_context,
                     pipe_code=self.code,
                     pipe_type=self.type,
                     node_kind=node_kind,
@@ -491,36 +686,47 @@ class PipeAbstract(ABC, BaseModel):
                     description=self.description,
                     domain_code=self.domain_code,
                 )
-                # Update job metadata with child graph context for nested pipes
-                if child_graph_context is not None:
+                # Update job metadata with child trace context for nested pipes
+                if child_trace_context is not None:
                     job_metadata = job_metadata.copy_with_update(
                         otel_context=job_metadata.otel_context,
-                        graph_context=child_graph_context,
+                        trace_context=child_trace_context,
                     )
         try:
-            await self.validate_before_run(
+            presence_scan = await self.validate_before_run(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
-            match pipe_run_params.run_mode:
-                case PipeRunMode.LIVE:
-                    pipe_output = await self.live_run_pipe(
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        pipe_run_params=pipe_run_params,
-                        output_name=output_name,
-                        library_crate=library_crate,
-                    )
-                case PipeRunMode.DRY:
-                    pipe_output = await self.dry_run_pipe(
-                        job_metadata=job_metadata,
-                        working_memory=working_memory,
-                        pipe_run_params=pipe_run_params,
-                        output_name=output_name,
-                        library_crate=library_crate,
-                    )
-            await self.validate_after_run(
-                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-            )
+            if presence_scan.liftable:
+                # Implicit lifting (D3): a plain input fed a recorded absence skips the pipe;
+                # its output is recorded absent with provenance chaining to the input's record.
+                pipe_output = self._make_lifted_output(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    liftable=presence_scan.liftable,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                )
+            else:
+                match pipe_run_params.run_mode:
+                    case PipeRunMode.LIVE:
+                        pipe_output = await self.live_run_pipe(
+                            job_metadata=job_metadata,
+                            working_memory=working_memory,
+                            pipe_run_params=pipe_run_params,
+                            output_name=output_name,
+                            library_crate=library_crate,
+                        )
+                    case PipeRunMode.DRY:
+                        pipe_output = await self.dry_run_pipe(
+                            job_metadata=job_metadata,
+                            working_memory=working_memory,
+                            pipe_run_params=pipe_run_params,
+                            output_name=output_name,
+                            library_crate=library_crate,
+                        )
+                await self.validate_after_run(
+                    job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+                )
         except Exception as exc:
             # Broad catch is intentional: graph tracing must record EVERY failure mode,
             # including unexpected ones — an untraced failure is an observability hole.
@@ -528,60 +734,186 @@ class PipeAbstract(ABC, BaseModel):
             # Can't be a `finally`: the success/error paths record different things and
             # the error path needs the exception object.
             # Record graph tracing error
-            if tracer_manager is not None and parent_graph_context is not None:
+            if tracer_manager is not None and parent_trace_context is not None:
                 error_stack: str | None = None
-                if parent_graph_context.data_inclusion.error_stack_traces:
+                if parent_trace_context.data_inclusion.error_stack_traces:
                     error_stack = traceback.format_exc()
                 tracer_manager.on_pipe_end_error(
-                    lookup_key=parent_graph_context.lookup_key,
+                    lookup_key=parent_trace_context.lookup_key,
                     node_id=graph_node_id,
-                    ended_at=datetime.now(timezone.utc),
+                    ended_at=datetime.now(UTC),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
                     error_stack=error_stack,
                 )
             raise
 
-        # Record graph tracing success
-        if tracer_manager is not None and parent_graph_context is not None:
-            # Capture output spec for data flow tracking
-            # Note: main_stuff may not exist for pipes like PipeParallel with add_each_output=true
-            main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+        # Record graph tracing completion — a lifted (skipped) pipe ends its node in the distinct
+        # `skipped` state with the skip reason; every other completion is a success.
+        if tracer_manager is not None and parent_trace_context is not None:
+            # Capture output spec for data flow tracking — a completed pipe run always resolves its
+            # declared output: a value or a recorded absence. An absent output has no payload to
+            # capture. A LIFTED pipe with a PLURAL output still wrote a real empty-list Stuff (D4)
+            # that downstream pipes consume, so its spec must register in the producer map exactly
+            # like a produced value — otherwise the consumers' DATA edges silently drop.
+            main_resolved = pipe_output.working_memory.resolve_main_stuff()
             output_spec: IOSpec | None = None
-            if main_stuff is not None:
+            output_concept_data: dict[str, Any] | None = None
+            if isinstance(main_resolved, Stuff):
+                main_stuff = main_resolved
+                # E1: same gating as the input block — skip the discarded payload dumps in costs-only mode.
+                include_graph_data = parent_trace_context.emit_graph_events
                 output_spec = IOSpec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
                     concept=main_stuff.concept.code,
                     content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
-                    data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
-                    data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                    data_html=main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                    data=main_stuff.content.smart_dump() if (include_graph_data and parent_trace_context.data_inclusion.stuff_json_content) else None,
+                    data_text=main_stuff.content.rendered_pretty_text()
+                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_text_content)
+                    else None,
+                    data_html=main_stuff.content.rendered_pretty_html()
+                    if (include_graph_data and parent_trace_context.data_inclusion.stuff_html_content)
+                    else None,
+                    # The optional-edge marker (D8): a data edge fed by this output reports that the
+                    # value may be absent in other runs.
+                    extra={"optional": True} if self.output.presence.is_optional else {},
                 )
 
-            # Serialize output concept for registry if enabled
-            output_concept_data: dict[str, Any] | None = None
-            if parent_graph_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
-                output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept)
+                # Serialize output concept for registry if enabled (E1: also gated on emit_graph_events).
+                if parent_trace_context.emit_graph_events and parent_trace_context.data_inclusion.pipe_and_concept_registry:
+                    output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept, library_crate=library_crate)
 
-            tracer_manager.on_pipe_end_success(
-                lookup_key=parent_graph_context.lookup_key,
-                node_id=graph_node_id,
-                ended_at=datetime.now(timezone.utc),
-                output_spec=output_spec,
-                output_concept_data=output_concept_data,
-            )
+            if presence_scan.liftable:
+                tracer_manager.on_pipe_end_skipped(
+                    lookup_key=parent_trace_context.lookup_key,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(UTC),
+                    skip_reason=self._make_skip_reason(liftable=presence_scan.liftable),
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data,
+                )
+                # Plural companion slots also wrote real empty-list Stuffs on the lift — register
+                # them as this node's outputs so their downstream DATA edges resolve too.
+                # (graph_node_id is set whenever tracing recorded the start; guard for the type.)
+                if graph_node_id is not None:
+                    for companion_slot in self.lifted_companion_slots():
+                        if not companion_slot.is_plural:
+                            continue
+                        companion_stuff = pipe_output.working_memory.get_optional_stuff(companion_slot.slot_name)
+                        if companion_stuff is None:
+                            continue
+                        tracer_manager.register_controller_output(
+                            lookup_key=parent_trace_context.lookup_key,
+                            node_id=graph_node_id,
+                            output_spec=IOSpec(
+                                name=companion_slot.slot_name,
+                                concept=companion_stuff.concept.code,
+                                content_type=companion_stuff.content.content_type,
+                                digest=companion_stuff.stuff_code,
+                            ),
+                        )
+            else:
+                tracer_manager.on_pipe_end_success(
+                    lookup_key=parent_trace_context.lookup_key,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(UTC),
+                    output_spec=output_spec,
+                    output_concept_data=output_concept_data,
+                )
 
         return pipe_output
+
+    def lifted_companion_slots(self) -> list[CompanionSlot]:
+        """Extra slots this pipe would have written besides its main output, to resolve when it
+        is lifted. Default: none; an `add_each_output` PipeParallel reports its branch slots.
+        """
+        return []
+
+    @classmethod
+    def _make_skip_reason(cls, *, liftable: list[AbsentInput]) -> str:
+        """The one skip-reason wording, shared by the absence record and the graph node."""
+        return f"skipped because input '{liftable[0].named_stuff_spec.variable_name}' is absent"
+
+    def _make_lifted_output(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        liftable: list[AbsentInput],
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+    ) -> PipeOutput:
+        """Skip this pipe (implicit lifting, D3) and record its output as absent with provenance.
+
+        A plural output does not go absent: it normalizes to an empty list (D4) — `[]`-emptiness
+        is the absence story for plurals — with a ledger note kept for observability; taint stops.
+        Plurality is resolved like the run path resolves it (declared multiplicity + the
+        invocation-level override), matching what the static taint pass promised downstream.
+        Companion slots the pipe would also have written (`lifted_companion_slots`) are resolved
+        the same way, so no downstream consumer meets a neither-value-nor-record hard miss.
+        """
+        lifted_input = liftable[0]
+        absent_names = ", ".join(absent.named_stuff_spec.variable_name for absent in liftable)
+        output_slot_name = output_name or MAIN_STUFF_NAME
+        log.info(f"Skipping {self.type} '{self.code}': absent input(s): {absent_names}")
+
+        skip_reason = self._make_skip_reason(liftable=liftable)
+        skip_record = AbsenceRecord(
+            variable_name=output_slot_name,
+            kind=AbsenceKind.SKIPPED,
+            reason=skip_reason,
+            producing_pipe=self.code,
+            upstream=lifted_input.absence_record,
+        )
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=self.output.multiplicity,
+            override_multiplicity=pipe_run_params.output_multiplicity,
+        )
+        if multiplicity_resolution.is_multiple_outputs_enabled:
+            empty_list_stuff = Stuff(
+                concept=self.output.concept,
+                content=ListContent[StuffContent](items=[]),
+                stuff_name=output_slot_name,
+                stuff_code=shortuuid.uuid()[:5],
+            )
+            working_memory.set_new_main_stuff(empty_list_stuff, name=output_name)
+            # Observability note only — the empty list is the value consumers see.
+            working_memory.record_absence(skip_record)
+        else:
+            working_memory.record_new_main_absence(skip_record)
+
+        for companion_slot in self.lifted_companion_slots():
+            companion_record = AbsenceRecord(
+                variable_name=companion_slot.slot_name,
+                kind=AbsenceKind.SKIPPED,
+                reason=skip_reason,
+                producing_pipe=companion_slot.producing_pipe_code,
+                upstream=lifted_input.absence_record,
+            )
+            if companion_slot.is_plural:
+                empty_companion_stuff = Stuff(
+                    concept=companion_slot.concept,
+                    content=ListContent[StuffContent](items=[]),
+                    stuff_name=companion_slot.slot_name,
+                    stuff_code=shortuuid.uuid()[:5],
+                )
+                working_memory.set_stuff(name=companion_slot.slot_name, stuff=empty_companion_stuff)
+                working_memory.record_absence(companion_record)
+            else:
+                working_memory.record_resolved_absence(companion_record)
+
+        return PipeOutput(working_memory=working_memory, pipeline_run_id=job_metadata.pipeline_run_id)
 
     @final
     async def live_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
@@ -649,11 +981,12 @@ class PipeAbstract(ABC, BaseModel):
     @final
     async def dry_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
@@ -668,27 +1001,30 @@ class PipeAbstract(ABC, BaseModel):
     @abstractmethod
     async def _live_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         pass
 
     @abstractmethod
     async def _dry_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        library_crate: "LibraryCrate | None" = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeOutput:
         pass
 
     def _start_pipe_span(
         self,
+        *,
         parent_otel_context: OtelContext,
         pipeline_run_id: str,
         working_memory: WorkingMemory,
@@ -753,7 +1089,7 @@ class PipeAbstract(ABC, BaseModel):
                 span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
 
             # Capture full input content for Langfuse
-            needed_input_names = set(self.needed_inputs().required_names)
+            needed_input_names = set(self.needed_inputs().declared_names)
             inputs_json = OtelFactory.make_inputs_json(
                 working_memory=working_memory,
                 needed_input_names=needed_input_names,
@@ -802,7 +1138,7 @@ class PipeAbstract(ABC, BaseModel):
 
         return span, is_root_span
 
-    def _end_pipe_span_success(self, span: Span | None, pipe_output: PipeOutput, is_root_span: bool) -> None:
+    def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
         """End the pipe's OTel span with success status. Safe to call if span is None.
 
         Args:
@@ -836,7 +1172,7 @@ class PipeAbstract(ABC, BaseModel):
                 span.set_attribute(LangfuseSpanAttr.TRACE_OUTCOME, SpanOutcome.SUCCESS)
         span.end()
 
-    def _end_pipe_span_error(self, span: Span | None, error: Exception, is_root_span: bool = False) -> None:
+    def _end_pipe_span_error(self, span: Span | None, *, error: Exception, is_root_span: bool = False) -> None:
         """End the pipe's OTel span with error status. Safe to call if span is None.
 
         Args:

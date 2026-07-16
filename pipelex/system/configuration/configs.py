@@ -1,4 +1,5 @@
-from typing import Annotated, Literal
+from enum import StrEnum
+from typing import Annotated, Literal, Self
 
 import shortuuid
 from pydantic import Field, field_validator, model_validator
@@ -11,11 +12,11 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.temporal.config_temporal import Temporal
+from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
+from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
-from pipelex.types import Self, StrEnum
 
 
 class ConfigPaths:
@@ -61,7 +62,6 @@ class PipeRunConfig(ConfigModel):
 
 
 class DryRunConfig(ConfigModel):
-    apply_to_jinja2_rendering: bool
     text_gen_truncate_length: int
     nb_list_items: int
     nb_extract_pages: int
@@ -87,23 +87,18 @@ class PromptingConfig(ConfigModel):
         return None
 
 
-class FeatureConfig(ConfigModel):
-    is_reporting_enabled: bool
-
-
 class ReportingConfig(ConfigModel):
     is_log_costs_to_console: bool
     is_generate_cost_report_file_enabled: bool
     cost_report_dir_path: str
     cost_report_base_name: str
     cost_report_extension: str
-    cost_report_unit_scale: float
+    cost_report_unit_scale: Annotated[float, Field(gt=0)]
 
 
 class TracingBackend(StrEnum):
     NDJSON = "ndjson"
     DYNAMODB = "dynamodb"
-    TEMPORAL_DYNAMODB = "temporal_dynamodb"
 
 
 class NdjsonTracingConfig(ConfigModel):
@@ -115,17 +110,11 @@ class DynamoDBTracingConfig(ConfigModel):
     region: str
 
 
-class TemporalDynamoDBTracingConfig(ConfigModel):
-    table_name: str
-    region: str
-
-
 class TracingConfig(ConfigModel):
     is_enabled: bool
     backend: TracingBackend = Field(strict=False)
     ndjson: NdjsonTracingConfig | None = None
     dynamodb: DynamoDBTracingConfig | None = None
-    temporal_dynamodb: TemporalDynamoDBTracingConfig | None = None
 
 
 class ObserverConfig(ConfigModel):
@@ -154,22 +143,26 @@ class PipelineExecutionConfig(ConfigModel):
     is_normalize_data_urls_to_storage: bool
     is_mock_inputs: bool
     is_generate_graph: bool
+    is_generate_usage: bool
     graph_config: GraphConfig
 
-    # Bounded fan-out concurrency for PipeBatch (the resilience-without-Temporal pillar).
+    # Bounded fan-out concurrency for PipeBatch (the in-process backpressure pillar, short of a durable execution backend).
     # An integer caps the number of branches executed at once; the literal "unbounded" disables the bound.
     max_concurrency: Annotated[int, Field(ge=1)] | Literal["unbounded"]
 
-    def with_graph_config_overrides(
+    def with_execution_overrides(
         self,
+        *,
         generate_graph: bool | None = None,
+        generate_usage: bool | None = None,
         force_include_full_data: bool | None = None,
         mock_inputs: bool | None = None,
     ) -> Self:
         """Create a copy of this config with optional overrides.
 
         Args:
-            generate_graph: If not None, overrides is_generate_graph.
+            generate_graph: If not None, overrides is_generate_graph (graph node/edge events + GraphSpec assembly).
+            generate_usage: If not None, overrides is_generate_usage (emit usage/cost tracing events).
             force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
@@ -182,6 +175,9 @@ class PipelineExecutionConfig(ConfigModel):
 
         if generate_graph is not None:
             updates["is_generate_graph"] = generate_graph
+
+        if generate_usage is not None:
+            updates["is_generate_usage"] = generate_usage
 
         if mock_inputs is not None:
             updates["is_mock_inputs"] = mock_inputs
@@ -204,7 +200,7 @@ class PipelineExecutionConfig(ConfigModel):
 
 class Pipelex(ConfigModel):
     storage_config: StorageConfig
-    feature_config: FeatureConfig
+    secrets_config: SecretsProviderConfig
     log_config: LogConfig
     aws_config: AwsConfig
 
@@ -213,6 +209,7 @@ class Pipelex(ConfigModel):
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
+    pipe_func_config: PipeFuncConfig
     pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
     tracing_config: TracingConfig
@@ -225,22 +222,37 @@ class Pipelex(ConfigModel):
 class MigrationConfig(ConfigModel):
     migration_maps: dict[str, dict[str, str]]
 
-    def text_in_renaming_keys(self, category: str, text: str) -> list[tuple[str, str]]:
+    def text_in_renaming_keys(self, text: str, *, category: str) -> list[tuple[str, str]]:
         renaming_map = self.migration_maps.get(category)
         if not renaming_map:
             return []
         return [(key, value) for key, value in renaming_map.items() if text in key]
 
-    def text_in_renaming_values(self, category: str, text: str) -> list[tuple[str, str]]:
+    def text_in_renaming_values(self, text: str, *, category: str) -> list[tuple[str, str]]:
         renaming_map = self.migration_maps.get(category)
         if not renaming_map:
             return []
         return [(key, value) for key, value in renaming_map.items() if text in value]
 
 
+class PluginsConfig(ConfigModel):
+    # Names of discovered plugins to skip at startup (a denylist; discovery is the
+    # source of truth for presence). Denylisting a plugin core requires
+    # unconditionally is a startup error. There is intentionally no allowlist.
+    disabled: list[str]
+
+    # Boot *this process* under the orchestrator plugin of this name. A boot-orchestrator
+    # plugin (e.g. the Temporal plugin) claims the process-global hub slots in its
+    # ``register`` iff ``plugins.boot_orchestrator == <its own name>``; any other value
+    # (or ``None``) leaves execution in-process. Core names no orchestrator — the gate is
+    # a plain name match, set programmatically (CLI ``--orchestrator`` / ``Pipelex.setup``),
+    # not from ``pipelex.toml``. Optional, so it stays absent from the TOML defaults.
+    boot_orchestrator: str | None = None
+
+
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
-    temporal: Temporal
     pipelex: Pipelex
+    plugins: PluginsConfig
     migration: MigrationConfig

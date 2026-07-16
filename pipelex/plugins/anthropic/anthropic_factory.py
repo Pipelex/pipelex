@@ -1,23 +1,24 @@
 import math
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
-from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
+from anthropic import AsyncAnthropic
+from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import Usage
 from anthropic.types.document_block_param import DocumentBlockParam
 from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
-from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicFactoryError
+from pipelex.plugins.model_handle import ModelHandle
 from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
@@ -25,10 +26,6 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     from anthropic.types.text_block_param import TextBlockParam
-
-
-class AnthropicFactoryError(CogtError):
-    pass
 
 
 class AnthropicSdkVariant(StrEnum):
@@ -39,13 +36,14 @@ class AnthropicSdkVariant(StrEnum):
 class AnthropicFactory:
     @staticmethod
     def make_anthropic_client(
-        plugin: Plugin,
+        model_handle: ModelHandle,
+        *,
         backend: InferenceBackend,
     ) -> AsyncAnthropic | AsyncAnthropicBedrock:
         try:
-            sdk_variant = AnthropicSdkVariant(plugin.sdk)
+            sdk_variant = AnthropicSdkVariant(model_handle.sdk)
         except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by AnthropicFactory"
+            msg = f"ModelHandle '{model_handle}' is not supported by AnthropicFactory"
             raise AnthropicFactoryError(msg) from exc
 
         # Tier 1 transport retry: set the SDK client's retry budget explicitly from config
@@ -104,7 +102,7 @@ class AnthropicFactory:
         return image_block_param
 
     @staticmethod
-    def _make_document_block_param(prepped_document: PreparedFile, title: str | None = None) -> DocumentBlockParam:
+    def _make_document_block_param(prepped_document: PreparedFile, *, title: str | None = None) -> DocumentBlockParam:
         """Convert a PreparedFile to an Anthropic DocumentBlockParam."""
         document_block_param: DocumentBlockParam
         match prepped_document:
@@ -171,6 +169,7 @@ class AnthropicFactory:
     def openai_typed_user_message(
         cls,
         user_content_txt: str,
+        *,
         prepped_user_images: list[PreparedFile] | None = None,
         prepped_user_documents: list[tuple[PreparedFile, str | None]] | None = None,
     ) -> "ChatCompletionMessageParam":
@@ -242,7 +241,7 @@ class AnthropicFactory:
         return nb_tokens_by_category
 
     @staticmethod
-    def make_nb_tokens_by_category_from_nb(nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
+    def make_nb_tokens_by_category_from_nb(*, nb_input: int, nb_output: int) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
             TokenCategory.INPUT: nb_input,
             TokenCategory.OUTPUT: nb_output,
@@ -250,7 +249,7 @@ class AnthropicFactory:
         return nb_tokens_by_category
 
     @staticmethod
-    def calculate_safe_max_tokens_for_timeout(timeout_seconds: int) -> int:
+    def calculate_safe_max_tokens_for_timeout(*, timeout_seconds: int) -> int:
         """Calculate max_tokens that won't trigger SDK timeout protection.
 
         Formula: max_tokens = timeout_seconds * 128000 / 3600

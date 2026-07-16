@@ -14,6 +14,7 @@ Example template usage:
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Iterator
 
 from typing_extensions import override
@@ -21,7 +22,6 @@ from typing_extensions import override
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff import Stuff
@@ -192,7 +192,7 @@ class StuffArtefact:
         msg = f"'{content_type}' content does not support indexing."
         raise TypeError(msg)
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, *, default: Any = None) -> Any:
         """Dict-like get method.
 
         Args:
@@ -261,6 +261,19 @@ class StuffArtefact:
         content_type = type(content).__name__
         msg = f"'{content_type}' content does not support len()."
         raise TypeError(msg)
+
+    def __bool__(self) -> bool:
+        """A present artefact is truthy; a ListContent artefact follows list emptiness.
+
+        Load-bearing for the optionals guard idiom: without `__bool__`, Jinja2's truth test
+        (`{% if var %}`, `@?var`'s expansion) falls through to `__len__`, which raises for
+        non-list content — the D7-blessed guard would crash on a PRESENT singular value.
+        An empty list is falsy on purpose (D4: `[]`-emptiness is the absence story for plurals).
+        """
+        content = self._stuff.content
+        if isinstance(content, ListContent):
+            return len(content) > 0
+        return True
 
     # -------------------------------------------------------------------------
     # Dict-like iteration (for template compatibility)
@@ -331,7 +344,7 @@ class StuffArtefact:
     # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    async def rendered_for_template_async(self, text_format: TextFormat) -> str:
+    async def rendered_for_template_async(self, *, text_format: TextFormat) -> str:
         """Render content for templates in the specified text format.
 
         Args:
@@ -349,6 +362,7 @@ class StuffArtefact:
 
     def render_with_images(
         self,
+        *,
         registry: ImageRegistry,
         text_format: TextFormat,
     ) -> str:
@@ -372,7 +386,7 @@ class StuffArtefact:
                 f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
             )
             raise TypeError(msg)
-        return content.render_with_images(registry, text_format)
+        return content.render_with_images(registry=registry, text_format=text_format)
 
     # -------------------------------------------------------------------------
     # Access to underlying Stuff

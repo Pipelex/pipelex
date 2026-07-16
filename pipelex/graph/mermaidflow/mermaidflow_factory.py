@@ -53,8 +53,8 @@ class MermaidflowFactory:
     def make_from_graphspec(
         cls,
         graph: GraphSpec,
-        graph_config: GraphConfig,
         *,
+        graph_config: GraphConfig,
         direction: FlowchartDirection | None = None,
         show_stuff_codes: bool = False,
         include_subgraphs: bool = True,
@@ -256,8 +256,16 @@ class MermaidflowFactory:
         if batch_item_edges or batch_aggregate_edges:
             lines.append("")
             lines.append("    %% Batch edges: list-item relationships")
-            cls._render_dashed_edges(batch_item_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
-            cls._render_dashed_edges(batch_aggregate_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
+            cls._render_dashed_edges(
+                batch_item_edges, lines=lines, stuff_id_mapping=stuff_id_mapping, all_stuff_info=all_stuff_info, show_stuff_codes=show_stuff_codes
+            )
+            cls._render_dashed_edges(
+                batch_aggregate_edges,
+                lines=lines,
+                stuff_id_mapping=stuff_id_mapping,
+                all_stuff_info=all_stuff_info,
+                show_stuff_codes=show_stuff_codes,
+            )
 
         # Render parallel combine edges (branch outputs → combined output) with dashed styling
         # Same approach: use stuff digests to connect stuff-to-stuff.
@@ -265,7 +273,13 @@ class MermaidflowFactory:
         if parallel_combine_edges:
             lines.append("")
             lines.append("    %% Parallel combine edges: branch outputs → combined output")
-            cls._render_dashed_edges(parallel_combine_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
+            cls._render_dashed_edges(
+                parallel_combine_edges,
+                lines=lines,
+                stuff_id_mapping=stuff_id_mapping,
+                all_stuff_info=all_stuff_info,
+                show_stuff_codes=show_stuff_codes,
+            )
 
         # Style definitions
         lines.append("")
@@ -335,6 +349,7 @@ class MermaidflowFactory:
     def _render_node(
         cls,
         node: NodeSpec,
+        *,
         mermaid_id: str,
         indent: str = "    ",
     ) -> str:
@@ -374,6 +389,7 @@ class MermaidflowFactory:
     def _render_stuff_node(
         cls,
         digest: str,
+        *,
         name: str,
         concept: str | None,
         stuff_id_mapping: dict[str, str],
@@ -411,6 +427,7 @@ class MermaidflowFactory:
     def _render_dashed_edges(
         cls,
         edges: list[EdgeSpec],
+        *,
         lines: list[str],
         stuff_id_mapping: dict[str, str],
         all_stuff_info: dict[str, tuple[str, str | None]],
@@ -470,6 +487,7 @@ class MermaidflowFactory:
     def _render_subgraph_recursive(
         cls,
         node_id: str,
+        *,
         nodes_by_id: dict[str, NodeSpec],
         id_mapping: dict[str, str],
         children_map: dict[str, list[str]],
@@ -576,7 +594,7 @@ class MermaidflowFactory:
             lines.append(f"{indent}end")
         else:
             # Leaf node - render as simple node
-            lines.append(cls._render_node(node, mermaid_id, indent))
+            lines.append(cls._render_node(node, mermaid_id=mermaid_id, indent=indent))
 
             # Render batch item stuffs (no producer, with -branch-N suffix) consumed by this node
             # This ensures batch item stuffs are placed inside the batch controller's subgraph

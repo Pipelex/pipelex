@@ -5,7 +5,7 @@ from typing import cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.hub import get_library_manager, set_current_library, teardown_current_library
+from pipelex.hub import clear_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager import LibraryManager
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
@@ -46,7 +46,7 @@ class TestLibraryCrateAccumulation:
             assert crate.fingerprint != ""
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     def test_multiple_load_from_blueprints_all_included_in_crate(self):
         """Blueprints from multiple load_from_blueprints() calls are all included in the crate."""
@@ -67,7 +67,7 @@ class TestLibraryCrateAccumulation:
             assert "analytics.compute_metric" in crate.pipes
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
 
     def test_load_from_crate_idempotent_on_same_fingerprint(self):
         """load_from_crate() returns empty list on second call with the same fingerprint."""
@@ -95,7 +95,55 @@ class TestLibraryCrateAccumulation:
             library_manager.teardown(library_id=second_library_id)
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()
+
+    def test_is_crate_loaded_tracks_fingerprint_lifecycle(self):
+        """is_crate_loaded() is False before load, True after, and False again after teardown."""
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        try:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.SCORING_BUNDLE])
+
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+
+            second_library_id = "is-crate-loaded-test-lib"
+            library_manager.open_library(library_id=second_library_id)
+
+            assert library_manager.is_crate_loaded(library_id="nonexistent", fingerprint=crate.fingerprint) is False
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is False
+
+            library_manager.load_from_crate(library_id=second_library_id, crate=crate)
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is True
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint="some-other-fingerprint") is False
+
+            library_manager.teardown(library_id=second_library_id)
+            assert library_manager.is_crate_loaded(library_id=second_library_id, fingerprint=crate.fingerprint) is False
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
+
+    def test_is_crate_loaded_matches_aggregate_crate_after_multi_batch_load(self):
+        """is_crate_loaded() recognizes the aggregate crate fingerprint after multi-batch loads.
+
+        get_crate() rebuilds a single crate from all accumulated blueprints, so once a library
+        is populated in more than one load batch its fingerprint differs from every per-batch
+        fingerprint. A caller transporting that aggregate crate must still get True.
+        """
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        try:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.SCORING_BUNDLE])
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.ANALYTICS_BUNDLE])
+
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+            assert library_manager.is_crate_loaded(library_id=library_id, fingerprint=crate.fingerprint) is True
+        finally:
+            library_manager.teardown(library_id=library_id)
+            clear_current_library()
 
     def test_teardown_clears_blueprints_for_library_id(self):
         """teardown(library_id) clears accumulated blueprints for that library_id."""
@@ -116,7 +164,7 @@ class TestLibraryCrateAccumulation:
             result = library_manager.get_crate(library_id=library_id)
             assert result is None
         finally:
-            teardown_current_library()
+            clear_current_library()
 
     def test_failed_load_from_crate_does_not_cache_fingerprint(self, mocker: MockerFixture):
         """A failed load_from_crate() must not cache the fingerprint, allowing retries."""
@@ -149,4 +197,4 @@ class TestLibraryCrateAccumulation:
                 library_manager.teardown(library_id=target_library_id)
         finally:
             library_manager.teardown(library_id=library_id)
-            teardown_current_library()
+            clear_current_library()

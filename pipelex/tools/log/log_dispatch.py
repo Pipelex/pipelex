@@ -66,6 +66,7 @@ class LogDispatch:
     def dispatch(
         self,
         content: str | Any,
+        *,
         severity: int,
         title: str | None = None,
         inline: str | None = None,
@@ -124,6 +125,7 @@ class LogDispatch:
     def _log_message(
         self,
         message: str,
+        *,
         severity: int,
         caller_info_str: str | None,
         title: str | None = None,
@@ -152,12 +154,13 @@ class LogDispatch:
             message_for_console = f"{caller_info_str}: {message}"
 
         if include_exception:
-            message += f"\n{traceback.format_exc()}"
+            message_for_console += f"\n{traceback.format_exc()}"
         self._log_to_console(message=message_for_console, severity=severity)
 
     def _log_data(
         self,
         data: Any,
+        *,
         severity: int,
         caller_info_str: str | None,
         title: str | None = None,
@@ -228,7 +231,7 @@ class LogDispatch:
                 message += f"\n{traceback.format_exc()}"
             self._log_to_console(message=message, severity=severity)
 
-    def _log_to_console(self, message: str, severity: int):
+    def _log_to_console(self, message: str, *, severity: int):
         """Logs a message to the console.
 
         Args:

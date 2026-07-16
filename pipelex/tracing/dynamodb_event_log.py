@@ -21,6 +21,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent
 
 try:
@@ -58,8 +59,20 @@ class DynamoDBEventLog(EventLogProtocol):
         self._writer_id = writer_id
         self._sequence: int = 0
         self._sequence_lock = threading.Lock()
-        dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-        self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+        # Translate construction-time botocore failures (e.g. a misconfigured region) into our
+        # domain EventLogSetupError, mirroring the read_events boundary. Best-effort callers
+        # (tracing assembly) catch the EventLogError base and degrade rather than aborting the run.
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        try:
+            dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+        except (ClientError, BotoCoreError) as exc:
+            msg = f"Failed to construct the DynamoDB event-log client for table={self._table_name} region={self._region}: {exc}"
+            raise EventLogSetupError(msg) from exc
 
     @property
     @override
@@ -83,7 +96,7 @@ class DynamoDBEventLog(EventLogProtocol):
         return f"PIPELINE_RUN#{pipeline_run_id}"
 
     @staticmethod
-    def _make_sk(workflow_id: str, writer_id: str, sequence: int) -> str:
+    def _make_sk(workflow_id: str, *, writer_id: str, sequence: int) -> str:
         return f"EVENT#{workflow_id}#{writer_id}#{sequence:010d}"
 
     def _key_condition(self, pipeline_run_id: str) -> Any:
@@ -95,7 +108,7 @@ class DynamoDBEventLog(EventLogProtocol):
         """Write a single event to DynamoDB. Synchronous and idempotent."""
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
-            "SK": self._make_sk(event.workflow_id, event.writer_id, event.sequence),
+            "SK": self._make_sk(event.workflow_id, writer_id=event.writer_id, sequence=event.sequence),
             "pipeline_run_id": event.pipeline_run_id,
             "workflow_id": event.workflow_id,
             "writer_id": event.writer_id,
@@ -106,22 +119,36 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
-        """Read all events for a pipeline run from DynamoDB."""
-        items: list[dict[str, Any]] = []
+        """Read all events for a pipeline run from DynamoDB.
 
-        response = self._table.query(
-            KeyConditionExpression=self._key_condition(pipeline_run_id),
-            ScanIndexForward=True,
+        Store-level failures (throttling, auth, network) are translated into
+        ``EventLogReadError`` so best-effort callers (graph assembly) can degrade
+        gracefully without catching raw botocore exceptions. Individual
+        unparseable items are skipped with a warning rather than failing the read.
+        """
+        from botocore.exceptions import (  # noqa: PLC0415 - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
         )
-        items.extend(response.get("Items", []))
 
-        while "LastEvaluatedKey" in response:
+        items: list[dict[str, Any]] = []
+        try:
             response = self._table.query(
                 KeyConditionExpression=self._key_condition(pipeline_run_id),
                 ScanIndexForward=True,
-                ExclusiveStartKey=response["LastEvaluatedKey"],
             )
             items.extend(response.get("Items", []))
+
+            while "LastEvaluatedKey" in response:
+                response = self._table.query(
+                    KeyConditionExpression=self._key_condition(pipeline_run_id),
+                    ScanIndexForward=True,
+                    ExclusiveStartKey=response["LastEvaluatedKey"],
+                )
+                items.extend(response.get("Items", []))
+        except (ClientError, BotoCoreError) as exc:
+            msg = f"Failed to read trace events from DynamoDB for pipeline_run_id={pipeline_run_id}: {type(exc).__name__}"
+            raise EventLogReadError(msg) from exc
 
         events: list[TraceEvent] = []
         for item in items:

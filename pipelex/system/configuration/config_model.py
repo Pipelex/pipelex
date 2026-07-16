@@ -1,9 +1,9 @@
+from enum import StrEnum
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.system.exceptions import ConfigModelError
-from pipelex.types import StrEnum
 
 StrEnumType = TypeVar("StrEnumType", bound=StrEnum)
 
@@ -14,6 +14,7 @@ class ConfigModel(BaseModel):
     @staticmethod
     def transform_dict_str_to_enum(
         input_dict: dict[str, str],
+        *,
         key_enum_cls: type[StrEnumType] | None = None,
         value_enum_cls: type[StrEnumType] | None = None,
     ) -> dict[str, StrEnumType] | dict[StrEnumType, str] | dict[StrEnumType, StrEnumType]:
@@ -41,6 +42,7 @@ class ConfigModel(BaseModel):
     @staticmethod
     def transform_dict_of_floats_str_to_enum(
         input_dict: dict[str, float],
+        *,
         key_enum_cls: type[StrEnumType],
     ) -> dict[StrEnumType, float]:
         """Transforms a dictionary with str keys and float values into a dictionary with enum keys and float values.
@@ -58,6 +60,7 @@ class ConfigModel(BaseModel):
     @staticmethod
     def transform_dict_keys_str_to_enum(
         input_dict: dict[str, Any],
+        *,
         key_enum_cls: type[StrEnumType],
     ) -> dict[StrEnumType, Any]:
         """Transforms a dictionary with str keys and Any values into a dictionary with enum keys and Any values.
@@ -75,6 +78,7 @@ class ConfigModel(BaseModel):
     @staticmethod
     def transform_list_of_str_to_enum(
         input_list: list[str],
+        *,
         enum_cls: type[StrEnumType],
     ) -> list[StrEnumType]:
         return [enum_cls(item) for item in input_list]

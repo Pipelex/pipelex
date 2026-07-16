@@ -92,6 +92,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
     async def _search_structured(
         self,
         search_job: SearchJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
         job_params = search_job.job_params
@@ -124,7 +125,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         result: dict[str, Any] = json.loads(content_str)
         return result
 
-    def _extract_usage(self, response: GenericResponse, search_job: SearchJob) -> None:
+    def _extract_usage(self, response: GenericResponse, *, search_job: SearchJob) -> None:
         """Extract token usage from the GenericResponse and populate the search job report."""
         response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
         search_tokens_usage = search_job.job_report.search_tokens_usage
@@ -136,7 +137,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
                 nb_tokens[TokenCategory.OUTPUT] = output_tokens
             search_tokens_usage.nb_tokens_by_category = nb_tokens
 
-    async def _call_relay(self, model: str, content: str) -> GenericResponse:
+    async def _call_relay(self, *, model: str, content: str) -> GenericResponse:
         """Send a request through Portkey to the relay.
 
         Args:

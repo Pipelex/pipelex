@@ -12,11 +12,10 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
+    agent_error_validate_bundle,
     agent_success_formatted,
-    extract_validation_errors,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.validate._output_helpers import format_validate_markdown
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
@@ -25,11 +24,11 @@ from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import format_validate_markdown
 
 
 def validate_method_cmd(
-    ctx: typer.Context,
     name: Annotated[
         str,
         typer.Argument(help="Name of the installed method"),
@@ -42,6 +41,13 @@ def validate_method_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    allow_signatures: Annotated[
+        bool,
+        typer.Option(
+            "--allow-signatures",
+            help="Accept PipeSignature placeholders in the dependency graph (lenient mode).",
+        ),
+    ] = False,
     output_format: Annotated[
         CliOutputFormat,
         typer.Option("--format", help="Success output format: markdown (default) or json (structured)"),
@@ -60,6 +66,7 @@ def validate_method_cmd(
     Examples:
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
+        pipelex-agent validate method my-method --allow-signatures
     """
     set_agent_cli_error_format(error_format or output_format)
 
@@ -69,7 +76,7 @@ def validate_method_cmd(
         library_dirs=library_dir,
     )
     if not method.mthds_files:
-        agent_error(f"Method '{name}' has no .mthds bundle files.", "MethodError")
+        agent_error(f"Method '{name}' has no .mthds bundle files.", error_type="MethodError", exit_code=2)
 
     bundle_path = method.mthds_files[0]
 
@@ -78,33 +85,48 @@ def validate_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False, needs_model_specs=True)
 
     try:
         if pipe:
             # Validate a specific pipe within the method's bundle
-            result = asyncio.run(validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths))
+            result = asyncio.run(
+                validate_pipe_in_bundle_core(
+                    bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs_paths, allow_signatures=allow_signatures
+                )
+            )
         else:
             # Validate the entire bundle
-            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths))
+            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures))
 
-        agent_success_formatted(result, format_validate_markdown, output_format)
+        agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
+
+        # Gate-from-report (D-B consumer-decides): valid but NOT runnable when unsatisfied PipeSignature
+        # placeholders remain. The success envelope (with pending_signatures + is_runnable) is emitted
+        # above; the exit code reflects the gate. --allow-signatures tolerates them. Re-raised by the
+        # `except typer.Exit` arm below so teardown still runs.
+        #
+        # Only the whole-method path gates: with --pipe, `result` is the slice envelope whose
+        # is_runnable derives from LIBRARY-WIDE pending_signatures, so gating there would fail a
+        # fully-implemented slice for unrelated placeholders. The slice makes no library-wide
+        # runnability claim (mirroring `validate pipe`), so it is not gated.
+        if not pipe and not allow_signatures and not result.get("is_runnable", True):
+            raise typer.Exit(1)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
-        validation_errors = extract_validation_errors(exc)
-        extra: dict[str, Any] = {"validation_errors": validation_errors}
-        if exc.dry_run_error_message:
-            extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
+        # Invalid verdict (see bundle_cmd): format-aware failure surface. JSON keeps the exact
+        # structured envelope; markdown renders the items as prose with a fix-aware footer.
+        agent_error_validate_bundle(exc, bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            "PipeOperatorModelChoiceError",
+            error_type="PipeOperatorModelChoiceError",
             cause=exc,
+            exit_code=2,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
             model_choice=str(exc.model_choice),
@@ -119,11 +141,16 @@ def validate_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
+
+    except typer.Exit:
+        # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
+        # propagate (exit code) rather than be reshaped into an agent_error by the broad handler below.
+        raise
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

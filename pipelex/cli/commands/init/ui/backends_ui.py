@@ -1,5 +1,7 @@
 """UI components for backend configuration in the init command."""
 
+from pathlib import Path
+
 import typer
 from rich.console import Console, Group
 from rich.panel import Panel
@@ -7,12 +9,12 @@ from rich.prompt import Prompt
 from rich.table import Table
 from rich.text import Text
 
-from pipelex.tools.misc.file_utils import path_exists
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
-def get_backend_options_from_toml(template_path: str, existing_path: str | None = None) -> list[tuple[str, str]]:
+def get_backend_options_from_toml(template_path: Path, *, existing_path: Path | None = None) -> list[tuple[str, str]]:
     """Get backend options dynamically from TOML files.
 
     Args:
@@ -26,7 +28,7 @@ def get_backend_options_from_toml(template_path: str, existing_path: str | None 
     seen_backends: set[str] = set()
 
     # Read template backends
-    if path_exists(template_path):
+    if template_path.exists():
         toml_doc = load_toml_from_path(template_path)
         for backend_key in toml_doc:
             if backend_key != "internal":  # Skip internal backend
@@ -40,7 +42,7 @@ def get_backend_options_from_toml(template_path: str, existing_path: str | None 
                 seen_backends.add(backend_key)
 
     # Add any additional backends from existing config (custom backends user may have added)
-    if existing_path and path_exists(existing_path):
+    if existing_path and existing_path.exists():
         toml_doc = load_toml_from_path(existing_path)
         for backend_key in toml_doc:
             if backend_key != "internal" and backend_key not in seen_backends:
@@ -56,7 +58,7 @@ def get_backend_options_from_toml(template_path: str, existing_path: str | None 
     return backend_options
 
 
-def get_currently_enabled_backends(backends_toml_path: str, backend_options: list[tuple[str, str]]) -> list[int]:
+def get_currently_enabled_backends(backends_toml_path: Path, *, backend_options: list[tuple[str, str]]) -> list[int]:
     """Get list of currently enabled backend indices from existing backends.toml.
 
     Args:
@@ -68,7 +70,7 @@ def get_currently_enabled_backends(backends_toml_path: str, backend_options: lis
     """
     currently_enabled: list[int] = []
 
-    if not path_exists(backends_toml_path):
+    if not backends_toml_path.exists():
         return currently_enabled
 
     try:
@@ -93,7 +95,7 @@ def get_currently_enabled_backends(backends_toml_path: str, backend_options: lis
 
 
 def build_backend_selection_panel(
-    backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
+    backend_options: list[tuple[str, str]], *, currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
 ) -> Panel:
     """Create a Rich Panel for backend selection with options table.
 
@@ -151,10 +153,7 @@ def build_backend_selection_panel(
 
 
 def prompt_backend_select(
-    console: Console,
-    backend_options: list[tuple[str, str]],
-    currently_enabled: list[int] | None = None,
-    is_first_time_setup: bool = False,
+    *, console: Console, backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
 ) -> tuple[list[int], set[str]]:
     """Prompt user to select backend indices with validation.
 
@@ -234,7 +233,7 @@ def prompt_backend_select(
     return selected_indices, selected_backend_keys
 
 
-def display_selected_backends(console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
+def display_selected_backends(*, console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:
     """Display confirmation of selected backends.
 
     Args:

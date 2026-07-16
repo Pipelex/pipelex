@@ -38,7 +38,7 @@ class JSONContent(StuffContent):
         return html
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return convert_to_markdown(data=self.json_obj, level=level, is_pretty=is_pretty)
 
     @override
@@ -50,5 +50,5 @@ class JSONContent(StuffContent):
         return json.dumps(self.json_obj, indent=4)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         return JSON.from_data(self.json_obj, indent=4)

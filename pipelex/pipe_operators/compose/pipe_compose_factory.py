@@ -2,7 +2,7 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -10,7 +10,7 @@ from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.pipe_operators.compose.exceptions import PipeComposeFactoryError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 
 
@@ -19,6 +19,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     @override
     def make(
         cls,
+        *,
         pipe_category: Any,
         pipe_type: str,
         pipe_code: str,
@@ -50,6 +51,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
     @classmethod
     def _make_template_mode(
         cls,
+        *,
         pipe_code: str,
         domain_code: str,
         description: str,
@@ -63,6 +65,11 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             msg = "Template source is required for template mode"
             raise PipeComposeFactoryError(msg)
 
+        # Preprocess here only to validate at load time (sigil syntax + Jinja2 parseability).
+        # The PipeCompose stores the *authored* source, like every other pipe (PipeLLM,
+        # PipeImgGen, PipeSearch), so downstream sigil rewrites (guard-lint, render) run exactly
+        # once. Storing the preprocessed form instead double-rewrote escaped literals (`$$var` →
+        # `$var` → `{{ var|format() }}`), causing false OPTIONAL_INPUT_UNGUARDED and render corruption.
         try:
             preprocessed_template = preprocess_template(template_source, declared_inputs=set(inputs.variables))
         except TemplateSigilSyntaxError as exc:
@@ -83,7 +90,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             description=description,
             inputs=inputs,
             output=output,
-            template=preprocessed_template,
+            template=template_source,
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,

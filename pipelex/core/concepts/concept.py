@@ -1,7 +1,7 @@
 from typing import Any, Callable
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
-from mthds.models.concept import ConceptAbstract
+from mthds.protocol.concept import ConceptAbstract
 from pydantic import field_validator
 
 from pipelex import log
@@ -93,6 +93,7 @@ class Concept(ConceptAbstract):
     @classmethod
     def are_concept_compatible(
         cls,
+        *,
         concept_1: "Concept",
         concept_2: "Concept",
         strict: bool = False,
@@ -144,7 +145,7 @@ class Concept(ConceptAbstract):
             return False
 
         # Check if classes are structurally equivalent (same fields, types)
-        if are_classes_equivalent(concept_1_class, concept_2_class):
+        if are_classes_equivalent(concept_1_class, class_2=concept_2_class):
             return True
 
         if strict:
@@ -160,7 +161,7 @@ class Concept(ConceptAbstract):
             pass
 
         # Check if concept_1 has compatible fields with concept_2
-        return has_compatible_field(concept_1_class, concept_2_class)
+        return has_compatible_field(concept_1_class, target_type=concept_2_class)
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
@@ -192,14 +193,18 @@ class Concept(ConceptAbstract):
 
     def render_concept_representation(
         self,
+        *,
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
+        class_name_overrides: dict[str, str] | None = None,
     ) -> tuple[dict[str, Any], set[str]]:
         """Render a representation for this concept.
 
         Args:
             output_format: The format to generate (JSON, PYTHON, or SCHEMA)
             is_multiple: If True, wrap content in a list/array schema
+            class_name_overrides: Optional runtime-class-name -> rendered-name mapping applied to
+                Python instantiation code and imports (see ConceptRepresentationGenerator)
 
         Returns:
             Tuple of (representation dict, imports_needed set)
@@ -211,9 +216,9 @@ class Concept(ConceptAbstract):
             case ConceptRepresentationFormat.SCHEMA:
                 return self._render_schema_representation(is_multiple=is_multiple)
             case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
-                generator = ConceptRepresentationGenerator(output_format)
+                generator = ConceptRepresentationGenerator(output_format, class_name_overrides=class_name_overrides)
                 # For inputs, we only want required fields (not optional ones)
-                result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
+                result = generator.generate_representation(self.concept_ref, structure_class=self.get_structure_class(), include_optional=False)
 
                 # If multiple and JSON format, wrap content in a list
                 # For Python format, the caller handles wrapping since content is a string
@@ -222,7 +227,7 @@ class Concept(ConceptAbstract):
 
                 return result, generator.imports_needed
 
-    def _render_schema_representation(self, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+    def _render_schema_representation(self, *, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
         """Render JSON Schema for this concept.
 
         Args:

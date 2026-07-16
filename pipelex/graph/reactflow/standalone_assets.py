@@ -24,17 +24,17 @@ class CDNAsset(BaseModel):
     crossorigin: Literal["anonymous", "use-credentials"] = "anonymous"
 
 
-MTHDS_UI_VERSION = "0.6.4"
+MTHDS_UI_VERSION = "0.11.0"
 ELKJS_VERSION = "0.11.1"
 
 MTHDS_UI_JS = CDNAsset(
     url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{MTHDS_UI_VERSION}/dist/standalone/graph-viewer.js",
-    integrity="sha384-Ji9Rm7swvsWO7j8GL/y4AgRIkpPFLnWb8BokurqkzDxzTy0pTaasYLCNJyMCilqY",
+    integrity="sha384-bn4wTUdVghyTZThZlUwPknWCtiDDDSnB94AH9/WS7P6Zb2O7x2Fu8bE1G8nPlz5y",
 )
 
 MTHDS_UI_CSS = CDNAsset(
     url=f"https://cdn.jsdelivr.net/npm/@pipelex/mthds-ui@{MTHDS_UI_VERSION}/dist/standalone/graph-viewer.css",
-    integrity="sha384-Ue1fm1guW8EQGdaqrsi+8Zm5Iq5AGkxa5+UeWw+sy8vVCSYkGez6+80+p9/oxqOn",
+    integrity="sha384-+RAnunPv8/gJkU2A4kO1jjx56ZMIdtJP2FC8yoYAfXJGOZWgWHnqz9EWVAho6/HZ",
 )
 
 ELKJS = CDNAsset(

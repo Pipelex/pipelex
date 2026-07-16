@@ -15,8 +15,10 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 class SearchResultContent(StuffContent):
     """Represents the result of a search query with an answer and list of sources."""
 
-    answer: str
-    sources: list[DocumentContent] = Field(default_factory=empty_list_factory_of(DocumentContent))
+    answer: str = Field(description="The answer to the search query")
+    sources: list[DocumentContent] = Field(
+        default_factory=empty_list_factory_of(DocumentContent), description="The source documents supporting the answer"
+    )
 
     @property
     @override
@@ -43,7 +45,7 @@ class SearchResultContent(StuffContent):
         return result
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         result = self.answer
         if self.sources:
             result += "\n\n**Sources:**\n\n"
@@ -51,7 +53,7 @@ class SearchResultContent(StuffContent):
         return result
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         group = Group()
 
         # Title

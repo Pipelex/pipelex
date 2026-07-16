@@ -5,7 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 
 @pytest.mark.llm
@@ -15,9 +15,7 @@ from pipelex.pipeline.runner import PipelexRunner
 class TestPipeLLMObjectList:
     async def test_craft_prompts(self, pipe_run_mode: PipeRunMode) -> None:
         """Test a PipeLLM pipe that generates a list of structured MoodboardPrompt objects."""
-        pipeline_response = await PipelexRunner(
-            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"], pipe_run_mode=pipe_run_mode
-        ).execute_pipeline(
+        pipeline_response = await PipelexMTHDSProtocol(library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"], pipe_run_mode=pipe_run_mode).execute(
             pipe_code="craft_prompts",
             inputs={
                 "inspiration": TextContent(text="1970s bohemian chic with earthy tones and flowing fabrics"),

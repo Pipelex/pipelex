@@ -1,12 +1,14 @@
 """Unit tests for ReportingManager event emission.
 
 Validates that when an EventLogProtocol is provided, ReportingManager emits
-UsageReportEvent alongside existing local accumulation, with per-context
-isolation for concurrent workflows.
+UsageReportEvent with per-context isolation for concurrent workflows.
 """
 
-from datetime import datetime, timedelta, timezone
+import logging
+from datetime import UTC, datetime, timedelta
 
+import pytest
+from botocore.exceptions import ClientError
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -17,7 +19,7 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -34,14 +36,14 @@ DATA_INCLUSION_OFF = DataInclusionConfig(
 
 def _make_test_llm_job(
     pipeline_run_id: str,
-    graph_context: GraphContext | None = None,
+    trace_context: TraceContext | None = None,
 ) -> LLMJob:
     """Create a minimal LLMJob for testing event emission."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     job_metadata = JobMetadata(
         user_id="test_user",
         pipeline_run_id=pipeline_run_id,
-        graph_context=graph_context,
+        trace_context=trace_context,
         started_at=now,
         completed_at=now + timedelta(seconds=1),
         unit_job_id=UnitJobId.LLM_GEN_TEXT,
@@ -62,14 +64,14 @@ def _make_test_llm_job(
     )
 
 
-def _make_graph_context(
+def _make_trace_context(
     graph_id: str,
     parent_node_id: str | None = None,
     tracer_key: str | None = None,
     node_sequence: int = 0,
-) -> GraphContext:
-    """Create a GraphContext for testing with lookup_key resolution."""
-    return GraphContext(
+) -> TraceContext:
+    """Create a TraceContext for testing with lookup_key resolution."""
+    return TraceContext(
         graph_id=graph_id,
         tracer_key=tracer_key,
         parent_node_id=parent_node_id,
@@ -87,7 +89,7 @@ class TestReportingEventEmission:
     def _make_reporting_manager_with_event_log(self) -> tuple[ReportingManager, InMemoryEventLog]:
         """Create a ReportingManager configured with an event log.
 
-        The context_key is PIPELINE_RUN_ID, matching the lookup_key of GraphContexts
+        The context_key is PIPELINE_RUN_ID, matching the lookup_key of TraceContexts
         created with graph_id=PIPELINE_RUN_ID and no tracer_key.
         """
         event_log = InMemoryEventLog()
@@ -99,7 +101,6 @@ class TestReportingEventEmission:
             workflow_id=self.WORKFLOW_ID,
             pipeline_run_id=self.PIPELINE_RUN_ID,
         )
-        manager.open_registry(self.PIPELINE_RUN_ID)
         return manager, event_log
 
     # ------------------------------------------------------------------
@@ -110,27 +111,27 @@ class TestReportingEventEmission:
         """UsageReportEvent is emitted when reporting an LLM inference job with event_log set."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        graph_context = _make_graph_context(graph_id=self.PIPELINE_RUN_ID)
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id=self.PIPELINE_RUN_ID)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
         usage_events = [evt for evt in events if isinstance(evt, UsageReportEvent)]
         assert len(usage_events) == 1
         assert usage_events[0].tokens_usage.nb_tokens_by_category[TokenCategory.INPUT] == 100
-        assert usage_events[0].node_id == "unknown"  # No graph_context parent set
+        assert usage_events[0].node_id == "unknown"  # No trace_context parent set
 
-    def test_report_inference_job_captures_node_id_from_graph_context(self) -> None:
+    def test_report_inference_job_captures_node_id_from_trace_context(self) -> None:
         """UsageReportEvent captures the parent node_id from graph context."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        graph_context = _make_graph_context(
+        trace_context = _make_trace_context(
             graph_id=self.PIPELINE_RUN_ID,
             parent_node_id="test-graph:node_42",
             node_sequence=43,
         )
 
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=graph_context)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
@@ -139,63 +140,52 @@ class TestReportingEventEmission:
         assert usage_events[0].node_id == "test-graph:node_42"
         assert usage_events[0].workflow_id == self.WORKFLOW_ID
 
-    # ------------------------------------------------------------------
-    # Registry tests (unchanged behavior)
-    # ------------------------------------------------------------------
+    @pytest.mark.parametrize(
+        "emit_error",
+        [
+            ClientError(
+                error_response={"Error": {"Code": "ProvisionedThroughputExceededException"}},
+                operation_name="PutItem",
+            ),
+            OSError("disk full"),
+        ],
+        ids=["client_error", "os_error"],
+    )
+    def test_registered_context_emit_failure_is_best_effort(
+        self,
+        mocker: MockerFixture,
+        caplog: pytest.LogCaptureFixture,
+        emit_error: Exception,
+    ) -> None:
+        """A backend emit failure on the registered-context fast path is dropped with a WARNING, never raised.
 
-    def test_inject_tokens_usages_adds_to_registry(self) -> None:
-        """inject_tokens_usages adds externally-collected usage data to the pipeline's registry."""
+        report_inference_job runs synchronously after the inference has already succeeded (and been
+        billed), so a transient event-log write failure — DynamoDB throttle/auth/timeout (ClientError)
+        or NDJSON disk error (OSError) — must not propagate and turn a successful inference into a
+        failed pipeline. Mirrors the runner-fallback contract in test_emit_runner_fallback.
+        """
+        manager, event_log = self._make_reporting_manager_with_event_log()
+        mocker.patch.object(event_log, "emit", side_effect=emit_error)
+
+        trace_context = _make_trace_context(graph_id=self.PIPELINE_RUN_ID)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=trace_context)
+
+        with caplog.at_level(logging.WARNING):
+            # Must not raise — the failure is logged and dropped.
+            manager.report_inference_job(llm_job)
+
+        assert any(record.levelno == logging.WARNING for record in caplog.records)
+
+    def test_setup_and_teardown_without_event_log(self) -> None:
+        """Without any event_log registered, setup/teardown are inert and report_inference_job no-ops."""
         manager = ReportingManager()
         manager.setup()
-        manager.open_registry(self.PIPELINE_RUN_ID)
 
-        tokens_usage = LLMTokensUsage(
-            job_metadata=_make_test_llm_job(self.PIPELINE_RUN_ID).job_metadata,
-            inference_model_name="test-model",
-            inference_model_id="test-model-id",
-            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
-            nb_tokens_by_category={TokenCategory.INPUT: 200, TokenCategory.OUTPUT: 100},
-        )
+        # A job whose trace_context is None must not emit anything and must not raise.
+        manager.report_inference_job(_make_test_llm_job("direct_run", trace_context=None))
 
-        manager.inject_tokens_usages(
-            pipeline_run_id=self.PIPELINE_RUN_ID,
-            tokens_usages=[tokens_usage],
-        )
-
-        registry = manager._get_or_create_registry(self.PIPELINE_RUN_ID)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        usages = registry.get_current_tokens_usage()
-        assert len(usages) == 1
-        assert usages[0].nb_tokens_by_category[TokenCategory.INPUT] == 200
-
-    def test_inject_tokens_usages_auto_creates_registry(self) -> None:
-        """inject_tokens_usages auto-creates registry if it doesn't exist yet."""
-        manager = ReportingManager()
-        manager.setup()
-
-        tokens_usage = LLMTokensUsage(
-            job_metadata=_make_test_llm_job("new_run").job_metadata,
-            inference_model_name="test-model",
-            inference_model_id="test-model-id",
-            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
-            nb_tokens_by_category={TokenCategory.INPUT: 50, TokenCategory.OUTPUT: 25},
-        )
-
-        manager.inject_tokens_usages(
-            pipeline_run_id="new_run",
-            tokens_usages=[tokens_usage],
-        )
-
-        registry = manager._get_or_create_registry("new_run")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-        usages = registry.get_current_tokens_usage()
-        assert len(usages) == 1
-
-    def test_no_event_log_works_as_before(self) -> None:
-        """ReportingManager without event_log works exactly as before."""
-        manager = ReportingManager()
-        manager.setup()
-        manager.open_registry("direct_run")
-        manager.close_registry("direct_run")
         manager.teardown()
+        assert len(manager._event_log_contexts) == 0  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     # ------------------------------------------------------------------
     # Per-context isolation regression tests
@@ -210,14 +200,12 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
-        job_a = _make_test_llm_job("run_a", graph_context=ctx_a)
-        job_b = _make_test_llm_job("run_b", graph_context=ctx_b)
+        job_a = _make_test_llm_job("run_a", trace_context=ctx_a)
+        job_b = _make_test_llm_job("run_b", trace_context=ctx_b)
 
         manager.report_inference_job(job_a)
         manager.report_inference_job(job_b)
@@ -231,6 +219,29 @@ class TestReportingEventEmission:
         assert events_b[0].workflow_id == "wf_b"
         assert events_b[0].pipeline_run_id == "run_b"
 
+    def test_set_event_log_silently_overwrites_existing_key(self) -> None:
+        """Re-registering a context key must replace, never raise — the silent overwrite is
+        the load-bearing self-heal for contexts leaked by a prior interrupted execution
+        (see the contract comment on ``ReportingManager.set_event_log``).
+        """
+        stale_log = InMemoryEventLog()
+        fresh_log = InMemoryEventLog()
+        manager = ReportingManager()
+        manager.setup()
+
+        manager.set_event_log(context_key="wf_a", event_log=stale_log, workflow_id="wf_a", pipeline_run_id="run_stale")
+        # Same key again — must not raise, must replace.
+        manager.set_event_log(context_key="wf_a", event_log=fresh_log, workflow_id="wf_a", pipeline_run_id="run_fresh")
+
+        ctx = _make_trace_context(graph_id="run_fresh", tracer_key="wf_a")
+        manager.report_inference_job(_make_test_llm_job("run_fresh", trace_context=ctx))
+
+        fresh_events = [evt for evt in fresh_log.read_events("run_fresh") if isinstance(evt, UsageReportEvent)]
+        assert len(fresh_events) == 1, "emission must route to the newest registered log"
+        assert fresh_events[0].pipeline_run_id == "run_fresh"
+        stale_events = list(stale_log.read_events("run_stale")) + list(stale_log.read_events("run_fresh"))
+        assert len(stale_events) == 0, "the replaced log must no longer receive emissions"
+
     def test_clear_event_log_removes_only_target_context(self) -> None:
         """Clearing one context does not affect another."""
         event_log_a = InMemoryEventLog()
@@ -240,17 +251,15 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
         # Clear context A before any emission
         manager.clear_event_log(context_key="wf_a")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
-        job_a = _make_test_llm_job("run_a", graph_context=ctx_a)
-        job_b = _make_test_llm_job("run_b", graph_context=ctx_b)
+        job_a = _make_test_llm_job("run_a", trace_context=ctx_a)
+        job_b = _make_test_llm_job("run_b", trace_context=ctx_b)
 
         manager.report_inference_job(job_a)  # Should NOT emit (context cleared)
         manager.report_inference_job(job_b)  # Should emit
@@ -260,11 +269,11 @@ class TestReportingEventEmission:
         assert len(events_a) == 0
         assert len(events_b) == 1
 
-    def test_no_graph_context_skips_emission(self) -> None:
-        """Jobs without graph_context skip event emission even when event logs are configured."""
+    def test_no_trace_context_skips_emission(self) -> None:
+        """Jobs without trace_context skip event emission even when event logs are configured."""
         manager, event_log = self._make_reporting_manager_with_event_log()
 
-        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, graph_context=None)
+        llm_job = _make_test_llm_job(self.PIPELINE_RUN_ID, trace_context=None)
         manager.report_inference_job(llm_job)
 
         events = event_log.read_events(self.PIPELINE_RUN_ID)
@@ -292,16 +301,14 @@ class TestReportingEventEmission:
 
         manager.set_event_log(context_key="wf_a", event_log=event_log_a, workflow_id="wf_a", pipeline_run_id="run_a")
         manager.set_event_log(context_key="wf_b", event_log=event_log_b, workflow_id="wf_b", pipeline_run_id="run_b")
-        manager.open_registry("run_a")
-        manager.open_registry("run_b")
 
-        ctx_a = _make_graph_context(graph_id="run_a", tracer_key="wf_a")
-        ctx_b = _make_graph_context(graph_id="run_b", tracer_key="wf_b")
+        ctx_a = _make_trace_context(graph_id="run_a", tracer_key="wf_a")
+        ctx_b = _make_trace_context(graph_id="run_b", tracer_key="wf_b")
 
         # Emit 3 events for context A, 1 for context B
         for _index in range(3):
-            manager.report_inference_job(_make_test_llm_job("run_a", graph_context=ctx_a))
-        manager.report_inference_job(_make_test_llm_job("run_b", graph_context=ctx_b))
+            manager.report_inference_job(_make_test_llm_job("run_a", trace_context=ctx_a))
+        manager.report_inference_job(_make_test_llm_job("run_b", trace_context=ctx_b))
 
         events_a = [evt for evt in event_log_a.read_events("run_a") if isinstance(evt, UsageReportEvent)]
         events_b = [evt for evt in event_log_b.read_events("run_b") if isinstance(evt, UsageReportEvent)]
@@ -321,10 +328,9 @@ class TestReportingEventEmission:
 
         manager = ReportingManager()
         manager.setup()
-        manager.open_registry("run_silent")
 
-        graph_context = _make_graph_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
-        llm_job = _make_test_llm_job("run_silent", graph_context=graph_context)
+        trace_context = _make_trace_context(graph_id="run_silent", tracer_key="wf_silent", parent_node_id="g:node_0")
+        llm_job = _make_test_llm_job("run_silent", trace_context=trace_context)
         manager.report_inference_job(llm_job)
 
         # No event log was ever set; no event should have been emitted anywhere.

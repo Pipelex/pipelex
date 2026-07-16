@@ -67,7 +67,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = content.render_with_images(registry, TextFormat.PLAIN)
+        result = content.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_PLAIN_LIST
         assert len(registry.images) == 3
@@ -86,7 +86,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = content.render_with_images(registry, TextFormat.PLAIN)
+        result = content.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_DICT
         assert len(registry.images) == 2
@@ -107,7 +107,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = content.render_with_images(registry, TextFormat.PLAIN)
+        result = content.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_NESTED_LIST
         assert len(registry.images) == 3
@@ -125,7 +125,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = content.render_with_images(registry, TextFormat.PLAIN)
+        result = content.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_IMAGE_RENDERABLE
         assert len(registry.images) == 2
@@ -144,7 +144,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = page.render_with_images(registry, TextFormat.PLAIN)
+        result = page.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_PAGE_CONTENT_ALL
         assert len(registry.images) == 3
@@ -160,7 +160,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = content.render_with_images(registry, TextFormat.PLAIN)
+        result = content.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_EMPTY_LIST
         assert len(registry.images) == 0
@@ -176,7 +176,7 @@ class TestStructuredContentRenderWithImages:
         )
         registry = ImageRegistry()
 
-        result = page.render_with_images(registry, TextFormat.PLAIN)
+        result = page.render_with_images(registry=registry, text_format=TextFormat.PLAIN)
 
         assert result == TestData.EXPECTED_NONE_PAGE_VIEW
         assert len(registry.images) == 1
@@ -198,4 +198,4 @@ class TestStuffArtefactWithImagesFailFast:
         registry = ImageRegistry()
 
         with pytest.raises(TypeError, match="does not implement ImageRenderable"):
-            artefact.render_with_images(registry, TextFormat.PLAIN)
+            artefact.render_with_images(registry=registry, text_format=TextFormat.PLAIN)

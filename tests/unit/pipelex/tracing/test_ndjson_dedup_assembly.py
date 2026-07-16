@@ -3,7 +3,7 @@
 Validates the end-to-end path: write duplicate events → read with dedup → assemble → correct GraphSpec.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,7 @@ from pipelex.tracing.trace_events import (
 _GRAPH_ID = "dedup_test"
 _PIPELINE_RUN_ID = "dedup_run_001"
 _WF_ID = "wf_replay"
-_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
 
 
 def _time_at(seconds: int) -> datetime:

@@ -8,7 +8,6 @@ from pipelex.cogt.img_gen.img_gen_worker_factory import ImgGenWorkerFactory
 from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerProtocol
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_models_manager, get_report_delegate
 
@@ -53,7 +52,7 @@ class InferenceManager(InferenceManagerProtocol):
     def _setup_one_internal_llm_worker(
         self,
         llm_handle: str,
-    ) -> LLMWorkerInternalAbstract:
+    ) -> LLMWorkerAbstract:
         inference_model = get_models_manager().get_inference_model(model_handle=llm_handle, model_type=ModelType.LLM)
         llm_worker = LLMWorkerFactory.make_llm_worker(
             inference_model=inference_model,
@@ -68,17 +67,6 @@ class InferenceManager(InferenceManagerProtocol):
         if llm_worker is None:
             llm_worker = self._setup_one_internal_llm_worker(llm_handle=llm_handle)
         return llm_worker
-
-    @override
-    def set_llm_worker_from_external_plugin(
-        self,
-        llm_handle: str,
-        llm_worker_class: type[LLMWorkerAbstract],
-        should_warn_if_already_registered: bool = True,
-    ):
-        if llm_handle in self.llm_workers and should_warn_if_already_registered:
-            log.warning(f"LLM worker for '{llm_handle}' already registered, skipping")
-        self.llm_workers[llm_handle] = llm_worker_class(reporting_delegate=get_report_delegate())
 
     ####################################################################################################
     # Manage ImageGen Workers

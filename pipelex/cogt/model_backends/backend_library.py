@@ -1,5 +1,5 @@
 from functools import partial
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from pydantic import Field, RootModel, ValidationError
 
@@ -33,15 +33,10 @@ from pipelex.tools.misc.dict_utils import (
 )
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
+from pipelex.tools.secrets.exceptions import UnknownVarPrefixError, VarFallbackPatternError, VarNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import (
-    UnknownVarPrefixError,
-    VarFallbackPatternError,
-    VarNotFoundError,
-    substitute_vars,
-)
+from pipelex.tools.secrets.secrets_utils import substitute_vars
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
-from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -61,6 +56,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def load(
         self,
+        *,
         secrets_provider: SecretsProviderAbstract,
         backends_library_path: str,
         backends_dir_path: str,
@@ -105,7 +101,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             if runtime_manager.is_ci_testing and backend_name == "vertexai":
                 continue
             try:
-                inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars_with_provider)
+                inference_backend_blueprint_dict = apply_to_strings_recursive(
+                    inference_backend_blueprint_dict_raw, transform_func=substitute_vars_with_provider
+                )
             except VarFallbackPatternError as var_fallback_pattern_exc:
                 if lenient:
                     log.verbose(f"Skipping backend '{backend_name}': variable fallback pattern error")
@@ -229,6 +227,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def _load_gateway_model_specs(
         self,
         gateway_config: GatewayConfig,
+        *,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
@@ -257,7 +256,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Apply variable substitution (in case remote config has any variables)
         try:
-            model_specs_dict = apply_to_strings_recursive(model_specs_dict, substitute_vars_with_provider)
+            model_specs_dict = apply_to_strings_recursive(model_specs_dict, transform_func=substitute_vars_with_provider)
         except (VarNotFoundError, UnknownVarPrefixError) as exc:
             msg = f"Variable substitution failed in remote gateway config: {exc}"
             raise InferenceModelSpecError(msg) from exc
@@ -267,6 +266,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     def _load_local_model_specs(
         self,
         backend_name: str,
+        *,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
@@ -287,7 +287,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         try:
             model_specs_dict_raw = load_toml_from_path(path=path_to_model_specs_toml)
             try:
-                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, substitute_vars_with_provider)
+                model_specs_dict = apply_to_strings_recursive(model_specs_dict_raw, transform_func=substitute_vars_with_provider)
             except (VarNotFoundError, UnknownVarPrefixError) as exc:
                 msg = f"Variable substitution failed in file '{path_to_model_specs_toml}': {exc}"
                 raise InferenceModelSpecError(msg) from exc
@@ -296,7 +296,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             raise InferenceBackendLibraryError(msg) from exc
         return model_specs_dict, f"file '{path_to_model_specs_toml}'"
 
-    def check_backend_credentials(self, path: str, include_disabled: bool = False) -> CredentialsValidationReport:
+    def check_backend_credentials(self, path: str, *, include_disabled: bool = False) -> CredentialsValidationReport:
         """Check if required environment variables are set for enabled backends.
 
         This method loads backend configurations and extracts variable placeholders

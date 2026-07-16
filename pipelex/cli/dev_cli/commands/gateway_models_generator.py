@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from operator import itemgetter
 from typing import TYPE_CHECKING, Any, cast
 
@@ -123,14 +123,14 @@ def generate_pure_markdown_list(models: list[dict[str, Any]]) -> str:
         outputs: list[str] = model.get("outputs", [])
 
         # Sort inputs and outputs using preferred order
-        def sort_by_preferred(items: list[str], preferred: list[str]) -> list[str]:
+        def sort_by_preferred(items: list[str], *, preferred: list[str]) -> list[str]:
             item_set = set(items)
             ordered = [col for col in preferred if col in item_set]
             remaining = sorted(item_set - set(preferred))
             return ordered + remaining
 
-        sorted_inputs = sort_by_preferred(inputs, PREFERRED_INPUT_ORDER)
-        sorted_outputs = sort_by_preferred(outputs, PREFERRED_OUTPUT_ORDER)
+        sorted_inputs = sort_by_preferred(inputs, preferred=PREFERRED_INPUT_ORDER)
+        sorted_outputs = sort_by_preferred(outputs, preferred=PREFERRED_OUTPUT_ORDER)
 
         inputs_str = ", ".join(sorted_inputs) if sorted_inputs else "none"
         outputs_str = ", ".join(sorted_outputs) if sorted_outputs else "none"
@@ -162,13 +162,13 @@ def generate_markdown_table(models: list[dict[str, Any]]) -> str:
         all_outputs.update(model.get("outputs", []))
 
     # Sort columns using preferred order, with any unlisted columns appended alphabetically
-    def sort_by_preferred(items: set[str], preferred: list[str]) -> list[str]:
+    def sort_by_preferred(items: set[str], *, preferred: list[str]) -> list[str]:
         ordered = [col for col in preferred if col in items]
         remaining = sorted(items - set(preferred))
         return ordered + remaining
 
-    input_cols = sort_by_preferred(all_inputs, PREFERRED_INPUT_ORDER)
-    output_cols = sort_by_preferred(all_outputs, PREFERRED_OUTPUT_ORDER)
+    input_cols = sort_by_preferred(all_inputs, preferred=PREFERRED_INPUT_ORDER)
+    output_cols = sort_by_preferred(all_outputs, preferred=PREFERRED_OUTPUT_ORDER)
 
     # Background colors for visual separation (semi-transparent for dark/light mode compatibility)
     input_bg = "background-color:rgba(33,150,243,0.15)"  # Semi-transparent blue
@@ -229,7 +229,7 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
         Complete Markdown content for the reference file.
     """
     models_by_type = extract_reference_data(model_specs)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections = [
         "# Pipelex Gateway — Available Models",
@@ -281,7 +281,7 @@ def generate_reference_pure_markdown(model_specs: BackendModelSpecs) -> str:
         Complete pure Markdown content for the reference file.
     """
     models_by_type = extract_reference_data(model_specs)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections = [
         "# Pipelex Gateway — Available Models (Plain Text)",

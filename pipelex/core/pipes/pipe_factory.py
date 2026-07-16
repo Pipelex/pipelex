@@ -3,14 +3,15 @@ from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
 from typing_extensions import runtime_checkable
 
-from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_ref_or_code
+from pipelex.core.concepts.helpers import strip_markers_from_concept_ref_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeFactoryErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
-from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
+from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
+from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory, StuffSpecFactoryError
+from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
 from pipelex.hub import get_class_registry
 
 if TYPE_CHECKING:
@@ -25,6 +26,7 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
     @classmethod
     def make(
         cls,
+        *,
         pipe_category: Any,
         pipe_type: str,
         pipe_code: str,
@@ -38,12 +40,13 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
 
 class PipeFactory(Generic[PipeAbstractType]):
     @classmethod
-    def make_pipe_ref_with_domain(cls, domain_code: str, pipe_code: str) -> str:
+    def make_pipe_ref_with_domain(cls, *, domain_code: str, pipe_code: str) -> str:
         return f"{domain_code}.{pipe_code}"
 
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         pipe_code: str,
         blueprint: PipeBlueprint,
@@ -56,7 +59,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         # Validate that the specified concepts are declared in the bundle, or are natives concepts.
         if blueprint.inputs is not None:
             for input_name, input_concept_ref_or_code in blueprint.inputs.items():
-                stripped_input_concept_ref_or_code = strip_multiplicity_from_concept_ref_or_code(concept_ref_or_code=input_concept_ref_or_code)
+                stripped_input_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=input_concept_ref_or_code)
                 if "." not in stripped_input_concept_ref_or_code:
                     if (
                         not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=stripped_input_concept_ref_or_code)
@@ -71,7 +74,7 @@ class PipeFactory(Generic[PipeAbstractType]):
                         raise PipeFactoryError(msg)
 
         if "." not in blueprint.output:
-            stripped_output_concept_ref_or_code = strip_multiplicity_from_concept_ref_or_code(concept_ref_or_code=blueprint.output)
+            stripped_output_concept_ref_or_code = strip_markers_from_concept_ref_or_code(concept_ref_or_code=blueprint.output)
             if (
                 not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=stripped_output_concept_ref_or_code)
                 and stripped_output_concept_ref_or_code not in concept_codes_from_the_same_domain
@@ -101,11 +104,17 @@ class PipeFactory(Generic[PipeAbstractType]):
             blueprint=blueprint.inputs or {},
         )
 
-        pipe_type = PipeType(blueprint.type)
-        pipe_category = pipe_type.category
-
-        # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
-        factory_class_name = f"{pipe_type.value}Factory"
+        # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix.
+        # A signature is outside the executable taxonomy: its `type` ("PipeSignature") is not a `PipeType`
+        # member and it has no category, so resolve the factory by name from the tag and skip the coercion.
+        pipe_category: PipeCategory | None
+        if blueprint.is_signature:
+            pipe_category = None
+            factory_class_name = f"{blueprint.type}Factory"  # "PipeSignatureFactory"
+        else:
+            pipe_type = PipeType(blueprint.type)
+            pipe_category = pipe_type.category
+            factory_class_name = f"{pipe_type.value}Factory"
         try:
             pipe_factory: type[PipeFactoryProtocol[Any, Any]] = get_class_registry().get_required_subclass(
                 name=factory_class_name,

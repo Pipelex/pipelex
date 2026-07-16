@@ -29,10 +29,11 @@ from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 
 
 def make_pipelex_for_cli(
+    *,
     context: ErrorContext,
     library_dirs: list[str] | list[Path] | None = None,
     needs_inference: bool = True,
-    temporal_enabled: bool | None = None,
+    boot_orchestrator: str | None = None,
     needs_model_specs: bool | None = None,
 ) -> Pipelex:
     """Initialize Pipelex for CLI commands with proper error handling.
@@ -44,7 +45,7 @@ def make_pipelex_for_cli(
         context: The CLI context for error messages.
         library_dirs: The library directories to use for the Pipelex instance.
         needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
-        temporal_enabled: When provided, overrides the temporal.is_enabled config value.
+        boot_orchestrator: When provided, boots this process under the orchestrator plugin of this name.
         needs_model_specs: When True, load real model specs even without inference.
 
     Returns:
@@ -58,7 +59,7 @@ def make_pipelex_for_cli(
             integration_mode=IntegrationMode.CLI,
             library_dirs=library_dirs,
             needs_inference=needs_inference,
-            temporal_enabled=temporal_enabled,
+            boot_orchestrator=boot_orchestrator,
             needs_model_specs=needs_model_specs,
         )
     except InferenceSetupRequiredError as exc:

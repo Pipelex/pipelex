@@ -1,14 +1,15 @@
-from dataclasses import dataclass, field
+from dataclasses import field
 
 from jinja2 import nodes
 from jinja2.exceptions import (
     TemplateSyntaxError,
     UndefinedError,
 )
+from pydantic.dataclasses import dataclass
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError, Jinja2StuffError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
@@ -16,13 +17,16 @@ from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 class VariableReference:
     """Represents a variable reference in a Jinja2 template with its applied filters.
 
+    Mutated in place: ``_collect_variable_references`` does ``.filters.append(...)``
+    on re-seen variables, so this is intentionally NOT frozen.
+
     Attributes:
         path: The full dotted path to the variable (e.g., "document.cover", "pages")
         filters: List of filter names applied to this variable (e.g., ["with_images", "tag"])
     """
 
     path: str
-    filters: list[str] = field(default_factory=list)  # pyright: ignore[reportUnknownVariableType]
+    filters: list[str] = field(default_factory=list[str])
 
 
 def _build_full_path(node: nodes.Node) -> str | None:
@@ -59,7 +63,7 @@ def _collect_declarations_from_body(body: list[nodes.Node]) -> set[str]:
     return declarations
 
 
-def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_names: set[str]) -> None:
+def _collect_full_variable_paths(node: nodes.Node, *, paths: set[str], declared_names: set[str]) -> None:
     """Recursively walk the AST and collect full variable paths.
 
     This function collects only the FULL (leaf) paths for each variable access chain.
@@ -111,10 +115,11 @@ def _collect_full_variable_paths(node: nodes.Node, paths: set[str], declared_nam
 
     # Recurse into child nodes (only for non-Name/Getattr nodes)
     for child in node.iter_child_nodes():
-        _collect_full_variable_paths(child, paths, new_declared)
+        _collect_full_variable_paths(child, paths=paths, declared_names=new_declared)
 
 
 def detect_jinja2_required_variables(
+    *,
     template_category: TemplateCategory,
     template_source: str,
 ) -> set[str]:
@@ -151,7 +156,7 @@ def detect_jinja2_required_variables(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     paths: set[str] = set()
-    _collect_full_variable_paths(parsed_ast, paths, set())
+    _collect_full_variable_paths(parsed_ast, paths=paths, declared_names=set())
     return paths
 
 
@@ -179,6 +184,7 @@ def _extract_filters_and_variable(node: nodes.Node) -> tuple[list[str], nodes.No
 
 def _collect_variable_references(
     node: nodes.Node,
+    *,
     references: dict[str, VariableReference],
     declared_names: set[str],
 ) -> None:
@@ -243,10 +249,11 @@ def _collect_variable_references(
 
     # Recurse into child nodes
     for child in node.iter_child_nodes():
-        _collect_variable_references(child, references, new_declared)
+        _collect_variable_references(child, references=references, declared_names=new_declared)
 
 
 def detect_jinja2_variable_references(
+    *,
     template_category: TemplateCategory,
     template_source: str,
 ) -> list[VariableReference]:
@@ -284,5 +291,5 @@ def detect_jinja2_variable_references(
         raise Jinja2DetectVariablesError(msg) from undef_error
 
     references: dict[str, VariableReference] = {}
-    _collect_variable_references(parsed_ast, references, set())
+    _collect_variable_references(parsed_ast, references=references, declared_names=set())
     return list(references.values())

@@ -4,13 +4,14 @@ This module defines the canonical, versioned data model for Pipelex run graphs.
 GraphSpec is renderer-agnostic and designed for JSON serialization.
 """
 
+from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from enum import StrEnum
+from typing import Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import Self, StrEnum
 
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200
@@ -19,6 +20,22 @@ MAX_STACK_LENGTH = 2000
 # Format tag stored in GraphSpec.meta so external tooling (e.g. the VS Code
 # graph viewer) can recognize a JSON file as a Pipelex execution graph.
 GRAPHSPEC_FORMAT = "mthds"
+
+
+class GraphSpecMode(StrEnum):
+    """Provenance mode for a GraphSpec."""
+
+    DRY = "dry"
+    LIVE = "live"
+    STATIC = "static"
+
+
+def make_graphspec_meta(*, mode: GraphSpecMode, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Build canonical GraphSpec metadata while preserving caller extras."""
+    meta = dict(extra or {})
+    meta["format"] = GRAPHSPEC_FORMAT
+    meta["mode"] = mode
+    return meta
 
 
 class NodeKind(StrEnum):
@@ -125,7 +142,7 @@ class EdgeKind(StrEnum):
                 return False
 
 
-def _truncate_string(value: str | None, max_length: int) -> str | None:
+def _truncate_string(value: str | None, *, max_length: int) -> str | None:
     """Truncate a string to max_length with ellipsis if needed."""
     if value is None:
         return None
@@ -195,7 +212,21 @@ class IOSpec(BaseModel):
     @classmethod
     def truncate_preview(cls, value: str | None) -> str | None:
         """Truncate preview to MAX_PREVIEW_LENGTH."""
-        return _truncate_string(value, MAX_PREVIEW_LENGTH)
+        return _truncate_string(value, max_length=MAX_PREVIEW_LENGTH)
+
+
+def output_digest_is_optional(*, output_specs: Sequence[IOSpec], digest: str) -> bool:
+    """Whether a producer registered ``digest`` as a declared-optional (`?`) output.
+
+    The optional marker rides the output IOSpec's ``extra`` dict (set at the pipe-run
+    epilogue from the pipe's declared output presence). One helper for both graph builders
+    (in-process GraphTracer and the event-replay assembler) so the optional-edge computation
+    cannot drift between them.
+    """
+    for output_spec in output_specs:
+        if output_spec.digest == digest:
+            return bool(output_spec.extra.get("optional"))
+    return False
 
 
 class NodeIOSpec(BaseModel):
@@ -223,7 +254,7 @@ class ErrorSpec(BaseModel):
     @classmethod
     def truncate_stack(cls, value: str | None) -> str | None:
         """Truncate stack trace to MAX_STACK_LENGTH."""
-        return _truncate_string(value, MAX_STACK_LENGTH)
+        return _truncate_string(value, max_length=MAX_STACK_LENGTH)
 
 
 class NodeSpec(BaseModel):
@@ -241,6 +272,8 @@ class NodeSpec(BaseModel):
     description: str | None = None
     domain_code: str | None = None
     status: NodeStatus = Field(strict=False)
+    # Why a `skipped` node was lifted (names the absent input); None for every other status.
+    skip_reason: str | None = None
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(
         default_factory=NodeIOSpec,
@@ -262,6 +295,8 @@ class EdgeSpec(BaseModel):
     source: str
     target: str
     kind: EdgeKind = Field(strict=False)
+    # A data edge fed by a declared-optional (`?`) output: the value may be absent in other runs.
+    optional: bool = False
     label: str | None = None
     # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
     source_stuff_digest: str | None = None
@@ -288,13 +323,21 @@ class GraphSpec(BaseModel):
     concept_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def ensure_format_meta(self) -> Self:
+    def ensure_meta_contract(self) -> Self:
         existing_format = self.meta.get("format")
         if existing_format is None:
             self.meta["format"] = GRAPHSPEC_FORMAT
         elif existing_format != GRAPHSPEC_FORMAT:
             msg = f"GraphSpec.meta['format'] must be '{GRAPHSPEC_FORMAT}', got '{existing_format}'"
             raise ValueError(msg)
+        if "mode" in self.meta:
+            existing_mode = self.meta["mode"]
+            try:
+                self.meta["mode"] = GraphSpecMode(existing_mode)
+            except ValueError as exc:
+                allowed_modes = ", ".join(mode for mode in GraphSpecMode)
+                msg = f"GraphSpec.meta['mode'] must be one of: {allowed_modes}; got '{existing_mode}'"
+                raise ValueError(msg) from exc
         return self
 
     def to_json(self) -> str:

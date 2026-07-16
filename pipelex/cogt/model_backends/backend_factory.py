@@ -39,6 +39,7 @@ class InferenceBackendFactory:
     def make_inference_backend(
         cls,
         name: str,
+        *,
         blueprint: InferenceBackendBlueprint,
         extra_config: dict[str, Any],
         model_specs: dict[str, InferenceModelSpec],

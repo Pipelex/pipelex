@@ -13,7 +13,7 @@ retry of its own — layering it on top of a retrying SDK would double-retry.
 
 import email.utils
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
@@ -38,7 +38,7 @@ _PRE_REQUEST_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
     httpx.PoolTimeout,
 )
 # The OpenAI / Anthropic SDKs honor Retry-After only up to ~60s, then fall back to backoff; match
-# that boundary — a longer wait is the Temporal line, not something to chase in direct mode.
+# that boundary — a longer wait is the durable-execution track's job, not something to chase in direct mode.
 _MAX_RETRY_AFTER_SECONDS: float = 60.0
 
 # Full-jitter exponential backoff: each wait is drawn from uniform(0, exponential_bound) so
@@ -63,7 +63,7 @@ def _parse_retry_after(raw_value: str | None) -> float | None:
         # A zoneless or "-0000" HTTP-date parses to a naive datetime; subtracting it from an
         # aware "now" would raise TypeError. Treat such a malformed header as unusable.
         return None
-    return max((parsed_date - datetime.now(timezone.utc)).total_seconds(), 0.0)
+    return max((parsed_date - datetime.now(UTC)).total_seconds(), 0.0)
 
 
 def _transport_retry_wait(retry_state: RetryCallState) -> float:
@@ -78,7 +78,7 @@ def _transport_retry_wait(retry_state: RetryCallState) -> float:
     return _exponential_wait(retry_state)
 
 
-def _make_retry_predicate(retry_on_ambiguous_failure: bool) -> Callable[[BaseException], bool]:
+def _make_retry_predicate(*, retry_on_ambiguous_failure: bool) -> Callable[[BaseException], bool]:
     """Build the retry predicate for the configured idempotency posture.
 
     With ``retry_on_ambiguous_failure`` True the predicate retries the full transient set — every
@@ -109,6 +109,7 @@ def _make_retry_predicate(retry_on_ambiguous_failure: bool) -> Callable[[BaseExc
 
 async def request_with_transport_retry(
     send_request: Callable[[], Awaitable[httpx.Response]],
+    *,
     max_retries: int,
     retry_on_ambiguous_failure: bool = True,
 ) -> httpx.Response:
@@ -133,7 +134,7 @@ async def request_with_transport_retry(
         httpx.HTTPError: The last attempt's error, re-raised once the retry budget is exhausted.
     """
     retrying = AsyncRetrying(
-        retry=retry_if_exception(_make_retry_predicate(retry_on_ambiguous_failure)),
+        retry=retry_if_exception(_make_retry_predicate(retry_on_ambiguous_failure=retry_on_ambiguous_failure)),
         wait=_transport_retry_wait,
         stop=stop_after_attempt(max_retries + 1),
         reraise=True,

@@ -1,9 +1,9 @@
 import re
+from enum import StrEnum
 from re import Match
 
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import StrEnum
 
 
 class _Sigil(StrEnum):
@@ -88,7 +88,7 @@ def _replace_dollar_sigil(match: Match[str]) -> str:
     return f"{{{{ {variable}|format() }}}}"
 
 
-def _validate_at_sigil_alone_on_line(template: str, declared_inputs: set[str]) -> None:
+def _validate_at_sigil_alone_on_line(template: str, *, declared_inputs: set[str]) -> None:
     r"""Scan for `@`/`@?` sigil candidates that are not alone on their own line and raise
     when the candidate's root identifier is one of the surrounding pipe's declared inputs.
 
@@ -142,7 +142,7 @@ def _normalize_and_escape(template: str) -> str:
     return normalized.replace("@@", _AT_ESCAPE_SENTINEL).replace("$$", _DOLLAR_ESCAPE_SENTINEL)
 
 
-def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
+def validate_template_sigils(template: str, *, declared_inputs: set[str]) -> None:
     r"""Raise `TemplateSigilSyntaxError` when an inline `@`/`@?` candidate's root identifier
     matches one of the pipe's declared inputs.
 
@@ -152,7 +152,7 @@ def validate_template_sigils(template: str, declared_inputs: set[str]) -> None:
     the author actually plans to use — i.e. the "real typo" cases.
     """
     prepared = _normalize_and_escape(template)
-    _validate_at_sigil_alone_on_line(prepared, declared_inputs)
+    _validate_at_sigil_alone_on_line(prepared, declared_inputs=declared_inputs)
 
 
 def rewrite_template_sigils(template: str) -> str:
@@ -197,5 +197,5 @@ def preprocess_template(template: str, *, declared_inputs: set[str] | None = Non
     line-ending-insensitive.
     """
     if declared_inputs is not None:
-        validate_template_sigils(template, declared_inputs)
+        validate_template_sigils(template, declared_inputs=declared_inputs)
     return rewrite_template_sigils(template)

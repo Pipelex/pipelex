@@ -30,7 +30,7 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
+    def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         pass
 
     @abstractmethod
@@ -50,5 +50,5 @@ class ConceptLibraryAbstract(ABC):
         pass
 
     @abstractmethod
-    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, search_domain_codes: list[str] | None = None) -> Concept:
+    def get_required_concept_from_concept_ref_or_code(self, concept_ref_or_code: str, *, search_domain_codes: list[str] | None = None) -> Concept:
         pass

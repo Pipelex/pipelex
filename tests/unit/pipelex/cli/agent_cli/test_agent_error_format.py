@@ -21,7 +21,7 @@ class TestAgentErrorFormat:
     def test_agent_error_defaults_to_json(self, capsys: pytest.CaptureFixture[str]) -> None:
         """With no format opted in, agent_error keeps emitting JSON to stderr."""
         with pytest.raises(typer.Exit):
-            agent_error("something went wrong", "FooError")
+            agent_error("something went wrong", error_type="FooError")
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert parsed["error_type"] == "FooError"
@@ -30,7 +30,7 @@ class TestAgentErrorFormat:
         """When markdown is the active error format, agent_error renders markdown to stderr."""
         set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
         with pytest.raises(typer.Exit) as exc_info:
-            agent_error("something went wrong", "FooError")
+            agent_error("something went wrong", error_type="FooError")
         assert exc_info.value.exit_code == 1
 
         captured = capsys.readouterr()
@@ -40,13 +40,18 @@ class TestAgentErrorFormat:
         with pytest.raises(json.JSONDecodeError):
             json.loads(captured.err)
 
-    def test_agent_error_markdown_renders_hint_details_and_source(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error_markdown renders the heading, hint callout, details, and source block."""
+    def test_agent_error_markdown_renders_hint_and_details_but_omits_source(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error_markdown renders the heading, hint callout, and details — but not the source block.
+
+        ``error_source`` (internal stack frames) is deliberately omitted from markdown — it's
+        noise for an LLM trying to fix a `.mthds` file. The field still appears in the JSON
+        envelope for programmatic consumers; that's covered by the integration test.
+        """
         cause = ValueError("bad value")
         with pytest.raises(typer.Exit):
             agent_error_markdown(
                 "model issue",
-                "PipeOperatorModelChoiceError",
+                error_type="PipeOperatorModelChoiceError",
                 cause=cause,
                 pipe_code="my_pipe",
             )
@@ -55,4 +60,5 @@ class TestAgentErrorFormat:
         assert "model issue" in err
         assert "💡" in err  # hint callout for a known error type
         assert "**pipe_code:** my_pipe" in err
-        assert "## Error source" in err
+        assert "## Error source" not in err
+        assert "error_source" not in err

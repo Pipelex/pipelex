@@ -21,10 +21,10 @@ A Rust-based formatter and linter for TOML that supports schema-based validation
 
 ## Linting
 
-Schema-based validation that catches structural and semantic issues beyond basic syntax checking. Detects invalid keys, missing required fields, type mismatches, and MTHDS-specific violations such as unknown pipe operators or invalid concept references.
+Schema-based validation that catches structural issues beyond basic syntax checking. Detects invalid keys, missing required fields, type mismatches, and MTHDS-specific violations such as unknown pipe operators. Cross-reference checks, such as resolving concept references, are handled by `pipelex validate`, not `plxt lint`.
 
 ## CI Integration
 
-Use `plxt fmt --check` to validate formatting without modifying files, and run `plxt lint` separately for schema and semantic checks. Both commands exit with a non-zero code on errors, making them easy to enforce in automated workflows.
+Use `plxt fmt --check` to validate formatting without modifying files, and run `plxt lint` separately for schema-based checks. Both commands exit with a non-zero code on errors, making them easy to enforce in automated workflows.
 
 For details, see the [plxt reference](../tools/plxt.md).

@@ -2,7 +2,7 @@ class URLs:
     logo_white_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-wot-1119x352.png"
     logo_black_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png"
     homepage = "https://pipelex.com"
-    app = "https://app.pipelex.com/"
+    durable_execution = "https://go.pipelex.com/durable-execution"
     repository = "https://github.com/Pipelex/pipelex"
     documentation = "https://docs.pipelex.com/"
     changelog = "https://docs.pipelex.com/latest/changelog/"
@@ -16,6 +16,12 @@ class URLs:
     backend_provider_docs = "https://docs.pipelex.com/latest/setup/configure-ai-providers/"
     native_concepts_docs = "https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/"
     app_cli_auth = "https://app.pipelex.com/auth/cli"
+
+    # Base for the RFC 7807 ``type`` URI of every PipelexError class. A stable
+    # identifier by spec — kept as a constant so PipelexError.type_uri() stays
+    # pure (no process config, safe inside Temporal workflow code). No trailing
+    # slash: type_uri() appends ``/<kebab-class-name>/``.
+    error_docs_base = "https://docs.pipelex.com/latest/errors"
 
     jpg_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_1.jpg"
     jpg_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_2.jpg"

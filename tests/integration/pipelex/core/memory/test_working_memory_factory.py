@@ -1,15 +1,19 @@
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_native_concept
 from tests.cases.images import ImageTestCases
 
 if TYPE_CHECKING:
-    from mthds.models.pipeline_inputs import PipelineInputs
+    from mthds.protocol.pipeline_inputs import PipelineInputs
 
 
 class TestWorkingMemoryFactory:
@@ -141,3 +145,34 @@ class TestWorkingMemoryFactory:
         text2_stuff = working_memory.root["text2"]
         assert isinstance(text2_stuff.content, TextContent)
         assert text2_stuff.content.text == "Second text"
+
+    def test_without_specs_stays_bottom_up(self, load_empty_library: Callable[[], None]):
+        """Smart Inputs regression: with no signature (`input_specs=None`), shaping is bypassed and
+        the bottom-up behavior is unchanged — a bare string still becomes native.Text.
+        """
+        load_empty_library()
+        # A bare string is narrower than the PipelineInputs alias formally admits, but flows at runtime.
+        pipeline_inputs: dict[str, Any] = {"greeting": "hello"}
+
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, input_specs=None)
+
+        stuff = working_memory.root["greeting"]
+        assert stuff.concept.code == NativeConceptCode.TEXT
+        assert isinstance(stuff.content, TextContent)
+        assert stuff.content.text == "hello"
+
+    def test_with_specs_shapes_bare_int_to_declared_number(self, load_empty_library: Callable[[], None]):
+        """A bare int reaches the shaper at runtime despite the narrow PipelineInputs alias (D10 is
+        release-gated) and is typed as the declared Number concept — the seam's runtime-reachability pin.
+        """
+        load_empty_library()
+        number_concept = get_native_concept(native_concept=NativeConceptCode.NUMBER)
+        input_specs = InputStuffSpecs(root={"count": StuffSpec(concept=number_concept)})
+        pipeline_inputs: dict[str, Any] = {"count": 42}
+
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, input_specs=input_specs)
+
+        stuff = working_memory.root["count"]
+        assert stuff.concept.code == NativeConceptCode.NUMBER
+        assert isinstance(stuff.content, NumberContent)
+        assert stuff.content.number == 42

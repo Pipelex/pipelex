@@ -11,7 +11,7 @@ class TestDictUtils:
     def test_insert_before_basic(self) -> None:
         """Test basic insert_before functionality."""
         original = {"a": 1, "c": 3}
-        result = insert_before(original, "c", "b", 2)
+        result = insert_before(original, target_key="c", new_key="b", new_value=2)
 
         expected_keys = ["a", "b", "c"]
         assert list(result.keys()) == expected_keys
@@ -23,7 +23,7 @@ class TestDictUtils:
     def test_insert_before_target_not_found(self) -> None:
         """Test insert_before when target key doesn't exist."""
         original = {"a": 1, "b": 2}
-        result = insert_before(original, "z", "c", 3)
+        result = insert_before(original, target_key="z", new_key="c", new_value=3)
 
         expected_keys = ["a", "b", "c"]
         assert list(result.keys()) == expected_keys
@@ -34,7 +34,7 @@ class TestDictUtils:
         original = {"a": 1, "b": 2, "c": 3}
         original_copy = original.copy()
 
-        insert_before(original, "b", "x", 999)
+        insert_before(original, target_key="b", new_key="x", new_value=999)
 
         assert original == original_copy
 
@@ -43,7 +43,7 @@ class TestDictUtils:
         original = {"type": "PipeLLM", "description": "Test pipe", "output": NativeConceptCode.TEXT, "system_prompt": "Test prompt"}
 
         # Insert inputs before output
-        result = insert_before(original, "output", "inputs", "InputText")
+        result = insert_before(original, target_key="output", new_key="inputs", new_value="InputText")
 
         expected_keys = ["type", "description", "inputs", "output", "system_prompt"]
         assert list(result.keys()) == expected_keys
@@ -56,7 +56,7 @@ class TestDictUtils:
         def uppercase_transform(s: str) -> str:
             return s.upper()
 
-        result = apply_to_strings_recursive(data, uppercase_transform)
+        result = apply_to_strings_recursive(data, transform_func=uppercase_transform)
 
         assert result["name"] == "HELLO ${USER}"
         assert result["age"] == 25  # Non-string values unchanged
@@ -69,7 +69,7 @@ class TestDictUtils:
         def env_substitute(s: str) -> str:
             return s.replace("${SUFFIX}", "_doe").replace("${MODE}", "_theme").replace("${BUILD}", "_final")
 
-        result = apply_to_strings_recursive(data, env_substitute)
+        result = apply_to_strings_recursive(data, transform_func=env_substitute)
 
         assert result["user"]["name"] == "john _doe"
         assert result["user"]["settings"]["theme"] == "dark _theme"
@@ -83,7 +83,7 @@ class TestDictUtils:
         def substitute_vars(s: str) -> str:
             return s.replace("${WORLD}", "earth").replace("${ENV}", "production").replace("${VAR}", "123")
 
-        result = apply_to_strings_recursive(data, substitute_vars)
+        result = apply_to_strings_recursive(data, transform_func=substitute_vars)
 
         assert result["items"] == ["hello earth", 42, "goodbye earth"]
         assert result["config"]["values"][0] == 1
@@ -98,7 +98,7 @@ class TestDictUtils:
         def dummy_transform(s: str) -> str:
             return s.upper()
 
-        result = apply_to_strings_recursive(data, dummy_transform)
+        result = apply_to_strings_recursive(data, transform_func=dummy_transform)
 
         assert result["empty_dict"] == {}
         assert result["empty_list"] == []
@@ -113,7 +113,7 @@ class TestDictUtils:
         def transform(s: str) -> str:
             return s.replace("${USER}", "john").replace("${ENV}", "prod").replace("${VAR}", "test")
 
-        result = apply_to_strings_recursive(original, transform)
+        result = apply_to_strings_recursive(original, transform_func=transform)
 
         # Original should be unchanged
         assert original == original_copy
@@ -130,7 +130,7 @@ class TestDictUtils:
         def substitute_vars(s: str) -> str:
             return s.replace("${USER}", "john").replace("${ENV}", "production")
 
-        result = apply_to_strings_in_list(data, substitute_vars)
+        result = apply_to_strings_in_list(data, transform_func=substitute_vars)
 
         assert result == ["hello john", "world", 42, True, "test production"]
         assert result is not data  # Should return a new list
@@ -142,7 +142,7 @@ class TestDictUtils:
         def transform(s: str) -> str:
             return s.replace("${VAR}", "variable").replace("${NESTED}", "nested").replace("${DEEP}", "deep").replace("${END}", "end")
 
-        result = apply_to_strings_in_list(data, transform)
+        result = apply_to_strings_in_list(data, transform_func=transform)
 
         assert result[0] == "outer variable"
         assert result[1][0] == 1
@@ -158,7 +158,7 @@ class TestDictUtils:
         def transform(s: str) -> str:
             return s.replace("${VAR}", "var").replace("${DICT}", "dict").replace("${DEEP}", "deep").replace("${ITEM}", "item")
 
-        result = apply_to_strings_in_list(data, transform)
+        result = apply_to_strings_in_list(data, transform_func=transform)
 
         assert result[0] == "list item var"
         assert result[1]["key1"] == "dict value dict"
@@ -174,7 +174,7 @@ class TestDictUtils:
         def dummy_transform(s: str) -> str:
             return s.upper()
 
-        result = apply_to_strings_in_list(data, dummy_transform)
+        result = apply_to_strings_in_list(data, transform_func=dummy_transform)
 
         assert result == []
         assert result is not data  # Should return a new list
@@ -186,7 +186,7 @@ class TestDictUtils:
         def transform(s: str) -> str:
             return s.upper()
 
-        result = apply_to_strings_in_list(data, transform)
+        result = apply_to_strings_in_list(data, transform_func=transform)
 
         assert result[0] == 1
         assert result[1] == 2.5
@@ -203,7 +203,7 @@ class TestDictUtils:
         def transform(s: str) -> str:
             return s.replace("${USER}", "john").replace("${VAR}", "variable").replace("${NESTED}", "nested")
 
-        result = apply_to_strings_in_list(original, transform)
+        result = apply_to_strings_in_list(original, transform_func=transform)
 
         # Original should be unchanged
         assert original == original_copy
@@ -236,7 +236,7 @@ class TestDictUtils:
                 result = result.replace(old, new)
             return result
 
-        result = apply_to_strings_in_list(data, transform)
+        result = apply_to_strings_in_list(data, transform_func=transform)
 
         assert result[0] == "root root"
         assert result[1]["dict_key"] == "dict value dict"
@@ -252,7 +252,7 @@ class TestDictUtils:
         context: dict[str, Any] = {}
         extra_params = {"foo.bar": "hello"}
 
-        result = substitute_nested_in_context(context, extra_params)
+        result = substitute_nested_in_context(context, extra_params=extra_params)
 
         assert result is context  # Should mutate original
         assert context["foo"]["bar"] == "hello"
@@ -262,7 +262,7 @@ class TestDictUtils:
         context: dict[str, Any] = {}
         extra_params = {"a.b.c.d": "deep_value"}
 
-        substitute_nested_in_context(context, extra_params)
+        substitute_nested_in_context(context, extra_params=extra_params)
 
         assert context["a"]["b"]["c"]["d"] == "deep_value"
 
@@ -275,7 +275,7 @@ class TestDictUtils:
             "other.key": "value4",
         }
 
-        substitute_nested_in_context(context, extra_params)
+        substitute_nested_in_context(context, extra_params=extra_params)
 
         assert context["foo"]["bar"]["nested"] == "value3"
         assert context["foo"]["baz"] == "value2"
@@ -290,7 +290,7 @@ class TestDictUtils:
             "another": 42,
         }
 
-        substitute_nested_in_context(context, extra_params)
+        substitute_nested_in_context(context, extra_params=extra_params)
 
         assert context["simple"] == "simple_value"
         assert context["nested"]["key"] == "nested_value"
@@ -301,7 +301,7 @@ class TestDictUtils:
         context: dict[str, Any] = {"foo": {"existing": "old_value"}}
         extra_params = {"foo.bar": "new_value"}
 
-        substitute_nested_in_context(context, extra_params)
+        substitute_nested_in_context(context, extra_params=extra_params)
 
         assert context["foo"]["existing"] == "old_value"
         assert context["foo"]["bar"] == "new_value"
@@ -312,7 +312,7 @@ class TestDictUtils:
         extra_params = {"foo.bar": "new_value"}
 
         with pytest.raises(NestedKeyConflictError) as exc_info:
-            substitute_nested_in_context(context, extra_params)
+            substitute_nested_in_context(context, extra_params=extra_params)
 
         assert "foo.bar" in exc_info.value.message
         assert "foo" in exc_info.value.message
@@ -322,7 +322,7 @@ class TestDictUtils:
         """Test function works when extra_params is None."""
         context: dict[str, Any] = {"existing": "value"}
 
-        result = substitute_nested_in_context(context, None)
+        result = substitute_nested_in_context(context, extra_params=None)
 
         assert result is context
         assert context == {"existing": "value"}
@@ -332,7 +332,7 @@ class TestDictUtils:
         context: dict[str, Any] = {"existing": "value"}
         extra_params: dict[str, Any] = {}
 
-        result = substitute_nested_in_context(context, extra_params)
+        result = substitute_nested_in_context(context, extra_params=extra_params)
 
         assert result is context
         assert context == {"existing": "value"}
@@ -343,7 +343,7 @@ class TestDictUtils:
         original_id = id(context)
         extra_params = {"foo.bar": "hello"}
 
-        result = substitute_nested_in_context(context, extra_params)
+        result = substitute_nested_in_context(context, extra_params=extra_params)
 
         assert id(result) == original_id
         assert result is context

@@ -7,6 +7,8 @@ worker's error family, with a human-readable message and a structured
 ``UserAction``.
 """
 
+from enum import StrEnum
+
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -21,7 +23,6 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult
-from pipelex.types import StrEnum
 
 
 class InferenceErrorFamily(StrEnum):
@@ -50,13 +51,13 @@ _NOT_FOUND_CLASSES: dict[InferenceErrorFamily, type[ModelNotFoundError]] = {
 }
 
 
-def _format_message(metadata: SDKErrorEnvelope, model_desc: str) -> str:
+def _format_message(metadata: SDKErrorEnvelope, *, model_desc: str) -> str:
     """Compose the human-readable error message from the provider, model, and SDK text."""
     status_part = f" (HTTP {metadata.status_code})" if metadata.status_code is not None else ""
     return f"{metadata.provider} inference failed for model '{model_desc}'{status_part}: {metadata.message}"
 
 
-def _render_detail(metadata: SDKErrorEnvelope, classification: ClassificationResult) -> str:
+def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
@@ -79,6 +80,7 @@ def _render_detail(metadata: SDKErrorEnvelope, classification: ClassificationRes
 
 def render_inference_error(
     metadata: SDKErrorEnvelope,
+    *,
     classification: ClassificationResult,
     family: InferenceErrorFamily,
     model_desc: str,
@@ -97,10 +99,10 @@ def render_inference_error(
         A ``CogtError`` subclass instance carrying the category, structured
         ``UserAction``, and ``provider_metadata``.
     """
-    message = _format_message(metadata, model_desc)
+    message = _format_message(metadata, model_desc=model_desc)
     user_action = UserAction(
         kind=classification.user_action_kind,
-        detail=_render_detail(metadata, classification),
+        detail=_render_detail(metadata, classification=classification),
     )
     if classification.is_model_not_found:
         not_found_class = _NOT_FOUND_CLASSES[family]

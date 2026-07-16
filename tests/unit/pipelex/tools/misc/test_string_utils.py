@@ -3,6 +3,7 @@ import pytest
 from pipelex.tools.misc.string_utils import (
     camel_to_snake_case,
     can_inject_text,
+    count_with_noun,
     get_root_from_dotted_path,
     is_none_or_has_text,
     is_not_none_and_has_text,
@@ -10,8 +11,10 @@ from pipelex.tools.misc.string_utils import (
     is_snake_case,
     matches_wildcard_pattern,
     normalize_to_ascii,
+    pascal_case_to_kebab,
     pascal_case_to_sentence,
     pascal_case_to_snake_case,
+    pluralize,
     snake_to_capitalize_first_letter,
     snake_to_pascal_case,
 )
@@ -97,14 +100,43 @@ def test_pascal_case_to_snake_case(pascal: str, expected: str) -> None:
     ("text", "expected"),
     [
         ("HelloWorld", "Hello world"),
-        ("BOB LowKey", "Bob low key"),
-        ("ParseJSONData", "Parse json data"),
-        ("ACDPService", "Acdp service"),
-        ("JSON2XMLConverter", "Json 2 xml converter"),
+        ("BOB LowKey", "BOB low key"),
+        ("ParseJSONData", "Parse JSON data"),
+        ("ACDPService", "ACDP service"),
+        ("JSON2XMLConverter", "JSON 2 XML converter"),
+        ("OpenAIClientFactory", "Open AI client factory"),
     ],
 )
 def test_pascal_case_to_sentence(text: str, expected: str) -> None:
     assert pascal_case_to_sentence(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("pascal", "expected"),
+    [
+        # Basic
+        ("FooBarBaz", "foo-bar-baz"),
+        # Trailing acronym
+        ("APIError", "api-error"),
+        # Embedded acronym
+        ("HTTPError", "http-error"),
+        # No-acronym multi-word
+        ("EnvVarNotFound", "env-var-not-found"),
+        # Numeric + acronym
+        ("OAuth2", "o-auth2"),
+        # Numeric mid-string
+        ("V2APIError", "v2-api-error"),
+        # Single-token
+        ("Cogt", "cogt"),
+        # All caps
+        ("AB", "ab"),
+        # Acronym then PascalCase
+        ("ABCDef", "abc-def"),
+    ],
+)
+def test_pascal_case_to_kebab(pascal: str, expected: str) -> None:
+    """Pinning the behavior of ``pascal_case_to_kebab`` for the per-class ``type_uri()`` derivation."""
+    assert pascal_case_to_kebab(pascal) == expected
 
 
 @pytest.mark.parametrize(
@@ -227,6 +259,39 @@ def test_get_root_from_dotted_path(dotted_path: str, expected: str) -> None:
 
 
 @pytest.mark.parametrize(
+    ("count", "singular", "plural", "expected"),
+    [
+        # Regular noun: singular at 1, default "+s" plural otherwise
+        (1, "pipe", None, "pipe"),
+        (2, "pipe", None, "pipes"),
+        (0, "pipe", None, "pipes"),
+        # Explicit irregular plural
+        (1, "entry", "entries", "entry"),
+        (3, "entry", "entries", "entries"),
+        # Verb agreement
+        (1, "is", "are", "is"),
+        (2, "is", "are", "are"),
+    ],
+)
+def test_pluralize(count: int, singular: str, plural: str | None, expected: str) -> None:
+    assert pluralize(count=count, singular=singular, plural=plural) == expected
+
+
+@pytest.mark.parametrize(
+    ("count", "singular", "plural", "expected"),
+    [
+        (1, "pipe", None, "1 pipe"),
+        (2, "pipe", None, "2 pipes"),
+        (0, "pipe", None, "0 pipes"),
+        (1, "entry", "entries", "1 entry"),
+        (5, "entry", "entries", "5 entries"),
+    ],
+)
+def test_count_with_noun(count: int, singular: str, plural: str | None, expected: str) -> None:
+    assert count_with_noun(count=count, singular=singular, plural=plural) == expected
+
+
+@pytest.mark.parametrize(
     ("text", "expected"),
     [
         # ASCII strings (should remain unchanged)
@@ -338,31 +403,31 @@ class TestMatchesWildcardPattern:
         ],
     )
     def test_matches_wildcard_pattern(self, text: str, pattern: str, expected: bool) -> None:
-        assert matches_wildcard_pattern(text, pattern) is expected
+        assert matches_wildcard_pattern(text, pattern=pattern) is expected
 
     def test_matches_wildcard_pattern_model_routing_examples(self) -> None:
         """Test with real-world model routing examples."""
         # Claude models
-        assert matches_wildcard_pattern("claude-3-sonnet", "claude-*") is True
-        assert matches_wildcard_pattern("claude-3-haiku", "claude-*") is True
-        assert matches_wildcard_pattern("claude-3.5-sonnet", "claude-*") is True
+        assert matches_wildcard_pattern("claude-3-sonnet", pattern="claude-*") is True
+        assert matches_wildcard_pattern("claude-3-haiku", pattern="claude-*") is True
+        assert matches_wildcard_pattern("claude-3.5-sonnet", pattern="claude-*") is True
 
         # GPT models
-        assert matches_wildcard_pattern("gpt-4o-mini", "gpt-*") is True
-        assert matches_wildcard_pattern("gpt-4", "gpt-*") is True
-        assert matches_wildcard_pattern("gpt-3.5-turbo", "gpt-*") is True
+        assert matches_wildcard_pattern("gpt-4o-mini", pattern="gpt-*") is True
+        assert matches_wildcard_pattern("gpt-4", pattern="gpt-*") is True
+        assert matches_wildcard_pattern("gpt-3.5-turbo", pattern="gpt-*") is True
 
         # Mistral models
-        assert matches_wildcard_pattern("mistral-large", "*large") is True
-        assert matches_wildcard_pattern("mistral-medium", "*medium") is True
-        assert matches_wildcard_pattern("mistral-small", "*small") is True
+        assert matches_wildcard_pattern("mistral-large", pattern="*large") is True
+        assert matches_wildcard_pattern("mistral-medium", pattern="*medium") is True
+        assert matches_wildcard_pattern("mistral-small", pattern="*small") is True
 
         # Contains patterns
-        assert matches_wildcard_pattern("claude-3-sonnet", "*sonnet*") is True
-        assert matches_wildcard_pattern("gpt-4o-mini", "*4o*") is True
-        assert matches_wildcard_pattern("mistral-large-instruct", "*large*") is True
+        assert matches_wildcard_pattern("claude-3-sonnet", pattern="*sonnet*") is True
+        assert matches_wildcard_pattern("gpt-4o-mini", pattern="*4o*") is True
+        assert matches_wildcard_pattern("mistral-large-instruct", pattern="*large*") is True
 
         # Negative cases
-        assert matches_wildcard_pattern("gemini-pro", "claude-*") is False
-        assert matches_wildcard_pattern("llama-2", "*gpt*") is False
-        assert matches_wildcard_pattern("anthropic-claude", "*sonnet") is False
+        assert matches_wildcard_pattern("gemini-pro", pattern="claude-*") is False
+        assert matches_wildcard_pattern("llama-2", pattern="*gpt*") is False
+        assert matches_wildcard_pattern("anthropic-claude", pattern="*sonnet") is False

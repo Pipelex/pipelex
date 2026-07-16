@@ -1,12 +1,13 @@
-from typing import Literal
+import re
+from enum import StrEnum
+from typing import Annotated, Any, Literal, Self, TypeAlias
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, model_validator
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.types import Self, StrEnum
 
 
 class AspectRatio(StrEnum):
@@ -15,10 +16,60 @@ class AspectRatio(StrEnum):
     LANDSCAPE_3_2 = "landscape_3_2"
     LANDSCAPE_16_9 = "landscape_16_9"
     LANDSCAPE_21_9 = "landscape_21_9"
+    LANDSCAPE_4_1 = "landscape_4_1"
+    LANDSCAPE_8_1 = "landscape_8_1"
     PORTRAIT_3_4 = "portrait_3_4"
     PORTRAIT_2_3 = "portrait_2_3"
     PORTRAIT_9_16 = "portrait_9_16"
     PORTRAIT_9_21 = "portrait_9_21"
+    PORTRAIT_1_4 = "portrait_1_4"
+    PORTRAIT_1_8 = "portrait_1_8"
+
+
+class SizeTier(StrEnum):
+    """Portable image size classes.
+
+    A tier promises a pixel class at the pipe's chosen aspect ratio, not identical
+    pixel dimensions across providers: each provider maps the tier to its own grid
+    or computed dimensions.
+    """
+
+    HALF_K = "0.5k"
+    ONE_K = "1k"
+    TWO_K = "2k"
+    FOUR_K = "4k"
+
+    @classmethod
+    def quoted_tokens(cls) -> str:
+        """Comma-separated quoted tier tokens, for error messages."""
+        return ", ".join(f"'{tier}'" for tier in cls)
+
+
+_EXACT_SIZE_PATTERN = re.compile(r"([1-9]\d*)x([1-9]\d*)")
+
+
+def parse_img_gen_size(value: Any) -> Any:
+    """Parse a string into a SizeTier token or an exact ImageSize; pass other values through."""
+    if not isinstance(value, str):
+        return value
+    try:
+        return SizeTier(value)
+    except ValueError:
+        pass
+    if exact_match := _EXACT_SIZE_PATTERN.fullmatch(value):
+        return ImageSize(width=int(exact_match.group(1)), height=int(exact_match.group(2)))
+    msg = f"Invalid image size '{value}': expected a size tier ({SizeTier.quoted_tokens()}) or an exact size like '2048x1152'"
+    raise ValueError(msg)
+
+
+# JSON-schema-facing input shape: in .mthds files an exact size is written as a "WxH" string,
+# so the schema must accept the pattern string alongside the tier enum and the ImageSize table.
+_ExactSizeStr: TypeAlias = Annotated[str, Field(pattern=rf"^{_EXACT_SIZE_PATTERN.pattern}$")]
+
+ImgGenSize: TypeAlias = Annotated[
+    SizeTier | ImageSize,
+    BeforeValidator(parse_img_gen_size, json_schema_input_type=SizeTier | _ExactSizeStr | ImageSize),
+]
 
 
 class Quality(StrEnum):
@@ -48,7 +99,7 @@ class Background(StrEnum):
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
-    size: ImageSize | None = None
+    size: ImgGenSize | None = None
     background: Background = Field(strict=False)
     quality: Quality | None = Field(default=None, strict=False)
     input_fidelity: InputFidelity | None = Field(default=None, strict=False)
@@ -78,6 +129,7 @@ class ImgGenJobParams(BaseModel):
 
 class ImgGenJobParamsDefaults(ConfigModel):
     aspect_ratio: AspectRatio = Field(strict=False)
+    size: ImgGenSize | None = None
     background: Background = Field(strict=False)
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
@@ -98,6 +150,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             output_format = ImageFormat.PNG
         return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
+            size=self.size,
             background=self.background,
             quality=self.quality,
             nb_steps=self.nb_steps,

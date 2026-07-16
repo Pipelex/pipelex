@@ -1,10 +1,11 @@
+from typing import Self
+
 from pydantic import Field, model_validator
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
 from typing_extensions import override
 
-from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -13,19 +14,27 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
-from pipelex.types import Self
 
 
 class ImageContent(StuffContent):
-    url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+    url: str = Field(..., description="The image URL: a storage URI, an HTTP(S) URL, or a base64 data URL")
 
     public_url: str | None = Field(default=None, description="The public URL of the image")
     source_prompt: str | None = Field(default=None, description="The source prompt of the image")
     source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
     caption: str | None = Field(default=None, description="The caption of the image")
     mime_type: str | None = Field(default=None, description="The MIME type of the image")
-    size: ImageSize | None = Field(default=None, description="The size in pixels (width and height) of the image")
+    width: int | None = Field(default=None, gt=0, description="The width of the image, in pixels")
+    height: int | None = Field(default=None, gt=0, description="The height of the image, in pixels")
     filename: str | None = Field(default=None, description="The original filename of the image")
+
+    @model_validator(mode="after")
+    def _validate_paired_dimensions(self) -> Self:
+        """Pixel dimensions come from measuring the image, which yields both — a lone one is a bug."""
+        if (self.width is None) != (self.height is None):
+            msg = "An Image carries both width and height, or neither — a lone pixel dimension is not a valid state."
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def _auto_populate_filename(self) -> Self:
@@ -65,11 +74,12 @@ class ImageContent(StuffContent):
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
     def render_with_images(
         self,
+        *,
         registry: ImageRegistry,
         text_format: TextFormat,  # noqa: ARG002
     ) -> str:
@@ -78,7 +88,7 @@ class ImageContent(StuffContent):
         return f"[Image {image_index + 1}]"
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         group = Group()
 
         # title indicating it's an image:
@@ -105,10 +115,10 @@ class ImageContent(StuffContent):
             group.renderables.append(caption_text)
 
         # Size if present
-        if self.size:
+        if self.width is not None and self.height is not None:
             size_text = Text()
             size_text.append("Size: ", style="bold")
-            size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
+            size_text.append(f"{self.width}x{self.height}", style="dim")
             group.renderables.append(size_text)
 
         # MIME type if present

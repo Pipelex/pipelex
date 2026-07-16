@@ -97,10 +97,10 @@ def concept_cmd(
     """
     # Validate that exactly one of spec or spec_file is provided
     if spec is None and spec_file is None:
-        agent_error("Either --spec or --spec-file must be provided", "ArgumentError")
+        agent_error("Either --spec or --spec-file must be provided", error_type="ArgumentError")
 
     if spec is not None and spec_file is not None:
-        agent_error("Cannot use both --spec and --spec-file", "ArgumentError")
+        agent_error("Cannot use both --spec and --spec-file", error_type="ArgumentError")
 
     # Load spec data
     spec_data: dict[str, Any]
@@ -111,9 +111,9 @@ def concept_cmd(
         else:
             spec_data = json.loads(spec)  # type: ignore[arg-type]
     except FileNotFoundError as exc:
-        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError", cause=exc)
+        agent_error(f"Spec file not found: {spec_file}", error_type="FileNotFoundError", cause=exc)
     except json.JSONDecodeError as exc:
-        agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
+        agent_error(f"Invalid JSON: {exc.msg}", error_type="JSONDecodeError", cause=exc)
 
     # Validate and convert spec
     try:
@@ -124,11 +124,11 @@ def concept_cmd(
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
-        agent_error(message, "ValidationError", cause=exc, validation_details=details)
+        agent_error(message, error_type="ValidationError", cause=exc, validation_details=details)
 
     except ValueError as exc:
-        agent_error(str(exc), "ValueError", cause=exc)
+        agent_error(str(exc), error_type="ValueError", cause=exc)
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)

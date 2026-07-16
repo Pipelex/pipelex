@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import importlib.util
-
 from rich.markup import escape
 
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.cogt.exceptions import ModelManagerError
-from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_console, get_models_manager
+from pipelex.cogt.exceptions import ModelListingUnsupportedError, ModelManagerError
+from pipelex.hub import get_console, get_model_lister_registry, get_models_manager
 
 
 class ModelLister:
@@ -17,6 +14,7 @@ class ModelLister:
     async def list_models(
         cls,
         backend_name: str,
+        *,
         flat: bool = False,
     ) -> None:
         """List available models for a specific backend.
@@ -48,135 +46,32 @@ class ModelLister:
                 models_by_sdk[sdk] = []
             models_by_sdk[sdk].append(model_name)
 
-        # Process each SDK separately
+        # Process each SDK separately, dispatching to the lister its backend plugin registered.
+        # A missing-extra guard lives inside each lister (it raises MissingDependencyError when
+        # called without its SDK installed), so the loop names no integration.
+        lister_registry = get_model_lister_registry()
         any_listed = False
         unsupported_sdks: list[str] = []
 
         for sdk in models_by_sdk:
+            lister = lister_registry.get_optional(sdk=sdk)
+            if lister is None:
+                # No plugin registered a lister for this SDK — it does not support remote listing.
+                unsupported_sdks.append(sdk)
+                continue
             try:
-                match sdk:
-                    case "openai" | "azure_openai" | "openai_responses" | "azure_openai_responses":
-                        from pipelex.plugins.openai.openai_list import list_openai_models  # noqa: PLC0415
-
-                        await list_openai_models(
-                            sdk=sdk,
-                            backend_name=backend_name,
-                            backend=backend,
-                            flat=flat,
-                            any_listed=any_listed,
-                        )
-                        any_listed = True
-
-                    case "anthropic":
-                        if importlib.util.find_spec("anthropic") is None:
-                            lib_name = "anthropic"
-                            lib_extra_name = "anthropic"
-                            msg = (
-                                "The anthropic SDK is required in order to use Anthropic models via the anthropic client. "
-                                "However, you can use Anthropic models through bedrock directly "
-                                "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
-                            )
-                            raise MissingDependencyError(
-                                lib_name,
-                                lib_extra_name,
-                                msg,
-                            )
-
-                        from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # noqa: PLC0415
-                        from pipelex.plugins.anthropic.anthropic_list import list_anthropic_models  # noqa: PLC0415
-
-                        try:
-                            await list_anthropic_models(
-                                sdk=sdk,
-                                backend_name=backend_name,
-                                backend=backend,
-                                flat=flat,
-                                any_listed=any_listed,
-                            )
-                            any_listed = True
-                        except AnthropicSDKUnsupportedError:
-                            unsupported_sdks.append(sdk)
-                            continue
-
-                    case "mistral":
-                        if importlib.util.find_spec("mistralai") is None:
-                            lib_name = "mistralai"
-                            lib_extra_name = "mistral"
-                            msg = (
-                                "The mistralai SDK is required in order to use Mistral models through the mistralai client. "
-                                "However, you can use Mistral models through bedrock directly "
-                                "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
-                            )
-                            raise MissingDependencyError(
-                                lib_name,
-                                lib_extra_name,
-                                msg,
-                            )
-
-                        from pipelex.plugins.mistral.mistral_list import list_mistral_models  # noqa: PLC0415
-
-                        list_mistral_models(
-                            sdk=sdk,
-                            backend_name=backend_name,
-                            flat=flat,
-                            any_listed=any_listed,
-                        )
-                        any_listed = True
-
-                    case "google":
-                        if importlib.util.find_spec("google.genai") is None:
-                            lib_name = "google-genai"
-                            lib_extra_name = "google"
-                            msg = "The google-genai SDK is required to use Google GenAI models."
-                            raise MissingDependencyError(
-                                lib_name,
-                                lib_extra_name,
-                                msg,
-                            )
-
-                        from pipelex.plugins.google.google_list import list_google_models  # noqa: PLC0415
-
-                        await list_google_models(
-                            sdk=sdk,
-                            backend_name=backend_name,
-                            backend=backend,
-                            flat=flat,
-                            any_listed=any_listed,
-                        )
-                        any_listed = True
-
-                    case "bedrock" | "bedrock_aioboto3":
-                        if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aioboto3") is None:
-                            lib_name = "boto3,aioboto3"
-                            lib_extra_name = "bedrock"
-                            msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
-                            raise MissingDependencyError(
-                                lib_name,
-                                lib_extra_name,
-                                msg,
-                            )
-
-                        from pipelex.plugins.bedrock.bedrock_list import list_bedrock_models  # noqa: PLC0415
-
-                        list_bedrock_models(
-                            sdk=sdk,
-                            backend_name=backend_name,
-                            backend=backend,
-                            flat=flat,
-                            any_listed=any_listed,
-                        )
-                        any_listed = True
-
-                    case _:
-                        # SDK doesn't support listing
-                        unsupported_sdks.append(sdk)
-                        continue
-
+                await lister(sdk=sdk, backend_name=backend_name, backend=backend, flat=flat, any_listed=any_listed)
+                any_listed = True
+            except ModelListingUnsupportedError:
+                # The lister's client variant cannot enumerate models (e.g. a bedrock-backed
+                # Anthropic client) — the same soft outcome as a missing lister.
+                unsupported_sdks.append(sdk)
+                continue
             except PipelexCLIError:
                 raise
             except Exception as exc:
-                # Per-SDK boundary: SDK list calls (plugin imports, network, remote APIs) have a non-enumerable
-                # failure surface; any failure is converted to PipelexCLIError with context. Re-raises, never swallows.
+                # Case 2: lister dispatch is an unbounded surface (lazy plugin imports, network, remote
+                # provider APIs); any failure is converted to PipelexCLIError with context. Never swallows.
                 msg = f"Error listing models for SDK '{sdk}' in backend '{backend_name}': {exc}"
                 raise PipelexCLIError(msg) from exc
 
@@ -191,6 +86,7 @@ class ModelLister:
 
     @staticmethod
     def _display_unsupported_sdks_message(
+        *,
         any_listed: bool,
         unsupported_sdks: list[str],
         backend_name: str,

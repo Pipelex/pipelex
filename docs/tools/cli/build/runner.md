@@ -76,8 +76,8 @@ pipelex build runner bundle my_bundle.mthds --output custom_runner.py
 
 The generated Python file includes:
 
-1. **All necessary imports** - Imports for Pipelex execution, content types, and any custom structures
-2. **Generated Pydantic structures** - Models for your concepts (also generated separately)
+1. **All necessary imports** - Imports for Pipelex execution, content types, and any custom structures (`from structures.structures import …`)
+2. **Generated Pydantic structures** - A stamped `structures/structures.py` module (plus its `codegen.lock`) emitted by the codegen engine, same as `pipelex build structures`
 3. **Input memory setup** - Example input values based on the pipe's input types
 4. **Pipeline execution** - Async function that executes the pipeline
 5. **Output handling** - Code to extract and display the results

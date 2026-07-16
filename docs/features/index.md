@@ -25,7 +25,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Pipe Operators](pipe-operators.md)**
 
-    The workers that do the actual processing: PipeLLM, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
+    The workers that do the actual processing: PipeLLM, PipeStructure, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc.
 
 -   **[Pipeline Orchestration](pipeline-orchestration.md)**
 
@@ -95,9 +95,9 @@ This section covers all Pipelex capabilities, organized by area.
 
     Pipeline validation without execution, dry run with mocked LLM responses, input validation, and allowed-to-fail pipes.
 
--   **[Distributed Execution with Temporal](distributed-execution.md)**
+-   **[Distributed Execution](distributed-execution.md)**
 
-    Run pipelines as durable Temporal workflows across worker pools. Per-activity routing, named runtime profiles, dashboard observability with custom search attributes.
+    Run the same methods as durable workflows on a Temporal or Mistral Workflows backend, [delivered through the Pipelex platform](https://pipelex.com/products#durable-execution). Per-activity routing, named runtime profiles, and dashboard observability.
 
 -   **[Telemetry & Observability](telemetry.md)**
 

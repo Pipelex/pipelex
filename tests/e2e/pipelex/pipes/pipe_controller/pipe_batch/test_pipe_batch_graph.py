@@ -11,7 +11,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -20,8 +20,8 @@ from tests.e2e.pipelex.pipes.pipe_controller.pipe_batch.test_data import JokeBat
 
 def _get_next_output_folder() -> Path:
     """Get the next numbered output folder for batch graph outputs."""
-    base_dir = str(Path(TEST_OUTPUTS_DIR) / "pipe_batch_graph")
-    return Path(get_incremental_directory_path(base_dir, "run"))
+    base_dir = Path(TEST_OUTPUTS_DIR) / "pipe_batch_graph"
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 @pytest.mark.dry_runnable
@@ -43,18 +43,18 @@ class TestPipeBatchGraph:
         4. Saves the GraphSpec for inspection
         """
         # Build effective config with graph tracing enabled
-        exec_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        exec_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
 
         # Run PipeBatch pipeline with graph tracing
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="batch_analyze_cvs_for_job_offer",
             inputs={
                 "cvs": [
@@ -129,7 +129,7 @@ class TestPipeBatchGraph:
         output_dir = _get_next_output_folder()
         graph_json_path = output_dir / "graph.json"
         graph_json = graph_spec.to_json()
-        save_text_to_path(graph_json, str(graph_json_path))
+        save_text_to_path(graph_json, path=graph_json_path)
         log.info(f"Saved graph.json to: {graph_json_path}")
 
         # Pretty print the graph summary
@@ -167,7 +167,7 @@ class TestPipeBatchGraph:
         """
         # Build config with graph tracing and all graph outputs enabled
         base_config = get_config().pipelex.pipeline_execution_config
-        exec_config = base_config.with_graph_config_overrides(
+        exec_config = base_config.with_execution_overrides(
             generate_graph=True,
             force_include_full_data=False,
         )
@@ -186,12 +186,12 @@ class TestPipeBatchGraph:
         exec_config = exec_config.model_copy(update={"graph_config": graph_config})
 
         # Run joke batch pipeline
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="generate_jokes_from_topics",
         )
         pipe_output = response.pipe_output
@@ -212,21 +212,21 @@ class TestPipeBatchGraph:
 
         # Save outputs to folder
         output_dir = Path(TEST_OUTPUTS_DIR) / "joke_batch_graph"
-        output_dir = Path(get_incremental_directory_path(str(output_dir), "run"))
+        output_dir = get_incremental_directory_path(output_dir, base_name="run")
 
         if graph_outputs.graphspec_json:
             graph_json_path = output_dir / "graph.json"
-            save_text_to_path(graph_outputs.graphspec_json, str(graph_json_path))
+            save_text_to_path(graph_outputs.graphspec_json, path=graph_json_path)
             log.info(f"Saved graph.json to: {graph_json_path}")
 
         if graph_outputs.mermaidflow_html:
             mermaid_path = output_dir / "mermaidflow.html"
-            save_text_to_path(graph_outputs.mermaidflow_html, str(mermaid_path))
+            save_text_to_path(graph_outputs.mermaidflow_html, path=mermaid_path)
             log.info(f"Saved mermaidflow.html to: {mermaid_path}")
 
         if graph_outputs.reactflow_html:
             reactflow_path = output_dir / "reactflow.html"
-            save_text_to_path(graph_outputs.reactflow_html, str(reactflow_path))
+            save_text_to_path(graph_outputs.reactflow_html, path=reactflow_path)
             log.info(f"Saved reactflow.html to: {reactflow_path}")
 
         # Log edge counts
@@ -309,11 +309,11 @@ class TestPipeBatchGraph:
         attribute of the SearchResult stuff, validating the dotted-path resolution
         implemented in SubPipe.run_pipe().
         """
-        runner = PipelexRunner(
+        runner = PipelexMTHDSProtocol(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
         )
-        response = await runner.execute_pipeline(
+        response = await runner.execute(
             pipe_code="article_briefing",
             inputs={"topic": "artificial intelligence"},
         )

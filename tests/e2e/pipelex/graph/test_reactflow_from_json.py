@@ -22,8 +22,8 @@ def _get_next_output_folder() -> Path:
 
     Creates folders like: temp/test_outputs/reactflow_from_json/run_01, run_02, etc.
     """
-    base_dir = str(Path(TEST_OUTPUTS_DIR) / "reactflow_from_json")
-    return Path(get_incremental_directory_path(base_dir, "run"))
+    base_dir = Path(TEST_OUTPUTS_DIR) / "reactflow_from_json"
+    return get_incremental_directory_path(base_dir, base_name="run")
 
 
 class TestReactFlowFromJson:
@@ -47,7 +47,7 @@ class TestReactFlowFromJson:
         json_path = Path(graph_json_path)
         assert json_path.exists(), f"Graph JSON file not found: {json_path}"
 
-        json_str = load_text_from_path(str(json_path))
+        json_str = load_text_from_path(json_path)
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Verify graph loaded correctly
@@ -57,7 +57,7 @@ class TestReactFlowFromJson:
 
         # Generate ReactFlow HTML directly from GraphSpec
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title=f"Graph: {topic}")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title=f"Graph: {topic}")
 
         # Save outputs to TEST_OUTPUTS_DIR
         output_dir = _get_next_output_folder()
@@ -93,12 +93,12 @@ class TestReactFlowFromJson:
         _ = topic  # Used for test identification
 
         # Load graph from JSON
-        json_str = load_text_from_path(graph_json_path)
+        json_str = load_text_from_path(Path(graph_json_path))
         graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Generate ReactFlow HTML
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title="Test Graph")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, config=rf_config, title="Test Graph")
 
         # Verify GraphSpec is embedded
         assert '<script type="application/json" id="pipelex-graphspec">' in reactflow_html

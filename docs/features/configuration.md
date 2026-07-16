@@ -13,17 +13,23 @@ Pipelex uses a layered TOML configuration system that lets you define sensible d
 
 ## Configuration Levels
 
-1. **Base defaults** — Built into Pipelex (`pipelex.toml` in the package)
-2. **Global overrides** — `~/.pipelex/pipelex.toml` for user-wide settings
-3. **Project overrides** — `{project_root}/.pipelex/pipelex.toml` for project-specific settings
-4. **Local overrides** — `pipelex_local.toml` (git-ignored) for machine-specific values
-5. **Environment / run-mode-specific** — `pipelex_dev.toml`, `pipelex_prod.toml`, `pipelex_testing.toml`, etc. The environment overlay is selected by the `PIPELEX_ENV` environment variable (accepted values: `local`, `dev`, `staging`, `prod`; defaults to `dev`).
+1. **Package defaults** — Built into Pipelex (`pipelex.toml` in the package)
+2. **Global tier** — `~/.pipelex/` for user-wide settings: the base `pipelex.toml`, then its override sequence
+3. **Project tier** — `{project_root}/.pipelex/` for project-specific settings: the base `pipelex.toml`, then the same override sequence
 
-A final `pipelex_override.toml` file can be used for last-resort overrides.
+Within each tier, the base `pipelex.toml` is followed by an override sequence, merged in order (later wins per key):
+
+- `pipelex_local.toml` — git-ignored, for machine-specific values
+- `pipelex_{environment}.toml` — e.g. `pipelex_dev.toml`, `pipelex_prod.toml`. The environment is selected by the `PIPELEX_ENV` environment variable (accepted values: `local`, `dev`, `staging`, `prod`; defaults to `dev`).
+- `pipelex_{run_mode}.toml` — e.g. `pipelex_unit_test.toml`, `pipelex_ci_test.toml`. The run mode is selected by the `RUN_MODE` environment variable (defaults to `normal`).
+- `pipelex_override.toml` — general-purpose overrides
+- `pipelex_temporary_override.toml` — last-resort, highest-precedence overrides within the tier
+
+The entire global tier merges before the project tier, so any project-tier file — including the plain project `pipelex.toml` — overrides every global-tier file.
 
 ## Environment Variables
 
-Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environment variables and secrets. Supports `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`.
+Two configuration areas support `${...}` variable substitution in their TOML files: the inference backend configuration (`.pipelex/inference/backends.toml` and the per-backend TOML files under `.pipelex/inference/backends/`) and the telemetry configuration (`.pipelex/telemetry.toml`). In those files, use `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`. The `pipelex.toml` layering described above does not perform substitution — a `${env:VAR}` there stays a literal string.
 
 ## Key Configuration Areas
 
@@ -32,6 +38,5 @@ Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environmen
 - **[Telemetry](../configuration/config-practical/telemetry-config.md)** — Observability settings
 - **[Reporting](../configuration/config-practical/reporting-config.md)** — Cost tracking and reports
 - **[Dry Run](../configuration/config-pipeline-validation/dry-run-config.md)** — Mock generation settings
-- **[Features](../configuration/config-advanced/feature-config.md)** — Feature flags
 
 For full configuration reference, see [Configuration](../configuration/index.md).

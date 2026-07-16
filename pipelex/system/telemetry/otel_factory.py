@@ -7,6 +7,8 @@ import base64
 import hashlib
 from typing import TYPE_CHECKING, Any
 
+from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_payload
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.system.environment import get_optional_env
@@ -29,7 +31,7 @@ if TYPE_CHECKING:
 
 class OtelFactory:
     @classmethod
-    def make_truncated_content(cls, content: str, max_length: int | None) -> str:
+    def make_truncated_content(cls, content: str, *, max_length: int | None) -> str:
         """Truncate content for telemetry capture if it exceeds max length.
 
         Args:
@@ -61,6 +63,7 @@ class OtelFactory:
     def make_inputs_json(
         cls,
         working_memory: WorkingMemory,
+        *,
         needed_input_names: set[str],
         max_length: int | None,
     ) -> str:
@@ -76,7 +79,16 @@ class OtelFactory:
         """
         inputs_dict: dict[str, Any] = {}
         for input_name in needed_input_names:
-            stuff = working_memory.get_stuff(name=input_name)
+            # An input slot resolved as a recorded absence (an omitted optional, a lifted
+            # producer) captures as the explicit absence document. A slot with neither a
+            # value nor a record stays the loud hard-miss raise below.
+            optional_stuff = working_memory.get_optional_stuff(name=input_name)
+            if optional_stuff is None:
+                absence_record = working_memory.get_optional_absence(input_name)
+                if absence_record is not None:
+                    inputs_dict[input_name] = build_absence_payload(absence_record)
+                    continue
+            stuff = optional_stuff or working_memory.get_stuff(name=input_name)
             inputs_dict[input_name] = {
                 "concept": stuff.concept.simple_concept_ref,
                 "content": stuff.content.smart_dump(),
@@ -89,25 +101,31 @@ class OtelFactory:
     def make_output_json(
         cls,
         pipe_output: PipeOutput,
+        *,
         max_length: int | None,
     ) -> str:
         """Serialize pipe output to JSON for telemetry.
 
         Args:
-            pipe_output: The pipe output containing the main stuff.
+            pipe_output: The pipe output containing the resolved main result.
             max_length: Maximum allowed length for the JSON string, or None for no limit.
 
         Returns:
             JSON string representing the output, potentially truncated.
         """
-        main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-        if main_stuff is None:
-            return "{}"
+        # Called on the success path only — a completed pipe run always resolves its declared
+        # output: a value or a recorded absence. An absence serializes to the explicit absence
+        # document (the span still ends successfully).
+        main_resolved = pipe_output.working_memory.resolve_main_stuff()
 
-        output_dict: dict[str, Any] = {
-            "concept": main_stuff.concept.simple_concept_ref,
-            "content": main_stuff.content.smart_dump(),
-        }
+        output_dict: dict[str, Any]
+        if isinstance(main_resolved, AbsenceRecord):
+            output_dict = build_absence_payload(main_resolved)
+        else:
+            output_dict = {
+                "concept": main_resolved.concept.simple_concept_ref,
+                "content": main_resolved.content.smart_dump(),
+            }
 
         json_str = cls.stringify_json(json_conent=output_dict)
         return cls.make_truncated_content(content=json_str, max_length=max_length)
@@ -128,7 +146,7 @@ class OtelFactory:
         return hash_md5_to_int(pipeline_run_id)
 
     @classmethod
-    def make_trace_names(cls, pipeline_run_id: str, pipe_code: str) -> tuple[str, str]:
+    def make_trace_names(cls, pipeline_run_id: str, *, pipe_code: str) -> tuple[str, str]:
         """Create both full and redacted trace names from pipeline run ID and pipe code.
 
         Args:
@@ -195,6 +213,7 @@ class OtelFactory:
     @classmethod
     def make_ai_tracer(
         cls,
+        *,
         user_id: str | None,
         custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,

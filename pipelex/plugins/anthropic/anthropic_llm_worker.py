@@ -4,9 +4,9 @@ from anthropic import (
     APIConnectionError,
     APIStatusError,
     AsyncAnthropic,
-    AsyncAnthropicBedrock,
     omit,
 )
+from anthropic.lib.bedrock import AsyncAnthropicBedrock
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
@@ -29,7 +29,7 @@ from pipelex.cogt.llm.llm_utils import (
     dump_kwargs,
     dump_response_from_structured_gen,
 )
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -57,7 +57,7 @@ class _ThinkingParams:
     suppress_temperature: bool
 
 
-class AnthropicLLMWorker(LLMWorkerInternalAbstract):
+class AnthropicLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
@@ -65,7 +65,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        LLMWorkerInternalAbstract.__init__(
+        LLMWorkerAbstract.__init__(
             self,
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
@@ -112,7 +112,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     # Instance methods
     #########################################################
 
-    def _build_thinking_params(self, job_params: LLMJobParams, max_tokens: int) -> _ThinkingParams:
+    def _build_thinking_params(self, job_params: LLMJobParams, *, max_tokens: int) -> _ThinkingParams:
         """Build thinking-related SDK parameters from job params and model spec.
 
         Args:
@@ -145,6 +145,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_params_for_effort(
         self,
         thinking_mode: ThinkingMode,
+        *,
         effort: ReasoningEffort,
         max_tokens: int,
     ) -> _ThinkingParams:
@@ -199,6 +200,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     def _build_thinking_params_for_budget(
         self,
         thinking_mode: ThinkingMode,
+        *,
         budget: int,
         max_tokens: int,
     ) -> _ThinkingParams:
@@ -307,6 +309,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
@@ -318,7 +321,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         timeout_seconds = anthropic_config.structured_output_timeout_seconds
 
         # Calculate safe max_tokens based on timeout
-        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds)
+        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds=timeout_seconds)
 
         # Use minimum of requested and safe limit
         requested_max_tokens = job_params.max_tokens or self.default_max_tokens

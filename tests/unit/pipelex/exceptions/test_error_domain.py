@@ -1,5 +1,9 @@
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError
-from pipelex.types import StrEnum
+from enum import StrEnum
+
+import pytest
+
+from pipelex.base_exceptions import ErrorDomain, PipelexError, error_domain_is_input
+from tests.helpers.error_report import make_error_report
 
 
 class _ConfigDomainError(PipelexError):
@@ -35,10 +39,39 @@ class TestErrorDomain:
 
     def test_to_dict_drops_error_domain_when_none(self) -> None:
         """ErrorReport.to_dict() omits error_domain when it is None."""
-        report_dict = ErrorReport(error_type="X", message="m").to_dict()
+        report_dict = make_error_report(error_type="X", message="m").to_dict()
         assert "error_domain" not in report_dict
 
     def test_to_dict_includes_error_domain_when_set(self) -> None:
         """ErrorReport.to_dict() includes error_domain when it is set."""
-        report_dict = ErrorReport(error_type="X", message="m", error_domain=ErrorDomain.CONFIG).to_dict()
+        report_dict = make_error_report(error_type="X", message="m", error_domain=ErrorDomain.CONFIG).to_dict()
         assert report_dict["error_domain"] == "config"
+
+    @pytest.mark.parametrize(
+        ("error_domain", "expected_is_input"),
+        [
+            (ErrorDomain.INPUT, True),
+            (ErrorDomain.CONFIG, False),
+            (ErrorDomain.RUNTIME, False),
+        ],
+    )
+    def test_is_input(self, error_domain: ErrorDomain, expected_is_input: bool) -> None:
+        """ErrorDomain.is_input is True only for INPUT — caller-fixable input faults."""
+        assert error_domain.is_input is expected_is_input
+
+    @pytest.mark.parametrize(
+        ("error_domain", "expected_is_input"),
+        [
+            (ErrorDomain.INPUT, True),
+            ("input", True),
+            (ErrorDomain.CONFIG, False),
+            ("config", False),
+            (ErrorDomain.RUNTIME, False),
+            ("runtime", False),
+            (None, False),
+            ("not_a_domain", False),
+        ],
+    )
+    def test_error_domain_is_input(self, error_domain: ErrorDomain | str | None, expected_is_input: bool) -> None:
+        """error_domain_is_input tolerates the serialized str/None shape ErrorReport.error_domain carries."""
+        assert error_domain_is_input(error_domain) is expected_is_input

@@ -4,7 +4,7 @@ from typing import ClassVar
 
 
 class ParallelCombinedGraphExpectationsBase:
-    """Base class for PipeParallel graph expectations with combined_output."""
+    """Base class for PipeParallel graph expectations with a combined output."""
 
     PARALLEL_PIPE_CODE: ClassVar[str]
     EXPECTED_PIPE_CODES: ClassVar[set[str]]
@@ -36,19 +36,20 @@ class ParallelAddEachGraphExpectations:
     # Expected number of edges by kind
     EXPECTED_EDGE_COUNTS: ClassVar[dict[str, int]] = {
         "contains": 4,  # sequence->parallel, sequence->combine, parallel->short, parallel->detailed
+        "parallel_combine": 2,  # short_summary->combined, detailed_summary->combined (always-combine)
         "data": 2,  # parallel->combine (short_summary), parallel->combine (detailed_summary)
     }
 
 
 class ParallelCombinedGraphExpectations(ParallelCombinedGraphExpectationsBase):
-    """Expected structure for the parallel_graph_combined graph (PipeSequence wrapping PipeParallel with combined_output)."""
+    """Expected structure for the parallel_graph_combined graph (PipeSequence wrapping PipeParallel with a combined output)."""
 
     PARALLEL_PIPE_CODE: ClassVar[str] = "pgc_parallel_analysis"
 
     # Expected node pipe_codes
     EXPECTED_PIPE_CODES: ClassVar[set[str]] = {
         "pgc_analysis_then_summarize",  # PipeSequence (outer controller)
-        "pgc_parallel_analysis",  # PipeParallel (parallel controller with combined_output)
+        "pgc_parallel_analysis",  # PipeParallel (parallel controller with structured combined output)
         "pgc_analyze_tone",  # PipeLLM (branch 1)
         "pgc_analyze_length",  # PipeLLM (branch 2)
         "pgc_summarize_combined",  # PipeLLM (downstream consumer of combined result)
@@ -79,7 +80,7 @@ class Parallel3BranchGraphExpectations(ParallelCombinedGraphExpectationsBase):
     # Expected node pipe_codes
     EXPECTED_PIPE_CODES: ClassVar[set[str]] = {
         "pg3_sequence",  # PipeSequence (outer controller)
-        "pg3_parallel",  # PipeParallel (3-branch parallel with combined_output)
+        "pg3_parallel",  # PipeParallel (3-branch parallel with combined output)
         "pg3_analyze_tone",  # PipeLLM (branch 1)
         "pg3_analyze_length",  # PipeLLM (branch 2)
         "pg3_analyze_style",  # PipeLLM (branch 3 - unused downstream)

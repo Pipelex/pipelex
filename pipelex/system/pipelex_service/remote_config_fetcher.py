@@ -167,6 +167,7 @@ class RemoteConfigFetcher:
     def _build_unavailable_error(
         cls,
         fetch_error: RemoteConfigFetchError,
+        *,
         cache_refused: bool = False,
     ) -> RemoteConfigUnavailableError:
         """Build the user-facing offline-mode error with a clear remediation hint.
@@ -197,7 +198,7 @@ class RemoteConfigFetcher:
         return RemoteConfigUnavailableError(msg)
 
     @classmethod
-    def fetch_remote_config(cls, require_fresh: bool = False) -> RemoteConfigResult:
+    def fetch_remote_config(cls, *, require_fresh: bool = False) -> RemoteConfigResult:
         """Fetch the Pipelex Service remote configuration.
 
         Args:

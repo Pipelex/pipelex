@@ -26,6 +26,14 @@ def validate_method_cmd(
             help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
+    orchestrator: Annotated[
+        str | None,
+        typer.Option(
+            "--orchestrator",
+            help="Boot this process under the named orchestrator plugin (e.g. 'temporal'). The validation sweep "
+            "stays in-process either way; use it to verify validation does not dispatch to an orchestrator runtime.",
+        ),
+    ] = None,
 ) -> None:
     """Validate an installed method by name.
 
@@ -51,4 +59,5 @@ def validate_method_cmd(
         bundle_path=None,
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} method",
+        orchestrator=orchestrator,
     )

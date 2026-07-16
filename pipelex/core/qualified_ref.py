@@ -1,3 +1,5 @@
+from typing import NamedTuple
+
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.tools.misc.string_utils import is_pascal_case, is_snake_case
@@ -5,6 +7,11 @@ from pipelex.tools.misc.string_utils import is_pascal_case, is_snake_case
 
 class QualifiedRefError(ValueError):
     """Raised when a qualified reference string is invalid."""
+
+
+class CrossPackageRef(NamedTuple):
+    alias: str
+    remainder: str
 
 
 class QualifiedRef(BaseModel):
@@ -126,7 +133,7 @@ class QualifiedRef(BaseModel):
         return ref
 
     @classmethod
-    def from_domain_and_code(cls, domain_path: str, local_code: str) -> "QualifiedRef":
+    def from_domain_and_code(cls, *, domain_path: str, local_code: str) -> "QualifiedRef":
         """Build from already-known parts.
 
         Args:
@@ -194,14 +201,14 @@ class QualifiedRef(BaseModel):
         return "->" in raw
 
     @staticmethod
-    def split_cross_package_ref(raw: str) -> tuple[str, str]:
+    def split_cross_package_ref(raw: str) -> CrossPackageRef:
         """Split a cross-package reference into alias and remainder.
 
         Args:
             raw: The raw reference string like 'alias->domain.pipe_code'
 
         Returns:
-            Tuple of (alias, remainder) where remainder is 'domain.pipe_code'
+            CrossPackageRef(alias, remainder) where remainder is 'domain.pipe_code'
 
         Raises:
             QualifiedRefError: If the string does not contain '->'
@@ -210,4 +217,4 @@ class QualifiedRef(BaseModel):
             msg = f"Reference '{raw}' is not a cross-package reference (no '->' found)"
             raise QualifiedRefError(msg)
         parts = raw.split("->", maxsplit=1)
-        return parts[0], parts[1]
+        return CrossPackageRef(alias=parts[0], remainder=parts[1])

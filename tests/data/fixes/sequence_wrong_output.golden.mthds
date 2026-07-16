@@ -1,0 +1,27 @@
+# Golden fixture for the match-sequence-output applier test.
+# Deliberately mixes styles: trailing comments, an inline table, a block table,
+# a multi-line string, and non-alphabetical key ordering.
+domain    = "seqfix_golden" # trailing comment with extra spaces
+main_pipe = "list_ideas"
+
+[concept]
+Idea = "An idea." # inline concept declaration
+
+[pipe.gen_ideas]
+type = "PipeLLM"
+description = "Generate ideas."
+output = "Idea[]"
+inputs = { topic = "Text" } # inline table style, key deliberately after output
+prompt = """
+Generate ideas about $topic
+"""
+
+# The sequence below declares the wrong output on purpose.
+[pipe.list_ideas]
+type = "PipeSequence"
+description = "Sequence."
+inputs = { topic = "Text" }
+output = "Idea[]" # wrong: the last step yields a list
+steps = [
+  { pipe = "gen_ideas", result = "ideas" },
+]

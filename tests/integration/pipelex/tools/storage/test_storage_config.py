@@ -41,3 +41,6 @@ class TestStorageConfigIntegration:
             case StorageMethod.GCP:
                 assert storage_config.gcp is not None
                 assert storage_config.uri_format == storage_config.gcp.uri_format
+            case _:
+                # External method token (D1): no built-in sub-config to compare against.
+                pass

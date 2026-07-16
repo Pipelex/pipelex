@@ -1,44 +1,56 @@
-from collections.abc import Sequence
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from datetime import UTC, datetime
+from typing import NamedTuple, cast
 
-from pydantic import Field, RootModel
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_job import SearchJob
-from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
-from pipelex.graph.graph_context import GraphContext
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.graph.trace_context import TraceContext
+from pipelex.hub import is_in_isolated_execution
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
+from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
+# DynamoDB PutItem failures come in two sibling botocore base classes (neither subclasses the other):
+# ClientError (service-side throttle / auth) and BotoCoreError (transport / credential / timeout, e.g.
+# EndpointConnectionError, ReadTimeoutError, NoCredentialsError). Both are imported together (present or
+# absent together) and join the best-effort emit catch when boto3 is installed — matching s3_storage_provider.
 try:
+    from botocore.exceptions import BotoCoreError as _BotoCoreError  # type: ignore[import-untyped]
     from botocore.exceptions import ClientError as _BotoClientError  # type: ignore[import-untyped]
 except ImportError:
+    _BotoCoreError = None  # type: ignore[assignment, misc]
     _BotoClientError = None  # type: ignore[assignment, misc]
 
-if TYPE_CHECKING:
-    from pathlib import Path
+
+# Infra-level failures an event-log backend can raise from emit(). Usage/cost reporting is a side
+# concern: by the time report_inference_job runs, the inference has already succeeded (and been
+# billed), so a transient event-log write failure must never propagate and turn a successful
+# inference into a failed pipeline. Both emit paths — the registered-context fast path and the
+# runner fallback — drop these with a WARNING. OSError covers the NDJSON backend (dir/file write
+# errors); ClientError (service-side throttle / auth) and BotoCoreError (transport / credential /
+# timeout, e.g. EndpointConnectionError, ReadTimeoutError, NoCredentialsError) cover the DynamoDB
+# backend when boto3 is installed. ClientError and BotoCoreError are sibling botocore base classes
+# (neither subclasses the other), so both must be listed.
+# cast: botocore is untyped, so the imported classes are Unknown; we know they are BaseException types.
+# Single assignment (no reassignment) so the uppercase constant satisfies reportConstantRedefinition.
+_EMIT_BEST_EFFORT_EXCEPTIONS: tuple[type[BaseException], ...] = (
+    (OSError, cast("type[BaseException]", _BotoClientError), cast("type[BaseException]", _BotoCoreError))
+    if _BotoClientError is not None and _BotoCoreError is not None
+    else (OSError,)
+)
 
 
-@dataclass
-class _EventLogContext:
+class _EventLogContext(NamedTuple):
     """Per-workflow/run event log state. Private to ReportingManager."""
 
     event_log: EventLogProtocol
@@ -46,24 +58,9 @@ class _EventLogContext:
     pipeline_run_id: str
 
 
-UsageRegistryRoot = list[TokensUsage]
-
-
-class UsageRegistry(RootModel[UsageRegistryRoot]):
-    root: UsageRegistryRoot = Field(default_factory=empty_list_factory_of(LLMTokensUsage))
-
-    def get_current_tokens_usage(self) -> UsageRegistryRoot:
-        return self.root
-
-    def add_tokens_usage(self, tokens_usage: TokensUsage):
-        self.root.append(tokens_usage)
-
-
 class ReportingManager(ReportingProtocol):
     def __init__(self):
-        self._reporting_config = get_config().pipelex.reporting_config
-        self._usage_registries: dict[str, UsageRegistry] = {}
-        # Per-context event log state, keyed by graph_context.lookup_key.
+        # Per-context event log state, keyed by trace_context.lookup_key.
         # Each concurrent workflow/run gets its own isolated context.
         self._event_log_contexts: dict[str, _EventLogContext] = {}
 
@@ -74,6 +71,7 @@ class ReportingManager(ReportingProtocol):
     @override
     def set_event_log(
         self,
+        *,
         context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
@@ -82,11 +80,21 @@ class ReportingManager(ReportingProtocol):
         """Configure event log for a specific workflow/run context.
 
         Args:
-            context_key: Unique key for this context (graph_context.lookup_key).
+            context_key: Unique key for this context (trace_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
-            workflow_id: Temporal workflow ID or "direct".
+            workflow_id: Run-scoped execution identity stamped into events
+                (Temporal run ID, or "direct" outside Temporal).
             pipeline_run_id: Pipeline run ID for event correlation.
         """
+        # The silent overwrite-on-existing-key below is intentional and load-bearing.
+        # Shared contract: worker-local state keyed by a deterministic per-run id must be
+        # self-healing on open/set, because a leaked entry from a prior interrupted
+        # execution remains possible (deadlock-detector thread abandonment skips finally
+        # entirely; worker kill between set and clear). The same idiom exists in
+        # LibraryManager.open_fresh_library and GraphTracerManager.open_tracer (both
+        # explicit, WARNING); here the bare dict assignment is the healing mechanism.
+        # Adding "context already exists -> raise" collision detection would reintroduce
+        # the eviction-poison class on the cost path (pre-M1 open_tracer did exactly that).
         self._event_log_contexts[context_key] = _EventLogContext(
             event_log=event_log,
             workflow_id=workflow_id,
@@ -94,7 +102,7 @@ class ReportingManager(ReportingProtocol):
         )
 
     @override
-    def clear_event_log(self, context_key: str) -> None:
+    def clear_event_log(self, *, context_key: str) -> None:
         """Remove event log configuration for a completed workflow/run."""
         self._event_log_contexts.pop(context_key, None)
 
@@ -104,54 +112,15 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def setup(self):
-        self._usage_registries.clear()
-        self._usage_registries[SpecialPipelineId.UNTITLED] = UsageRegistry()
+        self._event_log_contexts.clear()
 
     @override
     def teardown(self):
-        self._usage_registries.clear()
         self._event_log_contexts.clear()
 
     ############################################################
     # Private methods
     ############################################################
-
-    def _get_registry_strict(self, pipeline_run_id: str) -> UsageRegistry:
-        """Return the registry for ``pipeline_run_id`` or raise ``KeyError`` on miss.
-
-        Used by ``_report_*_job``: on the runner, the registry is never opened
-        because ``open_registry`` runs on the API process. Callers swallow
-        ``KeyError`` and skip the local-add — the runner-side
-        ``UsageReportEvent`` emission (Phase 2 fallback) is independent of
-        the registry, so distributed reassembly still gets the data.
-        """
-        return self._usage_registries[pipeline_run_id]
-
-    def _get_or_create_registry(self, pipeline_run_id: str) -> UsageRegistry:
-        """Return the registry for ``pipeline_run_id``, creating it on miss.
-
-        Used by ``inject_tokens_usages`` (the P1 cross-worker assembly path),
-        the console cost-report path, and ``generate_report`` when called for
-        a specific run that wasn't opened on this process.
-        """
-        if pipeline_run_id not in self._usage_registries:
-            self._usage_registries[pipeline_run_id] = UsageRegistry()
-        return self._usage_registries[pipeline_run_id]
-
-    def _try_add_to_registry(self, pipeline_run_id: str, tokens_usage: AnyTokensUsage) -> None:
-        """Add to the registry if it exists; silently skip if not.
-
-        Skipping on miss is the runner-process behavior — the registry was
-        never opened here. The local-skip is intentional: the
-        ``UsageReportEvent`` emitted by ``_emit_usage_event`` carries the
-        data into the shared backend partition, and the P1 readback path
-        will assemble it on the process that owns ``inject_tokens_usages``.
-        """
-        try:
-            registry = self._get_registry_strict(pipeline_run_id)
-        except KeyError:
-            return
-        registry.add_tokens_usage(tokens_usage)
 
     def _report_llm_job(self, llm_job: LLMJob):
         llm_tokens_usage = llm_job.job_report.llm_tokens_usage
@@ -160,13 +129,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        pipeline_run_id = llm_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, llm_tokens_usage)
-        self._emit_usage_event(llm_job, llm_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            llm_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=llm_tokens_usage)
-            log.verbose(llm_token_cost_report, title="Token Cost report")
+        self._emit_usage_event(llm_job, tokens_usage=llm_tokens_usage)
 
     def _report_img_gen_job(self, img_gen_job: ImgGenJob):
         img_gen_tokens_usage = img_gen_job.job_report.img_gen_tokens_usage
@@ -175,13 +138,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("ImgGen job has no img_gen_tokens_usage")
             return
 
-        pipeline_run_id = img_gen_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, img_gen_tokens_usage)
-        self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            img_gen_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=img_gen_tokens_usage)
-            log.verbose(img_gen_token_cost_report, title="Token Cost report")
+        self._emit_usage_event(img_gen_job, tokens_usage=img_gen_tokens_usage)
 
     def _report_extract_job(self, extract_job: ExtractJob):
         extract_tokens_usage = extract_job.job_report.extract_tokens_usage
@@ -190,13 +147,7 @@ class ReportingManager(ReportingProtocol):
             log.warning("Extract job has no extract_tokens_usage")
             return
 
-        pipeline_run_id = extract_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, extract_tokens_usage)
-        self._emit_usage_event(extract_job, extract_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            extract_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=extract_tokens_usage)
-            log.verbose(extract_token_cost_report, title="Token Cost report")
+        self._emit_usage_event(extract_job, tokens_usage=extract_tokens_usage)
 
     def _report_search_job(self, search_job: SearchJob):
         search_tokens_usage = search_job.job_report.search_tokens_usage
@@ -205,99 +156,111 @@ class ReportingManager(ReportingProtocol):
             log.warning("Search job has no search_tokens_usage")
             return
 
-        pipeline_run_id = search_job.job_metadata.pipeline_run_id
-        self._try_add_to_registry(pipeline_run_id, search_tokens_usage)
-        self._emit_usage_event(search_job, search_tokens_usage)
+        self._emit_usage_event(search_job, tokens_usage=search_tokens_usage)
 
-        if self._reporting_config.is_log_costs_to_console:
-            search_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=search_tokens_usage)
-            log.verbose(search_token_cost_report, title="Token Cost report")
-
-    ############################################################
-    # ReportingProtocol
-    ############################################################
-
-    @override
-    def open_registry(self, pipeline_run_id: str):
-        if pipeline_run_id in self._usage_registries:
-            msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
-            raise ReportingManagerError(msg)
-        self._usage_registries[pipeline_run_id] = UsageRegistry()
-
-    def inject_tokens_usages(self, pipeline_run_id: str, tokens_usages: Sequence[AnyTokensUsage]) -> None:
-        """Inject externally-collected token usage records into a pipeline's registry.
-
-        Used after assembling usage data from distributed trace events, so that
-        generate_report() can produce a complete cost report across all workers.
-
-        Args:
-            pipeline_run_id: The pipeline run to add usage data to.
-            tokens_usages: Token usage records to inject.
-        """
-        registry = self._get_or_create_registry(pipeline_run_id)
-        for tokens_usage in tokens_usages:
-            registry.add_tokens_usage(tokens_usage)
-
-    def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
+    def _emit_usage_event(self, inference_job: InferenceJobAbstract, *, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent for this job.
 
-        Fast path: when set_event_log was registered for this graph context's
-        lookup_key (router process or direct mode), emit through the cached
+        Fast path: when set_event_log was registered for this trace context's
+        lookup_key (workflow-thread or direct mode), emit through the cached
         per-context event log.
 
+        Isolated-execution path: an emission from inside an isolated sub-execution
+        (reported by the boot orchestrator's ``is_in_isolated_execution`` probe — a
+        Temporal activity, even when co-located with the workflow worker) NEVER takes
+        the fast path. The registered context there is the workflow's in-sandbox
+        BufferingEventLog, and an isolated sub-execution does not re-execute on replay —
+        a cross-thread write into that buffer makes the workflow's buffer content depend
+        on whether the sub-execution actually ran, breaking replay determinism (audit
+        finding H1). Such emissions must behave identically whether co-located or remote:
+        per-process fallback.
+
         Fallback: when context lookup misses (runner process — set_event_log
-        was never called here), emit through the per-process activity event
-        log so the event still lands in the same backend partition as the
-        rest of the run. See _emit_usage_event_runner_fallback for details.
+        was never called here) or the emission comes from an isolated sub-execution,
+        emit through the per-process activity event log so the event still lands in
+        the same backend partition as the rest of the run. See
+        _emit_usage_event_runner_fallback for details.
         """
-        graph_context = inference_job.job_metadata.graph_context
-        if graph_context is None:
+        trace_context = inference_job.job_metadata.trace_context
+        if trace_context is None:
             return
 
-        context = self._event_log_contexts.get(graph_context.lookup_key)
-        if context is not None:
-            self._emit_via_registered_context(context, graph_context, tokens_usage)
+        # Gate cost emission on emit_usage_events BEFORE the context lookup, so both the fast path
+        # (_emit_via_registered_context) and the runner fallback are guarded by the same check. This
+        # keeps correctness from resting on the cross-file invariant "a context is registered (via
+        # set_event_log) only when costs are on": _event_log_contexts is a process-global singleton
+        # and clear_event_log is best-effort in finally blocks, so a leaked context from a prior
+        # costs-enabled run could otherwise let a later graph-only run (emit_usage_events=False) emit
+        # usage events through the fast path on a colliding lookup_key (reused pipeline_run_id /
+        # workflow_id).
+        if not trace_context.emit_usage_events:
             return
+
+        if not is_in_isolated_execution():
+            context = self._event_log_contexts.get(trace_context.lookup_key)
+            if context is not None:
+                self._emit_via_registered_context(context=context, trace_context=trace_context, tokens_usage=tokens_usage)
+                return
 
         self._emit_usage_event_runner_fallback(
             inference_job=inference_job,
             tokens_usage=tokens_usage,
-            graph_context=graph_context,
+            trace_context=trace_context,
         )
 
     @staticmethod
     def _emit_via_registered_context(
+        *,
         context: _EventLogContext,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
         tokens_usage: AnyTokensUsage,
     ) -> None:
         """Fast-path emit through a context registered via set_event_log."""
-        node_id = graph_context.parent_node_id or "unknown"
+        node_id = trace_context.parent_node_id or "unknown"
         seq = context.event_log.next_sequence()
 
         event = UsageReportEvent(
             pipeline_run_id=context.pipeline_run_id,
             workflow_id=context.workflow_id,
             writer_id=context.event_log.writer_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,
             tokens_usage=tokens_usage,
         )
-        context.event_log.emit(event)
+        ReportingManager._emit_best_effort(event_log=context.event_log, event=event)
+
+    @staticmethod
+    def _emit_best_effort(*, event_log: EventLogProtocol, event: UsageReportEvent) -> None:
+        """Emit a usage event, dropping infra-level backend failures with a WARNING.
+
+        Shared by both emit paths (the registered-context fast path and the runner fallback).
+        report_inference_job runs synchronously after the inference has already succeeded, so an
+        event-log write failure must not propagate and fail the pipeline. We catch the specific
+        infra exception classes the backends raise at emit() time (see
+        ``_EMIT_BEST_EFFORT_EXCEPTIONS``) and drop the event. Other exceptions propagate.
+        """
+        try:
+            event_log.emit(event)
+        except _EMIT_BEST_EFFORT_EXCEPTIONS as exc:
+            log.warning(f"Usage event emit failed; dropping: {exc}")
 
     def _emit_usage_event_runner_fallback(
         self,
         inference_job: InferenceJobAbstract,
+        *,
         tokens_usage: AnyTokensUsage,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
     ) -> None:
-        """Emit through a per-process activity event log when no context was registered.
+        """Emit through the per-process activity event log.
 
-        On the runner, ``set_event_log`` was never called — the workflow only
-        registered a context on the router process. We fall back to a
-        process-local event log built from ``tracing_config``, stamped with a
-        stable per-process writer_id of the form ``act_{pid}_{uuid8}``.
+        This is the universal path for activity-side usage emissions (audit finding
+        H1): every emission from inside a Temporal activity routes here, co-located
+        or remote alike, so the workflow's in-sandbox buffer stays a pure function
+        of inline execution. It also covers the original fallback case — a runner
+        process where ``set_event_log`` was never called. The event log is
+        process-local, built from ``tracing_config``, stamped with a stable
+        per-process writer_id of the form ``act_{pid}_{uuid8}``.
 
         Documented over-counting risk (R2): retried activities re-emit a fresh
         event at sequence N+1 instead of overwriting the original at N, so the
@@ -305,12 +268,12 @@ class ReportingManager(ReportingProtocol):
         Suppression of retried-emit duplicates is a separate, harder problem
         (deferred follow-up).
 
-        Specific exceptions caught and dropped with WARNING:
+        Construction-time failures (lazy event-log build) caught and dropped with WARNING:
         - ``OSError``: NDJSON dir unwritable, file system errors.
         - ``MissingDependencyError``: ``boto3`` missing for the DynamoDB backend.
         - ``PipelexConfigError``: factory misconfigured.
-        - ``botocore.exceptions.ClientError`` (when boto3 is installed):
-            DynamoDB throttle / auth fail at PutItem time.
+        The emit() itself is delegated to ``_emit_best_effort``, which drops the
+        backend's emit-time infra failures (see ``_EMIT_BEST_EFFORT_EXCEPTIONS``).
         Other exceptions propagate.
         """
         tracing_config = get_config().pipelex.tracing_config
@@ -326,30 +289,23 @@ class ReportingManager(ReportingProtocol):
         if process_event_log is None:
             return
 
-        workflow_id = graph_context.tracer_key or graph_context.graph_id
-        node_id = graph_context.parent_node_id or "unknown"
+        workflow_id = trace_context.tracer_key or trace_context.graph_id
+        node_id = trace_context.parent_node_id or "unknown"
 
-        ActivityEventLogCache.warn_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
+        ActivityEventLogCache.log_once_runner_fallback_engaged(workflow_id=workflow_id, writer_id=process_event_log.writer_id)
 
         seq = process_event_log.next_sequence()
         event = UsageReportEvent(
             pipeline_run_id=inference_job.job_metadata.pipeline_run_id,
             workflow_id=workflow_id,
             writer_id=process_event_log.writer_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             sequence=seq,
             node_id=node_id,
             tokens_usage=tokens_usage,
         )
 
-        emit_exceptions: tuple[type[BaseException], ...] = (OSError,)
-        if _BotoClientError is not None:
-            emit_exceptions = (*emit_exceptions, _BotoClientError)
-
-        try:
-            process_event_log.emit(event)
-        except emit_exceptions as exc:
-            log.warning(f"Runner-side usage event emit failed; dropping: {exc}")
+        self._emit_best_effort(event_log=process_event_log, event=event)
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):
@@ -364,32 +320,3 @@ class ReportingManager(ReportingProtocol):
             self._report_search_job(search_job=inference_job)
         else:
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
-
-    @override
-    def generate_report(self, pipeline_run_id: str | None = None):
-        cost_report_file_path: Path | None = None
-        if self._reporting_config.is_generate_cost_report_file_enabled:
-            ensure_path(self._reporting_config.cost_report_dir_path)
-            cost_report_file_path = get_incremental_file_path(
-                base_path=self._reporting_config.cost_report_dir_path,
-                base_name=self._reporting_config.cost_report_base_name,
-                extension=self._reporting_config.cost_report_extension,
-            )
-
-        registries_to_process: dict[str, UsageRegistry] = {}
-        if pipeline_run_id:
-            registries_to_process = {pipeline_run_id: self._get_or_create_registry(pipeline_run_id)}
-        else:
-            registries_to_process = self._usage_registries
-
-        for run_id, registry in registries_to_process.items():
-            CostRegistry.generate_report(
-                pipeline_run_id=run_id,
-                tokens_usages=registry.get_current_tokens_usage(),
-                unit_scale=self._reporting_config.cost_report_unit_scale,
-                cost_report_file_path=cost_report_file_path,
-            )
-
-    @override
-    def close_registry(self, pipeline_run_id: str):
-        self._usage_registries.pop(pipeline_run_id)

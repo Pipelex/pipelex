@@ -101,7 +101,7 @@ class TestLoginCommand:
     def test_save_api_key_preserves_existing_entries(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """save_api_key preserves existing .env entries when adding the API key."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {"EXISTING_KEY": "existing_value"})
+        write_env_file(env_path, entries={"EXISTING_KEY": "existing_value"})
 
         mocker.patch(
             "pipelex.cli.commands.login.command.get_global_env_path",
@@ -116,7 +116,7 @@ class TestLoginCommand:
     def test_save_api_key_updates_existing_key(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """save_api_key overwrites an existing PIPELEX_GATEWAY_API_KEY."""
         env_path = tmp_path / ".env"
-        write_env_file(env_path, {PIPELEX_GATEWAY_API_KEY_VAR: "old_key"})
+        write_env_file(env_path, entries={PIPELEX_GATEWAY_API_KEY_VAR: "old_key"})
 
         mocker.patch(
             "pipelex.cli.commands.login.command.get_global_env_path",

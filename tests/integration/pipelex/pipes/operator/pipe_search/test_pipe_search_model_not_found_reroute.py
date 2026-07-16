@@ -12,7 +12,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -40,7 +40,7 @@ class TestPipeSearchModelNotFoundReroute:
         fake_worker = mocker.MagicMock()
         fake_worker.search_sourced_answer = mocker.AsyncMock(side_effect=not_found_error)
         mocker.patch(
-            "pipelex.pipe_operators.search.pipe_search.SearchWorkerFactory.make_search_worker",
+            "pipelex.cogt.content_generation.search_generate.SearchWorkerFactory.make_search_worker",
             return_value=fake_worker,
         )
 

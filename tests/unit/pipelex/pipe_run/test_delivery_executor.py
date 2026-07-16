@@ -1,6 +1,17 @@
+import socket
+
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import ErrorDomain, ErrorReport
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.delivery_assignment import (
     DeliveryAssignment,
     DeliveryStatus,
@@ -8,7 +19,22 @@ from pipelex.pipe_run.delivery_assignment import (
     WebhookTarget,
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
-from pipelex.pipe_run.exceptions import StorageDeliveryError, WebhookDeliveryError
+from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.tools.network.exceptions import SsrfBlockedError
+
+
+def _make_main_stuff() -> Stuff:
+    return Stuff(
+        stuff_code="main-code",
+        stuff_name="main_stuff",
+        concept=Concept(
+            code="Text",
+            domain_code="native",
+            description="Plain text",
+            structure_class_name="TextContent",
+        ),
+        content=TextContent(text="Hello delivery!"),
+    )
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -22,7 +48,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
-        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -39,6 +65,10 @@ class TestDeliveryExecutor:
         mock_storage.store.assert_called()
         stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
         assert any("test-user/plr-123/working_memory.json" in key for key in stored_keys)
+        # A completed run always delivers a main stuff, so the main_stuff artifact files are always written.
+        assert any("test-user/plr-123/main_stuff.json" in key for key in stored_keys)
+        assert any("test-user/plr-123/main_stuff.md" in key for key in stored_keys)
+        assert any("test-user/plr-123/main_stuff.html" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()
@@ -66,6 +96,8 @@ class TestDeliveryExecutor:
         call_kwargs = mock_client.post.call_args
         payload = call_kwargs.kwargs["json"]
         assert payload["pipeline_run_id"] == "plr-456"
+        assert payload["state"] == "COMPLETED"
+        # Transitional legacy spelling rides along for one release (master D1/D7).
         assert payload["status"] == "COMPLETED"
         assert "result_url" not in payload
 
@@ -134,7 +166,7 @@ class TestDeliveryExecutor:
         mock_output = mocker.MagicMock()
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {}
-        mock_output.working_memory.get_optional_main_stuff.return_value = None
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
         mock_output.graph_spec = None
 
         executor = DeliveryExecutor()
@@ -148,6 +180,86 @@ class TestDeliveryExecutor:
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
             )
+
+    async def test_generate_result_files_raises_without_main_stuff_typed(self, mocker: MockerFixture) -> None:
+        """A completed run always resolves its declared output — a typed working memory with neither
+        a main stuff nor a recorded absence is a contract violation, not an empty envelope.
+        """
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory = WorkingMemory()
+        mock_output.graph_spec = None
+
+        with pytest.raises(WorkingMemoryStuffNotFoundError):
+            await DeliveryExecutor().generate_result_files(mock_output)
+
+    async def test_generate_result_files_raises_without_main_stuff_raw(self, mocker: MockerFixture) -> None:
+        """Same contract on the raw (cross-process) path: neither a raw main stuff nor a recorded absence fails loudly."""
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = {"root": {}, "aliases": {}}
+        mock_output.graph_spec = None
+
+        with pytest.raises(PipeJobError):
+            await DeliveryExecutor().generate_result_files(mock_output)
+
+    async def test_generate_result_files_absent_main_typed(self, mocker: MockerFixture) -> None:
+        """An absent main output is a first-class success: the typed arm delivers an explicit
+        absence artifact (main_stuff.json/md/html) instead of raising.
+        """
+        working_memory = WorkingMemory()
+        working_memory.record_new_main_absence(
+            AbsenceRecord(
+                variable_name="penalty_summary",
+                kind=AbsenceKind.DECLARED_ABSENT,
+                reason="no penalty clause found in this contract",
+                producing_pipe="check_penalty_clause",
+            ),
+        )
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory = working_memory
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert "working_memory.json" in files
+        json_text = files["main_stuff.json"].data.decode("utf-8")
+        assert '"absent": true' in json_text
+        assert "no penalty clause found in this contract" in json_text
+        assert "check_penalty_clause" in json_text
+        md_text = files["main_stuff.md"].data.decode("utf-8")
+        assert "absent" in md_text.lower()
+        assert "no penalty clause found in this contract" in md_text
+        assert "main_stuff.html" in files
+
+    async def test_generate_result_files_absent_main_raw(self, mocker: MockerFixture) -> None:
+        """Same on the raw (cross-process) path: a recorded main absence in the raw ledger delivers
+        the absence artifact instead of the contract-violation error.
+        """
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = {
+            "root": {},
+            "aliases": {},
+            "absences": {
+                "main_stuff": {
+                    "variable_name": "penalty_summary",
+                    "kind": "skipped",
+                    "reason": "skipped because input 'penalty_clause' is absent",
+                    "producing_pipe": "summarize_penalty",
+                    "upstream": None,
+                },
+            },
+        }
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        json_text = files["main_stuff.json"].data.decode("utf-8")
+        assert '"absent": true' in json_text
+        assert "skipped because input 'penalty_clause' is absent" in json_text
+        md_text = files["main_stuff.md"].data.decode("utf-8")
+        assert "summarize_penalty" in md_text
+        assert "main_stuff.html" in files
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
@@ -254,7 +366,7 @@ class TestDeliveryExecutor:
     async def test_generate_result_files_with_pydantic_instances_in_raw(self, mocker: MockerFixture) -> None:
         """working_memory_raw can contain hydrated Pydantic instances after Temporal transit.
 
-        When `dump_for_temporal()` runs in a child workflow, it embeds `__class__` metadata
+        When `dump_for_transport()` runs in a child workflow, it embeds `__class__` metadata
         on ListContent items so the parent can reconstruct them. Kajson's Temporal data
         converter then eagerly rehydrates those dicts back into BaseModel instances on the
         activity worker that runs delivery — even though the typed slot is `dict[str, Any]`.
@@ -290,7 +402,7 @@ class TestDeliveryExecutor:
                     "content": [page],
                 }
             },
-            "aliases": {},
+            "aliases": {"main_stuff": "cv_pages"},
         }
         mock_output.graph_spec = None
 
@@ -299,6 +411,288 @@ class TestDeliveryExecutor:
         json_text = files["working_memory.json"].data.decode("utf-8")
         assert "Page 1 contents" in json_text
         assert "https://example.com/img.png" in json_text
+
+    async def test_webhook_includes_error_report_on_failed_status(self, mocker: MockerFixture) -> None:
+        """A FAILED delivery with an ``ErrorReport`` includes a VERBOSE ``error`` dict the receiver can rehydrate."""
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        error_report = ErrorReport(
+            error_type="LLMCompletionError",
+            message="provider returned 429",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
+            error_category="transient",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=True,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
+            model="gpt-4o-mini",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                message="429 Too Many Requests",
+                status_code=429,
+                retry_after_seconds=2.5,
+            ),
+        )
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-failed",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=error_report,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.FAILED
+        assert "error" in payload, "FAILED webhook must include the structured error report"
+        rehydrated = ErrorReport.from_dict(payload["error"])
+        assert rehydrated == error_report, "VERBOSE payload must round-trip through from_dict"
+
+    async def test_webhook_omits_error_when_report_is_none(self, mocker: MockerFixture) -> None:
+        """A completed delivery (no report) must not introduce an ``error`` field in the payload."""
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-success",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.COMPLETED
+        assert "error" not in payload
+
+    async def test_webhook_omits_error_when_failed_status_with_none_report(self, mocker: MockerFixture) -> None:
+        """A FAILED delivery with ``error_report=None`` must not introduce an ``error`` field in the payload.
+
+        The COMPLETED case is pinned by ``test_webhook_omits_error_when_report_is_none``,
+        but the FAILED case is not — a future regression defaulting ``error`` to ``{}``
+        on FAILED would slip through. ``_notify_webhook`` only writes
+        ``payload["error"]`` when ``error_report is not None``, regardless of status.
+        """
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-failed-no-report",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=None,
+        )
+
+        payload = mock_client.post.call_args.kwargs["json"]
+        assert payload["status"] == DeliveryStatus.FAILED
+        assert "error" not in payload
+
+    async def test_storage_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """The ``Storage delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_storage = mocker.AsyncMock()
+        mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
+        mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
+
+        mock_output = mocker.MagicMock()
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(storage=StorageTarget())
+
+        await executor.execute(
+            pipe_output=mock_output,
+            user_id="test-user",
+            pipeline_run_id="plr-storage-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+            request_id="req-abc-123",
+        )
+
+        storage_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Storage delivery completed" in str(c.args[0])]
+        assert storage_messages, "Storage delivery completion must emit one info log"
+        assert "request_id=req-abc-123" in storage_messages[0]
+        assert "pipeline_run_id=plr-storage-req" in storage_messages[0]
+
+    async def test_webhook_completion_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """The ``Webhook delivery completed`` log line carries the originating ``request_id`` for cross-phase correlation."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-webhook-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+            request_id="req-xyz-789",
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log"
+        assert "request_id=req-xyz-789" in webhook_messages[0]
+        assert "pipeline_run_id=plr-webhook-req" in webhook_messages[0]
+
+    async def test_failed_webhook_log_includes_request_id_when_set(self, mocker: MockerFixture) -> None:
+        """``request_id`` and ``error_report`` are independent dimensions of ``DeliveryExecutor.execute``.
+
+        The COMPLETED variant is pinned by ``test_webhook_completion_log_includes_request_id_when_set``;
+        this pins that the FAILED + populated-error_report path still surfaces ``request_id`` on the
+        delivery log line — so a future refactor that split the FAILED and COMPLETED webhook code
+        paths cannot drop the correlation id from the failure surface.
+        """
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        error_report = ErrorReport(
+            error_type="LLMCompletionError",
+            message="provider returned 429",
+            title="AI inference failed",
+            type_uri="https://docs.pipelex.com/latest/errors/llm-completion-error/",
+            error_category="transient",
+            error_domain=ErrorDomain.RUNTIME,
+            retryable=True,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
+            model="gpt-4o-mini",
+            provider="openai",
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI,
+                sdk_exception_type="RateLimitError",
+                message="429 Too Many Requests",
+                status_code=429,
+                retry_after_seconds=2.5,
+            ),
+        )
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-webhook-failed-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            error_report=error_report,
+            request_id="req-fail-1",
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log even on FAILED status"
+        assert "request_id=req-fail-1" in webhook_messages[0]
+        assert "pipeline_run_id=plr-webhook-failed-req" in webhook_messages[0]
+
+    async def test_completion_logs_omit_request_id_when_unset(self, mocker: MockerFixture) -> None:
+        """When ``request_id`` is None (run dispatched without an inbound id), the log lines do NOT print a stray ``request_id=None``."""
+        from pipelex import log as pipelex_log  # noqa: PLC0415
+
+        info_spy = mocker.spy(pipelex_log, "info")
+
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+
+        await executor.execute(
+            pipe_output=None,
+            user_id="test-user",
+            pipeline_run_id="plr-no-req",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.COMPLETED,
+        )
+
+        webhook_messages = [str(c.args[0]) for c in info_spy.call_args_list if "Webhook delivery completed" in str(c.args[0])]
+        assert webhook_messages, "Webhook delivery completion must emit one info log"
+        assert "request_id" not in webhook_messages[0], "an unset request_id must not produce a stray field"
+
+    async def test_webhook_aborts_on_dns_rebind_to_private_ip(self, mocker: MockerFixture) -> None:
+        """A callback host that passes literal-IP validation but resolves to a private
+        address at delivery time must abort with ``SsrfBlockedError`` — the DNS-rebinding
+        guard. The error is a security signal and propagates (it is NOT re-wrapped as a
+        ``WebhookDeliveryError``), so the delivery aborts loudly rather than POSTing to an
+        internal service. This drives the real ``SsrfGuardedTransport`` (httpx.AsyncClient
+        is deliberately NOT mocked here) and aborts before any socket opens.
+        """
+
+        def fake_getaddrinfo(*_args: object, **_kwargs: object) -> list[tuple[int, int, int, str, tuple[str, int]]]:
+            return [(int(socket.AF_INET), int(socket.SOCK_STREAM), 6, "", ("169.254.169.254", 80))]
+
+        mocker.patch("socket.getaddrinfo", side_effect=fake_getaddrinfo)
+
+        executor = DeliveryExecutor()
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="http://attacker.example/cb")])
+
+        with pytest.raises(SsrfBlockedError):
+            await executor.execute(
+                pipe_output=None,
+                user_id="test-user",
+                pipeline_run_id="plr-ssrf",
+                delivery_assignment=assignment,
+                status=DeliveryStatus.COMPLETED,
+            )
 
     async def test_webhook_failure_raises(self, mocker: MockerFixture) -> None:
         import httpx  # noqa: PLC0415

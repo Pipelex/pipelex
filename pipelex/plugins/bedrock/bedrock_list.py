@@ -10,14 +10,15 @@ from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
-from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.aws.aws_config import AwsCredentialsError
+from pipelex.plugins.model_handle import ModelHandle
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.backend import InferenceBackend
 
 
 def list_bedrock_models(
+    *,
     sdk: str,
     backend_name: str,
     backend: InferenceBackend,
@@ -39,7 +40,7 @@ def list_bedrock_models(
 
     from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
 
-    plugin = Plugin(sdk=sdk, backend=backend_name)
+    model_handle = ModelHandle(sdk=sdk, backend=backend_name)
 
     try:
         # Get AWS region for display
@@ -50,9 +51,9 @@ def list_bedrock_models(
         raise PipelexCLIError(msg) from exc
 
     try:
-        # List available models using the plugin-specific function
+        # List available models using the SDK-specific function
         bedrock_models_list = bedrock_list_available_models(
-            plugin=plugin,
+            model_handle=model_handle,
             backend=backend,
         )
 
@@ -78,6 +79,7 @@ def list_bedrock_models(
 
 def _display_bedrock_models_flat(
     models: list[dict[str, Any]],
+    *,
     sdk: str,
     backend_name: str,
     aws_region: str,
@@ -96,6 +98,7 @@ def _display_bedrock_models_flat(
 
 def _display_bedrock_models_table(
     models: list[dict[str, Any]],
+    *,
     sdk: str,
     aws_region: str,
 ) -> None:

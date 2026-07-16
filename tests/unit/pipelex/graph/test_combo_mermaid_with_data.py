@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import (
@@ -23,7 +23,7 @@ class TestMermaidflowWithData:
     """Tests for MermaidflowFactory.make_from_graphspec with data inclusion enabled."""
 
     GRAPH_ID: ClassVar[str] = "mermaidflow_data_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
     def _make_graph(
         self,
@@ -62,7 +62,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         assert isinstance(result, Mermaidflow)
         assert isinstance(result.mermaid_code, str)
@@ -82,7 +82,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have stuff_data with the data content
         assert result.stuff_data is not None
@@ -105,7 +105,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Keys should start with s_ prefix
         assert result.stuff_data is not None
@@ -126,7 +126,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[consumer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have stuff_data for the input
         assert result.stuff_data is not None
@@ -158,7 +158,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should only have one entry for this digest
         assert result.stuff_data is not None
@@ -179,8 +179,8 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
 
-        result_with_data = MermaidflowFactory.make_from_graphspec(graph, make_graph_config(include_stuff_json=True))
-        result_without_data = MermaidflowFactory.make_from_graphspec(graph, make_graph_config(include_stuff_json=False))
+        result_with_data = MermaidflowFactory.make_from_graphspec(graph, graph_config=make_graph_config(include_stuff_json=True))
+        result_without_data = MermaidflowFactory.make_from_graphspec(graph, graph_config=make_graph_config(include_stuff_json=False))
 
         assert result_with_data.mermaid_code == result_without_data.mermaid_code
 
@@ -198,7 +198,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=False)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # stuff_data should be None when not configured
         assert result.stuff_data is None
@@ -217,7 +217,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # stuff_data should be empty since data=None
         assert result.stuff_data is not None
@@ -238,7 +238,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_json=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Dict data should be preserved
         assert result.stuff_data is not None
@@ -261,7 +261,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_text=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have stuff_data_text with the pre-rendered text
         assert result.stuff_data_text is not None
@@ -284,7 +284,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_html=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have stuff_data_html with the pre-rendered HTML
         assert result.stuff_data_html is not None
@@ -306,7 +306,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_text=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # stuff_data_text should be empty since data_text=None
         assert result.stuff_data_text is not None
@@ -326,7 +326,7 @@ class TestMermaidflowWithData:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config(include_stuff_html=True)
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # stuff_data_html should be empty since data_html=None
         assert result.stuff_data_html is not None

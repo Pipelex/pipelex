@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from pipelex import log, pretty_print
@@ -47,7 +49,7 @@ class TestLLMVision:
     async def test_gen_text_from_vision_by_bytes(
         self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, topic: str, image_path: str
     ):
-        base64_data = await load_binary_as_base64(path=image_path)
+        base64_data = await load_binary_as_base64(path=Path(image_path))
         prompt_image = PromptImageBase64(base64_data=base64_data)
         llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         llm_job = LLMJobFactory.make_llm_job(

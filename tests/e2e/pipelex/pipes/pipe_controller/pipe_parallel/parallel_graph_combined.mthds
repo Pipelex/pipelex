@@ -1,5 +1,5 @@
 domain      = "test_parallel_graph_combined"
-description = "Test PipeParallel with combined_output wrapped in PipeSequence with follow-up consumer"
+description = "Test PipeParallel with a structured combined output wrapped in PipeSequence with follow-up consumer"
 main_pipe   = "pgc_analysis_then_summarize"
 
 [concept.PgcToneResult]
@@ -29,7 +29,6 @@ description = "Analyze tone and length in parallel with combined output"
 inputs = { input_text = "Text" }
 output = "PgcCombinedResult"
 add_each_output = true
-combined_output = "PgcCombinedResult"
 branches = [
   { pipe = "pgc_analyze_tone", result = "tone_result" },
   { pipe = "pgc_analyze_length", result = "length_result" },

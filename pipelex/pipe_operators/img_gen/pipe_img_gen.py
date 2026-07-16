@@ -4,9 +4,8 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -18,6 +17,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.image_content import ImageContent
@@ -36,6 +36,18 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
 
 
+def resolve_default_size(*, explicit_aspect_ratio: AspectRatio | None, default_size: ImgGenSize | None) -> ImgGenSize | None:
+    """Resolve the config-level size default applicable to a pipe, honoring exact-size/aspect-ratio exclusivity.
+
+    An exact size implies its own aspect ratio (the blueprint forbids setting both on a pipe), so an
+    exact-size deck default does not apply to a pipe that explicitly sets `aspect_ratio` — the more
+    specific pipe field wins. A tier default composes with any ratio and always applies.
+    """
+    if explicit_aspect_ratio is not None and isinstance(default_size, ImageSize):
+        return None
+    return default_size
+
+
 class PipeImgGenOutput(PipeOutput):
     pass
 
@@ -47,6 +59,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
+    size: ImgGenSize | None = None
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
@@ -54,7 +67,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     output_multiplicity: VariableMultiplicity
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         """Needed inputs are the inputs needed to run the pipe, specified in the inputs attribute of the pipe"""
         return self.inputs
 
@@ -68,6 +81,22 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if self.img_gen_choice:
             check_img_gen_choice_with_deck(img_gen_choice=self.img_gen_choice)
             self._validate_param_support_against_model_rules()
+
+        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        for template_blueprint, template_label in [
+            (self.img_gen_prompt_blueprint.prompt_blueprint, "prompt"),
+            (self.img_gen_prompt_blueprint.negative_prompt_blueprint, "negative_prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=template_blueprint.template,
+                template_category=template_blueprint.category,
+                template_label=template_label,
+            )
 
     def _validate_param_support_against_model_rules(self) -> None:
         """If `img_gen_choice` resolves to a concrete inference model with rules,
@@ -93,6 +122,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         unsupported = ImgGenParamSupport.check_blueprint_params(
             rules=spec.rules,
             aspect_ratio=self.aspect_ratio,
+            size=self.size,
             background=self.background,
             output_format=self.output_format,
             model_name=img_gen_setting.model,
@@ -138,13 +168,13 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeImgGenOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
 
         multiplicity_resolution = output_multiplicity_to_apply(
             base_multiplicity=self.output_multiplicity or False,
@@ -199,6 +229,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         # Build ImgGenJobParams from ImgGenSetting + one-time settings
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=self.aspect_ratio or img_gen_param_defaults.aspect_ratio,
+            size=self.size or resolve_default_size(explicit_aspect_ratio=self.aspect_ratio, default_size=img_gen_param_defaults.size),
             background=self.background or img_gen_param_defaults.background,
             quality=img_gen_setting.quality,
             nb_steps=img_gen_setting.nb_steps,
@@ -236,6 +267,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         if nb_images > 1:
             image_content_list = await content_generator.make_image_list(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 nb_images=nb_images,
@@ -253,6 +285,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         else:
             image_content = await content_generator.make_single_image(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 img_gen_handle=img_gen_handle,
                 img_gen_prompt=img_gen_prompt,
                 img_gen_job_params=img_gen_job_params,
@@ -282,36 +315,20 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             "nb_images": nb_images,
         }
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeImgGenOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeImgGenOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
-
-    @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

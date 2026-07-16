@@ -1,4 +1,6 @@
+from enum import StrEnum
 from functools import partial
+from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -7,13 +9,10 @@ from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.misc.dict_utils import apply_to_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
+from pipelex.tools.secrets.exceptions import UnknownVarPrefixError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.secrets.secrets_utils import (
-    UnknownVarPrefixError,
-    substitute_vars,
-)
+from pipelex.tools.secrets.secrets_utils import substitute_vars
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of, format_pydantic_validation_error
-from pipelex.types import Self, StrEnum
 
 TELEMETRY_CONFIG_FILE_NAME = "telemetry.toml"
 TELEMETRY_CONFIG_OVERRIDE_FILE_NAME = "telemetry_override.toml"
@@ -238,7 +237,7 @@ class TelemetryRedactionConfig(BaseModel):
             )
 
 
-def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
+def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
 
     Files are deep-merged in this order (later wins per leaf key):
@@ -282,7 +281,7 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     # Apply variable substitution to all string values (keep placeholders for missing vars)
     substitute_vars_with_provider = partial(substitute_vars, secrets_provider=secrets_provider, raise_on_missing_var=False)
     try:
-        telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
+        telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, transform_func=substitute_vars_with_provider)
     except UnknownVarPrefixError as exc:
         paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"

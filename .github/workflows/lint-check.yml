@@ -53,7 +53,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       PYTHON_VERSION: "3.11"
@@ -111,12 +111,51 @@ jobs:
         run: make check-config-sync
 
 # --------------------------------------------------------------------------
-# 4.  Aggregator job — the *single* required status check
+# 4.  Keyword-only convention — single job, version-independent
+# --------------------------------------------------------------------------
+  lint-keyword-only:
+    name: Lint (keyword-only)
+    runs-on: [aca-runner-lint]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run keyword-only convention check
+        run: make check-keyword-only
+
+# --------------------------------------------------------------------------
+# 5.  Drift contracts — single job, version-independent
+#     ADVISORY: deliberately NOT in lint-all's `needs`, so an open contract is
+#     visible on the PR but does not block merges. Promote it into lint-all's
+#     `needs` once the current open-PR backlog has landed.
+# --------------------------------------------------------------------------
+  lint-drift:
+    name: Lint (drift-contracts)
+    runs-on: [aca-runner-lint]
+    env:
+      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Run drift contracts check
+        run: make drift-check
+
+# --------------------------------------------------------------------------
+# 6.  Aggregator job — the *single* required status check
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync, lint-keyword-only]
     if: always()
 
     steps:
@@ -124,7 +163,8 @@ jobs:
         run: |
           if [ "${{ needs.lint-ruff-plxt.result }}" != "success" ] || \
              [ "${{ needs.lint-typecheck.result }}" != "success" ] || \
-             [ "${{ needs.lint-config-sync.result }}" != "success" ]; then
+             [ "${{ needs.lint-config-sync.result }}" != "success" ] || \
+             [ "${{ needs.lint-keyword-only.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
             exit 1
           fi

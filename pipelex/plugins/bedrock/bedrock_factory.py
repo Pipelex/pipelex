@@ -1,15 +1,13 @@
+from enum import StrEnum
+
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError
+from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.plugins.bedrock.bedrock_exceptions import BedrockFactoryError
 from pipelex.plugins.bedrock.bedrock_message import BedrockContentItem, BedrockMessage
-from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.types import StrEnum
-
-
-class BedrockFactoryError(CogtError):
-    pass
+from pipelex.plugins.model_handle import ModelHandle
 
 
 class BedrockSdkVariant(StrEnum):
@@ -29,13 +27,14 @@ class BedrockFactory:
     @classmethod
     def make_bedrock_client(
         cls,
-        plugin: Plugin,
+        model_handle: ModelHandle,
+        *,
         backend: InferenceBackend,
     ) -> BedrockClientProtocol:
         try:
-            sdk_variant = BedrockSdkVariant(plugin.sdk)
+            sdk_variant = BedrockSdkVariant(model_handle.sdk)
         except ValueError as exc:
-            msg = f"Plugin '{plugin}' is not supported by BedrockFactory"
+            msg = f"ModelHandle '{model_handle}' is not supported by BedrockFactory"
             raise BedrockFactoryError(msg) from exc
 
         bedrock_async_client: BedrockClientProtocol

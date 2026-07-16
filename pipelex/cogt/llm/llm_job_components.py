@@ -1,8 +1,10 @@
+from enum import StrEnum
+from typing import Self
+
 from pydantic import BaseModel, Field, model_validator
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
-from pipelex.types import Self, StrEnum
 
 
 class ReasoningEffort(StrEnum):

@@ -21,7 +21,7 @@ from .fixtures.generator_fixtures import content_generator, generated_content_fa
 from .fixtures.img_gen_fixtures import img_gen_job_params
 from .fixtures.llm_fixtures import llm_job_params, llm_preset_id
 from .fixtures.model_combo import ModelCombo
-from .fixtures.plugin_fixtures import plugin_for_anthropic, plugin_for_openai
+from .fixtures.model_handle_fixtures import model_handle_for_anthropic, model_handle_for_openai
 
 # Make fixtures available (prevent unused import warnings)
 __all__ = [
@@ -35,9 +35,9 @@ __all__ = [
     "img_gen_combo",
     "extract_combo",
     "search_combo",
-    # Plugin fixtures
-    "plugin_for_openai",
-    "plugin_for_anthropic",
+    # Model handle fixtures
+    "model_handle_for_openai",
+    "model_handle_for_anthropic",
     # Image generation fixtures
     "img_gen_job_params",
     # Generator fixtures

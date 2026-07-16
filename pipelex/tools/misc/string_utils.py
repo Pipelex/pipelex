@@ -118,6 +118,43 @@ def pascal_case_to_snake_case(name: str) -> str:
     return camel_to_snake_case(name=name)
 
 
+def pascal_case_to_kebab(name: str) -> str:
+    """Converts a PascalCase string to kebab-case format.
+
+    Acronym-aware: groups of uppercase letters stay together when followed by
+    another acronym character (``HTTPError`` -> ``http-error``,
+    ``V2APIError`` -> ``v2-api-error``), and a single uppercase introducer in
+    front of a CamelCase tail also breaks (``OAuth2`` -> ``o-auth2``).
+
+    Splits on the two transitions that mark a word boundary in PascalCase:
+    ``[a-z0-9] -> [A-Z]`` (lowercase/digit followed by uppercase) and
+    ``[A-Z] -> [A-Z][a-z]`` (uppercase followed by uppercase + lowercase).
+
+    Args:
+        name (str): The PascalCase string to convert (e.g., "MyVariableName" or "APIError").
+
+    Returns:
+        str: The kebab-case version of the string (e.g., "my-variable-name" or "api-error").
+
+    Examples:
+        >>> pascal_case_to_kebab("FooBarBaz")
+        'foo-bar-baz'
+        >>> pascal_case_to_kebab("APIError")
+        'api-error'
+        >>> pascal_case_to_kebab("HTTPError")
+        'http-error'
+        >>> pascal_case_to_kebab("EnvVarNotFound")
+        'env-var-not-found'
+        >>> pascal_case_to_kebab("OAuth2")
+        'o-auth2'
+        >>> pascal_case_to_kebab("V2APIError")
+        'v2-api-error'
+
+    """
+    parts = re.split(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", name)
+    return "-".join(part.lower() for part in parts if part)
+
+
 def pascal_case_to_sentence(name: str) -> str:
     """Converts a PascalCase string to a capitalized sentence.
 
@@ -154,7 +191,9 @@ def pascal_case_to_sentence(name: str) -> str:
             processed_words: list[str] = [word if word.isupper() else word.lower() for word in words]
             result_parts.append(" ".join(processed_words))
 
-    return " ".join(result_parts).capitalize()
+    # Capitalize only the leading character so preserved uppercase acronyms (e.g. "JSON") survive.
+    joined = " ".join(result_parts)
+    return joined[:1].upper() + joined[1:] if joined else joined
 
 
 def snake_to_pascal_case(snake_str: str) -> str:
@@ -293,7 +332,66 @@ def get_root_from_dotted_path(dotted_path: str) -> str:
     return dotted_path.split(".", 1)[0]
 
 
-def matches_wildcard_pattern(text: str, pattern: str) -> bool:
+def pluralize(*, count: int, singular: str, plural: str | None = None) -> str:
+    """Pick the singular or plural form of a word based on a count.
+
+    Returns ``singular`` when ``count == 1``, otherwise ``plural`` (defaulting to
+    ``singular`` + "s"). Works for nouns ("pipe"/"pipes") and verbs ("is"/"are").
+
+    Args:
+        count: The quantity that drives the agreement.
+        singular: The form to use when ``count == 1``.
+        plural: The form to use otherwise; defaults to ``singular`` + "s" for
+            regular nouns. Pass it for irregular plurals or verbs.
+
+    Returns:
+        The grammatically-agreed form of the word.
+
+    Examples:
+        >>> pluralize(count=1, singular="pipe")
+        'pipe'
+        >>> pluralize(count=2, singular="pipe")
+        'pipes'
+        >>> pluralize(count=0, singular="pipe")
+        'pipes'
+        >>> pluralize(count=1, singular="is", plural="are")
+        'is'
+        >>> pluralize(count=3, singular="entry", plural="entries")
+        'entries'
+
+    """
+    if count == 1:
+        return singular
+    return plural or f"{singular}s"
+
+
+def count_with_noun(*, count: int, singular: str, plural: str | None = None) -> str:
+    """Format a count together with its grammatically-agreed noun.
+
+    Produces "1 pipe" / "2 pipes" so messages stay clean instead of resorting to
+    the "(s)" shorthand. Delegates the noun agreement to :func:`pluralize`.
+
+    Args:
+        count: The quantity to render and to drive the noun's agreement.
+        singular: The singular form of the noun.
+        plural: The plural form; defaults to ``singular`` + "s".
+
+    Returns:
+        The count followed by a space and the agreed noun form.
+
+    Examples:
+        >>> count_with_noun(count=1, singular="pipe")
+        '1 pipe'
+        >>> count_with_noun(count=2, singular="pipe")
+        '2 pipes'
+        >>> count_with_noun(count=0, singular="entry", plural="entries")
+        '0 entries'
+
+    """
+    return f"{count} {pluralize(count=count, singular=singular, plural=plural)}"
+
+
+def matches_wildcard_pattern(text: str, *, pattern: str) -> bool:
     """Check if a text matches a wildcard pattern.
 
     Supports wildcards (*) at the beginning, end, or both.
@@ -307,15 +405,15 @@ def matches_wildcard_pattern(text: str, pattern: str) -> bool:
         True if the text matches the pattern
 
     Examples:
-        >>> matches_wildcard_pattern("claude-3-sonnet", "claude-*")
+        >>> matches_wildcard_pattern("claude-3-sonnet", pattern="claude-*")
         True
-        >>> matches_wildcard_pattern("gpt-4o-mini", "*mini")
+        >>> matches_wildcard_pattern("gpt-4o-mini", pattern="*mini")
         True
-        >>> matches_wildcard_pattern("mistral-large", "*large*")
+        >>> matches_wildcard_pattern("mistral-large", pattern="*large*")
         True
-        >>> matches_wildcard_pattern("any-model", "*")
+        >>> matches_wildcard_pattern("any-model", pattern="*")
         True
-        >>> matches_wildcard_pattern("exact-match", "exact-match")
+        >>> matches_wildcard_pattern("exact-match", pattern="exact-match")
         True
 
     """

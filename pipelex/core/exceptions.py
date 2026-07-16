@@ -44,6 +44,9 @@ class PipesAndConceptValidationErrorData(BaseModel):
     # === Entity Context (what failed) ===
     pipe_code: str | None = Field(default=None, description="Pipe code if error is in a pipe")
     concept_code: str | None = Field(default=None, description="Concept code if error is in a concept")
+    missing_pipe_code: str | None = Field(
+        default=None, description="Referenced pipe code that does not resolve (for unresolved pipe-dependency errors)"
+    )
     field_name: str | None = Field(default=None, description="Specific field that failed")
 
     # === Error Classification ===
@@ -57,3 +60,21 @@ class PipesAndConceptValidationErrorData(BaseModel):
 
     # === Variable names for input/output errors ===
     variable_names: list[str] | None = Field(default=None, description="Variable names (for input errors)")
+
+    # === Enriched expected value (for output-mismatch errors) ===
+    expected_output_ref: str | None = Field(
+        default=None,
+        description="The output ref the pipe should declare (bundle representation), set when the validator knows the correct value",
+    )
+
+    # === Enriched expected inputs mapping (for controller input-drift errors) ===
+    expected_inputs: dict[str, str] | None = Field(
+        default=None,
+        description="The full inputs mapping the pipe should declare (variable name → bundle-representation ref), "
+        "set when the validator knows the correct value",
+    )
+    declared_inputs: dict[str, str] | None = Field(
+        default=None,
+        description="The pipe's currently declared inputs mapping, rendered like expected_inputs, "
+        "so a fix planner can diff the two without file access",
+    )

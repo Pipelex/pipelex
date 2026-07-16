@@ -1,12 +1,13 @@
 import json
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 
 class NumberContent(StuffContent):
-    number: int | float
+    number: int | float = Field(description="The number")
 
     @property
     @override
@@ -22,7 +23,7 @@ class NumberContent(StuffContent):
         return str(self.number)
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:
         return str(self.number)
 
     @override

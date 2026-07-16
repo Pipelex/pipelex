@@ -7,7 +7,8 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.cli.commands.run._inputs_path_resolver import is_relative_local_path, resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths, resolve_url_in_value  # noqa: PLC2701
+from pipelex.tools.uri.uri_resolver import is_relative_local_path
 
 
 class _IsRelativeLocalPathCases:
@@ -20,6 +21,10 @@ class _IsRelativeLocalPathCases:
     DATA_URL = ("data:application/pdf;base64,AAAA", False)
     PIPELEX_STORAGE = ("pipelex-storage://bucket/file.pdf", False)
     FILE_URI = ("file:///home/user/file.pdf", False)
+    # Unrecognized schemes must NOT be rewritten as relative local paths: resolve_uri returns them as
+    # a ResolvedLocalPath but their `://` shows they are non-local, so the downstream remote guards work.
+    S3_URL = ("s3://bucket/people.csv", False)
+    GS_URL = ("gs://bucket/people.csv", False)
 
 
 class _ResolveInputsPathsCases:
@@ -211,6 +216,8 @@ class TestInputsPathResolver:
             _IsRelativeLocalPathCases.DATA_URL,
             _IsRelativeLocalPathCases.PIPELEX_STORAGE,
             _IsRelativeLocalPathCases.FILE_URI,
+            _IsRelativeLocalPathCases.S3_URL,
+            _IsRelativeLocalPathCases.GS_URL,
         ],
     )
     def test_is_relative_local_path(self, uri: str, expected: bool) -> None:
@@ -221,9 +228,14 @@ class TestInputsPathResolver:
 
     def test_resolve_url_in_value_string_passthrough(self) -> None:
         """Non-dict, non-list values pass through unchanged."""
-        assert resolve_url_in_value("hello", Path("/base")) == "hello"
-        assert resolve_url_in_value(42, Path("/base")) == 42
-        assert resolve_url_in_value(None, Path("/base")) is None
+        assert resolve_url_in_value("hello", base_dir=Path("/base")) == "hello"
+        assert resolve_url_in_value(42, base_dir=Path("/base")) == 42
+        assert resolve_url_in_value(None, base_dir=Path("/base")) is None
+
+    def test_resolve_url_in_value_tilde_expands_to_home(self) -> None:
+        """A ~-prefixed url is home-anchored: it expands to home, never joined onto base_dir."""
+        resolved = resolve_url_in_value({"url": "~/photo.jpg"}, base_dir=Path("/base"))
+        assert resolved == {"url": str(Path("~/photo.jpg").expanduser())}
 
     # ---- resolve_inputs_paths ----
 
@@ -244,5 +256,5 @@ class TestInputsPathResolver:
     )
     def test_resolve_inputs_paths(self, topic: str, inputs_dict: dict[str, Any], expected: dict[str, Any]) -> None:  # noqa: ARG002
         """Resolves relative url paths in various input structures."""
-        result = resolve_inputs_paths(inputs_dict, _ResolveInputsPathsCases.BASE_DIR)
+        result = resolve_inputs_paths(inputs_dict, base_dir=_ResolveInputsPathsCases.BASE_DIR)
         assert result == expected

@@ -1,11 +1,11 @@
-import os
+from enum import StrEnum
+from pathlib import Path
 
 import kajson
 from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadType
-from pipelex.types import StrEnum
 
 
 class LocalObserverEventType(StrEnum):
@@ -15,28 +15,29 @@ class LocalObserverEventType(StrEnum):
 
 
 class LocalObserver(ObserverProtocol):
-    def __init__(self, storage_dir: str | None = None) -> None:
-        self.storage_dir = storage_dir or get_config().pipelex.observer_config.observer_dir
-        os.makedirs(self.storage_dir, exist_ok=True)
+    def __init__(self, storage_dir: str | Path | None = None) -> None:
+        self.storage_dir = Path(storage_dir or get_config().pipelex.observer_config.observer_dir)
+        self.storage_dir.mkdir(parents=True, exist_ok=True)
 
-    def _write_to_jsonl(self, event_type: str, payload: PayloadType) -> None:
+    def _write_to_jsonl(self, *, event_type: str, payload: PayloadType) -> None:
+        # event_type goes last so a payload key cannot overwrite the lifecycle event name
         payload = {
-            "event_type": event_type,
             **payload,
+            "event_type": event_type,
         }
 
-        file_path = os.path.join(self.storage_dir, f"{event_type}.jsonl")
+        file_path = self.storage_dir / f"{event_type}.jsonl"
         with open(file_path, "a", encoding="utf-8") as file:
             file.write(kajson.dumps(payload) + "\n")
 
     @override
     async def observe_before_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.BEFORE_RUN, payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.BEFORE_RUN, payload=payload)
 
     @override
     async def observe_after_successful_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.AFTER_SUCCESSFUL_RUN, payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.AFTER_SUCCESSFUL_RUN, payload=payload)
 
     @override
     async def observe_after_failing_run(self, payload: PayloadType) -> None:
-        self._write_to_jsonl(LocalObserverEventType.AFTER_FAILING_RUN, payload)
+        self._write_to_jsonl(event_type=LocalObserverEventType.AFTER_FAILING_RUN, payload=payload)

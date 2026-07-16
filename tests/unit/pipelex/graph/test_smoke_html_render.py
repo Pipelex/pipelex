@@ -1,6 +1,6 @@
 """Bounded-size smoke check: catches a regression where assets get re-inlined."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
@@ -12,14 +12,14 @@ class TestSmokeHtmlRender:
         node = NodeSpec(node_id="n1", kind=NodeKind.OPERATOR, pipe_code="hello", status=NodeStatus.SUCCEEDED)
         graph = GraphSpec(
             graph_id="smoke",
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             pipeline_ref=PipelineRef(),
             nodes=[node],
             edges=[],
         )
         config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
 
-        html = generate_reactflow_html(graph, config)
+        html = generate_reactflow_html(graph, config=config)
 
         assert "cdn.jsdelivr.net/npm/@pipelex/mthds-ui" in html
         assert "cdn.jsdelivr.net/npm/elkjs" in html

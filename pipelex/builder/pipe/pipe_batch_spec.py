@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import Field, model_validator
 from rich.console import Group
@@ -8,7 +8,6 @@ from typing_extensions import override
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import Self
 
 
 class PipeBatchSpec(PipeSpec):
@@ -71,7 +70,7 @@ class PipeBatchSpec(PipeSpec):
         return self
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Get base pipe information from parent
         base_group = super().rendered_pretty(title=title, depth=depth)
 

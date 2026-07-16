@@ -20,8 +20,9 @@ from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.exceptions import ContextProviderError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
@@ -63,6 +64,7 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def make_img_gen_prompt(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         extra_params: dict[str, Any] | None = None,
         max_prompt_images: int | None = None,
@@ -196,6 +198,7 @@ class ImgGenPromptBlueprint(BaseModel):
     def _extract_direct_image(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -221,6 +224,7 @@ class ImgGenPromptBlueprint(BaseModel):
     def _extract_direct_list_images(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -264,6 +268,7 @@ class ImgGenPromptBlueprint(BaseModel):
 
     async def _render_text(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         template_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,

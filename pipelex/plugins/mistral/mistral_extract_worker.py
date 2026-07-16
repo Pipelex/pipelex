@@ -5,7 +5,7 @@ from mistralai import Mistral, MistralError
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
-from pipelex.cogt.extract.extract_input import ExtractInputError
+from pipelex.cogt.extract.exceptions import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -86,6 +86,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     async def _extract_pages_from_document(
         self,
         document_uri: str,
+        *,
         extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
         if extract_job_params.should_caption_images:

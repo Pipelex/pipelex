@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import BaseModel
@@ -5,14 +6,12 @@ from pydantic import BaseModel
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.types import StrEnum
 
 
 class ImgGenTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
     IMG_GEN_NAME = "img_gen_name"
     PLATFORM_IMG_GEN_ID = "platform_img_gen_id"
-    NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
     NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"

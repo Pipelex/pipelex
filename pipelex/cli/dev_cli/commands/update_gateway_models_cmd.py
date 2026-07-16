@@ -40,6 +40,7 @@ def gateway_models_reference_files() -> list[tuple[Path, Path]]:
 
 def _all_references_up_to_date(
     reference_files: list[tuple[Path, Path]],
+    *,
     expected_html: str,
     expected_plain: str,
 ) -> bool:
@@ -61,7 +62,7 @@ def _all_references_up_to_date(
     return True
 
 
-def update_gateway_models_cmd(quiet: bool = False) -> None:
+def update_gateway_models_cmd(*, quiet: bool = False) -> None:
     """Update the Pipelex Gateway models reference files.
 
     Fetches the current model specifications from the remote config and
@@ -121,7 +122,7 @@ def update_gateway_models_cmd(quiet: bool = False) -> None:
 
     # Skip writing if every reference file is already current (ignoring the
     # timestamp line) — avoids noisy diffs in PRs.
-    if _all_references_up_to_date(reference_files, markdown_content, plain_markdown_content):
+    if _all_references_up_to_date(reference_files, expected_html=markdown_content, expected_plain=plain_markdown_content):
         if quiet:
             console.print(f"[green]✓ Gateway models update: UP-TO-DATE[/green] ({model_count} models, no changes)")
         else:

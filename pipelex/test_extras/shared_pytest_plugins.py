@@ -1,4 +1,5 @@
 import os
+from enum import StrEnum
 
 import pytest
 from pytest import Config, FixtureRequest, Parser
@@ -6,11 +7,10 @@ from rich.console import Console
 from rich.panel import Panel
 
 from pipelex.hub import get_console
-from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
-from pipelex.types import StrEnum
 
 
 class ClassRegistryMode(StrEnum):
@@ -206,7 +206,9 @@ def setup_ci_environment():
         _cleanup_placeholder_env_vars(env_var_keys=env_var_keys)
 
 
-def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> None:
+def pytest_collection_modifyitems(  # kw-only: ignore — pytest hookimpl, invoked by pluggy as a framework entrypoint
+    config: Config, items: list[pytest.Item]
+) -> None:
     """Auto-skip non-dry-runnable inference tests when --disable-inference is set.
 
     This hook runs after test collection and adds skip markers to tests that:
@@ -214,7 +216,7 @@ def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> N
     - Are NOT marked with @pytest.mark.dry_runnable
 
     Tests marked with both inference and dry_runnable can still run because
-    they use the mock ContentGeneratorDry.
+    the cogt leaf mocks under run_mode=DRY.
     """
     if not config.getoption("--disable-inference", default=False):
         return

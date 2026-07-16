@@ -58,7 +58,13 @@ plugins:
       separator: '[\s\-\.]+'
   - redirects:
       redirect_maps:
-        'under-the-hood/temporal-deployment.md': 'distributed-execution/cluster-setup.md'
+        'under-the-hood/temporal-deployment.md': 'distributed-execution/index.md'
+        'distributed-execution/temporal/index.md': 'distributed-execution/index.md'
+        'distributed-execution/cluster-setup.md': 'distributed-execution/index.md'
+        'distributed-execution/workers.md': 'distributed-execution/index.md'
+        'distributed-execution/task-routing.md': 'distributed-execution/index.md'
+        'distributed-execution/observability.md': 'distributed-execution/index.md'
+        'under-the-hood/temporal-integration.md': 'under-the-hood/runtime-bridge-and-transport.md'
         'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
         'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
         'home/1-features/cli.md': 'features/cli.md'
@@ -141,7 +147,6 @@ plugins:
         'home/6-build-reliable-ai-workflows/pipes/provide-inputs.md': 'building-methods/pipes/provide-inputs.md'
         'home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md': 'building-methods/pipes/understanding-multiplicity.md'
         'home/6-build-reliable-ai-workflows/pipes/working-memory.md': 'building-methods/pipes/working-memory.md'
-        'home/7-configuration/config-advanced/feature-config.md': 'configuration/config-advanced/feature-config.md'
         'home/7-configuration/config-pipeline-validation/dry-run-config.md': 'configuration/config-pipeline-validation/dry-run-config.md'
         'home/7-configuration/config-practical/logging-config.md': 'configuration/config-practical/logging-config.md'
         'home/7-configuration/config-practical/pipe-run-config.md': 'configuration/config-practical/pipe-run-config.md'
@@ -239,10 +244,12 @@ plugins:
         - building-methods/libraries.md: "Libraries"
         - building-methods/packages.md: "Packages"
         - building-methods/pipes/executing-pipelines.md: "Executing Pipelines"
+        - building-methods/pipes/run-modes-and-backends.md: "Run Modes & Backends"
         - building-methods/pipes/provide-inputs.md: "Providing Inputs to Pipelines"
         - building-methods/pipes/working-memory.md: "Working Memory"
         - building-methods/pipes/pipe-output.md: "Pipe Output"
         - building-methods/pipes/understanding-multiplicity.md: "Understanding Multiplicity"
+        - building-methods/pipes/understanding-optionality.md: "Understanding Optionality"
         - building-methods/pipes/pipe-operators/index.md: "Pipe Operators Overview"
         - building-methods/pipes/pipe-operators/PipeLLM.md: "PipeLLM"
         - building-methods/pipes/pipe-operators/PipeStructure.md: "PipeStructure"
@@ -256,6 +263,7 @@ plugins:
         - building-methods/pipes/pipe-controllers/PipeParallel.md: "PipeParallel"
         - building-methods/pipes/pipe-controllers/PipeBatch.md: "PipeBatch"
         - building-methods/pipes/pipe-controllers/PipeCondition.md: "PipeCondition"
+        - building-methods/pipes/signature-pipes.md: "Signature Pipes"
         - building-methods/configure-ai-llm-to-optimize-methods.md: "Optimize Cost & Quality"
         - building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md: "LLM Prompting Style"
         Reference:
@@ -263,6 +271,7 @@ plugins:
         - tools/cli/init.md: "CLI Init"
         - tools/cli/update.md: "CLI Update"
         - tools/cli/validate.md: "CLI Validate"
+        - tools/cli/fix.md: "CLI Fix"
         - tools/cli/run.md: "CLI Run"
         - tools/cli/show.md: "CLI Show"
         - tools/cli/pkg.md: "CLI Pkg"
@@ -282,7 +291,6 @@ plugins:
         - configuration/config-technical/cogt-config.md: "Cogt Configuration"
         - configuration/config-technical/inference-backend-config.md: "LLM Providers & Models Configuration"
         - configuration/config-technical/library-config.md: "Library Configuration"
-        - configuration/config-advanced/feature-config.md: "Feature Configuration"
         - tools/plxt.md: "plxt (Formatter & Linter)"
         - tools/logging.md: "Logging"
         - analytics/data-extraction.md: "Observer Data Extraction"
@@ -300,6 +308,7 @@ plugins:
         - under-the-hood/index.md: "Under the Hood Overview"
         - under-the-hood/architecture-overview.md: "Architecture Overview"
         - under-the-hood/build-time-elaboration.md: "Build-time Elaboration"
+        - under-the-hood/codegen-projections.md: "Codegen Projections"
         - under-the-hood/dry-run-mock-generation.md: "Dry Run Mock Generation"
         - under-the-hood/execution-graph-tracing.md: "Execution Graph Tracing"
         - under-the-hood/image-handling-in-llm-prompts.md: "Image Handling in LLM Prompts"
@@ -308,13 +317,18 @@ plugins:
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
+        - under-the-hood/inference-backend-plugins.md: "Inference Backend Plugins"
+        - under-the-hood/orchestrator-plugins.md: "Orchestrator Plugins"
+        - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
+        - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/error-model.md: "Error Model"
-        - under-the-hood/temporal-integration.md: "Temporal Integration"
-        - under-the-hood/temporal-deployment.md: "Temporal Deployment"
-        - under-the-hood/distributed-content-generation.md: "Distributed Content Generation"
+        - under-the-hood/runtime-bridge-and-transport.md: "Runtime Bridge & Transport"
+        - under-the-hood/distributed-content-generation.md: "Content Generation Across Boundaries"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
+        - contribute/keyword-only-arguments.md: "Keyword-Only Arguments"
+        - contribute/drift-contracts.md: "Drift Contracts"
         - changelog.md: "Changelog"
 
 markdown_extensions:
@@ -341,6 +355,29 @@ markdown_extensions:
 extra_css:
   - stylesheets/mermaid.css
   - stylesheets/general.css
+
+# Pages intentionally excluded from the user-facing nav.
+#
+# - `CLAUDE.md` is a docs-authoring guide for contributors, not a published page.
+# - `errors/*.md` are generated reference stubs (one per PipelexError subclass) reached
+#   via the RFC 7807 `type` URI carried on every ErrorReport. They are not part of any
+#   guided navigation flow — the only nav entries are the landing page `errors/index.md`
+#   and the macro listing pages (`errors/authoring-and-language.md`, etc., re-included
+#   below), and the individual per-class pages live as orphan pages whose existence is
+#   declared here so `mkdocs build --strict` does not flag them as accidentally unlisted.
+# - `agents/*.md` are AI-agent-facing playbooks (debugging workflows, environment
+#   gotchas) referenced from the root `CLAUDE.md`. They are built and searchable but
+#   intentionally kept out of the user-facing nav so they don't clutter the reading
+#   flow for human readers of the docs site.
+not_in_nav: |
+  CLAUDE.md
+  errors/*.md
+  !errors/index.md
+  !errors/authoring-and-language.md
+  !errors/execution-and-runtime.md
+  !errors/inference-and-providers.md
+  !errors/platform-and-tooling.md
+  agents/*.md
 
 nav:
   - Get Started:
@@ -378,13 +415,6 @@ nav:
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
-    - Retries & Resilience: reliability/retries-and-resilience.md
-    - Distributed Execution with Temporal:
-      - Overview: distributed-execution/index.md
-      - Cluster Setup: distributed-execution/cluster-setup.md
-      - Worker Deployment: distributed-execution/workers.md
-      - Task-Queue Routing: distributed-execution/task-routing.md
-      - Workflow Observability: distributed-execution/observability.md
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -405,7 +435,7 @@ nav:
         - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
         - Validation & Dry Run: features/validation-dry-run.md
-        - Distributed Execution with Temporal: features/distributed-execution.md
+        - Distributed Execution: features/distributed-execution.md
         - Telemetry & Observability: features/telemetry.md
         - Cloud Storage: features/cloud-storage.md
         - Cost Tracking & Reporting: features/cost-tracking.md
@@ -427,10 +457,13 @@ nav:
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
+        - Run Modes & Backends: building-methods/pipes/run-modes-and-backends.md
         - Providing Inputs to Pipelines: building-methods/pipes/provide-inputs.md
         - Working Memory: building-methods/pipes/working-memory.md
         - Pipe Output: building-methods/pipes/pipe-output.md
+        - CSV Input & Output: building-methods/pipes/csv-input-and-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
+        - Understanding Optionality: building-methods/pipes/understanding-optionality.md
         - Pipe Operators:
           - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
@@ -446,14 +479,23 @@ nav:
           - PipeParallel: building-methods/pipes/pipe-controllers/PipeParallel.md
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
           - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
+        - Signature Pipes: building-methods/pipes/signature-pipes.md
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+    - Retries & Resilience:
+      - Overview: reliability/retries-and-resilience.md
+      - Automatic Retries: reliability/automatic-retries.md
+      - Failure Classification: reliability/failure-classification.md
+      - Durable Execution: reliability/durable-execution.md
+    - Distributed Execution: distributed-execution/index.md
   - Reference:
+    - Gateway Available Models: setup/gateway-models.md
     - CLI Reference:
       - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
       - Update: tools/cli/update.md
       - Validate: tools/cli/validate.md
+      - Fix: tools/cli/fix.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md
@@ -464,6 +506,18 @@ nav:
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
       - Agent CLI: tools/cli/agent-cli.md
+    - Tools:
+      - plxt (Formatter & Linter): tools/plxt.md
+      - Logging: tools/logging.md
+    - Analytics:
+      - Observer Data Extraction: analytics/data-extraction.md
+      - Telemetry: setup/telemetry.md
+    - Error Reference:
+      - Overview: errors/index.md
+      - Authoring & language: errors/authoring-and-language.md
+      - Execution & runtime: errors/execution-and-runtime.md
+      - Inference & providers: errors/inference-and-providers.md
+      - Platform & tooling: errors/platform-and-tooling.md
     - Configuration (TOML reference):
       - Overview: configuration/index.md
       - Pipeline Validation Configuration:
@@ -478,14 +532,6 @@ nav:
         - Cogt: configuration/config-technical/cogt-config.md
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
-        - Feature: configuration/config-advanced/feature-config.md
-    - Tools:
-      - plxt (Formatter & Linter): tools/plxt.md
-      - Logging: tools/logging.md
-    - Analytics:
-      - Observer Data Extraction: analytics/data-extraction.md
-    - Telemetry: setup/telemetry.md
-    - Gateway Available Models: setup/gateway-models.md
   - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md
@@ -499,6 +545,7 @@ nav:
       - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
       - Build-time Elaboration: under-the-hood/build-time-elaboration.md
+      - Codegen Projections: under-the-hood/codegen-projections.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
       - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
@@ -507,12 +554,18 @@ nav:
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
+      - Inference Backend Plugins: under-the-hood/inference-backend-plugins.md
+      - Orchestrator Plugins: under-the-hood/orchestrator-plugins.md
+      - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
+      - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Error Model: under-the-hood/error-model.md
-      - Temporal Integration: under-the-hood/temporal-integration.md
-      - Distributed Content Generation: under-the-hood/distributed-content-generation.md
+      - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md
+      - Content Generation Across Boundaries: under-the-hood/distributed-content-generation.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
+    - Keyword-Only Arguments: contribute/keyword-only-arguments.md
+    - Drift Contracts: contribute/drift-contracts.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
     - Changelog: changelog.md

@@ -27,7 +27,7 @@ class ImgGenConfig(ConfigModel):
     def make_default_img_gen_job_params(self) -> ImgGenJobParams:
         return self.img_gen_param_defaults.make_img_gen_job_params()
 
-    def get_num_inference_steps(self, model_name: str, quality: Quality) -> int:
+    def get_num_inference_steps(self, model_name: str, *, quality: Quality) -> int:
         quality_to_steps_map = self.quality_to_steps_maps.get(model_name)
         if not quality_to_steps_map:
             msg = f"No quality-to-steps map found for model '{model_name}'"
@@ -93,7 +93,7 @@ class LLMConfig(ConfigModel):
             raise LLMConfigError(msg)
         return template
 
-    def get_reasoning_budget(self, prompting_target: str, effort: ReasoningEffort) -> int:
+    def get_reasoning_budget(self, prompting_target: str, *, effort: ReasoningEffort) -> int:
         effort_to_budget_map = self.effort_to_budget_maps.get(prompting_target)
         if not effort_to_budget_map:
             msg = f"No effort-to-budget map found for prompting target '{prompting_target}'"

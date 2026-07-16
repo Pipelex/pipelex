@@ -53,7 +53,7 @@ def _get_available_ide_commands() -> dict[str, dict[str, str]]:
     return {ide_name: info for ide_name, info in _IDE_INFO.items() if shutil.which(info["cmd"]) is not None}
 
 
-def _install_extension(ide_name: str, cmd: str, console: Console) -> bool:
+def _install_extension(ide_name: str, *, cmd: str, console: Console) -> bool:
     """Install the Pipelex extension for a given IDE.
 
     Args:
@@ -86,7 +86,7 @@ def _install_extension(ide_name: str, cmd: str, console: Console) -> bool:
         return False
 
 
-def suggest_extension_install_if_needed(console: Console) -> None:
+def suggest_extension_install_if_needed(*, console: Console) -> None:
     """Check whether the Pipelex IDE extension is installed and offer to install it.
 
     Uses ``<cmd> --list-extensions`` to reliably detect whether the extension
@@ -114,6 +114,6 @@ def suggest_extension_install_if_needed(console: Console) -> None:
 
     if install:
         for ide_name, info in ides_needing_install.items():
-            _install_extension(ide_name, info["cmd"], console)
+            _install_extension(ide_name, cmd=info["cmd"], console=console)
     else:
         console.print("[dim]You can install it later from the IDE marketplace or the links above.[/dim]")

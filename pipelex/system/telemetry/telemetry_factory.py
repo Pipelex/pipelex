@@ -14,7 +14,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
     TelemetryManagerNoOp,
 )
-from pipelex.tools.secrets.secrets_errors import SecretNotFoundError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -22,6 +22,7 @@ class TelemetryFactory:
     @classmethod
     def make_telemetry_manager(
         cls,
+        *,
         secrets_provider: SecretsProviderAbstract,
         integration_mode: IntegrationMode,
         remote_config: RemoteConfig | None,

@@ -3,11 +3,12 @@
 from datetime import datetime
 from typing import Any
 
+from pipelex import log
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
+from pipelex.graph.trace_context import TraceContext
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
 
@@ -93,6 +94,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
     def open_tracer(
         self,
         graph_id: str,
+        *,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
@@ -100,7 +102,10 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
         tracer_key: str | None = None,
-    ) -> GraphContext:
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
+    ) -> TraceContext:
         """Create and initialize a new tracer for a pipeline run.
 
         Args:
@@ -115,22 +120,40 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             tracer_key: Lookup key for the tracer in the manager's dict. Defaults to graph_id.
                 In Temporal mode, use the workflow_id to avoid collisions when multiple
                 workflows share the same graph_id on the same process.
+            emit_graph_events: Whether this run assembles a GraphSpec / emits graph events.
+                Threaded into setup so the returned TraceContext is born with the correct flag
+                (no post-hoc model_copy needed at the call site).
+            emit_usage_events: Whether this run emits usage (cost) events. Threaded into setup
+                so the returned TraceContext is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
-            Initial GraphContext to pass through JobMetadata.
-
-        Raises:
-            ValueError: If a tracer for this key already exists.
+            Initial TraceContext to pass through JobMetadata.
         """
         key = tracer_key or graph_id
+        # Collision-proof pop-and-replace: a stale tracer under this key can only be the
+        # leftover of a prior interrupted execution (e.g. a Temporal workflow evicted before
+        # its finally-block close_tracer ran). Raising would let worker-local leak state
+        # decide whether tracing setup succeeds — a replay-determinism breach (audit
+        # finding M1). Delegate the eviction to close_tracer (the single teardown path).
+        # The warning is gated on key membership, not on close_tracer's return value: that
+        # value is ambiguous (None both when no tracer existed and when a costs-only tracer
+        # legitimately tears down without a GraphSpec).
         if key in self._tracers:
-            msg = f"Tracer for key '{key}' already exists"
-            raise ValueError(msg)
+            log.warning(f"Tracer for key '{key}' already exists; replacing stale tracer left by a prior interrupted execution")
+            try:
+                self.close_tracer(key)
+            except Exception as stale_teardown_exc:  # noqa: BLE001
+                # Best-effort: the stale tracer's teardown runs graph assembly over arbitrary
+                # half-built state from the interrupted execution — its failure must never
+                # fail the fresh run's setup (that would be the M1 class again: worker-local
+                # leak state deciding setup success). close_tracer pops before tearing down,
+                # so the key is free either way.
+                log.warning(f"Stale tracer teardown for key '{key}' failed; replacing anyway: {stale_teardown_exc}")
 
         tracer = GraphTracer()
-        self._tracers[key] = tracer
 
-        graph_context = tracer.setup(
+        trace_context = tracer.setup(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
             pipeline_ref_domain=pipeline_ref_domain,
@@ -138,11 +161,18 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             event_log=event_log,
             workflow_id=workflow_id,
             pipeline_run_id=pipeline_run_id,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
+            mode=mode,
         )
-        # Set the tracer_key on the GraphContext so downstream lookups use the same key
+        # Set the tracer_key on the TraceContext so downstream lookups use the same key
         if tracer_key is not None:
-            graph_context = graph_context.model_copy(update={"tracer_key": tracer_key})
-        return graph_context
+            trace_context = trace_context.model_copy(update={"tracer_key": tracer_key})
+
+        # Register only once setup has fully succeeded: a failure above must not leave
+        # an unusable tracer entry in the process-wide manager.
+        self._tracers[key] = tracer
+        return trace_context
 
     def close_tracer(self, tracer_key: str) -> GraphSpec | None:
         """Finalize tracing for a specific pipeline run and return its GraphSpec.
@@ -190,7 +220,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -200,11 +231,11 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str | None, GraphContext | None]:
+    ) -> tuple[str | None, TraceContext | None]:
         """Record the start of a pipe execution.
 
         Args:
-            graph_context: Current graph context containing graph_id.
+            trace_context: Current trace context containing graph_id.
             pipe_code: The pipe code being executed.
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
@@ -216,14 +247,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
 
         Returns:
-            Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
+            Tuple of (node_id, child_trace_context) if tracing is active, (None, None) otherwise.
         """
-        tracer = self._get_tracer(graph_context.lookup_key)
+        tracer = self._get_tracer(trace_context.lookup_key)
         if tracer is None:
             return None, None
 
         return tracer.on_pipe_start(
-            graph_context=graph_context,
+            trace_context=trace_context,
             pipe_code=pipe_code,
             pipe_type=pipe_type,
             node_kind=node_kind,
@@ -237,6 +268,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_success(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -274,6 +306,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_execution_data(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         execution_data: dict[str, Any],
@@ -292,8 +325,45 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             return
         tracer.register_execution_data(node_id=node_id, execution_data=execution_data)
 
+    def on_pipe_end_skipped(
+        self,
+        *,
+        lookup_key: str,
+        node_id: str | None,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent.
+
+        Args:
+            lookup_key: The tracer lookup key.
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote (PLURAL outputs normalize
+                to an empty list, D4) — registered in the producer map for DATA edges.
+            output_concept_data: Optional serialized concept dict for that output's concept.
+        """
+        if node_id is None:
+            return
+
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+
+        tracer.on_pipe_end_skipped(
+            node_id=node_id,
+            ended_at=ended_at,
+            skip_reason=skip_reason,
+            output_spec=output_spec,
+            output_concept_data=output_concept_data,
+        )
+
     def on_pipe_end_error(
         self,
+        *,
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
@@ -326,36 +396,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             error_stack=error_stack,
         )
 
-    def add_edge(
-        self,
-        lookup_key: str,
-        source_node_id: str,
-        target_node_id: str,
-        edge_kind: EdgeKind,
-        label: str | None = None,
-    ) -> None:
-        """Add an edge between two nodes.
-
-        Args:
-            lookup_key: The tracer lookup key.
-            source_node_id: The source node ID.
-            target_node_id: The target node ID.
-            edge_kind: The type of edge.
-            label: Optional label for the edge.
-        """
-        tracer = self._get_tracer(lookup_key)
-        if tracer is None:
-            return
-
-        tracer.add_edge(
-            source_node_id=source_node_id,
-            target_node_id=target_node_id,
-            edge_kind=edge_kind,
-            label=label,
-        )
-
     def register_controller_output(
         self,
+        *,
         lookup_key: str,
         node_id: str,
         output_spec: IOSpec,
@@ -377,6 +420,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_item_extraction(
         self,
+        *,
         lookup_key: str,
         list_stuff_code: str,
         item_stuff_code: str,
@@ -405,6 +449,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_aggregation(
         self,
+        *,
         lookup_key: str,
         output_list_stuff_code: str,
         item_stuff_code: str,
@@ -433,6 +478,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_parallel_combine(
         self,
+        *,
         lookup_key: str,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],

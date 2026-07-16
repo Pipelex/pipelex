@@ -9,18 +9,18 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
-from pipelex.cli.agent_cli.commands.inputs._inputs_core import inputs_core
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, emit_no_inputs_result, inputs_core
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 
 def inputs_method_cmd(
-    ctx: typer.Context,
     name: Annotated[
         str,
         typer.Argument(help="Name of the installed method"),
@@ -33,14 +33,26 @@ def inputs_method_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    template_format: Annotated[
+        InputsTemplateFormat,
+        typer.Option("--format", help="Inputs template format: 'json' for the JSON result envelope (default), 'toml' for raw TOML on stdout"),
+    ] = InputsTemplateFormat.JSON,
+    explicit: Annotated[
+        bool,
+        typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
+    ] = False,
 ) -> None:
-    """Generate example input JSON for an installed method and output JSON results.
+    """Generate an example inputs template for an installed method.
 
     Resolves the method by name, finds its .mthds bundle, and generates inputs.
+    Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
+    success, JSON to stderr on error with exit code 1.
 
     Examples:
         pipelex-agent inputs method my-method
         pipelex-agent inputs method my-method --pipe custom_pipe
+        pipelex-agent inputs method my-method --format toml
+        pipelex-agent inputs method my-method --explicit
     """
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
@@ -56,36 +68,29 @@ def inputs_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, needs_inference=False, needs_model_specs=True)
 
     try:
-        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs_paths))
-        agent_success(result)
+        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs_paths, explicit=explicit))
+        emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
         validation_errors = extract_validation_errors(exc)
         extra: dict[str, Any] = {"validation_errors": validation_errors}
         if exc.dry_run_error_message:
             extra["dry_run_error"] = exc.dry_run_error_message
-        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
+        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
-        agent_success(
-            {
-                "success": True,
-                "pipe_code": pipe_code,
-                "inputs": {},
-                "message": str(exc),
-            }
-        )
+        emit_no_inputs_result(pipe_code=pipe_code, message=str(exc), template_format=template_format)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            "PipeOperatorModelChoiceError",
+            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -101,11 +106,11 @@ def inputs_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:  # noqa: BLE001
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

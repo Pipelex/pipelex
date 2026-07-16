@@ -55,6 +55,56 @@ def describe_uri(uri: str) -> str:
     return resolved_uri.kind.desc
 
 
+def is_relative_local_path(uri: str) -> bool:
+    """Check whether *uri* is a relative local file path.
+
+    Uses :func:`resolve_uri` to classify the URI.  Returns ``True`` only when
+    the URI resolves to a :class:`ResolvedLocalPath` **and** the path is not
+    absolute.
+
+    Args:
+        uri: The URI string to check.
+
+    Returns:
+        ``True`` if *uri* is a relative local path, ``False`` otherwise.
+    """
+    resolved = resolve_uri(uri)
+    if not isinstance(resolved, ResolvedLocalPath):
+        return False
+    if "://" in resolved.path:
+        # An unrecognized scheme (``s3://``, ``gs://``, …) slips through ``resolve_uri`` as a
+        # ResolvedLocalPath but is NOT a local file path; do not treat it as relative
+        # (that would let a caller mangle ``s3://bucket/x`` into ``<base_dir>/s3:/bucket/x`` and
+        # defeat the downstream remote-url guards). Mirrors the same ``"://"`` stopgap in the CSV
+        # input hook; both go away once ``resolve_uri`` classifies schemes (tools/uri follow-up).
+        return False
+    return not Path(resolved.path).is_absolute()
+
+
+def resolve_local_path_reference(uri: str, *, base_dir: Path | None) -> str:
+    """Expand a leading ``~`` to the user's home, then resolve a still-relative local path against
+    *base_dir* (D3).
+
+    ``~/photo.jpg`` → ``<home>/photo.jpg`` (absolute — never joined onto *base_dir*); a genuine
+    relative local path → ``<base_dir>/<path>`` when *base_dir* is given, else unchanged (the CWD
+    contract); an absolute path or any remote/scheme URI → unchanged. Mirrors the CLI's expanduser of
+    the inputs-file arg itself (``_inputs_file_loader``/``_run_core``/``stdin_resolver``), extended to
+    the file-ish input *values* — the shaper's file/CSV arms and the CLI's url-key walk share it.
+
+    Args:
+        uri: The path/URL reference to resolve (a bare input value or a ``{"url": ...}`` value).
+        base_dir: Directory that a still-relative local path resolves against; ``None`` leaves a
+            relative path untouched (in-process / inline-JSON callers keep the CWD contract).
+
+    Returns:
+        The resolved reference string.
+    """
+    expanded = str(Path(uri).expanduser()) if uri.startswith("~") else uri
+    if base_dir is not None and is_relative_local_path(expanded):
+        return str(base_dir / expanded)
+    return expanded
+
+
 def resolve_uri(uri: str) -> ResolvedUri:
     """Resolve a URI string to its typed representation.
 
@@ -159,6 +209,7 @@ def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
 
 async def make_base64_url_from_any_uri(
     uri: str,
+    *,
     storage_provider: StorageProviderAbstract | None = None,
 ) -> str:
     """Convert a URI to a base64 data URL.
@@ -186,7 +237,7 @@ async def make_base64_url_from_any_uri(
         case ResolvedHttpUrl():
             base64_url = await make_base64_url_from_http_url(url=resolved_uri.url)
         case ResolvedLocalPath():
-            base64_url = await make_base64_url_from_path(path=resolved_uri.path)
+            base64_url = await make_base64_url_from_path(path=Path(resolved_uri.path))
         case ResolvedPipelexStorage():
             if storage_provider is None:
                 msg = f"Cannot convert pipelex-storage:// URI to base64 without a storage provider: {uri}"

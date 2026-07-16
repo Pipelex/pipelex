@@ -1,0 +1,8 @@
+domain      = "research"
+description = "Research method headers"
+
+# Header: bare native `Text` input, bare same-domain `KeyFinding` output.
+[pipe.find_key_findings]
+description = "Find the key findings in a document (contract only)."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"

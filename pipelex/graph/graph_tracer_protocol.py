@@ -4,8 +4,8 @@ from typing import Any, Protocol
 from typing_extensions import override
 
 from pipelex.graph.graph_config import DataInclusionConfig
-from pipelex.graph.graph_context import GraphContext
-from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
+from pipelex.graph.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
 
@@ -18,6 +18,7 @@ class GraphTracerProtocol(Protocol):
 
     def setup(
         self,
+        *,
         graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
@@ -25,7 +26,10 @@ class GraphTracerProtocol(Protocol):
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
-    ) -> GraphContext:
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
+    ) -> TraceContext:
         """Initialize tracing for a new pipeline run.
 
         Args:
@@ -36,9 +40,14 @@ class GraphTracerProtocol(Protocol):
             event_log: Optional event log for distributed tracing.
             workflow_id: Temporal workflow ID or "direct" for single-process mode.
             pipeline_run_id: Pipeline run ID for event emission.
+            emit_graph_events: Whether graph (node/edge) trace events should be emitted for this run.
+                Stamped onto the returned TraceContext so it is born with the correct flag.
+            emit_usage_events: Whether usage (cost) trace events should be emitted for this run.
+                Stamped onto the returned TraceContext so it is born with the correct flag.
+            mode: Provenance mode to stamp onto generated GraphSpecs.
 
         Returns:
-            Initial GraphContext to pass through JobMetadata.
+            Initial TraceContext to pass through JobMetadata.
         """
         ...
 
@@ -52,7 +61,8 @@ class GraphTracerProtocol(Protocol):
 
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -62,11 +72,11 @@ class GraphTracerProtocol(Protocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str, GraphContext]:
+    ) -> tuple[str, TraceContext]:
         """Record the start of a pipe execution.
 
         Args:
-            graph_context: Current graph context from JobMetadata.
+            trace_context: Current trace context from JobMetadata.
             pipe_code: The pipe code being executed.
             pipe_type: The pipe type (e.g., "PipeLLM", "PipeSequence").
             node_kind: The kind of node (controller, operator, etc.).
@@ -78,13 +88,14 @@ class GraphTracerProtocol(Protocol):
             domain_code: Optional domain code of the pipe (mirrored onto NodeSpec).
 
         Returns:
-            Tuple of (node_id for this pipe, updated GraphContext for children).
+            Tuple of (node_id for this pipe, updated TraceContext for children).
         """
         ...
 
     def on_pipe_end_success(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
@@ -106,6 +117,7 @@ class GraphTracerProtocol(Protocol):
     def on_pipe_end_error(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         error_type: str,
         error_message: str,
@@ -122,14 +134,43 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        """Record that a pipe was lifted (skipped) because a plain input resolved absent (D3).
+
+        A skip is a successful outcome (the run continues; the pipe's output is a recorded
+        absence), rendered as its own node state so "why did my workflow produce nothing?"
+        is answerable from the graph.
+
+        Args:
+            node_id: The node ID returned from on_pipe_start.
+            ended_at: When the skip was decided.
+            skip_reason: Human-readable reason (names the absent input).
+            output_spec: The real output a lifted pipe still wrote, when there is one — a
+                PLURAL output normalizes to an empty list (D4) that downstream pipes consume,
+                so it must register in the producer map for DATA edges. None for a singular
+                output (a recorded absence has no payload).
+            output_concept_data: Optional serialized concept dict for that output's concept.
+        """
+        ...
+
     def add_edge(
         self,
+        *,
         source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         """Add an edge between two nodes.
 
@@ -140,11 +181,13 @@ class GraphTracerProtocol(Protocol):
             label: Optional label for the edge.
             source_stuff_digest: Optional stuff digest for the source (for batch edges).
             target_stuff_digest: Optional stuff digest for the target (for batch edges).
+            optional: Marker for a data edge fed by a declared-optional (`?`) output.
         """
         ...
 
     def register_controller_output(
         self,
+        *,
         node_id: str,
         output_spec: IOSpec,
     ) -> None:
@@ -161,6 +204,7 @@ class GraphTracerProtocol(Protocol):
 
     def register_batch_item_extraction(
         self,
+        *,
         list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -179,6 +223,7 @@ class GraphTracerProtocol(Protocol):
 
     def register_batch_aggregation(
         self,
+        *,
         output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -198,6 +243,7 @@ class GraphTracerProtocol(Protocol):
 
     def register_parallel_combine(
         self,
+        *,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
@@ -216,6 +262,7 @@ class GraphTracerProtocol(Protocol):
 
     def register_execution_data(
         self,
+        *,
         node_id: str,
         execution_data: dict[str, Any],
     ) -> None:
@@ -237,6 +284,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def setup(
         self,
+        *,
         graph_id: str,
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
@@ -244,10 +292,15 @@ class GraphTracerNoOp(GraphTracerProtocol):
         event_log: "EventLogProtocol | None" = None,
         workflow_id: str = "direct",
         pipeline_run_id: str | None = None,
-    ) -> GraphContext:
-        return GraphContext(
+        emit_graph_events: bool = True,
+        emit_usage_events: bool = True,
+        mode: GraphSpecMode = GraphSpecMode.LIVE,
+    ) -> TraceContext:
+        return TraceContext(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
+            emit_graph_events=emit_graph_events,
+            emit_usage_events=emit_usage_events,
         )
 
     @override
@@ -257,7 +310,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def on_pipe_start(
         self,
-        graph_context: GraphContext,
+        trace_context: TraceContext,
+        *,
         pipe_code: str,
         pipe_type: str,
         node_kind: NodeKind,
@@ -267,15 +321,16 @@ class GraphTracerNoOp(GraphTracerProtocol):
         concept_data: list[dict[str, Any]] | None = None,
         description: str | None = None,
         domain_code: str | None = None,
-    ) -> tuple[str, GraphContext]:
-        node_id = graph_context.make_node_id()
-        child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
+    ) -> tuple[str, TraceContext]:
+        node_id = trace_context.make_node_id()
+        child_context = trace_context.copy_for_child(node_id, next_sequence=trace_context.node_sequence + 1)
         return node_id, child_context
 
     @override
     def on_pipe_end_success(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
@@ -287,6 +342,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_execution_data(
         self,
+        *,
         node_id: str,
         execution_data: dict[str, Any],
     ) -> None:
@@ -296,6 +352,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     def on_pipe_end_error(
         self,
         node_id: str,
+        *,
         ended_at: datetime,
         error_type: str,
         error_message: str,
@@ -304,20 +361,35 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pass
 
     @override
+    def on_pipe_end_skipped(
+        self,
+        node_id: str,
+        *,
+        ended_at: datetime,
+        skip_reason: str,
+        output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        pass
+
+    @override
     def add_edge(
         self,
+        *,
         source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+        optional: bool = False,
     ) -> None:
         pass
 
     @override
     def register_controller_output(
         self,
+        *,
         node_id: str,
         output_spec: IOSpec,
     ) -> None:
@@ -326,6 +398,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_batch_item_extraction(
         self,
+        *,
         list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -336,6 +409,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_batch_aggregation(
         self,
+        *,
         output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -346,6 +420,7 @@ class GraphTracerNoOp(GraphTracerProtocol):
     @override
     def register_parallel_combine(
         self,
+        *,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,

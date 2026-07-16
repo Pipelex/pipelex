@@ -1,3 +1,6 @@
+from datetime import date, datetime, time, timedelta, timezone
+from typing import cast
+
 import pytest
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -21,7 +24,9 @@ class TestStructureGenerator:
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("TestModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TestModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -77,7 +82,9 @@ class TestModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ComplexModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ComplexModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -119,7 +126,9 @@ class ComplexModel(StructuredContent):
             "size": ConceptStructureBlueprint(description="Size of the product", choices=["XS", "S", "M", "L", "XL"], required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("Product", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="Product", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -173,7 +182,7 @@ class Product(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("Order", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(class_name="Order", structure_blueprint=structure_blueprint)
 
         expected_code = '''\
 """
@@ -209,7 +218,9 @@ class Order(StructuredContent):
         """Test generation of structure with no fields."""
         structure_blueprint: dict[str, ConceptStructureBlueprint] = {}
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("EmptyModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="EmptyModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -245,7 +256,9 @@ class EmptyModel(StructuredContent):
             "page_count": ConceptStructureBlueprint(description="Number of pages", type=ConceptStructureBlueprintFieldType.INTEGER, required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("DocumentInfo", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DocumentInfo", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -282,7 +295,9 @@ class DocumentInfo(StructuredContent):
             "value": ConceptStructureBlueprint(description="Test value", type=ConceptStructureBlueprintFieldType.TEXT, required=True),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ConvenienceTest", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ConvenienceTest", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -334,7 +349,9 @@ class ConvenienceTest(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("TypeMappingTest", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TypeMappingTest", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -369,6 +386,174 @@ class TypeMappingTest(StructuredContent):
         assert result == expected_code
         assert issubclass(generated_class, StructuredContent)
 
+    def test_date_field_maps_to_calendar_date(self):
+        """`type = "date"` generates a `datetime.date` field (JSON schema `format: date`), no time."""
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'issued_on: date = Field(..., description="Issue date")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["issued_on"]["format"] == "date"
+
+    def test_datetime_field_maps_to_timestamp(self):
+        """`type = "datetime"` generates a `datetime.datetime` field (JSON schema `format: date-time`)."""
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'recorded_at: datetime = Field(..., description="Record timestamp")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["recorded_at"]["format"] == "date-time"
+
+    def test_time_field_maps_to_time_of_day(self):
+        """`type = "time"` generates a `datetime.time` field that survives exec-validation.
+
+        Regression: `_validate_execution`'s exec_globals seeded `date`/`datetime` but not `time`,
+        so any bundle with a `time` field crashed library loading with `NameError: name 'time'`.
+        """
+        structure_blueprint = {
+            "issued_at": ConceptStructureBlueprint(description="Issue time", type=ConceptStructureBlueprintFieldType.TIME, required=True),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TimeFieldTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import time" in result
+        assert 'issued_at: time = Field(..., description="Issue time")' in result
+        assert cast("type[StructuredContent]", generated_class).model_json_schema()["properties"]["issued_at"]["format"] == "time"
+
+    def test_date_field_with_default_round_trips(self):
+        """A `type = "date"` field with a date default generates code that evaluates.
+
+        `repr(date(...))` is module-qualified (`datetime.date(...)`), but the generated code imports
+        the bare `date` class, so the default must be emitted un-prefixed or the class body raises at eval.
+        """
+        structure_blueprint = {
+            "issued_on": ConceptStructureBlueprint(
+                description="Issue date", type=ConceptStructureBlueprintFieldType.DATE, default_value=date(2026, 7, 7)
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["issued_on"].default == date(2026, 7, 7)
+
+    def test_datetime_field_with_offset_default_round_trips(self):
+        """A `type = "datetime"` field with an offset-aware datetime default evaluates and keeps the offset."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "recorded_at": ConceptStructureBlueprint(
+                description="Record timestamp", type=ConceptStructureBlueprintFieldType.DATETIME, default_value=offset_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["recorded_at"].default == offset_default
+
+    def test_time_field_with_default_round_trips(self):
+        """A `type = "time"` default evaluates through the same bare-class import as its annotation."""
+        time_default = time(9, 30, 15)
+        structure_blueprint = {
+            "starts_at": ConceptStructureBlueprint(
+                description="Start time", type=ConceptStructureBlueprintFieldType.TIME, default_value=time_default
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="TimeDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.time(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["starts_at"].default == time_default
+
+    def test_list_of_date_field_maps_to_list_of_calendar_date(self):
+        """`type = "list", item_type = "date"` generates a `List[date]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "deadlines": ConceptStructureBlueprint(
+                description="Deadlines", type=ConceptStructureBlueprintFieldType.LIST, item_type="date", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import date" in result
+        assert 'deadlines: List[date] = Field(..., description="Deadlines")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
+    def test_list_of_datetime_field_maps_to_list_of_timestamp(self):
+        """`type = "list", item_type = "datetime"` generates a `List[datetime]` field with the bare-class import, and exec-validates."""
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps", type=ConceptStructureBlueprintFieldType.LIST, item_type="datetime", required=True
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "from datetime import datetime" in result
+        assert 'logged_at: List[datetime] = Field(..., description="Log timestamps")' in result
+        assert issubclass(cast("type[StructuredContent]", generated_class), StructuredContent)
+
+    def test_list_of_datetime_field_with_default_round_trips(self):
+        """List defaults containing datetimes are recursively formatted with generated imports."""
+        offset_default = datetime(2026, 7, 7, 15, 40, tzinfo=timezone(timedelta(hours=2)))
+        structure_blueprint = {
+            "logged_at": ConceptStructureBlueprint(
+                description="Log timestamps",
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type="datetime",
+                default_value=[offset_default],
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DatetimeListDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.datetime(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["logged_at"].default == [offset_default]
+
+    def test_dict_of_date_field_with_default_round_trips(self):
+        """Dict defaults containing dates are recursively formatted with generated imports."""
+        date_default = date(2026, 7, 7)
+        structure_blueprint = {
+            "deadlines_by_name": ConceptStructureBlueprint(
+                description="Deadlines",
+                type=ConceptStructureBlueprintFieldType.DICT,
+                key_type="str",
+                value_type="date",
+                default_value={"ship": date_default},
+            ),
+        }
+
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DateDictDefaultTest", structure_blueprint=structure_blueprint
+        )
+
+        assert "datetime.date(" not in result
+        assert cast("type[StructuredContent]", generated_class).model_fields["deadlines_by_name"].default == {"ship": date_default}
+
     def test_required_vs_optional_fields(self):
         """Test that fields can be marked as required vs optional."""
         structure_blueprint = {
@@ -376,7 +561,9 @@ class TypeMappingTest(StructuredContent):
             "optional_field": ConceptStructureBlueprint(description="Optional field", type=ConceptStructureBlueprintFieldType.TEXT, required=False),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("RequiredFieldsModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="RequiredFieldsModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -430,7 +617,9 @@ class RequiredFieldsModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("PersonWithDefaults", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="PersonWithDefaults", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -485,7 +674,9 @@ class PersonWithDefaults(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ListTypesModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ListTypesModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -543,7 +734,9 @@ class ListTypesModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("DictTypesModel", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="DictTypesModel", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -607,7 +800,9 @@ class DictTypesModel(StructuredContent):
             ),
         }
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("ComplexItem", structure_blueprint)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="ComplexItem", structure_blueprint=structure_blueprint
+        )
 
         expected_code = '''\
 """
@@ -657,7 +852,9 @@ class ComplexItem(StructuredContent):
 
         normalized_structure = normalize_structure_blueprint(mixed_structure_blueprint)
 
-        result, generated_class = StructureGenerator().generate_from_structure_blueprint("PersonInfo", normalized_structure)
+        result, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="PersonInfo", structure_blueprint=normalized_structure
+        )
 
         expected_code = '''\
 """
@@ -672,7 +869,7 @@ If you want to customize this structure:
 To regenerate: pipelex build structures <target_directory>
 """
 
-from datetime import datetime
+from datetime import date
 from enum import Enum
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pydantic import Field
@@ -684,7 +881,7 @@ class PersonInfo(StructuredContent):
 
     name: str = Field(..., description="The name of the person")
     age: float = Field(..., description="The age of the person")
-    birthdate: datetime = Field(..., description="The birthdate of the person")
+    birthdate: date = Field(..., description="The birthdate of the person")
 '''
 
         assert result == expected_code
@@ -703,7 +900,7 @@ class PersonInfo(StructuredContent):
         }
 
         generator = StructureGenerator()
-        python_code, the_class = generator.generate_from_structure_blueprint("ValidTestModel", structure_blueprint)
+        python_code, the_class = generator.generate_from_structure_blueprint(class_name="ValidTestModel", structure_blueprint=structure_blueprint)
 
         expected_code = '''\
 """
@@ -777,8 +974,8 @@ class WrongClassName(StructuredContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Question",
-            structure_blueprint,
+            class_name="Question",
+            structure_blueprint=structure_blueprint,
             base_class_name="TextContent",
         )
 
@@ -839,8 +1036,8 @@ class Question(TextContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "TableScreenshot",
-            structure_blueprint,
+            class_name="TableScreenshot",
+            structure_blueprint=structure_blueprint,
             base_class_name="ImageContent",
         )
 
@@ -893,8 +1090,8 @@ class TableScreenshot(ImageContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Temperature",
-            structure_blueprint,
+            class_name="Temperature",
+            structure_blueprint=structure_blueprint,
             base_class_name="NumberContent",
         )
 
@@ -946,8 +1143,8 @@ class Temperature(NumberContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "ConfigData",
-            structure_blueprint,
+            class_name="ConfigData",
+            structure_blueprint=structure_blueprint,
             base_class_name="JSONContent",
         )
 
@@ -993,8 +1190,8 @@ class ConfigData(JSONContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "EnhancedText",
-            structure_blueprint,
+            class_name="EnhancedText",
+            structure_blueprint=structure_blueprint,
             base_class_name="TextContent",
         )
 
@@ -1049,8 +1246,8 @@ class EnhancedText(TextContent):
 
         generator = StructureGenerator()
         generated_code, generated_class = generator.generate_from_structure_blueprint(
-            "Invoice",
-            structure_blueprint,
+            class_name="Invoice",
+            structure_blueprint=structure_blueprint,
             base_class_name="DocumentContent",
         )
 
@@ -1112,8 +1309,8 @@ class Invoice(DocumentContent):
 
             generator = StructureGenerator()
             generated_code, generated_class = generator.generate_from_structure_blueprint(
-                class_name,
-                structure_blueprint,
+                class_name=class_name,
+                structure_blueprint=structure_blueprint,
                 base_class_name=base_class_name,
             )
 

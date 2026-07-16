@@ -1,7 +1,11 @@
+from enum import StrEnum
+
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -12,7 +16,8 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.types import StrEnum
+from pipelex.core.stuffs.time_content import TimeContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 
 
 class NativeConceptCode(StrEnum):
@@ -23,15 +28,42 @@ class NativeConceptCode(StrEnum):
     HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
-    IMG_GEN_PROMPT = "ImgGenPrompt"
+    YES_NO = "YesNo"
+    DATE = "Date"
+    TIME = "Time"
     PAGE = "Page"
     JSON = "JSON"
     SEARCH_RESULT = "SearchResult"
     ANYTHING = "Anything"
+    COMPOSITE = "Composite"
 
     @property
     def as_output_multiple_indeterminate(self) -> str:
         return f"{self.value}[]"
+
+    @property
+    def is_composite(self) -> bool:
+        """Whether this native concept can hold a named composition (a PipeParallel combination)."""
+        match self:
+            case NativeConceptCode.COMPOSITE:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.IMAGE
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+            ):
+                return False
 
     @property
     def concept_ref(self) -> str:
@@ -63,14 +95,22 @@ class NativeConceptCode(StrEnum):
                 return TextAndImagesContent
             case NativeConceptCode.NUMBER:
                 return NumberContent
+            case NativeConceptCode.YES_NO:
+                return YesNoContent
+            case NativeConceptCode.DATE:
+                return DateContent
+            case NativeConceptCode.TIME:
+                return TimeContent
             case NativeConceptCode.PAGE:
                 return PageContent
             case NativeConceptCode.JSON:
                 return JSONContent
             case NativeConceptCode.SEARCH_RESULT:
                 return SearchResultContent
-            case NativeConceptCode.IMG_GEN_PROMPT | NativeConceptCode.ANYTHING:
-                # These don't have dedicated content classes
+            case NativeConceptCode.COMPOSITE:
+                return CompositeContent
+            case NativeConceptCode.ANYTHING:
+                # This doesn't have a dedicated content class
                 return None
 
     @classmethod
@@ -120,11 +160,14 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.IMG_GEN_PROMPT
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
             ):
                 return False
 
@@ -143,11 +186,14 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
-                | NativeConceptCode.IMG_GEN_PROMPT
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
                 | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.COMPOSITE
             ):
                 return False
             case NativeConceptCode.DYNAMIC:

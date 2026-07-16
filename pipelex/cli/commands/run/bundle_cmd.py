@@ -5,8 +5,10 @@ from typing import Annotated
 
 import typer
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
-from pipelex.cli.commands.run._run_core import COMMAND, execute_run
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
+from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
+from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
@@ -61,6 +63,14 @@ def run_bundle_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
+    mock_usage: Annotated[
+        bool,
+        typer.Option(
+            "--mock-usage",
+            hidden=True,
+            help="Internal test trigger: dry run whose LLM leaf mocks report nonzero synthetic usage so the cost report renders. Requires --dry-run.",
+        ),
+    ] = False,
     mock_inputs: Annotated[
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
@@ -69,9 +79,9 @@ def run_bundle_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
-    temporal: Annotated[
-        bool | None,
-        typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
+    orchestrator: Annotated[
+        str | None,
+        typer.Option("--orchestrator", help="Boot this process under the named orchestrator plugin (e.g. 'temporal'); omit for in-process execution"),
     ] = None,
     dynamic_output_concept_ref: Annotated[
         str | None,
@@ -79,6 +89,20 @@ def run_bundle_cmd(
             "--dynamic-output-concept",
             "-O",
             help="Concept ref (e.g. 'document_qa.ReferenceCount') used to resolve a pipe whose output is declared as 'Dynamic'.",
+        ),
+    ] = None,
+    costs: Annotated[
+        bool | None,
+        typer.Option(
+            "--costs/--no-costs",
+            help="Override config: emit usage (cost) tracing events and render the end-of-run cost report. Default on.",
+        ),
+    ] = None,
+    save_csv: Annotated[
+        str | None,
+        typer.Option(
+            "--save-csv",
+            help="Write the main stuff to this literal CSV path (not under --output-dir; absolute/~/relative ok). Requires a flat list output.",
         ),
     ] = None,
 ) -> None:
@@ -91,14 +115,7 @@ def run_bundle_cmd(
         pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
         pipelex run bundle pipeline_01/ --dry-run
     """
-    # Validate --mock-inputs requires --dry-run
-    if mock_inputs and not dry_run:
-        typer.secho(
-            "Failed to run: --mock-inputs requires --dry-run",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
+    validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
@@ -130,11 +147,16 @@ def run_bundle_cmd(
                 raise typer.Exit(1)
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs if --inputs not explicitly provided
-        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-        if not inputs and inputs_file.is_file():
-            inputs = str(inputs_file)
-            typer.echo(f"Auto-detected inputs: {inputs}")
+        # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
+        if not inputs:
+            try:
+                inputs_file = find_default_inputs_file(directory=target_path)
+            except AmbiguousInputsFilesError as ambiguity_exc:
+                typer.secho(f"Failed to run: {ambiguity_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from ambiguity_exc
+            if inputs_file is not None:
+                inputs = str(inputs_file)
+                typer.echo(f"Auto-detected inputs: {inputs}")
 
         # Add directory as library dir
         target_dir_str = str(target_path)
@@ -169,9 +191,12 @@ def run_bundle_cmd(
         graph_full_data=graph_full_data,
         output_dir=output_dir,
         dry_run=dry_run,
+        mock_usage=mock_usage,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
+        costs=costs,
         telemetry_command_label=f"{COMMAND} bundle",
-        temporal=temporal,
+        orchestrator=orchestrator,
         dynamic_output_concept_ref=dynamic_output_concept_ref,
+        save_csv=save_csv,
     )

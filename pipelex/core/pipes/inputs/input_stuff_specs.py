@@ -9,7 +9,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -26,6 +26,7 @@ class TypedNamedStuffSpec(NamedStuffSpec):
     def make_from_named(
         cls,
         named: NamedStuffSpec,
+        *,
         structure_class: type[StuffContent],
     ) -> "TypedNamedStuffSpec":
         return cls(**named.model_dump(), structure_class=structure_class)
@@ -59,7 +60,11 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
                 log.verbose(
                     f"Variable {transformed_key} already exists with a different concept code: {transformed_dict[transformed_key]} -> {stuff_spec}",
                 )
-            transformed_dict[transformed_key] = StuffSpec(concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            transformed_dict[transformed_key] = StuffSpec(
+                concept=stuff_spec.concept,
+                multiplicity=stuff_spec.multiplicity,
+                presence=stuff_spec.presence,
+            )
 
         return transformed_dict
 
@@ -80,8 +85,15 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_variable_existing(self, variable_name: str) -> bool:
         return variable_name in self.root
 
-    def add_stuff_spec(self, variable_name: str, concept: Concept, multiplicity: VariableMultiplicity | None = None):
-        self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity)
+    def add_stuff_spec(
+        self,
+        *,
+        variable_name: str,
+        concept: Concept,
+        multiplicity: VariableMultiplicity | None = None,
+        presence: PresenceMarker = PresenceMarker.PLAIN,
+    ):
+        self.root[variable_name] = StuffSpec(concept=concept, multiplicity=multiplicity, presence=presence)
 
     @property
     def items(self) -> list[tuple[str, StuffSpec]]:
@@ -106,9 +118,23 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         return list(self.root.keys())
 
     @property
-    def required_names(self) -> list[str]:
-        the_required_names: list[str] = []
+    def declared_names(self) -> list[str]:
+        """Every declared input name, regardless of presence marker."""
+        the_declared_names: list[str] = []
         for requirement_expression in self.root:
+            declared_variable_name = get_root_from_dotted_path(requirement_expression)
+            the_declared_names.append(declared_variable_name)
+        return the_declared_names
+
+    @property
+    def required_names(self) -> list[str]:
+        """Declared input names whose value is required at run time: plain and forced (`!`)
+        inputs. Optional (`?`) inputs are declared but may legitimately be absent.
+        """
+        the_required_names: list[str] = []
+        for requirement_expression, stuff_spec in self.root.items():
+            if stuff_spec.presence.is_optional:
+                continue
             required_variable_name = get_root_from_dotted_path(requirement_expression)
             the_required_names.append(required_variable_name)
         return the_required_names
@@ -124,6 +150,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
                     requirement_expression=requirement_expression,
                     concept=stuff_spec.concept,
                     multiplicity=stuff_spec.multiplicity,
+                    presence=stuff_spec.presence,
                 ),
             )
         return the_named_stuff_spec
@@ -132,7 +159,7 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
-    def format_for_display(self, indent: int = 6) -> str:
+    def format_for_display(self, *, indent: int = 6) -> str:
         """Format input stuff specs as a human-readable multi-line string.
 
         Args:
@@ -149,7 +176,18 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
         return "\n" + "\n".join(lines)
 
-    def render_inputs(self, indent: int = 2) -> str:
+    def build_inputs_template(self) -> dict[str, Any]:
+        """Build the inputs template dict: variable name -> example stuff representation.
+
+        Returns:
+            Dictionary mapping each input variable to its generated example value
+        """
+        template: dict[str, Any] = {}
+        for var_name, stuff_spec in self.root.items():
+            template[var_name] = stuff_spec.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
+        return template
+
+    def render_inputs(self, *, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:
@@ -158,8 +196,4 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
         Returns:
             Formatted JSON string with all inputs
         """
-        json_inputs: dict[str, Any] = {}
-        for var_name, stuff_spec in self.root.items():
-            json_inputs[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
-
-        return json.dumps(json_inputs, indent=indent, ensure_ascii=False)
+        return json.dumps(self.build_inputs_template(), indent=indent, ensure_ascii=False)

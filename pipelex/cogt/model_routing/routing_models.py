@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from enum import StrEnum
 
-from pipelex.types import StrEnum
+from pydantic import BaseModel
 
 
 class BackendMatchingMethod(StrEnum):

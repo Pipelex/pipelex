@@ -30,7 +30,7 @@ class TestStructureGeneratorEscaping:
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Animal", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Animal", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -75,7 +75,7 @@ class Animal(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("TestClass", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="TestClass", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -120,7 +120,7 @@ class TestClass(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Message", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Message", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -165,7 +165,7 @@ class Message(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("FilePath", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="FilePath", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -210,7 +210,7 @@ class FilePath(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("MultiLine", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="MultiLine", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -255,7 +255,7 @@ class MultiLine(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Columns", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="Columns", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -301,7 +301,7 @@ and more!"""
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("ComplexType", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="ComplexType", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -347,7 +347,7 @@ class ComplexType(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("WithDefault", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="WithDefault", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -395,7 +395,7 @@ class WithDefault(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("DefaultPath", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="DefaultPath", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -440,7 +440,7 @@ class DefaultPath(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("EmptyDesc", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="EmptyDesc", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -491,7 +491,7 @@ class EmptyDesc(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("LongDesc", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="LongDesc", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -540,7 +540,7 @@ class LongDesc(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("UnicodeTest", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="UnicodeTest", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -585,7 +585,7 @@ class UnicodeTest(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("CRLF", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="CRLF", structure_blueprint=blueprint)
 
         expected_code = '''\
 """
@@ -644,7 +644,7 @@ class CRLF(StructuredContent):
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("AnimalRecord", blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint(class_name="AnimalRecord", structure_blueprint=blueprint)
 
         expected_code = '''\
 """

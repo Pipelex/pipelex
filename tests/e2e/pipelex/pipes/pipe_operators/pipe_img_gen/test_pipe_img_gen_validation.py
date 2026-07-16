@@ -20,7 +20,8 @@ from pytest import MonkeyPatch
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_console, get_model_deck
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
@@ -40,7 +41,7 @@ def pipelex_routed_to_openai_for_e2e() -> Iterator[None]:
     routing_profiles_doc["active"] = routing_profile_name
     routing_override_dir = Path(tempfile.mkdtemp(prefix="pipelex-routing-pipe-img-gen-e2e-validation-"))
     routing_override_path = routing_override_dir / routing_profiles_path.name
-    save_toml_to_path(routing_profiles_doc, str(routing_override_path))
+    save_toml_to_path(routing_profiles_doc, path=str(routing_override_path))
     routing_monkeypatch.setattr(
         type(config_manager),
         "routing_profiles_file_path",

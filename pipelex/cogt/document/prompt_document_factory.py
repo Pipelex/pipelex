@@ -16,11 +16,7 @@ from pipelex.tools.misc.base64_utils import (
 class PromptDocumentFactory:
     @classmethod
     def make_prompt_document(
-        cls,
-        uri: str | None = None,
-        base64_data: str | None = None,
-        raw_bytes: bytes | None = None,
-        mime_type: str | None = None,
+        cls, *, uri: str | None = None, base64_data: str | None = None, raw_bytes: bytes | None = None, mime_type: str | None = None
     ) -> PromptDocument:
         """Create a PromptDocument from the provided input.
 

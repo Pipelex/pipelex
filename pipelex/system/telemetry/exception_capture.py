@@ -42,7 +42,7 @@ class DualClientExceptionCapture:
         sys.excepthook = self._original_excepthook
         threading.excepthook = self._original_threading_excepthook
 
-    def _exception_handler(
+    def _exception_handler(  # kw-only: ignore — installed as sys.excepthook; interpreter calls it positionally
         self,
         exc_type: type[BaseException],
         exc_value: BaseException,

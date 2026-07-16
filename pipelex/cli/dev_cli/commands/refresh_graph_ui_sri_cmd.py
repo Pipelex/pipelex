@@ -83,7 +83,7 @@ ELKJS = CDNAsset(
 '''
 
 
-def _validate_version(name: str, value: str) -> str:
+def _validate_version(*, name: str, value: str) -> str:
     if not _VERSION_PATTERN.fullmatch(value):
         msg = f"Invalid {name} version {value!r}: expected a SemVer string like 1.2.3 or 1.2.3-rc.1"
         raise PipelexCLIError(msg)
@@ -103,7 +103,7 @@ def _validate_sri(value: str) -> str:
     return value
 
 
-def _fetch(url: str, timeout: float = 30.0) -> bytes:
+def _fetch(url: str, *, timeout: float = 30.0) -> bytes:
     """Fetch the full body at `url`. Raises if the URL is not on the allowlist or the request fails."""
     if not any(url.startswith(prefix) and url.endswith(suffix) for prefix, suffix in _ALLOWED_URL_SHAPES):
         msg = f"Refusing to fetch {url}: only the jsDelivr graph viewer URLs are allowed"
@@ -146,10 +146,7 @@ def _render_module_source(
 
 
 def refresh_graph_ui_sri_cmd(
-    mthds_ui_version: str | None = None,
-    elkjs_version: str | None = None,
-    output_path: Path | None = None,
-    quiet: bool = False,
+    *, mthds_ui_version: str | None = None, elkjs_version: str | None = None, output_path: Path | None = None, quiet: bool = False
 ) -> None:
     """Refetch the pinned graph viewer assets and rewrite `standalone_assets.py`.
 
@@ -161,12 +158,12 @@ def refresh_graph_ui_sri_cmd(
     """
     # `is None` (not falsy) so an explicit empty-string argument fails validation rather than silently falling back to the default.
     target_mthds_ui_version = _validate_version(
-        "mthds-ui",
-        current_pins.MTHDS_UI_VERSION if mthds_ui_version is None else mthds_ui_version,
+        name="mthds-ui",
+        value=current_pins.MTHDS_UI_VERSION if mthds_ui_version is None else mthds_ui_version,
     )
     target_elkjs_version = _validate_version(
-        "elkjs",
-        current_pins.ELKJS_VERSION if elkjs_version is None else elkjs_version,
+        name="elkjs",
+        value=current_pins.ELKJS_VERSION if elkjs_version is None else elkjs_version,
     )
     target_path = output_path or _DEFAULT_OUTPUT_PATH
 

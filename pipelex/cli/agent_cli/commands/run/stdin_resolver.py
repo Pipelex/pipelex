@@ -5,14 +5,30 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
 MAIN_STUFF_KEY = "main_stuff"
+
+
+class ParsedCliInputs(NamedTuple):
+    """Parsed CLI inputs plus the directory bare relative file paths resolve against (Smart Inputs D3).
+
+    ``inputs_base_dir`` is the inputs file's parent when inputs were file-loaded (``--inputs <file>``
+    or an auto-detected default file), else ``None`` — an inline-JSON, stdin, or no-inputs caller
+    has no file to anchor relative paths to. It rides to the runner so the shaper can resolve bare
+    relative file-ish / CSV strings (whose declared concept the signature-blind CLI cannot see).
+    ``pipeline_inputs`` is ``None`` when no inputs were supplied.
+    """
+
+    pipeline_inputs: dict[str, Any] | None
+    inputs_base_dir: Path | None
 
 
 def _extract_concept_code(concept_data: Any) -> str:
@@ -76,12 +92,12 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 
     working_memory_raw: Any = stdin_data[WORKING_MEMORY_KEY]
     if not isinstance(working_memory_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory': expected a dict", "JSONDecodeError")
+        agent_error("stdin envelope has invalid 'working_memory': expected a dict", error_type="JSONDecodeError")
     working_memory = cast("dict[str, Any]", working_memory_raw)
 
     root_raw: Any = working_memory.get("root", {})
     if not isinstance(root_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory.root': expected a dict", "JSONDecodeError")
+        agent_error("stdin envelope has invalid 'working_memory.root': expected a dict", error_type="JSONDecodeError")
     root = cast("dict[str, Any]", root_raw)
 
     aliases_raw: Any = working_memory.get("aliases", {})
@@ -114,27 +130,37 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 
 def parse_cli_inputs(
     inputs_arg: str | None,
+    *,
     stdin_fallback: bool = True,
-    auto_inputs_path: str | None = None,
-) -> dict[str, Any] | None:
-    """Parse pipeline inputs from CLI --inputs argument, stdin, or auto-detected path.
+    auto_inputs_dir: Path | None = None,
+) -> ParsedCliInputs:
+    """Parse pipeline inputs from CLI --inputs argument, stdin, or an auto-detected directory.
 
     Resolution order:
 
     1. If ``inputs_arg`` is provided: parse as inline JSON (starts with ``{``) or file path.
     2. If ``inputs_arg`` is None and ``stdin_fallback`` is True and stdin is not a TTY:
        read JSON from stdin and resolve envelope format if present.
-    3. If ``auto_inputs_path`` is provided: parse it as a file path (lowest priority fallback).
-    4. Otherwise return None (no inputs).
+    3. If ``auto_inputs_dir`` is provided: probe it for a default inputs file
+       (``inputs.json`` / ``inputs.toml``) and parse it (lowest-priority fallback).
+    4. Otherwise return an empty result (no inputs).
+
+    The auto-detect probe — including its ``inputs.json``/``inputs.toml`` ambiguity
+    rule — runs only here, in step 3, so it can never pre-empt higher-priority
+    ``--inputs`` or piped stdin: the ambiguity error is surfaced only when the
+    auto-detected file is the source actually being used.
 
     Args:
         inputs_arg: The ``--inputs`` CLI argument value, or None.
         stdin_fallback: Whether to attempt reading from stdin when ``inputs_arg`` is None.
-        auto_inputs_path: Auto-detected inputs file path (e.g. from a directory target).
-            Only used as a last-resort fallback when both ``inputs_arg`` and stdin are absent.
+        auto_inputs_dir: Directory to probe for a default inputs file (e.g. a
+            directory target). Only consulted as a last-resort fallback when both
+            ``inputs_arg`` and stdin are absent.
 
     Returns:
-        Parsed inputs dict, or None if no inputs are available.
+        A :class:`ParsedCliInputs` — the parsed inputs dict (``None`` if no inputs are available)
+        plus the inputs file's directory (``None`` for inline JSON, stdin, or no inputs), so a
+        file-loaded caller can hand it to the runner as ``inputs_base_dir`` for D3 path resolution.
     """
     if inputs_arg is not None:
         return _parse_inputs_arg(inputs_arg)
@@ -142,40 +168,54 @@ def parse_cli_inputs(
     if stdin_fallback and not sys.stdin.isatty():
         stdin_inputs = _read_stdin_inputs()
         if stdin_inputs is not None:
-            return stdin_inputs
+            # Piped stdin has no anchoring file — relative paths keep the CWD contract.
+            return ParsedCliInputs(pipeline_inputs=stdin_inputs, inputs_base_dir=None)
 
-    if auto_inputs_path is not None:
-        return _parse_inputs_arg(auto_inputs_path)
+    if auto_inputs_dir is not None:
+        try:
+            auto_inputs_file = find_default_inputs_file(directory=auto_inputs_dir)
+        except AmbiguousInputsFilesError as ambiguity_exc:
+            agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
+        if auto_inputs_file is not None:
+            return _parse_inputs_arg(str(auto_inputs_file))
 
-    return None
+    return ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None)
 
 
-def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
+def _parse_inputs_arg(inputs_arg: str) -> ParsedCliInputs:
     """Parse the --inputs argument as inline JSON or file path.
 
     Args:
         inputs_arg: The --inputs CLI argument value.
 
     Returns:
-        Parsed inputs dict, or None if empty.
+        A :class:`ParsedCliInputs` — inline JSON carries no base dir; a file path carries its
+        parent directory so bare relative file-ish / CSV inputs resolve against it (D3).
     """
     if inputs_arg.startswith("{"):
         try:
             result: dict[str, Any] = json.loads(inputs_arg)
-            return result
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
-    else:
-        try:
-            loaded = load_json_dict_from_path(inputs_arg)
-            # Resolve relative url paths against the inputs file's parent directory
-            base_dir = Path(inputs_arg).parent.resolve()
-            return resolve_inputs_paths(loaded, base_dir)
-        except FileNotFoundError as exc:
-            agent_error(f"Input file not found: {inputs_arg}", "FileNotFoundError", cause=exc)
-        except JsonTypeError as exc:
-            agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", "JsonTypeError", cause=exc)
-    return None
+            agent_error(f"Failed to parse inline JSON inputs: {exc}", error_type="JSONDecodeError", cause=exc)
+        return ParsedCliInputs(pipeline_inputs=result, inputs_base_dir=None)
+    try:
+        # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+        # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+        inputs_path = Path(inputs_arg).expanduser()
+        loaded = load_inputs_dict_from_path(inputs_path)
+        # Resolve relative url paths against the inputs file's parent directory. The same directory
+        # rides to the runner as inputs_base_dir so the shaper can resolve bare relative file-ish /
+        # CSV strings (whose declared concept the signature-blind CLI cannot see).
+        base_dir = inputs_path.parent.resolve()
+        return ParsedCliInputs(pipeline_inputs=resolve_inputs_paths(loaded, base_dir=base_dir), inputs_base_dir=base_dir)
+    except FileNotFoundError as exc:
+        agent_error(f"Input file not found: {inputs_arg}", error_type="FileNotFoundError", cause=exc)
+    except json.JSONDecodeError as exc:
+        agent_error(f"Input file contains invalid JSON: {inputs_arg}: {exc}", error_type="JSONDecodeError", cause=exc)
+    except JsonTypeError as exc:
+        agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", error_type="JsonTypeError", cause=exc)
+    except TomlError as exc:
+        agent_error(exc.message, error_type="TomlError", cause=exc)
 
 
 def _read_stdin_inputs() -> dict[str, Any] | None:
@@ -195,10 +235,10 @@ def _read_stdin_inputs() -> dict[str, Any] | None:
     try:
         parsed: Any = json.loads(stdin_raw)
     except json.JSONDecodeError as exc:
-        agent_error(f"Failed to parse stdin JSON: {exc}", "JSONDecodeError", cause=exc)
+        agent_error(f"Failed to parse stdin JSON: {exc}", error_type="JSONDecodeError", cause=exc)
 
     if not isinstance(parsed, dict):
-        agent_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, "JSONDecodeError")
+        agent_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, error_type="JSONDecodeError")
 
     parsed_dict = cast("dict[str, Any]", parsed)
     return resolve_stdin_inputs(parsed_dict)

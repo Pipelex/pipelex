@@ -34,6 +34,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.7-opus**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-4.8-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **deepseek-v3.2**
   - inputs: text
   - outputs: text, structured
@@ -49,13 +52,13 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-3.0-flash**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gemini-3.0-pro**
-  - inputs: text, images, pdf
-  - outputs: text, structured
 - **gemini-3.1-flash-lite**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-3.1-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.5-flash**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-flash-latest**
@@ -203,7 +206,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - inputs: text, images
   - outputs: image
 - **gpt-image-1-mini**
-  - inputs: text
+  - inputs: text, images
   - outputs: image
 - **gpt-image-1.5**
   - inputs: text, images
@@ -217,12 +220,15 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **nano-banana-2**
   - inputs: text, images
   - outputs: image
+- **nano-banana-2-lite**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana-pro**
   - inputs: text, images
   - outputs: image
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-28T12:50:14Z
+> Last updated: 2026-07-06T14:28:01Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

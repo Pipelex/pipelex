@@ -1,17 +1,20 @@
 from operator import attrgetter
-from typing import Any, cast
+from typing import Any, Self, cast
 
-from mthds.models.working_memory import WorkingMemoryAbstract
+from mthds.protocol.working_memory import WorkingMemoryAbstract
 from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.exceptions import (
     WorkingMemoryConsistencyError,
     WorkingMemoryStuffAttributeNotFoundError,
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -23,8 +26,8 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
-from pipelex.types import Self
 
 MAIN_STUFF_NAME = "main_stuff"
 BATCH_ITEM_STUFF_NAME = "BATCH_ITEM"
@@ -38,6 +41,11 @@ StuffArtefactDict = dict[str, StuffArtefact]
 class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: dict[str, str] = Field(default_factory=dict)
+    # The absence ledger (D2): recorded facts that a named slot holds no value, with provenance.
+    # A name may carry both a value and a record (D4 plural normalization note); the value wins
+    # for consumers — records are consulted only when no Stuff is present, and enumerated whole
+    # by the run report.
+    absences: dict[str, AbsenceRecord] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_stuff_names(self) -> Self:
@@ -93,6 +101,74 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             message=f"Stuff '{name}' not found in working memory, valid keys are: {self.list_keys()}",
         )
 
+    def record_absence(self, record: AbsenceRecord) -> None:
+        """Write a ledger NOTE: the record is keyed by variable name, any value under that name
+        is left in place (and wins in `resolve_stuff`). This is the observability-note arm (e.g.
+        the D4 plural empty-list note); an absence that RESOLVES a slot goes through
+        `record_resolved_absence` instead.
+        """
+        self.absences[record.variable_name] = record
+
+    def record_resolved_absence(self, record: AbsenceRecord) -> None:
+        """Record an absence as the slot's RESOLUTION: a stale value (or alias) under the same
+        name is removed so it cannot outrank the fresh absence — the mirror of `set_stuff`'s
+        value-supersedes-record invariant.
+        """
+        self.remove_stuff(name=record.variable_name)
+        self.remove_alias(alias=record.variable_name)
+        self.record_absence(record)
+
+    def get_optional_absence(self, name: str) -> AbsenceRecord | None:
+        """Alias-aware, mirroring `get_optional_stuff`: an alias to a resolved-absent slot must
+        surface the record, not degrade to a hard miss.
+        """
+        if record := self.absences.get(name):
+            return record
+        if alias := self.aliases.get(name):
+            return self.absences.get(alias)
+        return None
+
+    def record_new_main_absence(self, record: AbsenceRecord) -> None:
+        """Record a pipe-output absence as the resolved main result.
+
+        Marks both the named slot and the main-stuff position, and removes any stale value under
+        either name so a previous output cannot masquerade as this pipe's. Other names stay
+        untouched — memory is otherwise unchanged.
+        """
+        self.remove_main_stuff()
+        self.remove_alias_to_main_stuff()
+        self.record_resolved_absence(record)
+        self.absences[MAIN_STUFF_NAME] = record
+
+    def resolve_stuff(self, name: str) -> Stuff | AbsenceRecord:
+        """Tri-state resolved accessor for post-run reads: a value or a recorded absence.
+
+        A present Stuff wins over a ledger note under the same name. A slot with neither a value
+        nor a record is a hard miss — never produced, which is a bug, not an absence.
+        """
+        if stuff := self.get_optional_stuff(name=name):
+            return stuff
+        if record := self.get_optional_absence(name=name):
+            return record
+        raise WorkingMemoryStuffNotFoundError(
+            variable_name=name,
+            message=(
+                f"Stuff '{name}' not found in working memory and no absence is recorded for it. "
+                f"Valid keys are: {self.list_keys()}; recorded absences: {list(self.absences.keys())}"
+            ),
+        )
+
+    def resolve_main_stuff(self) -> Stuff | AbsenceRecord:
+        return self.resolve_stuff(name=MAIN_STUFF_NAME)
+
+    def list_missing_names(self, names: set[str]) -> list[str]:
+        """The names (sorted) that hold neither a value nor a recorded absence — genuine misses.
+
+        The shared miss-gate check for controllers: a recorded absence is not a miss (the
+        consuming pipe's own gate applies the trichotomy — skip / run / force).
+        """
+        return [name for name in sorted(names) if self.get_optional_stuff(name=name) is None and self.get_optional_absence(name=name) is None]
+
     def get_stuffs(self, names: set[str]) -> list[Stuff]:
         the_stuffs: list[Stuff] = []
         for name in names:
@@ -116,13 +192,15 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         if MAIN_STUFF_NAME in self.root:
             del self.root[MAIN_STUFF_NAME]
 
-    def set_stuff(self, name: str, stuff: Stuff):
+    def set_stuff(self, *, name: str, stuff: Stuff):
         self.root[name] = stuff
+        # A value written under a name supersedes its absence record.
+        self.absences.pop(name, None)
 
     def is_stuff_exists(self, name: str) -> bool:
         return name in self.root or name in self.aliases
 
-    def add_new_stuff(self, name: str, stuff: Stuff, aliases: list[str] | None = None):
+    def add_new_stuff(self, *, name: str, stuff: Stuff, aliases: list[str] | None = None):
         # TODO: Add unit tests for this method
         if self.is_stuff_code_used(stuff_code=stuff.stuff_code):
             msg = f"Stuff code '{stuff.stuff_code}' is already used by another stuff"
@@ -141,10 +219,13 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         self.set_stuff(name=name, stuff=stuff)
         if aliases:
             for alias in aliases:
-                self.set_alias(alias, name)
+                self.set_alias(alias, target=name)
 
-    def set_new_main_stuff(self, stuff: Stuff, name: str | None = None):
+    def set_new_main_stuff(self, stuff: Stuff, *, name: str | None = None):
         # TODO: Add unit tests for this method
+        # A real main output supersedes any positional main-stuff absence record; named-slot
+        # records for other variables stay (they remain genuinely absent).
+        self.absences.pop(MAIN_STUFF_NAME, None)
         if name:
             self.remove_main_stuff()
             self.add_new_stuff(name=name, stuff=stuff, aliases=[MAIN_STUFF_NAME])
@@ -154,7 +235,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             self.set_stuff(name=MAIN_STUFF_NAME, stuff=stuff)
             log.verbose(f"Setting new main stuff (unnamed): {stuff.concept.code} = '{stuff.short_desc}'")
 
-    def set_alias(self, alias: str, target: str) -> None:
+    def set_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias == target:
             msg = f"Cannot create alias '{alias}' pointing to itself"
@@ -164,7 +245,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             raise WorkingMemoryConsistencyError(msg)
         self.aliases[alias] = target
 
-    def add_alias(self, alias: str, target: str) -> None:
+    def add_alias(self, alias: str, *, target: str) -> None:
         """Add an alias pointing to a target name."""
         if alias in self.root:
             msg = f"Cannot add alias '{alias}' as it already exists"
@@ -201,7 +282,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return artefact_dict
 
     @override
-    def get_typed_object_or_attribute(self, name: str, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
+    def get_typed_object_or_attribute(self, name: str, *, wanted_type: type[Any] | None = None, accept_list: bool = False) -> Any:
         """Retrieve a typed object or nested attribute from working memory.
 
         This method is primarily used to:
@@ -326,7 +407,7 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
 
         return top_level_content
 
-    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], wanted_type: type[Any] | None) -> list[Any] | None:
+    def _get_typed_items_from_list_content(self, list_content: ListContent[Any], *, wanted_type: type[Any] | None) -> list[Any] | None:
         """Extract items from ListContent with optional type validation.
 
         Used to collect specific content types (e.g., Images, Documents) from lists
@@ -367,17 +448,17 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     # Stuff accessors
     ################################################################################################
 
-    def get_stuff_as(self, name: str, content_type: type[StuffContentType]) -> StuffContentType:
+    def get_stuff_as(self, name: str, *, content_type: type[StuffContentType]) -> StuffContentType:
         """Get stuff content as StuffContentType."""
         return self.get_stuff(name=name).content_as(content_type=content_type)
 
-    def get_stuff_as_list(self, name: str, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
+    def get_stuff_as_list(self, name: str, *, item_type: type[StuffContentType]) -> ListContent[StuffContentType]:
         """Get stuff content as ListContent with items of type StuffContentType.
         If the items are of possibly various types, use item_type=StuffContent.
         """
         return self.get_stuff(name=name).as_list_of_fixed_content_type(item_type=item_type)
 
-    def get_list_stuff_first_item_as(self, name: str, item_type: type[StuffContentType]) -> StuffContentType:
+    def get_list_stuff_first_item_as(self, name: str, *, item_type: type[StuffContentType]) -> StuffContentType:
         """Get stuff content as ListContent with items of type StuffContentType then return the first item."""
         return self.get_stuff_as_list(name=name, item_type=item_type).items[0]
 
@@ -404,6 +485,14 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     def get_stuff_as_number(self, name: str) -> NumberContent:
         """Get stuff content as NumberContent if applicable."""
         return self.get_stuff(name=name).as_number
+
+    def get_stuff_as_yes_no(self, name: str) -> YesNoContent:
+        """Get stuff content as YesNoContent if applicable."""
+        return self.get_stuff(name=name).as_yes_no
+
+    def get_stuff_as_date(self, name: str) -> DateContent:
+        """Get stuff content as DateContent if applicable."""
+        return self.get_stuff(name=name).as_date
 
     def get_stuff_as_html(self, name: str) -> HtmlContent:
         """Get stuff content as HtmlContent if applicable."""
@@ -452,6 +541,16 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         return self.get_stuff_as_number(name=MAIN_STUFF_NAME)
 
     @property
+    def main_stuff_as_yes_no(self) -> YesNoContent:
+        """Get main stuff content as YesNoContent if applicable."""
+        return self.get_stuff_as_yes_no(name=MAIN_STUFF_NAME)
+
+    @property
+    def main_stuff_as_date(self) -> DateContent:
+        """Get main stuff content as DateContent if applicable."""
+        return self.get_stuff_as_date(name=MAIN_STUFF_NAME)
+
+    @property
     def main_stuff_as_html(self) -> HtmlContent:
         """Get main stuff content as HtmlContent if applicable."""
         return self.get_stuff_as_html(name=MAIN_STUFF_NAME)
@@ -469,8 +568,8 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
         """Serialize the working memory as a dictionary."""
         return self.model_dump(serialize_as_any=True)
 
-    def dump_for_temporal(self) -> dict[str, Any]:
-        """Serialize for Temporal transit with explicit ListContent representation.
+    def dump_for_transport(self) -> dict[str, Any]:
+        """Serialize for cross-process transport with explicit ListContent representation.
 
         Like smart_dump(), but serializes ListContent as a plain list instead of
         ``{"items": [...]}``.  This removes the ambiguity at hydration time: a
@@ -493,7 +592,6 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                 list_content = cast("ListContent[StuffContent]", content)
                 serialized_items: list[dict[str, Any]] = []
                 for item in list_content.items:
-                    item_dict = item.model_dump(serialize_as_any=True)
                     # Preserve per-item type metadata for the hydration side.
                     # These keys are deliberately in pipelex's private namespace
                     # (NOT kajson's `__class__` / `__module__`) so that kajson's
@@ -501,8 +599,43 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
                     # Temporal data-converter boundary — class binding is
                     # pipelex's job, not kajson's, since the dynamic class may
                     # only exist in a per-workflow ClassRegistry.
-                    item_dict["__pipelex_class__"] = type(item).__name__
-                    item_dict["__pipelex_module__"] = type(item).__module__
-                    serialized_items.append(item_dict)
+                    serialized_items.append(_encode_content_with_class_markers(item))
                 raw_root[stuff_name]["content"] = serialized_items
+            elif isinstance(content, CompositeContent) and stuff_name in raw_root:
+                # Composite components are extra="allow" fields: a plain model_dump loses
+                # their classes, so stamp each component with the same pipelex-private
+                # markers as list items. The nesting convention mirrors the top level:
+                # a list value is a ListContent, a dict value is a single StuffContent.
+                raw_root[stuff_name]["content"] = _encode_composite_for_transport(content)
         return raw
+
+
+def _encode_content_with_class_markers(content: StuffContent) -> dict[str, Any]:
+    """Serialize one StuffContent with pipelex-private class markers for hydration."""
+    if isinstance(content, CompositeContent):
+        content_dict = _encode_composite_for_transport(content)
+    else:
+        content_dict = content.model_dump(serialize_as_any=True)
+    content_dict["__pipelex_class__"] = type(content).__name__
+    content_dict["__pipelex_module__"] = type(content).__module__
+    return content_dict
+
+
+def _encode_composite_for_transport(composite: CompositeContent) -> dict[str, Any]:
+    """Serialize a CompositeContent's components, each carrying its class markers.
+
+    A ListContent component is encoded as a plain list of marker-stamped item dicts
+    (same shape rule as the top-level transport format: list ⇒ ListContent, dict ⇒
+    single StuffContent), so the hydration side rebuilds typed contents without
+    heuristics.
+    """
+    encoded: dict[str, Any] = {}
+    for component_name, component_value in composite.components.items():
+        if isinstance(component_value, ListContent):
+            list_component = cast("ListContent[StuffContent]", component_value)
+            encoded[component_name] = [_encode_content_with_class_markers(item) for item in list_component.items]
+        elif isinstance(component_value, StuffContent):
+            encoded[component_name] = _encode_content_with_class_markers(component_value)
+        else:
+            encoded[component_name] = component_value
+    return encoded

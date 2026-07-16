@@ -6,6 +6,7 @@ PreparedFile instances that can be consumed by LLM provider APIs.
 
 import asyncio
 import base64
+from pathlib import Path
 
 from pipelex.cogt.image.prompt_image import (
     PromptImage,
@@ -28,6 +29,7 @@ from pipelex.tools.uri.resolved_uri import (
 
 async def prepare_prompt_image(
     prompt_image: PromptImage,
+    *,
     is_http_url_enabled: bool,
 ) -> PreparedFile:
     """Prepare a single prompt image for LLM API consumption.
@@ -67,7 +69,7 @@ async def prepare_prompt_image(
                         )
 
                 case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(prompt_image.resolved.path)
+                    raw_bytes = await load_binary_async(Path(prompt_image.resolved.path))
                     prepared = PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
@@ -94,6 +96,7 @@ async def prepare_prompt_image(
 
 async def prep_prompt_images(
     prompt_images: list[PromptImage],
+    *,
     is_http_url_enabled: bool,
 ) -> list[PreparedFile]:
     """Prepare multiple prompt images in parallel.
@@ -145,7 +148,7 @@ async def prepare_prompt_image_as_base64(prompt_image: PromptImage) -> PreparedF
                     )
 
                 case ResolvedLocalPath():
-                    raw_bytes = await load_binary_async(prompt_image.resolved.path)
+                    raw_bytes = await load_binary_async(Path(prompt_image.resolved.path))
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),

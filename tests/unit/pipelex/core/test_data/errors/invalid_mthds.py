@@ -1,4 +1,4 @@
-from pipelex.core.interpreter.interpreter import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 
 INVALID_MTHDS_SYNTAX = (
     "invalid_mthds_syntax",
@@ -7,7 +7,7 @@ description = "Domain with invalid MTHDS syntax"
 
 [concept]
 InvalidConcept = "This is missing a closing quote""",
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 MALFORMED_SECTION = (
@@ -18,7 +18,7 @@ description = "Domain with malformed section"
 [concept
 TestConcept = "Missing closing bracket"
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 UNCLOSED_STRING = (
@@ -26,7 +26,7 @@ UNCLOSED_STRING = (
     """domain = "test_domain"
 description = "Domain with unclosed string
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 DUPLICATE_KEYS = (
@@ -38,7 +38,7 @@ description = "Duplicate definition key"
 [concept]
 TestConcept = "A test concept"
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 INVALID_ESCAPE_SEQUENCE = (
@@ -49,7 +49,7 @@ description = "Domain with invalid escape sequence \\z"
 [concept]
 TestConcept = "A test concept"
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 # PipelexBundleBlueprint Structure Errors
@@ -174,7 +174,7 @@ description = "Domain with invalid table syntax"
 [concept.]
 InvalidName = "Empty table name"
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 INVALID_ARRAY_SYNTAX = (
@@ -185,7 +185,7 @@ description = "Domain with invalid array syntax"
 [concept]
 TestConcept = ["Unclosed array"
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 INVALID_ARRAY_SYNTAX2 = (
     "invalid_array_syntax",
@@ -195,7 +195,7 @@ description = "Domain with invalid array syntax"
 [concept]
 [concept]
 """,
-    MthdsDecodeError,
+    PipelexInterpreterError,
 )
 
 DOUBLE_DOT_DOMAIN = (

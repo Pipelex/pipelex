@@ -60,11 +60,7 @@ def get_all_urls_from_class() -> list[tuple[str, str]]:
     return url_pairs
 
 
-async def check_single_url_async(
-    client: httpx.AsyncClient,
-    name: str,
-    url: str,
-) -> URLCheckResult:
+async def check_single_url_async(*, client: httpx.AsyncClient, name: str, url: str) -> URLCheckResult:
     """Check if a single URL is accessible asynchronously.
 
     Args:
@@ -116,6 +112,7 @@ async def check_single_url_async(
 
 async def check_all_urls_async(
     url_pairs: list[tuple[str, str]],
+    *,
     request_timeout: int,
 ) -> list[URLCheckResult]:
     """Check all URLs concurrently with connection pooling.
@@ -135,12 +132,12 @@ async def check_all_urls_async(
         timeout=request_timeout,
         limits=HTTP_LIMITS,
     ) as client:
-        tasks = [check_single_url_async(client, name, url) for name, url in url_pairs]
+        tasks = [check_single_url_async(client=client, name=name, url=url) for name, url in url_pairs]
         results = await asyncio.gather(*tasks)
     return list(results)
 
 
-def check_urls_cmd(quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
+def check_urls_cmd(*, quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
     """Check all URLs defined in pipelex/urls.py for broken links.
 
     Args:

@@ -1,0 +1,28 @@
+domain    = "signature_mixed"
+main_pipe = "process_doc"
+
+[concept]
+MixDoc     = "A document concept used in the mixed signature pipeline."
+MixSummary = "A summary concept used in the mixed signature pipeline."
+
+[pipe.extract_doc]
+type        = "PipeLLM"
+description = "Extract text from a document."
+inputs      = { doc = "MixDoc" }
+output      = "Text"
+prompt      = "Extract text from $doc."
+
+[pipe.summarize_extracted]
+description = "Summarize extracted text (contract only)."
+inputs      = { extracted = "Text" }
+output      = "MixSummary"
+
+[pipe.process_doc]
+type = "PipeSequence"
+description = "Extract then summarize."
+inputs = { doc = "MixDoc" }
+output = "MixSummary"
+steps = [
+  { pipe = "extract_doc", result = "extracted" },
+  { pipe = "summarize_extracted", result = "summary" },
+]

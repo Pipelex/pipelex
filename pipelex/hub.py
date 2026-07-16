@@ -1,5 +1,6 @@
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Generator, Sequence
+from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ClassVar, Optional
@@ -28,9 +29,10 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.sdk_client_manager import SdkClientManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
@@ -38,6 +40,7 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -47,6 +50,23 @@ if TYPE_CHECKING:
 
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+    from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+    from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+    from pipelex.plugins.model_lister_registry import ModelListerRegistry
+    from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+    from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
+    from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
+    from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
+    from pipelex.tracing.event_log_protocol import EventLogProtocol
+
+
+def _never_in_isolated_execution() -> bool:
+    """Core default isolated-execution probe: the in-process orchestrator has no replay/activity
+    split, so an emission is never inside an isolated sub-execution. A boot-orchestrator plugin
+    whose runtime has such a split (a Temporal worker) replaces this by claiming
+    ``HubSlot.ISOLATED_EXECUTION_PROBE``.
+    """
+    return False
 
 
 class PipelexHub:
@@ -68,10 +88,22 @@ class PipelexHub:
         self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
-        self._plugin_manager: PluginManager | None = None
+        self._sdk_client_manager: SdkClientManager | None = None
+        self._inference_backend_registry: InferenceBackendRegistry | None = None
+        self._model_lister_registry: ModelListerRegistry | None = None
+        self._orchestrator_registry: OrchestratorRegistry | None = None
+        self._bundle_validator_registry: BundleValidatorRegistry | None = None
+        self._storage_provider_registry: StorageProviderRegistry | None = None
+        self._secrets_provider_registry: SecretsProviderRegistry | None = None
+        self._pipe_func_executor_registry: PipeFuncExecutorRegistry | None = None
         self._inference_manager: InferenceManagerProtocol
         self._report_delegate: ReportingProtocol
         self._content_generator: ContentGeneratorProtocol | None = None
+        self._pipe_func_executor: PipeFuncExecutorProtocol | None = None
+        # Keyless boot (``Pipelex.make(needs_inference=False)``) forces every run to DRY (eng
+        # review D4): the backend still picks inline vs in-workflow on its own; the leaf mocks.
+        # Consumed by ``PipeRunParamsFactory.make_run_params`` (the single writer of run_mode).
+        self._is_dry_run_forced: bool = False
 
         # pipelex
         self._library_manager: LibraryManagerAbstract | None = None
@@ -81,6 +113,11 @@ class PipelexHub:
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
         self._pipe_run: PipeRunProtocol | None = None
+        # Ambient probe claimed by a boot-orchestrator plugin (ISOLATED_EXECUTION_PROBE): True when
+        # the current call runs inside an isolated sub-execution (a Temporal activity) whose emissions
+        # must bypass the parent run's registered buffer. Core default never isolated (see
+        # _never_in_isolated_execution); consumed by ReportingManager to route usage emissions.
+        self._isolated_execution_probe: Callable[[], bool] = _never_in_isolated_execution
 
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
@@ -111,7 +148,7 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None):
+    def setup_config(self, config_cls: type[ConfigRoot], *, config_overrides: dict[str, Any] | None = None, config_dir: Path | None = None):
         """Set the global configuration instance.
 
         Args:
@@ -119,8 +156,12 @@ class PipelexHub:
             config_overrides: Optional dict deep-merged on top of all TOML layers
                 as the highest-priority override. Useful for tests that need
                 specific config without editing TOML files.
+            config_dir: Optional explicit config dir. When provided, project/global
+                layering is bypassed and only this directory is read. Used by the
+                doctor ``--global`` path so the hub reflects exactly the directory
+                being reported on.
         """
-        config_dict = config_manager.load_config(extra_overrides=config_overrides)
+        config_dict = config_manager.load_config(extra_overrides=config_overrides, config_dir=config_dir)
         self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):
@@ -164,8 +205,29 @@ class PipelexHub:
     def set_models_manager(self, models_manager: ModelManagerAbstract):
         self._models_manager = models_manager
 
-    def set_plugin_manager(self, plugin_manager: PluginManager):
-        self._plugin_manager = plugin_manager
+    def set_sdk_client_manager(self, sdk_client_manager: SdkClientManager):
+        self._sdk_client_manager = sdk_client_manager
+
+    def set_inference_backend_registry(self, inference_backend_registry: "InferenceBackendRegistry"):
+        self._inference_backend_registry = inference_backend_registry
+
+    def set_model_lister_registry(self, model_lister_registry: "ModelListerRegistry"):
+        self._model_lister_registry = model_lister_registry
+
+    def set_orchestrator_registry(self, orchestrator_registry: "OrchestratorRegistry"):
+        self._orchestrator_registry = orchestrator_registry
+
+    def set_bundle_validator_registry(self, bundle_validator_registry: "BundleValidatorRegistry"):
+        self._bundle_validator_registry = bundle_validator_registry
+
+    def set_storage_provider_registry(self, storage_provider_registry: "StorageProviderRegistry"):
+        self._storage_provider_registry = storage_provider_registry
+
+    def set_secrets_provider_registry(self, secrets_provider_registry: "SecretsProviderRegistry"):
+        self._secrets_provider_registry = secrets_provider_registry
+
+    def set_pipe_func_executor_registry(self, pipe_func_executor_registry: "PipeFuncExecutorRegistry"):
+        self._pipe_func_executor_registry = pipe_func_executor_registry
 
     def set_inference_manager(self, inference_manager: InferenceManagerProtocol):
         self._inference_manager = inference_manager
@@ -175,6 +237,15 @@ class PipelexHub:
 
     def set_content_generator(self, content_generator: ContentGeneratorProtocol):
         self._content_generator = content_generator
+
+    def set_pipe_func_executor(self, pipe_func_executor: PipeFuncExecutorProtocol):
+        self._pipe_func_executor = pipe_func_executor
+
+    def set_dry_run_forced(self, *, is_forced: bool) -> None:
+        self._is_dry_run_forced = is_forced
+
+    def is_dry_run_forced(self) -> bool:
+        return self._is_dry_run_forced
 
     # pipelex
 
@@ -192,6 +263,9 @@ class PipelexHub:
 
     def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
         self._pipe_run = pipe_run
+
+    def set_isolated_execution_probe(self, probe: Callable[[], bool]) -> None:
+        self._isolated_execution_probe = probe
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -220,6 +294,15 @@ class PipelexHub:
         if self._config is None:
             msg = "Config instance is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
+        return self._config
+
+    def get_optional_config(self) -> ConfigRoot | None:
+        """Get the current configuration if it has been set, otherwise None.
+
+        Non-raising counterpart to ``get_required_config``. Used by callers that must
+        run before/around bootstrap (e.g. ``report_validation_error`` invoked from the
+        doctor's setup helper when ``setup_config`` itself failed).
+        """
         return self._config
 
     def get_console(self) -> Console:
@@ -260,11 +343,53 @@ class PipelexHub:
             raise RuntimeError(msg)
         return self._models_manager
 
-    def get_plugin_manager(self) -> PluginManager:
-        if self._plugin_manager is None:
-            msg = "PluginManager2 is not initialized"
+    def get_sdk_client_manager(self) -> SdkClientManager:
+        if self._sdk_client_manager is None:
+            msg = "SdkClientManager is not initialized"
             raise RuntimeError(msg)
-        return self._plugin_manager
+        return self._sdk_client_manager
+
+    def get_inference_backend_registry(self) -> "InferenceBackendRegistry":
+        if self._inference_backend_registry is None:
+            msg = "InferenceBackendRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._inference_backend_registry
+
+    def get_model_lister_registry(self) -> "ModelListerRegistry":
+        if self._model_lister_registry is None:
+            msg = "ModelListerRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._model_lister_registry
+
+    def get_orchestrator_registry(self) -> "OrchestratorRegistry":
+        if self._orchestrator_registry is None:
+            msg = "OrchestratorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._orchestrator_registry
+
+    def get_bundle_validator_registry(self) -> "BundleValidatorRegistry":
+        if self._bundle_validator_registry is None:
+            msg = "BundleValidatorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._bundle_validator_registry
+
+    def get_storage_provider_registry(self) -> "StorageProviderRegistry":
+        if self._storage_provider_registry is None:
+            msg = "StorageProviderRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._storage_provider_registry
+
+    def get_secrets_provider_registry(self) -> "SecretsProviderRegistry":
+        if self._secrets_provider_registry is None:
+            msg = "SecretsProviderRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._secrets_provider_registry
+
+    def get_pipe_func_executor_registry(self) -> "PipeFuncExecutorRegistry":
+        if self._pipe_func_executor_registry is None:
+            msg = "PipeFuncExecutorRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor_registry
 
     def get_inference_manager(self) -> InferenceManagerProtocol:
         return self._inference_manager
@@ -277,6 +402,12 @@ class PipelexHub:
             msg = "ContentGenerator is not initialized"
             raise RuntimeError(msg)
         return self._content_generator
+
+    def get_required_pipe_func_executor(self) -> PipeFuncExecutorProtocol:
+        if self._pipe_func_executor is None:
+            msg = "PipeFuncExecutor is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_func_executor
 
     # pipelex
 
@@ -315,6 +446,15 @@ class PipelexHub:
             msg = "PipeRun is not initialized"
             raise RuntimeError(msg)
         return self._pipe_run
+
+    def is_in_isolated_execution(self) -> bool:
+        """True when the current call runs inside an isolated sub-execution whose side-effecting
+        emissions must not be written into the parent run's registered (replay-deterministic) buffer.
+
+        Delegates to the boot-orchestrator's claimed probe (a Temporal worker reports True while a
+        call executes inside an activity); the core default is always False.
+        """
+        return self._isolated_execution_probe()
 
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
@@ -373,6 +513,10 @@ def get_required_config() -> ConfigRoot:
     return get_pipelex_hub().get_required_config()
 
 
+def get_optional_config() -> ConfigRoot | None:
+    return get_pipelex_hub().get_optional_config()
+
+
 def get_secrets_provider() -> SecretsProviderAbstract:
     return get_pipelex_hub().get_required_secrets_provider()
 
@@ -418,8 +562,36 @@ def get_model_deck() -> ModelDeck:
     return get_models_manager().get_model_deck()
 
 
-def get_plugin_manager() -> PluginManager:
-    return get_pipelex_hub().get_plugin_manager()
+def get_sdk_client_manager() -> SdkClientManager:
+    return get_pipelex_hub().get_sdk_client_manager()
+
+
+def get_inference_backend_registry() -> "InferenceBackendRegistry":
+    return get_pipelex_hub().get_inference_backend_registry()
+
+
+def get_model_lister_registry() -> "ModelListerRegistry":
+    return get_pipelex_hub().get_model_lister_registry()
+
+
+def get_orchestrator_registry() -> "OrchestratorRegistry":
+    return get_pipelex_hub().get_orchestrator_registry()
+
+
+def get_bundle_validator_registry() -> "BundleValidatorRegistry":
+    return get_pipelex_hub().get_bundle_validator_registry()
+
+
+def get_storage_provider_registry() -> "StorageProviderRegistry":
+    return get_pipelex_hub().get_storage_provider_registry()
+
+
+def get_secrets_provider_registry() -> "SecretsProviderRegistry":
+    return get_pipelex_hub().get_secrets_provider_registry()
+
+
+def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
+    return get_pipelex_hub().get_pipe_func_executor_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:
@@ -448,8 +620,72 @@ def get_report_delegate() -> ReportingProtocol:
     return get_pipelex_hub().get_report_delegate()
 
 
+def is_in_isolated_execution() -> bool:
+    """Module-level accessor — see :meth:`PipelexHub.is_in_isolated_execution`."""
+    return get_pipelex_hub().is_in_isolated_execution()
+
+
+_content_generator_override: ContextVar[ContentGeneratorProtocol | None] = ContextVar("content_generator_override", default=None)
+
+
+@contextmanager
+def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Generator[None, None, None]:
+    """Set ``content_generator`` as the active generator for the scope, then restore the prior value on exit.
+
+    Inference operators (PipeLLM / PipeImgGen / PipeExtract / PipeSearch / PipeStructure) resolve
+    :func:`get_content_generator`; under a Temporal-enabled hub that default is
+    ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
+    dry-run/validation activity body) wraps itself in this scope with an inline generator so its
+    leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
+    mock without dispatching and without storage IO. ContextVar-scoped like
+    :func:`scoped_pipe_router`, so concurrent runs don't cross-contaminate.
+    """
+    prev = _content_generator_override.get()
+    _content_generator_override.set(content_generator)
+    try:
+        yield
+    finally:
+        _content_generator_override.set(prev)
+
+
+def is_dry_run_forced() -> bool:
+    """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
+    return get_pipelex_hub().is_dry_run_forced()
+
+
 def get_content_generator() -> ContentGeneratorProtocol:
+    override = _content_generator_override.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_content_generator()
+
+
+_pipe_func_executor_override: ContextVar[PipeFuncExecutorProtocol | None] = ContextVar("pipe_func_executor_override", default=None)
+
+
+@contextmanager
+def scoped_pipe_func_executor(pipe_func_executor: PipeFuncExecutorProtocol) -> Generator[None, None, None]:
+    """Set ``pipe_func_executor`` as the active executor for the scope, then restore the prior value on exit.
+
+    The PipeFunc counterpart of :func:`scoped_content_generator`: in a process whose hub default
+    executor dispatches PipeFunc steps out-of-process (a distributed-orchestrator worker), this scope
+    lets an in-process run force a specific executor — e.g. the local one, so its PipeFunc steps run
+    here instead of being re-dispatched. ContextVar-scoped like :func:`scoped_pipe_router`, so
+    concurrent runs never cross-contaminate.
+    """
+    prev = _pipe_func_executor_override.get()
+    _pipe_func_executor_override.set(pipe_func_executor)
+    try:
+        yield
+    finally:
+        _pipe_func_executor_override.set(prev)
+
+
+def get_pipe_func_executor() -> PipeFuncExecutorProtocol:
+    override = _pipe_func_executor_override.get()
+    if override is not None:
+        return override
+    return get_pipelex_hub().get_required_pipe_func_executor()
 
 
 # pipelex
@@ -479,13 +715,43 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_current_library_id_or_none() -> str | None:
+    """Return the current library_id, or ``None`` if none is set."""
+    return _library_id.get()
+
+
 def get_default_library_dirs() -> list[Path] | None:
     return get_pipelex_hub().get_default_library_dirs()
 
 
-def teardown_current_library() -> None:
-    """Teardown the library_id for the current async context."""
+def clear_current_library() -> None:
+    """Clear the current-library binding (the ``None`` case of :func:`set_current_library`).
+
+    Resets the ``_library_id`` ContextVar to ``None`` for the current async context. This only
+    drops the *pointer* to which library is current — it does **not** free the ``Library`` object
+    from the ``LibraryManager``. To release the library itself, call
+    ``library_manager.teardown(library_id=...)`` (the two are distinct and a full cleanup typically
+    does both).
+    """
     _library_id.set(None)
+
+
+@contextmanager
+def scoped_current_library(library_id: str) -> Generator[None, None, None]:
+    """Set ``library_id`` for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_library_id`` ContextVar value before setting the new
+    one. On exit — success or exception — restores the prior value (or clears
+    the var if there wasn't one). Use this whenever a function temporarily
+    needs a current library for a nested operation without clobbering an
+    outer caller's library_id.
+    """
+    prev = _library_id.get()
+    _library_id.set(library_id)
+    try:
+        yield
+    finally:
+        _library_id.set(prev)
 
 
 def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:
@@ -507,6 +773,7 @@ def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tu
         - effective_dirs: The resolved list of Path objects
         - source_label: A string describing the source for logging (e.g., "per-call")
     """
+    reject_bare_str_or_path(library_dirs, param_name="library_dirs")
     if library_dirs is not None:
         return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
 
@@ -545,14 +812,15 @@ def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
-def get_pipe_source(pipe_code: str) -> Path | None:
-    """Get the source file path for a pipe.
+def get_pipe_source(pipe_code: str) -> str | None:
+    """Get the source identifier for a pipe.
 
     Args:
         pipe_code: The pipe code to look up.
 
     Returns:
-        Path to the .mthds file the pipe was loaded from, or None if unknown.
+        The source the pipe was loaded from — a filesystem path or a logical URI,
+        preserved verbatim — or None if unknown.
     """
     return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 
@@ -565,8 +833,91 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
+_current_pipe_router: ContextVar["PipeRouterProtocol | None"] = ContextVar("current_pipe_router", default=None)
+
+
+def set_pipe_router(pipe_router: "PipeRouterProtocol") -> None:
+    """Override the active pipe router for the current async context.
+
+    Used by host runtimes that want controllers to dispatch sub-pipes
+    through their own router (e.g. Mistral Workflows mode swaps in a router
+    that turns sub-pipe calls into child workflows / activities). The
+    override is contextvar-scoped, so concurrent runs on the same hub
+    don't leak into each other. Pass ``None`` via
+    ``teardown_current_pipe_router()`` to restore the hub default.
+    """
+    _current_pipe_router.set(pipe_router)
+
+
+def teardown_current_pipe_router() -> None:
+    """Clear any contextvar-scoped router override set by ``set_pipe_router``."""
+    _current_pipe_router.set(None)
+
+
+@contextmanager
+def scoped_pipe_router(pipe_router: "PipeRouterProtocol") -> Generator[None, None, None]:
+    """Set ``pipe_router`` as the active router for the scope, then restore the prior value on exit.
+
+    Captures the prior ``_current_pipe_router`` ContextVar value before setting
+    the new one. On exit — success or exception — restores the prior override
+    (or clears it if there wasn't one). Use this whenever a call needs its own
+    router for the *whole* run (root pipe + nested controller sub-pipes, which
+    resolve :func:`get_pipe_router`) without clobbering an outer caller's
+    override. Mirrors :func:`scoped_current_library`.
+
+    Prefer this over the raw ``set_pipe_router`` / ``teardown_current_pipe_router``
+    pair internally: the raw teardown unconditionally resets the override to
+    ``None`` and so does not restore an outer override. The raw pair is kept
+    because our Mistral Workflows plugin depends on it.
+    """
+    prev = _current_pipe_router.get()
+    _current_pipe_router.set(pipe_router)
+    try:
+        yield
+    finally:
+        _current_pipe_router.set(prev)
+
+
 def get_pipe_router() -> "PipeRouterProtocol":
+    override = _current_pipe_router.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_pipe_router()
+
+
+_event_log_override: ContextVar["EventLogProtocol | None"] = ContextVar("event_log_override", default=None)
+
+
+@contextmanager
+def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, None]:
+    """Pin ``event_log`` as the trace-event transport for the scope, then restore the prior value on exit.
+
+    Both the write side (tracer emission, set up in ``pipeline_run_setup``) and the read
+    side (``tracing_assembly.assemble_tracing``) prefer this override over building a new
+    backend via ``make_event_log``, so emit and assemble share the SAME instance — which
+    is what makes a plain in-memory event log usable for graph assembly (no external
+    store bridges the two sides). A set override implies tracing-enabled: it is honored
+    even when ``tracing_config.is_enabled`` is False.
+
+    Lifecycle: the machinery never calls ``cleanup`` on the instance and the read side does
+    not ``close`` it — but the write-side tracer DOES call ``close()`` on its event log at
+    teardown (``GraphTracer._reset``), which happens BEFORE the read side assembles. A scoped
+    event log's ``close()`` must therefore be safe to call mid-lifecycle — idempotent or a
+    no-op, as ``InMemoryEventLog``'s is. Scoping a backend whose ``close()`` releases a real
+    resource (NDJSON file handle, DynamoDB client) would break its own assembly read. Mirrors
+    :func:`scoped_pipe_router`.
+    """
+    prev = _event_log_override.get()
+    _event_log_override.set(event_log)
+    try:
+        yield
+    finally:
+        _event_log_override.set(prev)
+
+
+def get_event_log_override() -> "EventLogProtocol | None":
+    """Return the contextvar-scoped event-log override set by :func:`scoped_event_log`, or None."""
+    return _event_log_override.get()
 
 
 def get_pipe_run() -> "PipeRunProtocol":

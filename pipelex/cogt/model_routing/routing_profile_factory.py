@@ -1,9 +1,10 @@
+from typing import Self
+
 from pydantic import Field, model_validator
 
 from pipelex.cogt.exceptions import RoutingProfileBlueprintValueError
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import Self
 
 
 class RoutingProfileBlueprint(ConfigModel):
@@ -38,6 +39,7 @@ class RoutingProfileFactory:
     def make_routing_profile(
         cls,
         name: str,
+        *,
         blueprint: RoutingProfileBlueprint,
     ) -> RoutingProfile:
         """Create a RoutingProfile from a blueprint.
@@ -55,5 +57,6 @@ class RoutingProfileFactory:
             description=blueprint.description,
             default=blueprint.default,
             routes=blueprint.routes,
+            optional_routes=blueprint.optional_routes,
             fallback_order=blueprint.fallback_order,
         )

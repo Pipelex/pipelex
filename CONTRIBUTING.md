@@ -33,7 +33,7 @@ We are open to contributions in all areas of our core Pipelex library:
 
 ## Requirements
 
-- Python ≥3.10
+- Python ≥3.11
 - uv ≥ 0.7.2
 
 ## Development Setup
@@ -42,8 +42,8 @@ We are open to contributions in all areas of our core Pipelex library:
 - Run `make install` to set up virtualenv and dependencies
 - Copy `.env.example` to `.env` and configure API keys
 - Use uv for dependency management:
-  - Runtime deps: `uv pip install <package>`
-  - Dev deps: `uv pip install --extra dev <package>`
+  - Runtime deps: `uv add <package>`
+  - Dev deps: `uv add --optional dev <package>`
   - Keep dependencies alphabetically ordered in pyproject.toml
 
 ## Pull Request Process
@@ -71,6 +71,18 @@ We are open to contributions in all areas of our core Pipelex library:
 - Copy `.env.example` to `.env`
 - Fill in required credentials (OPENAI_API_KEY, AWS_ACCESS_KEY_ID, etc.)
 - Never commit `.env`
+
+## SWE Agent Rules
+
+`CLAUDE.md` and `AGENTS.md` are regenerated from `pipelex/kit/agent_rules/` via `make rules`. The committed `CLAUDE.md` is **lean**: it omits the Python and pytest standards, which Pipelex maintainers get from their multi-repo workspace's `.claude/rules/` directory. `AGENTS.md` keeps the full set inline.
+
+If you are contributing without that workspace and want a `CLAUDE.md` that includes the Python and pytest standards inline, run once:
+
+```bash
+make rules-claude-standalone
+```
+
+That overwrites `CLAUDE.md` with the full standalone version. Do not commit this regenerated file — the lean version is canonical in git.
 
 ## License
 

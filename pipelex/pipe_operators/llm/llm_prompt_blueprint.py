@@ -17,8 +17,9 @@ from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.pipe_operators.llm.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
+from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
+from pipelex.tools.misc.exceptions import ContextProviderError
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
@@ -59,6 +60,7 @@ class LLMPromptBlueprint(BaseModel):
     # let's get back to it when we have a better solution for structuring_method
     async def make_llm_prompt(
         self,
+        *,
         output_concept_ref: str,
         context_provider: ContextProviderAbstract,
         output_structure_prompt: str | None = None,
@@ -277,6 +279,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_image(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -302,6 +305,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_list_images(
         self,
         image_ref: ImageReference,
+        *,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
         image_registry_indices: dict[str, int],
@@ -345,6 +349,7 @@ class LLMPromptBlueprint(BaseModel):
 
     async def _unravel_text(
         self,
+        *,
         context_provider: ContextProviderAbstract,
         jinja2_blueprint: TemplateBlueprint,
         extra_params: dict[str, Any] | None = None,
@@ -377,6 +382,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_document(
         self,
         doc_ref: DocumentReference,
+        *,
         context_provider: ContextProviderAbstract,
         prompt_user_documents: dict[str, PromptDocument],
     ) -> None:
@@ -404,6 +410,7 @@ class LLMPromptBlueprint(BaseModel):
     def _extract_direct_list_documents(
         self,
         doc_ref: DocumentReference,
+        *,
         context_provider: ContextProviderAbstract,
         prompt_user_documents: dict[str, PromptDocument],
     ) -> None:

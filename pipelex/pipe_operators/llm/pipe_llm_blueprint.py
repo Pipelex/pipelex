@@ -1,21 +1,21 @@
-from typing import Literal
+from enum import StrEnum
+from typing import Literal, Self
 
 from pydantic import model_validator
 from typing_extensions import override
 
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-from pipelex.types import Self, StrEnum
 
 
 class StructuringMethod(StrEnum):
@@ -106,10 +106,14 @@ class PipeLLMBlueprint(PipeBlueprint):
         }
 
         # Find variables used in prompts but not satisfied by any input
-        missing_inputs = {var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, declared_inputs)}
+        missing_inputs = {
+            var_path for var_path in filtered_variable_paths if not is_variable_satisfied_by_inputs(var_path, input_names=declared_inputs)
+        }
 
         # Find inputs declared but not used by any variable path
-        unused_inputs = {input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, filtered_variable_paths)}
+        unused_inputs = {
+            input_name for input_name in declared_inputs if not is_input_used_by_variables(input_name, variable_paths=filtered_variable_paths)
+        }
 
         if missing_inputs:
             missing_vars_str = ", ".join(sorted(missing_inputs))

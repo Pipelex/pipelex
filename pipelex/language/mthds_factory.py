@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Mapping, cast
 
 import tomlkit
@@ -9,7 +10,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -49,7 +49,7 @@ class MthdsFactory:
         )
 
     @classmethod
-    def convert_dicts_to_inline_tables(cls, value: Any, field_ordering: list[str] | None = None) -> Any:  # Can't type this because of tomlkit
+    def convert_dicts_to_inline_tables(cls, value: Any, *, field_ordering: list[str] | None = None) -> Any:  # Can't type this because of tomlkit
         """Recursively convert Python values; dicts -> inline tables; lists kept as arrays."""
         if isinstance(value, Mapping):
             value = cast("Mapping[str, Any]", value)
@@ -89,7 +89,7 @@ class MthdsFactory:
 
     @classmethod
     def convert_mapping_to_table(
-        cls, mapping: Mapping[str, Any], field_ordering: list[str] | None = None
+        cls, mapping: Mapping[str, Any], *, field_ordering: list[str] | None = None
     ) -> Any:  # Can't type this because of tomlkit
         """Convert a mapping into a TOML Table where any nested mappings (third level+)
         are converted to inline tables.

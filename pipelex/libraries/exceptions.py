@@ -4,7 +4,13 @@ from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 
 
 class LibraryError(PipelexError):
-    pass
+    _declared_title = "Library error"
+
+
+class CrateNormalizationError(LibraryError):
+    """Raised when a library crate cannot be normalized (e.g. a crate key that is not domain-qualified)."""
+
+    _declared_title = "Crate normalization error"
 
 
 class LibraryLoadingError(LibraryError):

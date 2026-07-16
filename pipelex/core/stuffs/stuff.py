@@ -2,12 +2,14 @@
 from typing import Any, cast, get_args, get_origin
 
 from kajson import kajson
-from mthds.models.stuff import DictStuffAbstract, StuffAbstract
+from mthds.protocol.stuff import StuffAbstract
+from mthds.runners.api.models import DictStuffAbstract
 from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -19,6 +21,7 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.pretty import PrettyPrintable, PrettyRenderable
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
@@ -91,12 +94,20 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
     def is_number(self) -> bool:
         return isinstance(self.content, NumberContent)
 
+    @property
+    def is_yes_no(self) -> bool:
+        return isinstance(self.content, YesNoContent)
+
+    @property
+    def is_date(self) -> bool:
+        return isinstance(self.content, DateContent)
+
     def content_as(self, content_type: type[StuffContentType]) -> StuffContentType:
         """Get content with proper typing if it's of the expected type."""
-        return self.verify_content_type(self.content, content_type)
+        return self.verify_content_type(self.content, content_type=content_type)
 
     @classmethod
-    def verify_content_type(cls, content: StuffContent, content_type: type[StuffContentType]) -> StuffContentType:
+    def verify_content_type(cls, content: StuffContent, *, content_type: type[StuffContentType]) -> StuffContentType:
         """Verify and convert content to the expected type."""
         # First try the direct isinstance check for performance
         if isinstance(content, content_type):
@@ -183,7 +194,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
 
         converted_items: list[StuffContentType] = []
         for item in list_content.items:
-            converted_item = self.verify_content_type(item, item_type)
+            converted_item = self.verify_content_type(item, content_type=item_type)
             converted_items.append(converted_item)
 
         return ListContent[StuffContentType](items=converted_items)
@@ -219,6 +230,16 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
         return self.content_as(content_type=NumberContent)
 
     @property
+    def as_yes_no(self) -> YesNoContent:
+        """Get content as YesNoContent if applicable."""
+        return self.content_as(content_type=YesNoContent)
+
+    @property
+    def as_date(self) -> DateContent:
+        """Get content as DateContent if applicable."""
+        return self.content_as(content_type=DateContent)
+
+    @property
     def as_html(self) -> HtmlContent:
         """Get content as HtmlContent if applicable."""
         return self.content_as(content_type=HtmlContent)
@@ -229,7 +250,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
         return self.content_as(MermaidContent)
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         """Render stuff for pretty printing.
 
         Args:
@@ -246,7 +267,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             title = f"Some stuff ([bold green]{self.concept.code}[/bold green])"
         return self.content.rendered_pretty(title=title, depth=depth)
 
-    def pretty_print_stuff(self, title: str | None = None) -> None:
+    def pretty_print_stuff(self, *, title: str | None = None) -> None:
         title = title or f"[cyan]{self.stuff_name}[/cyan] ([bold green]{self.concept.code}[/bold green])"
         self.content.pretty_print_content(title=title)
 

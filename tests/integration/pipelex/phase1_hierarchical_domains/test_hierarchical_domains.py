@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle, validate_bundles_from_directory
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 
 VALID_DIR = Path(__file__).parent / "valid_fixtures"
 INVALID_DIR = Path(__file__).parent / "invalid_fixtures"

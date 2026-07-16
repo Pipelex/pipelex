@@ -1,18 +1,17 @@
-import os
 from pathlib import Path
 from typing import Any, Callable
 
 import pytest
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.protocol.pipeline_inputs import StuffContentOrData
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_library
+from pipelex.hub import get_class_registry, get_concept_library
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES
+from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES, DueDate, UrgencyFlag
 
 
 @pytest.fixture(scope="class")
@@ -20,10 +19,14 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     load_test_library([Path(__file__).parent])
     # Register the class in the class registry
     ClassRegistryUtils.register_classes_in_file(
-        file_path=os.path.join(os.path.dirname(__file__), "data.py"),
+        file_path=Path(__file__).parent / "data.py",
         base_class=StructuredContent,
         is_include_imported=False,
     )
+    # UrgencyFlag/DueDate refine YesNo/Date (StuffContent, not StructuredContent), so register them explicitly —
+    # this mirrors the subclass the refinement machinery registers for a `refines = "YesNo"`/`refines = "Date"` concept.
+    get_class_registry().register_class(class_type=UrgencyFlag)
+    get_class_registry().register_class(class_type=DueDate)
 
     # Create and register the test concept
     concept_library = get_concept_library()
@@ -57,11 +60,37 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     )
     concept_library.add_new_concept(concept=concept_another)
 
+    # Create a concept that refines native.YesNo (for the bool-envelope refining case)
+    concept_urgency_flag = ConceptFactory.make(
+        domain_code="test_domain",
+        concept_code="UrgencyFlag",
+        description="Test concept for unit tests",
+        structure_class_name="UrgencyFlag",
+        refines="native.YesNo",
+    )
+    concept_library.add_new_concept(concept=concept_urgency_flag)
+
+    # Create a concept that refines native.Date (for the date-envelope refining case)
+    concept_due_date = ConceptFactory.make(
+        domain_code="test_domain",
+        concept_code="DueDate",
+        description="Test concept for unit tests",
+        structure_class_name="DueDate",
+        refines="native.Date",
+    )
+    concept_library.add_new_concept(concept=concept_due_date)
+
     yield concept
 
     # Cleanup after test
     concept_library.remove_concepts_by_concept_refs(
-        concept_refs=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept"]
+        concept_refs=[
+            "test_domain.MyConcept",
+            "test_domain.MyConceptNotNativeText",
+            "test_domain.AnotherConcept",
+            "test_domain.UrgencyFlag",
+            "test_domain.DueDate",
+        ]
     )
 
 

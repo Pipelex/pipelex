@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 
 from pydantic import ValidationError
@@ -5,7 +6,6 @@ from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
-from pipelex.types import StrEnum
 
 
 class ModelScope(StrEnum):
@@ -15,11 +15,18 @@ class ModelScope(StrEnum):
     CONCEPT = "concept"
 
 
-def _extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
+def extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
     """Extract a wrapped PipeValidationError from a pydantic error if present.
 
     When a PipeValidationError is raised inside a model validator, pydantic wraps it.
     This function attempts to extract the original PipeValidationError from the error context.
+
+    Shared by both validation-error categorizers — the pipe categorizer below
+    (Pipe/Concept model validation) and the blueprint categorizer
+    (``core.interpreter.validation_error_categorizer``, which unwraps a
+    blueprint-stage ``PipeValidationError`` raised by a pydantic validator on the
+    blueprint models, e.g. the PipeBatch / SubPipe batch-name collisions). One
+    definition so the two categorizers cannot drift on how pydantic wraps the error.
 
     Args:
         error: Pydantic error details that may contain a wrapped PipeValidationError
@@ -87,7 +94,7 @@ def categorize_pipe_validation_error(
     categorized_errors: list[PipesAndConceptValidationErrorData] = []
     for error in errors:
         # First, check if this is a wrapped PipeValidationError
-        wrapped_pipe_error = _extract_wrapped_pipe_validation_error(error)
+        wrapped_pipe_error = extract_wrapped_pipe_validation_error(error)
         if wrapped_pipe_error:
             categorized_error = categorize_pipe_validation_with_libraries_error(pipe_error=wrapped_pipe_error)
         elif model_scope == ModelScope.PIPE:
@@ -118,6 +125,7 @@ def categorize_pipe_validation_error(
 
 def _handle_pipe_errors(
     error: ErrorDetails,
+    *,
     pipe_code: str | None,
 ) -> PipesAndConceptValidationErrorData:
     """Handle all PIPE validation errors.
@@ -181,10 +189,14 @@ def categorize_pipe_validation_with_libraries_error(
         PipesAndConceptValidationErrorData with all relevant fields populated
     """
     message = pipe_error.explanation or str(pipe_error)
-    if pipe_error.required_concept_codes and pipe_error.provided_concept_code:
-        message += f" (required: {pipe_error.required_concept_codes}, provided: {pipe_error.provided_concept_code})"
-
     error_type = pipe_error.error_type or PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+    # The required/provided concept refs are a debugging aid appended to the message. Suppress them
+    # for multiplicity errors (identical concept on both sides — see is_inadequate_output_multiplicity)
+    # and otherwise render the required refs as joined author-syntax refs, never a Python list repr
+    # (whose `['x']` brackets read like MTHDS `[]` multiplicity syntax).
+    if not error_type.is_inadequate_output_multiplicity and pipe_error.required_concept_codes and pipe_error.provided_concept_code:
+        required_refs = ", ".join(pipe_error.required_concept_codes)
+        message += f" (required: {required_refs}, provided: {pipe_error.provided_concept_code})"
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
         domain_code=pipe_error.domain_code,
@@ -195,6 +207,9 @@ def categorize_pipe_validation_with_libraries_error(
         message=message,
         field_path=pipe_error.file_path or "",
         variable_names=pipe_error.variable_names,
+        expected_output_ref=pipe_error.expected_output_ref,
+        expected_inputs=pipe_error.expected_inputs,
+        declared_inputs=pipe_error.declared_inputs,
     )
 
 

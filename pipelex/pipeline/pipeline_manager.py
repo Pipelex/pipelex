@@ -1,20 +1,12 @@
 from pydantic import Field, RootModel
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.pipeline.exceptions import PipelineManagerAlreadyExistsError, PipelineManagerNotFoundError
 from pipelex.pipeline.pipeline import Pipeline
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 
 PipelineManagerRoot = dict[str, Pipeline]
-
-
-class PipelineManagerNotFoundError(PipelexError):
-    pass
-
-
-class PipelineManagerAlreadyExistsError(PipelexError):
-    pass
 
 
 class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
@@ -40,15 +32,19 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
             raise PipelineManagerNotFoundError(msg)
         return pipeline
 
-    def _set_pipeline(self, pipeline_run_id: str, pipeline: Pipeline) -> Pipeline:
+    def _set_pipeline(self, *, pipeline_run_id: str, pipeline: Pipeline) -> Pipeline:
         self.root[pipeline_run_id] = pipeline
         return pipeline
 
     @override
-    def add_new_pipeline(self, pipe_code: str | None, pipeline_run_id: str | None = None) -> Pipeline:
+    def add_new_pipeline(self, *, pipe_code: str | None, pipeline_run_id: str | None = None) -> Pipeline:
         if pipeline_run_id is not None and pipeline_run_id in self.root:
             msg = f"Pipeline {pipeline_run_id} already exists"
             raise PipelineManagerAlreadyExistsError(msg)
         pipeline = PipelineFactory.make_pipeline(pipeline_run_id=pipeline_run_id)
         self._set_pipeline(pipeline_run_id=pipeline.pipeline_run_id, pipeline=pipeline)
         return pipeline
+
+    @override
+    def remove_pipeline(self, pipeline_run_id: str) -> None:
+        self.root.pop(pipeline_run_id, None)

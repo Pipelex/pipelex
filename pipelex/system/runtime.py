@@ -1,7 +1,8 @@
+from enum import StrEnum
+
 from pydantic import BaseModel
 
 from pipelex.system.environment import get_optional_env, is_env_var_truthy
-from pipelex.types import StrEnum
 
 RUN_MODE_ENV_VAR_KEY = "RUN_MODE"
 CODEX_CLOUD_ENV_VAR_KEY = "CODEX_CLOUD"

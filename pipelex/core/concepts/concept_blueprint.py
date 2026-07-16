@@ -1,4 +1,5 @@
-from typing import Any
+import keyword
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -47,6 +48,15 @@ class ConceptBlueprint(BaseModel):
         cls, structure: str | dict[str, ConceptStructureBlueprintType] | None
     ) -> str | dict[str, ConceptStructureBlueprintType] | None:
         if isinstance(structure, dict):
+            invalid_identifier_fields = [field_name for field_name in structure if not field_name.isidentifier() or keyword.iskeyword(field_name)]
+            if invalid_identifier_fields:
+                invalid_list = ", ".join(f"'{name}'" for name in sorted(invalid_identifier_fields))
+                msg = (
+                    "Concept structure field names must be valid Python identifiers and cannot be Python keywords. "
+                    f"Problematic fields: {invalid_list}."
+                )
+                raise ValueError(msg)
+
             # Check for reserved field names
             reserved_fields_used = [field_name for field_name in structure if field_name in RESERVED_FIELD_NAMES]
             if reserved_fields_used:
@@ -75,13 +85,18 @@ class ConceptBlueprint(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_mutually_exclusive_fields(cls, values: dict[str, Any] | str) -> dict[str, Any] | str:
+    def validate_mutually_exclusive_fields(cls, values: Any) -> Any:
         """Validate that refines and structure are not both set."""
-        if isinstance(values, dict) and values.get("refines") and values.get("structure"):
+        # mode="before" receives raw, unvalidated input — a non-dict (e.g. a plain string in a
+        # `ConceptBlueprint | str` union) must fall through untouched rather than crash on dict access
+        if not isinstance(values, dict):
+            return values
+        fields = cast("dict[str, Any]", values)
+        if fields.get("refines") and fields.get("structure"):
             msg = (
                 f"A concept cannot have both 'refines' and 'structure'. "
-                f"Got refines='{values.get('refines')}' and structure='{values.get('structure')}'. "
-                f"Concept description: '{values.get('description')}'"
+                f"Got refines='{fields.get('refines')}' and structure='{fields.get('structure')}'. "
+                f"Concept description: '{fields.get('description')}'"
             )
             raise ValueError(msg)
-        return values
+        return fields

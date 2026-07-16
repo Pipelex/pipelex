@@ -17,6 +17,7 @@ from pipelex.cogt.exceptions import (
     LLMCompletionError,
     LLMModelNotFoundError,
 )
+from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.plugins.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
@@ -66,6 +67,7 @@ def _make_google_img_gen_worker(mocker: MockerFixture) -> GoogleImgGenWorker:
     mock_model.desc = "test-model-desc"
     mock_model.model_id = "imagen-3.0-generate-002"
     mock_model.name = "imagen-3.0-generate-002"
+    mock_model.rules = {ImgGenArgTopic.ASPECT_RATIO: AspectRatioTaxonomy.GEMINI_3_FLASH}
     worker.inference_model = mock_model
 
     mock_async_client = mocker.MagicMock()

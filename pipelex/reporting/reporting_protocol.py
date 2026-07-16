@@ -7,13 +7,7 @@ from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 class ReportingProtocol(Protocol):
-    def open_registry(self, pipeline_run_id: str): ...
-
     def report_inference_job(self, inference_job: InferenceJobAbstract): ...
-
-    def generate_report(self, pipeline_run_id: str | None = None): ...
-
-    def close_registry(self, pipeline_run_id: str): ...
 
     def setup(self): ...
 
@@ -21,43 +15,33 @@ class ReportingProtocol(Protocol):
 
     def set_event_log(
         self,
+        *,
         context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
         pipeline_run_id: str,
     ) -> None: ...
 
-    def clear_event_log(self, context_key: str) -> None: ...
+    def clear_event_log(self, *, context_key: str) -> None: ...
 
 
 class ReportingNoOp(ReportingProtocol):
     @override
-    def open_registry(self, pipeline_run_id: str):
+    def report_inference_job(self, inference_job: InferenceJobAbstract) -> None:
         pass
 
     @override
-    def report_inference_job(self, inference_job: InferenceJobAbstract):
+    def setup(self) -> None:
         pass
 
     @override
-    def generate_report(self, pipeline_run_id: str | None = None):
-        pass
-
-    @override
-    def close_registry(self, pipeline_run_id: str):
-        pass
-
-    @override
-    def setup(self):
-        pass
-
-    @override
-    def teardown(self):
+    def teardown(self) -> None:
         pass
 
     @override
     def set_event_log(
         self,
+        *,
         context_key: str,
         event_log: EventLogProtocol,
         workflow_id: str,
@@ -66,5 +50,5 @@ class ReportingNoOp(ReportingProtocol):
         pass
 
     @override
-    def clear_event_log(self, context_key: str) -> None:
+    def clear_event_log(self, *, context_key: str) -> None:
         pass

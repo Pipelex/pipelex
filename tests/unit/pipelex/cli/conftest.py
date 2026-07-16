@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import pytest
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
-from pipelex.tools.log.log_levels import LogLevel
+from pipelex.cli.error_handlers import set_traceback_requested
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    from pytest_mock import MockerFixture
+
+@pytest.fixture(autouse=True)
+def reset_traceback_requested() -> Iterator[None]:
+    """Keep the --traceback ContextVar from leaking between cli/ tests.
+
+    ``PipelexCLI.make_context`` (and tests that call ``set_traceback_requested``) set
+    this flag; without a reset a leaked ``True`` would make a sibling test's "no flag"
+    assertion order-dependent.
+    """
+    set_traceback_requested(value=False)
+    yield
+    set_traceback_requested(value=False)
 
 
 @pytest.fixture(autouse=True)
@@ -27,11 +38,3 @@ def reset_agent_cli_error_format() -> Iterator[None]:
     set_agent_cli_error_format(CliOutputFormat.JSON)
     yield
     set_agent_cli_error_format(CliOutputFormat.JSON)
-
-
-@pytest.fixture
-def agent_ctx(mocker: MockerFixture) -> Any:
-    """Create a mock typer.Context with log_level in obj, for direct command-function calls."""
-    ctx = mocker.MagicMock()
-    ctx.obj = {"log_level": LogLevel.WARNING}
-    return ctx

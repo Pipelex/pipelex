@@ -11,6 +11,7 @@ from pipelex.hub import get_console
 
 
 def list_mistral_models(
+    *,
     sdk: str,
     backend_name: str,
     flat: bool,
@@ -52,6 +53,7 @@ def list_mistral_models(
 
 def _display_mistral_models_flat(
     models: list[Any],
+    *,
     sdk: str,
     backend_name: str,
     any_listed: bool,
@@ -67,6 +69,7 @@ def _display_mistral_models_flat(
 
 def _display_mistral_models_table(
     models: list[Any],
+    *,
     sdk: str,
     backend_name: str,
 ) -> None:

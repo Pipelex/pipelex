@@ -7,7 +7,7 @@ import shortuuid
 from pytest_mock import MockerFixture
 
 from pipelex import log
-from pipelex.hub import get_library_manager, get_report_delegate, set_current_library
+from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
@@ -125,10 +125,13 @@ def reset_pipelex_config_fixture():
 @pytest.fixture(scope="class")
 def load_test_library() -> Generator[Callable[[list[Path]], None], None, None]:
     library_id = None
+    prev_library_id = None
 
     def _load(library_dirs: list[Path]) -> None:
-        nonlocal library_id
+        nonlocal library_id, prev_library_id
         library_manager = get_library_manager()
+        if library_id is None:
+            prev_library_id = get_current_library_id_or_none()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
 
@@ -144,16 +147,26 @@ def load_test_library() -> Generator[Callable[[list[Path]], None], None, None]:
     if library_id is not None:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
+        # Restore the binding that existed before _load ran (same pattern as scoped_current_library),
+        # so an outer scope's current library survives. prev was captured before open_library minted
+        # the new id, so this can never resurrect the torn-down library.
+        if prev_library_id is not None:
+            set_current_library(library_id=prev_library_id)
+        else:
+            clear_current_library()
         log.verbose(f"Torn down library: {library_id}")
 
 
 @pytest.fixture(scope="class")
 def load_empty_library() -> Generator[Callable[[], str], None, None]:
     library_id = None
+    prev_library_id = None
 
     def _load() -> str:
-        nonlocal library_id
+        nonlocal library_id, prev_library_id
         library_manager = get_library_manager()
+        if library_id is None:
+            prev_library_id = get_current_library_id_or_none()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
 
@@ -165,25 +178,27 @@ def load_empty_library() -> Generator[Callable[[], str], None, None]:
     if library_id is not None:
         library_manager = get_library_manager()
         library_manager.teardown(library_id=library_id)
+        # Restore the binding that existed before _load ran (same pattern as scoped_current_library),
+        # so an outer scope's current library survives. prev was captured before open_library minted
+        # the new id, so this can never resurrect the torn-down library.
+        if prev_library_id is not None:
+            set_current_library(library_id=prev_library_id)
+        else:
+            clear_current_library()
         log.verbose(f"Torn down library: {library_id}")
 
 
 @pytest.fixture
-def job_metadata(request: pytest.FixtureRequest) -> Generator[JobMetadata, None, None]:
+def job_metadata(request: pytest.FixtureRequest) -> JobMetadata:
     """Provide a JobMetadata instance with test-specific values.
 
     Uses the test node ID as pipeline_run_id for better traceability in logs.
-    Opens a registry for the pipeline run ID before the test and closes it after.
     """
     test_id: str = request.node.nodeid  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
     random_code: str = shortuuid.uuid()[:5]
     pipeline_run_id: str = f"{test_id}-{random_code}"
 
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-
-    yield JobMetadata(
+    return JobMetadata(
         user_id="pytest",
         pipeline_run_id=pipeline_run_id,
     )
-
-    get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)

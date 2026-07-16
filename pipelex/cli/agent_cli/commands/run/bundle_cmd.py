@@ -10,14 +10,14 @@ from typing import Annotated, Any
 import typer
 from mthds.runners.types import RunnerType
 
-from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -52,6 +52,10 @@ def run_bundle_cmd(
         bool,
         typer.Option("--graph/--no-graph", help="Generate execution graph visualizations (saved alongside output)"),
     ] = True,
+    costs: Annotated[
+        bool,
+        typer.Option("--costs/--no-costs", help="Emit usage (cost) tracing events. Default on."),
+    ] = True,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -85,11 +89,11 @@ def run_bundle_cmd(
 
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
-        agent_error("--mock-inputs requires --dry-run", "ArgumentError")
+        agent_error("--mock-inputs requires --dry-run", error_type="ArgumentError")
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
-    auto_inputs_path: str | None = None
+    auto_inputs_dir: Path | None = None
     target_path = Path(path)
 
     if target_path.is_dir():
@@ -100,19 +104,20 @@ def run_bundle_cmd(
         else:
             mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
             if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", "FileNotFoundError")
+                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError")
             if len(mthds_files) > 1:
                 mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
                 agent_error(
                     f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
                     f"Pass the .mthds file directly instead.",
-                    "ArgumentError",
+                    error_type="ArgumentError",
                 )
             bundle_path = str(mthds_files[0])
 
-        # Auto-detect inputs file (used as low-priority fallback)
-        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-        auto_inputs_path = str(inputs_file) if inputs_file.is_file() else None
+        # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
+        # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and
+        # stdin are ruled out, so an ambiguous dir can't pre-empt an explicit flag or piped stdin.
+        auto_inputs_dir = target_path
 
         # Add directory as library dir (prepend to user-supplied list)
         target_dir_str = str(target_path)
@@ -126,7 +131,7 @@ def run_bundle_cmd(
     else:
         agent_error(
             f"'{path}' is not a .mthds file or directory. Use 'run pipe <code>' for pipe codes, or 'run bundle <path>' for .mthds files/directories.",
-            "ArgumentError",
+            error_type="ArgumentError",
         )
 
     # Load MTHDS content from bundle
@@ -140,18 +145,19 @@ def run_bundle_cmd(
                 if not main_pipe_code:
                     agent_error(
                         f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
-                        "BundleError",
+                        error_type="BundleError",
                     )
                 pipe_code = main_pipe_code
         except FileNotFoundError as exc:
-            agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+            agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
-            agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
-        except (PipelexInterpreterError, MthdsDecodeError) as exc:
-            agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
+            agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
+        except PipelexInterpreterError as exc:
+            agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", error_type=type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_path=auto_inputs_path)
+    parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
+    pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
     runner_type: RunnerType = ctx.obj["runner"]
 
@@ -159,11 +165,12 @@ def run_bundle_cmd(
         case RunnerType.API:
             # Validate unsupported flags for API runner
             if dry_run:
-                agent_error("--dry-run is not supported with --runner api", "ArgumentError")
+                agent_error("--dry-run is not supported with --runner api", error_type="ArgumentError")
             if mock_inputs:
-                agent_error("--mock-inputs is not supported with --runner api", "ArgumentError")
+                agent_error("--mock-inputs is not supported with --runner api", error_type="ArgumentError")
 
-            from mthds.client.exceptions import ClientAuthenticationError, PipelineRequestError  # noqa: PLC0415
+            from mthds.protocol.exceptions import PipelineRequestError  # noqa: PLC0415
+            from mthds.runners.api.exceptions import ClientAuthenticationError  # noqa: PLC0415
 
             try:
                 result = asyncio.run(
@@ -174,20 +181,22 @@ def run_bundle_cmd(
                         with_memory=with_memory,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
+                agent_success_formatted(
+                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
+                )
 
             except ClientAuthenticationError as exc:
-                agent_error(str(exc), "ClientAuthenticationError", cause=exc)
+                agent_error(str(exc), error_type="ClientAuthenticationError", cause=exc)
 
             except PipelineRequestError as exc:
-                agent_error(str(exc), "PipelineRequestError", cause=exc)
+                agent_error(str(exc), error_type="PipelineRequestError", cause=exc)
 
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), type(exc).__name__, cause=exc)
+                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=not dry_run, needs_model_specs=True)
+            make_pipelex_for_agent_cli(needs_inference=not dry_run, needs_model_specs=True)
 
             try:
                 result = asyncio.run(
@@ -200,10 +209,14 @@ def run_bundle_cmd(
                         mock_inputs=mock_inputs,
                         library_dirs=library_dir,
                         graph=graph,
+                        costs=costs,
                         with_memory=with_memory,
+                        inputs_base_dir=parsed_inputs.inputs_base_dir,
                     )
                 )
-                agent_success_formatted(result, functools.partial(format_run_markdown, with_memory=with_memory), output_format)
+                agent_success_formatted(
+                    result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format
+                )
 
             except PipelineExecutionError as exc:
                 extra_fields: dict[str, Any] = {
@@ -213,12 +226,12 @@ def run_bundle_cmd(
                 if exc.__cause__:
                     extra_fields["cause_type"] = type(exc.__cause__).__name__
                     extra_fields["cause_message"] = str(exc.__cause__)
-                agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
+                agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **extra_fields)
 
             except PipeOperatorModelChoiceError as exc:
                 agent_error(
                     exc.message,
-                    "PipeOperatorModelChoiceError",
+                    error_type="PipeOperatorModelChoiceError",
                     cause=exc,
                     pipe_code=exc.pipe_code,
                     model_type=str(exc.model_type),
@@ -234,11 +247,11 @@ def run_bundle_cmd(
                     availability_extra["fallback_list"] = exc.fallback_list
                 if exc.pipe_stack:
                     availability_extra["pipe_stack"] = exc.pipe_stack
-                agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+                agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
             except Exception as exc:  # noqa: BLE001
                 # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(str(exc), type(exc).__name__, cause=exc)
+                agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
 
             finally:
                 Pipelex.teardown_if_needed()

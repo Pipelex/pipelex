@@ -9,7 +9,6 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.library_crate import LibraryCrate
 
 if TYPE_CHECKING:
-    from pipelex.core.concepts.concept import Concept
     from pipelex.libraries.library import Library
 
 
@@ -31,6 +30,17 @@ class LibraryManagerAbstract(ABC):
         """Open a library with the given library_id. Creates it if it doesn't exist. If no library_id is provided, it creates one."""
 
     @abstractmethod
+    def open_fresh_library(self, library_id: str) -> "Library":
+        """Open a library guaranteed to be empty, tearing down any pre-existing library under this id.
+
+        For callers that reuse a deterministic library_id across executions (e.g. a Temporal
+        workflow keyed by its workflow id): a pre-existing library under such an id can only be
+        the leftover of an interrupted predecessor execution whose cleanup never ran. Reusing it
+        is poison — its crate fingerprints would dedup-skip a fresh crate load while a freshly
+        attached ClassRegistry no longer holds the crate's dynamic classes.
+        """
+
+    @abstractmethod
     def get_library(self, library_id: str) -> "Library":
         """Get the Library object for a specific library_id."""
 
@@ -45,16 +55,34 @@ class LibraryManagerAbstract(ABC):
         """
         return None
 
-    def get_pipe_source(self, pipe_code: str) -> Path | None:  # noqa: ARG002
-        """Get the source file path for a pipe.
+    def get_pipe_source(self, pipe_code: str) -> str | None:  # noqa: ARG002
+        """Get the source identifier for a pipe.
 
         Args:
             pipe_code: The pipe code to look up.
 
         Returns:
-            Path to the .mthds file the pipe was loaded from, or None if unknown.
+            The source the pipe was loaded from — a filesystem path or a logical URI,
+            preserved verbatim — or None if unknown.
         """
         return None
+
+    def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:  # noqa: ARG002
+        """Whether a crate with this fingerprint was already loaded into this library.
+
+        Returns False by default (managers that don't track crate fingerprints report
+        nothing as loaded). Overridden by LibraryManager, which keeps per-library
+        fingerprint bookkeeping for load idempotency.
+
+        Args:
+            library_id: The library to query.
+            fingerprint: The crate fingerprint to look up.
+
+        Returns:
+            True when the crate is already loaded into the library, False otherwise
+            (including when the library_id is unknown).
+        """
+        return False
 
     @abstractmethod
     def get_crate(self, library_id: str) -> LibraryCrate | None:
@@ -70,7 +98,7 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
+    def load_from_crate(self, *, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
@@ -82,60 +110,23 @@ class LibraryManagerAbstract(ABC):
         """
 
     @abstractmethod
-    def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
+    def load_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass
 
     @abstractmethod
-    def load_concepts_only_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
-        """Load only domains and concepts from blueprints, skipping pipes.
-
-        This is a lightweight alternative to load_from_blueprints() that only processes
-        domains and concepts. It does not load pipes, does not perform pipe validation,
-        and does not run library.validate_library().
-
-        Args:
-            library_id: The ID of the library to load into
-            blueprints: List of parsed MTHDS blueprints to load
-
-        Returns:
-            List of all concepts that were loaded
-        """
-
-    @abstractmethod
-    def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
+    def _remove_from_blueprint(self, *, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         pass
 
     @abstractmethod
-    def _remove_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
+    def _remove_from_blueprints(self, *, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> None:
         pass
 
     @abstractmethod
     def load_libraries(
         self,
+        *,
         library_id: str,
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
         pass
-
-    @abstractmethod
-    def load_libraries_concepts_only(
-        self,
-        library_id: str,
-        library_dirs: list[Path] | None = None,
-        library_file_paths: list[Path] | None = None,
-    ) -> list["Concept"]:
-        """Load only domains and concepts from library directories, skipping pipes.
-
-        This is a lightweight alternative to load_libraries() that only processes
-        domains and concepts. It does not load pipes, does not perform pipe validation,
-        and does not run library.validate_library().
-
-        Args:
-            library_id: The ID of the library to load into
-            library_dirs: List of directories containing MTHDS files
-            library_file_paths: List of specific MTHDS file paths to load
-
-        Returns:
-            List of all concepts that were loaded
-        """

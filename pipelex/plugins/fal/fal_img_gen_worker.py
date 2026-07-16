@@ -37,6 +37,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     async def _submit_and_get_result(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> Any:
         if self.inference_model.rules is None:
@@ -96,6 +97,7 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         fal_result = await self._submit_and_get_result(img_gen_job=img_gen_job, nb_images=nb_images)

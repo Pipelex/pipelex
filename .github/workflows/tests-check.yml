@@ -17,13 +17,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
     permissions:
       contents: read
       id-token: write
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
+      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +36,19 @@ jobs:
 
       - name: Run tests
         run: make gha-tests
+
+      - name: Show hang dumps
+        if: failure()
+        run: |
+          if ls "$PIPELEX_HANG_DUMP_DIR"/* >/dev/null 2>&1; then
+            for dump_file in "$PIPELEX_HANG_DUMP_DIR"/*; do
+              echo "::group::$dump_file"
+              cat "$dump_file"
+              echo "::endgroup::"
+            done
+          else
+            echo "No hang dumps were produced."
+          fi
 
 # --------------------------------------------------------------------------
 # 2.  Aggregator job — the *single* required status check

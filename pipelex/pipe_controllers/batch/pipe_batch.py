@@ -4,11 +4,14 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_mock import stamp_mock_main_coordination
 from pipelex.config import get_config
+from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import get_pipe_router, get_required_pipe
@@ -18,16 +21,16 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.async_utils import gather_bounded
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
     from pipelex.libraries.library_crate import LibraryCrate
 
 # When a single PipeBatch fans out over more than this many items, log a one-time advisory pointing at
-# the Temporal track — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
+# durable execution — bounded fan-out is a basic backpressure effort, not durable, rate-limited execution.
 LARGE_BATCH_ADVISORY_THRESHOLD = 100
 
 
@@ -63,7 +66,7 @@ class PipeBatch(PipeController):
         return required_variables
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @override
@@ -92,7 +95,7 @@ class PipeBatch(PipeController):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ) -> None:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_list_stuff_name = batch_params.input_list_stuff_name
@@ -115,6 +118,7 @@ class PipeBatch(PipeController):
     @override
     async def _live_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -144,10 +148,10 @@ class PipeBatch(PipeController):
             log.warning(
                 f"PipeBatch '{self.code}' is fanning out over {item_count} items. Bounded fan-out "
                 f"(max_concurrency={max_concurrency_setting}) is a basic backpressure effort, not durable execution — "
-                f"for a workload this size, consider running on Temporal for durable, rate-limited execution."
+                f"for a workload this size, consider a durable execution backend for rate-limited, resumable runs: {URLs.durable_execution}"
             )
 
-        async def _run_branch(item_input_stuff: "Stuff", branch_output_item_code: str) -> PipeOutput:
+        async def _run_branch(item_input_stuff: "Stuff", *, branch_output_item_code: str) -> PipeOutput:
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
@@ -163,7 +167,6 @@ class PipeBatch(PipeController):
                     "output_multiplicity": None,
                 },
             )
-            branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             return await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=sub_pipe,
@@ -189,20 +192,20 @@ class PipeBatch(PipeController):
             )
 
             # Register batch item extraction with graph tracer
-            if job_metadata.graph_context is not None:
+            if job_metadata.trace_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
-                    batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                    batch_controller_node_id = job_metadata.trace_context.parent_node_id
                     tracer_manager.register_batch_item_extraction(
-                        lookup_key=job_metadata.graph_context.lookup_key,
+                        lookup_key=job_metadata.trace_context.lookup_key,
                         list_stuff_code=input_stuff.stuff_code,
                         item_stuff_code=branch_input_item_code,
                         item_index=branch_index,
                         batch_controller_node_id=batch_controller_node_id,
                     )
 
-            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code))
+            branch_factories.append(functools.partial(_run_branch, item_input_stuff, branch_output_item_code=branch_output_item_code))
 
         pipe_outputs = await gather_bounded(branch_factories, max_concurrency=max_concurrency)
 
@@ -210,9 +213,14 @@ class PipeBatch(PipeController):
         branch_output_stuff_codes: list[str] = []
 
         for pipe_output in pipe_outputs:
-            branch_output_stuff = pipe_output.main_stuff
-            output_items.append(branch_output_stuff.content)
-            branch_output_stuff_codes.append(branch_output_stuff.stuff_code)
+            branch_resolved = pipe_output.working_memory.resolve_main_stuff()
+            if isinstance(branch_resolved, AbsenceRecord):
+                # Compaction (D4): an absent branch result cannot occupy a list slot — it is
+                # dropped, so the aggregated output holds only the found items (compactMap).
+                log.verbose(f"PipeBatch '{self.code}': dropping absent branch result ({branch_resolved.reason})")
+                continue
+            output_items.append(branch_resolved.content)
+            branch_output_stuff_codes.append(branch_resolved.stuff_code)
 
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
@@ -222,16 +230,16 @@ class PipeBatch(PipeController):
         )
 
         # Register batch aggregation with graph tracer
-        if job_metadata.graph_context is not None:
+        if job_metadata.trace_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                # Pass the PipeBatch's node_id (from graph_context.parent_node_id) so that
+                # Pass the PipeBatch's node_id (from trace_context.parent_node_id) so that
                 # BATCH_AGGREGATE edges correctly target this PipeBatch node, not a parent
                 # controller that may later finish and register as producer of the same output
-                batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                batch_controller_node_id = job_metadata.trace_context.parent_node_id
                 for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
                     tracer_manager.register_batch_aggregation(
-                        lookup_key=job_metadata.graph_context.lookup_key,
+                        lookup_key=job_metadata.trace_context.lookup_key,
                         output_list_stuff_code=output_stuff.stuff_code,
                         item_stuff_code=item_stuff_code,
                         item_index=agg_index,
@@ -248,7 +256,7 @@ class PipeBatch(PipeController):
             "item_count": len(input_content.items),
             "branch_pipe_code": self.branch_pipe_code,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,
@@ -258,6 +266,7 @@ class PipeBatch(PipeController):
     @override
     async def _dry_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -271,20 +280,19 @@ class PipeBatch(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
-        # For dry run coordination: set the first item's pipe_code to "mock_main"
-        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
-        main_stuff = pipe_output.main_stuff
-        content = main_stuff.content
-        if isinstance(content, ListContent):
-            list_content = cast("ListContent[StuffContent]", content)
-            if list_content.items:
-                first_item = list_content.items[0]
-                if hasattr(first_item, "pipe_code"):
-                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+        # Dry-run coordination: see stamp_mock_main_coordination's docstring (single home, D3).
+        # Tri-state read for robustness: the batch's own aggregated output is always stamped by the
+        # live arm today, but this site must never crash on a resolved-as-absent main.
+        main_resolved = pipe_output.working_memory.resolve_main_stuff()
+        if isinstance(main_resolved, Stuff):
+            content = main_resolved.content
+            if isinstance(content, ListContent):
+                list_content = cast("ListContent[StuffContent]", content)
+                stamp_mock_main_coordination(list_content.items)
         return pipe_output
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

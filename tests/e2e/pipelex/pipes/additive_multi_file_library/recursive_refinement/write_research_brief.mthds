@@ -1,0 +1,31 @@
+domain = "market_research"
+
+# Intermediate concept introduced (and declared once) by the controller that owns it.
+[concept]
+KeyFinding = "A single notable finding extracted from the source document"
+
+# Concrete definition of the main pipe — a controller. Same code as the root's PipeSignature header,
+# so it satisfies it at merge (the concrete wins); the contract matches by concept identity.
+[pipe.write_research_brief]
+type = "PipeSequence"
+description = "Find the key findings in the document, then draft a brief from them."
+inputs = { document = "Document" }
+output = "ResearchBrief"
+steps = [
+  { pipe = "find_key_findings", result = "findings" },
+  { pipe = "draft_brief", result = "brief" },
+]
+
+# Forward declarations of the not-yet-built sub-pipes, in this same controller file. Each is a header
+# that joins the backlog and is satisfied later by a concrete definition in its own sibling file.
+[pipe.find_key_findings]
+description   = "Extract the notable findings from a source document."
+inputs        = { document = "Document" }
+output        = "KeyFinding[]"
+signature_for = "PipeLLM"
+
+[pipe.draft_brief]
+description   = "Draft a research brief from a document and its key findings."
+inputs        = { document = "Document", findings = "KeyFinding[]" }
+output        = "ResearchBrief"
+signature_for = "PipeLLM"

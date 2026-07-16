@@ -1,11 +1,11 @@
 ---
 title: "Pipe Routing & Execution"
-description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (Temporal) execution modes."
+description: "How PipeJobs are created, routed, and executed — covering both direct (single-process) and distributed (host-runtime) execution."
 ---
 
 # Pipe Routing & Execution
 
-Pipelex supports two execution modes for running pipes: **direct execution** (single-process) and **distributed execution** (via Temporal workers). Both modes share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there.
+Pipelex runs pipes either **direct** (single-process) or **distributed** on a host runtime. Both share the same pipe definitions, library loading, and controller logic. The key difference is *where* the pipe runs and how the PipeJob travels to get there. The distributed host runtime is a durable backend — Temporal-backed execution or a Mistral Workflows integration — delivered through the Pipelex platform (see [Distributed Execution](../distributed-execution/index.md)). Both reach pipe execution through the same framework-agnostic runtime bridge.
 
 ---
 
@@ -14,7 +14,12 @@ Pipelex supports two execution modes for running pipes: **direct execution** (si
 | Term | Meaning |
 |------|---------|
 | **Direct execution** | All pipes run in the same Python process. Library, class registry, and pipe resolution are shared in-memory. |
-| **Distributed execution** | PipeJob is serialized and sent to a remote Temporal worker. The worker is a separate process (potentially on a different machine). |
+| **Distributed execution** | PipeJob is serialized and sent to a remote worker — a Pipelex Temporal worker, or a Mistral Workflows activity. The worker is a separate process (potentially on a different machine). |
+
+---
+
+!!! note "The runtime bridge"
+    Both distributed paths reach pipe execution through the framework-agnostic runtime bridge. The open `pipelex/runtime_bridge/` keeps the boot, serialization, mode/delivery, and worker-side hydration (`primitives/hydration.py`) pieces; the cross-process **dispatch** primitives — classifying controller pipes as child workflows and leaf operators as activities (`pipe_classification`), flushing trace events (`trace_flush`), and delivering results (`delivery`) — were extracted into the closed `pipelex-transport` library, which both commercial host-runtime plugins import. Graph and token-usage assembly is not a bridge primitive — it lives in `pipelex/pipe_run/tracing_assembly.py` and runs the same way for local and distributed runs.
 
 ---
 
@@ -23,7 +28,7 @@ Pipelex supports two execution modes for running pipes: **direct execution** (si
 Every pipe execution — regardless of mode — follows the same pattern:
 
 1. **Setup**: `pipeline_run_setup()` loads the library, resolves the pipe, initializes working memory, and creates a `PipeJob`
-2. **Route**: A router (`PipeRouter` or `PipeRouterTop`) receives the PipeJob and dispatches it
+2. **Route**: A router (`PipeRouter` for direct mode, or the booted orchestrator's distributed router) receives the PipeJob and dispatches it
 3. **Execute**: The pipe's `run_pipe()` method runs, potentially resolving and executing child pipes
 
 The `PipeJob` is the universal unit of execution. It carries everything needed to run a single pipe.
@@ -44,7 +49,7 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 | `output_name` | `str \| None` | Override for the output variable name |
 | `library_crate` | `LibraryCrate \| None` | Serializable library snapshot for distributed execution |
 
-`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For Temporal dispatch, `prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
+`PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, a transport-prep step in the closed `pipelex-transport` library moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
 ---
 
@@ -72,13 +77,13 @@ When a `.mthds` file declares a concept like `RawText = "Raw input text..."`, th
 These dynamically-generated classes become the `content` type of `Stuff` objects in `WorkingMemory`.
 
 !!! info "Why Dynamic Classes Matter"
-    When a PipeJob is serialized (e.g., for Temporal transport), Kajson embeds `__class__` and `__module__` metadata. The receiving process must have these classes registered in its class registry to deserialize the payload.
+    When `WorkingMemory` crosses to a Temporal worker, `dump_for_transport()` stamps content with pipelex-private `__pipelex_class__` / `__pipelex_module__` markers instead of Kajson's `__class__` / `__module__` — deliberately keeping Kajson's universal decoder out of the loop at the data-converter boundary. Pipelex's hydrator resolves those markers against the per-workflow `ClassRegistry`, the only place these dynamic concept classes are registered.
 
 ---
 
 ## Direct Execution
 
-In direct execution, everything runs in a single Python process. This is the default mode when Temporal is not enabled.
+In direct execution, everything runs in a single Python process. This is the default mode when no orchestrator plugin is booted.
 
 ### Flow
 
@@ -104,13 +109,15 @@ PipeRouter.run(pipe_job)
 
 ### Router Selection
 
-The router is selected during `Pipelex.setup()`:
+The router is selected during `Pipelex.setup()` by resolving the hub's `PIPE_ROUTER` slot. A boot-orchestrator plugin (e.g. the closed `pipelex-temporal` plugin) claims that slot in its `register()` when `plugins.boot_orchestrator` names it; otherwise the default in-process router is used:
 
 ```python
-if get_config().temporal.is_enabled:
-    effective_pipe_router = make_tprl_pipe_router_top()   # Distributed
-else:
-    effective_pipe_router = PipeRouter(observer=...)       # Direct
+# A boot-orchestrator plugin swaps in its distributed router when
+# plugins.boot_orchestrator == its own name; otherwise this default runs.
+effective_pipe_router = self._resolve_hub_slot(
+    slot=HubSlot.PIPE_ROUTER,
+    default=lambda: PipeRouter(observer=multi_observer),   # Direct, in-process
+)
 ```
 
 ### How PipeRouter Works
@@ -118,12 +125,13 @@ else:
 `PipeRouter` implements `PipeRouterProtocol` with a minimal `_run_pipe_job()`:
 
 ```python
-async def _run_pipe_job(self, pipe_job, wfid=None):
+async def _run_pipe_job(self, pipe_job: PipeJob) -> PipeOutput:
     return await pipe_job.pipe.run_pipe(
         job_metadata=pipe_job.job_metadata,
-        working_memory=pipe_job.working_memory,
+        working_memory=pipe_job.get_working_memory(),
         output_name=pipe_job.output_name,
         pipe_run_params=pipe_job.pipe_run_params,
+        library_crate=pipe_job.library_crate,
     )
 ```
 
@@ -150,22 +158,21 @@ All controllers follow the same pattern:
 
 ### Auto-Switching Router
 
-The hub (`get_pipe_router()`) automatically returns the correct router based on context:
+The hub (`get_pipe_router()`) returns the router for whichever orchestrator the process is booted under:
 
-- **Direct execution**: Returns `PipeRouter` — child pipes run in-process
-- **Distributed execution, outside workflow** (submitter side): Returns `PipeRouterTop` — submits a top-level Temporal workflow
-- **Distributed execution, inside workflow** (worker side): Returns `PipeRouterChild` — creates a Temporal child workflow via `execute_child_workflow()`
+- **Direct execution**: the in-process `PipeRouter` — child pipes run in the same process.
+- **Distributed execution**: the booted host-runtime orchestrator's router, which has claimed the hub's `PIPE_ROUTER` slot. That router auto-detects whether it is dispatching from the **submitter** (start a top-level workflow) or from **inside a running workflow** (start a child workflow). Pipelex's Temporal backend realizes this as `TemporalPipeRouter`, which picks `execute_workflow` vs `execute_child_workflow` accordingly.
 
-This means each child pipe in a controller gets its own Temporal workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the Temporal UI.
+This means each child pipe in a controller gets its own workflow boundary in distributed mode — enabling independent retries, separate worker assignment, and per-pipe visibility in the host runtime's UI.
 
 !!! note "Library Dependency"
-    Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current workflow via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each `WfPipeRouter` loads the crate from the `PipeJob` into a per-workflow `Library` instance. Controllers call `get_required_pipe()` inside Temporal workflow code — accessing per-workflow state via ContextVar. The Temporal sandbox is disabled (`--is-not-sandboxed`) because library loading is a side effect incompatible with replay semantics.
+    Controllers depend on the library being loaded in the current process. `get_required_pipe()` queries the library scoped to the current run via `ContextVar`, which must have been populated by loading a `LibraryCrate`. In distributed execution, each worker-side job loads the crate from the `PipeJob` into a per-run `Library` instance before resolving child pipes. (Temporal-specific detail: the backend disables the Temporal sandbox via `--no-sandbox` because library loading is a side effect incompatible with replay semantics.) See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for how the crate and working memory cross the boundary.
 
 ---
 
 ## Distributed Execution
 
-In distributed execution, the PipeJob is serialized and sent to a Temporal worker for execution.
+In distributed execution, the PipeJob is serialized and sent to a host-runtime worker for execution. The concrete dispatch shape below is illustrated with Pipelex's [Temporal backend](https://pipelex.com/products#temporal); the boundary mechanics (LibraryCrate, deferred hydration, per-call isolation) are backend-neutral and documented in [Runtime Bridge & Transport](./runtime-bridge-and-transport.md).
 
 ### Flow
 
@@ -180,8 +187,8 @@ sequenceDiagram
     S->>S: Resolve pipe, build LibraryCrate
     S->>S: Create PipeJob (crate attached)
 
-    Note over S: PipeRouterTop.run()
-    S->>S: prepare_for_temporal()<br/>(WM → working_memory_raw)
+    Note over S: TemporalPipeRouter.run() (submitter side)
+    S->>S: transport prep (closed)<br/>(WM → working_memory_raw)
     S->>T: Submit WfPipeRouter(PipeJob)
     T->>W: Dispatch workflow
 
@@ -204,76 +211,36 @@ sequenceDiagram
     S->>S: Hydrate PipeOutput<br/>(working_memory_raw → WM)
 ```
 
-### Key Components
+### Key components (the backend's role)
 
-**PipeRouterTop** (`pipelex/temporal/tprl_pipe/pipe_router_top.py`)
+A host-runtime orchestrator supplies the pieces that turn this generic shape into real workflows. The contract each implements is open core; the concrete classes are backend-specific. In Pipelex's Temporal backend:
 
-Implements `PipeRouterProtocol` like `PipeRouter`, but dispatches via Temporal instead of direct execution. Uses `WorkflowExecutor` to submit `WfPipeRouter` workflows.
+- a **router** implementing `PipeRouterProtocol` (`TemporalPipeRouter`) that dispatches via Temporal instead of running in-process;
+- a **worker-side job** (a Temporal workflow) that receives a deserialized `PipeJob`, loads the crate, hydrates working memory, and calls `pipe.run_pipe()` — exactly like the direct router;
+- a **data converter** that uses Kajson to (de)serialize Pydantic models with subclass types preserved — critical because `PipeJob.pipe` is a `PipeAbstract` subclass and `WorkingMemory` holds `Stuff` objects with concept-specific content classes;
+- a **worker entry point** that calls `Pipelex.make(boot_orchestrator="temporal")` and starts the worker with its registered workflows and activities (shipped as the `pipelex-temporal worker` console command).
 
-**WfPipeRouter** (`pipelex/temporal/tprl_pipe/wf_pipe_router.py`)
+The concrete modules live in the closed `pipelex-temporal` plugin (`pipelex_temporal/...`), documented in that repo. The open contracts they satisfy — `PipeRouterProtocol`, the boundary DTOs, serialization — are listed in the [Orchestrator SPI](./orchestrator-plugins.md#the-orchestrator-spi).
 
-The Temporal workflow that runs on the worker. Receives a deserialized `PipeJob` and calls `pipe.run_pipe()` — exactly like the direct router.
+### Content generation activities
 
-**Kajson Data Converter** (`pipelex/temporal/temporal_data_converter.py`)
-
-Custom Temporal payload converter that uses Kajson for serializing/deserializing Pydantic models. Preserves subclass types during transport, which is critical because `PipeJob.pipe` is a `PipeAbstract` subclass and `WorkingMemory` contains `Stuff` objects with concept-specific content classes.
-
-**Worker CLI** (`pipelex/temporal/worker_cli.py`)
-
-Entry point for the worker process. Calls `Pipelex.make(temporal_enabled=True)` to initialize the framework, then starts the Temporal worker with registered workflows and activities.
-
-### Content Generation Activities
-
-Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch dedicated Temporal activities for their actual work. Activities are invoked directly from inside `WfPipeRouter` via `ContentGeneratorInWorkflow` (`pipelex/temporal/tprl_content_generation/content_generator_in_workflow.py`), which calls `workflow.execute_activity(act_*, ...)` — there is no intermediate child workflow per content-generation call.
-
-| Activity | Purpose |
-|----------|---------|
-| `act_llm_gen_text` | LLM text generation |
-| `act_llm_gen_object` | LLM structured output (single object) |
-| `act_llm_gen_object_list` | LLM structured output (list) |
-| `act_jinja2_gen_text` | Jinja2 template rendering |
-| `act_extract_gen_extract_pages` | Document extraction (OCR) |
-| `act_render_page_views` | PDF page rendering (page-views) |
-| `act_img_gen_images` | Image generation |
-
-All content-generation activities resolve dispatch via `worker_config.resolve_dispatch(...)`, so task-queue routing can be configured per activity (and, where applicable, per handle) through `[temporal.worker_config.activity_queues]`. If no routing is configured, activities fall back to the workflow's own task queue.
-
-### Worker Environment
-
-The `@with_conditional_worker` decorator on `PipeRouterTop._run_pipe_job()` supports two environments:
-
-- **EXTERNAL** (production) — assumes a worker is already running, submits the workflow directly
-- **INTERNAL** (testing) — spins up an embedded worker for the duration of the execution
+Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) dispatch their actual leaf work as host-runtime activities, invoked from inside the worker-side job via the runtime's in-workflow content generator — no intermediate child workflow per content-generation call. A backend can route those activities to different task queues per activity (and, where applicable, per handle); in the Temporal backend that routing is configured under the plugin's own `[worker_config.activity_queues]` config (in the plugin's `temporal.toml`, not core config), falling back to the job's own task queue when unset. The concrete activity set and queue-routing reference live in the `pipelex-temporal` plugin's docs; see also [Content Generation Across Boundaries](./distributed-content-generation.md) for the backend-neutral serialization mechanism.
 
 !!! note "Future Improvement: Per-Pipe Routing"
-    Router selection is currently global and binary: either all pipes go through Temporal, or none do. A simple `PipeCompose` (microseconds of Jinja2 rendering) gets the same Temporal overhead as a `PipeLLM` (minutes of API call time). Per-pipe or per-type routing decisions could improve efficiency.
+    Router selection is currently global and binary: either all pipes go through the distributed backend, or none do. A simple `PipeCompose` (microseconds of Jinja2 rendering) gets the same dispatch overhead as a `PipeLLM` (minutes of API call time). Per-pipe or per-type routing decisions could improve efficiency.
 
 ---
 
-## LibraryCrate, Deferred Hydration, and Per-Workflow Isolation
+## Crossing the boundary: crate, hydration, isolation
 
-Distributed execution introduces three mechanisms that don't exist in direct mode. These solve the fundamental challenge: the worker is a separate process that doesn't share the submitter's library, class registry, or working memory state.
+Distributed execution introduces three mechanisms that don't exist in direct mode, because the worker is a separate process that shares none of the submitter's library, class registry, or working-memory state. They are backend-neutral; for the full walkthrough see [Runtime Bridge & Transport](./runtime-bridge-and-transport.md). In short:
 
-For a detailed walkthrough of these mechanisms, see [Temporal Integration](./temporal-integration.md).
+- **LibraryCrate propagation** — the submitter attaches a serializable snapshot of all pipes and concepts to the `PipeJob`; every worker-side job loads it (idempotently, by fingerprint) so `get_required_pipe()` resolves at every level.
+- **Deferred hydration** — `WorkingMemory` crosses as a raw JSON dict (`working_memory_raw`) on both `PipeJob` inputs and `PipeOutput` return values, avoiding deserialization failures when a receiving process hasn't registered the bundle's dynamic concept classes. The transport-prep helpers live in the closed `pipelex-transport` library; the raw field and the hydration helper stay in open core.
+- **Per-call isolation** — each job gets its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library`, scoped via `ContextVar`, so concurrent jobs with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
 
-### LibraryCrate Propagation
-
-The submitter builds a `LibraryCrate` — a serializable snapshot of all pipes and concepts — and attaches it to the `PipeJob`. Each `WfPipeRouter` on the worker loads the crate into a per-workflow scoped library, making all pipes resolvable via `get_required_pipe()`.
-
-### Deferred Hydration (Input and Output)
-
-Deferred hydration applies to both **PipeJob inputs** and **PipeOutput return values**. In both cases, `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object, avoiding deserialization failures when dynamic concept classes aren't registered in the receiving process's class registry.
-
-- **Input**: `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
-- **Output**: `PipeOutput.prepare_for_temporal()` does the same before returning from a child workflow. The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
-
-### Per-Workflow ClassRegistry and Library Scoping
-
-Each workflow creates its own `ClassRegistry` (pre-seeded from the global registry) and its own `Library` instance, both scoped via `ContextVar`. This ensures concurrent workflows with conflicting concept names (e.g., two bundles that both define `Result` with different fields) don't cross-contaminate.
-
-### Known Limitation: StuffArtefact Serialization in Dry-Run
-
-PipeCondition and PipeCompose dispatch the `act_jinja2_gen_text` activity (via `ContentGeneratorInWorkflow.make_templated_text`) to render their expression / construct templates. The activity serializes working memory contents through the Temporal data converter. In dry-run mode, working memory contains `StuffArtefact` debug objects that are not JSON-serializable, causing these internal activities to fail. PipeBatch also fails in dry-run (likely a related serialization issue in child PipeJob creation). PipeSequence and PipeParallel are unaffected — they dispatch child pipes through `SubPipe.run_pipe()` without internal templating activities. See [Temporal Integration](./temporal-integration.md#known-limitation-stuffartefact-serialization-in-dry-run) for details and fix direction.
+!!! warning "Known backend limitation: StuffArtefact in dry-run"
+    On a host runtime whose data converter serializes working memory for internal templating activities (Temporal's `act_jinja2_gen_text`, dispatched by PipeCondition and PipeCompose), dry-run mode can fail: working memory then holds `StuffArtefact` debug objects that are not JSON-serializable. PipeSequence and PipeParallel are unaffected — they dispatch child pipes without internal templating activities. This is a backend-specific concern; see the `pipelex-temporal` plugin docs for details and fix direction.
 
 ---
 
@@ -291,7 +258,7 @@ flowchart TB
         S1 --> S2 --> S3 --> S4 --> S5 --> S6
     end
 
-    S6 --> Decision{temporal.is_enabled?}
+    S6 --> Decision{boot_orchestrator set?}
 
     subgraph Direct["Direct Execution"]
         D1["PipeRouter._run_pipe_job()"]
@@ -303,12 +270,12 @@ flowchart TB
         D3 --> D4
     end
 
-    subgraph Distributed["Distributed Execution (Temporal)"]
-        T1["PipeRouterTop: prepare_for_temporal()"]
+    subgraph Distributed["Distributed Execution (Temporal example)"]
+        T1["Submitter router: transport prep (closed)"]
         T2["Kajson serialize PipeJob + crate"]
-        T3["Temporal Server"]
+        T3["Host runtime (Temporal Server)"]
         T4["Worker: Kajson deserialize"]
-        T5["WfPipeRouter: load crate, hydrate WM"]
+        T5["Worker job: load crate, hydrate WM"]
         T6["pipe.run_pipe()"]
         T1 --> T2 --> T3 --> T4 --> T5 --> T6
     end
@@ -330,18 +297,13 @@ flowchart TB
 | Pipeline setup | `pipelex/pipeline/pipeline_run_setup.py` |
 | PipeRouter (direct) | `pipelex/pipe_run/pipe_router.py` |
 | PipeRouterProtocol | `pipelex/pipe_run/pipe_router_protocol.py` |
-| PipeRouterTop (distributed, outside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
-| PipeRouterChild (distributed, inside workflow) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
-| Auto-switch utility | `pipelex/temporal/temporal_workflow_utils.py` |
-| WfPipeRouter workflow | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |
-| Kajson data converter | `pipelex/temporal/temporal_data_converter.py` |
-| Worker CLI | `pipelex/temporal/worker_cli.py` |
+| Distributed router / worker job / data converter / worker CLI | backend-specific — in the host-runtime plugin (e.g. `pipelex_temporal/...`), not open core |
 | Library manager | `pipelex/libraries/library_manager.py` |
 | ConceptFactory | `pipelex/core/concepts/concept_factory.py` |
 | StructureGenerator | `pipelex/core/concepts/structure_generation/generator.py` |
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
-| Deferred hydration utility | `pipelex/temporal/tprl_pipe/hydration.py` |
+| Deferred hydration utility (open core) | `pipelex/runtime_bridge/primitives/hydration.py` |
 | Hub (get_required_pipe, get_class_registry) | `pipelex/hub.py` |
 | PipeSequence | `pipelex/pipe_controllers/sequence/pipe_sequence.py` |
 | PipeCondition | `pipelex/pipe_controllers/condition/pipe_condition.py` |

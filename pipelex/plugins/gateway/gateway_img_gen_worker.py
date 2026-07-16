@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from PIL import Image
 from portkey_ai import AsyncPortkey
+
+# The vendored openai package is the one AsyncPortkey.openai_client is built from, so the
+# exceptions it raises are the vendored classes (not the real `openai` package's) — there is
+# no public re-export of them in portkey_ai.
+from portkey_ai._vendor import openai as portkey_vendored_openai  # noqa: PLC2701
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
@@ -14,7 +21,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
+from pipelex.cogt.img_gen.img_gen_args_factory import ImageFileTuple, ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_gateway_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
@@ -23,7 +30,9 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
-from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
+from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
+from pipelex.tools.misc.exceptions import FileTypeError
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -60,6 +69,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
@@ -73,15 +83,91 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             model_name=self.inference_model.name,
         )
 
-        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path") or f"/{self.inference_model.model_id}"
+        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path")
+        if not endpoint_path:
+            msg = f"Model '{self.inference_model.name}' does not have an endpoint_path configured but it's required for this model/sdk."
+            raise ImgGenParameterError(msg)
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+        image_files: list[ImageFileTuple] | None = args_dict.pop("image", None)
+        # Given that different backends and different models can be used with this worker, we must interpret the response,
+        # so we build a plain dict from it in both branches and detect its shape below.
+        response_dict: dict[str, Any]
         try:
             # TODO: add portkey tracing headers when enabled
-            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                url=endpoint_path,
-                **args_dict,
-            )
-        except portkey_exceptions.APIError as exc:
+            if image_files is not None:
+                # OpenAI/Azure's Images API splits generation and editing across two REST routes, and
+                # only /images/edits accepts the 'image' parameter (/images/generations rejects it with
+                # a 400 "Unknown parameter"). The args factory maps input images to httpx-style file
+                # tuples under "image"; they must travel as a multipart body.
+                edits_endpoint_path = endpoint_path.replace("/images/generations", "/images/edits", 1)
+                if edits_endpoint_path == endpoint_path:
+                    msg = f"Could not derive an /images/edits route from endpoint path '{endpoint_path}'"
+                    raise ImgGenParameterError(msg)
+                # OpenAI's multipart convention for /images/edits (matching the openai SDK's
+                # extract_files serialization): a single input image is the bare 'image' field,
+                # but multiple images must each go under 'image[]' — repeated bare 'image' parts
+                # are collapsed to one by the server, silently dropping the others.
+                image_field_name = "image[]" if len(image_files) > 1 else "image"
+                multipart_files: list[tuple[str, Any]] = [(image_field_name, image_file) for image_file in image_files]
+                # TODO: PR the one-line fix upstream to portkey-python-sdk — AsyncAPIClient._build_request()
+                # omits files=options.files (the sync APIClient passes it), so AsyncPortkey.post(files=...)
+                # silently sends an empty body (verified on portkey-ai 2.3.0 through 2.3.2 and current main).
+                # Once the fix ships, restore the plain Portkey call
+                # `self.portkey_client.with_options(config=config_id).post(url=edits_endpoint_path, files=...)`;
+                # commit 2d4ae4ecb71116e942c0adf2e6516de4b42f0614 holds the state of things and analysis.
+                # Until then, route the edit through the vendored AsyncOpenAI client that AsyncPortkey already
+                # carries: same base_url, Portkey auth headers baked in as default_headers, shared connection
+                # pool — and its multipart serializer renders every scalar arg passed as `body` into a form
+                # field (bools lowercased, arrays bracketed) once Content-Type is multipart/form-data.
+                http_response = await self.portkey_client.openai_client.post(
+                    edits_endpoint_path,
+                    cast_to=httpx.Response,
+                    body=args_dict,
+                    files=multipart_files,
+                    options={
+                        "headers": {
+                            PortkeyHeaderKey.CONFIG: config_id,
+                            "Content-Type": "multipart/form-data",
+                        },
+                    },
+                )
+                # A 2xx with a non-JSON body (e.g. an intermediary's HTML error page) must surface as a
+                # categorized ImgGenGenerationError, not a raw JSONDecodeError — the latter escapes the
+                # Temporal PipelexError bridge and gets retried, duplicating a billable generation.
+                try:
+                    response_dict = http_response.json()
+                except json.JSONDecodeError as exc:
+                    msg = f"Gateway returned a non-JSON body for model '{self.inference_model.name}'"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CONTACT_SUPPORT,
+                            detail="The Gateway returned a malformed response — retry, and report this if it persists",
+                        ),
+                        provider_metadata=None,
+                    ) from exc
+            else:
+                response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    url=endpoint_path,
+                    **args_dict,
+                )
+                if response is None:
+                    msg = f"Could not get a response for model '{self.inference_model.name}' via Portkey"
+                    raise ImgGenGenerationError(
+                        msg,
+                        error_category=InferenceErrorCategory.UNKNOWN,
+                        user_action=UserAction(
+                            kind=UserActionKind.CONTACT_SUPPORT,
+                            detail="The Gateway returned no response — retry, and report this if it persists",
+                        ),
+                        provider_metadata=None,
+                    )
+                if not isinstance(response, GenericResponse):
+                    msg = "Response is not of type GenericResponse"
+                    raise TypeError(msg)
+                response_dict = response.model_dump(serialize_as_any=True)
+        except (portkey_exceptions.APIError, portkey_vendored_openai.APIError) as exc:
             metadata = extract_gateway_metadata(exc)
             classification = classify_inference_error(metadata)
             raise render_inference_error(
@@ -91,26 +177,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 model_desc=self.inference_model.desc,
                 model_handle=self.inference_model.name,
             ) from exc
-
-        if response is None:
-            msg = f"Could not get a response for model '{self.inference_model.model_id}' via Portkey"
-            raise ImgGenGenerationError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="The Gateway returned no response — retry, and report this if it persists",
-                ),
-                provider_metadata=None,
-            )
-
-        if not isinstance(response, GenericResponse):
-            msg = "Response is not of type GenericResponse"
-            raise TypeError(msg)
-
-        # Given that different backends and different models can be used with this worker, we must interpret the response,
-        # so we do it according to the shape we detect
-        response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
 
         # Extract usage tokens if available
         if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
@@ -211,7 +277,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     )
                 first_base64 = first_image.get("b64_json")
                 if not isinstance(first_base64, str):
-                    msg = f"No base64 image data in first image from model '{self.inference_model.model_id}'"
+                    msg = f"No base64 image data in first image from model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.CONTENT,
@@ -235,7 +301,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     with Image.open(io.BytesIO(image_bytes)) as pil_img:
                         width, height = pil_img.size
                 except (ValueError, OSError, FileTypeError) as exc:
-                    msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.model_id}'"
+                    msg = f"Could not decode the image returned by the Gateway for model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.UNKNOWN,
@@ -260,7 +326,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
-                    msg = f"No base64 image data received from model '{self.inference_model.model_id}'"
+                    msg = f"No base64 image data received from model '{self.inference_model.name}'"
                     raise ImgGenGenerationError(
                         msg,
                         error_category=InferenceErrorCategory.CONTENT,
@@ -339,7 +405,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 )
                 generated_images.append(generated_image)
         else:
-            msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
+            msg = f"Unexpected response from model '{self.inference_model.name}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,

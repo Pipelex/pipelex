@@ -35,7 +35,11 @@ Each entry in the `steps` array is a table with the following keys:
 | Key      | Type   | Description                                                        | Required |
 | -------- | ------ | ------------------------------------------------------------------ | -------- |
 | `pipe`   | string | The name of the pipe to execute for this step.                     | Yes      |
-| `result` | string | The name to give to the output of this step in the working memory. | Yes      |
+| `result` | string | The name to give to this step's output in the working memory. When omitted, the output is stored only in the unnamed `main_stuff` slot (the default output), so later steps can pick it up as their implicit input but cannot reference it by a dedicated name. | No       |
+| `nb_output` | integer | Request a fixed number of outputs from this step's pipe. Cannot be combined with `multiple_output`. | No       |
+| `multiple_output` | boolean | Request a variable number of outputs from this step's pipe (the model decides how many). Cannot be combined with `nb_output`. | No       |
+| `batch_over` | string | The name of a list in the working memory to batch this step over, running the pipe once per item. Must be provided together with `batch_as`. See [Understanding Multiplicity](../understanding-multiplicity.md). | No       |
+| `batch_as` | string | The name each item takes in the working memory during a `batch_over` run. Must differ from `batch_over` (e.g. `batch_over = "items"`, `batch_as = "item"`). | No       |
 
 !!! important "Output Concept Matching"
     The output concept of the `PipeSequence` has to match the output of the last pipe in the sequence.
@@ -48,27 +52,28 @@ Let's imagine a pipeline that first extracts text from an image, then summarizes
 [pipe.extract_text_from_image]
 type = "PipeExtract"
 description = "Extract text from an image"
-output = "Text"
-model = "mistral-ocr"
+inputs = { image = "Image" }
+output = "Page[]"
+model = "@default-extract-image"
 
 [pipe.summarize_text]
 type = "PipeLLM"
 description = "Summarize text"
-inputs = { text = "Text" }
+inputs = { extracted_text = "Page[]" }
 output = "Text"
 
 [pipe.translate_to_french]
 type = "PipeLLM"
 description = "Translate text to French"
-inputs = { text = "Text" }
+inputs = { english_summary = "Text" }
 output = "Text"
 
 
 [pipe.image_to_french_summary]
 type = "PipeSequence"
 description = "Extract, summarize, and translate text from an image"
-inputs = { image = "source.Image" }
-output = "target.FrenchText"
+inputs = { image = "Image" }
+output = "Text"
 steps = [
     { pipe = "extract_text_from_image", result = "extracted_text" },
     { pipe = "summarize_text", result = "english_summary" },

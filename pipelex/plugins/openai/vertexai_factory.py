@@ -1,19 +1,12 @@
+from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
-from pipelex.cogt.exceptions import CogtError
+from pipelex.plugins.openai.openai_exceptions import VertexAIConfigError, VertexAICredentialsError
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.system.exceptions import CredentialsError, MissingDependencyError
+from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.misc.json_utils import load_json_dict_from_path
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.types import StrEnum
-
-
-class VertexAIConfigError(CogtError):
-    pass
-
-
-class VertexAICredentialsError(CredentialsError):
-    pass
 
 
 class VertexAIExtraField(StrEnum):
@@ -51,7 +44,7 @@ class VertexAIFactory(ConfigModel):
         return endpoint, api_key
 
     @classmethod
-    def _make_endpoint(cls, gcp_project_id: str, gcp_location: str) -> str:
+    def _make_endpoint(cls, gcp_project_id: str, *, gcp_location: str) -> str:
         return f"https://{gcp_location}-aiplatform.googleapis.com/v1beta1/projects/{gcp_project_id}/locations/{gcp_location}/endpoints/openapi"
 
     @classmethod
@@ -71,7 +64,7 @@ class VertexAIFactory(ConfigModel):
             raise MissingDependencyError(lib_name, lib_extra_name, msg) from exc
 
         try:
-            credentials_dict: dict[str, Any] = load_json_dict_from_path(path=gcp_credentials_file_path)
+            credentials_dict: dict[str, Any] = load_json_dict_from_path(path=Path(gcp_credentials_file_path))
         except FileNotFoundError as exc:
             msg = f"Could not get VertexAI credentials from GCP credentials file: File not found: {gcp_credentials_file_path}"
             raise VertexAICredentialsError(msg) from exc

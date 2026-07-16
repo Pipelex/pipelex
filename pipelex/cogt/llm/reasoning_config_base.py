@@ -1,6 +1,7 @@
+from enum import StrEnum
+
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
-from pipelex.types import StrEnum
 
 EffortToLevelMap = dict[str, str]
 DISABLED_LEVEL = "disabled"
@@ -8,6 +9,7 @@ DISABLED_LEVEL = "disabled"
 
 def validate_effort_to_level_map(
     effort_to_level_map: EffortToLevelMap,
+    *,
     config_name: str,
     level_type: type[StrEnum] | None = None,
 ) -> EffortToLevelMap:
@@ -36,7 +38,7 @@ def validate_effort_to_level_map(
     return effort_to_level_map
 
 
-def get_reasoning_level_str(effort_to_level_map: EffortToLevelMap, effort: ReasoningEffort) -> str | None:
+def get_reasoning_level_str(*, effort_to_level_map: EffortToLevelMap, effort: ReasoningEffort) -> str | None:
     """Look up effort in the map, return None for 'disabled'."""
     level = effort_to_level_map.get(effort)
     if level is None:

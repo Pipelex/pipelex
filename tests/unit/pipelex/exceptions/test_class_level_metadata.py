@@ -17,15 +17,18 @@ from pipelex.cogt.exceptions import (
     SdkTypeError,
 )
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.stuffs.exceptions import DateContentError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
-from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError, ValidateBundleError
+from pipelex.plugins.exceptions import UnknownSecretsMethodError, UnknownStorageMethodError
+from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
     PipelexServiceConfigValidationError,
     PipelexServiceError,
     RemoteConfigFetchError,
 )
+from pipelex.tools.tabular.exceptions import CsvError
 
 _PIPELINE_EXEC_ERROR = PipelineExecutionError(
     message="boom",
@@ -52,6 +55,7 @@ class TestClassLevelMetadata:
             ("service_config_validation", PipelexServiceConfigValidationError("boom"), ErrorDomain.CONFIG),
             ("remote_config_fetch", RemoteConfigFetchError("boom"), ErrorDomain.CONFIG),
             ("gateway_terms", GatewayTermsNotAcceptedError(), ErrorDomain.CONFIG),
+            ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
         ],
     )
     def test_error_domain(self, _topic: str, exc: PipelexError, expected_domain: ErrorDomain) -> None:
@@ -93,3 +97,53 @@ class TestClassLevelMetadata:
         report = exc.to_error_report()
         assert exc.error_category is expected_category
         assert report.error_category == expected_category
+
+    @pytest.mark.parametrize(
+        ("_topic", "exc", "expected_caller_facing"),
+        [
+            ("interpreter", PipelexInterpreterError("boom"), True),
+            ("validate_bundle", ValidateBundleError("boom"), True),
+            ("csv", CsvError("boom"), True),
+            ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
+            ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"]), True),
+            ("date_content", DateContentError("boom"), True),
+            ("config", PipelexConfigError("boom"), False),
+            ("pipe_execution", PipeExecutionError("boom"), False),
+            ("cogt", CogtError("boom"), False),
+        ],
+    )
+    def test_caller_facing_message(self, _topic: str, exc: PipelexError, expected_caller_facing: bool) -> None:
+        """Only classes whose message describes the caller's own input carry caller_facing_message in to_error_report().
+
+        ``PipelexInterpreterError`` / ``ValidateBundleError`` author caller-facing
+        copy (.mthds syntax, bundle validation); every other class defaults to
+        False so STRICT disclosure redacts its message.
+        """
+        report = exc.to_error_report()
+        assert report.caller_facing_message is expected_caller_facing
+
+    def test_caller_facing_message_inherits_for_interpreter_subclass(self) -> None:
+        """A subclass of ``PipelexInterpreterError`` stays caller-facing.
+
+        Pins the deliberate inheritance contract on ``_authors_caller_facing_message``
+        (plain attribute access — see ``base_exceptions.py``): a future refactor
+        swapping the flag to ``cls.__dict__`` lookup (the path used by
+        ``_declared_title`` / ``_declared_type_uri``) would silently downgrade
+        STRICT disclosure for every subclass and let internal messages leak under
+        STRICT — or, more likely, silently redact authored caller-facing copy.
+        """
+
+        class _SubInterpreterError(PipelexInterpreterError):
+            pass
+
+        report = _SubInterpreterError("boom").to_error_report()
+        assert report.caller_facing_message is True
+
+    def test_caller_facing_message_inherits_for_validate_bundle_subclass(self) -> None:
+        """A subclass of ``ValidateBundleError`` stays caller-facing — same contract as the interpreter case."""
+
+        class _SubValidateBundleError(ValidateBundleError):
+            pass
+
+        report = _SubValidateBundleError("boom").to_error_report()
+        assert report.caller_facing_message is True

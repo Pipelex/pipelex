@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
@@ -8,7 +9,68 @@ from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 
 VariableMultiplicity = bool | int
 
-MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
+# The io-ref suffix grammar: an optional multiplicity suffix ("[]" or "[N]") followed by an
+# optional presence marker ("?" optional / "!" force). Order is fixed: multiplicity then presence.
+# Group 1: concept ref or code; group 2: bracket content (None / "" / digits); group 3: presence
+# marker symbol (None / "?" / "!").
+MULTIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?([?!])?$"
+
+
+class PresenceMarker(StrEnum):
+    """Presence of a value in a declared slot: plain (always present), optional (`?` — the slot may
+    legitimately hold no value), or force (`!` — a use-site assertion that the value must be present).
+    """
+
+    PLAIN = "plain"
+    OPTIONAL = "optional"
+    FORCE = "force"
+
+    @classmethod
+    def from_symbol(cls, symbol: str | None) -> PresenceMarker:
+        match symbol:
+            case None | "":
+                return PresenceMarker.PLAIN
+            case "?":
+                return PresenceMarker.OPTIONAL
+            case "!":
+                return PresenceMarker.FORCE
+            case _:
+                msg = f"Invalid presence marker symbol: '{symbol}'. Expected '?', '!', or nothing."
+                raise PipeVariableMultiplicityError(msg)
+
+    @property
+    def symbol(self) -> str:
+        match self:
+            case PresenceMarker.PLAIN:
+                return ""
+            case PresenceMarker.OPTIONAL:
+                return "?"
+            case PresenceMarker.FORCE:
+                return "!"
+
+    @property
+    def is_optional(self) -> bool:
+        match self:
+            case PresenceMarker.OPTIONAL:
+                return True
+            case PresenceMarker.PLAIN | PresenceMarker.FORCE:
+                return False
+
+    @property
+    def is_force(self) -> bool:
+        match self:
+            case PresenceMarker.FORCE:
+                return True
+            case PresenceMarker.PLAIN | PresenceMarker.OPTIONAL:
+                return False
+
+    @property
+    def is_plain(self) -> bool:
+        match self:
+            case PresenceMarker.PLAIN:
+                return True
+            case PresenceMarker.OPTIONAL | PresenceMarker.FORCE:
+                return False
 
 
 class VariableMultiplicityResolution(BaseModel):
@@ -19,7 +81,7 @@ class VariableMultiplicityResolution(BaseModel):
     specific_output_count: int | None = Field(default=None, description="Exact number of items to expect/generate, if specified")
 
 
-def make_variable_multiplicity(nb_items: int | None, multiple_items: bool | None) -> VariableMultiplicity | None:
+def make_variable_multiplicity(*, nb_items: int | None, multiple_items: bool | None) -> VariableMultiplicity | None:
     """This function takes two mutually exclusive parameters that control how many items a variable can have
     and converts them into a single VariableMultiplicity type.
 
@@ -53,45 +115,49 @@ def make_variable_multiplicity(nb_items: int | None, multiple_items: bool | None
 class MultiplicityParseResult(BaseModel):
     concept_ref_or_code: str
     multiplicity: int | bool | None
+    presence: PresenceMarker = PresenceMarker.PLAIN
 
 
 def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityParseResult:
-    """Parse a concept specification string to extract concept and multiplicity.
+    """Parse a concept specification string to extract concept, multiplicity, and presence.
 
     Supported formats:
-    - "ConceptName" -> (ConceptName, None)
-    - "ConceptName[]" -> (ConceptName, True)
-    - "ConceptName[5]" -> (ConceptName, 5)
-    - "domain.ConceptName" -> (domain.ConceptName, None)
-    - "domain.ConceptName[]" -> (domain.ConceptName, True)
-    - "domain.ConceptName[5]" -> (domain.ConceptName, 5)
+    - "ConceptName" -> (ConceptName, None, plain)
+    - "ConceptName[]" -> (ConceptName, True, plain)
+    - "ConceptName[5]" -> (ConceptName, 5, plain)
+    - "ConceptName?" -> (ConceptName, None, optional)
+    - "ConceptName!" -> (ConceptName, None, force)
+    - "domain.ConceptName" and any of the suffixes above on a qualified ref
+
+    The parser accepts multiplicity + presence combinations ("ConceptName[]?") so that callers with
+    context (blueprint input vs output validation) can reject them with a precise, typed error; the
+    D1 v1 rule that markers are mutually exclusive with multiplicity is NOT enforced here.
 
     Args:
         concept_ref_or_code: Concept specification string with optional multiplicity brackets
+            and optional presence marker (order fixed: multiplicity then presence)
 
     Returns:
-        MultiplicityParseResult with concept (without brackets) and multiplicity value
+        MultiplicityParseResult with concept (without suffixes), multiplicity, and presence
 
     Raises:
         PipeVariableMultiplicityError: If the concept specification has invalid syntax
             or if multiplicity is zero or negative (a pipe must produce at least one output)
     """
-    # Use strict pattern to validate identifier syntax
-    # Concept must start with letter/underscore, with zero or more dotted domain segments, optional brackets
-    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
-    match = re.match(pattern, concept_ref_or_code)
+    match = re.match(MULTIPLICITY_PATTERN, concept_ref_or_code)
 
     if not match:
         msg = (
             f"Invalid concept specification syntax: '{concept_ref_or_code}'. "
-            f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]', "
-            f"'domain.ConceptName', 'domain.ConceptName[]', or 'domain.ConceptName[N]' "
+            f"Expected format: 'ConceptName' or 'domain.ConceptName' with an optional multiplicity "
+            f"suffix ('[]' or '[N]') and/or an optional presence marker ('?' or '!') after it, "
             f"where concept and domain names must start with a letter or underscore."
         )
         raise PipeVariableMultiplicityError(msg)
 
     extracted_concept = match.group(1)
     bracket_content = match.group(2)
+    marker_symbol = match.group(3)
 
     multiplicity: int | bool | None
     if bracket_content is None:
@@ -107,10 +173,14 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
             msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
             raise PipeVariableMultiplicityError(msg)
 
-    return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
+    return MultiplicityParseResult(
+        concept_ref_or_code=extracted_concept,
+        multiplicity=multiplicity,
+        presence=PresenceMarker.from_symbol(marker_symbol),
+    )
 
 
-def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
+def is_multiplicity_compatible(*, source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
     """Check if a source multiplicity is compatible with a target multiplicity.
 
     This is used to validate that a pipe's output multiplicity can fulfill a required output multiplicity.
@@ -131,19 +201,19 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
         True if source_multiplicity can fulfill target_multiplicity, False otherwise
 
     Examples:
-        >>> is_multiplicity_compatible(None, None)
+        >>> is_multiplicity_compatible(source_multiplicity=None, target_multiplicity=None)
         True
-        >>> is_multiplicity_compatible(True, True)
+        >>> is_multiplicity_compatible(source_multiplicity=True, target_multiplicity=True)
         True
-        >>> is_multiplicity_compatible(3, True)  # Fixed count fulfills variable expectation
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=True)  # Fixed count fulfills variable expectation
         True
-        >>> is_multiplicity_compatible(True, 3)  # Variable cannot fulfill fixed expectation
+        >>> is_multiplicity_compatible(source_multiplicity=True, target_multiplicity=3)  # Variable cannot fulfill fixed expectation
         False
-        >>> is_multiplicity_compatible(3, 3)
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=3)
         True
-        >>> is_multiplicity_compatible(3, 5)  # Different fixed counts are incompatible
+        >>> is_multiplicity_compatible(source_multiplicity=3, target_multiplicity=5)  # Different fixed counts are incompatible
         False
-        >>> is_multiplicity_compatible(None, True)  # Single cannot fulfill list expectation
+        >>> is_multiplicity_compatible(source_multiplicity=None, target_multiplicity=True)  # Single cannot fulfill list expectation
         False
     """
     # Case 1: Target expects single item (None)
@@ -167,8 +237,13 @@ def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None,
     return source_multiplicity == target_multiplicity
 
 
-def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: VariableMultiplicity | None) -> str:
-    """Format a concept code or string with multiplicity notation.
+def format_concept_with_multiplicity(
+    concept_code_or_string: str,
+    *,
+    multiplicity: VariableMultiplicity | None,
+    presence: PresenceMarker = PresenceMarker.PLAIN,
+) -> str:
+    """Format a concept code or string with multiplicity and presence notation.
 
     This is the reverse operation of parse_concept_with_multiplicity.
 
@@ -178,30 +253,31 @@ def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: 
             - None: single item (no brackets)
             - True: variable-length list (empty brackets [])
             - int: fixed-length list (brackets with number [N])
+        presence: The presence marker, rendered after the multiplicity suffix ("" / "?" / "!")
 
     Returns:
-        Formatted concept specification string with multiplicity notation
+        Formatted concept specification string with multiplicity and presence notation
 
     Examples:
-        >>> format_concept_with_multiplicity("Text", None)
+        >>> format_concept_with_multiplicity("Text", multiplicity=None)
         "Text"
-        >>> format_concept_with_multiplicity("Text", True)
+        >>> format_concept_with_multiplicity("Text", multiplicity=True)
         "Text[]"
-        >>> format_concept_with_multiplicity("Text", 3)
+        >>> format_concept_with_multiplicity("Text", multiplicity=3)
         "Text[3]"
-        >>> format_concept_with_multiplicity("domain.Text", None)
-        "domain.Text"
-        >>> format_concept_with_multiplicity("domain.Text", True)
-        "domain.Text[]"
-        >>> format_concept_with_multiplicity("domain.Text", 5)
-        "domain.Text[5]"
+        >>> format_concept_with_multiplicity("Text", multiplicity=None, presence=PresenceMarker.OPTIONAL)
+        "Text?"
+        >>> format_concept_with_multiplicity("domain.Text", multiplicity=None, presence=PresenceMarker.FORCE)
+        "domain.Text!"
     """
+    multiplicity_suffix: str
     if multiplicity is None:
         # Single item - no brackets
-        return concept_code_or_string
+        multiplicity_suffix = ""
     elif multiplicity is True:
         # Variable-length list - empty brackets
-        return f"{concept_code_or_string}[]"
+        multiplicity_suffix = "[]"
     else:
         # Fixed-length list - brackets with number
-        return f"{concept_code_or_string}[{multiplicity}]"
+        multiplicity_suffix = f"[{multiplicity}]"
+    return f"{concept_code_or_string}{multiplicity_suffix}{presence.symbol}"

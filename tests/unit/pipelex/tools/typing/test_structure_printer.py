@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -8,7 +9,6 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.typing.structure_printer import StructurePrinter
-from pipelex.types import StrEnum
 
 
 # Test Enums
@@ -189,8 +189,8 @@ class TestStructurePrinter:
             '    LOW = "LOW"',
         ]
 
-        pretty_print(result, "results")
-        pretty_print(expected, "expected")
+        pretty_print(result, title="results")
+        pretty_print(expected, title="expected")
         assert result == expected, f"Expected:\n{''.join(expected)}\n\nGot:\n{''.join(result)}"
 
     def test_list_content(self):

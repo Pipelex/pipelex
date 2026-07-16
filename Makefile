@@ -24,6 +24,7 @@ VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
+HEARTBEAT_INTERVAL ?= 20
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -43,6 +44,29 @@ define PRINT_TITLE
     $(eval PADDED_TITLE := $(FULL_TITLE)$(PADDING))
     @echo ""
     @echo "$(PADDED_TITLE)"
+endef
+
+define WAIT_WITH_HEARTBEAT
+	start_time=$$(date +%s); \
+	$(1) & \
+	cmd_pid=$$!; \
+	( while kill -0 "$$cmd_pid" 2>/dev/null; do \
+		sleep $(HEARTBEAT_INTERVAL); \
+		if kill -0 "$$cmd_pid" 2>/dev/null; then \
+			elapsed=$$(( $$(date +%s) - $$start_time )); \
+			echo "• $(2) still running ($${elapsed}s elapsed)"; \
+		fi; \
+	done ) & \
+	heartbeat_pid=$$!; \
+	wait "$$cmd_pid"; \
+	exit_code=$$?; \
+	kill "$$heartbeat_pid" 2>/dev/null || true; \
+	wait "$$heartbeat_pid" 2>/dev/null || true
+endef
+
+define RUN_WITH_HEARTBEAT
+	@$(call WAIT_WITH_HEARTBEAT,$(1),$(2)); \
+	exit $$exit_code
 endef
 
 define HELP
@@ -66,6 +90,7 @@ make plxt-format              - Format MTHDS/TOML/PLX files with plxt
 make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
+make rules-claude-standalone  - Install a standalone CLAUDE.md (full ruleset, for contributors without the Pipelex workspace)
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
@@ -77,6 +102,8 @@ make generate-mthds-schema    - Generate JSON Schema for .mthds files
 make gms                      - Shorthand -> generate-mthds-schema
 make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
 make cms                      - Shorthand -> check-mthds-schema
+make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
+make gep                      - Shorthand -> generate-error-pages
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -86,7 +113,7 @@ make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
-make cleanenv                 - Remove virtual env and lock files
+make cleanenv                 - Remove virtual env
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
 
@@ -103,6 +130,8 @@ make gha-tests		          - Run tests for github actions (exit on first failure)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
 make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
+make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
+make atd                      - Shorthand -> agent-test-debug
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -119,12 +148,14 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-temporal            - Run temporal tests (SRV=local|testing MODE=live REG=isolated)
-make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
 make fui                      - Shorthand -> fix-unused-imports
+make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a bare *)
+make fko                      - Shorthand -> fix-keyword-only
+make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>" RATIONALE="…")
+make sgr                      - Shorthand -> subject-grant
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -140,17 +171,6 @@ make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
 make view-graph               - Start server and open ReactFlow graph in browser
-
-make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
-make ts                       - Shorthand -> temporal-server
-make temporal-stop            - Kill the local Temporal dev server (port 7233)
-make tstop                    - Shorthand -> temporal-stop
-make temporal-worker          - Start a Temporal worker (separate process)
-make tw                       - Shorthand -> temporal-worker
-make temporal-run             - Run a pipe through Temporal (real LLM calls)
-make trun                     - Shorthand -> temporal-run
-make temporal-run-dry         - Run a pipe through Temporal (dry run, no LLM)
-make trund                    - Shorthand -> temporal-run-dry
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -175,22 +195,22 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-rules check-urls cu insert-skeleton \
+	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
+	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check agent-test \
+	validate v check c cc agent-check agent-test agent-test-debug atd \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
+	generate-error-pages generate-error-pages-quiet gep \
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	temporal-server ts temporal-stop tstop temporal-worker tw temporal-worker-router twr temporal-worker-runner twn \
-	temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
 
 all help:
@@ -277,6 +297,10 @@ rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
 	$(VENV_PIPELEX_DEV) kit rules --set all
 
+rules-claude-standalone: env
+	$(call PRINT_TITLE,"Installing standalone CLAUDE.md with the full ruleset for contributors without the Pipelex workspace")
+	$(VENV_PIPELEX_DEV) kit rules --set standalone --targets claude
+
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
 	$(VENV_PIPELEX_DEV) check-rules --quiet
@@ -306,6 +330,56 @@ check-config-sync: env
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
 
+check-keyword-only: env
+	$(call PRINT_TITLE,"Enforcing the keyword-only-arguments convention across pipelex/ source")
+	$(VENV_PIPELEX_DEV) check-keyword-only --quiet
+
+cko: check-keyword-only
+	@echo "> done: cko = check-keyword-only"
+
+fix-keyword-only: env
+	$(call PRINT_TITLE,"Auto-fixing keyword-only-arguments violations across pipelex/ source")
+	$(VENV_PIPELEX_DEV) check-keyword-only --fix --quiet
+	$(VENV_RUFF) format . --config pyproject.toml
+
+fko: fix-keyword-only
+	@echo "> done: fko = fix-keyword-only"
+
+subject-grant: env
+	$(call PRINT_TITLE,"Recording a subject grant")
+	@if [ -z "$(FUNC)" ] || [ -z "$(RATIONALE)" ]; then \
+		echo 'Usage: make subject-grant FUNC="<relative_path>::<qualified_name>" RATIONALE="…"'; \
+		exit 1; \
+	fi
+	$(VENV_PIPELEX_DEV) subject-grant "$(FUNC)" --rationale "$(RATIONALE)"
+
+sgr: subject-grant
+	@echo "> done: sgr = subject-grant"
+
+drift-plan: env
+	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
+
+dp: drift-plan
+	@echo "> done: dp = drift-plan"
+
+drift-check: env
+	$(call PRINT_TITLE,"Checking drift contracts — review obligations between code and docs")
+	$(VENV_PIPELEX_DEV) drift check --quiet
+
+dc: drift-check
+	@echo "> done: dc = drift-check"
+
+drift-ack: env
+	$(call PRINT_TITLE,"Recording drift ack")
+	@if [ -z "$(CONTRACT)" ] || [ -z "$(RATIONALE)" ]; then \
+		echo 'Usage: make drift-ack CONTRACT=<contract-id> RATIONALE="…" [BY=<reviewer>]'; \
+		exit 1; \
+	fi
+	$(VENV_PIPELEX_DEV) drift ack "$(CONTRACT)" --rationale "$(RATIONALE)" $(if $(BY),--by "$(BY)")
+
+da: drift-ack
+	@echo "> done: da = drift-ack"
+
 generate-mthds-schema: env
 	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
 	$(VENV_PIPELEX_DEV) generate-mthds-schema
@@ -322,6 +396,16 @@ check-mthds-schema: env
 
 cms: check-mthds-schema
 	@echo "> done: cms = check-mthds-schema"
+
+generate-error-pages: env
+	$(call PRINT_TITLE,"Generating per-class error documentation pages")
+	$(VENV_PIPELEX_DEV) generate-error-pages
+
+generate-error-pages-quiet: env
+	$(VENV_PIPELEX_DEV) generate-error-pages --quiet
+
+gep: generate-error-pages
+	@echo "> done: gep = generate-error-pages"
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -630,42 +714,6 @@ test-img-gen: env
 tg: test-img-gen
 	@echo "> done: tg = test-img-gen"
 
-SRV ?=
-MODE ?=
-REG ?=
-TEMPORAL_PYTEST_MARKERS := $(if $(filter live,$(MODE)),"temporal","temporal and (dry_runnable or not inference)")
-TEMPORAL_TESTS_DIR := tests/integration/pipelex/temporal/
-
-test-temporal: env
-	$(call PRINT_TITLE,"Unit testing Temporal")
-	@if [ -n "$(TEST)" ]; then \
-		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
-			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s --lf \
-				$(if $(SRV),--temporal-server $(SRV),) \
-				$(if $(REG),--class-registry $(REG),) \
-				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-				$(TEMPORAL_TESTS_DIR); \
-		else \
-			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s -k "$(TEST)" \
-				$(if $(SRV),--temporal-server $(SRV),) \
-				$(if $(REG),--class-registry $(REG),) \
-				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-				$(TEMPORAL_TESTS_DIR); \
-		fi; \
-	else \
-		$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s \
-			$(if $(SRV),--temporal-server $(SRV),) \
-			$(if $(REG),--class-registry $(REG),) \
-			$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
-			$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
-			$(TEMPORAL_TESTS_DIR); \
-	fi
-
-ttm: test-temporal
-	@echo "> done: ttm = test-temporal"
-
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
@@ -684,12 +732,70 @@ ta: test-pipelex-api
 agent-test: env
 	@echo "• Running unit tests..."
 	@tmpfile=$$(mktemp); \
-	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
-	exit_code=$$?; \
+	$(call WAIT_WITH_HEARTBEAT,$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1,agent-test); \
 	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
 	exit $$exit_code
+
+# Debug variant of agent-test for when the suite hangs or fails opaquely.
+# Use this instead of agent-test when:
+#   - a prior `make agent-test` hung (or got killed) without a verdict
+#   - failures show xdist worker crashes / "node down" noise
+#   - you need to see what's actually happening during the run
+# Differences vs agent-test:
+#   - pkill stale `pytest` processes first (zombies from
+#     prior hung runs compound contention and cause more hangs)
+#   - outer wall-clock `timeout` so fixture-teardown hangs and xdist
+#     worker-replace loops can't run forever (`pytest --timeout` is per-test only)
+#   - direct file redirect — `tail -f $(DEBUG_LOG)` in another shell for live progress
+#   - `-v` (not `-q`) so each test name lands in the log as it runs
+# Tunable: DEBUG_TIMEOUT (outer wall-clock seconds, default 480), DEBUG_LOG (log path).
+# Full playbook: docs/agents/debugging-hanging-pytest-runs.md
+DEBUG_TIMEOUT ?= 480
+DEBUG_LOG ?= /tmp/pytest-agent-test-debug.log
+TIMEOUT_CMD := $(shell command -v timeout 2>/dev/null || command -v gtimeout 2>/dev/null)
+agent-test-debug: env
+	@if [ -z "$(TIMEOUT_CMD)" ]; then \
+		echo "✘ Neither 'timeout' nor 'gtimeout' is installed."; \
+		echo "  On macOS: brew install coreutils"; \
+		echo "  The outer wall-clock cap is the whole point of this target — install before using."; \
+		exit 1; \
+	fi
+	@echo "• Cleaning stale pytest processes..."
+	@pkill -9 -f "pytest" 2>/dev/null || true
+	@sleep 1
+	@echo "• Running with outer timeout=$(DEBUG_TIMEOUT)s, log: $(DEBUG_LOG)"
+	@echo "  Live progress: tail -f $(DEBUG_LOG)"
+	@$(TIMEOUT_CMD) $(DEBUG_TIMEOUT) $(VENV_PYTEST) -n auto --timeout=120 --timeout-method=thread \
+		-m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -v \
+		> $(DEBUG_LOG) 2>&1; \
+	exit_code=$$?; \
+	if [ $$exit_code -eq 124 ]; then \
+		echo ""; \
+		echo "TIMEOUT: outer cap hit at $(DEBUG_TIMEOUT)s — fixture teardown or xdist worker-replace loop suspected."; \
+		echo "  Tail of log:"; \
+		tail -30 $(DEBUG_LOG) | sed 's/^/    /'; \
+		echo "  Full log: $(DEBUG_LOG)"; \
+		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
+	elif [ $$exit_code -ne 0 ]; then \
+		echo ""; \
+		echo "FAIL: tests failed (exit $$exit_code). Unique failed tests:"; \
+		grep -oE "FAILED tests/[^ ]+" $(DEBUG_LOG) | sort -u | sed 's/^/    /'; \
+		echo ""; \
+		echo "  Full log: $(DEBUG_LOG)"; \
+		echo "  Tip: grep failures by error class name, not formatted message —"; \
+		echo "       grep -B 2 -A 10 'YourErrorClass' $(DEBUG_LOG)"; \
+		echo "  If failures show xdist worker crashes ('node down'), re-run that"; \
+		echo "  slice serially: .venv/bin/pytest --timeout=60 -q tests/integration/.../"; \
+		echo "  Playbook: docs/agents/debugging-hanging-pytest-runs.md"; \
+	else \
+		echo "PASS: all tests green. Log: $(DEBUG_LOG)"; \
+	fi; \
+	exit $$exit_code
+
+atd: agent-test-debug
+	@echo "> done: atd = agent-test-debug"
 
 ##########################################################################################
 ### TEST DIAGNOSTICS
@@ -771,7 +877,9 @@ plxt-format: env
 	$(call PRINT_TITLE,"Formatting MTHDS/TOML with plxt")
 	$(VENV_PLXT) fmt
 
-plxt-lint: env
+# plxt validates .mthds files against the locally generated schema (see .pipelex/plxt.toml),
+# so make sure it exists and is fresh before linting.
+plxt-lint: env generate-mthds-schema-quiet
 	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 
@@ -783,15 +891,18 @@ lint: ruff-lint plxt-lint
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+	@echo "$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml,pyright)
 
 mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	@echo "$(VENV_MYPY) --config-file pyproject.toml"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_MYPY) --config-file pyproject.toml,mypy)
 
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
-	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
+	@echo "$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests"
+	$(call RUN_WITH_HEARTBEAT,$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests,pylint)
 
 
 ##########################################################################################
@@ -822,7 +933,7 @@ merge-check-plxt-format: env
 	$(call PRINT_TITLE,"Checking MTHDS/TOML formatting with plxt")
 	$(VENV_PLXT) fmt --check
 
-merge-check-plxt-lint: env
+merge-check-plxt-lint: env generate-mthds-schema-quiet
 	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 
@@ -874,16 +985,16 @@ Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
-docs: env
+docs: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
 	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 -f "$(CURDIR)/mkdocs.yml" --watch "$(CURDIR)/docs" -s
 
-docs-check: env
+docs-check: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
 docs-serve-versioned: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-serve-versioned: env
+docs-serve-versioned: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Serving versioned documentation with mike")
 	$(VENV_MIKE) serve
 
@@ -893,19 +1004,19 @@ docs-list: env
 	$(VENV_MIKE) list
 
 docs-deploy: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy: env
+docs-deploy: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
 docs-deploy-stable: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-stable: env
+docs-deploy-stable: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 	$(MAKE) docs-deploy-root
 
 docs-deploy-specific-version-pre-release: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-specific-version-pre-release: env
+docs-deploy-specific-version-pre-release: env generate-error-pages-quiet
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root
@@ -988,67 +1099,6 @@ sg: serve-graph
 vg: view-graph
 	@echo "> done: vg = view-graph"
 
-temporal-server:
-	$(call PRINT_TITLE,"Starting local Temporal dev server")
-	@if ! command -v temporal >/dev/null 2>&1; then \
-		echo "Error: 'temporal' CLI not found. Install it with: brew install temporal"; \
-		exit 1; \
-	fi
-	@echo "• Temporal Web UI will be available at http://localhost:8233"
-	@echo "• Temporal gRPC service at localhost:7233"
-	@echo "• Press Ctrl+C to stop"
-	temporal server start-dev
-
-ts: temporal-server
-
-temporal-stop:
-	$(call PRINT_TITLE,"Stopping local Temporal dev server")
-	@PID=$$(lsof -tiTCP:7233 -sTCP:LISTEN 2>/dev/null); \
-	if [ -z "$$PID" ]; then \
-		echo "• No process found on port 7233"; \
-	else \
-		kill $$PID && echo "• Killed Temporal server (PID $$PID)"; \
-	fi
-
-tstop: temporal-stop
-
-TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds
-TEMPORAL_PIPE ?= simple_text_sequence
-TEMPORAL_LIB ?=
-
-TEMPORAL_SCOPE ?=
-
-temporal-worker: env
-	$(call PRINT_TITLE,"Starting Temporal worker$(if $(TEMPORAL_SCOPE), (scope: $(TEMPORAL_SCOPE)),)")
-	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed \
-		$(if $(TEMPORAL_SCOPE),--scope $(TEMPORAL_SCOPE),)
-
-tw: temporal-worker
-
-temporal-worker-router: env
-	$(MAKE) temporal-worker TEMPORAL_SCOPE=router
-
-twr: temporal-worker-router
-
-temporal-worker-runner: env
-	$(MAKE) temporal-worker TEMPORAL_SCOPE=runner
-
-twn: temporal-worker-runner
-
-temporal-run: env
-	$(call PRINT_TITLE,"Running pipe through Temporal")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo --graph \
-		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
-
-trun: temporal-run
-
-temporal-run-dry: env
-	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo --graph \
-		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
-
-trund: temporal-run-dry
-
 ##########################################################################################
 ### GRAPH UI ASSET SYNC (from mthds-ui)
 ##########################################################################################
@@ -1057,7 +1107,7 @@ trund: temporal-run-dry
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
+c: check-keyword-only format lint pyright mypy
 	@echo "> done: c = check"
 
 cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
@@ -1066,10 +1116,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports format lint pyright mypy
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only
 	@echo "> done: agent-check"
 
 v: validate

@@ -14,7 +14,7 @@ These tests pin the helper's behaviour:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path  # noqa: TC003 — referenced by pytest fixture type hints at runtime
 from typing import TYPE_CHECKING
 
@@ -78,7 +78,7 @@ def _store_malformed_cache(remote_config_payload: dict[str, object]) -> None:
     del remote_config_payload  # intentionally discarded — we write a deliberately broken payload
     cached = CachedRemoteConfig(
         schema_version=CACHE_SCHEMA_VERSION,
-        cached_at=datetime.now(tz=timezone.utc),
+        cached_at=datetime.now(tz=UTC),
         raw_config={},
     )
     cache_path = RemoteConfigCache.cache_path()
@@ -125,7 +125,7 @@ class TestCachePriming:
         mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)
+        prime_remote_config_cache(console=console)
 
         cache_path = RemoteConfigCache.cache_path()
         assert cache_path.exists(), "priming should write the on-disk cache"
@@ -150,7 +150,7 @@ class TestCachePriming:
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)  # must NOT raise
+        prime_remote_config_cache(console=console)  # must NOT raise
 
         cache_path = RemoteConfigCache.cache_path()
         assert not cache_path.exists(), "priming must not create a cache file when offline"
@@ -166,7 +166,7 @@ class TestCachePriming:
         httpx_get_mock = mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)
+        prime_remote_config_cache(console=console)
 
         assert fetch_spy.call_count == 0, "priming must not invoke the fetcher when gateway is disabled"
         assert httpx_get_mock.call_count == 0, "priming must not hit the network when gateway is disabled"
@@ -201,7 +201,7 @@ class TestCachePriming:
         mocker.patch("httpx.get", side_effect=httpx.ConnectError("no network"))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)  # must NOT raise
+        prime_remote_config_cache(console=console)  # must NOT raise
 
         printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
         assert "yellow" in printed.lower(), f"stale-cache-offline priming must warn; got: {printed!r}"
@@ -254,7 +254,7 @@ class TestCachePriming:
         mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console, target_config_dir=target_dir)
+        prime_remote_config_cache(console=console, target_config_dir=target_dir)
 
         assert RemoteConfigCache.cache_path().exists(), (
             "priming must run (and write the cache) when the TARGET backends.toml has gateway "
@@ -290,7 +290,7 @@ class TestCachePriming:
         httpx_get_mock = mocker.patch("httpx.get", side_effect=httpx.ConnectError("should not be called"))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console, target_config_dir=target_dir)
+        prime_remote_config_cache(console=console, target_config_dir=target_dir)
 
         assert fetch_spy.call_count == 0, "target dir disables the gateway — priming must NOT consult the layered backends.toml"
         assert httpx_get_mock.call_count == 0
@@ -320,7 +320,7 @@ class TestCachePriming:
         mocker.patch.object(RemoteConfigCache, "store", side_effect=OSError("read-only cache directory"))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)  # must NOT raise
+        prime_remote_config_cache(console=console)  # must NOT raise
 
         cache_path = RemoteConfigCache.cache_path()
         assert not cache_path.exists(), "no cache file should exist when the write failed"
@@ -352,7 +352,7 @@ class TestCachePriming:
         mocker.patch.object(RemoteConfigCache, "store", side_effect=_store_malformed_cache)
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)  # must NOT raise
+        prime_remote_config_cache(console=console)  # must NOT raise
 
         printed = " ".join(str(call_args) for call_args in console.print.call_args_list)
         assert "yellow" in printed.lower(), f"a malformed cached payload must surface a yellow warning; got: {printed!r}"
@@ -382,7 +382,7 @@ class TestCachePriming:
         mocker.patch("httpx.get", return_value=_make_httpx_response(_fake_remote_payload()))
 
         console = mocker.create_autospec(Console, instance=True)
-        prime_remote_config_cache(console)
+        prime_remote_config_cache(console=console)
 
         fresh_on_disk = json.loads(cache_path.read_text(encoding="utf-8"))
         assert fresh_on_disk["raw_config"]["aws_region"] == "us-east-1", "priming must overwrite the existing cache"

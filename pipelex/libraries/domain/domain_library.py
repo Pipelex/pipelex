@@ -1,11 +1,12 @@
+from typing import Self
+
 from pydantic import RootModel
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.domains.domain import Domain
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
 from pipelex.libraries.domain.exceptions import DomainLibraryError
-from pipelex.types import Self
 
 DomainLibraryRoot = dict[str, Domain]
 
@@ -31,21 +32,28 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
         return self.root.get(domain_code)
 
     def add_domain(self, domain: Domain):
-        # TODO: resolve domain metadata conflicts properly — currently first-write-wins with a warning.
-        # The system_prompt field is used as a PipeLLM fallback; it should be inlined at pipe factory time
-        # before LibraryCrate construction so domain-level system_prompt becomes unnecessary.
+        # TODO: the system_prompt field is used as a PipeLLM fallback; it should be inlined at pipe factory
+        # time before LibraryCrate construction so domain-level system_prompt becomes unnecessary.
         domain_code = domain.code
         if domain_code in self.root:
+            # Fold the incoming domain's metadata into the established one: an omitted field defers to
+            # whichever same-domain file declared it, so the merge is order-independent and quiet on
+            # omissions; only a genuine double-declaration of two different non-empty values warns.
             existing = self.root[domain_code]
-            if existing.description != domain.description:
-                log.warning(
-                    f"Domain '{domain_code}' declared with different descriptions: "
-                    f"'{existing.description}' vs '{domain.description}'. Keeping the first.",
-                )
-            if existing.system_prompt != domain.system_prompt:
-                log.warning(
-                    f"Domain '{domain_code}' declared with different system_prompts. Keeping the first.",
-                )
+            existing.description = merge_domain_metadata_field(
+                domain_code=domain_code,
+                field_label="description",
+                established=existing.description,
+                incoming=domain.description,
+                show_values_on_conflict=True,
+            )
+            existing.system_prompt = merge_domain_metadata_field(
+                domain_code=domain_code,
+                field_label="system_prompt",
+                established=existing.system_prompt,
+                incoming=domain.system_prompt,
+                show_values_on_conflict=False,
+            )
             return
         self.root[domain_code] = domain
 

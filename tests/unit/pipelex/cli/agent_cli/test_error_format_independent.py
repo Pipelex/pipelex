@@ -9,7 +9,7 @@ from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
-from pipelex.tools.log.log_levels import LogLevel
+from pipelex.cli.agent_cli.commands.run.stdin_resolver import ParsedCliInputs
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -23,16 +23,16 @@ class TestErrorFormatIndependent:
         mocker.patch(f"{RUN_PIPE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{RUN_PIPE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{RUN_PIPE_MODULE}.resolve_pipe_from_exports", return_value=[])
-        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=None)
+        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None))
         mocker.patch(f"{RUN_PIPE_MODULE}.run_pipeline_core", new=mocker.AsyncMock(return_value=result))
         ctx = mocker.MagicMock()
-        ctx.obj = {"log_level": LogLevel.WARNING, "runner": RunnerType.PIPELEX}
+        ctx.obj = {"runner": RunnerType.PIPELEX}
         return ctx
 
     def _ctx_for_error_path(self, mocker: MockerFixture) -> Any:
         """Mock typer.Context shaped for the error path (no Pipelex init needed)."""
         ctx = mocker.MagicMock()
-        ctx.obj = {"log_level": LogLevel.WARNING, "runner": RunnerType.PIPELEX}
+        ctx.obj = {"runner": RunnerType.PIPELEX}
         return ctx
 
     @pytest.mark.parametrize(

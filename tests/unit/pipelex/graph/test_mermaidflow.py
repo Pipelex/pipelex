@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import (
@@ -21,7 +21,7 @@ class TestMermaidflow:
     """Tests for MermaidflowFactory.make_from_graphspec function."""
 
     GRAPH_ID: ClassVar[str] = "mermaidflow_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
 
     def _make_graph(
         self,
@@ -56,7 +56,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
         assert "No data flow information available" in result.mermaid_code
 
     def test_controller_renders_as_subgraph(self) -> None:
@@ -88,7 +88,7 @@ class TestMermaidflow:
             edges=[contains_edge],
         )
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have subgraph for controller
         assert "subgraph" in result.mermaid_code
@@ -126,7 +126,7 @@ class TestMermaidflow:
             edges=[contains_edge],
         )
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Stuff node should be rendered
         assert "my_output" in result.mermaid_code
@@ -146,7 +146,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[consumer_node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Pipeline input stuff should appear
         assert "pipeline_input" in result.mermaid_code
@@ -177,7 +177,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[producer_node, consumer_node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Verify producer -> stuff -> consumer edges exist
         lines = result.mermaid_code.split("\n")
@@ -219,7 +219,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[producer_node, consumer1_node, consumer2_node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # All pipe nodes and stuff should appear
         assert "producer" in result.mermaid_code
@@ -246,7 +246,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[failed_node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
         assert ":::failed" in result.mermaid_code
 
     def test_style_definitions_included(self) -> None:
@@ -263,7 +263,7 @@ class TestMermaidflow:
         }
         graph = self._make_graph(nodes=[producer_node])
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
         assert "classDef failed" in result.mermaid_code
         assert "classDef controller" in result.mermaid_code
         assert "classDef stuff" in result.mermaid_code
@@ -284,11 +284,11 @@ class TestMermaidflow:
         graph_config = make_graph_config()
 
         # Without show_stuff_codes
-        result_without = MermaidflowFactory.make_from_graphspec(graph, graph_config, show_stuff_codes=False)
+        result_without = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config, show_stuff_codes=False)
         assert "xyzab" not in result_without.mermaid_code  # First 5 chars
 
         # With show_stuff_codes
-        result_with = MermaidflowFactory.make_from_graphspec(graph, graph_config, show_stuff_codes=True)
+        result_with = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config, show_stuff_codes=True)
         assert "xyzab" in result_with.mermaid_code  # First 5 chars should be shown
 
     def test_deterministic_output(self) -> None:
@@ -336,8 +336,8 @@ class TestMermaidflow:
             edges=[contains_edge_1, contains_edge_2],
         )
         graph_config = make_graph_config()
-        result1 = MermaidflowFactory.make_from_graphspec(graph, graph_config)
-        result2 = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result1 = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
+        result2 = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
         assert result1.mermaid_code == result2.mermaid_code
 
     def test_subgraph_depth_coloring(self) -> None:
@@ -381,7 +381,7 @@ class TestMermaidflow:
             edges=[outer_contains, inner_contains],
         )
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # Should have multiple subgraphs with different colors
         assert "subgraph" in result.mermaid_code
@@ -396,7 +396,7 @@ class TestMermaidflow:
             "status": NodeStatus.SUCCEEDED,
             "node_io": NodeIOSpec(
                 inputs=[],
-                outputs=[IOSpec(name="combined_output", concept="MergedText", digest="combined_digest_001")],
+                outputs=[IOSpec(name="combined_result", concept="MergedText", digest="combined_digest_001")],
             ),
         }
         branch_a = {
@@ -452,7 +452,7 @@ class TestMermaidflow:
             edges=[contains_a, contains_b, combine_a, combine_b],
         )
         graph_config = make_graph_config()
-        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config=graph_config)
 
         # The combined output stuff should appear inside the controller's subgraph
         # (between subgraph ... and end)
@@ -470,5 +470,5 @@ class TestMermaidflow:
         assert subgraph_end_idx is not None, "Controller subgraph end not found"
 
         subgraph_content = "\n".join(lines[subgraph_start_idx : subgraph_end_idx + 1])
-        assert "combined_output" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
+        assert "combined_result" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
         assert ":::stuff" in subgraph_content, "Combined output stuff should have :::stuff class styling"

@@ -8,13 +8,14 @@ autocompletion for .mthds files in the vscode-pipelex extension.
 from __future__ import annotations
 
 import copy
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, cast, get_args
+
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.tools.misc.package_utils import get_package_version
 
 # Fields that are injected at load time, never written by users in .mthds files
 _INTERNAL_FIELDS = {"source"}
@@ -22,20 +23,17 @@ _INTERNAL_FIELDS = {"source"}
 # Fields that are technical union discriminators, not user-facing
 _PIPE_INTERNAL_FIELDS = {"pipe_category"}
 
-# Pipe definition names (as they appear in Pydantic schema $defs)
-_PIPE_DEFINITION_NAMES = {
-    "PipeFuncBlueprint",
-    "PipeImgGenBlueprint",
-    "PipeComposeBlueprint",
-    "PipeLLMBlueprint",
-    "PipeExtractBlueprint",
-    "PipeSearchBlueprint",
-    "PipeStructureBlueprint",
-    "PipeBatchBlueprint",
-    "PipeConditionBlueprint",
-    "PipeParallelBlueprint",
-    "PipeSequenceBlueprint",
-}
+# Pipe definition names (as they appear in Pydantic schema $defs), derived from the
+# discriminated union so a newly added pipe type is covered automatically — no drift.
+# PipeBlueprintUnion is `Annotated[A | B | ..., Field(discriminator="type")]`:
+# get_args(...)[0] is the Union, and get_args(union) yields the member classes, whose
+# __name__ matches the Pydantic $defs key.
+_PIPE_DEFINITION_NAMES: frozenset[str] = frozenset(member.__name__ for member in get_args(get_args(PipeBlueprintUnion)[0]))
+
+# The signature arm is the one typeless arm: `_normalize_type_on_pipe_definitions` REMOVES `type` from
+# it entirely, so a contract-only table with no `type` matches it and an explicit `type = "PipeSignature"`
+# is rejected (extra property under the arm's `additionalProperties: false`).
+_SIGNATURE_DEFINITION_NAME = PipeSignatureBlueprint.__name__
 
 
 def generate_mthds_schema() -> dict[str, Any]:
@@ -55,6 +53,7 @@ def generate_mthds_schema() -> dict[str, Any]:
 
     schema = _remove_internal_fields(schema)
     schema = _promote_schema_required_fields(schema)
+    schema = _normalize_type_on_pipe_definitions(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
 
@@ -75,25 +74,25 @@ def _remove_internal_fields(schema: dict[str, Any]) -> dict[str, Any]:
     root_props = schema.get("properties", {})
     for field_name in _INTERNAL_FIELDS:
         root_props.pop(field_name, None)
-    _remove_from_required(schema, _INTERNAL_FIELDS)
+    _remove_from_required(schema, field_names=_INTERNAL_FIELDS)
 
     # Remove internal fields from all definitions
     for def_name, def_schema in definitions.items():
         props = def_schema.get("properties", {})
         for field_name in _INTERNAL_FIELDS:
             props.pop(field_name, None)
-        _remove_from_required(def_schema, _INTERNAL_FIELDS)
+        _remove_from_required(def_schema, field_names=_INTERNAL_FIELDS)
 
         # Remove pipe_category only from pipe blueprint definitions
         if def_name in _PIPE_DEFINITION_NAMES:
             for field_name in _PIPE_INTERNAL_FIELDS:
                 props.pop(field_name, None)
-            _remove_from_required(def_schema, _PIPE_INTERNAL_FIELDS)
+            _remove_from_required(def_schema, field_names=_PIPE_INTERNAL_FIELDS)
 
     return schema
 
 
-def _remove_from_required(schema_obj: dict[str, Any], field_names: set[str]) -> None:
+def _remove_from_required(schema_obj: dict[str, Any], *, field_names: set[str]) -> None:
     """Remove field names from a schema object's 'required' list."""
     required = schema_obj.get("required")
     if required is not None:
@@ -129,6 +128,47 @@ def _promote_schema_required_fields(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
+def _normalize_type_on_pipe_definitions(schema: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the `type` discriminator across pipe blueprint definitions for Draft-4 `oneOf`.
+
+    The runtime union disambiguates with `Field(discriminator="type")`, but `_convert_to_draft4`
+    strips `discriminator` (Draft 4 has none), so the arms must self-disambiguate. Two shapes:
+
+    - **Concrete arms** declare `type` as a Literal with a default (e.g.
+      `type: Literal["PipeLLM"] = "PipeLLM"`), so Pydantic omits it from `required`. We force `type`
+      into `required` so a typed table matches exactly one arm and a table lacking `type` fails these
+      arms cleanly instead of ambiguously multi-matching.
+    - **The signature arm** is the one typeless arm: we REMOVE `type` from it entirely (property and
+      `required`). Every pipe def has `additionalProperties: false`, so the signature arm becomes
+      `{description, output, inputs?, signature_for?}` with no `type`. A typeless contract table
+      therefore matches only this arm (concrete arms require `type`); a table with a *concrete* `type`
+      fails this arm (extra `type` property) and matches only its own arm; a typeless table with a
+      stray field matches no arm; and an explicit `type = "PipeSignature"` is rejected here too (extra
+      `type` property) — the language surface no longer accepts the retired tag.
+    """
+    schema = copy.deepcopy(schema)
+    defs_key = "$defs" if "$defs" in schema else "definitions"
+    definitions = schema.get(defs_key, {})
+
+    for def_name in _PIPE_DEFINITION_NAMES:
+        def_schema = definitions.get(def_name)
+        if def_schema is None:
+            continue
+        properties = def_schema.get("properties", {})
+        if def_name == _SIGNATURE_DEFINITION_NAME:
+            # Typeless arm: no `type` at all, so an explicit tag is rejected as an extra property.
+            properties.pop("type", None)
+            _remove_from_required(def_schema, field_names={"type"})
+            continue
+        if "type" not in properties:
+            continue
+        required = def_schema.setdefault("required", [])
+        if "type" not in required:
+            required.append("type")
+
+    return schema
+
+
 def _convert_to_draft4(schema: dict[str, Any]) -> dict[str, Any]:
     """Convert JSON Schema from Pydantic's Draft 2020-12 to Draft 4 for Taplo.
 
@@ -145,7 +185,7 @@ def _convert_to_draft4(schema: dict[str, Any]) -> dict[str, Any]:
         schema["definitions"] = schema.pop("$defs")
 
     # Walk the schema tree to apply conversions
-    _walk_schema(schema, _draft4_visitor)
+    _walk_schema(schema, visitor=_draft4_visitor)
 
     return schema
 
@@ -287,7 +327,7 @@ def _add_taplo_metadata(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def _walk_schema(node: dict[str, Any] | list[Any] | Any, visitor: Callable[[dict[str, Any]], None]) -> None:
+def _walk_schema(node: dict[str, Any] | list[Any] | Any, *, visitor: Callable[[dict[str, Any]], None]) -> None:
     """Recursively walk a JSON Schema tree, calling visitor on each dict node.
 
     Args:
@@ -298,8 +338,8 @@ def _walk_schema(node: dict[str, Any] | list[Any] | Any, visitor: Callable[[dict
         typed_node = cast("dict[str, Any]", node)
         visitor(typed_node)
         for child_value in typed_node.values():
-            _walk_schema(child_value, visitor)
+            _walk_schema(child_value, visitor=visitor)
     elif isinstance(node, list):
         typed_list = cast("list[Any]", node)
         for child_item in typed_list:
-            _walk_schema(child_item, visitor)
+            _walk_schema(child_item, visitor=visitor)

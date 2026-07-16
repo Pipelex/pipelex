@@ -1,20 +1,20 @@
 import re
 from typing import TYPE_CHECKING
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.variable_multiplicity import PresenceMarker
 from pipelex.hub import get_required_concept
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 
 
-class InputStuffSpecsFactoryError(PipelexError):
-    pass
+__all__ = ["InputStuffSpecsFactory", "InputStuffSpecsFactoryError"]
 
 
 class InputStuffSpecsFactory:
@@ -25,6 +25,7 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         blueprint: dict[str, str],
     ) -> InputStuffSpecs:
@@ -40,6 +41,7 @@ class InputStuffSpecsFactory:
     @classmethod
     def make_from_string(
         cls,
+        *,
         domain_code: str,
         stuff_spec_str: str,
     ) -> StuffSpec:
@@ -61,10 +63,11 @@ class InputStuffSpecsFactory:
         Raises:
             InputStuffSpecsFactoryError: If the stuff spec string format is invalid
         """
-        # Pattern to match concept string and optional multiplicity brackets
+        # Pattern to match concept string, optional multiplicity brackets, and optional presence marker
         # Group 1: concept string (everything before brackets)
         # Group 2: content inside brackets (empty string for [], digits for [5])
-        pattern = r"^(.+?)(?:\[(\d*)\])?$"
+        # Group 3: presence marker symbol (None, "?", or "!")
+        pattern = r"^(.+?)(?:\[(\d*)\])?([?!])?$"
         match = re.match(pattern, stuff_spec_str)
 
         if not match:
@@ -73,6 +76,7 @@ class InputStuffSpecsFactory:
 
         concept_ref_or_code = match.group(1)
         multiplicity_str = match.group(2)
+        marker_symbol = match.group(3)
 
         # Validate and resolve concept string with domain
         try:
@@ -97,4 +101,4 @@ class InputStuffSpecsFactory:
         # else: No brackets, multiplicity stays None
 
         concept = get_required_concept(concept_ref=concept_ref_with_domain)
-        return StuffSpec(concept=concept, multiplicity=multiplicity)
+        return StuffSpec(concept=concept, multiplicity=multiplicity, presence=PresenceMarker.from_symbol(marker_symbol))

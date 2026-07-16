@@ -25,6 +25,7 @@ class GeneratedContentFactory:
     def _build_storage_key(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         data: bytes,
         mime_type: str | None,
@@ -67,6 +68,7 @@ class GeneratedContentFactory:
     async def make_image_content(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
@@ -151,7 +153,8 @@ class GeneratedContentFactory:
         return ImageContent(
             url=url,
             public_url=public_url,
-            size=raw_details.size,
+            width=raw_details.size.width if raw_details.size else None,
+            height=raw_details.size.height if raw_details.size else None,
             mime_type=mime_type,
             caption=raw_details.caption,
         )
@@ -159,6 +162,7 @@ class GeneratedContentFactory:
     async def make_page_contents(
         self,
         primary_id: str,
+        *,
         secondary_id: str,
         extract_output: ExtractOutput,
     ) -> list[PageContent]:

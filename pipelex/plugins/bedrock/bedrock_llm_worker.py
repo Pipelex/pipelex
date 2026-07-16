@@ -4,32 +4,29 @@ from botocore.exceptions import ClientError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCapabilityError, SdkTypeError
 from pipelex.cogt.inference.error_classification import extract_bedrock_metadata
 from pipelex.cogt.inference.error_classify import classify_inference_error
 from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
-from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
+from pipelex.plugins.bedrock.bedrock_exceptions import BedrockWorkerConfigurationError
 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class BedrockWorkerConfigurationError(CogtError):
-    pass
-
-
-class BedrockLLMWorker(LLMWorkerInternalAbstract):
+class BedrockLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        LLMWorkerInternalAbstract.__init__(
+        LLMWorkerAbstract.__init__(
             self,
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
@@ -93,6 +90,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
     async def _gen_object(
         self,
         llm_job: LLMJob,
+        *,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # TODO: try with the newest instructor release

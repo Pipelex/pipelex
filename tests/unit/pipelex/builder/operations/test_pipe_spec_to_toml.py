@@ -11,10 +11,39 @@ _BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC
 class TestPipeSpecToToml:
     """Comprehensive tests for pipe_spec_to_toml covering all pipe types."""
 
+    # -- PipeSignature (typeless) -----------------------------------------
+
+    def test_signature_toml_has_no_type_line(self) -> None:
+        """A signature renders as a typeless `[pipe.x]` section — no `type` line, since omitting the
+        type IS the signature — so it re-parses as a signature (an explicit `type = "PipeSignature"`
+        would now be rejected).
+        """
+        spec = parse_pipe_spec(
+            {"pipe_code": "summarize_doc", "description": "Summarize a doc.", "inputs": {"doc": "Document"}, "output": "Text"},
+            pipe_type=None,
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "[pipe.summarize_doc]" in toml
+        assert "type =" not in toml
+        assert 'description = "Summarize a doc."' in toml
+        assert 'output = "Text"' in toml
+
+    def test_signature_toml_preserves_signature_for_hint(self) -> None:
+        """The optional `signature_for` hint round-trips (guards against renderer drift with the
+        agent-CLI `_pipe_spec_to_toml`, which also emits it).
+        """
+        spec = parse_pipe_spec(
+            {"pipe_code": "x", "description": "d", "inputs": {"doc": "Text"}, "output": "Text", "signature_for": "PipeLLM"},
+            pipe_type=None,
+        )
+        toml = pipe_spec_to_toml(spec)
+        assert "type =" not in toml
+        assert 'signature_for = "PipeLLM"' in toml
+
     # -- PipeLLM ----------------------------------------------------------
 
     def test_llm_basic_structure(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        spec = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "[pipe.test_pipe]" in toml
         assert 'type = "PipeLLM"' in toml
@@ -22,29 +51,29 @@ class TestPipeSpecToToml:
         assert 'output = "Text"' in toml
 
     def test_llm_inputs_as_inline_table(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        spec = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert 'inputs = {text = "Text"}' in toml
 
     def test_llm_model_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        spec = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$writing-creative"' in toml
 
     def test_llm_no_model_omits_field(self) -> None:
         data = {key: val for key, val in _BASE_LLM.items() if key != "model"}
-        spec = parse_pipe_spec("PipeLLM", data)
+        spec = parse_pipe_spec(data, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
 
     def test_llm_system_prompt_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "system_prompt": "You are a helpful writer."})
+        spec = parse_pipe_spec({**_BASE_LLM, "system_prompt": "You are a helpful writer."}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "system_prompt" in toml
         assert "You are a helpful writer." in toml
 
     def test_llm_prompt_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        spec = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "prompt" in toml
         assert "Write about $text" in toml
@@ -52,29 +81,29 @@ class TestPipeSpecToToml:
     def test_llm_no_inputs_omits_inputs(self) -> None:
         empty_inputs: dict[str, str] = {}
         data = {**_BASE_LLM, "inputs": empty_inputs}
-        spec = parse_pipe_spec("PipeLLM", data)
+        spec = parse_pipe_spec(data, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "inputs" not in toml
 
     def test_llm_multiple_inputs(self) -> None:
         data = {**_BASE_LLM, "inputs": {"text": "Text", "context": "Document"}}
-        spec = parse_pipe_spec("PipeLLM", data)
+        spec = parse_pipe_spec(data, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert 'text = "Text"' in toml
         assert 'context = "Document"' in toml
 
     def test_llm_structuring_method_preliminary_text_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "structuring_method": "preliminary_text"})
+        spec = parse_pipe_spec({**_BASE_LLM, "structuring_method": "preliminary_text"}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert 'structuring_method = "preliminary_text"' in toml
 
     def test_llm_structuring_method_direct_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "structuring_method": "direct"})
+        spec = parse_pipe_spec({**_BASE_LLM, "structuring_method": "direct"}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert 'structuring_method = "direct"' in toml
 
     def test_llm_no_structuring_method_omits_field(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
+        spec = parse_pipe_spec({**_BASE_LLM}, pipe_type="PipeLLM")
         toml = pipe_spec_to_toml(spec)
         assert "structuring_method" not in toml
 
@@ -82,13 +111,13 @@ class TestPipeSpecToToml:
 
     def test_structure_basic_structure(self) -> None:
         spec = parse_pipe_spec(
-            "PipeStructure",
             {
                 "pipe_code": "structure_review",
                 "description": "Structure a review",
                 "inputs": {"draft_text": "Text"},
                 "output": "RestaurantReview",
             },
+            pipe_type="PipeStructure",
         )
         toml = pipe_spec_to_toml(spec)
         assert "[pipe.structure_review]" in toml
@@ -98,7 +127,6 @@ class TestPipeSpecToToml:
 
     def test_structure_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeStructure",
             {
                 "pipe_code": "structure_review",
                 "description": "Structure a review",
@@ -106,19 +134,20 @@ class TestPipeSpecToToml:
                 "output": "RestaurantReview",
                 "model": "$structuring-fast",
             },
+            pipe_type="PipeStructure",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$structuring-fast"' in toml
 
     def test_structure_no_model_omits_field(self) -> None:
         spec = parse_pipe_spec(
-            "PipeStructure",
             {
                 "pipe_code": "structure_review",
                 "description": "Structure a review",
                 "inputs": {"draft_text": "Text"},
                 "output": "RestaurantReview",
             },
+            pipe_type="PipeStructure",
         )
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
@@ -128,8 +157,14 @@ class TestPipeSpecToToml:
 
     def test_func_function_name_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeFunc",
-            {"pipe_code": "my_func", "description": "Run a function", "inputs": {"data": "Text"}, "output": "Text", "function_name": "process_data"},
+            {
+                "pipe_code": "my_func",
+                "description": "Run a function",
+                "inputs": {"data": "Text"},
+                "output": "Text",
+                "function_name": "process_data",
+            },
+            pipe_type="PipeFunc",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'function_name = "process_data"' in toml
@@ -139,15 +174,15 @@ class TestPipeSpecToToml:
 
     def test_img_gen_model_and_prompt_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeImgGen",
             {
                 "pipe_code": "gen_image",
                 "description": "Generate image",
-                "inputs": {"prompt_text": "ImgGenPrompt"},
+                "inputs": {"prompt_text": "Text"},
                 "output": "Image",
                 "model": "$gen-image",
                 "prompt": "Generate: $prompt_text",
             },
+            pipe_type="PipeImgGen",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$gen-image"' in toml
@@ -155,14 +190,14 @@ class TestPipeSpecToToml:
 
     def test_img_gen_no_model_omits_field(self) -> None:
         spec = parse_pipe_spec(
-            "PipeImgGen",
             {
                 "pipe_code": "gen_image",
                 "description": "Generate image",
-                "inputs": {"prompt_text": "ImgGenPrompt"},
+                "inputs": {"prompt_text": "Text"},
                 "output": "Image",
                 "prompt": "Generate: $prompt_text",
             },
+            pipe_type="PipeImgGen",
         )
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
@@ -171,7 +206,6 @@ class TestPipeSpecToToml:
 
     def test_extract_model_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeExtract",
             {
                 "pipe_code": "my_extract",
                 "description": "Extract text",
@@ -179,13 +213,13 @@ class TestPipeSpecToToml:
                 "output": "Page[]",
                 "model": "@default-extract-document",
             },
+            pipe_type="PipeExtract",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'model = "@default-extract-document"' in toml
 
     def test_extract_max_page_images_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeExtract",
             {
                 "pipe_code": "my_extract",
                 "description": "Extract text",
@@ -193,13 +227,13 @@ class TestPipeSpecToToml:
                 "output": "Page[]",
                 "max_page_images": 5,
             },
+            pipe_type="PipeExtract",
         )
         toml = pipe_spec_to_toml(spec)
         assert "max_page_images = 5" in toml
 
     def test_extract_page_views_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeExtract",
             {
                 "pipe_code": "my_extract",
                 "description": "Extract text",
@@ -207,14 +241,14 @@ class TestPipeSpecToToml:
                 "output": "Page[]",
                 "page_views": True,
             },
+            pipe_type="PipeExtract",
         )
         toml = pipe_spec_to_toml(spec)
         assert "page_views = true" in toml
 
     def test_extract_no_optional_fields_omits_them(self) -> None:
         spec = parse_pipe_spec(
-            "PipeExtract",
-            {"pipe_code": "my_extract", "description": "Extract text", "inputs": {"doc": "Document"}, "output": "Page[]"},
+            {"pipe_code": "my_extract", "description": "Extract text", "inputs": {"doc": "Document"}, "output": "Page[]"}, pipe_type="PipeExtract"
         )
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
@@ -225,7 +259,6 @@ class TestPipeSpecToToml:
 
     def test_search_all_fields_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeSearch",
             {
                 "pipe_code": "web_search",
                 "description": "Search the web",
@@ -239,6 +272,7 @@ class TestPipeSpecToToml:
                 "exclude_domains": ["spam.com"],
                 "max_results": 10,
             },
+            pipe_type="PipeSearch",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$search-model"' in toml
@@ -251,8 +285,14 @@ class TestPipeSpecToToml:
 
     def test_search_minimal(self) -> None:
         spec = parse_pipe_spec(
-            "PipeSearch",
-            {"pipe_code": "web_search", "description": "Search", "inputs": {"query_text": "Text"}, "output": "Text", "prompt": "Find $query_text"},
+            {
+                "pipe_code": "web_search",
+                "description": "Search",
+                "inputs": {"query_text": "Text"},
+                "output": "Text",
+                "prompt": "Find $query_text",
+            },
+            pipe_type="PipeSearch",
         )
         toml = pipe_spec_to_toml(spec)
         assert "Find $query_text" in toml
@@ -267,7 +307,6 @@ class TestPipeSpecToToml:
 
     def test_sequence_steps_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeSequence",
             {
                 "pipe_code": "my_seq",
                 "description": "A sequence",
@@ -278,6 +317,7 @@ class TestPipeSpecToToml:
                     {"pipe_code": "step_two", "result": "final"},
                 ],
             },
+            pipe_type="PipeSequence",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeSequence"' in toml
@@ -288,7 +328,6 @@ class TestPipeSpecToToml:
 
     def test_sequence_step_with_batch_over(self) -> None:
         spec = parse_pipe_spec(
-            "PipeSequence",
             {
                 "pipe_code": "my_seq",
                 "description": "A sequence with batch",
@@ -298,6 +337,7 @@ class TestPipeSpecToToml:
                     {"pipe_code": "process", "result": "processed", "batch_over": "items", "batch_as": "item"},
                 ],
             },
+            pipe_type="PipeSequence",
         )
         toml = pipe_spec_to_toml(spec)
         assert "batch_over" in toml
@@ -308,48 +348,30 @@ class TestPipeSpecToToml:
 
     def test_parallel_branches_and_add_each_output(self) -> None:
         spec = parse_pipe_spec(
-            "PipeParallel",
             {
                 "pipe_code": "my_par",
                 "description": "Parallel branches",
                 "inputs": {"doc": "Document"},
-                "output": "Text",
+                "output": "Composite",
                 "add_each_output": True,
                 "branches": [
                     {"pipe_code": "branch_a", "result": "result_a"},
                     {"pipe_code": "branch_b", "result": "result_b"},
                 ],
             },
+            pipe_type="PipeParallel",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeParallel"' in toml
         assert "add_each_output = true" in toml
         assert "branch_a" in toml
         assert "branch_b" in toml
-
-    def test_parallel_combined_output_in_toml(self) -> None:
-        spec = parse_pipe_spec(
-            "PipeParallel",
-            {
-                "pipe_code": "my_par",
-                "description": "Parallel with combined output",
-                "inputs": {"doc": "Document"},
-                "output": "Text",
-                "add_each_output": False,
-                "combined_output": "MergedResult",
-                "branches": [
-                    {"pipe_code": "branch_a", "result": "result_a"},
-                ],
-            },
-        )
-        toml = pipe_spec_to_toml(spec)
-        assert 'combined_output = "MergedResult"' in toml
+        assert "combined_output" not in toml
 
     # -- PipeCondition ----------------------------------------------------
 
     def test_condition_expression_outcomes_default(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCondition",
             {
                 "pipe_code": "my_cond",
                 "description": "Route by status",
@@ -359,6 +381,7 @@ class TestPipeSpecToToml:
                 "outcomes": {"high": "handle_high", "low": "handle_low"},
                 "default_outcome": "handle_default",
             },
+            pipe_type="PipeCondition",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeCondition"' in toml
@@ -371,7 +394,6 @@ class TestPipeSpecToToml:
 
     def test_batch_fields_in_toml(self) -> None:
         spec = parse_pipe_spec(
-            "PipeBatch",
             {
                 "pipe_code": "my_batch",
                 "description": "Batch process",
@@ -381,6 +403,7 @@ class TestPipeSpecToToml:
                 "input_list_name": "items",
                 "input_item_name": "item",
             },
+            pipe_type="PipeBatch",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeBatch"' in toml
@@ -392,7 +415,6 @@ class TestPipeSpecToToml:
 
     def test_compose_template_mode_fields(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCompose",
             {
                 "pipe_code": "render_greeting",
                 "description": "Render a greeting",
@@ -401,6 +423,7 @@ class TestPipeSpecToToml:
                 "target_format": "markdown",
                 "template": "Hello $name!",
             },
+            pipe_type="PipeCompose",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'type = "PipeCompose"' in toml
@@ -409,7 +432,6 @@ class TestPipeSpecToToml:
 
     def test_compose_no_construct_in_template_mode(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCompose",
             {
                 "pipe_code": "render_greeting",
                 "description": "Render a greeting",
@@ -418,6 +440,7 @@ class TestPipeSpecToToml:
                 "target_format": "markdown",
                 "template": "Hello $name!",
             },
+            pipe_type="PipeCompose",
         )
         toml = pipe_spec_to_toml(spec)
         assert "construct" not in toml
@@ -426,7 +449,6 @@ class TestPipeSpecToToml:
 
     def test_compose_construct_with_from_mappings(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCompose",
             {
                 "pipe_code": "compose_sheet",
                 "description": "Compose interview sheet",
@@ -437,6 +459,7 @@ class TestPipeSpecToToml:
                     "questions": {"from": "questions"},
                 },
             },
+            pipe_type="PipeCompose",
         )
         toml = pipe_spec_to_toml(spec)
         assert "[pipe.compose_sheet.construct]" in toml
@@ -444,7 +467,6 @@ class TestPipeSpecToToml:
 
     def test_compose_construct_with_static_values(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCompose",
             {
                 "pipe_code": "compose_report",
                 "description": "Compose a report",
@@ -456,6 +478,7 @@ class TestPipeSpecToToml:
                     "page_count": 42,
                 },
             },
+            pipe_type="PipeCompose",
         )
         toml = pipe_spec_to_toml(spec)
         assert 'version = "1.0"' in toml
@@ -463,7 +486,6 @@ class TestPipeSpecToToml:
 
     def test_compose_no_template_in_construct_mode(self) -> None:
         spec = parse_pipe_spec(
-            "PipeCompose",
             {
                 "pipe_code": "compose_report",
                 "description": "Compose a report",
@@ -471,6 +493,7 @@ class TestPipeSpecToToml:
                 "output": "Report",
                 "construct": {"title": {"from": "title"}},
             },
+            pipe_type="PipeCompose",
         )
         toml = pipe_spec_to_toml(spec)
         assert "target_format" not in toml

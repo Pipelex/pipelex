@@ -1,98 +1,34 @@
 ---
-title: "Distributed Execution with Temporal"
-description: "Run Pipelex pipelines as durable Temporal workflows across worker pools. Cluster setup, worker deployment, task-queue routing, and dashboard observability."
+title: "Distributed Execution"
+description: "Run Pipelex methods as durable, horizontally-scaled workflows — crash survival, automatic per-step retries, and operational visibility, delivered through the Pipelex platform."
 ---
 
-# Distributed Execution with Temporal
+# Distributed Execution
 
-Run your Pipelex pipelines as durable Temporal workflows across one or more worker processes. This section walks through setting up the cluster, running workers, routing work to the right pools, and reading the Temporal Web UI.
+Pipelex methods run in-process by default — you call a pipe and everything happens in one process. When you move to production and need work that survives crashes, retries every step under failure, and scales across machines, the **same methods** run as durable workflows. No rewrite: the methods you build locally are the methods that run distributed.
 
-## What it is
+## What it gives you
 
-Pipelex pipelines normally run in-process — you call `pipelex run pipe ...` or invoke a pipe from Python and everything happens in one Python process. With the optional `pipelex[temporal]` integration, the same pipelines run as **Temporal workflows**: each pipe execution becomes a workflow on a Temporal cluster, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes a Temporal activity executed on a worker. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work.
+- **Crash survival** — a long-running pipeline resumes exactly where it left off after a restart or worker crash, instead of starting over.
+- **Per-step retries** — every LLM call, image generation, and document extraction retries on its own, with its own timeout and retry policy, so one flaky provider call doesn't sink the whole run.
+- **Horizontal scale** — fan work out across many workers, and route different workloads — a provider, a model, OCR — to their own pools so they scale and fail independently.
+- **Operational visibility** — every run is durable and observable: see what's running, what each step is doing, and replay history when you need it.
 
-The whole layer is opt-in. Flip `[temporal] is_enabled = true` in `.pipelex/pipelex.toml`, install `pipelex[temporal]`, and the same `.mthds` methods run distributed without changing a line.
+## How it works
 
-## When you'd want it
+You don't change your methods. Under the hood, Pipelex maps each method onto a durable execution graph — controller pipes become workflows, and each leaf operation (the actual AI calls) becomes an independently-retried unit of work. Pipelex handles the AI; the orchestration layer handles durability, retries, scheduling, and visibility. Which durable backend runs your methods is a deployment choice, not a code change.
 
-You don't need Temporal for local development — pipes run in-process by default. Reach for distributed execution when you need:
+## Backends
 
-- **Durability** — long-running pipelines survive process restarts and worker crashes. Temporal replays history to resume exactly where execution left off.
-- **Retries with budget control** — every activity (LLM call, extract, image gen) retries independently with per-activity timeouts and retry policies.
-- **Horizontal scale** — fan out work across multiple worker machines. Pipelex lets you route OpenAI calls to one pool, Anthropic to another, OCR to a third.
-- **Operational visibility** — every workflow shows up in the Temporal Web UI with the pipe code, pipeline run id, user, session, and a per-activity summary line.
+Distributed execution is delivered through the Pipelex platform, on top of proven orchestration engines:
 
-## The big picture
+- **[Temporal-backed execution](https://pipelex.com/products#temporal)** — run your methods as durable workflows on a Temporal control plane, with per-step retries and full replay history.
+- **[Mistral Workflows](https://pipelex.com/products#mistral-workflows)** — run your pipes inside Mistral's managed Workflows orchestration, so there's no control plane for you to operate.
 
-```
-Your application
-      │
-      │  pipe_run(...)  ──→  starts a Temporal workflow
-      ▼
-┌────────────────────┐
-│   Temporal cluster │  durability, history, retries, search
-└─────────┬──────────┘
-          │  tasks distributed by queue
-          ▼
-   ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-   │   worker    │ │   worker    │ │   worker    │  poll task queues,
-   │  (router)   │ │ (LLM pool)  │ │ (img-gen)   │  execute workflows
-   └─────────────┘ └─────────────┘ └─────────────┘  and activities
-```
+Both run the identical `.mthds` methods through the same Pipelex runtime, so the durability model and the [error contract](../reliability/failure-classification.md) are the same whichever one executes your work.
 
-A submitter (your app or `pipelex run`) starts a workflow; one or more worker processes poll task queues for work; results flow back through the workflow's history. You can run a single worker that handles everything, or split workers by activity class for independent scaling and isolation.
+## Get started
 
-## What you'll set up
+Distributed and durable execution is part of the Pipelex platform rather than something you wire up yourself. To run your methods durably at scale — or to talk through which backend fits your deployment — see **[Pipelex products](https://pipelex.com/products#durable-execution)**.
 
-Three things, in this order:
-
-- **[Cluster Setup](cluster-setup.md)** — one-time namespace prerequisites: register the custom search attributes Pipelex needs for the dashboard view. Run `pipelex setup-temporal-namespace` and you're done.
-- **[Worker Deployment](workers.md)** — how to run `pipelex worker`, what `--scope` and `--profile` do, and how to compose multiple workers into a deployment.
-- **[Task-Queue Routing](task-routing.md)** — when you outgrow a single queue: per-activity routing, per-queue timeouts and retry policies, per-handle overrides. Skip on day one; revisit when you need to isolate workloads.
-
-## What you'll see in the Temporal dashboard
-
-Every workflow Pipelex starts carries human-readable identity: a workflow id derived from your pipeline run id, a Markdown summary of the pipe and its inputs, and per-activity summary lines that explain what each LLM or extract call is doing. Filter by `PipeCode`, `PipelineRunId`, `UserId`, `SessionId`, or `DomainCode` from the dashboard's search attribute selector. See **[Workflow Observability](observability.md)** for the full reference.
-
-## Quick start
-
-Minimal configuration in `.pipelex/pipelex.toml`:
-
-```toml
-[temporal]
-is_enabled = true
-
-[temporal.worker_config]
-default_task_queue = "temporal_task_queue"
-
-[temporal.temporal_config]
-selected_server = "local"
-
-[temporal.temporal_config.temporal_server_configs.local]
-target_host = "localhost:7233"
-namespace = "default"
-api_key_method = "none"
-```
-
-Register the custom search attributes once (assumes Temporal is reachable):
-
-```bash
-pipelex setup-temporal-namespace
-```
-
-Boot a worker against the default task queue:
-
-```bash
-pipelex worker
-```
-
-Submit work from your application — the same `pipe_run(...)` you'd use locally now executes as a Temporal workflow because `[temporal] is_enabled = true`. The Pipelex Python API automatically dispatches through the Temporal hub.
-
-## Where to go next
-
-- **[Cluster Setup](cluster-setup.md)** — search attributes, `pipelex setup-temporal-namespace`, Temporal Cloud permission model.
-- **[Worker Deployment](workers.md)** — `pipelex worker`, scopes, runtime profiles, multi-worker topologies.
-- **[Task-Queue Routing](task-routing.md)** — `activity_queues`, queue options, per-handle overrides, dispatch tracing.
-- **[Workflow Observability](observability.md)** — workflow ids, activity ids, summary fields, search-attribute filtering.
-
-For the runtime mechanics that make distributed execution work under the hood — LibraryCrate propagation, deferred hydration, per-workflow class registry isolation — see [Temporal Integration](../under-the-hood/temporal-integration.md) and [Distributed Content Generation](../under-the-hood/distributed-content-generation.md).
+For the failure-handling model that durable execution builds on, see [Retries & Resilience](../reliability/retries-and-resilience.md).

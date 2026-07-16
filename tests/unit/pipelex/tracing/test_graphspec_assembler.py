@@ -1,9 +1,9 @@
 """Tests for GraphSpecAssembler."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind, NodeStatus
+from pipelex.graph.graphspec import EdgeKind, ErrorSpec, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -12,6 +12,7 @@ from pipelex.tracing.trace_events import (
     EdgeEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
+    PipeEndSkippedEvent,
     PipeEndSuccessEvent,
     PipeStartEvent,
 )
@@ -24,7 +25,7 @@ _GRAPH_ID = "test_graph"
 _PIPELINE_RUN_ID = "run_001"
 _WF_A = "wf_a"
 _WF_B = "wf_b"
-_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
 
 
 def _time_at(seconds: int) -> datetime:
@@ -68,6 +69,111 @@ class TestGraphSpecAssembler:
         assert result.graph_id == _GRAPH_ID
         assert result.nodes == []
         assert result.edges == []
+        assert result.meta["mode"] == GraphSpecMode.LIVE
+
+    def test_explicit_mode(self) -> None:
+        """Assembler stamps the requested GraphSpec provenance mode."""
+        result = GraphSpecAssembler.assemble(events=[], graph_id=_GRAPH_ID, mode=GraphSpecMode.DRY)
+        assert result.meta["format"] == "mthds"
+        assert result.meta["mode"] == GraphSpecMode.DRY
+
+    def test_registry_source_payloads_survive_assembly(self) -> None:
+        """PipeStartEvent and PipeEndSuccessEvent registry payloads are copied unchanged."""
+        pipe_source = "/fake/sourceful_pipe.mthds"
+        input_concept_source = "/fake/input_concepts.mthds"
+        output_concept_source = "/fake/output_concepts.mthds"
+        node_id = _node_id(_WF_A, 0)
+
+        result = GraphSpecAssembler.assemble(
+            events=[
+                PipeStartEvent(
+                    **_base(_WF_A, 0),
+                    node_id=node_id,
+                    pipe_code="sourceful_pipe",
+                    pipe_type="PipeLLM",
+                    node_kind=NodeKind.OPERATOR,
+                    domain_code="sourceful",
+                    pipe_data={
+                        "code": "sourceful_pipe",
+                        "domain_code": "sourceful",
+                        "type": "PipeLLM",
+                        "source": pipe_source,
+                    },
+                    concept_data=[
+                        {
+                            "code": "InputConcept",
+                            "domain_code": "sourceful",
+                            "source": input_concept_source,
+                        }
+                    ],
+                ),
+                PipeEndSuccessEvent(
+                    **_base(_WF_A, 1),
+                    node_id=node_id,
+                    ended_at=_time_at(1),
+                    output_concept_data={
+                        "code": "OutputConcept",
+                        "domain_code": "sourceful",
+                        "source": output_concept_source,
+                    },
+                ),
+            ],
+            graph_id=_GRAPH_ID,
+        )
+
+        assert result.pipe_registry["sourceful.sourceful_pipe"]["source"] == pipe_source
+        assert result.concept_registry["sourceful.InputConcept"]["source"] == input_concept_source
+        assert result.concept_registry["sourceful.OutputConcept"]["source"] == output_concept_source
+
+    def test_skipped_plural_output_still_produces_data_edge(self) -> None:
+        """A PipeEndSkippedEvent carrying the lifted pipe's real empty-list output spec (D4)
+        registers the digest in the producer map, so the downstream DATA edge resolves —
+        mirroring GraphTracer.on_pipe_end_skipped.
+        """
+        producer_node = _node_id(_WF_A, 0)
+        consumer_node = _node_id(_WF_A, 1)
+
+        result = GraphSpecAssembler.assemble(
+            events=[
+                PipeStartEvent(
+                    **_base(_WF_A, 0),
+                    node_id=producer_node,
+                    pipe_code="lifted_plural_pipe",
+                    pipe_type="PipeFunc",
+                    node_kind=NodeKind.OPERATOR,
+                ),
+                PipeEndSkippedEvent(
+                    **_base(_WF_A, 1),
+                    node_id=producer_node,
+                    ended_at=_time_at(1),
+                    skip_reason="skipped because input 'source' is absent",
+                    output_spec=_io_spec("items", "stuff-empty-list"),
+                ),
+                PipeStartEvent(
+                    **_base(_WF_A, 2),
+                    node_id=consumer_node,
+                    pipe_code="items_consumer",
+                    pipe_type="PipeFunc",
+                    node_kind=NodeKind.OPERATOR,
+                    input_specs=[_io_spec("items", "stuff-empty-list")],
+                ),
+                PipeEndSuccessEvent(
+                    **_base(_WF_A, 3),
+                    node_id=consumer_node,
+                    ended_at=_time_at(3),
+                ),
+            ],
+            graph_id=_GRAPH_ID,
+        )
+
+        skipped_node = next(node for node in result.nodes if node.node_id == producer_node)
+        assert skipped_node.status == NodeStatus.SKIPPED
+        assert skipped_node.skip_reason == "skipped because input 'source' is absent"
+        assert [output.digest for output in skipped_node.node_io.outputs] == ["stuff-empty-list"]
+        data_edges = [edge for edge in result.edges if edge.kind == EdgeKind.DATA]
+        assert len(data_edges) == 1
+        assert data_edges[0].source == producer_node
+        assert data_edges[0].target == consumer_node
 
     def test_simple_sequence(self) -> None:
         """3 child pipes in sequence under a parent.

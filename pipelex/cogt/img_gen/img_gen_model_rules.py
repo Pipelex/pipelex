@@ -12,7 +12,7 @@ The taxonomy system allows the factory to generate the correct API arguments for
 without hardcoding provider-specific logic throughout the codebase.
 """
 
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 
 class ImgGenArgTopic(StrEnum):
@@ -70,16 +70,28 @@ class PromptTaxonomy(StrEnum):
 
 
 class AspectRatioTaxonomy(StrEnum):
-    """Taxonomy for mapping aspect ratio parameters.
+    """Taxonomy for mapping image geometry parameters.
+
+    This topic governs aspect ratio AND size jointly: providers expose both through a
+    single surface (one `size` param on OpenAI, one `image_config` on Google, one grid
+    lookup for pixel dimensions), so each taxonomy value encodes which (aspect ratio x
+    size) pairs the model accepts and how they translate to API arguments.
 
     Different providers use different parameter names and value formats:
     - FLUX: uses `image_size` with values like "square_hd", "landscape_4_3"
     - FLUX_11_ULTRA: uses `aspect_ratio` with values like "1:1", "4:3"
-    - GPT_IMAGE_LEGACY: uses fixed OpenAI GPT Image sizes (gpt-image-1 / -1-mini / -1.5)
-    - GPT_IMAGE_2: validates and forwards exact OpenAI GPT Image 2 sizes
+    - GPT_IMAGE_LEGACY: uses fixed OpenAI GPT Image sizes (gpt-image-1 / -1-mini / -1.5);
+      size tier "1k" maps to those fixed sizes, other tiers are rejected
+    - GPT_IMAGE_2: validates and forwards exact OpenAI GPT Image 2 sizes; size tiers are
+      derived by scaling the 1K preset table ("1k"/"2k" satisfiable, "4k" exceeds its caps)
     - QWEN_IMAGE: uses `width` and `height` with pixel dimensions mapped from aspect ratios
       (e.g., "1:1" -> 1328x1328, "16:9" -> 1664x928, "9:16" -> 928x1664,
        "4:3" -> 1472x1140, "3:4" -> 1140x1472, "3:2" -> 1584x1056, "2:3" -> 1056x1584)
+    - GEMINI_2_5: Google Gemini 2.5 Flash Image (nano-banana) — 1K only, standard ratios
+    - GEMINI_3_PRO: Google Gemini 3 Pro Image — 1K/2K/4K, standard ratios (no banners)
+    - GEMINI_3_FLASH: Google Gemini 3.1 Flash Image — 1K/2K/4K, all ratios incl. banners
+      ("0.5k" deferred until Google's wire token is verified)
+    - GEMINI_3_FLASH_LITE: Google Gemini 3.1 Flash Lite Image — 1K only, all ratios
     """
 
     FLUX = "flux"
@@ -87,6 +99,10 @@ class AspectRatioTaxonomy(StrEnum):
     GPT_IMAGE_LEGACY = "gpt_image_legacy"
     GPT_IMAGE_2 = "gpt_image_2"
     QWEN_IMAGE = "qwen_image"
+    GEMINI_2_5 = "gemini_2_5"
+    GEMINI_3_PRO = "gemini_3_pro"
+    GEMINI_3_FLASH = "gemini_3_flash"
+    GEMINI_3_FLASH_LITE = "gemini_3_flash_lite"
 
 
 class InferenceTaxonomy(StrEnum):

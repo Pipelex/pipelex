@@ -1,15 +1,16 @@
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import override
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenSize, SizeTier
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
+from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_errors import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
-from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -26,10 +27,22 @@ class PipeImgGenBlueprint(PipeBlueprint):
 
     # One-time settings (not in ImgGenSetting)
     aspect_ratio: AspectRatio | None = Field(default=None, strict=False)
+    size: ImgGenSize | None = None
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
     output_format: ImageFormat | None = Field(default=None, strict=False)
+
+    @model_validator(mode="after")
+    def validate_size_vs_aspect_ratio(self) -> Self:
+        if isinstance(self.size, ImageSize) and self.aspect_ratio is not None:
+            msg = (
+                f"PipeImgGen cannot set both an exact size ('{self.size.width}x{self.size.height}') and aspect_ratio "
+                f"('{self.aspect_ratio}'): an exact size implies the aspect ratio. "
+                f"Remove aspect_ratio, or use a size tier ({SizeTier.quoted_tokens()}) instead of an exact size."
+            )
+            raise ValueError(msg)
+        return self
 
     @override
     def validate_inputs(self):

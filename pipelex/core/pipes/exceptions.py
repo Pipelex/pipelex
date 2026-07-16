@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
@@ -6,7 +8,6 @@ from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReference
-from pipelex.types import StrEnum
 
 
 class PipeFactoryErrorType(StrEnum):
@@ -109,12 +110,207 @@ class PipeValidationErrorType(StrEnum):
     CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
 
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
-    IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    UNKNOWN_PIPE_TYPE = "unknown_pipe_type"
+    # A `[pipe.x]` section declared no `type` yet carries fields beyond the signature contract
+    # (`description`, `inputs`, `output`). The author is describing an implementation without naming
+    # its type — the counterpart to UNKNOWN_PIPE_TYPE (a declared-but-invalid type).
+    MISSING_PIPE_TYPE = "missing_pipe_type"
     BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
+
+    # Presence-marker grammar misuse, detected at blueprint parse time: a presence marker
+    # (`?` or `!`) combined with a multiplicity suffix, or `!` on an output (D1, D4 of the
+    # optionals design).
+    OPTIONAL_MARKER_INVALID = "optional_marker_invalid"
+
+    # Static absence-taint violations (D6/D7/D11 of the optionals design): a maybe-absent slot
+    # escaping through a non-optional controller boundary; a `continue`-reachable PipeCondition
+    # without a `?` output; an unguarded template reference to a declared-optional input; a
+    # required structure field fed by a maybe-absent PipeParallel branch.
+    OPTIONAL_NOT_HANDLED = "optional_not_handled"
+    OPTIONAL_OUTPUT_REQUIRED = "optional_output_required"
+    OPTIONAL_INPUT_UNGUARDED = "optional_input_unguarded"
+    OPTIONAL_BRANCH_REQUIRED_FIELD = "optional_branch_required_field"
+
+    # Advisory-only (rides the validation report's `warnings` array, never raised as an error):
+    # a `!` (force) input whose slot is guaranteed present in every analyzed flow — the
+    # assertion can never fire.
+    OPTIONAL_FORCE_REDUNDANT = "optional_force_redundant"
+
+    # Blueprint parse-time concept error: a bundle declares a concept whose code collides with a
+    # native Pipelex concept (`Text`, `Number`, …). Structurally suppressible — set only at the
+    # single `validate_concept_keys` raise site — so the fix planner keys on it safely.
+    NATIVE_CONCEPT_REDECLARATION = "native_concept_redeclaration"
+
+    # Wiring / reference-resolution failures, detected when validating a pipe's contract against the
+    # merged library (a referenced concept or dependency pipe does not resolve).
+    UNRESOLVED_CONCEPT = "unresolved_concept"
+    UNRESOLVED_PIPE_DEPENDENCY = "unresolved_pipe_dependency"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
+
+    @property
+    def is_controller_input_drift(self) -> bool:
+        """True for the input-drift trio the fix planner can act on when enriched."""
+        match self:
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+            ):
+                return True
+            case (
+                PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_inadequate_output(self) -> bool:
+        """True for the output-mismatch pair the fix planner can act on when enriched."""
+        match self:
+            case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_inadequate_output_multiplicity(self) -> bool:
+        """True only for the multiplicity-mismatch case.
+
+        The required/provided concept-ref suffix appended by the error categorizer is suppressed
+        for this case: a multiplicity mismatch has the same concept on both sides by definition
+        (the concept-compatibility check passed just before it fired), so the suffix would print
+        two identical refs and its list-repr brackets would masquerade as `[]` multiplicity syntax.
+        """
+        match self:
+            case PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_native_concept_redeclaration(self) -> bool:
+        """True for the blueprint-channel native-concept redeclaration the fix planner strips."""
+        match self:
+            case PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
+
+    @property
+    def is_invalid_pipe_code_syntax(self) -> bool:
+        """True for the invalid-pipe-code-syntax error the fix planner strips when it is enriched.
+
+        Gates entry to ``strip-namespace``; the planner still requires the ``stripped_pipe_code``
+        enrichment, so un-strippable syntax errors (malformed codes, cross-package dotted refs)
+        fall through as ``None`` even though they share this ``error_type``.
+        """
+        match self:
+            case PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX:
+                return True
+            case (
+                PipeValidationErrorType.MISSING_INPUT_VARIABLE
+                | PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE
+                | PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT
+                | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY
+                | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
+                | PipeValidationErrorType.UNKNOWN_PIPE_TYPE
+                | PipeValidationErrorType.MISSING_PIPE_TYPE
+                | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
+                | PipeValidationErrorType.OPTIONAL_MARKER_INVALID
+                | PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+                | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+                | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+                | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+                | PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT
+                | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION
+                | PipeValidationErrorType.UNRESOLVED_CONCEPT
+                | PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY
+                | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
+            ):
+                return False
 
 
 class PipeValidationError(ValueError):
@@ -127,6 +323,9 @@ class PipeValidationError(ValueError):
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,
         provided_concept_code: str | None = None,
+        expected_output_ref: str | None = None,
+        expected_inputs: dict[str, str] | None = None,
+        declared_inputs: dict[str, str] | None = None,
         file_path: str | None = None,
         explanation: str | None = None,
     ):
@@ -136,6 +335,18 @@ class PipeValidationError(ValueError):
         self.variable_names = variable_names
         self.required_concept_codes = required_concept_codes
         self.provided_concept_code = provided_concept_code
+        # The output ref the pipe should declare (full bundle representation: concept +
+        # multiplicity + presence marker), set only where the validator knows the correct
+        # value at detection time — the semantic fact the fix planner translates into a
+        # suggested fix.
+        self.expected_output_ref = expected_output_ref
+        # The full inputs mapping the pipe should declare (variable name → bundle-representation
+        # ref), set only at the controller input-drift raise sites where ``needed_inputs()`` is
+        # in hand — the semantic fact the fix planner translates into a sync-controller-inputs fix.
+        # ``declared_inputs`` is the pipe's current declaration rendered the same way, so the
+        # planner (pure, no file access) can emit a minimal diff instead of a table rewrite.
+        self.expected_inputs = expected_inputs
+        self.declared_inputs = declared_inputs
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
@@ -150,6 +361,12 @@ class PipeValidationError(ValueError):
             msg += f" • required_concept_codes='{self.required_concept_codes}'"
         if self.provided_concept_code:
             msg += f" • provided_concept_code='{self.provided_concept_code}'"
+        if self.expected_output_ref:
+            msg += f" • expected_output_ref='{self.expected_output_ref}'"
+        if self.expected_inputs:
+            msg += f" • expected_inputs='{self.expected_inputs}'"
+        if self.declared_inputs:
+            msg += f" • declared_inputs='{self.declared_inputs}'"
         if self.file_path:
             msg += f" • file='{self.file_path}'"
         if self.explanation:

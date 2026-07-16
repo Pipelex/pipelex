@@ -15,7 +15,7 @@ There are two main ways to inject custom implementations:
 ### 1. During Initialization
 
 ```python
-from pipelex import Pipelex
+from pipelex.pipelex import Pipelex
 
 pipelex = Pipelex.make(
     reporting_delegate=MyReportingDelegate(),
@@ -31,18 +31,9 @@ pipelex = Pipelex.make(
 from pipelex.hub import PipelexHub
 
 hub = PipelexHub()
-hub.set_reporting_delegate(MyReportingDelegate())
+hub.set_report_delegate(MyReportingDelegate())
 # ... and so on for other components
 ```
-
-## NoOp Implementations
-
-Some components have "NoOp" (No Operation) implementations that are used when the feature is disabled:
-
-- `ReportingNoOp`: Used when reporting is disabled
-- `ActivityManagerNoOp`: Used when activity tracking is disabled
-
-These NoOp implementations implement the same protocol but do nothing, allowing the system to function without the specific feature.
 
 ## Protocol Compliance
 
@@ -54,14 +45,6 @@ All custom implementations MUST:
 4. Handle errors appropriately
 5. Clean up resources when needed
 
-## Feature Flags
-
-Some components are controlled by feature flags in the configuration:
-
-- `is_reporting_enabled`: Controls Reporting system
-
-When a feature is disabled, the corresponding NoOp implementation is used automatically.
-
 ## Available Injectable Components
 
 Pipelex supports injection of the following components:
@@ -69,7 +52,8 @@ Pipelex supports injection of the following components:
 **Reporting Delegate** (`ReportingManager`)
 
 - Protocol: `ReportingProtocol`
-- Default: `ReportingManager` or `ReportingNoOp` if disabled
+- Default: `ReportingManager`
+- No-op option: inject `ReportingNoOp` to disable reporting explicitly
 - [Details](reporting-delegate-injection.md)
 
 **Secrets Provider** (`EnvSecretsProvider`)

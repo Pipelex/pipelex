@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.system.pipelex_service.types import RemoteConfigSource
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_type import ModelType
@@ -48,6 +48,7 @@ class CogtError(PipelexError):
     provider_metadata: ProviderErrorMetadata | None = None
     model_handle: str | None = None
     backend_name: str | None = None
+    _declared_title = "AI inference failed"
 
     def __init__(
         self,
@@ -64,7 +65,7 @@ class CogtError(PipelexError):
         if provider_metadata is not None:
             self.provider_metadata = provider_metadata
 
-    def fill_model_and_provider(self, model_handle: str | None, backend_name: str | None) -> None:
+    def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:
         """Fill ``model_handle`` / ``backend_name`` from the worker, only when still unset.
 
         Inference-failure leaf errors raised deep inside a provider plugin
@@ -85,18 +86,27 @@ class CogtError(PipelexError):
 
     @override
     def to_error_report(self) -> ErrorReport:
-        report = ErrorReport(
-            error_type=type(self).__name__,
-            message=self.message,
-            error_category=self.error_category,
-            error_domain=self.error_domain,
-            retryable=self.error_category.is_retryable if self.error_category is not None else None,
-            user_action=self.user_action,
-            model=self.model_handle,
-            provider=self.backend_name,
-            provider_metadata=self.provider_metadata,
+        # Start from the base report (which already runs cause-chain enrichment
+        # over the shared classification fields) and layer the CogtError-specific
+        # fields on top with the same wrapper-wins-when-set semantics: a value
+        # explicitly set on this CogtError overrides whatever the cause surfaced,
+        # otherwise the cause-derived value carried by ``base_report`` stays.
+        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
+        # model instance is always truthy — a wrapper that attached
+        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
+        # discards the cause's actionable hints. Pinned by
+        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
+        base_report = super().to_error_report()
+        own_retryable = self.error_category.is_retryable if self.error_category is not None else None
+        return base_report.model_copy(
+            update={
+                "error_category": self.error_category or base_report.error_category,
+                "retryable": own_retryable if own_retryable is not None else base_report.retryable,
+                "model": self.model_handle or base_report.model,
+                "provider": self.backend_name or base_report.provider,
+                "provider_metadata": self.provider_metadata or base_report.provider_metadata,
+            }
         )
-        return self._enrich_error_report_from_cause(report)
 
 
 def find_inference_error_category_in_chain(exc: BaseException) -> InferenceErrorCategory | None:
@@ -112,17 +122,12 @@ def find_inference_error_category_in_chain(exc: BaseException) -> InferenceError
     (``non_retryable``) from the underlying failure's category. A ``CogtError`` carrying no
     category is skipped — the walk continues to the first one that actually classifies the failure.
 
-    The ``id()`` set guards against a cyclic ``__cause__`` chain: without it a cycle would
-    spin this loop forever — and it runs on the error path, so the failure being classified
-    would be lost to a hang rather than reported.
+    Walks via ``iter_cause_chain``, which owns the cyclic-``__cause__`` guard so a cycle
+    terminates the walk instead of hanging the error path.
     """
-    current: BaseException | None = exc
-    seen: set[int] = set()
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, CogtError) and current.error_category is not None:
-            return current.error_category
-        current = current.__cause__
+    for node in iter_cause_chain(exc):
+        if isinstance(node, CogtError) and node.error_category is not None:
+            return node.error_category
     return None
 
 
@@ -431,6 +436,22 @@ class RoutingProfileDisabledBackendError(CogtError):
 
 class ModelManagerError(CogtError):
     pass
+
+
+class ModelListingUnsupportedError(CogtError):
+    """A registered lister cannot enumerate models for an SDK variant at runtime.
+
+    A *soft* control signal for the ``list-models`` loop: it is caught and the SDK
+    is reported as unsupported-for-remote-listing rather than failing the command.
+    Same outcome as a registry miss (no lister registered for the SDK at all). A
+    lister closure raises it when its client variant cannot list (e.g. a
+    bedrock-backed Anthropic client), translating any vendor-specific
+    "unsupported" exception so core names no integration.
+    """
+
+    def __init__(self, *, sdk: str) -> None:
+        self.sdk = sdk
+        super().__init__(f"The '{sdk}' SDK client does not support remote model listing.")
 
 
 class ModelDeckNotFoundError(CogtError):

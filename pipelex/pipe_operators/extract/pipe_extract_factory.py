@@ -17,6 +17,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
     @override
     def make(
         cls,
+        *,
         pipe_category: Any,
         pipe_type: str,
         pipe_code: str,

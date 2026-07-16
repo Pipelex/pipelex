@@ -5,7 +5,6 @@ to determine which variables reference images (directly or nested) and how they
 should be extracted at runtime.
 """
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.concepts.concept import Concept
@@ -13,18 +12,11 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_native_concept, get_required_concept
+from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_variable_references
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
-
-
-class WithImagesFilterError(PipelexError):
-    """Raised when | with_images is used on a type without nested images."""
-
-
-class UnusedInputError(PipelexError):
-    """Raised when an input is declared but never referenced in the template."""
 
 
 class TemplateImageAnalyzer:
@@ -42,6 +34,7 @@ class TemplateImageAnalyzer:
     def analyze_template_for_images(
         cls,
         template_source: str,
+        *,
         input_specs: dict[str, str],
         domain_code: str,
         template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
@@ -85,11 +78,11 @@ class TemplateImageAnalyzer:
             has_multiplicity = parsed_input.multiplicity is not None and parsed_input.multiplicity is not False
 
             # Resolve the concept for this variable
-            concept = cls._resolve_concept(input_spec, domain_code)
+            concept = cls._resolve_concept(input_spec, domain_code=domain_code)
 
             # Determine what type the variable path resolves to
             # For nested paths like "doc.cover", we need to traverse the structure
-            resolved_type_info = cls._resolve_variable_type(var_ref.path, root_var, concept)
+            resolved_type_info = cls._resolve_variable_type(var_ref.path, root_var=root_var, root_concept=concept)
             if resolved_type_info is None:
                 continue
 
@@ -144,6 +137,7 @@ class TemplateImageAnalyzer:
     def validate_unused_inputs(
         cls,
         template_sources: list[str],
+        *,
         input_specs: dict[str, str],
         template_category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     ) -> None:
@@ -177,7 +171,7 @@ class TemplateImageAnalyzer:
             raise UnusedInputError(msg)
 
     @classmethod
-    def _resolve_concept(cls, concept_ref_or_code: str, domain_code: str) -> Concept:
+    def _resolve_concept(cls, concept_ref_or_code: str, *, domain_code: str) -> Concept:
         """Resolve a concept reference to a Concept object.
 
         Handles multiplicity brackets like Image[] or Text[3] by stripping them.
@@ -201,6 +195,7 @@ class TemplateImageAnalyzer:
     def _resolve_variable_type(
         cls,
         var_path: str,
+        *,
         root_var: str,
         root_concept: Concept,
     ) -> tuple[bool, bool, bool, list[str] | None] | None:

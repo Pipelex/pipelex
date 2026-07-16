@@ -1,7 +1,8 @@
 import types
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Self, TypeVar, cast
 
 from kajson.class_registry import ClassRegistry
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -11,7 +12,6 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -32,7 +32,7 @@ from pipelex.cogt.model_backends.backend_credentials import (
 from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
-from pipelex.config import get_config
+from pipelex.config import get_config, get_pipe_func_execution_mode
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
@@ -43,14 +43,25 @@ from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
+from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.pipeline_manager import PipelineManager
 from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
-from pipelex.plugins.plugin_manager import PluginManager
+from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.exceptions import UnknownBootOrchestratorError
+from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
+from pipelex.plugins.model_lister_registry import ModelListerRegistry
+from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
+from pipelex.plugins.registrar import HubSlot, PluginRegistrar
+from pipelex.plugins.sdk_client_manager import SdkClientManager
+from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
+from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
-from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import PipelexConfig
@@ -80,11 +91,8 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
-from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
-from pipelex.types import Self
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
@@ -92,6 +100,8 @@ if TYPE_CHECKING:
     from pipelex.system.pipelex_service.types import RemoteConfigSource
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
+
+_HubSlotImplT = TypeVar("_HubSlotImplT")
 
 
 class Pipelex(metaclass=MetaSingleton):
@@ -101,6 +111,10 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: type[ConfigRoot] | None = None,
         config_overrides: dict[str, Any] | None = None,
     ) -> None:
+        # Readiness gate: flipped True only at the very end of make(), after setup() and the optional
+        # validate_model_deck() both succeed. Readers (ensure_pipelex_booted) must gate on this, NOT on
+        # mere registry presence -- MetaSingleton registers the instance before setup() configures the hub.
+        self.is_ready: bool = False
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         self.pipelex_hub = PipelexHub()
@@ -122,9 +136,12 @@ class Pipelex(metaclass=MetaSingleton):
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
         self.func_registry: FuncRegistry | None = None
+        # plugins — the registrar is built in setup() (build_registrar); held for the slot-claim /
+        # CLI-command / teardown apply-points. Declared here so teardown() can guard on it.
+        self._plugin_registrar: PluginRegistrar | None = None
         # cogt
-        self.plugin_manager = PluginManager()
-        self.pipelex_hub.set_plugin_manager(self.plugin_manager)
+        self.sdk_client_manager = SdkClientManager()
+        self.pipelex_hub.set_sdk_client_manager(self.sdk_client_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
@@ -134,12 +151,12 @@ class Pipelex(metaclass=MetaSingleton):
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} init done")
 
     @staticmethod
-    def _get_config_file_not_found_error_msg(component_name: str) -> str:
+    def _get_config_file_not_found_error_msg(*, component_name: str) -> str:
         """Generate error message for missing config files."""
         return f"Config files are missing for the {component_name}. Run `pipelex init config` to generate the missing files."
 
     @staticmethod
-    def _get_validation_error_msg(component_name: str, validation_exc: Exception) -> str:
+    def _get_validation_error_msg(*, component_name: str, validation_exc: Exception) -> str:
         """Generate error message for invalid config files."""
         msg = ""
         cause_exc = validation_exc.__cause__
@@ -161,9 +178,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
     def setup(
         self,
+        *,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -171,6 +189,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManagerAbstract | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -185,16 +204,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # Override temporal.is_enabled if temporal_enabled is explicitly provided
-        if temporal_enabled is not None:
-            config = get_config()
-            updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
-            config.temporal = updated_temporal
-
-        self._temporal_task_manager: object | None = None
-
-        # Initialize secrets provider early - needed for gateway check
-        secrets_provider = secrets_provider or EnvSecretsProvider()
+        # Boot this process under the named orchestrator plugin, when explicitly provided.
+        # The matching boot-orchestrator plugin (e.g. Temporal) claims the hub slots in its
+        # register() iff plugins.boot_orchestrator == its own name; any other value is in-process.
+        if boot_orchestrator is not None:
+            get_config().plugins.boot_orchestrator = boot_orchestrator
 
         # --- Pipelex Service and Telemetry --------------------------------------------------
 
@@ -263,6 +277,38 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                         stacklevel=2,
                     )
 
+        # --- Plugin discovery -----------------------------------------------------------------
+        # Build the plugin registrar from the fully-resolved config (pure and import-light:
+        # registering the built-ins imports no backend SDK, constructs no client, touches no hub).
+        # Built here — after the gateway service/terms precondition gate above (so an unaccepted-terms or
+        # first-run boot fails fast before any discovery work) and before the telemetry factory below,
+        # which is the first consumer of the secrets provider. Secrets is now a config-selected plugin
+        # seam: the built-in SecretsPlugin's factory (and any external pipelex-secrets-<backend>) is
+        # looked up from the registrar-derived SecretsProviderRegistry just below. The other registries
+        # (inference, storage, …) are still built later at their own hub-set points, all referencing this
+        # same already-built registrar; the slot-claim thunks / teardown callbacks it also accumulates are
+        # applied at their ordered apply-points in later phases.
+        plugin_registrar = build_registrar(config=get_config())
+        self._plugin_registrar = plugin_registrar
+        # Reject an unknown boot orchestrator before falling through to the core defaults. The requested
+        # name (CLI --orchestrator / setup(boot_orchestrator=...) / config) is matched against registered
+        # plugin names — the same namespace the slot-claim gate uses (boot_orchestrator == plugin.name).
+        # When no plugin of that name registered (not installed, disabled, or a typo) nothing claims the
+        # hub slots, so without this guard the run would silently execute in-process instead of under the
+        # requested runtime. Checked here to fail fast, before the telemetry/model work.
+        requested_boot_orchestrator = get_config().plugins.boot_orchestrator
+        if requested_boot_orchestrator is not None and requested_boot_orchestrator not in plugin_registrar.registered_plugin_names:
+            raise UnknownBootOrchestratorError(requested=requested_boot_orchestrator)
+
+        # Secrets provider precedence: explicit setup() param > config-selected registry factory.
+        # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
+        # Resolved here because the telemetry factory just below (and the model setup further down) consume it.
+        secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
+        self.pipelex_hub.set_secrets_provider_registry(secrets_provider_registry)
+        if secrets_provider is None:
+            secrets_config = get_config().pipelex.secrets_config
+            secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
+
         # Disable Pipelex telemetry when:
         # - inference is not needed (no live runs to track), OR
         # - the gateway config came from the cache (stale specs imply potentially stale model
@@ -289,10 +335,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.func_registry = func_registry or FuncRegistry()
         self.pipelex_hub.set_func_registry(func_registry=self.func_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
-        if storage_provider is None:
-            storage_config = get_config().pipelex.storage_config
-            storage_provider = make_storage_provider_from_config(storage_config)
-        self.pipelex_hub.set_storage_provider(storage_provider)
+        # Storage is selected from the config-driven StorageProviderRegistry, built from the plugin
+        # registrar (constructed above, just before the telemetry factory). Its resolution and hub-set
+        # still happen later at the plugin-derived-registries block — after secrets is on the hub here,
+        # so the GCP factory's secret read works.
 
         # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
         stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
@@ -320,7 +366,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- AI Models and Inference Management ------------------------------------------------
 
-        self.plugin_manager.setup()
+        self.sdk_client_manager.setup()
 
         self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
         self.pipelex_hub.set_models_manager(models_manager=self.models_manager)
@@ -333,23 +379,23 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("routing profile library")
+            msg = self._get_config_file_not_found_error_msg(component_name="routing profile library")
             raise PipelexSetupError(msg) from routing_not_found_exc
         except InferenceBackendLibraryNotFoundError as backend_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("inference backend library")
+            msg = self._get_config_file_not_found_error_msg(component_name="inference backend library")
             raise PipelexSetupError(msg) from backend_not_found_exc
         except ModelDeckNotFoundError as deck_not_found_exc:
-            msg = self._get_config_file_not_found_error_msg("model deck")
+            msg = self._get_config_file_not_found_error_msg(component_name="model deck")
             raise PipelexSetupError(msg) from deck_not_found_exc
         except RoutingProfileDisabledBackendError as routing_profile_exc:
             msg = f"Some backend(s) required for a routing profile is not enabled: {routing_profile_exc}"
             raise PipelexSetupError(msg) from routing_profile_exc
 
         except InferenceBackendLibraryValidationError as backend_validation_exc:
-            msg = self._get_validation_error_msg("inference backend library", backend_validation_exc)
+            msg = self._get_validation_error_msg(component_name="inference backend library", validation_exc=backend_validation_exc)
             raise PipelexSetupError(msg) from backend_validation_exc
         except ModelDeckValidationError as deck_validation_exc:
-            msg = self._get_validation_error_msg("model deck", deck_validation_exc)
+            msg = self._get_validation_error_msg(component_name="model deck", validation_exc=deck_validation_exc)
             msg += "\n\nIf you added your own config files to the model deck then you'll have to change them manually."
             raise PipelexSetupError(msg) from deck_validation_exc
 
@@ -363,32 +409,65 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             )
             raise PipelexSetupError(error_msg) from credentials_exc
 
-        if content_generator is None:
-            if not needs_inference:
-                content_generator = ContentGeneratorDry()
-            elif get_config().temporal.is_enabled:
-                from pipelex.temporal.tprl_content_generation.content_generator_in_workflow_factory import (  # noqa: PLC0415
-                    ContentGeneratorInWorkflowFactory,
-                )
+        # Keyless boot forces every run to DRY — consumed at PipeRunParamsFactory.make_run_params,
+        # the single writer of run_mode, covering every entry point; generator selection is
+        # backend-keyed unconditionally (eng review D4) — a keyless Temporal submitter must still
+        # dispatch activities and mock inside them, so `needs_inference` plays no role in picking the
+        # generator. Its other boot roles (gateway/model setup, credentials, telemetry) are unchanged.
+        # --- Plugin-derived registries --------------------------------------------------------
+        # The plugin registrar was built earlier (with the boot-orchestrator gate checked and the
+        # config-selected secrets provider resolved) just before the telemetry factory. Turn its
+        # accumulated contributions into the hub registries here — after the gateway/model setup checks
+        # and before the hub setup points below — the family worker factories look their backends up on
+        # these at run time.
+        self.pipelex_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.pipelex_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
+        self.pipelex_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
+        self.pipelex_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
+        storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)
+        self.pipelex_hub.set_storage_provider_registry(storage_provider_registry)
+        pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
+        self.pipelex_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
+        # Storage provider precedence: explicit setup() param > config-selected registry factory.
+        # The built-in StoragePlugin supplies every method, so there is no separate core default.
+        # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
+        if storage_provider is None:
+            storage_config = get_config().pipelex.storage_config
+            storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
+        self.pipelex_hub.set_storage_provider(storage_provider)
 
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGeneratorInWorkflowFactory.make_content_generator_in_workflow(
-                    generated_content_factory=generated_content_factory,
-                )
-            else:
-                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-                content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+        self.pipelex_hub.set_dry_run_forced(is_forced=not needs_inference)
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
+        # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
+        # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
+        if content_generator is None:
+            content_generator = self._resolve_hub_slot(
+                slot=HubSlot.CONTENT_GENERATOR,
+                default=lambda: ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=storage_provider)),
+            )
         self.pipelex_hub.set_content_generator(content_generator)
+
+        # Injection precedence: explicit setup() param > plugin slot-claim thunk > config-selected
+        # registry factory. The PipeFunc execution axis is orthogonal to orchestration: a Temporal
+        # worker claims the PIPE_FUNC_EXECUTOR slot to wrap execution in an activity, and inside that
+        # activity resolves the real executor through this same registry by execution_mode. Every
+        # non-worker boot resolves directly here — pipe_func_config.execution_mode selects the mode
+        # ("direct" in-process by default; a sandbox mode like "daytona" runs it out-of-process).
+        if pipe_func_executor is None:
+            pipe_func_config = get_config().pipelex.pipe_func_config
+            execution_mode = get_pipe_func_execution_mode()
+            pipe_func_executor = self._resolve_hub_slot(
+                slot=HubSlot.PIPE_FUNC_EXECUTOR,
+                default=lambda: pipe_func_executor_registry.get_required(mode=execution_mode)(pipe_func_config),
+            )
+        self.pipelex_hub.set_pipe_func_executor(pipe_func_executor)
 
         self.inference_manager = inference_manager or InferenceManager()
         self.pipelex_hub.set_inference_manager(self.inference_manager)
 
         # --- Libraries & Registries -------------------------------------------------------------
 
-        if get_config().pipelex.feature_config.is_reporting_enabled:
-            self.reporting_delegate = reporting_delegate or ReportingManager()
-        else:
-            self.reporting_delegate = ReportingNoOp()
+        self.reporting_delegate = reporting_delegate or ReportingManager()
         self.pipelex_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
 
@@ -423,54 +502,65 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
-        # --- Temporal --------------------------------------------------------------------------
+        # --- Task Manager ----------------------------------------------------------------------
+        # The TASK_MANAGER slot is claimed only by a boot-orchestrator plugin running this process as
+        # its runtime (a Temporal worker). The thunk does the full wiring on the plugin's own hub and
+        # is torn down via a registered teardown callback (LIFO) — no core default, no explicit param.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+        task_manager_factory = plugin_registrar.slot_claims.get(HubSlot.TASK_MANAGER)
+        if task_manager_factory is not None:
+            task_manager_factory()
 
-            temporal_task_manager = TemporalTaskManager()
-            temporal_hub.set_task_manager(temporal_task_manager)
-            temporal_task_manager.complement_catalog(
-                extra_catalog=Tasks.TASK_PACKS,
-                extra_workflows=[],
-                extra_activities=[],
-            )
-            temporal_task_manager.setup()
-            self._temporal_task_manager = temporal_task_manager
+        # --- Isolated-execution probe ----------------------------------------------------------
+        # Claimed only by a boot-orchestrator plugin whose runtime has a replay/activity split (e.g. a
+        # Temporal worker): the thunk resolves the ambient predicate that reports whether the current
+        # call runs inside an isolated sub-execution (an activity). ReportingManager consults it to
+        # route an activity-side usage emission to the per-process log instead of the workflow's
+        # registered buffer (audit H1). Unclaimed (any in-process boot), the fresh hub's default
+        # reports "never isolated", so no wiring is needed here.
+        isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
+        if isolated_execution_probe_factory is not None:
+            self.pipelex_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
 
         # --- Pipe Router -----------------------------------------------------------------------
+        # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
 
         if pipe_router:
             self.pipelex_hub.set_pipe_router(pipe_router)
-        elif get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_router(make_temporal_pipe_router())
         else:
-            self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
+            self.pipelex_hub.set_pipe_router(self._resolve_hub_slot(slot=HubSlot.PIPE_ROUTER, default=lambda: PipeRouter(observer=multi_observer)))
 
         # --- Pipe Run --------------------------------------------------------------------------
+        # No explicit param for pipe_run: plugin slot-claim thunk > core default.
 
-        if get_config().temporal.is_enabled:
-            from pipelex.temporal.tprl_pipe.temporal_pipe_run import make_temporal_pipe_run  # noqa: PLC0415
-
-            self.pipelex_hub.set_pipe_run(make_temporal_pipe_run())
-        else:
-            self.pipelex_hub.set_pipe_run(PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        self.pipelex_hub.set_pipe_run(
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.pipelex_hub.get_required_pipe_router()))
+        )
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
-    def teardown(self):
-        # temporal
-        if self._temporal_task_manager is not None:
-            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
-            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
+    def _resolve_hub_slot(self, *, slot: HubSlot, default: Callable[[], _HubSlotImplT]) -> _HubSlotImplT:
+        """Resolve a process-global hub slot: a plugin's claimed thunk if present, else the core default.
 
-            if isinstance(self._temporal_task_manager, TemporalTaskManager):
-                self._temporal_task_manager.teardown()
-            temporal_hub.reset()
+        Call sites apply explicit-injection precedence first (an explicit ``setup()`` param wins),
+        so this only arbitrates plugin-claim vs core-default. The claim is a thunk invoked here at the
+        boot apply-point — never during ``register`` — so a non-worker boot constructs no plugin impl.
+        The return type follows the core ``default`` (the claimed thunk is typed ``Any`` and adopts it).
+        """
+        if self._plugin_registrar is not None:
+            factory = self._plugin_registrar.slot_claims.get(slot)
+            if factory is not None:
+                return cast("_HubSlotImplT", factory())
+        return default()
+
+    def teardown(self):
+        # Plugin-contributed teardown callbacks (LIFO) — e.g. a Temporal worker tears down its task
+        # manager + resets its hub. Names no integration: the callbacks were registered by whichever
+        # boot-orchestrator plugin claimed the runtime, and run before core teardown so a worker's
+        # in-flight Temporal resources release first.
+        if self._plugin_registrar is not None:
+            for teardown_callback in reversed(self._plugin_registrar.teardown_callbacks):
+                teardown_callback()
 
         # pipelex
         self.pipeline_manager.teardown()
@@ -481,7 +571,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.inference_manager.teardown()
         if self.reporting_delegate:
             self.reporting_delegate.teardown()
-        self.plugin_manager.teardown()
+        self.sdk_client_manager.teardown()
 
         # tools
         self.kajson_manager.teardown()
@@ -506,9 +596,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     @classmethod
     def make(
         cls,
+        *,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
-        temporal_enabled: bool | None = None,
+        boot_orchestrator: str | None = None,
         needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
@@ -516,6 +607,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_func_executor: PipeFuncExecutorProtocol | None = None,
         pipeline_manager: PipelineManager | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
@@ -534,12 +626,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            needs_inference: When False, disables inference functionality by using a mock
-                content generator and loading backends leniently (skipping those with missing
-                credentials). This skips gateway terms check and model deck validation.
-                Useful for commands like validate/show that don't call inference APIs.
-            temporal_enabled: When provided, overrides the temporal.is_enabled config value.
-                True forces Temporal workflow execution, False forces direct execution.
+            needs_inference: When False, forces every run THIS process initiates to DRY mode
+                (consumed at PipeRunParamsFactory.make_run_params, the single writer of run_mode:
+                operators dispatch normally and the cogt leaf mocks) and loads backends leniently
+                (skipping those with missing credentials). This skips gateway terms check and model
+                deck validation. Useful for commands like validate/show that don't call inference
+                APIs. Generator selection stays backend-keyed. Submitter-side contract only: it does
+                not constrain work this process executes as a Temporal worker.
+            boot_orchestrator: When provided, boots this process under the orchestrator plugin
+                of this name (e.g. "temporal" to run pipes through the Temporal worker runtime).
+                Any other value (or None) leaves execution in-process. Core names no orchestrator;
+                the matching plugin gates on its own name.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate
                 commands that need gateway-provided model specs without enabling full inference.
@@ -549,6 +646,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             models_manager: Custom model configuration manager
             inference_manager: Custom inference routing manager
             content_generator: Custom content generation implementation
+            pipe_func_executor: Custom PipeFunc execution seam. Defaults to the in-process executor;
+                the Temporal worker claims this slot to dispatch PipeFunc runs to a sandbox activity.
             pipeline_manager: Custom pipeline management
             pipe_router: Custom pipe routing logic
             reporting_delegate: Custom reporting handler
@@ -557,7 +656,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             observers: Custom observers for pipeline events
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
-                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+                Per-call library_dirs in execute/start will override this default.
             config_overrides: Optional dict deep-merged on top of all TOML config layers
                 as the highest-priority override. Useful for tests that need specific
                 config without editing TOML files.
@@ -579,7 +678,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
-                temporal_enabled=temporal_enabled,
+                boot_orchestrator=boot_orchestrator,
                 needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
@@ -587,6 +686,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 models_manager=models_manager,
                 inference_manager=inference_manager,
                 content_generator=content_generator,
+                pipe_func_executor=pipe_func_executor,
                 pipeline_manager=pipeline_manager,
                 pipe_router=pipe_router,
                 reporting_delegate=reporting_delegate,
@@ -599,10 +699,28 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             if needs_inference:
                 pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
-            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors
+            # A failed boot must release the process-global singletons it acquired, not just the
+            # singleton registration — otherwise they leak and poison the next boot in the same
+            # process. setup() establishes these progressively (logging + hub config in __init__, the
+            # KajsonManager class registry, the template registries) and may mutate config (e.g.
+            # plugins.boot_orchestrator); failing partway skips teardown(), the normal release point.
+            # We release the same process-global state teardown() does, but via its class-level entry
+            # points so it is safe on a half-built instance (full teardown() would touch managers a
+            # partial setup never assigned). Without this the next boot raises "LogConfig is already
+            # set" and serves a stale, half-populated class registry (the KajsonManager singleton
+            # ignores a fresh registry once created).
+            pipelex_instance.pipelex_hub.reset_config()
+            KajsonManager.teardown()
+            TemplateLoader.reset()
+            TemplateRegistry.clear()
+            # Cleanup the singleton instance if setup fails to avoid "already initialized" errors.
             if cls in MetaSingleton.instances:
                 del MetaSingleton.instances[cls]
             raise
+        # Publish readiness only now: setup() AND the optional validate_model_deck() have both succeeded
+        # and the delete-on-failure handler above is behind us, so a reader can never adopt an instance
+        # that is about to be removed from the registry.
+        pipelex_instance.is_ready = True
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} ready")
         return pipelex_instance
 
@@ -610,6 +728,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def get_optional_instance(cls) -> Self | None:
         instance = MetaSingleton.instances.get(cls)
         return cast("Self | None", instance)
+
+    @classmethod
+    def is_fully_booted(cls) -> bool:
+        """True only when a singleton exists AND has completed make() (setup + validation).
+
+        Distinct from ``get_optional_instance() is not None``: the metaclass registers the instance
+        before ``setup()`` configures the hub. Callers that must not touch a half-built instance
+        (``ensure_pipelex_booted``) gate on this.
+        """
+        instance = cls.get_optional_instance()
+        return instance is not None and instance.is_ready
 
     @classmethod
     def get_instance(cls) -> Self:

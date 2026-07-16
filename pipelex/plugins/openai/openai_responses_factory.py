@@ -11,7 +11,7 @@ from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
+from pipelex.plugins.backend_extras_factory import BackendExtrasFactory
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 
 
-class OpenAIResponsesFactory(PluginFactoryAbstract):
+class OpenAIResponsesFactory(BackendExtrasFactory):
     def __init__(self, is_http_url_enabled: bool):
         super().__init__()
         self.is_http_url_enabled = is_http_url_enabled
@@ -108,6 +108,6 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return inference_model.extra_headers or {}, {}

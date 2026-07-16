@@ -1,20 +1,21 @@
-from typing import Annotated
+from enum import StrEnum
+from typing import Annotated, Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 
+from pipelex.core.bundles.exceptions import InvalidPipeCodeSyntaxError, NativeConceptRedeclarationError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.pipe_blueprint import normalize_typeless_signature_section
 from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
-from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
@@ -24,8 +25,33 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlue
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure_blueprint import PipeStructureBlueprint
-from pipelex.types import Self, StrEnum
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 from pipelex.urls import URLs
+
+
+def _strippable_same_domain_pipe_code(code: str, *, domain: str | None, existing_pipe_codes: set[str] | None = None) -> str | None:
+    """Return the namespace-stripped bare code when ``code`` is a safely-strippable same-domain
+    over-qualification (``<domain>.<bare>``), else ``None`` — the raise-site gate for
+    ``strip-namespace``.
+
+    Strippable requires: a dotted code whose prefix equals the bundle's own ``domain``, a bare tail
+    that is itself a valid snake_case pipe code, and — for a declaration key, where
+    ``existing_pipe_codes`` is supplied — no bare code already occupying that key (the rename would
+    collide). ``main_pipe`` passes ``existing_pipe_codes=None``: it is a single value, not a table
+    key, and the ``pipe`` field is not yet validated when the ``main_pipe`` validator runs — its
+    safety gate lives in the blueprint categorizer (``_main_pipe_strip_is_safe``), which holds the
+    raw bundle dict and drops the enrichment when stripping would retarget ``main_pipe`` to a
+    different declaration or rewrite it to a pipe that does not exist.
+    """
+    if domain is None or "." not in code:
+        return None
+    prefix, bare = code.rsplit(".", 1)
+    if prefix != domain or not is_pipe_code_valid(bare):
+        return None
+    if existing_pipe_codes is not None and bare in existing_pipe_codes:
+        return None
+    return bare
+
 
 PipeBlueprintUnion = Annotated[
     PipeFuncBlueprint
@@ -38,7 +64,8 @@ PipeBlueprintUnion = Annotated[
     | PipeBatchBlueprint
     | PipeConditionBlueprint
     | PipeParallelBlueprint
-    | PipeSequenceBlueprint,
+    | PipeSequenceBlueprint
+    | PipeSignatureBlueprint,
     Field(discriminator="type"),
 ]
 
@@ -109,130 +136,63 @@ class PipelexBundleBlueprint(BaseModel):
                     f"Native concepts are: {', '.join(native_concept_codes)}. "
                     f"See {URLs.native_concepts_docs}"
                 )
-                raise ValueError(msg)
+                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
+                # blueprint categorizer recovers the offending code structurally for the fix planner.
+                raise NativeConceptRedeclarationError(msg, concept_code=concept_code)
         return concept
 
     @field_validator("main_pipe", mode="before")
     @classmethod
-    def validate_main_pipe_syntax(cls, main_pipe: str | None) -> str | None:
+    def validate_main_pipe_syntax(cls, main_pipe: str | None, info: ValidationInfo) -> str | None:
         if main_pipe is None:
             return None
         if not is_pipe_code_valid(main_pipe):
             msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
+            stripped = _strippable_same_domain_pipe_code(main_pipe, domain=cast("str | None", info.data.get("domain")))
+            if stripped is not None:
+                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
+                # blueprint categorizer recovers the strip target structurally for the fix planner.
+                raise InvalidPipeCodeSyntaxError(msg, offending_code=main_pipe, stripped_code=stripped)
             raise ValueError(msg)
         return main_pipe
 
     @field_validator("pipe", mode="before")
     @classmethod
-    def validate_pipe_keys(cls, pipe: dict[str, PipeBlueprintUnion] | None) -> dict[str, PipeBlueprintUnion] | None:
+    def validate_pipe_keys(cls, pipe: Any, info: ValidationInfo) -> Any:
+        """Validate pipe codes and normalize typeless sections before the discriminated union runs.
+
+        A `[pipe.x]` section with no `type` whose keys are exactly the signature contract
+        (`SIGNATURE_ONLY_KEYS`) is normalized by injecting the internal `PipeSignature`
+        discriminator, so the union routes it to `PipeSignatureBlueprint` — the author never writes
+        the tag. A typeless section that declares anything more is describing an implementation
+        without naming its type, which is a hard error. A section that already names a `type` (or is
+        an already-built blueprint instance rather than a raw dict) passes through untouched.
+        """
         if pipe is None:
             return None
-        for pipe_code in pipe:
-            if not is_pipe_code_valid(pipe_code=pipe_code):
+        if not isinstance(pipe, dict):
+            # Let the field type raise its own "should be a dict" error.
+            return pipe
+        typed_pipe = cast("dict[Any, Any]", pipe)
+        domain = cast("str | None", info.data.get("domain"))
+        existing_pipe_codes = {key for key in typed_pipe if isinstance(key, str)}
+        normalized: dict[Any, Any] = {}
+        for pipe_code, pipe_section in typed_pipe.items():
+            if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
+                stripped = _strippable_same_domain_pipe_code(pipe_code, domain=domain, existing_pipe_codes=existing_pipe_codes)
+                if stripped is not None:
+                    # Typed (still a ValueError) so the categorizer recovers the rename target
+                    # (offending dotted key + stripped bare key) structurally for the fix planner.
+                    raise InvalidPipeCodeSyntaxError(msg, offending_code=pipe_code, stripped_code=stripped)
                 raise ValueError(msg)
-        return pipe
+            normalized[pipe_code] = normalize_typeless_signature_section(pipe_code=pipe_code, pipe_section=pipe_section)
+        return normalized
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":
         if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
             msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
-            raise ValueError(msg)
-        return self
-
-    @model_validator(mode="after")
-    def validate_local_concept_references(self) -> Self:
-        """Validate that local concept references are declared in this bundle or are native concepts.
-
-        This validates two cases:
-        1. Concept codes without domain prefix (e.g., 'MyConceptName')
-        2. Concept refs with the same domain as this bundle (e.g., 'this_domain.MyConceptName')
-
-        External references (concepts from other domains) are not validated here - they're
-        assumed to be declared in their respective bundles and loaded via dependencies.
-        """
-        declared_concepts: set[str] = set(self.concept.keys()) if self.concept else set()
-        native_codes = {native.value for native in NativeConceptCode.values_list()}
-        all_refs = self._collect_local_concept_references()
-
-        undeclared_refs: list[str] = []
-        for concept_ref_or_code, context in all_refs:
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
-                continue
-
-            # Parse the reference using QualifiedRef
-            ref = QualifiedRef.parse(concept_ref_or_code)
-
-            if ref.is_external_to(self.domain):
-                # External reference - skip validation (will be validated when loading dependencies)
-                continue
-
-            # Local reference (bare code or same domain) - validate
-            concept_code = ref.local_code
-            if concept_code not in declared_concepts and concept_code not in native_codes:
-                undeclared_refs.append(f"'{concept_ref_or_code}' in {context}")
-
-        if undeclared_refs:
-            msg = (
-                f"The following local concept references are not declared in domain '{self.domain}' at '{self.source}' "
-                f"and are not native concepts: {', '.join(undeclared_refs)}. "
-                f"Declared concepts: {sorted(declared_concepts) if declared_concepts else '(none)'}. "
-                f"Native concepts: {sorted(native_codes)}"
-            )
-            raise ValueError(msg)
-        return self
-
-    @model_validator(mode="after")
-    def validate_local_pipe_references(self) -> Self:
-        """Validate that domain-qualified pipe references pointing to this bundle's domain exist locally.
-
-        Three categories:
-        - Bare refs (no dot): no validation here (deferred to package-level resolution)
-        - Domain-qualified, same domain: must exist in self.pipe
-        - Domain-qualified, different domain: skip (external, validated at load time)
-
-        Special outcomes ("fail", "continue") are excluded from validation.
-        """
-        declared_pipes: set[str] = set(self.pipe.keys()) if self.pipe else set()
-        special_outcomes = SpecialOutcome.value_list()
-        all_pipe_refs = self.collect_pipe_references()
-
-        invalid_refs: list[str] = []
-        for pipe_ref_str, context in all_pipe_refs:
-            # Skip special outcomes
-            if pipe_ref_str in special_outcomes:
-                continue
-
-            # Cross-package references are validated at package level, not bundle level
-            if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
-                continue
-
-            # Try to parse as a pipe ref
-            try:
-                ref = QualifiedRef.parse_pipe_ref(pipe_ref_str)
-            except QualifiedRefError:
-                # If it doesn't parse as a valid pipe ref, skip (will be caught elsewhere)
-                continue
-
-            if not ref.is_qualified:
-                # Bare ref - no validation at bundle level
-                continue
-
-            if ref.is_external_to(self.domain):
-                # External domain - skip
-                continue
-
-            # Same domain, qualified ref - must exist locally
-            if ref.local_code not in declared_pipes:
-                invalid_refs.append(f"'{pipe_ref_str}' in {context}")
-
-        if invalid_refs:
-            msg = (
-                f"The following same-domain pipe references are not declared in domain '{self.domain}' "
-                f"at '{self.source}': {', '.join(invalid_refs)}. "
-                f"Declared pipes: {sorted(declared_pipes) if declared_pipes else '(none)'}"
-            )
             raise ValueError(msg)
         return self
 
@@ -268,22 +228,33 @@ class PipelexBundleBlueprint(BaseModel):
 
         return pipe_refs
 
-    def _collect_local_concept_references(self) -> list[tuple[str, str]]:
+    def collect_concept_references(self) -> list[tuple[str, str]]:
+        """Collect all concept references from this bundle's concepts and pipes.
+
+        Mirrors collect_pipe_references(): returns every concept reference (bare code,
+        same-domain, external-domain, or cross-package) paired with a context path. The
+        caller decides which references to resolve and where. Reference resolution for
+        same-domain refs is performed at library level over the merged crate, not per file,
+        so a concept declared in one file can be referenced from a sibling file.
+
+        Returns:
+            List of (concept_ref_or_code, context_description) tuples
+        """
         local_refs: list[tuple[str, str]] = []
 
         # Collect from concepts
         if self.concept:
             for concept_code, concept_blueprint in self.concept.items():
-                local_refs.extend(self._collect_local_refs_from_concept(concept_code, concept_blueprint))
+                local_refs.extend(self._collect_local_refs_from_concept(concept_code, concept_blueprint=concept_blueprint))
 
         # Collect from pipes
         if self.pipe:
             for pipe_code, pipe_blueprint in self.pipe.items():
-                local_refs.extend(self._collect_local_refs_from_pipe(pipe_code, pipe_blueprint))
+                local_refs.extend(self._collect_local_refs_from_pipe(pipe_code, pipe_blueprint=pipe_blueprint))
 
         return local_refs
 
-    def _collect_local_refs_from_concept(self, concept_code: str, concept_blueprint: ConceptBlueprint | str) -> list[tuple[str, str]]:
+    def _collect_local_refs_from_concept(self, concept_code: str, *, concept_blueprint: ConceptBlueprint | str) -> list[tuple[str, str]]:
         local_refs: list[tuple[str, str]] = []
 
         if isinstance(concept_blueprint, str):
@@ -306,7 +277,7 @@ class PipelexBundleBlueprint(BaseModel):
 
         return local_refs
 
-    def _collect_local_refs_from_pipe(self, pipe_code: str, pipe_blueprint: PipeBlueprintUnion) -> list[tuple[str, str]]:
+    def _collect_local_refs_from_pipe(self, pipe_code: str, *, pipe_blueprint: PipeBlueprintUnion) -> list[tuple[str, str]]:
         local_refs: list[tuple[str, str]] = []
 
         # Check inputs
@@ -318,10 +289,5 @@ class PipelexBundleBlueprint(BaseModel):
         # Check output
         local_ref = parse_concept_with_multiplicity(pipe_blueprint.output).concept_ref_or_code
         local_refs.append((local_ref, f"pipe.{pipe_code}.output"))
-
-        # Check combined_output for PipeParallel
-        if isinstance(pipe_blueprint, PipeParallelBlueprint) and pipe_blueprint.combined_output:
-            local_ref = parse_concept_with_multiplicity(pipe_blueprint.combined_output).concept_ref_or_code
-            local_refs.append((local_ref, f"pipe.{pipe_code}.combined_output"))
 
         return local_refs

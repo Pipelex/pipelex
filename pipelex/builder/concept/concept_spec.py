@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import Any
+from datetime import date, datetime
+from enum import StrEnum
+from typing import Any, Self, cast
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
@@ -8,7 +9,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
+from pipelex.builder.concept.exceptions import ConceptSpecError
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
@@ -16,7 +17,6 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
-from pipelex.types import Self, StrEnum
 
 
 class ConceptStructureSpecFieldType(StrEnum):
@@ -25,6 +25,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    DATETIME = "datetime"
     CONCEPT = "concept"
     LIST = "list"
 
@@ -38,14 +39,11 @@ class ConceptStructureSpecFieldType(StrEnum):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
                 | ConceptStructureSpecFieldType.CONCEPT
                 | ConceptStructureSpecFieldType.LIST
             ):
                 return False
-
-
-class ConceptSpecError(PipelexError):
-    pass
 
 
 class ConceptStructureSpec(StructuredContent):
@@ -135,6 +133,7 @@ class ConceptStructureSpec(StructuredContent):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
             ):
                 pass
 
@@ -159,6 +158,7 @@ class ConceptStructureSpec(StructuredContent):
                 case (
                     ConceptStructureSpecFieldType.BOOLEAN
                     | ConceptStructureSpecFieldType.DATE
+                    | ConceptStructureSpecFieldType.DATETIME
                     | ConceptStructureSpecFieldType.CONCEPT
                     | ConceptStructureSpecFieldType.LIST
                 ):
@@ -179,19 +179,24 @@ class ConceptStructureSpec(StructuredContent):
         match self.type:
             case ConceptStructureSpecFieldType.TEXT:
                 if not isinstance(self.default_value, str):
-                    self._raise_type_mismatch_error("str", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="str", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.INTEGER:
                 if not isinstance(self.default_value, int):
-                    self._raise_type_mismatch_error("int", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="int", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.BOOLEAN:
                 if not isinstance(self.default_value, bool):
-                    self._raise_type_mismatch_error("bool", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="bool", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.NUMBER:
                 if not isinstance(self.default_value, (int, float)):
-                    self._raise_type_mismatch_error("number (int or float)", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="number (int or float)", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.DATE:
+                # A calendar date, not a datetime: datetime is a subclass of date, so reject it explicitly
+                # (a datetime default would carry a time the `date` field silently drops).
+                if not isinstance(self.default_value, date) or isinstance(self.default_value, datetime):
+                    self._raise_type_mismatch_error(expected_type_name="date", actual_type_name=type(self.default_value).__name__)
+            case ConceptStructureSpecFieldType.DATETIME:
                 if not isinstance(self.default_value, datetime):
-                    self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+                    self._raise_type_mismatch_error(expected_type_name="datetime", actual_type_name=type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
@@ -199,7 +204,7 @@ class ConceptStructureSpec(StructuredContent):
                 # LIST type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
 
-    def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
+    def _raise_type_mismatch_error(self, *, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
         raise ValueError(msg)
 
@@ -251,10 +256,10 @@ class ConceptSpec(StructuredContent):
         default=None,
         description=(
             "If applicable: the native concept this concept extends "
-            "(Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic) "
+            "(Text, Html, Image, Document, Number, Page, TextAndImages, JSON, Anything, Dynamic) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
-        examples=["Text", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "ImgGenPrompt", "JSON"],
+        examples=["Text", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "JSON"],
     )
 
     @field_validator("concept_code", mode="before")
@@ -315,14 +320,19 @@ class ConceptSpec(StructuredContent):
 
     @model_validator(mode="before")
     @classmethod
-    def model_validate_spec(cls, values: dict[str, Any]) -> dict[str, Any]:
-        if values.get("refines") and values.get("structure"):
+    def model_validate_spec(cls, values: Any) -> Any:
+        # mode="before" receives raw, unvalidated input — a non-dict (e.g. a plain string in a
+        # `ConceptSpec | str` union) must fall through untouched rather than crash on dict access
+        if not isinstance(values, dict):
+            return values
+        fields = cast("dict[str, Any]", values)
+        if fields.get("refines") and fields.get("structure"):
             msg = (
-                f"Forbidden to have refines and structure at the same time: `{values.get('refines')}` "
-                f"and `{values.get('structure')}` for concept that has the description `{values.get('description')}`"
+                f"Forbidden to have refines and structure at the same time: `{fields.get('refines')}` "
+                f"and `{fields.get('structure')}` for concept that has the description `{fields.get('description')}`"
             )
             raise ConceptSpecError(msg)
-        return values
+        return fields
 
     def to_blueprint(self) -> ConceptBlueprint:
         """Convert this ConceptBlueprint to the original core ConceptBlueprint."""
@@ -350,11 +360,12 @@ class ConceptSpec(StructuredContent):
                 | ConceptStructureSpecFieldType.BOOLEAN
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.DATETIME
             ):
                 return field_spec.type
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))

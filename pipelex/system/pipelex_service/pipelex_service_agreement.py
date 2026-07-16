@@ -26,7 +26,7 @@ class PipelexServiceOnboarding(ConfigModel):
     )
 
 
-def update_service_terms_acceptance(accepted: bool, config_dir: Path | None = None) -> None:
+def update_service_terms_acceptance(*, accepted: bool, config_dir: Path | None = None) -> None:
     """Update the service terms acceptance in pipelex_service.toml.
 
     Args:
@@ -47,10 +47,10 @@ def update_service_terms_acceptance(accepted: bool, config_dir: Path | None = No
     toml_doc["agreement"]["terms_accepted"] = accepted  # type: ignore[index]
 
     resolved_config_dir.mkdir(parents=True, exist_ok=True)
-    save_toml_to_path(toml_doc, service_config_path)
+    save_toml_to_path(toml_doc, path=service_config_path)
 
 
-def update_inference_setup_completed(completed: bool, config_dir: Path | None = None) -> None:
+def update_inference_setup_completed(*, completed: bool, config_dir: Path | None = None) -> None:
     """Update the inference setup completed flag in pipelex_service.toml.
 
     Args:
@@ -74,4 +74,4 @@ def update_inference_setup_completed(completed: bool, config_dir: Path | None = 
     toml_doc["onboarding"]["inference_setup_completed"] = completed  # type: ignore[index]
 
     resolved_config_dir.mkdir(parents=True, exist_ok=True)
-    save_toml_to_path(toml_doc, service_config_path)
+    save_toml_to_path(toml_doc, path=service_config_path)

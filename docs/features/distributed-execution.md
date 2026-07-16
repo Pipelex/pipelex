@@ -1,34 +1,27 @@
 ---
-title: "Distributed Execution with Temporal"
-description: "Run Pipelex pipelines as durable Temporal workflows across one or more worker processes. Per-activity routing, runtime profiles, and dashboard observability."
+title: "Distributed Execution"
+description: "Run Pipelex methods as durable, horizontally-scaled workflows — crash survival, per-step retries, and operational visibility, delivered through the Pipelex platform."
 ---
 
-# Distributed Execution with Temporal
+# Distributed Execution
 
-Run your `.mthds` methods as durable Temporal workflows.
+Run your `.mthds` methods as durable workflows — the same methods you build locally, executed with crash survival, per-step retries, and horizontal scale.
 
 ## Overview
 
-Pipelex pipelines normally run in-process. With the optional `pipelex[temporal]` integration, the same pipelines run as Temporal workflows: each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an activity. Temporal handles durability, retries, scheduling, and visibility; Pipelex handles the AI work. Flip `[temporal] is_enabled = true` in `pipelex.toml` and the same methods run distributed without changing a line of method code.
+Pipelex pipelines normally run in-process. When you need durability, retries that survive failure, and scale, the same pipelines run as durable workflows: each pipe becomes a workflow, child pipes become child workflows, and every LLM call, image generation, or document extraction becomes an independently-retried unit of work. Pipelex handles the AI work; the orchestration layer handles durability, retries, scheduling, and visibility — and your method code doesn't change.
 
-## Supported deployment patterns
+## What you get
 
-- **Single worker** — one process polls one task queue, runs everything. Right for most deployments.
-- **Router + runners** — a dedicated workflow worker dispatches activities to one or more runner pools (LLM, image-gen, extract). Each runner pool scales independently and isolates failures.
-- **Per-provider isolation** — separate worker pools for OpenAI, Anthropic, image generation, and OCR, each on its own task queue with its own retry policy and rate cap.
+- **Crash survival** — long pipelines resume exactly where they left off after a restart.
+- **Per-step retries** — each LLM call, extraction, or image generation retries on its own, with its own timeout and retry policy.
+- **Horizontal scale** — fan work across workers and route workloads to pools that scale and fail independently.
+- **Operational visibility** — every run is durable, observable, and replayable.
 
-## Configuration
+## Backends
 
-All knobs live under `[temporal.*]` in `pipelex.toml`:
-
-- `[temporal.search_attributes]` — custom search attributes attached to every workflow start.
-- `[temporal.worker_config]` — default task queue, workflow and activity timeouts, baseline retry policy.
-- `[temporal.activity_queues.<activity>]` — per-activity, per-handle task-queue routing.
-- `[temporal.queue_options.<queue>]` — per-queue timeout, retry, and rate-cap overlays.
-- `[temporal.worker_runtime_profiles.profiles.<name>]` — named runtime profiles for `pipelex worker --profile`.
-- `[temporal.worker_scopes.scopes.<name>]` — named scopes for `pipelex worker --scope`.
-- `[temporal.temporal_config]` — server profiles (`local`, `testing`, …) and log toggles.
+Distributed execution is delivered through the Pipelex platform, on proven orchestration engines — [Temporal-backed durable execution](https://pipelex.com/products#temporal), and a [Mistral Workflows](https://pipelex.com/products#mistral-workflows) integration that runs your pipes inside Mistral's managed Workflows. Both run the identical methods through the same Pipelex runtime, so the durability model and the error contract are the same whichever one executes your work.
 
 ## Get started
 
-See the **[Distributed Execution with Temporal](../distributed-execution/index.md)** guide for the full walkthrough — overview, cluster setup, worker deployment, task-queue routing, and workflow observability.
+See the **[Distributed Execution](../distributed-execution/index.md)** capability guide, or explore the platform at **[Pipelex products](https://pipelex.com/products#durable-execution)**.

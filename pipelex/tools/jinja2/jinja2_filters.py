@@ -1,4 +1,5 @@
 import re
+from enum import StrEnum
 from typing import Any
 
 from jinja2 import pass_context
@@ -6,12 +7,11 @@ from jinja2.runtime import Context, Undefined
 
 from pipelex.cogt.templating.templating_style import TagStyle
 from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
-from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
-from pipelex.types import StrEnum
 
 ########################################################################################
 # Jinja2 filters
@@ -104,10 +104,10 @@ async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
     else:
         rendered_value = str(value)
 
-    return apply_tag_style(context, rendered_value, final_tag_name)
+    return apply_tag_style(context=context, value=rendered_value, tag_name=final_tag_name)
 
 
-def apply_tag_style(context: Context, value: str, tag_name: str | None = None) -> str:
+def apply_tag_style(*, context: Context, value: str, tag_name: str | None = None) -> str:
     """Apply tag style wrapping to content.
 
     Args:

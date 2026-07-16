@@ -44,8 +44,8 @@ class GraphOutputs(BaseModel):
 
 async def generate_graph_outputs(
     graph_spec: GraphSpec,
-    graph_config: GraphConfig,
     *,
+    graph_config: GraphConfig,
     pipe_code: str = "",
     title: str | None = None,
     direction: FlowchartDirection | None = None,
@@ -93,7 +93,7 @@ async def generate_graph_outputs(
     # Generate mermaidflow view
     if inclusion.mermaidflow_mmd or inclusion.mermaidflow_html:
         mermaidflow = MermaidflowFactory.make_from_graphspec(
-            graph_spec, graph_config, direction=effective_direction, include_subgraphs=include_subgraphs
+            graph_spec, graph_config=graph_config, direction=effective_direction, include_subgraphs=include_subgraphs
         )
         if inclusion.mermaidflow_mmd:
             mermaidflow_mmd = mermaidflow.mermaid_code
@@ -120,7 +120,7 @@ async def generate_graph_outputs(
             effective_rf_config = effective_rf_config.model_copy(update={"layout_direction": direction})
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
-            effective_rf_config,
+            config=effective_rf_config,
             title=page_title,
         )
 
@@ -134,6 +134,7 @@ async def generate_graph_outputs(
 
 def save_graph_outputs_to_dir(
     graph_outputs: GraphOutputs,
+    *,
     output_dir: Path,
 ) -> dict[str, Path]:
     """Save graph outputs to a directory.

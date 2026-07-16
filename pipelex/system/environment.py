@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from pipelex.system.exceptions import ToolError
+from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
 # Load global credentials first (~/.pipelex/.env)
@@ -16,10 +16,6 @@ load_dotenv(dotenv_path=".env", override=True)
 
 # Environment variable for specifying library directories (PATH-style, colon-separated on Unix, semicolon on Windows)
 PIPELEXPATH_ENV_KEY = "PIPELEXPATH"
-
-
-class EnvVarNotFoundError(ToolError):
-    pass
 
 
 def get_required_env(key: str) -> str:

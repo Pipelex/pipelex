@@ -1,4 +1,5 @@
 from importlib.resources import files
+from importlib.resources.abc import Traversable
 from pathlib import Path
 
 import pipelex.builder as builder_pkg  # package import — used for __file__ path
@@ -6,7 +7,6 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.tools.misc.file_utils import find_files_in_dir
-from pipelex.types import Traversable
 
 
 def get_pipelex_mthds_files_from_package() -> list[Path]:
@@ -21,7 +21,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
     mthds_files: list[Path] = []
     pipelex_package = files("pipelex")
 
-    def _find_mthds_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
+    def _find_mthds_in_traversable(traversable: Traversable, *, collected: list[Path]) -> None:
         """Recursively find .mthds files in a Traversable."""
         excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
         try:
@@ -36,11 +36,11 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:
-                        _find_mthds_in_traversable(child, collected)
+                        _find_mthds_in_traversable(child, collected=collected)
         except (PermissionError, OSError) as exc:
             log.warning(f"Could not access {traversable}: {exc}")
 
-    _find_mthds_in_traversable(pipelex_package, mthds_files)
+    _find_mthds_in_traversable(pipelex_package, collected=mthds_files)
     log.verbose(f"Found {len(mthds_files)} MTHDS files in pipelex package")
     return mthds_files
 
@@ -73,7 +73,7 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
 
         # Find all .mthds files in the directory, excluding problematic directories
         mthds_files = find_files_in_dir(
-            dir_path=str(dir_path),
+            dir_path=dir_path,
             pattern=f"*{MTHDS_EXTENSION}",
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
             force_include_dirs=[str(Path(builder_pkg.__file__).parent)],

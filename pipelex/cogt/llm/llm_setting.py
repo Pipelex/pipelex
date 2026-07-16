@@ -1,4 +1,4 @@
-from typing import Annotated, Literal, Union
+from typing import Annotated, Literal, Self, Union
 
 from pydantic import BeforeValidator, Field, WithJsonSchema, field_validator, model_validator
 
@@ -7,7 +7,6 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import Self
 
 
 class LLMSettingValueError(ValueError):
@@ -92,11 +91,7 @@ class LLMSettingChoices(ConfigModel):
         return {item for item in (self.for_text, self.for_object) if isinstance(item, ModelReference)}
 
     @classmethod
-    def make_completed_with_defaults(
-        cls,
-        for_text: LLMModelChoice | None = None,
-        for_object: LLMModelChoice | None = None,
-    ) -> Self:
+    def make_completed_with_defaults(cls, *, for_text: LLMModelChoice | None = None, for_object: LLMModelChoice | None = None) -> Self:
         return cls(
             for_text=for_text,
             for_object=for_object,

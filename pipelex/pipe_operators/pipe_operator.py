@@ -30,6 +30,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @override
     async def _live_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -85,6 +86,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @override
     async def _dry_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -98,6 +100,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @abstractmethod
     async def _live_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -105,12 +108,23 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     ) -> PipeOperatorOutputType:
         pass
 
-    @abstractmethod
     async def _dry_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOperatorOutputType:
-        pass
+        """Default DRY behavior: reuse the live path — run_mode=DRY rides
+        ``pipe_run_params.cogt_run_params`` into every assignment and the cogt leaf mocks, on any
+        backend (inline or inside a Temporal activity). Operators whose dry behavior genuinely
+        differs (e.g. ``PipeFunc`` mocks its output instead of running user code, ``PipeCompose``
+        adds a construct-mode fallback) override this.
+        """
+        return await self._live_run_operator_pipe(
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+        )

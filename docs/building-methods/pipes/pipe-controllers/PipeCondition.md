@@ -11,8 +11,8 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 `PipeCondition` is a routing mechanism. Its execution flow is as follows:
 
 1.  **Evaluate an Expression**: It takes an expression and renders it using Jinja2, with the full `WorkingMemory` available as context. This evaluation results in a simple string.
-2.  **Look Up in Pipe Map**: The resulting string is used as a key to find a corresponding pipe name in the `pipe_map`.
-3.  **Use Default (Optional)**: If the key is not found in the `pipe_map`, it will use the `default_pipe_code` if one is provided. If there's no match and no default, an error is raised.
+2.  **Look Up in the Outcome Map**: The resulting string is used as a key to find a corresponding outcome in `outcomes` — the name of a pipe to execute, or a special outcome (`continue` / `fail`).
+3.  **Use Default**: If the key is not found in `outcomes`, the `default_outcome` is used.
 4.  **Execute Chosen Pipe**: The chosen pipe is then executed. It receives the exact same `WorkingMemory` and inputs that were passed to the `PipeCondition` operator. The output of the chosen pipe becomes the output of the `PipeCondition` itself.
 
 ## Configuration
@@ -29,12 +29,12 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 | `output`                       | string         | The output concept produced by the selected pipe.                                                | Yes                            |
 | `expression`                   | string         | A simple Jinja2 expression. `{{ ... }}` are automatically added. Good for simple variable access like `"my_var.category"`.                                | Yes (or `expression_template`)   |
 | `expression_template`            | string         | A full Jinja2 template string. Use this for more complex logic, like `{% if my_var.value > 10 %}high{% else %}low{% endif %}`.                           | Yes (or `expression`)          |
-| `pipe_map`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute.                                  | Yes                            |
-| `default_pipe_code`            | string         | The name of a pipe to execute if the expression result does not match any key in `pipe_map`.                                                             | No                             |
-| `add_alias_from_expression_to` | string         | An advanced feature. If provided, the string result of the expression evaluation is added to the working memory as an alias with this name.               | No                             |
+| `outcomes`                     | table (dict)   | A mapping where keys are the possible string results of the expression, and values are the names of the pipes to execute — or the special outcomes `continue` / `fail`.                                  | Yes                            |
+| `default_outcome`            | string         | The outcome used when the expression result does not match any key in `outcomes`: a pipe name, `continue`, or `fail`.                                                             | Yes                             |
+| `add_alias_from_expression_to` | string         | An advanced feature. If provided, an alias named after the string result of the expression evaluation is added to the working memory, pointing to the existing entry named by this value (which must already be in the working memory).               | No                             |
 
 !!! important "Output Concept Matching"
-    The output concept of the `PipeCondition` has to match the output of all the pipes in the `pipe_map`.
+    The output concept of the `PipeCondition` has to match the output of all the pipes in the `outcomes`.
 
 ### Example: Simple routing based on category
 
@@ -44,8 +44,11 @@ Here's a basic example showing how PipeCondition routes based on input data:
 domain = "routing_example"
 description = "Example of PipeCondition routing"
 
-[concept]
-CategoryInput = "Input with a category field"
+[concept.CategoryInput]
+description = "Input with a category field"
+
+[concept.CategoryInput.structure]
+category = "The category of the input"
 
 # Define the PipeCondition first
 [pipe.route_by_category]
@@ -54,8 +57,9 @@ description = "Route based on category field"
 inputs = { input_data = "CategoryInput" }
 output = "native.Text"
 expression = "input_data.category"
+default_outcome = "fail"
 
-[pipe.route_by_category.pipe_map]
+[pipe.route_by_category.outcomes]
 small = "process_small"
 medium = "process_medium"
 large = "process_large"
@@ -89,7 +93,7 @@ Output this only: "large"
 How this works:
 1. `PipeCondition` receives input data with a `category` field (e.g., `{category: "small"}`)
 2. It evaluates the expression `"input_data.category"` which results in the string `"small"`
-3. It looks up `"small"` in the `pipe_map` and finds the corresponding pipe: `"process_small"`
+3. It looks up `"small"` in the `outcomes` and finds the corresponding pipe: `"process_small"`
 4. The `process_small` pipe is executed with the same working memory
 5. The output from `process_small` becomes the output of the entire `PipeCondition`
 
@@ -102,9 +106,9 @@ description = "Route with default handling"
 inputs = { classification = "DocumentType" }
 output = "ProcessedDocument"
 expression = "classification.type"
-default_pipe_code = "process_unknown"
+default_outcome = "process_unknown"
 
-[pipe.route_with_fallback.pipe_map]
+[pipe.route_with_fallback.outcomes]
 invoice = "process_invoice"
 receipt = "process_receipt"
 
@@ -136,6 +140,42 @@ Process this unknown document type...
 """
 ```
 
+## Special outcomes: `continue` and `fail`
+
+Beside pipe names, an outcome (or the `default_outcome`) can be one of two special outcomes:
+
+- **`fail`**: the run fails loudly with an error naming the pipe and the evaluated expression. Use it to make "this should never happen" branches explicit.
+- **`continue`**: the condition declares that it produced **no output**. The runtime records an absence for the declared output (with the evaluated expression as the reason) and the run continues as a success — the rest of the working memory is unchanged.
+
+Because `continue` resolves the declared output as absent, a `continue`-reachable condition (any outcome mapped to `continue`, or `default_outcome = "continue"`) **must declare its output optional** — `output = "Constraint?"`. Validation enforces this statically (`optional_output_required`), so the no-output path is always visible to the type system. The same visibility rule applies at the condition's boundary: if a mapped outcome pipe declares an optional output, the condition must declare `?` too (`optional_not_handled`).
+
+### What happens downstream of `continue`
+
+An absent output propagates like any recorded absence:
+
+- A downstream pipe consuming it as a **plain** input is skipped (lifted), and its own output is recorded absent in turn.
+- A downstream pipe declaring the input **optional** (`?`) runs and handles both arms.
+- A downstream pipe declaring the input **forced** (`!`) fails with a typed error carrying the full provenance chain.
+- Inside a `PipeBatch`, an absent branch result is dropped from the aggregated list (compaction): batching a "keep or skip" condition over items yields a list of only the kept results.
+- Inside a `PipeParallel`, an absent branch result is omitted from the combined output (a non-required structured field absorbs it as its default — `null` unless the field declares another default).
+
+!!! warning "Breaking change: `continue` no longer passes the previous output through"
+    `continue` used to deliver the current main stuff by passing it through. It now resolves the condition's output as **absent** instead. The previous value is not lost — it stays in the working memory under its own name, so a downstream pipe consumes it explicitly by that name (declared `?` when it may be absent). If you need "use the new value if produced, otherwise the previous one", that coalescing idiom is planned as a follow-up; today, model it with an explicit downstream pipe that declares both inputs.
+
+```toml
+[pipe.build_or_skip]
+type = "PipeCondition"
+description = "Builds a constraint for approved links, skips rejected ones"
+inputs = { verified_link = "VerifiedLink" }
+output = "Constraint?"
+expression = "verified_link.verdict"
+default_outcome = "continue"
+
+[pipe.build_or_skip.outcomes]
+approved = "build_single_constraint"
+rejected = "continue"
+```
+
 ## Expression Types
 
 ### Simple Expression
@@ -162,7 +202,7 @@ expression_template = "{% if input_data.score >= 70 %}high{% else %}low{% endif 
 
 ### Default Routing
 ```python
-default_pipe_code = "process_unknown"
+default_outcome = "process_unknown"
 ```
 
 - Fallback pipe when no match is found

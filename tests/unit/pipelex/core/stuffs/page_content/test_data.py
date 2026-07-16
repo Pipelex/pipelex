@@ -38,7 +38,8 @@ class TestData:
             "source_negative_prompt": None,
             "caption": None,
             "mime_type": None,
-            "size": None,
+            "width": None,
+            "height": None,
             "filename": None,
         },
     }

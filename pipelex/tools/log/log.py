@@ -70,6 +70,25 @@ class Log:
         self.poor_handler = None
         self.log_dispatch.reset()
 
+    def configure_if_unset(self, log_config: LogConfig) -> bool:
+        """Configure logging unless already configured.
+
+        Useful for entry points that may be reached after another caller (a library
+        embedding Pipelex, an interleaved test) has already initialized logging.
+        ``configure`` itself is once-per-process and raises on a second call; this
+        guarded variant returns False instead.
+
+        Args:
+            log_config: The log configuration to use.
+
+        Returns:
+            True if configuration was applied, False if logging was already configured.
+        """
+        if self._log_config_instance is not None:
+            return False
+        self.configure(log_config=log_config)
+        return True
+
     def configure(self, log_config: LogConfig):
         """Configure the logging system with the given project name and log configuration.
 
@@ -148,7 +167,7 @@ class Log:
                 raise RuntimeError(msg)
             self.rich_handler.console = Console(file=sys.stderr)
 
-    def set_level_by_int(self, level_int: int):
+    def set_level_by_int(self, *, level_int: int):
         """Set the log level using an integer value.
 
         Args:
@@ -170,7 +189,7 @@ class Log:
             level = LOGGING_LEVEL_OFF
         else:
             level = getattr(logging, level_name.upper())
-        self.set_level_by_int(level)
+        self.set_level_by_int(level_int=level)
 
     def set_level(self, level: LogLevel):
         """Set the default log level for all loggers.
@@ -181,7 +200,7 @@ class Log:
         """
         self.set_level_by_int(level_int=level.int_logging_level)
 
-    def set_level_for_package(self, package_name: str, level: LogLevel):
+    def set_level_for_package(self, package_name: str, *, level: LogLevel):
         """Set the log level for a specific package.
 
         Args:
@@ -205,6 +224,7 @@ class Log:
     def verbose(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -223,6 +243,7 @@ class Log:
     def debug(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -241,6 +262,7 @@ class Log:
     def dev(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -259,6 +281,7 @@ class Log:
     def info(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
     ):
@@ -277,6 +300,7 @@ class Log:
     def warning(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         problem_id: str | None = None,
@@ -299,6 +323,7 @@ class Log:
     def error(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         include_exception: bool = False,
@@ -329,6 +354,7 @@ class Log:
     def critical(
         self,
         content: str | Any,
+        *,
         title: str | None = None,
         inline: str | None = None,
         include_exception: bool = False,

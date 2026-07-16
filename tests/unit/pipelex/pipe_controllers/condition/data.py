@@ -53,7 +53,7 @@ class PipeConditionInputTestCases:
         PipeConditionBlueprint(
             description="Test case: valid_with_special_outcome",
             inputs={"should_process": "native.Text"},
-            output="native.Text",
+            output="native.Text?",
             expression="should_process",
             outcomes={"yes": "process_pipe"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -78,7 +78,7 @@ class PipeConditionInputTestCases:
         PipeConditionBlueprint(
             description="Test case: valid_single_outcome",
             inputs={"flag": "native.Text"},
-            output="native.Text",
+            output="native.Text?",
             expression="flag",
             outcomes={"true": "process_pipe"},
             default_outcome=SpecialOutcome.CONTINUE,

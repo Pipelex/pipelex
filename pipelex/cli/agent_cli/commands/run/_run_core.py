@@ -7,16 +7,22 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
+from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
+from pipelex.core.memory.absence import AbsenceRecord
+from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown, build_absence_payload
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
 async def run_pipeline_core(
     pipe_code: str,
+    *,
     mthds_contents: list[str] | None = None,
     bundle_uris: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
@@ -24,7 +30,9 @@ async def run_pipeline_core(
     mock_inputs: bool = False,
     library_dirs: list[str] | None = None,
     graph: bool = False,
+    costs: bool = True,
     with_memory: bool = False,
+    inputs_base_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -37,8 +45,11 @@ async def run_pipeline_core(
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
         graph: Whether to generate execution graph visualizations.
+        costs: Whether to emit usage (cost) tracing events. Default True.
         with_memory: Whether to include full working memory in output (True) or
             return compact concept JSON only (False, default).
+        inputs_base_dir: Directory bare relative file paths in ``inputs`` resolve against (Smart
+            Inputs D3) — the inputs file's parent when file-loaded, else ``None``.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -48,35 +59,45 @@ async def run_pipeline_core(
     """
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+    execution_config = get_config().pipelex.pipeline_execution_config.with_execution_overrides(
         generate_graph=graph,
+        generate_usage=costs,
         mock_inputs=mock_inputs or None,
     )
 
-    runner = PipelexRunner(
+    runner = PipelexMTHDSProtocol(
         bundle_uris=bundle_uris,
         pipe_run_mode=pipe_run_mode,
         execution_config=execution_config,
         library_dirs=library_dirs,
+        inputs_base_dir=inputs_base_dir,
     )
-    response = await runner.execute_pipeline(
+    response = await runner.execute(
         pipe_code=pipe_code,
         mthds_contents=mthds_contents,
         inputs=inputs,
     )
     pipe_output = response.pipe_output
 
-    main_stuff = pipe_output.working_memory.get_optional_main_stuff()
-    main_stuff_json: dict[str, Any] = {}
-    if main_stuff:
+    # A completed run always resolves its declared output: a value or a recorded absence. An
+    # absent main output renders the explicit absence document on every arm of the envelope.
+    main_resolved = pipe_output.working_memory.resolve_main_stuff()
+    main_stuff_json: dict[str, Any]
+    compact_result: dict[str, Any]
+    if isinstance(main_resolved, AbsenceRecord):
+        main_stuff_json = {
+            "json": build_absence_json(main_resolved),
+            "markdown": build_absence_markdown(main_resolved),
+            "html": build_absence_html(main_resolved),
+        }
+        compact_result = build_absence_payload(main_resolved)
+    else:
+        main_stuff = main_resolved
         main_stuff_json = {
             "json": await main_stuff.content.rendered_json_async(),
             "markdown": await main_stuff.content.rendered_markdown_async(),
             "html": await main_stuff.content.rendered_html_async(),
         }
-
-    compact_result: dict[str, Any] | None = None
-    if main_stuff:
         compact_result = json.loads(main_stuff_json["json"])
 
     result = build_run_output(
@@ -98,6 +119,25 @@ async def run_pipeline_core(
     # leaks into the compact stdout output.  It is written to the on-disk
     # JSON file and, when with_memory is True, included in the returned dict.
     side_effects: dict[str, Any] = {}
+
+    # Cost report: best-effort structured `cost_report` object in the JSON output (machine-first; no Rich
+    # table on stderr like the human CLI). build_cost_summary returns None for runs that did no reportable
+    # work (dry runs: zero tokens and zero cost), so a free/zero-price real run yields a summary (total_cost
+    # 0) while a dry run yields None. When a summary is produced it rides the side-effect envelope: on disk
+    # always, and in the stdout result under --with-memory; the markdown renderer ignores the key, so it is
+    # JSON-only. It is therefore absent for dry runs, --no-costs (the gate below), or an aggregation failure
+    # (the guard below skips it without failing the run) — consumers treat it as optional.
+    if costs and pipe_output.tokens_usages:
+        # A cost-summary failure must never fail an otherwise-successful run (mirrors the main CLI's
+        # render_run_cost_report guard): CostRegistry can raise CostRegistryError (a PipelexError) during
+        # aggregation. Catch it, log, and skip the cost_report rather than propagate.
+        try:
+            cost_summary = CostRegistry.build_cost_summary(tokens_usages=pipe_output.tokens_usages)
+        except PipelexError as cost_summary_error:
+            log.warning(f"Cost summary generation failed (run succeeded): {cost_summary_error}")
+        else:
+            if cost_summary is not None:
+                side_effects["cost_report"] = cost_summary
 
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:

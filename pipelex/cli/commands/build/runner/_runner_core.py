@@ -1,38 +1,38 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import typer
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from posthog import tag
 
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
     handle_model_choice_error,
 )
+from pipelex.codegen.emission import write_stamped_projection
+from pipelex.codegen.emitters.naming import runtime_to_emitted_class_names
+from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
+from pipelex.codegen.emitters.types_emitter import emit_types
+from pipelex.codegen.resolved_concepts import resolve_concepts_from_crate
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.core.registry_models import CoreRegistryModels
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import (
-    get_class_registry,
-    get_func_registry,
+    get_current_library_id_or_none,
     get_library_manager,
     get_required_pipe,
     get_telemetry_manager,
-    resolve_library_dirs,
-    set_current_library,
 )
+from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -41,6 +41,8 @@ from pipelex.tools.misc.file_utils import (
 )
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 COMMAND = "build"
@@ -48,20 +50,9 @@ SUB_COMMAND_RUNNER = "runner"
 
 
 async def _prepare_runner_core(
-    pipe_code: str | None = None,
-    bundle_path: Path | None = None,
-    output_path: Path | None = None,
-    library_dirs: list[Path] | None = None,
+    *, pipe_code: str | None = None, bundle_path: Path | None = None, output_path: Path | None = None, library_dirs: list[Path] | None = None
 ) -> None:
     """Core logic for generating a Python runner file."""
-    # Set up library so pipes can be found
-    lib_manager = get_library_manager()
-    lib_id, _ = lib_manager.open_library()
-    set_current_library(library_id=lib_id)
-    effective_dirs, _ = resolve_library_dirs([str(lib_dir) for lib_dir in library_dirs] if library_dirs else None)
-    if effective_dirs:
-        lib_manager.load_libraries(library_id=lib_id, library_dirs=effective_dirs)
-
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     if bundle_path:
@@ -105,37 +96,35 @@ async def _prepare_runner_core(
     if output_path:
         final_output_path = output_path
     else:
-        bundle_dir = Path(bundle_path).parent
+        bundle_dir = bundle_path.parent
         final_output_path = bundle_dir / f"run_{pipe_code}.py"
-    output_dir = Path(final_output_path).parent
+    output_dir = final_output_path.parent
 
-    # Generate structures folder FIRST
+    # Emit the types projection (stamped structures.py + codegen.lock) into structures/ via the
+    # codegen engine. validate_bundle left its loaded-and-validated library open and current, so the
+    # crate is read from there (D6: the normalized crate is built from a valid library).
     structures_output_dir = output_dir / "structures"
-    if all_blueprints:
-        get_class_registry().teardown()
-        get_func_registry().teardown()
-        get_class_registry().register_classes(CoreRegistryModels.get_all_models())
-        generated_structures = generate_structures_from_blueprints(
-            blueprints=all_blueprints,
-            output_directory=structures_output_dir,
-            target_path=output_dir,
+    class_name_overrides: dict[str, str] = {}
+    library_id = get_current_library_id_or_none()
+    crate = get_library_manager().get_crate(library_id) if library_id else None
+    if crate is not None:
+        normalized_crate = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+        emitted = emit_types(normalized_crate, target=CodegenTarget.PYTHON_STRUCTURES)
+        report = write_stamped_projection(
+            emitted,
+            output_dir=structures_output_dir,
+            crate_fingerprint=normalized_crate.fingerprint,
+            engine_version=PACKAGE_VERSION,
+            kind=CodegenKind.TYPES,
+            target=CodegenTarget.PYTHON_STRUCTURES,
         )
-        if generated_structures:
-            typer.secho(f"Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
-
-    if structures_output_dir.exists():
-        ClassRegistryUtils.register_classes_in_folder(
-            folder_path=str(structures_output_dir),
-            base_class=StuffContent,
-            is_recursive=True,
-        )
-    ClassRegistryUtils.register_classes_in_folder(
-        folder_path=str(output_dir),
-        base_class=StuffContent,
-        is_recursive=True,
-        force_exclude_dirs=[str(structures_output_dir.resolve())] if structures_output_dir.exists() else None,
-    )
-    get_class_registry().register_classes(CoreRegistryModels.get_all_models())
+        for filename in report.written:
+            typer.secho(f"Generated {structures_output_dir / filename}", fg=typer.colors.GREEN)
+        for filename in report.unchanged:
+            typer.secho(f"Unchanged {structures_output_dir / filename}", fg=typer.colors.BLUE)
+        for filename in report.removed:
+            typer.secho(f"Removed stale {structures_output_dir / filename}", fg=typer.colors.YELLOW)
+        class_name_overrides = runtime_to_emitted_class_names(resolve_concepts_from_crate(normalized_crate))
 
     output_is_list = False
     for blueprint in all_blueprints:
@@ -147,21 +136,24 @@ async def _prepare_runner_core(
 
     if library_dirs:
         pipelex_library_dir = str(library_dirs[0].resolve())
-    elif bundle_path:
-        pipelex_library_dir = str(Path(bundle_path).parent.resolve())
     else:
-        pipelex_library_dir = None
+        pipelex_library_dir = str(bundle_path.parent.resolve())
 
     try:
-        runner_code = generate_runner_code(pipe=the_pipe, output_multiplicity=output_is_list, library_dir=pipelex_library_dir)
+        runner_code = generate_runner_code(
+            pipe=the_pipe,
+            output_multiplicity=output_is_list,
+            library_dir=pipelex_library_dir,
+            class_name_overrides=class_name_overrides,
+        )
     except Exception as exc:
         # CLI command boundary: any failure generating the runner code is reported to the user and exits via typer.Exit.
         typer.secho(f"Error generating runner code: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=runner_code, path=str(final_output_path))
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=runner_code, path=final_output_path)
         typer.secho(f"Generated runner file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.
@@ -170,6 +162,7 @@ async def _prepare_runner_core(
 
 
 def execute_prepare_runner(
+    *,
     pipe_code: str | None,
     bundle_path: Path | None,
     output_path: Path | None,

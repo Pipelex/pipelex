@@ -11,7 +11,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_run.pipe_run_params import PipeRunMode
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.json_utils import load_json_list_from_path
@@ -35,7 +35,7 @@ class TestPipeSequenceDryRun:
         """Test that the Discord newsletter pipeline creates correct working memory with ListContent for batched inputs."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
         # Load the discord channel updates data from JSON
-        discord_channel_updates_data = load_json_list_from_path(path="tests/data/discord_newsletter/discord_sample.json")
+        discord_channel_updates_data = load_json_list_from_path(path=Path("tests/data/discord_newsletter/discord_sample.json"))
 
         # Create structured DiscordChannelUpdate objects
         discord_channel_updates = ListContent[DiscordChannelUpdate](

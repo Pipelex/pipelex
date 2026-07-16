@@ -24,7 +24,7 @@ class TestModelDumpSubclass:
     def test_reconstructed_flat_model_roundtrip(self) -> None:
         """Flat reconstructed model roundtrips through model_dump(serialize_as_any=True) → model_validate."""
         schema = InnerDetail.model_json_schema()
-        reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, "InnerDetail")
+        reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="InnerDetail")
 
         raw_obj: BaseModel = reconstructed_class(label="score", value=42)
 
@@ -36,7 +36,7 @@ class TestModelDumpSubclass:
     def test_reconstructed_nested_model_roundtrip(self) -> None:
         """Nested reconstructed model roundtrips through model_dump(serialize_as_any=True) → model_validate."""
         schema = OuterModel.model_json_schema()
-        reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, "OuterModel")
+        reconstructed_class = SchemaToModelFactory.make_from_json_schema(schema, class_name="OuterModel")
 
         raw_obj: BaseModel = reconstructed_class(
             title="Test",

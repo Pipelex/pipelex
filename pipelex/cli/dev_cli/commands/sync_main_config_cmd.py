@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from enum import StrEnum
 from pathlib import Path
 
 from rich.markup import escape
@@ -11,12 +12,11 @@ from rich.table import Table
 
 from pipelex.hub import get_console
 from pipelex.tools.misc.toml_sync import TomlSyncResult, sync_toml_values
-from pipelex.types import StrEnum
 
 # Config file paths
-MAIN_CONFIG_PATH = "pipelex/pipelex.toml"
-KIT_CONFIG_PATH = "pipelex/kit/configs/pipelex.toml"
-PROJECT_CONFIG_PATH = ".pipelex/pipelex.toml"
+MAIN_CONFIG_PATH = Path("pipelex/pipelex.toml")
+KIT_CONFIG_PATH = Path("pipelex/kit/configs/pipelex.toml")
+PROJECT_CONFIG_PATH = Path(".pipelex/pipelex.toml")
 
 
 class SyncTarget(StrEnum):
@@ -37,6 +37,7 @@ def _format_value(value: object) -> str:
 
 def _display_sync_result(
     result: TomlSyncResult,
+    *,
     target_label: str,
     show_diff: bool,
     quiet: bool,
@@ -73,12 +74,7 @@ def _display_sync_result(
         console.print(table)
 
 
-def sync_main_config_cmd(
-    target: SyncTarget = SyncTarget.ALL,
-    dry_run: bool = False,
-    quiet: bool = False,
-    show_diff: bool = True,
-) -> None:
+def sync_main_config_cmd(*, target: SyncTarget = SyncTarget.ALL, dry_run: bool = False, quiet: bool = False, show_diff: bool = True) -> None:
     """Sync values from main config to kit and/or project configs.
 
     Args:
@@ -90,8 +86,7 @@ def sync_main_config_cmd(
     console = get_console()
 
     # Check if main config exists
-    main_path = Path(MAIN_CONFIG_PATH)
-    if not main_path.exists():
+    if not MAIN_CONFIG_PATH.exists():
         if quiet:
             console.print(f"[red]Error:[/red] Main config not found: {MAIN_CONFIG_PATH}")
         else:
@@ -111,14 +106,13 @@ def sync_main_config_cmd(
         console.print(f"  Source: [cyan]{MAIN_CONFIG_PATH}[/cyan]")
         console.print()
 
-    results: list[tuple[str, TomlSyncResult | None, str]] = []
+    results: list[tuple[str, TomlSyncResult | None, Path]] = []
 
     # Sync to kit config
     if sync_kit:
-        kit_path = Path(KIT_CONFIG_PATH)
-        if kit_path.exists():
+        if KIT_CONFIG_PATH.exists():
             try:
-                kit_result = sync_toml_values(MAIN_CONFIG_PATH, KIT_CONFIG_PATH, dry_run=dry_run)
+                kit_result = sync_toml_values(source_path=MAIN_CONFIG_PATH, target_path=KIT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("kit", kit_result, KIT_CONFIG_PATH))
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check
@@ -134,10 +128,9 @@ def sync_main_config_cmd(
 
     # Sync to project config
     if sync_project:
-        project_path = Path(PROJECT_CONFIG_PATH)
-        if project_path.exists():
+        if PROJECT_CONFIG_PATH.exists():
             try:
-                project_result = sync_toml_values(MAIN_CONFIG_PATH, PROJECT_CONFIG_PATH, dry_run=dry_run)
+                project_result = sync_toml_values(source_path=MAIN_CONFIG_PATH, target_path=PROJECT_CONFIG_PATH, dry_run=dry_run)
                 results.append(("project", project_result, PROJECT_CONFIG_PATH))
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check
@@ -155,7 +148,7 @@ def sync_main_config_cmd(
     total_updated = 0
     for label, result, path in results:
         if result is not None:
-            _display_sync_result(result, f"{label} ({path})", show_diff=show_diff, quiet=quiet)
+            _display_sync_result(result, target_label=f"{label} ({path})", show_diff=show_diff, quiet=quiet)
             total_updated += result.updated_count
 
     if not quiet:

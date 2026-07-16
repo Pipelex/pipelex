@@ -1,20 +1,17 @@
-from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
+from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.hub import get_required_concept
-
-
-class StuffSpecFactoryError(PipelexError):
-    pass
 
 
 class StuffSpecFactory:
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         output_string: str,
     ) -> StuffSpec:
@@ -55,4 +52,4 @@ class StuffSpecFactory:
             ),
         )
 
-        return StuffSpec(concept=concept, multiplicity=parse_result.multiplicity)
+        return StuffSpec(concept=concept, multiplicity=parse_result.multiplicity, presence=parse_result.presence)

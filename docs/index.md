@@ -65,7 +65,7 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 -   :material-pipe: **[Pipe Operators](./features/pipe-operators.md)**
 
-    Six operators that do the work: LLM calls, document extraction, image generation, web search, composition, and custom functions.
+    Operators that do the work: LLM calls, text structuring, document extraction, image generation, web search, composition, and custom functions.
 
 -   :material-sitemap: **[Pipeline Orchestration](./features/pipeline-orchestration.md)**
 

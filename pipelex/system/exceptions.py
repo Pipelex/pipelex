@@ -1,16 +1,23 @@
 import logging
+from enum import StrEnum
 from typing import ClassVar
 
-from pipelex.base_exceptions import PipelexError
-from pipelex.types import StrEnum
+from pipelex.base_exceptions import ErrorDomain, PipelexError
 
 
 class ToolError(PipelexError):
-    pass
+    _declared_title = "Tool error"
 
 
 class NestedKeyConflictError(ToolError):
     """Raised when attempting to create nested keys under a non-dict value."""
+
+
+class EnvVarNotFoundError(ToolError):
+    # A missing required env var is fixed by an operator setting it, not by the
+    # caller correcting input — the textbook CONFIG-domain failure.
+    error_domain = ErrorDomain.CONFIG
+    _declared_title = "Environment variable not set"
 
 
 class MissingDependencyError(PipelexError):
@@ -27,7 +34,7 @@ class MissingDependencyError(PipelexError):
 
 
 class CredentialsError(PipelexError):
-    pass
+    _declared_title = "Missing or invalid credentials"
 
 
 class TracebackMessageErrorMode(StrEnum):
@@ -52,12 +59,12 @@ class TracebackMessageError(PipelexError):
 
 
 class FatalError(TracebackMessageError):
-    pass
+    _declared_title = "Fatal error"
 
 
 class ConfigValidationError(FatalError):
     pass
 
 
-class ConfigModelError(ValueError, FatalError):
+class ConfigModelError(FatalError, ValueError):
     pass

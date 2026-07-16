@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError
+from pipelex.cogt.exceptions import CogtError, ImgGenParameterError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -36,8 +36,18 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         return self.inference_model.is_img2img_supported
 
     def _check_can_perform_job(self, img_gen_job: ImgGenJob):
-        # This can be overridden by subclasses for specific checks
-        pass
+        """Reject jobs the model cannot honor, before any provider call.
+
+        Subclasses may override for provider-specific checks; overrides must call
+        `super()._check_can_perform_job(img_gen_job=img_gen_job)` to keep the
+        capability checks below.
+        """
+        if img_gen_job.img_gen_prompt.input_images and not self.inference_model.is_img2img_supported:
+            msg = (
+                f"Model '{self.inference_model.name}' does not accept image inputs, but input images were provided. "
+                "Use an image model that supports image-to-image generation, or remove the input images."
+            )
+            raise ImgGenParameterError(msg)
 
     async def gen_image(
         self,
@@ -81,6 +91,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         log.dev(f"✨ {self.desc} ✨")
@@ -115,6 +126,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def _gen_image_list(
         self,
         img_gen_job: ImgGenJob,
+        *,
         nb_images: int,
     ) -> list[GeneratedImageRawDetails]:
         pass

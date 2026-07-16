@@ -73,7 +73,7 @@ class TestCostRegistry:
 
         # Save to CSV
         csv_file = tmp_path / "test_report.csv"
-        CostRegistry.save_to_csv(records, csv_file)
+        CostRegistry.save_to_csv(records, file_path=csv_file)
 
         # Verify file exists
         assert csv_file.exists()
@@ -99,7 +99,7 @@ class TestCostRegistry:
     def test_save_to_csv_empty_records(self, tmp_path: Path):
         """Test that save_to_csv handles empty records gracefully."""
         csv_file = tmp_path / "empty_report.csv"
-        CostRegistry.save_to_csv([], csv_file)
+        CostRegistry.save_to_csv([], file_path=csv_file)
 
         # File should not be created for empty records
         assert not csv_file.exists()
@@ -135,7 +135,7 @@ class TestCostRegistry:
 
         # Save to CSV - should handle varying fields without errors
         csv_file = tmp_path / "varying_fields_report.csv"
-        CostRegistry.save_to_csv(records, csv_file)
+        CostRegistry.save_to_csv(records, file_path=csv_file)
 
         # Verify file exists
         assert csv_file.exists()
@@ -430,3 +430,168 @@ class TestCostRegistry:
             output_cost=2.0,
         )
         assert total == 3.5
+
+    def test_generate_report_print_to_console_false_skips_console(self, job_metadata: JobMetadata, mocker: MockerFixture):
+        """When print_to_console=False, the console.print is not called."""
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={
+                TokenCategory.INPUT: 100,
+                TokenCategory.OUTPUT: 50,
+                TokenCategory.INPUT_CACHED: 20,
+            },
+            unit_costs={
+                CostCategory.INPUT: 1000,
+                CostCategory.INPUT_CACHED: 500,
+                CostCategory.OUTPUT: 2000,
+            },
+        )
+
+        CostRegistry.generate_report(
+            pipeline_run_id="test-pipeline",
+            tokens_usages=[llm_tokens_usage],
+            unit_scale=1.0,
+            cost_report_file_path=None,
+            print_to_console=False,
+        )
+
+        mock_console.print.assert_not_called()
+
+    def test_generate_report_print_to_console_false_still_writes_csv(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
+        """When print_to_console=False, CSV file is still written if a path is provided."""
+        mock_console = mocker.MagicMock()
+        mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
+
+        llm_tokens_usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            nb_tokens_by_category={
+                TokenCategory.INPUT: 100,
+                TokenCategory.OUTPUT: 50,
+                TokenCategory.INPUT_CACHED: 20,
+            },
+            unit_costs={
+                CostCategory.INPUT: 1000,
+                CostCategory.INPUT_CACHED: 500,
+                CostCategory.OUTPUT: 2000,
+            },
+        )
+
+        csv_file = tmp_path / "csv_only.csv"
+        CostRegistry.generate_report(
+            pipeline_run_id="test-pipeline",
+            tokens_usages=[llm_tokens_usage],
+            unit_scale=1.0,
+            cost_report_file_path=csv_file,
+            print_to_console=False,
+        )
+
+        mock_console.print.assert_not_called()
+        assert csv_file.exists()
+        with open(csv_file, encoding="utf-8") as file:
+            rows = list(csv.DictReader(file))
+        assert len(rows) == 1
+        assert rows[0][LLMTokenCostReportField.LLM_NAME] == "test-model"
+
+    def test_aggregate_costs_totals_and_reportability(self, job_metadata: JobMetadata):
+        """One aggregation pass yields the run total and the reportable-work flag.
+
+        ``has_reportable_usage`` is True for a priced run AND for a free/zero-price run with real tokens
+        (cost 0), but False for a dry run (zero tokens, zero cost) — so dry runs are the only thing suppressed.
+        """
+        priced = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="m",
+            inference_model_id="m-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},  # 0.1 + 0.1 = 0.2
+        )
+        free = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="ollama-x",
+            inference_model_id="ollama-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={},  # real tokens, no price -> cost 0
+        )
+        dry = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="dry",
+            inference_model_id="dry-run",
+            nb_tokens_by_category={},
+            unit_costs={},
+        )
+
+        priced_aggregated = CostRegistry.aggregate_costs([priced])
+        assert priced_aggregated.total_cost == 0.2
+        assert priced_aggregated.total_nb_tokens == 150
+        assert priced_aggregated.has_reportable_usage is True
+
+        free_aggregated = CostRegistry.aggregate_costs([free])
+        assert free_aggregated.total_cost == 0.0
+        assert free_aggregated.total_nb_tokens == 150
+        assert free_aggregated.has_reportable_usage is True  # tokens but no cost -> still reportable
+
+        dry_aggregated = CostRegistry.aggregate_costs([dry])
+        assert dry_aggregated.total_cost == 0.0
+        assert dry_aggregated.total_nb_tokens == 0
+        assert dry_aggregated.has_reportable_usage is False  # the only case we suppress
+
+    def test_build_cost_summary_non_zero(self, job_metadata: JobMetadata):
+        """A priced run yields a JSON-serializable summary with a total and per-model rows."""
+        usage = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="claude-x",
+            inference_model_id="claude-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={CostCategory.INPUT: 1000, CostCategory.OUTPUT: 2000},
+        )
+
+        summary = CostRegistry.build_cost_summary([usage])
+
+        assert summary is not None
+        assert summary["total_cost"] == 0.2
+        assert len(summary["by_model"]) == 1
+        row = summary["by_model"][0]
+        assert row["model"] == "claude-x"
+        assert row["model_type"] == "llm"
+        assert row["nb_tokens_input"] == 100
+        assert row["nb_tokens_output"] == 50
+        assert row["cost"] == 0.2
+
+    def test_build_cost_summary_free_model_returns_summary(self, job_metadata: JobMetadata):
+        """A free/zero-price model with real tokens still reports its usage, with total_cost 0."""
+        free = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="ollama-x",
+            inference_model_id="ollama-x-id",
+            nb_tokens_by_category={TokenCategory.INPUT: 100, TokenCategory.OUTPUT: 50},
+            unit_costs={},
+        )
+
+        summary = CostRegistry.build_cost_summary([free])
+
+        assert summary is not None
+        assert summary["total_cost"] == 0.0
+        row = summary["by_model"][0]
+        assert row["model"] == "ollama-x"
+        assert row["nb_tokens_input"] == 100
+        assert row["nb_tokens_output"] == 50
+        assert row["cost"] == 0.0
+
+    def test_build_cost_summary_dry_run_returns_none(self, job_metadata: JobMetadata):
+        """A dry-run-shaped usage (zero tokens, zero cost) does no reportable work, so no summary."""
+        dry = LLMTokensUsage(
+            job_metadata=job_metadata,
+            inference_model_name="dry",
+            inference_model_id="dry-run",
+            nb_tokens_by_category={},
+            unit_costs={},
+        )
+
+        assert CostRegistry.build_cost_summary([dry]) is None

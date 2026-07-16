@@ -4,10 +4,9 @@ from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
-from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
@@ -17,17 +16,18 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
+from pipelex.hub import get_class_registry, get_concept_library, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
@@ -72,10 +72,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.template is None:
             return set()
 
+        # `self.template` is authored source (sigils not yet rewritten), so rewrite once before
+        # detecting Jinja2 variables — otherwise `$var` / `@var` sigils go unseen as required inputs.
         try:
             full_paths = detect_jinja2_required_variables(
                 template_category=self.category,
-                template_source=self.template,
+                template_source=rewrite_template_sigils(self.template),
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"
@@ -89,15 +91,27 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     # TODO: this needs testing!!!
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
         for input_name, stuff_spec in self.inputs.root.items():
-            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            needed_inputs.add_stuff_spec(
+                variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+            )
         return needed_inputs
 
     @override
     def validate_inputs_static(self):
-        pass
+        # Guard-lint (D7): every template reference to a declared-optional input must be guarded.
+        # Construct mode composes structured fields, not authored templates — nothing to lint there.
+        if self.template is not None:
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=self.template,
+                template_category=self.category,
+                template_label="template",
+            )
 
     @override
     def validate_inputs_with_library(self):
@@ -143,21 +157,18 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeComposeOutput:
-        content_generator = content_generator or get_content_generator()
-
         if self.is_construct_mode:
             return await self._run_construct_mode(
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator,
             )
         else:
             return await self._run_template_mode(
@@ -169,6 +180,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     async def _run_template_mode(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -218,7 +230,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             "compose_mode": "template",
             "rendered_text": rendered_template_text,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeComposeOutput(
             working_memory=working_memory,
@@ -227,11 +239,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     async def _run_construct_mode(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
         """Run PipeCompose in construct mode (produces StructuredContent output)."""
         if self.construct_blueprint is None:
@@ -245,14 +257,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         )
 
         # Create composer and compose the structured content
-        # Pass runtime params, extra context, and content generator for template fields (consistent with _run_template_mode)
         composer = StructuredContentComposer(
             construct_blueprint=self.construct_blueprint,
             working_memory=working_memory,
             output_class=output_class,
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
-            content_generator=content_generator,
             pipe_run_params=pipe_run_params,
         )
         try:
@@ -273,7 +283,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             "compose_mode": "construct",
             "fields": composer.field_resolutions,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeComposeOutput(
             working_memory=working_memory,
@@ -283,19 +293,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     @override
     async def _dry_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeComposeOutput:
-        content_generator_used: ContentGeneratorProtocol
-        if get_config().pipelex.dry_run_config.apply_to_jinja2_rendering:
-            log.verbose(f"PipeCompose: using dry run operator pipe for jinja2 rendering: {self.code}")
-            content_generator_used = ContentGeneratorDry()
-        else:
-            log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
-            content_generator_used = get_content_generator()
-
         if self.is_construct_mode:
             try:
                 return await self._live_run_operator_pipe(
@@ -303,7 +306,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                     working_memory=working_memory,
                     pipe_run_params=pipe_run_params,
                     output_name=output_name,
-                    content_generator=content_generator_used,
                 )
             except PipeComposeError as exc:
                 # Construct mode can fail with mock data (e.g., description-only concepts
@@ -327,11 +329,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator_used,
             )
 
     def _make_mock_construct_output(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         output_name: str | None,
@@ -352,12 +354,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

@@ -1,0 +1,198 @@
+"""Unit tests for doctor's config-location, config-files and telemetry checks."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from pydantic import BaseModel, ValidationError
+
+from pipelex.cli.commands.doctor_cmd import (
+    check_config_files,
+    check_telemetry_config,
+    gather_config_location,
+)
+from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.system.configuration.config_loader import ConfigLoader, config_manager
+from pipelex.system.configuration.configs import PipelexConfig
+from pipelex.system.exceptions import ConfigValidationError
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
+from pipelex.tools.misc.exceptions import TomlError
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pytest_mock import MockerFixture
+
+
+class _TinyModel(BaseModel):
+    value: int
+
+
+def _make_validation_error() -> ValidationError:
+    try:
+        _TinyModel.model_validate({"value": "not-an-int"})
+    except ValidationError as exc:
+        return exc
+    msg = "expected validation to fail"
+    raise AssertionError(msg)
+
+
+class TestDoctorConfigChecks:
+    def test_gather_config_location_project_local(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """With a project .pipelex/ resolved, the location is reported as project-local."""
+        project_dir = tmp_path / "project" / ".pipelex"
+        global_dir = tmp_path / "global"
+        mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
+        mocker.patch.object(ConfigLoader, "project_root", new_callable=mocker.PropertyMock, return_value=tmp_path / "project")
+        mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
+        mocker.patch.object(ConfigLoader, "pipelex_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
+
+        location = gather_config_location()
+
+        assert location.is_project_local is True
+        assert location.config_dir == str(project_dir)
+        assert location.project_root == str(tmp_path / "project")
+        assert location.global_config_dir == str(global_dir)
+
+    def test_gather_config_location_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Without a project .pipelex/, the location is the global config dir."""
+        global_dir = tmp_path / "global"
+        mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=None)
+        mocker.patch.object(ConfigLoader, "project_root", new_callable=mocker.PropertyMock, return_value=None)
+        mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
+        mocker.patch.object(ConfigLoader, "pipelex_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
+
+        location = gather_config_location()
+
+        assert location.is_project_local is False
+        assert location.project_root is None
+        assert location.config_dir == str(global_dir)
+
+    def test_check_config_files_all_good(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """No missing files and no pipelex.toml to validate is healthy."""
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+
+        healthy, missing_count, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is True
+        assert missing_count == 0
+        assert message == "All configuration files present and valid"
+
+    def test_check_config_files_missing_files_counted(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Missing config files are counted in the unhealthy message."""
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=3)
+
+        healthy, missing_count, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert missing_count == 3
+        assert message == "3 configuration file(s) missing"
+
+    def test_check_config_files_init_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A failure while probing for missing files is reported as a finding."""
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", side_effect=PipelexCLIError("probe failed"))
+
+        healthy, missing_count, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert missing_count == 0
+        assert "Error checking config files: probe failed" in message
+
+    def test_check_config_files_validation_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A pydantic ValidationError on the merged config produces the migration-aware report."""
+        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        mocker.patch.object(config_manager, "load_config", return_value={})
+        mocker.patch.object(PipelexConfig, "model_validate", side_effect=_make_validation_error())
+
+        healthy, missing_count, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert missing_count == 0
+        assert message.startswith("Configuration validation failed:")
+
+    def test_check_config_files_config_validation_error_with_cause(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A ConfigValidationError wrapping a ValidationError recovers the original report."""
+        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        wrapped_error = ConfigValidationError("wrapped")
+        wrapped_error.__cause__ = _make_validation_error()
+        mocker.patch.object(config_manager, "load_config", side_effect=wrapped_error)
+
+        healthy, _, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message.startswith("Configuration validation failed:")
+        assert "wrapped" not in message
+
+    def test_check_config_files_config_validation_error_without_cause(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A ConfigValidationError without an underlying ValidationError uses its own message."""
+        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        mocker.patch.object(config_manager, "load_config", side_effect=ConfigValidationError("plain failure"))
+
+        healthy, _, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "Configuration validation failed: plain failure"
+
+    def test_check_config_files_toml_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A TOML parse failure on pipelex.toml is reported as a load error."""
+        (tmp_path / "pipelex.toml").write_text("not valid toml [", encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        mocker.patch.object(
+            config_manager,
+            "load_config",
+            side_effect=TomlError(message="unterminated table", doc="", pos=0, lineno=1, colno=1),
+        )
+
+        healthy, _, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert "Error loading pipelex.toml:" in message
+        assert "unterminated table" in message
+
+    def test_check_config_files_os_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """An OSError while loading the config is reported as a load error."""
+        (tmp_path / "pipelex.toml").write_text("[pipelex]\n", encoding="utf-8")
+        mocker.patch("pipelex.cli.commands.doctor_cmd.init_config", return_value=0)
+        mocker.patch.object(config_manager, "load_config", side_effect=OSError("permission denied"))
+
+        healthy, _, message = check_config_files(config_dir=tmp_path)
+
+        assert healthy is False
+        assert "Error loading pipelex.toml: permission denied" in message
+
+    def test_check_telemetry_config_file_not_found(self, tmp_path: Path) -> None:
+        """A missing telemetry.toml is unhealthy with a clear message."""
+        healthy, message = check_telemetry_config(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "Telemetry configuration file not found"
+
+    def test_check_telemetry_config_toml_syntax_error(self, tmp_path: Path) -> None:
+        """Invalid TOML in telemetry.toml is reported as a syntax error."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text("not [ valid toml", encoding="utf-8")
+
+        healthy, message = check_telemetry_config(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message.startswith("TOML syntax error:")
+
+    def test_check_telemetry_config_old_format_detected(self, tmp_path: Path) -> None:
+        """The legacy flat format gets the dedicated migration message."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('telemetry_mode = "off"\nproject_api_key = "key"\n', encoding="utf-8")
+
+        healthy, message = check_telemetry_config(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "Config format has changed - run 'pipelex init telemetry' to update"
+
+    def test_check_telemetry_config_invalid_new_format(self, tmp_path: Path) -> None:
+        """A new-format file that fails validation gets the generic fix message."""
+        (tmp_path / TELEMETRY_CONFIG_FILE_NAME).write_text('[custom_posthog]\nmode = "no-such-mode"\n', encoding="utf-8")
+
+        healthy, message = check_telemetry_config(config_dir=tmp_path)
+
+        assert healthy is False
+        assert message == "Invalid configuration - run 'pipelex init telemetry' to fix"

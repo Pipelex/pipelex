@@ -5,42 +5,27 @@ This module provides functions to generate executable Python code for Pipelex pi
 Main Functions:
 --------------
 - generate_runner_code(pipe): Generate complete executable Python script
+
+Custom structure classes are imported from the codegen engine's single-module projection
+(`structures/structures.py`, emitted by `codegen types --target python-structures` — see
+`pipelex/codegen/`). A class that lives in a real importable module (a user-registered class backing
+a `structure = "<ClassName>"` concept) is imported from that module instead.
 """
 
-from dataclasses import dataclass
 from typing import Any
 
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
 )
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
+from pipelex.hub import get_class_registry
 
-
-@dataclass
-class CustomClassInfo:
-    """Information about a custom structure class for import generation."""
-
-    class_name: str
-    domain_code: str
-    concept_code: str
-
-    @property
-    def module_name(self) -> str:
-        """Get the module name (filename without .py) for this class."""
-        concept_snake_case = pascal_case_to_snake_case(self.concept_code)
-        return f"{self.domain_code}__{concept_snake_case}"
-
-    @property
-    def import_statement(self) -> str:
-        """Get the import statement for this class (uses sys.path from script directory)."""
-        return f"from structures.{self.module_name} import {self.class_name}"
+STRUCTURES_MODULE = "structures.structures"
+"""Module path of the emitted types projection, relative to the generated script's directory."""
 
 
 def _is_multiple(multiplicity: VariableMultiplicity | None) -> bool:
@@ -60,7 +45,7 @@ def _is_multiple(multiplicity: VariableMultiplicity | None) -> bool:
     return multiplicity > 1
 
 
-def _format_representation_as_python(representation: dict[str, Any], is_multiple: bool = False) -> str:
+def _format_representation_as_python(representation: dict[str, Any], *, is_multiple: bool = False) -> str:
     """Format a representation dict as Python code.
 
     Args:
@@ -81,7 +66,7 @@ def _format_representation_as_python(representation: dict[str, Any], is_multiple
     return f'{{\n            "concept": "{concept}",\n            "content": {content},\n        }}'
 
 
-def _get_structure_class_import(class_name: str) -> str | None:
+def _get_structure_class_import(*, class_name: str) -> str | None:
     """Get the import statement for a native structure class.
 
     The import statement is generated dynamically from the class's actual module location,
@@ -99,61 +84,59 @@ def _get_structure_class_import(class_name: str) -> str | None:
     return f"from {cls.__module__} import {cls.__name__}"
 
 
-def _collect_concept_info(concept: Concept) -> CustomClassInfo | None:
-    """Collect information about a concept for import generation.
+def _custom_import_statement(*, class_name: str, emitted_names: set[str]) -> str:
+    """Build the import statement for a custom (non-native) structure class.
 
-    Args:
-        concept: The concept to collect info for
-
-    Returns:
-        CustomClassInfo if it's a custom concept, None if native
+    A name the codegen engine emitted comes from the single-module projection. Otherwise, a class
+    registered from a real importable module (a user-authored class backing a
+    `structure = "<ClassName>"` concept) is imported from that module; runtime-materialized classes
+    (exec'd, no importable module) fall back to the projection module, which carries their emitted
+    counterparts.
     """
-    if SpecialDomain.is_native(concept.domain_code):
-        return None
-
-    # For custom concepts, use the concept code as the class name
-    # The structure class name should match the concept code
-    return CustomClassInfo(
-        class_name=concept.structure_class_name,
-        domain_code=concept.domain_code,
-        concept_code=concept.code,
-    )
+    if class_name not in emitted_names:
+        registered = get_class_registry().get_class(name=class_name)
+        if registered is not None and registered.__module__ not in {"__main__", "builtins"}:
+            return f"from {registered.__module__} import {class_name}"
+    return f"from {STRUCTURES_MODULE} import {class_name}"
 
 
-def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict[str, CustomClassInfo]]:
-    """Collect all imports needed for a pipe's inputs.
+def _collect_imports_for_inputs(inputs: InputStuffSpecs, *, class_name_overrides: dict[str, str]) -> tuple[set[str], set[str]]:
+    """Collect all class names needed for a pipe's inputs.
 
     Args:
         inputs: The pipe inputs
+        class_name_overrides: Runtime-class-name -> emitted-name mapping applied to the rendered code
 
     Returns:
-        Tuple of (set of native class names, dict mapping class name to CustomClassInfo)
+        Tuple of (native class names, custom class names) — custom names are post-override spellings
     """
     native_classes: set[str] = set()
-    custom_classes: dict[str, CustomClassInfo] = {}
+    custom_classes: set[str] = set()
 
     for input_req in inputs.root.values():
         concept = input_req.concept
         structure_class = concept.get_structure_class()
 
-        # Get imports from the representation generator
-        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
-        generator.generate_representation(concept.concept_ref, structure_class)
+        # Get imports from the representation generator (includes nested custom classes)
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON, class_name_overrides=class_name_overrides)
+        generator.generate_representation(concept.concept_ref, structure_class=structure_class)
 
         for class_name in generator.imports_needed:
             if NativeConceptCode.is_native_structure_class(class_name):
                 native_classes.add(class_name)
             else:
-                # For custom classes, we need the concept info
-                # The class name should be the structure class name which is the concept code
-                custom_info = _collect_concept_info(concept)
-                if custom_info and custom_info.class_name == class_name:
-                    custom_classes[class_name] = custom_info
+                custom_classes.add(class_name)
 
     return native_classes, custom_classes
 
 
-def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
+def generate_runner_code(
+    pipe: PipeAbstract,
+    *,
+    output_multiplicity: bool = False,
+    library_dir: str | None = None,
+    class_name_overrides: dict[str, str] | None = None,
+) -> str:
     """Generate the complete Python runner code for a pipe.
 
     This generates a runnable Python script with:
@@ -166,17 +149,22 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         pipe: The pipe to generate runner code for
         output_multiplicity: Whether the output is a list (e.g., Text[])
         library_dir: Directory containing the MTHDS bundles to load
+        class_name_overrides: Runtime-class-name -> emitted-name mapping so the script spells custom
+            classes the way the accompanying types projection defines them (bare-when-unique)
     """
-    # Get output information
-    structure_class_name = pipe.output.concept.structure_class_name
+    overrides = class_name_overrides or {}
+    emitted_names = set(overrides.values())
+
+    # Get output information (spelled per the emitted projection when a mapping is provided)
+    runtime_output_class_name = pipe.output.concept.structure_class_name
+    structure_class_name = overrides.get(runtime_output_class_name, runtime_output_class_name)
     is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
-    custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
 
     # Check if output is the special "Anything" concept (no specific content type)
     is_anything_output = pipe.output.concept.code == NativeConceptCode.ANYTHING
 
     # Collect all imports needed for inputs
-    native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)
+    native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs, class_name_overrides=overrides)
 
     # Track if we need to import Any from typing (for Anything output)
     needs_any_import = is_anything_output
@@ -185,8 +173,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     if not is_anything_output:
         if is_native:
             native_classes.add(structure_class_name)
-        elif custom_info:
-            custom_classes[structure_class_name] = custom_info
+        else:
+            custom_classes.add(structure_class_name)
 
     # Build import section
     import_lines: list[str] = []
@@ -214,23 +202,22 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     # Add native content class imports
     native_imports: list[str] = []
     for class_name in sorted(native_classes):
-        import_stmt = _get_structure_class_import(class_name)
+        import_stmt = _get_structure_class_import(class_name=class_name)
         if import_stmt:
             native_imports.append(import_stmt)
     import_lines.extend(native_imports)
 
-    # Add custom structure class imports from structures folder
+    # Add custom structure class imports (from the types projection or their real module)
     if custom_classes:
         import_lines.append("")
-        for class_name in sorted(custom_classes.keys()):
-            custom_info = custom_classes[class_name]
-            import_lines.append(custom_info.import_statement)
+        for class_name in sorted(custom_classes):
+            import_lines.append(_custom_import_statement(class_name=class_name, emitted_names=emitted_names))
 
     import_lines.extend(
         [
             "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.runner import PipelexRunner",
+            "from pipelex.pipeline.runner import PipelexMTHDSProtocol",
         ]
     )
 
@@ -242,6 +229,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
             result, _ = input_req.concept.render_concept_representation(
                 output_format=ConceptRepresentationFormat.PYTHON,
                 is_multiple=is_multiple,
+                class_name_overrides=overrides,
             )
             python_code = _format_representation_as_python(result, is_multiple=is_multiple)
             input_entries.append(f'            "{var_name}": {python_code},')
@@ -266,8 +254,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         "",
         "",
         f"async def run_{pipe.code}() -> {return_type}:",
-        "    runner = PipelexRunner()",
-        "    response = await runner.execute_pipeline(",
+        "    runner = PipelexMTHDSProtocol()",
+        "    response = await runner.execute(",
         f'        pipe_code="{pipe.code}",',
     ]
 

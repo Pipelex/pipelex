@@ -18,7 +18,7 @@ These three components together form what we call a **Pipelex Bundle** (the cont
 
 ## Understanding Library Scope
 
-When you execute pipelines using `execute_pipeline` or `start_pipeline`, a library is created to hold all the necessary definitions. This library:
+When you execute pipelines using `execute` or `start`, a library is created to hold all the necessary definitions. This library:
 
 - Contains the pipes and concepts available for execution
 - Provides isolation between different pipeline runs when using different library IDs
@@ -31,12 +31,11 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 | Component | Uniqueness Scope | Example |
 |-----------|-----------------|---------|
 | **Domains** | Unique per library | Each library can have one `marketing` domain |
-| **Pipes** | Unique per library* | Each library can have one `generate_tagline` pipe |
+| **Pipes** | Unique per domain | Each domain can have one `generate_tagline` pipe |
 | **Concepts** | Unique per domain | Each domain can have one `ProductDescription` concept |
 | **Domain.Concept** | Unique per library | `marketing.ProductDescription` is unique within a library |
 
-!!! info "Future Change"
-    *Pipe uniqueness will soon be scoped per domain instead of per library, allowing different domains within the same library to have pipes with the same code.
+Pipes are identified by their domain-qualified reference (e.g. `marketing.generate_tagline`), so different domains within the same library can have pipes with the same code.
 
 ## Local vs Remote Libraries
 
@@ -44,17 +43,18 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 
 Currently, all libraries are **local**, meaning they are loaded from:
 
-- Directories on your filesystem (using `library_dirs` parameter)
-- MTHDS content strings (using `mthds_content` parameter)
+- Directories on your filesystem (using the `library_dirs` constructor parameter)
+- MTHDS content strings (using the `mthds_contents` parameter)
 - The current working directory (default behavior)
 
 ```python
 # Loading from local directories
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_dirs=["./pipelines", "./shared_pipes"])
+response = await runner.execute(
     pipe_code="generate_tagline",
-    library_dirs=["./pipelines", "./shared_pipes"],
     inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 ### Remote Libraries (Coming Soon)
@@ -69,20 +69,20 @@ In the future, you'll be able to import and use remote libraries, enabling:
 
 ### 1. Library Creation
 
-When you call `execute_pipeline` or `start_pipeline`, a library is created with a unique `library_id`:
+When the runner executes a method, a library is created with a unique `library_id`. Pipelex-specific configuration (library id, directories) is provided on the `PipelexMTHDSProtocol` constructor:
 
 ```python
 # Explicit library ID
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_id="my_custom_library")
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_id="my_custom_library",  # Custom ID
     inputs={...},
 )
 
 # Automatic library ID (defaults to pipeline_run_id)
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="my_pipe",
-    # library_id not specified - uses pipeline_run_id
     inputs={...},
 )
 ```
@@ -95,9 +95,9 @@ The library is populated based on the parameters you provide:
 
 ```python
 # Loads all .mthds files from specified directories
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_dirs=["./pipelines"])
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_dirs=["./pipelines"],
     inputs={...},
 )
 ```
@@ -111,16 +111,19 @@ domain = "marketing"
 
 [concept]
 ProductDescription = "A product description"
+Tagline = "A catchy tagline for a product"
 
 [pipe.my_pipe]
 type = "PipeLLM"
+description = "Generate a tagline for a product"
 inputs = { desc = "ProductDescription" }
 output = "Tagline"
-prompt = "Generate a tagline for: @desc"
+prompt = "Generate a tagline for: $desc"
 """
 
-pipe_output = await execute_pipeline(
-    mthds_content=mthds_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[mthds_content],
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -140,18 +143,16 @@ You can manage multiple libraries simultaneously by using different `library_id`
 
 ```python
 # Library for marketing pipelines
-marketing_output = await execute_pipeline(
+marketing_runner = PipelexMTHDSProtocol(library_id="marketing_lib", library_dirs=["./marketing_pipes"])
+marketing_response = await marketing_runner.execute(
     pipe_code="generate_tagline",
-    library_id="marketing_lib",
-    library_dirs=["./marketing_pipes"],
     inputs={...},
 )
 
 # Library for analytics pipelines
-analytics_output = await execute_pipeline(
+analytics_runner = PipelexMTHDSProtocol(library_id="analytics_lib", library_dirs=["./analytics_pipes"])
+analytics_response = await analytics_runner.execute(
     pipe_code="analyze_data",
-    library_id="analytics_lib",
-    library_dirs=["./analytics_pipes"],
     inputs={...},
 )
 ```
@@ -162,49 +163,46 @@ analytics_output = await execute_pipeline(
 
 ```python
 # Good: Explicit ID for maintaining state
-pipe_output = await execute_pipeline(
+runner = PipelexMTHDSProtocol(library_id="app_library")
+response = await runner.execute(
     pipe_code="my_pipe",
-    library_id="app_library",
     inputs={...},
 )
 ```
 
 ### 2. Use MTHDS Content for Dynamic Pipelines
 
-When generating or modifying pipelines dynamically, use `mthds_content`:
+When generating or modifying pipelines dynamically, use `mthds_contents`:
 
 ```python
 # Generate MTHDS content dynamically
 mthds_content = generate_custom_pipeline(user_requirements)
 
-pipe_output = await execute_pipeline(
-    mthds_content=mthds_content,
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
+    mthds_contents=[mthds_content],
     inputs={...},
 )
 ```
 
-A temporary library will be created holding the Pipelex bundle, and the library_id will be pipeline_run_id.
+A temporary library will be created holding the Pipelex bundle, and the library_id will be pipeline_run_id. Since no `pipe_code` is passed, the generated content must declare `main_pipe` at the top of the bundle (e.g. `main_pipe = "my_pipe"`) so the runner knows which pipe to execute — otherwise pass `pipe_code=` explicitly.
 
 ### 3. Reuse Library IDs for Related Executions
 
 If multiple pipeline runs should share the same library context:
 
 ```python
-library_id = "shared_context"
+runner = PipelexMTHDSProtocol(library_id="shared_context", library_dirs=["./pipes"])
 
 # First execution
-output1 = await execute_pipeline(
+response1 = await runner.execute(
     pipe_code="pipe1",
-    library_id=library_id,
-    library_dirs=["./pipes"],
     inputs={...},
 )
 
 # Second execution with same library
-output2 = await execute_pipeline(
+response2 = await runner.execute(
     pipe_code="pipe2",
-    library_id=library_id,
-    library_dirs=["./pipes"],
     inputs={...},
 )
 ```

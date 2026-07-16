@@ -84,7 +84,7 @@ def login_cmd() -> None:
     webbrowser.open(auth_url)
 
     server.timeout = LOGIN_TIMEOUT_SECONDS
-    server_thread = threading.Thread(target=serve_until_callback, args=(server, result), daemon=True)
+    server_thread = threading.Thread(target=serve_until_callback, args=(server,), kwargs={"result": result}, daemon=True)
     server_thread.start()
     server_thread.join(timeout=LOGIN_TIMEOUT_SECONDS)
 
@@ -98,11 +98,11 @@ def login_cmd() -> None:
         console.print("[bold red]Login timed out.[/bold red]")
         console.print(f"[dim]No response received within {LOGIN_TIMEOUT_SECONDS}s.[/dim]")
         console.print("[dim]You can try again with: pipelex login[/dim]")
-        console.print(f"[dim]Or visit {URLs.app} to generate your API key manually.[/dim]\n")
+        console.print(f"[dim]Or visit {URLs.app_cli_auth} to generate your API key manually.[/dim]\n")
         raise SystemExit(1)
 
 
-def serve_until_callback(server: HTTPServer, result: dict[str, str | None]) -> None:
+def serve_until_callback(server: HTTPServer, *, result: dict[str, str | None]) -> None:
     """Handle requests until we get the API key or timeout."""
     try:
         while result["api_key"] is None:
@@ -117,4 +117,4 @@ def save_api_key(api_key: str) -> None:
     env_path = get_global_env_path()
     entries = read_env_file(env_path)
     entries[PIPELEX_GATEWAY_API_KEY_VAR] = api_key
-    write_env_file(env_path, entries)
+    write_env_file(env_path, entries=entries)

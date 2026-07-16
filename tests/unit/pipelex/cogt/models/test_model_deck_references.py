@@ -93,7 +93,7 @@ class TestModelDeckReferences:
         known_handles: dict[str, ModelType] = {}
         backends_dir = config_manager.backends_dir_path
 
-        toml_files = find_files_in_dir(str(backends_dir), pattern="*.toml", is_recursive=False)
+        toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:
             backend_data = load_toml_from_path_if_exists(str(toml_path))
             if backend_data:

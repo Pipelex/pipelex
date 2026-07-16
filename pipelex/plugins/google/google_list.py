@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 
 async def list_google_models(
+    *,
     sdk: str,
     backend_name: str,
     backend: InferenceBackend,
@@ -55,6 +56,7 @@ async def list_google_models(
 
 def _display_google_models_flat(
     models: list[Any],
+    *,
     sdk: str,
     backend_name: str,
     any_listed: bool,
@@ -72,6 +74,7 @@ def _display_google_models_flat(
 
 def _display_google_models_table(
     models: list[Any],
+    *,
     sdk: str,
     backend_name: str,
 ) -> None:

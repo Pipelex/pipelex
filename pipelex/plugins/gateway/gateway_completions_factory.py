@@ -15,6 +15,7 @@ from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
+from pipelex.config import get_config
 from pipelex.plugins.gateway.gateway_constants import GatewayOpenAISdkVariant
 from pipelex.plugins.gateway.gateway_exceptions import GatewayExtractResponseError, GatewayFactoryError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -34,7 +35,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.backend import InferenceBackend
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-    from pipelex.plugins.plugin_sdk_registry import Plugin
+    from pipelex.plugins.model_handle import ModelHandle
 
 
 class GatewayCompletionsFactory(OpenAICompletionsFactory):
@@ -102,7 +103,8 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
     @classmethod
     def make_portkey_openai_client_for_completions(
         cls,
-        plugin: Plugin,
+        model_handle: ModelHandle,
+        *,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -112,8 +114,8 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         endpoint = GatewayFactory.get_endpoint(backend=backend)
         api_key = GatewayFactory.get_api_key(backend=backend)
 
-        if not GatewayOpenAISdkVariant.is_completions(plugin.sdk):
-            msg = f"Plugin '{plugin}' is not supported by '{cls.__name__}'"
+        if not GatewayOpenAISdkVariant.is_completions(model_handle.sdk):
+            msg = f"ModelHandle '{model_handle}' is not supported by '{cls.__name__}'"
             raise GatewayFactoryError(msg)
 
         return openai.AsyncOpenAI(
@@ -122,6 +124,9 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
             # not the OpenAI Authorization header. The SDK rejects an empty api_key since
             # 2.34.0, so we pass a non-empty placeholder; the gateway ignores it.
             api_key="unused-auth-via-portkey-headers",
+            # Tier 1 transport retry: set explicitly from config rather than inheriting the SDK default,
+            # so a transport_max_retries override applies to the gateway LLM path too (matches PortkeyCompletionsFactory).
+            max_retries=get_config().cogt.transport_max_retries,
             default_headers=createHeaders(
                 api_key=api_key,
                 strict_open_ai_compliance=False,
@@ -132,6 +137,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
     @classmethod
     def make_extract_output_from_response(
         cls,
+        *,
         inference_model: InferenceModelSpec,
         response: GenericResponse,
     ) -> ExtractOutput:
@@ -361,6 +367,6 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
 
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         return GatewayFactory.make_extras(inference_model=inference_model, inference_job=inference_job, output_desc=output_desc)

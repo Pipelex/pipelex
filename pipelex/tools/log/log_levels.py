@@ -1,6 +1,5 @@
 import logging
-
-from pipelex.types import StrEnum
+from enum import StrEnum
 
 # custom logging level for development, between DEBUG and INFO
 LOGGING_LEVEL_DEV = 15
@@ -44,7 +43,7 @@ class LogLevel(StrEnum):
                 return LOGGING_LEVEL_OFF
 
     @staticmethod
-    def from_int(logging_level: int) -> "LogLevel":
+    def from_int(*, logging_level: int) -> "LogLevel":
         if logging_level == LOGGING_LEVEL_VERBOSE:
             return LogLevel.VERBOSE
         elif logging_level == LOGGING_LEVEL_DEV:

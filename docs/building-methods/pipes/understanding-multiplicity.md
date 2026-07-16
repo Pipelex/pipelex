@@ -23,7 +23,7 @@ A concept represents a semantic entity—a meaningful piece of knowledge with cl
 [concept]
 Keyword = "A significant word or term extracted from text"
 ProductIdea = "A concept for a new product or service"
-Document = "A written or printed record containing information"
+SourceDocument = "A written or printed record containing information"
 ```
 
 Each of these definitions describes a single, coherent entity. The essence of what makes something a "Keyword" doesn't change whether you have one keyword or a hundred.
@@ -34,7 +34,7 @@ The number of items you're working with is a circumstantial detail of your metho
 
 - A pipe that extracts keywords from text might find 3 keywords or 30—but each is still a `Keyword`
 - A pipe that generates product ideas might produce 5 ideas or 10—but each remains a `ProductIdea`
-- A pipe that processes documents might handle 1 document or a batch of 100—but each is still a `Document`
+- A pipe that processes documents might handle 1 document or a batch of 100—but each is still a `SourceDocument`
 
 By keeping concepts singular and using multiplicity to express quantity, Pipelex maintains a clean semantic model that's both flexible and intuitive.
 
@@ -71,8 +71,8 @@ This is the default behavior and represents the most common case.
 Use empty brackets in the output to let the LLM decide how many items to generate:
 
 ```toml
-[concept]
-LineItem = "A single line item from an invoice"
+[concept.LineItem]
+description = "A single line item from an invoice"
 
 [concept.LineItem.structure]
 description = "Description of the item or service"
@@ -185,13 +185,13 @@ Use empty brackets `[]` to specify that the pipe expects a list with an indeterm
 
 ```toml
 [concept]
-Document = "A written or printed record"
+SourceDocument = "A written or printed record"
 Summary = "A concise overview of multiple documents"
 
 [pipe.summarize_all_documents]
 type = "PipeLLM"
 description = "Create a unified summary of multiple documents"
-inputs = { documents = "Document[]" }
+inputs = { documents = "SourceDocument[]" }
 output = "Summary"
 prompt = """
 Analyze all of these documents:
@@ -216,7 +216,6 @@ Use a number in brackets `[N]` to specify that the pipe expects exactly that man
 
 ```toml
 [concept]
-Image = "A visual image file"
 Comparison = "A detailed comparison analysis"
 
 [pipe.compare_two_images]
@@ -259,7 +258,7 @@ Extract all fields from this invoice:
 type = "PipeSequence"
 description = "Process multiple invoices"
 inputs = { invoice_images = "InvoiceImage[]" }
-output = "InvoiceData"
+output = "InvoiceData[]"
 steps = [
     { pipe = "extract_single_invoice", batch_over = "invoice_images", batch_as = "invoice_image", result = "all_invoice_data" }
 ]
@@ -278,8 +277,7 @@ SubjectLine = "An email subject line"
 type = "PipeLLM"
 description = "Generate 3 subject line options"
 inputs = { email_body = "EmailContent" }
-output = "SubjectLine"
-nb_output = 3
+output = "SubjectLine[3]"
 prompt = """
 Email content:
 @email_body
@@ -379,11 +377,11 @@ Use fixed input multiplicity when:
 When a pipe produces multiple outputs, Pipelex automatically wraps them in a `ListContent` container. This container maintains the type information:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 
 # Execute a pipe with multiple outputs
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="extract_line_items",
     inputs={"invoice_text": "Your invoice text here..."}
 )
@@ -401,11 +399,11 @@ line_items_container = pipe_output.main_stuff_as_list(item_type=LineItem)
 Similarly, when providing multiple inputs, you can use lists:
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.core.stuffs.text_content import TextContent
 
-runner = PipelexRunner()
-response = await runner.execute_pipeline(
+runner = PipelexMTHDSProtocol()
+response = await runner.execute(
     pipe_code="summarize_all_documents",
     inputs={
         "documents": [

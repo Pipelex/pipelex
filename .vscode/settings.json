@@ -1,6 +1,5 @@
 {
     "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
-    "python.analysis.extraPaths": ["./tests"],
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff",
         "editor.formatOnSave": true,
@@ -11,7 +10,7 @@
     },
     "ruff.configuration": "--config=pyproject.toml",
     "mypy.enabled": true,
-    "mypy.runUsingActiveInterpreter": true,
+    "mypy.runUsingActiveInterpreter": true, 
     "search.exclude": {
         ".mypy_cache/*": true,
         "**/dev_context": true

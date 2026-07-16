@@ -2,10 +2,10 @@ from collections.abc import Awaitable, Callable, Coroutine
 from functools import wraps
 from typing import Any, ParamSpec, Protocol, TypeVar
 
+from pipelex.cogt.content_generation.assignment_models import SearchAssignment
+from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
-from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -14,6 +14,7 @@ from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -43,16 +44,29 @@ def update_job_metadata(func: Callable[P, Coroutine[Any, Any, R]]) -> Callable[P
 
 
 class ContentGeneratorProtocol(Protocol):
+    """Content-generation seam between operators and the cogt leaves.
+
+    Every leaf-dispatching method takes ``cogt_run_params`` (the cogt slice of the run params,
+    sliced off ``PipeRunParams`` by the operator). Implementations stamp it onto the assignment
+    they build, so the leaf sees the same ``run_mode`` on any backend — inline or inside a
+    Temporal activity. The two search methods take a pre-built assignment instead; the operator
+    stamps ``cogt_run_params`` at assignment construction.
+    """
+
     def make_llm_text(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
         llm_prompt_for_text: LLMPrompt,
     ) -> Coroutine[Any, Any, str]: ...
 
     def make_object(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
@@ -60,29 +74,20 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_object_list(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
         llm_prompt_for_object_list: LLMPrompt,
         nb_items: int | None = None,
     ) -> Coroutine[Any, Any, list[BaseModelTypeVar]]: ...
 
-    async def make_image_content(
-        self,
-        job_metadata: JobMetadata,
-        generated_image_raw_details: GeneratedImageRawDetails,
-        img_gen_prompt: ImgGenPrompt | None,
-    ) -> ImageContent: ...
-
-    async def make_page_contents(
-        self,
-        job_metadata: JobMetadata,
-        extract_output: ExtractOutput,
-    ) -> list[PageContent]: ...
-
     def make_single_image(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
@@ -91,7 +96,9 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_image_list(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         img_gen_handle: str,
         img_gen_prompt: ImgGenPrompt,
         nb_images: int,
@@ -101,7 +108,9 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_templated_text(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
@@ -110,7 +119,9 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_render_page_views(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
@@ -119,9 +130,23 @@ class ContentGeneratorProtocol(Protocol):
 
     def make_extract_pages(
         self,
+        *,
         job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
         extract_input: ExtractInput,
         extract_handle: str,
         extract_job_params: ExtractJobParams,
         extract_job_config: ExtractJobConfig,
     ) -> Coroutine[Any, Any, list[PageContent]]: ...
+
+    def make_search_sourced_answer(
+        self,
+        search_assignment: SearchAssignment,
+    ) -> Coroutine[Any, Any, SearchResultContent]: ...
+
+    def make_search_structured(
+        self,
+        *,
+        output_structure_class: type[BaseModelTypeVar],
+        search_assignment: SearchAssignment,
+    ) -> Coroutine[Any, Any, BaseModelTypeVar]: ...

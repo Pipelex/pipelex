@@ -2,6 +2,8 @@ from typing import Any, ClassVar
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.stuffs.composite_content import CompositeContent
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -16,6 +18,8 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.time_content import TimeContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_factory import PipeBatchFactory
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -38,6 +42,8 @@ from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_factory import PipeSearchFactory
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_operators.structure.pipe_structure_factory import PipeStructureFactory
+from pipelex.pipe_signature.pipe_signature import PipeSignature
+from pipelex.pipe_signature.pipe_signature_factory import PipeSignatureFactory
 from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
@@ -78,9 +84,20 @@ class CoreRegistryModels(RegistryModels):
         PipeSequenceFactory,
     ]
 
+    PIPE_SIGNATURES: ClassVar[list[PipeAbstractType]] = [
+        PipeSignature,
+    ]
+
+    PIPE_SIGNATURES_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
+        PipeSignatureFactory,
+    ]
+
     STUFF: ClassVar[list[ModelType]] = [
         TextContent,
         NumberContent,
+        YesNoContent,
+        DateContent,
+        TimeContent,
         ImageContent,
         Stuff,
         StuffContent,
@@ -92,6 +109,7 @@ class CoreRegistryModels(RegistryModels):
         PageContent,
         JSONContent,
         SearchResultContent,
+        CompositeContent,
     ]
 
     EXPERIMENTAL: ClassVar[list[ModelType]] = [

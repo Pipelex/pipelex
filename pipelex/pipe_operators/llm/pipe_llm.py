@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.base_exceptions import iter_cause_chain
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -22,6 +22,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.pipes.validation import is_input_used_by_variables, is_variable_satisfied_by_inputs
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
@@ -70,7 +71,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         # Check for unused inputs: declared in inputs but not used by any variable path
         for input_name in input_names:
-            if not is_input_used_by_variables(input_name, required_variable_paths):
+            if not is_input_used_by_variables(input_name, variable_paths=required_variable_paths):
                 msg = f"PipeLLM '{self.code}' has input '{input_name}' declared but it is not used in the prompt or system_prompt."
                 raise PipeValidationError(
                     message=msg,
@@ -82,7 +83,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
         # Check for missing inputs: variable paths in prompt/system_prompt not satisfied by any input
         for variable_path in required_variable_paths:
-            if not is_variable_satisfied_by_inputs(variable_path, input_names):
+            if not is_variable_satisfied_by_inputs(variable_path, input_names=input_names):
                 msg = f"PipeLLM '{self.code}' uses variable '{variable_path}' in prompt/system_prompt but it is not declared in inputs."
                 raise PipeValidationError(
                     message=msg,
@@ -91,6 +92,22 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     variable_names=[variable_path],
                     explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
                 )
+
+        # Guard-lint (D7): every reference to a declared-optional input must be guarded.
+        for template_blueprint, template_label in [
+            (self.llm_prompt_spec.prompt_blueprint, "prompt"),
+            (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            lint_optional_input_guards(
+                pipe_code=self.code,
+                domain_code=self.domain_code,
+                inputs=self.inputs,
+                template_source=template_blueprint.template,
+                template_category=template_blueprint.category,
+                template_label=template_label,
+            )
 
     @override
     def validate_inputs_with_library(self):
@@ -126,11 +143,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for input_name, stuff_spec in self.inputs.items:
-            needed_inputs.add_stuff_spec(variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity)
+            needed_inputs.add_stuff_spec(
+                variable_name=input_name, concept=stuff_spec.concept, multiplicity=stuff_spec.multiplicity, presence=stuff_spec.presence
+            )
 
         return needed_inputs
 
@@ -167,13 +186,13 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
-        content_generator: ContentGeneratorProtocol | None = None,
     ) -> PipeLLMOutput:
-        content_generator = content_generator or get_content_generator()
+        content_generator = get_content_generator()
         # interpret / unwrap the arguments
         output_stuff_spec = self.resolve_dynamic_output_stuff_spec(pipe_run_params=pipe_run_params)
 
@@ -212,8 +231,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         if (not self.llm_prompt_spec.templating_style) and (
             inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM)
         ):
-            # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
-            # TODO: improve this by making it possible to get the inference model for external LLM Plugins
+            # Note: the case where we don't get an inference model corresponds to the use of an external LLM plugin
+            # TODO: improve this by making it possible to get the inference model for external LLM plugins
             prompting_target = llm_setting_main.prompting_target or inference_model.prompting_target
             self.llm_prompt_spec.templating_style = get_config().pipelex.prompting_config.get_prompting_style(
                 prompting_target=prompting_target,
@@ -241,6 +260,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_text: str = await content_generator.make_llm_text(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     llm_prompt_for_text=llm_prompt_1_for_text,
                     llm_setting_main=llm_setting_main,
                 )
@@ -320,7 +340,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             )
             execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
 
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
         return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -328,6 +348,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
 
     async def _llm_gen_object_stuff_content(
         self,
+        *,
         job_metadata: JobMetadata,
         pipe_run_params: PipeRunParams,
         is_multiple_output: bool,
@@ -348,6 +369,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             try:
                 generated_objects = await content_generator.make_object_list(
                     job_metadata=job_metadata,
+                    cogt_run_params=pipe_run_params.cogt_run_params,
                     object_class=content_class,
                     llm_prompt_for_object_list=llm_prompt_for_object,
                     llm_setting_for_object_list=llm_setting_for_object,
@@ -366,6 +388,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         try:
             return await content_generator.make_object(
                 job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
                 object_class=content_class,
                 llm_prompt_for_object=llm_prompt_for_object,
                 llm_setting_for_object=llm_setting_for_object,
@@ -379,41 +402,23 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError, settings: list[LLMSetting]) -> str:
+    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
         """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
         error_details = str(exc)
-        current_exc: BaseException | None = exc
-        while current_exc is not None:
+        for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
                 error_details += f"\n{format_pydantic_validation_error(current_exc)}"
                 break
-            current_exc = current_exc.__cause__
         return f"{error_details}\nLLM settings: {settings}"
 
     @override
-    async def _dry_run_operator_pipe(
-        self,
-        job_metadata: JobMetadata,
-        working_memory: WorkingMemory,
-        pipe_run_params: PipeRunParams,
-        output_name: str | None = None,
-    ) -> PipeLLMOutput:
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=ContentGeneratorDry(),
-        )
-
-    @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

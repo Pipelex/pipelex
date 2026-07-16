@@ -6,7 +6,7 @@ from pathlib import Path
 import typer
 from posthog import tag
 
-from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -15,11 +15,12 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
-from pipelex.core.pipes.inputs.input_renderer import NoInputsRequiredError, render_inputs
+from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.hub import get_library_manager, get_required_pipe, get_telemetry_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -32,12 +33,15 @@ SUB_COMMAND_INPUTS = "inputs"
 
 
 async def _generate_inputs_core(
+    *,
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
     library_dir: list[str] | None = None,
+    template_format: InputsTemplateFormat = InputsTemplateFormat.JSON,
+    explicit: bool = False,
 ) -> None:
-    """Core logic for generating input JSON for a pipe."""
+    """Core logic for generating an inputs template file for a pipe."""
     # Set up library so pipes can be found
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
@@ -83,28 +87,36 @@ async def _generate_inputs_core(
         typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
+    inputs_template_str: str
+    default_file_name: str
     try:
-        inputs_json_str = render_inputs(the_pipe, indent=2)
+        match template_format:
+            case InputsTemplateFormat.JSON:
+                inputs_template_str = render_inputs(the_pipe, indent=2, explicit=explicit)
+                default_file_name = DEFAULT_INPUTS_FILE_NAME
+            case InputsTemplateFormat.TOML:
+                inputs_template_str = render_inputs_toml(the_pipe, explicit=explicit)
+                default_file_name = DEFAULT_INPUTS_TOML_FILE_NAME
     except NoInputsRequiredError as exc:
         typer.secho(str(exc), fg=typer.colors.YELLOW)
         raise typer.Exit(0) from exc
     except Exception as exc:
-        # CLI command boundary: any failure generating the input JSON is reported to the user and exits via typer.Exit.
-        typer.secho(f"Error generating input JSON: {exc}", fg=typer.colors.RED)
+        # CLI command boundary: any failure generating the inputs template is reported to the user and exits via typer.Exit.
+        typer.secho(f"Error generating inputs template: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     if output_path:
         final_output_path = output_path
     elif bundle_path:
         bundle_dir = bundle_path.parent
-        final_output_path = bundle_dir / DEFAULT_INPUTS_FILE_NAME
+        final_output_path = bundle_dir / default_file_name
     else:
-        final_output_path = Path("results") / DEFAULT_INPUTS_FILE_NAME
+        final_output_path = Path("results") / default_file_name
 
     try:
-        ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=inputs_json_str, path=str(final_output_path))
-        typer.secho(f"Generated input JSON file: {final_output_path}", fg=typer.colors.GREEN)
+        ensure_directory_for_file_path(file_path=final_output_path)
+        save_text_to_path(text=inputs_template_str, path=final_output_path)
+        typer.secho(f"Generated inputs file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         # CLI command boundary: any failure writing the file is reported to the user and exits via typer.Exit.
         typer.secho(f"Error saving file: {exc}", fg=typer.colors.RED)
@@ -112,10 +124,13 @@ async def _generate_inputs_core(
 
 
 def execute_generate_inputs(
+    *,
     pipe_code: str | None,
     bundle_path: Path | None,
     output_path: Path | None,
     library_dir: list[str] | None = None,
+    template_format: InputsTemplateFormat = InputsTemplateFormat.JSON,
+    explicit: bool = False,
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_INPUTS}",
 ) -> None:
     """Synchronous entry point wrapping the async inputs generation with Pipelex setup/teardown."""
@@ -129,7 +144,16 @@ def execute_generate_inputs(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=telemetry_command_label)
 
-            asyncio.run(_generate_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path, library_dir=library_dir))
+            asyncio.run(
+                _generate_inputs_core(
+                    pipe_code=pipe_code,
+                    bundle_path=bundle_path,
+                    output_path=output_path,
+                    library_dir=library_dir,
+                    template_format=template_format,
+                    explicit=explicit,
+                )
+            )
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

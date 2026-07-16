@@ -20,12 +20,12 @@ Here are the primary pipe controllers available in Pipelex:
 
 ## Overview
 
-Pipelex provides the following pipe operators:
+Pipelex provides the following pipe controllers:
 
 - `PipeSequence`: For chaining multiple pipes in sequence
 - `PipeParallel`: For running different pipes in parallel
 - `PipeBatch`: For running one pipe over a batch of inputs
-- `PipeCondition`: For conditional execution based on input validation
+- `PipeCondition`: For conditional execution based on an evaluated expression
 
 ## PipeSequence
 
@@ -40,12 +40,11 @@ Run multiple pipes in sequence.
 
 ## PipeCondition
 
-Enables conditional execution based on input validation.
+Enables conditional execution based on an evaluated expression.
 
 ### Key Features
 
 - Expression-based routing
 - Default fallback paths
 - Jinja2 template support
-- Input validation
 - Error handling

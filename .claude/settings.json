@@ -40,9 +40,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/check-keyword-only.sh",
+            "timeout": 10
+          }
+        ]
+      }
     ]
-  },
-  "enabledPlugins": {
-    "temporal@temporal-marketplace": true
   }
 }

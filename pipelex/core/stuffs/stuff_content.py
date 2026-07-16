@@ -1,7 +1,7 @@
 from typing import Any, TypeVar, final
 
 from kajson import kajson
-from mthds.models.stuff import StuffContentAbstract
+from mthds.protocol.stuff import StuffContentAbstract
 from rich.json import JSON
 from typing_extensions import override
 
@@ -61,7 +61,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         """
         return f"<pre>{self.rendered_json()}</pre>"
 
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+    def rendered_markdown(self, *, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
         """Render content as Markdown for documentation or LLM prompts.
 
         Defaults to JSON in a code block. Override in subclasses for custom Markdown output.
@@ -76,7 +76,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         return kajson.dumps(self.smart_dump(), indent=4)
 
     @final
-    def rendered_for_prompt(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    def rendered_for_prompt(self, *, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return self.rendered_plain()
@@ -92,7 +92,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     # -------------------------------------------------------------------------------------
 
     @final
-    async def rendered_for_template_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    async def rendered_for_template_async(self, *, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return await self.rendered_plain_async()
@@ -110,7 +110,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         """Default HTML rendering - subclasses can override for custom rendering."""
         return self.rendered_html()
 
-    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, *, level: int = 1, is_pretty: bool = False) -> str:
         """Default Markdown rendering - subclasses can override for custom rendering."""
         return self.rendered_markdown(level=level, is_pretty=is_pretty)
 
@@ -122,7 +122,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     # -------------------------------------------------------------------------
 
     @override
-    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+    def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         """Render content for pretty printing.
 
         Args:
@@ -132,11 +132,11 @@ class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
         json_data = self.smart_dump()
         return JSON.from_data(json_data, indent=4)
 
-    def pretty_print_content(self, title: str | None = None) -> None:
+    def pretty_print_content(self, *, title: str | None = None) -> None:
         pretty = self.rendered_pretty()
         width = PrettyPrinter.pretty_width()
         pretty_print(pretty, title=title, width=width)
 
     @override
-    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+    def rendered_pretty_html(self, *, title: str | None = None, width: int | None = None) -> str:
         return self.rendered_html()

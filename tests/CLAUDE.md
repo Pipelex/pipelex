@@ -31,7 +31,6 @@ Replace `<paths>` with the test directories from the mapping below. Concatenate 
 | `pipelex/pipeline/` | `tests/integration/pipelex/pipeline/` |
 | `pipelex/plugins/` | `tests/unit/pipelex/plugins/ tests/integration/pipelex/plugins/` |
 | `pipelex/system/` | `tests/unit/pipelex/system/ tests/integration/pipelex/system/` |
-| `pipelex/temporal/` | `tests/unit/pipelex/temporal/ tests/integration/pipelex/temporal/` |
 | `pipelex/tools/` | `tests/unit/pipelex/tools/ tests/integration/pipelex/tools/` |
 
 Note: `pipe_controllers/`, `pipe_operators/`, and `pipe_run/` share integration tests at `tests/integration/pipelex/pipes/` -- deduplicate the path when multiple of these areas are touched.
@@ -50,7 +49,7 @@ Fall back to the full suite when:
 
 - Changes span 3+ source areas from the mapping above
 - Changes touch `pyproject.toml`, `tests/conftest.py`, or `tests/helpers/`
-- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/hub.py`, `pipelex/types.py`
+- Changes touch root-level modules: `pipelex/__init__.py`, `pipelex/hub.py`
 - Changes touch `pipelex/system/configuration/` (config loading affects everything)
 - Refactors touching base exceptions or shared base classes
 - Preparing a release, a push, or a commit intended for remote (e.g. `/release`, `/commit-push`, `/ship`, or when the context makes it obvious the work is about to land)

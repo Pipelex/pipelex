@@ -34,8 +34,8 @@ from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.package_utils import get_package_version
-from pipelex.tools.misc.toml_utils import TomlError
 
 if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager
@@ -69,7 +69,7 @@ def do_show_pipe(pipe_code: str) -> None:
     pretty_print(pipe, title=f"Pipe '{pipe_code}'")
 
 
-def do_show_backends(show_all: bool = False) -> None:
+def do_show_backends(*, show_all: bool = False) -> None:
     """Display all backends and the active routing profile."""
     try:
         secrets_provider = get_secrets_provider()

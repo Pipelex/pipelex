@@ -22,6 +22,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
     @override
     def make(
         cls,
+        *,
         pipe_category: Any,
         pipe_type: str,
         pipe_code: str,
@@ -101,6 +102,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             img_gen_prompt_blueprint=img_gen_prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
+            size=blueprint.size,
             is_raw=blueprint.is_raw,
             seed=blueprint.seed,
             background=blueprint.background,

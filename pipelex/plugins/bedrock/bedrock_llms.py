@@ -3,18 +3,19 @@ from typing import Any, cast
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.config import get_config
 from pipelex.exceptions import MissingDependencyError
-from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.aws.aws_config import AwsCredentialsError
+from pipelex.plugins.model_handle import ModelHandle
+from pipelex.tools.aws.exceptions import AwsCredentialsError
 
 
 def bedrock_list_available_models(
-    plugin: Plugin,  # noqa: ARG001
+    model_handle: ModelHandle,  # noqa: ARG001
+    *,
     backend: InferenceBackend,  # noqa: ARG001
 ) -> list[dict[str, Any]]:
     """List available Bedrock foundation models.
 
     Args:
-        plugin: The plugin configuration (unused, kept for interface consistency)
+        model_handle: The model handle (unused, kept for interface consistency)
         backend: The inference backend configuration (unused, kept for interface consistency)
 
     Returns:

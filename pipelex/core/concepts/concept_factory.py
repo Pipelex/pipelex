@@ -1,4 +1,5 @@
-from typing import cast
+from enum import StrEnum
+from typing import NamedTuple, cast
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
@@ -18,7 +19,6 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.types import StrEnum
 
 
 def _get_class_registry() -> ClassRegistryAbstract:
@@ -27,6 +27,11 @@ def _get_class_registry() -> ClassRegistryAbstract:
 
     hub = importlib.import_module("pipelex.hub")
     return hub.get_class_registry()  # type: ignore[no-any-return]
+
+
+class StructureNameAndRefine(NamedTuple):
+    structure_class_name: str
+    refine_string: str | None
 
 
 class ConceptDeclarationType(StrEnum):
@@ -80,7 +85,7 @@ class DomainAndConceptCode(BaseModel):
 
 class ConceptFactory:
     @classmethod
-    def make(cls, concept_code: str, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
+    def make(cls, *, concept_code: str, domain_code: str, description: str, structure_class_name: str, refines: str | None = None) -> Concept:
         return Concept(
             code=concept_code,
             domain_code=domain_code,
@@ -142,12 +147,26 @@ class ConceptFactory:
                     description="A number",
                     structure_class_name=structure_class_name,
                 )
-            case NativeConceptCode.IMG_GEN_PROMPT:
+            case NativeConceptCode.YES_NO:
                 return Concept(
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
-                    description="A prompt for an image generator",
-                    structure_class_name=NativeConceptCode.TEXT.structure_class_name,
+                    description="The answer to a yes/no question",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.DATE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A calendar date, optionally with a time of day — as precise as its source states.",
+                    structure_class_name=structure_class_name,
+                )
+            case NativeConceptCode.TIME:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A time of day, optionally with a UTC offset — as precise as its source states.",
+                    structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.PAGE:
                 return Concept(
@@ -177,11 +196,19 @@ class ConceptFactory:
                     description="A search result with answer and sources",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.COMPOSITE:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A named composition of contents",
+                    structure_class_name=structure_class_name,
+                )
 
     @classmethod
     def make_domain_and_concept_code_from_concept_ref_or_code(
         cls,
         concept_ref_or_code: str,
+        *,
         domain_code: str | None = None,
     ) -> DomainAndConceptCode:
         # Handle cross-package references (alias->domain.ConceptCode)
@@ -218,11 +245,11 @@ class ConceptFactory:
             raise ConceptFactoryError(msg)
 
     @classmethod
-    def make_concept_ref_with_domain(cls, domain_code: str, concept_code: str) -> str:
+    def make_concept_ref_with_domain(cls, *, domain_code: str, concept_code: str) -> str:
         return f"{domain_code}.{concept_code}"
 
     @classmethod
-    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, domain_code: str, concept_ref_or_code: str) -> str:
+    def make_concept_ref_with_domain_from_concept_ref_or_code(cls, *, domain_code: str, concept_ref_or_code: str) -> str:
         input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
             concept_ref_or_code=concept_ref_or_code,
             domain_code=domain_code,
@@ -234,7 +261,7 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_refine(cls, refine: str, domain_code: str) -> str:
+    def make_refine(cls, refine: str, *, domain_code: str) -> str:
         """Validate and normalize a refine string.
 
         If the refine is a native concept code without domain (e.g., 'Text'),
@@ -268,6 +295,7 @@ class ConceptFactory:
     def _handle_structure_with_classname(
         cls,
         blueprint: ConceptBlueprint,
+        *,
         concept_code: str,
         domain_code: str,
     ) -> str:
@@ -294,6 +322,7 @@ class ConceptFactory:
     def _handle_blueprint_with_structure(
         cls,
         blueprint: ConceptBlueprint,
+        *,
         concept_code: str,
         domain_code: str,
     ) -> str:
@@ -317,7 +346,7 @@ class ConceptFactory:
         # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
 
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
         try:
             _, the_generated_class = StructureGenerator(local_domain=domain_code).generate_from_structure_blueprint(
                 class_name=qualified_class_name,
@@ -336,28 +365,28 @@ class ConceptFactory:
     @classmethod
     def _handle_basic_blueprint(
         cls,
+        *,
         concept_code: str,
         domain_code: str,
         description: str,
-    ) -> tuple[str, str | None]:
-        """Handle BASIC_BLUEPRINT declaration type.
-
-        Returns:
-            Tuple of (structure_class_name, refine_string)
-        """
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
+    ) -> StructureNameAndRefine:
+        """Handle BASIC_BLUEPRINT declaration type."""
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
         # Check if a valid structure class already exists — first by bare concept_code
         # (for pre-existing Python classes registered under their own name), then by
         # qualified name (for previously generated dynamic classes)
         if Concept.is_valid_structure_class(structure_class_name=concept_code):
-            return concept_code, None
+            return StructureNameAndRefine(structure_class_name=concept_code, refine_string=None)
         if Concept.is_valid_structure_class(structure_class_name=qualified_class_name):
-            return qualified_class_name, None
+            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=None)
 
         # Because native concepts have structure class names diffrent than other (with "Content")
         if concept_code in NativeConceptCode.values_list():
-            return NativeConceptCode.TEXT.structure_class_name, NativeConceptCode.TEXT.concept_ref
+            return StructureNameAndRefine(
+                structure_class_name=NativeConceptCode.TEXT.structure_class_name,
+                refine_string=NativeConceptCode.TEXT.concept_ref,
+            )
 
         try:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
@@ -372,22 +401,20 @@ class ConceptFactory:
         # Register the generated class
         _get_class_registry().register_class(the_generated_class)
 
-        return qualified_class_name, NativeConceptCode.TEXT.concept_ref
+        return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref)
 
     @classmethod
     def _handle_refines(
         cls,
         blueprint: ConceptBlueprint,
+        *,
         concept_code: str,
         domain_code: str,
-    ) -> tuple[str, str]:
+    ) -> StructureNameAndRefine:
         """Handle REFINES declaration type.
 
         Concept refines another concept - generate a new class that inherits from the refined
         structure class.
-
-        Returns:
-            Tuple of (structure_class_name, refine_string)
         """
         if blueprint.refines is None:
             msg = "Expected refines to be set"
@@ -399,7 +426,7 @@ class ConceptFactory:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
-        qualified_class_name = make_qualified_structure_class_name(domain_code, concept_code)
+        qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
         # Cross-package refines: base class isn't available locally, so generate
         # a standalone TextContent subclass. The refinement relationship is tracked
@@ -419,7 +446,7 @@ class ConceptFactory:
                 raise ConceptFactoryError(msg) from exc
 
             _get_class_registry().register_class(the_generated_class)
-            return qualified_class_name, current_refine
+            return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
@@ -430,7 +457,7 @@ class ConceptFactory:
             refined_structure_class_name = refined_concept_code + "Content"
         else:
             refined_domain_code = refined_ref.domain_path or domain_code
-            refined_structure_class_name = make_qualified_structure_class_name(refined_domain_code, refined_concept_code)
+            refined_structure_class_name = make_qualified_structure_class_name(domain_code=refined_domain_code, concept_code=refined_concept_code)
 
         # Generate a new class that inherits from the refined structure class
         # This creates an empty class that can be extended with additional fields in the future
@@ -451,11 +478,12 @@ class ConceptFactory:
         # Register the generated class
         _get_class_registry().register_class(the_generated_class)
 
-        return qualified_class_name, current_refine
+        return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
     @classmethod
     def make_from_blueprint(
         cls,
+        *,
         domain_code: str,
         concept_code: str,
         blueprint_or_string_description: ConceptBlueprint | str,

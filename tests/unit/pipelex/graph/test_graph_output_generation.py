@@ -4,7 +4,7 @@ Validates that generate_graph_outputs and save_graph_outputs_to_dir produce
 the expected output files (GraphSpec JSON, Mermaid MMD, Mermaid HTML, ReactFlow HTML).
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,7 +14,7 @@ from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outpu
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeIOSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef, TimingSpec
 from tests.unit.pipelex.graph.conftest import make_graph_config
 
-_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+_T0 = datetime(2025, 7, 1, 12, 0, 0, tzinfo=UTC)
 
 
 def _make_sequence_graphspec() -> GraphSpec:
@@ -109,7 +109,7 @@ class TestGraphOutputGeneration:
         graph_spec = _make_sequence_graphspec()
         config = _enable_all_outputs(make_graph_config())
 
-        outputs = await generate_graph_outputs(graph_spec, config, pipe_code="my_sequence")
+        outputs = await generate_graph_outputs(graph_spec, graph_config=config, pipe_code="my_sequence")
 
         assert outputs.graphspec_json is not None
         assert "output_test_graph" in outputs.graphspec_json
@@ -129,9 +129,9 @@ class TestGraphOutputGeneration:
         graph_spec = _make_sequence_graphspec()
         config = _enable_all_outputs(make_graph_config())
 
-        outputs = await generate_graph_outputs(graph_spec, config, pipe_code="my_sequence")
+        outputs = await generate_graph_outputs(graph_spec, graph_config=config, pipe_code="my_sequence")
         output_dir = tmp_path / "graph_output"
-        saved_files = save_graph_outputs_to_dir(outputs, output_dir)
+        saved_files = save_graph_outputs_to_dir(outputs, output_dir=output_dir)
 
         assert output_dir.is_dir()
         assert "graphspec_json" in saved_files
@@ -163,7 +163,7 @@ class TestGraphOutputGeneration:
             },
         )
 
-        outputs = await generate_graph_outputs(graph_spec, config, pipe_code="my_sequence")
+        outputs = await generate_graph_outputs(graph_spec, graph_config=config, pipe_code="my_sequence")
 
         assert outputs.graphspec_json is not None
         assert outputs.mermaidflow_mmd is None
@@ -185,7 +185,7 @@ class TestGraphOutputGeneration:
             },
         )
 
-        outputs = await generate_graph_outputs(graph_spec, config, pipe_code="my_sequence")
+        outputs = await generate_graph_outputs(graph_spec, graph_config=config, pipe_code="my_sequence")
 
         assert outputs.mermaidflow_mmd is not None
         assert "step_one" in outputs.mermaidflow_mmd

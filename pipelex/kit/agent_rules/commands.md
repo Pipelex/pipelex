@@ -7,7 +7,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports fix-keyword-only format generate-mthds-schema lint pyright mypy check-keyword-only)
    ```
 
    This runs multiple code quality tools:
@@ -17,6 +17,18 @@
    - plxt: Format and lint TOML, MTHDS, and PLX files
 
    Always fix any issues reported by these tools before proceeding.
+
+## Keyword-only arguments check
+
+   Non-subject function parameters across `pipelex/` source must be keyword-only, and a positional subject is legal only under a grant recorded in `subject_grants.toml`. The convention is mechanically enforced and already runs as part of `make agent-check`, but you can invoke it on its own:
+
+   ```bash
+   make check-keyword-only   # alias: make cko — read-only gate; hard-blocks on any violation
+   make fix-keyword-only     # alias: make fko — auto-insert a bare * for mechanically-fixable violations
+   make subject-grant FUNC="<path>::<qualname>" RATIONALE="…"   # alias: make sgr — grant a positional subject
+   ```
+
+   `check-keyword-only` owns the pass/fail gate; `fix-keyword-only` rewrites what it can (including ungranted subjects — grant BEFORE running checks if the subject should stay positional) and reports the shapes it can't fix mechanically (resolve those by hand). See [`docs/contribute/keyword-only-arguments.md`](docs/contribute/keyword-only-arguments.md) for the full convention.
 
 ## Cleaning Derived Files
 
@@ -35,8 +47,14 @@
    ```bash
    make agent-test
    # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
-   # Zero output on success; full output on failure.
+   # Heartbeat progress lines while running; full output only on failure.
    ```
+
+## When `make agent-test` hangs or fails opaquely
+
+   Use **`make agent-test-debug`** (alias: `make atd`). Same suite, but with stale-process cleanup upfront, an outer wall-clock `timeout` so fixture-teardown hangs and xdist worker-replace loops can't run forever, direct file redirect for live progress (`tail -f /tmp/pytest-agent-test-debug.log`), and `-v` so each test name lands in the log as it runs. On failure it prints the failed tests, the log path, and a grep hint; on timeout, the tail of the log and the log path.
+
+   For the full debugging methodology — clean-state protocol, when to bail to the user, how to grep failures by error class name, when xdist failures are flakes vs real bugs — see [`docs/agents/debugging-hanging-pytest-runs.md`](docs/agents/debugging-hanging-pytest-runs.md).
 
 ## Running Tests with Prints
 
@@ -58,7 +76,7 @@
    # or
    make tp TEST=test_function_name
    ```
-   Note: Matches names starting with the provided string.
+   Note: Matches names containing the provided string (pytest `-k` substring matching).
 
 ## Running Last Failed Tests
 
@@ -73,30 +91,6 @@
    make t TEST=LF
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
-
-## Temporal Integration Test Options
-
-   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
-
-   - `--temporal-server`: Which Temporal server to use
-     - `none` (default): in-process test server — no external dependencies, used in CI
-     - `time-skipping`: in-process server with deterministic time control
-     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
-
-   ```bash
-   # CI default: in-process server
-   .venv/bin/pytest tests/integration/pipelex/temporal/
-
-   # Dev with local Temporal server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server local
-
-   # Dev with cloud/testing server
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --temporal-server testing
-   ```
-
----
 
 ## Prerequisites for running command lines: use virtual environment
 
@@ -127,10 +121,23 @@
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
 
+   - **`generate-error-pages`**: Regenerate the per-class error reference pages under `docs/errors/` — one Markdown page per `PipelexError` subclass, which is what each error's `type_uri` dereferences to. Run after adding or renaming an error class. Pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs. Also available as `make generate-error-pages` (alias `make gep`).
+
+     ```bash
+     .venv/bin/pipelex-dev generate-error-pages
+     ```
+
    - **`refresh-graph-ui-sri`**: Refetch the pinned graph viewer assets from jsDelivr (`@pipelex/mthds-ui` standalone JS+CSS, `elkjs`) and rewrite `pipelex/graph/reactflow/standalone_assets.py` with new `sha384` Subresource Integrity hashes. Use when bumping the pinned mthds-ui or elkjs version.
 
      ```bash
      .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3
      # or rotate elkjs alongside:
      .venv/bin/pipelex-dev refresh-graph-ui-sri --mthds-ui-version 0.6.3 --elkjs-version 0.11.1
+     ```
+
+   - **`drift`**: Drift contracts — deterministic review obligations between code and docs, declared in the root `drift.toml` (see `docs/contribute/drift-contracts.md`). When `make drift-check` (part of `make check` and CI) reports an open contract: run `make drift-plan` to see what changed and what to review, actually review the targets and fix what is stale, `git add` the trigger files (the digest reads the git index, not the working tree), then record the review with `make drift-ack CONTRACT=<id> RATIONALE="…"`. The rationale is the on-the-record review decision — write an honest sentence. There is no bypass flag; "reviewed, no doc change needed" is a legitimate rationale.
+
+     ```bash
+     make drift-plan
+     make drift-ack CONTRACT=config-docs RATIONALE="Documented the new setting; other config pages unaffected."
      ```

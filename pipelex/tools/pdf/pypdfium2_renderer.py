@@ -13,7 +13,6 @@ from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.hub import get_storage_provider
-from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.uri.resolved_uri import (
@@ -34,10 +33,6 @@ DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH = 15
 # Note: JPEG2000 (JPXDecode) could also be extracted directly, but ImageFormat
 # doesn't support jp2 output, so JPEG2000 images go through bitmap extraction
 FILTER_JPEG = "DCTDecode"
-
-
-class PyPdfium2RendererError(ToolError):
-    pass
 
 
 PdfInput = str | pathlib.Path | bytes
@@ -72,6 +67,7 @@ async def _resolve_pdf_uri_to_input(pdf_uri: str) -> PdfInput:
 
 def _extract_image_from_pdf_object(
     image_obj: PdfImage,
+    *,
     output_format: ImageFormat | None,
 ) -> ExtractedImageFromPage:
     """Extract an image from a PdfImage object, preferring direct extraction when possible.
@@ -160,7 +156,7 @@ class PyPdfium2Renderer:
     # ---- internal blocking helper ------------------------------------
     # TODO: Needs UT
     @staticmethod
-    def _render_pdf_pages_sync(pdf_input: PdfInput, scale: float) -> list[Image.Image]:
+    def _render_pdf_pages_sync(pdf_input: PdfInput, *, scale: float) -> list[Image.Image]:
         pdf_doc = pdfium.PdfDocument(pdf_input)
         images: list[Image.Image] = []
         for index in range(len(pdf_doc)):
@@ -193,6 +189,7 @@ class PyPdfium2Renderer:
     @staticmethod
     def _extract_embedded_images_from_page_sync(
         pdf_input: PdfInput,
+        *,
         page_index: int,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
         output_format: ImageFormat | None = None,
@@ -229,6 +226,7 @@ class PyPdfium2Renderer:
     @staticmethod
     def _extract_embedded_images_from_pdf_sync(
         pdf_input: PdfInput,
+        *,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
         output_format: ImageFormat | None = None,
     ) -> dict[int, list[ExtractedImageFromPage]]:
@@ -266,18 +264,18 @@ class PyPdfium2Renderer:
         return all_images
 
     # ---- public async façade -----------------------------------------
-    async def render_pdf_pages(self, pdf_input: PdfInput, dpi: int) -> list[Image.Image]:
+    async def render_pdf_pages(self, pdf_input: PdfInput, *, dpi: int) -> list[Image.Image]:
         scale = dpi / PDFIUM2_REFERENCE_DPI
         """Render *one* page and return PNG bytes."""
         async with self._pdfium_lock:
-            return await asyncio.to_thread(self._render_pdf_pages_sync, pdf_input, scale)
+            return await asyncio.to_thread(self._render_pdf_pages_sync, pdf_input, scale=scale)
 
     async def extract_text_from_pdf_pages(self, pdf_input: PdfInput) -> list[str]:
         """Extract text from all pages of a PDF."""
         async with self._pdfium_lock:
             return await asyncio.to_thread(self._extract_text_from_pdf_pages_sync, pdf_input)
 
-    async def render_pdf_pages_from_uri(self, pdf_uri: str, dpi: int) -> list[Image.Image]:
+    async def render_pdf_pages_from_uri(self, pdf_uri: str, *, dpi: int) -> list[Image.Image]:
         pdf_input = await _resolve_pdf_uri_to_input(pdf_uri)
         return await self.render_pdf_pages(pdf_input=pdf_input, dpi=dpi)
 
@@ -289,6 +287,7 @@ class PyPdfium2Renderer:
     async def extract_embedded_images_from_page(
         self,
         pdf_input: PdfInput,
+        *,
         page_index: int,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
         output_format: ImageFormat | None = None,
@@ -309,14 +308,15 @@ class PyPdfium2Renderer:
             return await asyncio.to_thread(
                 self._extract_embedded_images_from_page_sync,
                 pdf_input,
-                page_index,
-                max_depth,
-                output_format,
+                page_index=page_index,
+                max_depth=max_depth,
+                output_format=output_format,
             )
 
     async def extract_embedded_images_from_pdf(
         self,
         pdf_input: PdfInput,
+        *,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
         output_format: ImageFormat | None = None,
     ) -> dict[int, list[ExtractedImageFromPage]]:
@@ -335,13 +335,14 @@ class PyPdfium2Renderer:
             return await asyncio.to_thread(
                 self._extract_embedded_images_from_pdf_sync,
                 pdf_input,
-                max_depth,
-                output_format,
+                max_depth=max_depth,
+                output_format=output_format,
             )
 
     async def extract_embedded_images_from_pdf_uri(
         self,
         pdf_uri: str,
+        *,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
         output_format: ImageFormat | None = None,
     ) -> dict[int, list[ExtractedImageFromPage]]:

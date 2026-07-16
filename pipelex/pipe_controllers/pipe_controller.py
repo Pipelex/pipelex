@@ -20,6 +20,7 @@ class PipeController(PipeAbstract):
     def class_name(self) -> str:
         return self.__class__.__name__
 
+    @override
     @abstractmethod
     def pipe_dependencies(self) -> set[str]:
         """Return the pipes that are dependencies of the pipe.
@@ -32,6 +33,7 @@ class PipeController(PipeAbstract):
     @override
     async def _live_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -50,6 +52,7 @@ class PipeController(PipeAbstract):
     @override
     async def _dry_run_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -67,6 +70,7 @@ class PipeController(PipeAbstract):
     @abstractmethod
     async def _live_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
@@ -78,6 +82,7 @@ class PipeController(PipeAbstract):
     @abstractmethod
     async def _dry_run_controller_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,

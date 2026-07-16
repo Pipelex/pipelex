@@ -12,7 +12,7 @@ class TestUpdateCursorRules:
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
+        update_cursor_rules(repo_root, kit_index=kit_index, agent_set=agent_set)
 
         cursor_rules_dir = repo_root / ".cursor" / "rules"
         assert cursor_rules_dir.exists()
@@ -23,7 +23,7 @@ class TestUpdateCursorRules:
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
+        update_cursor_rules(repo_root, kit_index=kit_index, agent_set=agent_set)
 
         # Check first .mdc file for front-matter
         cursor_rules_dir = repo_root / ".cursor" / "rules"
@@ -37,7 +37,7 @@ class TestUpdateCursorRules:
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
+        update_cursor_rules(repo_root, kit_index=kit_index, agent_set=agent_set)
 
         cursor_rules_dir = repo_root / ".cursor" / "rules"
         exported_files: set[str] = set()
@@ -52,4 +52,4 @@ class TestUpdateCursorRules:
         kit_index = load_index()
 
         with pytest.raises(KitError, match=r"Agent set 'unknown' not found in index.toml"):
-            update_cursor_rules(tmp_path, kit_index, agent_set="unknown")
+            update_cursor_rules(tmp_path, kit_index=kit_index, agent_set="unknown")

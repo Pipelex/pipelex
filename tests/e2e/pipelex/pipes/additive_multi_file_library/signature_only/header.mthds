@@ -1,0 +1,17 @@
+domain      = "research"
+description = "Research method headers"
+
+# Forward declaration ("header"): a PipeSignature is a contract only, no way of running.
+[pipe.find_key_findings]
+description = "Find the key findings in a document (contract only)."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"
+
+# A sibling controller may already reference the header by bare same-domain code, even though no
+# concrete definition exists yet — this is the top-down build in progress.
+[pipe.research_brief]
+type        = "PipeSequence"
+description = "Produce a research brief from a document."
+inputs      = { doc = "Text" }
+output      = "KeyFinding"
+steps       = [{ pipe = "find_key_findings", result = "findings" }]

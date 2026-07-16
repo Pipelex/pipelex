@@ -1,11 +1,10 @@
-import asyncio
-import inspect
 from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
 from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -15,8 +14,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
+from pipelex.hub import get_class_registry, get_pipe_func_executor
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -37,12 +35,18 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
+    def needed_inputs(self, *, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         return self.inputs
 
     @field_validator("function_name", mode="before")
     @classmethod
     def validate_function_name(cls, function_name: str) -> str:
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the customer's function is not registered in this process (its
+            # source only travels on the crate), so the registry lookup + return-type inspection
+            # cannot run here. The sandbox registers the real function and validates it for real
+            # when it loads. Accept the declared name verbatim.
+            return function_name
         function = func_registry.get_function(function_name)
         if not function:
             # Check if this function was found but is ineligible (e.g., missing return type)
@@ -77,6 +81,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     def validate_output_with_library(self):
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the function is not in this process, so its return type cannot be
+            # inspected to cross-check against the output concept's structure class. The sandbox does
+            # this check for real at registration time. Skip the whole library-output validation here.
+            return
         function = func_registry.get_required_function(self.function_name)
         return_type: type[StuffContent] | None = get_type_hints(function).get("return")
         if return_type is None:
@@ -174,22 +183,26 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     @override
     async def _live_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
-        function = func_registry.get_required_function(self.function_name)
 
         try:
-            if inspect.iscoroutinefunction(function):
-                func_output_object = await function(working_memory=working_memory)
-            else:
-                func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
+            execution_result = await get_pipe_func_executor().run_pipe_func(
+                job_metadata=job_metadata,
+                pipe_code=self.code,
+                function_name=self.function_name,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+            )
         except Exception as exc:
-            # PipeFunc invokes an arbitrary user-registered function whose failure surface is not enumerable;
-            # any failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
+            # PipeFunc runs arbitrary user code — in-process, or (in hosted mode) inside a sandbox
+            # reached through a Temporal activity — whose failure surface is not enumerable; any
+            # failure is wrapped into a diagnostic PipeRunError below. Re-raises, never swallows.
             # Build informative error message with actual input values from working memory
             inputs_lines: list[str] = []
             for input_name in self.inputs.root:
@@ -209,17 +222,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        the_content: StuffContent
-        if isinstance(func_output_object, StuffContent):
-            the_content = func_output_object
-        elif isinstance(func_output_object, list):
-            func_result_list = cast("list[StuffContent]", func_output_object)
-            the_content = ListContent(items=func_result_list)
-        elif isinstance(func_output_object, str):
-            the_content = TextContent(text=func_output_object)
-        else:
-            msg = f"Function '{self.function_name}' must return a StuffContent or a list, got {type(func_output_object)}"
-            raise TypeError(msg)
+        the_content = execution_result.content
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
@@ -235,14 +238,15 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         # Capture execution data for the graph tracer. PipeFunc has no prompts or
         # models to record, but the sidepanel should still show *what* function ran
         # and what kind of content it returned — useful for debugging and for
-        # distinguishing multiple PipeFunc nodes in a graph.
+        # distinguishing multiple PipeFunc nodes in a graph. In hosted mode the module/qualname
+        # ride back on the execution result (the operator no longer holds the callable).
         execution_data_dict: dict[str, Any] = {
             "function_name": self.function_name,
-            "function_module": getattr(function, "__module__", None),
-            "function_qualname": getattr(function, "__qualname__", self.function_name),
+            "function_module": execution_result.function_module,
+            "function_qualname": execution_result.function_qualname or self.function_name,
             "output_content_type": type(the_content).__name__,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,
@@ -252,20 +256,33 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     @override
     async def _dry_run_operator_pipe(
         self,
+        *,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        function = func_registry.get_required_function(self.function_name)
         log.info(
             f"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function \
             but only validating the inputs and return type."
         )
-        return_type = get_type_hints(function).get("return")
-        if return_type is None:
-            msg = f"Dry run of {self.type} '{self.code}' failed: The return type of the function is None. It should be a subclass of StuffContent."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+        # Sandbox-hosted mode: the customer function is not registered in THIS process (its source only
+        # travels on the crate to the sandbox), so its return type cannot be inspected here. Build the
+        # mock output from the DECLARED output concept's structure class instead — mirroring PipeLLM's
+        # dry run — and let the sandbox validate the real function's return type when it registers it.
+        function = None if is_pipe_func_sandbox_hosted() else func_registry.get_required_function(self.function_name)
+        return_type: type[StuffContent]
+        if function is None:
+            return_type = get_class_registry().get_required_subclass(
+                name=self.output.concept.structure_class_name,
+                base_class=StuffContent,
+            )
+        else:
+            hinted_return_type = get_type_hints(function).get("return")
+            if hinted_return_type is None:
+                msg = f"Dry run of {self.type} '{self.code}' failed: function return type is None; it must be a subclass of StuffContent."
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            return_type = hinted_return_type
 
         # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
         stuff_spec = TypedNamedStuffSpec(
@@ -302,7 +319,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             "output_content_type": type(mock_content).__name__,
             "is_mock_output": True,
         }
-        self._register_execution_data(job_metadata, execution_data_dict)
+        self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)
 
         return PipeFuncOutput(
             working_memory=working_memory,
@@ -311,8 +328,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
+        if is_pipe_func_sandbox_hosted():
+            # Sandbox-hosted mode: the function is not registered in this process, so its return type
+            # cannot be inspected here. The sandbox validates the real function when it registers it.
+            return
         function = func_registry.get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
         # TODO: this should not happend ever. The correct way to do this would be to have a unit test making sure
@@ -329,6 +350,6 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass

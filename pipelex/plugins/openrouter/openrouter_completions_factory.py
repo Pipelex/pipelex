@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class OpenRouterCompletionsFactory(OpenAICompletionsFactory):
     @override
     def make_extras(
-        self, inference_model: InferenceModelSpec, inference_job: InferenceJobAbstract, output_desc: str
+        self, inference_model: InferenceModelSpec, *, inference_job: InferenceJobAbstract, output_desc: str
     ) -> tuple[dict[str, str], dict[str, Any]]:
         if isinstance(inference_job, ImgGenJob):
             extra_body = {"modalities": ["image"]}

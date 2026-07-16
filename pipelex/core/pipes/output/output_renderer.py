@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 def _collect_possible_outputs(
     the_pipe: PipeAbstract,
+    *,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
 ) -> list[dict[str, Any]]:
     """Collect all possible outputs for a pipe with native.Anything output.
@@ -29,6 +30,10 @@ def _collect_possible_outputs(
     Returns:
         A list of possible output dicts, each containing 'concept_ref' and 'content'
     """
+    if the_pipe.is_signature:
+        # A signature is outside the `PipeType` taxonomy (no executable kind) and contributes no
+        # concrete output options; short-circuit before the `PipeType(...)` coercion, which would raise.
+        return []
     pipe_type = PipeType(the_pipe.type)
 
     # Check if the pipe is a PipeCondition
@@ -41,10 +46,11 @@ def _collect_possible_outputs(
                 return []
 
             possible_outputs: list[dict[str, Any]] = []
-            for mapped_pipe_code in mapped_pipe_codes:
+            # pipe_dependencies() is a set — sort so the user-facing output_option_N numbering is deterministic
+            for mapped_pipe_code in sorted(mapped_pipe_codes):
                 mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
                 try:
-                    output_dict = mapped_pipe.output.render_stuff_spec(output_format)
+                    output_dict = mapped_pipe.output.render_stuff_spec(output_format=output_format)
                     content = output_dict.get("content", output_dict)
                     possible_outputs.append(
                         {
@@ -79,11 +85,11 @@ def _collect_possible_outputs(
 
             # If last pipe also has Anything output, recurse
             if last_pipe.output.concept.code == NativeConceptCode.ANYTHING:
-                return _collect_possible_outputs(last_pipe, output_format)
+                return _collect_possible_outputs(last_pipe, output_format=output_format)
 
             # Otherwise render the last pipe's output
             try:
-                output_dict = last_pipe.output.render_stuff_spec(output_format)
+                output_dict = last_pipe.output.render_stuff_spec(output_format=output_format)
                 content = output_dict.get("content", output_dict)
                 return [
                     {
@@ -112,6 +118,7 @@ def _collect_possible_outputs(
 
 def render_output(
     the_pipe: PipeAbstract,
+    *,
     indent: int = 2,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
 ) -> str:
@@ -137,14 +144,14 @@ def render_output(
     # Handle each format type
     match output_format:
         case ConceptRepresentationFormat.SCHEMA:
-            return _render_schema_output(the_pipe, indent)
+            return _render_schema_output(the_pipe, indent=indent)
         case ConceptRepresentationFormat.PYTHON:
             return _render_python_output(the_pipe)
         case ConceptRepresentationFormat.JSON:
-            return _render_json_output(the_pipe, indent)
+            return _render_json_output(the_pipe, indent=indent)
 
 
-def _render_json_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
+def _render_json_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
     """Render JSON representation of the pipe's output.
 
     Args:
@@ -159,7 +166,7 @@ def _render_json_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
     """
     # Check if output is native.Anything (has no specific shape)
     if the_pipe.output.concept.code == NativeConceptCode.ANYTHING:
-        possible_outputs = _collect_possible_outputs(the_pipe, ConceptRepresentationFormat.JSON)
+        possible_outputs = _collect_possible_outputs(the_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
@@ -177,7 +184,7 @@ def _render_json_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
         return json.dumps(result, indent=indent, ensure_ascii=False)
 
     # Normal output rendering - returns dict with "concept" and "content"
-    output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.JSON)
+    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.JSON)
     return json.dumps(output_dict, indent=indent, ensure_ascii=False)
 
 
@@ -195,7 +202,7 @@ def _render_python_output(the_pipe: PipeAbstract) -> str:
     """
     # Check if output is native.Anything (has no specific shape)
     if the_pipe.output.concept.code == NativeConceptCode.ANYTHING:
-        possible_outputs = _collect_possible_outputs(the_pipe, ConceptRepresentationFormat.PYTHON)
+        possible_outputs = _collect_possible_outputs(the_pipe, output_format=ConceptRepresentationFormat.PYTHON)
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
@@ -218,7 +225,7 @@ def _render_python_output(the_pipe: PipeAbstract) -> str:
         return "\n".join(lines)
 
     # Normal output rendering
-    output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.PYTHON)
+    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.PYTHON)
     concept_ref = output_dict.get("concept", "")
     content = output_dict.get("content", "")
 
@@ -230,7 +237,7 @@ def _render_python_output(the_pipe: PipeAbstract) -> str:
     return "\n".join(lines)
 
 
-def _render_schema_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
+def _render_schema_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
     """Render JSON Schema for the pipe's output.
 
     Args:
@@ -245,7 +252,7 @@ def _render_schema_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
     """
     # Check if output is native.Anything (has no specific shape)
     if the_pipe.output.concept.code == NativeConceptCode.ANYTHING:
-        possible_outputs = _collect_possible_outputs(the_pipe, ConceptRepresentationFormat.SCHEMA)
+        possible_outputs = _collect_possible_outputs(the_pipe, output_format=ConceptRepresentationFormat.SCHEMA)
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
@@ -262,5 +269,5 @@ def _render_schema_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
         return json.dumps(result, indent=indent, ensure_ascii=False)
 
     # Normal output rendering - get JSON Schema directly
-    output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.SCHEMA)
+    output_dict = the_pipe.output.render_stuff_spec(output_format=ConceptRepresentationFormat.SCHEMA)
     return json.dumps(output_dict, indent=indent, ensure_ascii=False)

@@ -79,7 +79,7 @@ class SchemaToModelFactory:
     _source_cache_lock: ClassVar[threading.Lock] = threading.Lock()
 
     @classmethod
-    def make_from_json_schema(cls, schema: dict[str, Any], class_name: str) -> type[BaseModel]:
+    def make_from_json_schema(cls, schema: dict[str, Any], *, class_name: str) -> type[BaseModel]:
         """Reconstruct a BaseModel class from a JSON schema dict.
 
         Args:
@@ -103,7 +103,7 @@ class SchemaToModelFactory:
                 return cls._schema_cache[cache_key]
 
             source_code = cls._generate_source_from_schema(schema)
-            reconstructed_class = cls._exec_and_extract_class(source_code, class_name)
+            reconstructed_class = cls._exec_and_extract_class(source_code, class_name=class_name)
             reconstructed_class.__kajson_class_source__ = source_code  # type: ignore[attr-defined]
             if len(cls._schema_cache) >= cls._SCHEMA_CACHE_MAX_SIZE:
                 cls._schema_cache.popitem(last=False)
@@ -123,7 +123,7 @@ class SchemaToModelFactory:
         return "".join(segment[0].upper() + segment[1:] if segment else "" for segment in segments)
 
     @classmethod
-    def _collect_unsafe_extension_paths(cls, node: Any, path: str, found: list[str]) -> None:
+    def _collect_unsafe_extension_paths(cls, node: Any, *, path: str, found: list[str]) -> None:
         """Walk a JSON-schema-shaped value, collecting dotted paths to any x-python-* key.
 
         These extensions cause datamodel-code-generator to emit arbitrary `from X import Y`
@@ -136,11 +136,11 @@ class SchemaToModelFactory:
                 child_path = f"{path}.{key}" if path else key
                 if key.startswith(cls._UNSAFE_EXTENSION_PREFIX):
                     found.append(child_path)
-                cls._collect_unsafe_extension_paths(value, child_path, found)
+                cls._collect_unsafe_extension_paths(value, path=child_path, found=found)
         elif isinstance(node, list):
             node_list = cast("list[Any]", node)
             for index, item in enumerate(node_list):
-                cls._collect_unsafe_extension_paths(item, f"{path}[{index}]", found)
+                cls._collect_unsafe_extension_paths(item, path=f"{path}[{index}]", found=found)
 
     @classmethod
     def _reject_unsafe_schema_extensions(cls, schema: dict[str, Any]) -> None:
@@ -152,7 +152,7 @@ class SchemaToModelFactory:
         leaving no signal in logs for incident response.
         """
         found: list[str] = []
-        cls._collect_unsafe_extension_paths(schema, "", found)
+        cls._collect_unsafe_extension_paths(schema, path="", found=found)
         if found:
             msg = f"Unsafe codegen extensions found in schema: {found}"
             raise UnsafeSchemaError(msg)
@@ -198,7 +198,7 @@ class SchemaToModelFactory:
             output_path.unlink(missing_ok=True)
 
     @classmethod
-    def _restricted_import(
+    def _restricted_import(  # kw-only: ignore -- registered as __import__; the interpreter calls it positionally
         cls,
         name: str,
         import_globals: dict[str, Any] | None = None,
@@ -316,7 +316,7 @@ class SchemaToModelFactory:
             return dict(types_dict)
 
     @classmethod
-    def _exec_and_extract_class(cls, source_code: str, class_name: str) -> type[BaseModel]:
+    def _exec_and_extract_class(cls, source_code: str, *, class_name: str) -> type[BaseModel]:
         """Execute source code and extract the named BaseModel class."""
         all_user_types = cls.make_types_from_source(source_code)
         model_classes: dict[str, type[BaseModel]] = {name: obj for name, obj in all_user_types.items() if issubclass(obj, BaseModel)}

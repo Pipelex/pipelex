@@ -5,6 +5,7 @@ instances that can be consumed by various APIs.
 """
 
 import base64
+from pathlib import Path
 
 from pipelex.hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
@@ -22,6 +23,7 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 async def prepare_file_from_uri(
     uri: str,
+    *,
     keep_http_url: bool,
     keep_local_path: bool,
 ) -> PreparedFile:
@@ -69,7 +71,7 @@ async def prepare_file_from_uri(
             if keep_local_path:
                 prepared = PreparedFileLocalPath(path=resolved_uri.path)
             else:
-                raw_bytes = await load_binary_async(resolved_uri.path)
+                raw_bytes = await load_binary_async(Path(resolved_uri.path))
                 prepared = PreparedFileBase64(
                     base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                     file_type=detect_file_type_from_bytes(raw_bytes),

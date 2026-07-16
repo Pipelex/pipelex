@@ -130,7 +130,9 @@ description = "Summarize a document"
 inputs = { document = "Document" }
 output = "DocumentSummary"
 prompt = """
-Summarize the key points from this document: @document
+Summarize the key points from this document:
+
+@document
 """
 ```
 
@@ -222,7 +224,7 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | LLM choice used whenever this `PipeLLM` produces a structured output. Applies both to direct structured generation and to the structuring step when `structuring_method = "preliminary_text"` is set. | No       |
 | `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
-| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
+| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`). Use `@input_name` as a block sigil on its own line to insert the content of an entire input — inline `@var` raises `TemplateSigilSyntaxError` when `var` collides with a declared input. For a declared-optional input (`?`), use `@?input_name` — it inserts the content when present and renders nothing when absent, and counts as a guard for the optionality lint (a bare `$var`/`@var` reference to an optional input is rejected as `optional_input_unguarded`; see [Understanding Optionality](../understanding-optionality.md)). Image and document variables follow the same rules. Escape with `@@` or `$$` to emit a literal `@` or `$` (e.g., `@@font-face` inside a `<style>` block). | No       |
 | `structuring_method`        | string              | `"direct"` (default) generates the structured output in one LLM call. `"preliminary_text"` expands the pipe at load time into a `PipeLLM` (text) + [`PipeStructure`](./PipeStructure.md) sequence — two LLM calls. Cannot be combined with a `Text` output. | No       |
 
 ### LLM Setting Fields
@@ -234,7 +236,7 @@ When `model` is specified as a table (inline LLM setting), it accepts the follow
 | `model` | string | Model name or alias (e.g., `"claude-4.5-sonnet"`, `"@default-premium"`) |
 | `temperature` | float | Sampling temperature (0.0 – 1.0) |
 | `max_tokens` | integer | Maximum output tokens |
-| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"max"`. Not supported for structured generation. |
+| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"xhigh"`, `"max"`. Not supported for structured generation. |
 | `reasoning_budget` | integer | Explicit token budget for reasoning. Mutually exclusive with `reasoning_effort`. Supported by Anthropic and Google only. |
 | `description` | string | Human-readable description (for presets) |
 

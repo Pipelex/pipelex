@@ -1,28 +1,48 @@
 from typing import Annotated
 
-import click
 import typer
 from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.commands.build.app import build_app
+from pipelex.cli.commands.codegen.app import codegen_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
+from pipelex.cli.commands.fix.app import fix_app
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.login.command import login_cmd
+from pipelex.cli.commands.plugins_cmd import plugins_app
+from pipelex.cli.commands.resolve_cmd import resolve_cmd
 from pipelex.cli.commands.run.app import run_app
-from pipelex.cli.commands.setup_temporal_namespace_cmd import setup_temporal_namespace_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.update_cmd import update_cmd
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
-from pipelex.cli.commands.worker_cmd import worker_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
+from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
+
+# Core commands in display order (natural ordering doesn't work between Typer groups and commands).
+_CORE_COMMAND_ORDER: list[str] = [
+    "login",
+    "init",
+    "doctor",
+    "update",
+    "build",
+    "validate",
+    "fix",
+    "resolve",
+    "codegen",
+    "run",
+    "graph",
+    "show",
+    "which",
+    "plugins",
+]
 
 
 class PipelexCLI(TyperGroup):
@@ -30,21 +50,7 @@ class PipelexCLI(TyperGroup):
 
     @override
     def list_commands(self, ctx: Context) -> list[str]:
-        # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return [
-            "login",
-            "init",
-            "doctor",
-            "update",
-            "build",
-            "validate",
-            "run",
-            "graph",
-            "show",
-            "which",
-            "worker",
-            "setup-temporal-namespace",
-        ]
+        return list(_CORE_COMMAND_ORDER)
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -63,18 +69,27 @@ class PipelexCLI(TyperGroup):
         parent: Context | None = None,
         **extra: object,
     ) -> Context:
-        """Intercept --no-logo from args before Click/Typer processes them.
+        """Intercept global flags from args before Click/Typer processes them.
 
-        This allows --no-logo to be placed anywhere in the command line
-        (before or after subcommands) while keeping the CLI architecture clean.
+        This allows --no-logo and --traceback to be placed anywhere in the
+        command line (before or after subcommands) while keeping the CLI
+        architecture clean.
         """
         no_logo = "--no-logo" in args
         if no_logo:
             args = [arg for arg in args if arg != "--no-logo"]
 
+        traceback = "--traceback" in args
+        if traceback:
+            args = [arg for arg in args if arg != "--traceback"]
+
         ctx = super().make_context(info_name, args, parent, **extra)
         ctx.ensure_object(dict)
         ctx.obj["no_logo"] = no_logo
+        ctx.obj["traceback"] = traceback
+        # Record at parse time so error handlers honor --traceback without relying on
+        # an active global Click context (absent under typer >= 0.26 / click >= 8.4).
+        set_traceback_requested(value=traceback)
         return ctx
 
 
@@ -86,7 +101,7 @@ app = typer.Typer(
 )
 
 
-def version_callback(value: bool) -> None:
+def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes Option callbacks positionally
     """Print version and exit when --version is passed."""
     if value:
         package_version = get_package_version()
@@ -111,9 +126,11 @@ def app_callback(
     console = get_console()
     package_version = get_package_version()
 
-    # Get no_logo flag from context (set by PipelexCLI.make_context)
-    click_ctx = click.get_current_context()
-    no_logo = click_ctx.obj.get("no_logo", False) if click_ctx.obj else False
+    # Get no_logo flag from context (set by PipelexCLI.make_context). Use the
+    # ctx parameter Typer injects rather than click.get_current_context(): the
+    # global context stack is not populated when a subcommand is dispatched
+    # under typer >= 0.26 / click >= 8.4, which made every subcommand crash.
+    no_logo = ctx.obj.get("no_logo", False) if ctx.obj else False
 
     if no_logo:
         console.print(f"Pipelex v{package_version}")
@@ -216,12 +233,15 @@ app.add_typer(
     name="validate",
     help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
+app.add_typer(
+    fix_app,
+    name="fix",
+    help="Apply deterministic safe fixes to a bundle (.mthds) and re-validate until valid",
+)
+app.command(name="resolve", help="Resolve a bundle closure into the normalized library crate (JSON or TOML) on stdout")(resolve_cmd)
+app.add_typer(codegen_app, name="codegen", help="Project the resolved crate into typed, runnable artifacts (types, inputs) and check for drift")
 app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
-app.command(name="worker", help="Start a Temporal worker for distributed workflow execution")(worker_cmd)
-app.command(
-    name="setup-temporal-namespace",
-    help="Register Pipelex's custom search attributes on the configured Temporal namespace",
-)(setup_temporal_namespace_cmd)
+app.add_typer(plugins_app, name="plugins", help="Inspect the discovered plugins (inference backends, orchestrators) and their contributions")

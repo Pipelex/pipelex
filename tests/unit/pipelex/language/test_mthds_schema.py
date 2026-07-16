@@ -2,12 +2,41 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import jsonschema
 import pytest
 
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
+from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+# Per-pipe-kind required fields beyond the universal {description, output}, with
+# minimal schema-valid values. Keyed by the `type` discriminator value. Used to
+# build a minimal table that validates against exactly one oneOf arm.
+_PIPE_KIND_EXTRA_FIELDS: dict[str, dict[str, Any]] = {
+    "PipeFunc": {"function_name": "do_it"},
+    "PipeImgGen": {"prompt": "draw a cat"},
+    "PipeCompose": {},
+    "PipeLLM": {},
+    "PipeExtract": {},
+    "PipeSearch": {"prompt": "find it"},
+    "PipeStructure": {},
+    "PipeBatch": {"branch_pipe_code": "sub_pipe", "input_list_name": "items", "input_item_name": "item"},
+    "PipeCondition": {"default_outcome": "fallback_pipe", "outcomes": {"yes": "yes_pipe"}},
+    "PipeParallel": {"branches": [{"pipe": "sub_pipe"}]},
+    "PipeSequence": {"steps": [{"pipe": "sub_pipe"}]},
+    # `PipeSignature` is deliberately absent: a signature is typeless, so there is no typed table for
+    # it — an explicit `type = "PipeSignature"` table matches no arm (see test_explicit_signature_tag_is_rejected).
+}
+
+
+def _minimal_pipe_table(pipe_type: str) -> dict[str, Any]:
+    """A minimal schema-valid pipe table for the given `type` discriminator value."""
+    return {"type": pipe_type, "description": f"A minimal {pipe_type} pipe", "output": "Text", **_PIPE_KIND_EXTRA_FIELDS[pipe_type]}
 
 
 class TestMthdsSchemaGeneration:
@@ -161,6 +190,144 @@ class TestMthdsSchemaGeneration:
         assert has_from, "Should have a 'from' (variable reference) variant"
         assert has_template, "Should have a 'template' variant"
         assert has_nested, "Should have a 'nested construct' variant"
+
+    def test_type_required_on_every_concrete_pipe_arm(self, schema: dict[str, Any]) -> None:
+        """Every *concrete* pipe arm requires `type`; the signature arm is the one typeless arm.
+
+        Reads the arm names straight from the generated `oneOf`, so a newly added pipe type is
+        covered automatically — this doubles as the drift guard. The signature arm is the one typeless
+        arm: it has NO `type` property at all (an explicit `type = "PipeSignature"` is rejected as an
+        extra property under `additionalProperties: false`), so it lists `type` in neither `properties`
+        nor `required`.
+        """
+        definitions = schema["definitions"]
+        arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
+        arm_def_names = [arm["$ref"].rsplit("/", 1)[-1] for arm in arms]
+
+        assert arm_def_names, "The pipe union oneOf should have at least one arm"
+        signature_def_name = PipeSignatureBlueprint.__name__
+        assert signature_def_name in arm_def_names, "The signature arm must be present in the pipe union"
+        for def_name in arm_def_names:
+            required = definitions[def_name].get("required", [])
+            properties = definitions[def_name].get("properties", {})
+            if def_name == signature_def_name:
+                assert "type" not in properties, f"the signature arm must have NO 'type' property (got {sorted(properties)})"
+                assert "type" not in required, f"the signature arm must NOT require 'type' (got {required})"
+            else:
+                assert "type" in required, f"{def_name} must list 'type' in its required array (got {required})"
+
+    @pytest.mark.parametrize(
+        "table",
+        [
+            pytest.param({"description": "bare contract", "output": "Text"}, id="bare-contract"),
+            pytest.param({"description": "with inputs", "output": "Text", "inputs": {"doc": "Text"}}, id="with-inputs"),
+            pytest.param({"description": "with hint", "output": "Text", "signature_for": "PipeLLM"}, id="with-signature-for"),
+        ],
+    )
+    def test_typeless_contract_table_matches_signature_arm(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
+        """A typeless section carrying only the contract validates — it is a signature."""
+        validator = _pipe_union_oneof_validator(schema)
+        errors = sorted(validator.iter_errors(table), key=str)
+        assert not errors, f"A typeless contract table must validate, got errors: {[e.message for e in errors]}"
+
+    @pytest.mark.parametrize(
+        "table",
+        [
+            # A typeless table that adds an implementation field beyond the contract. `prompt` is
+            # shared by PipeLLM/PipeImgGen and `function_name` uniquely looks like PipeFunc, but with
+            # no `type` neither matches any arm.
+            pytest.param({"description": "looks like an impl", "output": "Text", "prompt": "do it"}, id="stray-prompt"),
+            pytest.param({"description": "looks like PipeFunc", "output": "Text", "function_name": "do_it"}, id="stray-function-name"),
+        ],
+    )
+    def test_typeless_table_with_stray_field_is_rejected(self, schema: dict[str, Any], table: dict[str, Any]) -> None:
+        """A typeless section that declares more than the contract matches no arm."""
+        validator = _pipe_union_oneof_validator(schema)
+        assert not validator.is_valid(table), f"A typeless non-contract table must be rejected: {table}"
+
+    def test_typoed_type_is_rejected(self, schema: dict[str, Any]) -> None:
+        """A misspelled `type` matches no arm (not a concrete kind; the signature arm pins the tag)."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeLLMM", "description": "typo", "output": "Text"}
+        assert not validator.is_valid(table)
+
+    def test_explicit_signature_tag_is_rejected(self, schema: dict[str, Any]) -> None:
+        """An explicit `type = "PipeSignature"` table matches no arm: the signature arm has no `type`
+        property (extra property under `additionalProperties: false`) and every concrete arm pins its
+        own `type` enum. `PipeSignature` is no longer a selectable type.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        table = {"type": "PipeSignature", "description": "explicit tag", "output": "Text"}
+        assert not validator.is_valid(table)
+
+    @pytest.mark.parametrize("pipe_type", sorted(_PIPE_KIND_EXTRA_FIELDS))
+    def test_typed_pipe_table_matches_exactly_one_arm(self, schema: dict[str, Any], pipe_type: str) -> None:
+        """A minimal typed table for each pipe kind must match exactly one oneOf arm.
+
+        Draft-4 `oneOf` validates iff exactly one subschema matches, so a successful
+        validation here proves the `type` discriminator resolves to a single variant.
+        """
+        validator = _pipe_union_oneof_validator(schema)
+        table = _minimal_pipe_table(pipe_type)
+        errors = sorted(validator.iter_errors(table), key=str)
+        assert not errors, f"{pipe_type} table should match exactly one oneOf arm, got errors: {[e.message for e in errors]}"
+
+    @pytest.mark.parametrize(
+        ("size_value", "should_validate"),
+        [
+            pytest.param("1k", True, id="tier-token"),
+            pytest.param("2048x1152", True, id="exact-size-string"),
+            pytest.param({"width": 2048, "height": 1152}, True, id="exact-size-table"),
+            pytest.param("banana", False, id="garbage-string"),
+            pytest.param("0x100", False, id="zero-width"),
+        ],
+    )
+    def test_pipe_img_gen_size_field_schema(self, schema: dict[str, Any], size_value: Any, should_validate: bool) -> None:
+        """The `size` field must accept tier tokens and exact `WxH` strings, as written in .mthds files."""
+        validator = _pipe_union_oneof_validator(schema)
+        table = {**_minimal_pipe_table("PipeImgGen"), "size": size_value}
+        assert validator.is_valid(table) is should_validate, f"size={size_value!r} should {'' if should_validate else 'not '}validate"
+
+    def test_minimal_table_coverage_matches_schema_pipe_kinds(self, schema: dict[str, Any]) -> None:
+        """Guard: the test's per-kind table map covers exactly the *concrete* pipe kinds in the schema.
+
+        If a new pipe type is added, this fails until a minimal table is provided —
+        keeping `test_typed_pipe_table_matches_exactly_one_arm` exhaustive. The signature arm is
+        excluded: it is typeless (no `type` enum) and is not a selectable type.
+        """
+        definitions = schema["definitions"]
+        arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
+        signature_def_name = PipeSignatureBlueprint.__name__
+        schema_types = {
+            definitions[def_name]["properties"]["type"]["enum"][0]
+            for arm in arms
+            if (def_name := arm["$ref"].rsplit("/", 1)[-1]) != signature_def_name
+        }
+        assert set(_PIPE_KIND_EXTRA_FIELDS) == schema_types
+
+
+class _SchemaValidator(Protocol):
+    """Minimal typed view of a jsonschema validator.
+
+    The `types-jsonschema` stubs expose `is_valid` / `iter_errors` as overloads whose
+    deprecated second arm carries `Unknown`, which trips strict pyright's
+    reportUnknownMemberType. Casting to this Protocol gives clean call-site types.
+    """
+
+    def is_valid(self, instance: object) -> bool: ...
+
+    def iter_errors(self, instance: object) -> Iterator[Any]: ...
+
+
+def _pipe_union_oneof_validator(schema: dict[str, Any]) -> _SchemaValidator:
+    """Build a Draft-4 validator for the pipe-union `oneOf` at properties.pipe.anyOf[0].additionalProperties.
+
+    The arms are `$ref`s into `#/definitions/...`, so the wrapper carries the full
+    `definitions` map for reference resolution.
+    """
+    arms = schema["properties"]["pipe"]["anyOf"][0]["additionalProperties"]["oneOf"]
+    wrapper = {"oneOf": arms, "definitions": schema["definitions"]}
+    return cast("_SchemaValidator", jsonschema.Draft4Validator(wrapper))
 
 
 def _assert_key_absent_recursive(node: Any, key: str, message: str) -> None:

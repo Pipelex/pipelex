@@ -1,11 +1,10 @@
 import types
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
 from pydantic import BaseModel
 
 from pipelex.hub import get_class_registry
-from pipelex.types import StrEnum
 
 
 def _build_type_hints_namespace() -> dict[str, Any]:
@@ -69,6 +68,7 @@ class StructurePrinter:
     def get_type_structure(
         self,
         tp: type[Any],
+        *,
         seen_types: set[str] | None = None,
         collected_types: dict[str, type[Any]] | None = None,
         collected_enums: dict[str, type[Enum]] | None = None,

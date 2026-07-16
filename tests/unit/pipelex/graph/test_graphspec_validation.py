@@ -9,6 +9,7 @@ from pipelex.graph.graphspec import (
     EdgeSpec,
     ErrorSpec,
     GraphSpec,
+    GraphSpecMode,
     NodeKind,
     NodeSpec,
     NodeStatus,
@@ -317,6 +318,7 @@ class TestGraphSpecValidation:
             edges=[],
         )
         assert graph.meta["format"] == "mthds"
+        assert "mode" not in graph.meta
 
     def test_meta_format_preserved_when_correct(self) -> None:
         graph = GraphSpec(
@@ -329,6 +331,41 @@ class TestGraphSpecValidation:
         )
         assert graph.meta["format"] == "mthds"
         assert graph.meta["extra"] == "value"
+
+    @pytest.mark.parametrize("mode", [GraphSpecMode.DRY, GraphSpecMode.LIVE, GraphSpecMode.STATIC])
+    def test_meta_mode_preserved_when_valid(self, mode: GraphSpecMode) -> None:
+        graph = GraphSpec(
+            graph_id="test_graph",
+            created_at=ValidGraphData.CREATED_AT,
+            pipeline_ref=PipelineRef(),
+            nodes=[],
+            edges=[],
+            meta={"format": "mthds", "mode": mode},
+        )
+        assert graph.meta["format"] == "mthds"
+        assert graph.meta["mode"] == mode
+
+    def test_meta_mode_rejected_when_wrong(self) -> None:
+        with pytest.raises(ValidationError):
+            GraphSpec(
+                graph_id="test_graph",
+                created_at=ValidGraphData.CREATED_AT,
+                pipeline_ref=PipelineRef(),
+                nodes=[],
+                edges=[],
+                meta={"format": "mthds", "mode": "wrong"},
+            )
+
+    def test_meta_mode_rejected_when_none(self) -> None:
+        with pytest.raises(ValidationError):
+            GraphSpec(
+                graph_id="test_graph",
+                created_at=ValidGraphData.CREATED_AT,
+                pipeline_ref=PipelineRef(),
+                nodes=[],
+                edges=[],
+                meta={"format": "mthds", "mode": None},
+            )
 
     def test_meta_format_rejected_when_wrong(self) -> None:
         with pytest.raises(ValidationError):

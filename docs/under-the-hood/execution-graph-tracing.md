@@ -22,7 +22,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 ```
 
 !!! info "Non-Intrusive Design"
-    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `GraphContext` in `JobMetadata`, not global state.
+    Graph tracing is opt-in. When disabled, a no-op tracer is used with zero overhead. The tracer is injected via `TraceContext` in `JobMetadata`, not global state.
 
 ---
 
@@ -30,13 +30,13 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexMTHDSProtocol(execution_config=...).execute(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
-| Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
-| Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
+| Force exclude data | `--graph --graph-no-data` | The four stuff/error `data_inclusion` flags → `False` (`pipe_and_concept_registry` unaffected) | Previews only |
+| Dry run with graph | `--dry-run --graph` | `PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=...)` | Graph of mock execution |
 
 !!! info "Full Data Included by Default"
-    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, and `error_stack_traces` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings.
+    The default configuration includes full data in graphs (`stuff_json_content`, `stuff_text_content`, `stuff_html_content`, `error_stack_traces`, and `pipe_and_concept_registry` are all `true`). Use `--graph-full-data` or `--graph-no-data` only to override project-specific settings — the flags toggle the first four; `pipe_and_concept_registry` is set only via config.
 
 ---
 
@@ -61,30 +61,38 @@ pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 ### API
 
 ```python
-from pipelex.pipeline.runner import PipelexRunner
-from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
+from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 # Execute with graph tracing via config
-runner = PipelexRunner(
-    execution_config=config.with_graph_config_overrides(generate_graph=True),
+runner = PipelexMTHDSProtocol(
+    execution_config=config.with_execution_overrides(generate_graph=True),
 )
-response = await runner.execute_pipeline(
+response = await runner.execute(
     pipe_code="my_pipe",
 )
 pipe_output = response.pipe_output
 
-# Dry run directly returns GraphSpec
-graph_spec = await dry_run_pipe_with_graph(pipe)
+# Dry run with graph: the same runner in DRY mode with mock inputs — no separate code path.
+dry_runner = PipelexMTHDSProtocol(
+    pipe_run_mode=PipeRunMode.DRY,
+    execution_config=config.with_execution_overrides(generate_graph=True, mock_inputs=True),
+)
+response = await dry_runner.execute(pipe_code="my_pipe")
+graph_spec = response.pipe_output.graph_spec
 ```
+
+!!! tip "Dry run from MTHDS content"
+    To dry-run an entire bundle straight from MTHDS content and get back a `GraphSpec`, use `dry_run_pipeline(mthds_contents=...)` (`pipelex/pipeline/dry_run_pipeline.py`) — the shared entrypoint behind the CLI graph commands, which wires the same DRY-mode runner for you. It owns its graph transport (a scoped in-memory event log), so it produces the graph regardless of the host's `tracing_config` and never writes trace files as a side effect.
 
 ### Outputs
 
 | Output | File | Purpose |
 |--------|------|---------|
-| `graphspec_json` | `_graphspec.json` | Canonical graph representation |
-| `mermaidflow_mmd` | `_mermaid.mmd` | Mermaid flowchart code |
-| `mermaidflow_html` | `_mermaid.html` | Standalone Mermaid viewer |
-| `reactflow_html` | `_reactflow.html` | Interactive ReactFlow viewer |
+| `graphspec_json` | `graphspec.json` | Canonical graph representation |
+| `mermaidflow_mmd` | `mermaidflow.mmd` | Mermaid flowchart code |
+| `mermaidflow_html` | `mermaidflow.html` | Standalone Mermaid viewer |
+| `reactflow_html` | `reactflow.html` | Interactive ReactFlow viewer |
 
 ---
 
@@ -103,7 +111,7 @@ flowchart TB
         direction TB
         MGR["GraphTracerManager<br/>(singleton)"]
         TRACER["GraphTracer"]
-        CTX["GraphContext"]
+        CTX["TraceContext"]
         MGR --> TRACER
         TRACER --> CTX
     end
@@ -165,6 +173,8 @@ class GraphSpec(BaseModel):
         return self.model_dump_json(by_alias=True, indent=2)
 ```
 
+`meta.format` is always `"mthds"` on newly emitted Pipelex graphs. `meta.mode` records provenance for renderers and shared tooling: Pipelex execution graphs emit `"dry"` for dry-run/mock execution and `"live"` for real execution. The shared renderer also accepts `"static"` for graphs produced by a static MTHDS graph builder.
+
 ### Node Types
 
 | NodeKind | Description |
@@ -185,6 +195,11 @@ class GraphSpec(BaseModel):
 | `DATA` | Data flow (stuff passed between pipes) |
 | `CONTAINS` | Parent-child containment (controller → children) |
 | `SELECTED_OUTCOME` | Condition outcome selection |
+| `BATCH_ITEM` | Batch fan-out: input list → item extracted for each batch iteration |
+| `BATCH_AGGREGATE` | Batch fan-in: item outputs → aggregated output list |
+| `PARALLEL_COMBINE` | Branch outputs → combined output in PipeParallel |
+
+Every `EdgeSpec` also carries an `optional` boolean (default `false`). On a `DATA` edge it marks that the producer's output is declared optional (`?` presence marker) — the value flowed on this run but may be absent on others. Renderers can use it to draw the edge distinctly (e.g. dashed).
 
 ### Node Status
 
@@ -194,8 +209,10 @@ class GraphSpec(BaseModel):
 | `RUNNING` | Currently executing |
 | `SUCCEEDED` | Completed successfully |
 | `FAILED` | Execution failed |
-| `SKIPPED` | Skipped during execution |
+| `SKIPPED` | Lifted (skipped) because a plain input resolved absent — a successful outcome, not an error |
 | `CANCELED` | Canceled before completion |
+
+A `SKIPPED` node also carries `skip_reason` (a human-readable sentence naming the absent input, e.g. `skipped because input 'source' is absent`). A lifted pipe with a plural output still writes a real empty-list value, so its node registers that output and downstream `DATA` edges resolve normally; a lifted singular output is a recorded absence with no output spec.
 
 ---
 
@@ -206,7 +223,7 @@ class GraphSpec(BaseModel):
 ```python
 # 1. Manager opens tracer for pipeline run
 manager = GraphTracerManager.get_or_create_instance()
-graph_context = manager.open_tracer(
+trace_context = manager.open_tracer(
     graph_id=pipeline_run_id,
     data_inclusion=config.data_inclusion,
     pipeline_ref_domain="my_domain",
@@ -216,12 +233,12 @@ graph_context = manager.open_tracer(
 # 2. Context flows through JobMetadata to each pipe
 job_metadata = JobMetadata(
     pipeline_run_id=pipeline_run_id,
-    graph_context=graph_context,
+    trace_context=trace_context,
 )
 
 # 3. Each pipe reports start/end to tracer
 node_id, child_context = manager.on_pipe_start(
-    graph_context=graph_context,
+    trace_context=trace_context,
     pipe_code="extract_text",
     pipe_type="PipeExtract",
     node_kind=NodeKind.OPERATOR,
@@ -231,7 +248,7 @@ node_id, child_context = manager.on_pipe_start(
 
 # 4. On completion, report success with output
 manager.on_pipe_end_success(
-    graph_id=graph_context.graph_id,
+    lookup_key=trace_context.lookup_key,
     node_id=node_id,
     ended_at=datetime.now(timezone.utc),
     output_spec=IOSpec(...),
@@ -241,20 +258,42 @@ manager.on_pipe_end_success(
 graph_spec = manager.close_tracer(pipeline_run_id)
 ```
 
-### GraphContext Propagation
+### Event-Log Transport and the Scoped Override
 
-GraphContext is a serializable context that flows through pipe execution:
+Trace events travel through an `EventLogProtocol` backend (`pipelex/tracing/`): the tracer emits events into it during the run (write side, wired in `pipeline_run_setup`), and `assemble_tracing` reads them back after the run to build the `GraphSpec` and usage aggregates (read side, triggered from `PipeRun.run`). Both sides normally build their backend instance independently from `tracing_config` via `make_event_log` — NDJSON files or DynamoDB bridge the two instances through external storage.
+
+For fully in-process runs, `pipelex.hub.scoped_event_log` pins one shared instance for both sides instead:
 
 ```python
-class GraphContext(BaseModel):
+from pipelex.hub import scoped_event_log
+from pipelex.tracing.in_memory_event_log import InMemoryEventLog
+
+with scoped_event_log(InMemoryEventLog()):
+    response = await runner.execute(...)  # graph assembles in memory
+```
+
+Semantics:
+
+- The override is ContextVar-scoped (mirrors `scoped_pipe_router`), so concurrent runs with separate scopes never cross-contaminate, and the prior value is restored on exit.
+- A set override **implies tracing-enabled**: it is honored even when `tracing_config.is_enabled` is `False`, on both the write side and the read side's early-return.
+- Lifecycle: the read side does not `close()` the scoped instance and the machinery never calls `cleanup()` on it — but the write-side tracer DOES call `close()` on its event log at teardown, before the read side assembles. A scoped event log's `close()` must therefore be idempotent or a no-op (as `InMemoryEventLog`'s is); scoping a backend whose `close()` releases a real resource would break its own assembly read.
+
+This is what lets a graph-producing dry-run trace entirely in memory (no NDJSON file, no DynamoDB round-trip). Both dry-run entrypoints rely on it: `dry_run_pipe_in_process` (`pipelex/pipe_run/dry_run_in_process.py` — the graph arm of protocol `validate` and of the single Temporal validation activity) and `dry_run_pipeline` (`pipelex/pipeline/dry_run_pipeline.py`) itself — these functions exist to produce a graph, so they install their own scoped `InMemoryEventLog` rather than depending on the host having tracing configured (a host with `tracing_config.is_enabled = false`, like pipelex-api's `/validate` in direct mode, still gets its graph). A run that nonetheless finishes without a graph raises the typed `DryRunGraphNotProducedError`.
+
+### TraceContext Propagation
+
+TraceContext is a serializable context that flows through pipe execution:
+
+```python
+class TraceContext(BaseModel):
     graph_id: str                           # Unique graph identifier
     parent_node_id: str | None              # Parent pipe's node ID
     node_sequence: int                      # Counter for generating node IDs
     data_inclusion: DataInclusionConfig     # What data to capture
 
-    def copy_for_child(self, child_node_id: str, next_sequence: int) -> GraphContext:
+    def copy_for_child(self, child_node_id: str, *, next_sequence: int) -> TraceContext:
         """Create context for nested pipe execution."""
-        return GraphContext(
+        return TraceContext(
             graph_id=self.graph_id,
             parent_node_id=child_node_id,
             node_sequence=next_sequence,
@@ -345,7 +384,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 
 mermaidflow = MermaidflowFactory.make_from_graphspec(
     graph_spec,
-    graph_config,
+    graph_config=graph_config,
     direction=FlowchartDirection.TOP_DOWN,
     include_subgraphs=True,
 )
@@ -379,6 +418,7 @@ stuff_json_content = true       # Include full serialized data
 stuff_text_content = true       # Include ASCII text representation
 stuff_html_content = true       # Include HTML representation
 error_stack_traces = true       # Include full stack traces
+pipe_and_concept_registry = true  # Include pipe and concept registries in the GraphSpec
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true           # Generate GraphSpec JSON
@@ -391,22 +431,28 @@ reactflow_html = true           # Generate ReactFlow HTML
 
 | Option | Description |
 |--------|-------------|
-| `direction` | Flowchart direction (TB, LR, BT, RL) |
+| `direction` | Flowchart direction (`top_down`, `left_to_right`) |
 | `is_include_data_edges` | Show data flow edges |
 | `is_include_contains_edges` | Show containment edges |
+| `is_include_selected_outcome_edges` | Show condition-result (selected outcome) edges |
 | `is_show_stuff_codes` | Show digest in stuff labels |
-| `style.theme` | Mermaid theme (default, dark, forest, neutral) |
+| `style.theme` | Mermaid theme (default, base, dark, forest, neutral) |
 
 ### ReactFlowRenderingConfig
 
 | Option | Description |
 |--------|-------------|
-| `layout_direction` | Dagre layout direction (TB, LR) |
+| `is_use_cdn` | Load the graph viewer assets from a CDN (jsDelivr) instead of inlining them |
+| `layout_direction` | Flowchart layout direction (`top_down`, `left_to_right`), converted internally to Dagre's TB/LR |
 | `nodesep` | Node separation in pixels |
 | `ranksep` | Rank separation in pixels |
 | `edge_type` | Edge style (bezier, smoothstep, step, straight) |
 | `initial_zoom` | Initial viewport zoom |
+| `pan_to_top` | Pan the viewport to the top on load |
+| `default_title` | Title of the generated HTML page |
+| `show_batch_controller` | Render controller pipes as grouping containers |
 | `style.theme` | UI theme (light, dark, system) |
+| `style.palette` | Node color palette (`yellow_blue`, `dracula`) |
 
 ---
 
@@ -422,9 +468,10 @@ class IOSpec(BaseModel):
     preview: str | None          # Truncated preview (max 200 chars)
     size: int | None             # Content size
     digest: str | None           # Unique identifier for data flow
-    data: Any | None             # Full serialized content
+    data: str | dict[str, Any] | list[str] | list[dict[str, Any]] | None  # Full serialized content
     data_text: str | None        # ASCII text representation
     data_html: str | None        # HTML representation
+    extra: dict[str, Any]        # Extra markers, e.g. `optional` set on a declared-optional (`?`) output
 ```
 
 !!! warning "Preview Truncation"
@@ -458,8 +505,8 @@ validate_graphspec(graph_spec)
 | `GraphSpec.to_json()` | Serialize to JSON string |
 | `GraphAnalysis.from_graphspec(g)` | Pre-compute analysis |
 | `MermaidflowFactory.make_from_graphspec(...)` | Generate Mermaid |
-| `generate_reactflow_html(graphspec, config)` | Generate ReactFlow HTML |
-| `generate_graph_outputs(g, config, pipe_code)` | Generate all outputs |
+| `generate_reactflow_html(graphspec, config=...)` | Generate ReactFlow HTML |
+| `generate_graph_outputs(g, graph_config=..., pipe_code=...)` | Generate all outputs |
 
 ---
 
@@ -471,7 +518,7 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/graph_context.py` | Serializable tracing context |
+| `pipelex/graph/trace_context.py` | Serializable tracing context |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |

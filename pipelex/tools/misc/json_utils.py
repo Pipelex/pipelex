@@ -10,19 +10,11 @@ from kajson import kajson
 from kajson.exceptions import UnijsonEncoderError
 from pydantic import BaseModel
 
-from pipelex.system.exceptions import ToolError
+from pipelex.tools.misc.exceptions import ArgumentTypeError, JsonTypeError
 from pipelex.tools.misc.file_utils import save_text_to_path
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
 JsonContent = Union[dict[str, Any], list[Any]]
-
-
-class ArgumentTypeError(ToolError):
-    pass
-
-
-class JsonTypeError(ToolError):
-    pass
 
 
 CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__", "__pipelex_class__", "__pipelex_module__")
@@ -76,7 +68,7 @@ def clean_json_content(content: Any) -> Any:
 
 
 # TODO: make this more powerful using kajson
-def clean_json_dumps(data: Any, indent: int | None = None) -> str:
+def clean_json_dumps(data: Any, *, indent: int | None = None) -> str:
     """Serialize data to a JSON string, producing clean output without metadata.
 
     Unlike kajson.dumps (which adds ``__class__``/``__module__`` metadata for
@@ -97,7 +89,7 @@ def clean_json_dumps(data: Any, indent: int | None = None) -> str:
     return json.dumps(clean_json_content(data), indent=indent)
 
 
-def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False) -> str:
+def json_str(some_object: Any, *, title: str | None = None, is_spaced: bool = False) -> str:
     """Creates a formatted JSON string representation of any Python object with optional title and spacing.
 
     This function is a higher-level wrapper around purify_json that provides additional formatting
@@ -135,7 +127,8 @@ def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False
 
 def save_as_json_to_path(
     object_to_save: Any,
-    path: str,
+    *,
+    path: Path,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
     create_directory: bool = False,
@@ -147,7 +140,7 @@ def save_as_json_to_path(
 
     Args:
         object_to_save (Any): The Python object to be saved as JSON. Can be any JSON-serializable object.
-        path (str): The file path where the JSON file will be saved.
+        path (Path): The file path where the JSON file will be saved.
         indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
         create_directory (bool, optional): Whether to create the directory if it doesn't exist. Defaults to False.
@@ -157,17 +150,17 @@ def save_as_json_to_path(
 
     """
     _, json_string = purify_json(object_to_save, indent=indent, is_warning_enabled=is_warning_enabled)
-    save_text_to_path(json_string, path, create_directory=create_directory)
+    save_text_to_path(json_string, path=path, create_directory=create_directory)
 
 
-def load_json_from_path(path: str) -> JsonContent:
+def load_json_from_path(path: Path) -> JsonContent:
     """Loads and parses a JSON file from the specified path.
 
     This function reads a JSON file and returns its contents as a Python object.
     The file is read using UTF-8 encoding.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         JsonContent: The parsed JSON content as a Python object (can be a dict, list, string, number, bool, or None).
@@ -177,19 +170,18 @@ def load_json_from_path(path: str) -> JsonContent:
         json.JSONDecodeError: If the file contains invalid JSON.
 
     """
-    with open(path, encoding="utf-8") as file:
-        json_content: JsonContent = json.load(file)
-        return json_content
+    json_content: JsonContent = json.loads(path.read_text(encoding="utf-8"))
+    return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[str, Any]:
+def load_json_dict_from_path(path: Path) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         Dict[str, Any]: The parsed JSON content as a Python dictionary.
@@ -207,14 +199,14 @@ def load_json_dict_from_path(path: str) -> dict[str, Any]:
     return json_content
 
 
-def load_json_list_from_path(path: str) -> list[Any]:
+def load_json_list_from_path(path: Path) -> list[Any]:
     """Loads a JSON file and ensures it contains a list.
 
     This function reads a JSON file and verifies that its content is a list.
     It uses load_json_from_path internally and adds type checking.
 
     Args:
-        path (str): The file path to the JSON file to be loaded.
+        path (Path): The file path to the JSON file to be loaded.
 
     Returns:
         List[Any]: The parsed JSON content as a Python list.
@@ -232,29 +224,37 @@ def load_json_list_from_path(path: str) -> list[Any]:
     raise JsonTypeError(msg)
 
 
-def deep_update(target_dict: dict[str, Any], updates: dict[str, Any]):
-    """Recursively updates a dictionary with values from another dictionary.
+def deep_update(target_dict: dict[str, Any], *, updates: Mapping[str, Any]):
+    """Recursively updates a dictionary with values from another mapping.
 
-    This function performs a deep merge of two dictionaries, handling nested
-    dictionaries. For dictionaries, it recursively updates values. For all other
-    types (including lists), values from updates override the target values.
+    This function performs a deep merge, handling nested mappings (``dict`` or any
+    ``Mapping`` — ``MappingProxyType``, etc.). For mappings, it recursively updates
+    values. For all other types (including lists), values from ``updates`` override
+    the target values.
+
+    The merged ``target_dict`` always holds plain ``dict`` instances at recursion
+    points, even when an input branch was a frozen ``Mapping``. Downstream code that
+    iterates results expecting a real ``dict`` (Pydantic ``model_validate`` on a
+    sub-tree, deep-merge with another layer) stays compatible.
 
     Args:
         target_dict (Dict[str, Any]): The dictionary to update. This dictionary
             will be modified in place.
-        updates (Dict[str, Any]): The dictionary containing updates to apply.
+        updates: The mapping containing updates to apply.
 
     Example:
         >>> base = {"a": 1, "b": {"x": 2, "y": 3}, "c": [1, 2]}
         >>> updates = {"b": {"y": 4, "z": 5}, "c": [3, 4]}
-        >>> deep_update(base, updates)
+        >>> deep_update(base, updates=updates)
         >>> print(base)
         {'a': 1, 'b': {'x': 2, 'y': 4, 'z': 5}, 'c': [3, 4]}
 
     """
     for key, value in updates.items():
-        if isinstance(value, dict) and key in target_dict and isinstance(target_dict[key], dict):
-            deep_update(target_dict[key], value)  # pyright: ignore[reportUnknownArgumentType]
+        if isinstance(value, Mapping) and key in target_dict and isinstance(target_dict[key], dict):
+            deep_update(target_dict[key], updates=value)  # pyright: ignore[reportUnknownArgumentType]
+        elif isinstance(value, Mapping) and not isinstance(value, dict):
+            target_dict[key] = dict(value)  # pyright: ignore[reportUnknownArgumentType]
         else:
             target_dict[key] = value
 
@@ -314,6 +314,7 @@ def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:
 
 def purify_json(
     data: Any,
+    *,
     indent: int | None = None,
     is_truncate_bytes_enabled: bool = False,
     is_warning_enabled: bool = True,
@@ -393,6 +394,7 @@ def purify_json(
 
 def purify_json_list(
     data: list[Any],
+    *,
     indent: int | None = None,
     is_truncate_bytes_enabled: bool = False,
 ) -> tuple[list[Any], str]:
@@ -448,7 +450,7 @@ def purify_json_list(
     return pure_list, list_string
 
 
-def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: bool = True) -> tuple[dict[str, Any], str]:
+def purify_json_dict(data: Any, *, indent: int | None = None, is_warning_enabled: bool = True) -> tuple[dict[str, Any], str]:
     """Converts any Python object into a JSON-serializable dictionary and its string representation.
 
     This function specifically handles dictionary-like objects and Pydantic BaseModel instances,
@@ -503,7 +505,7 @@ def purify_json_dict(data: Any, indent: int | None = None, is_warning_enabled: b
     return pure_dict, dict_string
 
 
-def pure_json_str(data: Any, indent: int | None = None, is_warning_enabled: bool = True) -> str:
+def pure_json_str(data: Any, *, indent: int | None = None, is_warning_enabled: bool = True) -> str:
     """Converts any Python object directly to its JSON string representation.
 
     This is a convenience wrapper around purify_json that returns only the string

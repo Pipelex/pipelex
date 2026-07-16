@@ -1,11 +1,11 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pipelex.graph.graph_context import GraphContext
+from pipelex.graph.trace_context import TraceContext
 from pipelex.system.telemetry.otel_context import OtelContext
-from pipelex.types import StrEnum
 
 
 class JobCategory(StrEnum):
@@ -50,6 +50,18 @@ class JobMetadata(BaseModel):
     # so cannot cause a non-determinism mismatch on child-workflow starts.
     session_id: str | None = None
 
+    # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
+    # HTTP request enters Pipelex). Rides on ``JobMetadata`` so it crosses the
+    # Temporal serialization boundary — every activity / workflow can correlate
+    # logs and the resulting ``ErrorReport`` back to the originating request.
+    # Distinct from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
+    # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
+    # both can appear together when the API surfaces a provider failure.
+    # Constrained at the wire-format boundary (printable ASCII only, max 128
+    # chars) so an unsanitized upstream value cannot inject newlines or control
+    # characters into the log lines or ``ErrorReport`` envelopes that quote it.
+    request_id: str | None = Field(default=None, max_length=128, pattern=r"^[\x20-\x7E]+$")
+
     # Business ID for the current pipe execution (16-char hex string).
     # Always set during pipe runs for tracking purposes.
     pipe_run_id: str | None = None
@@ -57,8 +69,9 @@ class JobMetadata(BaseModel):
     # OTel context with precomputed trace/span IDs. None when telemetry is disabled.
     otel_context: OtelContext | None = None
 
-    # GraphSpec tracing context. None when graph tracing is disabled.
-    graph_context: GraphContext | None = None
+    # Per-execution trace context carrying the shared node tree for both the graph
+    # (node/edge) and usage (cost) event streams. None when neither stream is enabled.
+    trace_context: TraceContext | None = None
 
     content_generation_job_id: str | None = None
     unit_job_id: UnitJobId | None = None
@@ -75,8 +88,9 @@ class JobMetadata(BaseModel):
 
     def copy_with_update(
         self,
+        *,
         otel_context: OtelContext | None,
-        graph_context: GraphContext | None = None,
+        trace_context: TraceContext | None = None,
         **updates: Any,
     ) -> "JobMetadata":
         """Create a copy of this metadata with updates applied.
@@ -85,17 +99,17 @@ class JobMetadata(BaseModel):
             otel_context: OTel context to set on the copy. Always set explicitly
                 because it's computed fresh per pipe run and should replace the parent's context
                 (even when None, e.g. in dry mode or when tracing is disabled).
-            graph_context: GraphSpec tracing context to set on the copy. If None,
-                inherits from the current context (unlike otel_context).
+            trace_context: Per-execution trace context (graph + usage streams) to set on
+                the copy. If None, inherits from the current context (unlike otel_context).
             **updates: Fields to update on the copy.
         """
-        # graph_context defaults to current value if not provided (inheritance)
-        effective_graph_context = graph_context if graph_context is not None else self.graph_context
+        # trace_context defaults to current value if not provided (inheritance)
+        effective_trace_context = trace_context if trace_context is not None else self.trace_context
         return self.model_copy(
             deep=True,
             update={
                 "otel_context": otel_context,
-                "graph_context": effective_graph_context,
+                "trace_context": effective_trace_context,
                 **updates,
             },
         )

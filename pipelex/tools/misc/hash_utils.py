@@ -1,7 +1,7 @@
 import hashlib
 
 
-def hash_sha256(data: str | bytes, length: int | None = None) -> str:
+def hash_sha256(data: str | bytes, *, length: int | None = None) -> str:
     """Hash the data using truncated SHA256.
 
     Uses the first `length` characters of SHA256 hex digest, which provides

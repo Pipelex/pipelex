@@ -82,16 +82,22 @@ output = "Analysis"
 ## Current Limitations
 
 !!! warning "No structure on refined concepts (For Now)"
-    When you refine a concept, you **cannot** add an inline structure or specify a `structure_class_name`. This limitation will be lifted in future releases.
+    When you refine a concept, you **cannot** also define a `structure` — neither by naming a structure class nor with an inline `[concept.X.structure]` table. The validator rejects the combination: a concept cannot have both `refines` and `structure`. This limitation will be lifted in future releases.
     
     **Not allowed:**
 ```toml
 [concept.Invoice]
 description = "A commercial invoice"
 refines = "Document"
-structure_class_name = "InvoiceModel"  # ❌ Not allowed
+structure = "InvoiceModel"  # ❌ Not allowed: refines and structure are mutually exclusive
+```
 
-[concept.Invoice.structure]  # ❌ Not allowed
+```toml
+[concept.Invoice]
+description = "A commercial invoice"
+refines = "Document"
+
+[concept.Invoice.structure]  # ❌ Not allowed: an inline table is the same structure field
 invoice_number = "Invoice ID"
 ```
 
@@ -146,7 +152,7 @@ description = "A screen capture image"
 refines = "Image"
 ```
 
-Each inherits `ImageContent` structure (url, caption, base_64, etc.) with specific semantic meaning.
+Each inherits `ImageContent` structure (url, caption, mime_type, etc.) with specific semantic meaning.
 
 ### Refining Text
 
@@ -234,6 +240,7 @@ description = "A weighted score result"
 [pipe.compute_weighted_score]
 type = "PipeLLM"
 description = "Compute a weighted score"
+inputs = { item = "Text" }
 output = "WeightedScore"
 prompt = "Compute a weighted score for: {{ item }}"
 ```
@@ -263,6 +270,7 @@ refines = "scoring_lib->scoring.WeightedScore"
 [pipe.compute_detailed_score]
 type = "PipeLLM"
 description = "Compute a detailed score"
+inputs = { item = "Text" }
 output = "DetailedScore"
 prompt = "Compute a detailed score for: {{ item }}"
 ```

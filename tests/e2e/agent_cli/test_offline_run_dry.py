@@ -19,6 +19,8 @@ import pytest
 from tests.e2e.agent_cli.conftest import (
     OFFLINE_BUNDLES_DIR,
     PIPELEX_AGENT_BIN,
+    gateway_backend_model_specs_for_kit_deck,
+    load_kit_model_deck_blueprint,
     set_gateway_enabled,
     write_active_routing_profile,
     write_remote_config_cache,
@@ -104,80 +106,14 @@ def _parse_agent_json(output: str) -> dict[str, object]:
     raise AssertionError(msg)
 
 
-# A minimal but structurally complete cached remote-config payload. ``backend_model_specs``
-# must include every terminal handle referenced by the default kit deck so the gateway
-# membership check passes for the "known-model" scenario.
-def _comprehensive_cached_backend_model_specs() -> dict[str, object]:
-    """Build a ``backend_model_specs`` payload that satisfies the default kit deck.
-
-    The kit's ``1_llm_deck.toml`` references many concrete handles via aliases/waterfalls.
-    We list them all here so the gateway-membership check in ``Pipelex.setup`` accepts the
-    cache. The spec body uses ``gateway_completions`` (LLMs) / ``gateway_image`` (image-gen)
-    sdks since the gateway proxies to those — values are minimal but valid against
-    ``InferenceModelSpecBlueprint``.
-    """
-    llm_handle_template: dict[str, object] = {
-        "sdk": "gateway_completions",
-        "model_type": "llm",
-        "inputs": ["text"],
-        "outputs": ["text", "structured"],
-    }
-    img_gen_handle_template: dict[str, object] = {
-        "sdk": "gateway_image",
-        "model_type": "img_gen",
-    }
-    extract_handle_template: dict[str, object] = {
-        "sdk": "gateway_extract",
-        "model_type": "text_extractor",
-    }
-    search_handle_template: dict[str, object] = {
-        "sdk": "gateway_search",
-        "model_type": "search",
-    }
-
-    llm_handles = [
-        "claude-3.7-sonnet",
-        "claude-4.5-haiku",
-        "claude-4.5-sonnet",
-        "claude-4.6-opus",
-        "claude-4.6-sonnet",
-        "claude-4.7-opus",
-        "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-pro-latest",
-        "gpt-4o",
-        "gpt-4o-mini",
-        "gpt-5",
-        "gpt-5-mini",
-        "gpt-5-nano",
-        "gpt-5.1",
-        "gpt-5.2",
-        "mistral-large",
-    ]
-    img_gen_handles = [
-        "gpt-image-1",
-        "gpt-image-1-mini",
-        "gpt-image-2",
-        "nano-banana",
-        "nano-banana-2",
-        "nano-banana-pro",
-    ]
-    extract_handles = ["azure-document-intelligence", "linkup-fetch"]
-    search_handles = ["linkup-standard", "linkup-deep"]
-
-    specs: dict[str, object] = {"defaults": {"sdk": "gateway_completions"}}
-    for handle in llm_handles:
-        specs[handle] = dict(llm_handle_template)
-    for handle in img_gen_handles:
-        specs[handle] = dict(img_gen_handle_template)
-    for handle in extract_handles:
-        specs[handle] = dict(extract_handle_template)
-    for handle in search_handles:
-        specs[handle] = dict(search_handle_template)
-    return specs
-
-
 def _cached_remote_config_payload() -> dict[str, object]:
+    """A structurally complete cached remote-config payload for the primed-cache scenarios.
+
+    ``backend_model_specs`` is derived from the shipped kit deck (see
+    ``gateway_backend_model_specs_for_kit_deck``) so the gateway-membership check in
+    ``Pipelex.setup`` accepts the cache without a hand-maintained handle list that goes
+    stale whenever the deck promotes an alias to a new model.
+    """
     return {
         "posthog": {
             "project_api_key": "test-key",
@@ -185,7 +121,7 @@ def _cached_remote_config_payload() -> dict[str, object]:
             "is_geoip_enabled": False,
             "is_debug_enabled": False,
         },
-        "backend_model_specs": _comprehensive_cached_backend_model_specs(),
+        "backend_model_specs": gateway_backend_model_specs_for_kit_deck(),
         "aws_region": "us-east-1",
     }
 
@@ -252,6 +188,44 @@ class TestOfflineDryRun:
         message = str(payload.get("message", ""))
         assert "pipelex init" in message.lower(), f"Error must mention `pipelex init` remediation; got: {message!r}"
 
+    def test_primed_cache_specs_track_kit_deck_premium_alias(self) -> None:
+        """Regression: the primed gateway cache is derived from the kit deck, so it tracks alias promotions.
+
+        Reads the deck's own ``default-premium`` target — whatever model it currently points
+        to — and asserts the derived gateway specs cover it, without hardcoding the model name.
+        If a future deck promotes the premium alias to a new handle this keeps passing; if the
+        derivation ever stops covering a referenced handle it fails fast here (a unit-speed
+        check) instead of deep inside a subprocess setup with an opaque GatewayUnknownModelError.
+        """
+        blueprint = load_kit_model_deck_blueprint()
+        premium_target = blueprint.llm.aliases["default-premium"]
+        specs = gateway_backend_model_specs_for_kit_deck()
+        assert premium_target in specs, (
+            f"Derived gateway specs must cover the kit deck's default-premium target '{premium_target}'; got handles: {sorted(specs)}"
+        )
+
+    def test_primed_cache_excludes_software_only_internal_handles(self) -> None:
+        """Regression: the gateway cache must not claim software-only internal extractors as gateway models.
+
+        ``@default-no-inference`` / ``@default-text-from-pdf`` resolve to an extractor served by the
+        local ``internal`` backend (``PipelexBackend.INTERNAL`` — "runs internally, without AI"), which
+        the Pipelex Gateway never provides. If the derived gateway specs claimed it, an offline dry-run
+        could resolve the alias to the fake ``gateway_extract`` worker instead of exercising the real
+        internal backend. The companion assertion guards the other direction: a genuinely gateway-served
+        extract model (the ``default-extract-document`` target) must stay covered, so the exclusion does
+        not over-reach onto provider-backed models the gateway does proxy.
+        """
+        blueprint = load_kit_model_deck_blueprint()
+        software_only_target = blueprint.extract.aliases["default-no-inference"]
+        gateway_extract_target = blueprint.extract.aliases["default-extract-document"]
+        specs = gateway_backend_model_specs_for_kit_deck()
+        assert software_only_target not in specs, (
+            f"Derived gateway specs must exclude software-only internal handle '{software_only_target}'; got handles: {sorted(specs)}"
+        )
+        assert gateway_extract_target in specs, (
+            f"Gateway-served extract target '{gateway_extract_target}' must remain covered; got handles: {sorted(specs)}"
+        )
+
     def test_gateway_known_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         """Gateway enabled + no network + primed cache → dry-run exits 0 with stale-cache warning."""
         pipelex_dir = hermetic_home / ".pipelex"
@@ -268,6 +242,32 @@ class TestOfflineDryRun:
         assert '"type": "RemoteConfigStale"' in rendered, (
             f"Cached-source setup must surface a RemoteConfigStale warning on the envelope; got: {payload!r}"
         )
+
+    def test_gateway_img_gen_with_cache_succeeds_offline(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
+        """Gateway enabled + no network + primed cache → an image-gen pipe dry-runs offline.
+
+        Companion to ``test_gateway_known_with_cache_succeeds_offline``, but the bundle's pipe is a
+        ``PipeImgGen`` referencing a gateway image handle (``nano-banana``). It proves the derived
+        cache covers img_gen handles too — not just LLMs — so the gateway-membership check passes for
+        an image model and the offline dry-run completes.
+
+        Scope note: dry-run mocks image generation at the cogt leaf, so this does NOT build
+        the img-gen worker and therefore does not exercise the spec's ``sdk`` -> worker-factory mapping;
+        it covers membership + handle resolution for image models. The sdk-vs-factory contract is a
+        runtime (non-dry) concern.
+        """
+        pipelex_dir = hermetic_home / ".pipelex"
+        set_gateway_enabled(pipelex_dir / "inference" / "backends.toml", enabled=True)
+        write_remote_config_cache(pipelex_dir, _cached_remote_config_payload())
+
+        staged_bundle = _stage_bundle(OFFLINE_BUNDLES_DIR / "gateway_img_gen_model", hermetic_home)
+        result = _run_agent_bundle(staged_bundle, offline_subprocess_env, cwd=hermetic_home)
+
+        assert result.returncode == 0, (
+            f"Gateway img-gen dry-run with primed cache must succeed offline.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
+        )
+        payload = _parse_agent_json(result.stdout)
+        assert "error" not in payload, payload
 
     def test_gateway_unknown_with_cache_fails_with_clear_error(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         """Bundle pipe references a model absent from the cached gateway specs → clear error.

@@ -32,6 +32,7 @@ KIND_LABELS: dict[ModelReferenceKind, str] = {
 
 def get_collection_keys(
     model_deck: ModelDeck,
+    *,
     model_type: ModelType,
     kind: ModelReferenceKind,
 ) -> list[str]:
@@ -72,10 +73,7 @@ def get_collection_keys(
 
 
 def suggest_model_alternatives(
-    model_deck: ModelDeck,
-    model_type: ModelType,
-    name: str,
-    kind: ModelReferenceKind,
+    *, model_deck: ModelDeck, model_type: ModelType, name: str, kind: ModelReferenceKind
 ) -> tuple[list[str], list[str], list[str]]:
     """Find fuzzy matches and detect wrong-sigil usage for a model name.
 
@@ -92,7 +90,7 @@ def suggest_model_alternatives(
         - cross_collection_suggestions: fuzzy matches in other collections, with sigil and label
     """
     sigil = KIND_SIGILS[kind]
-    candidates = get_collection_keys(model_deck, model_type, kind)
+    candidates = get_collection_keys(model_deck, model_type=model_type, kind=kind)
     fuzzy_matches = difflib.get_close_matches(name, candidates, n=5, cutoff=0.5)
     suggestions = [f"{sigil}{match}" for match in fuzzy_matches]
 
@@ -100,7 +98,7 @@ def suggest_model_alternatives(
     cross_suggestions: list[str] = []
     other_kinds = [other_kind for other_kind in ModelReferenceKind if other_kind != kind]
     for other_kind in other_kinds:
-        other_candidates = get_collection_keys(model_deck, model_type, other_kind)
+        other_candidates = get_collection_keys(model_deck, model_type=model_type, kind=other_kind)
         other_sigil = KIND_SIGILS[other_kind]
         label = KIND_LABELS[other_kind]
         if name in other_candidates:

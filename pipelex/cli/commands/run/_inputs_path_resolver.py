@@ -9,33 +9,15 @@ relative local paths.
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
-
-def is_relative_local_path(uri: str) -> bool:
-    """Check whether *uri* is a relative local file path.
-
-    Uses :func:`resolve_uri` to classify the URI.  Returns ``True`` only when
-    the URI resolves to a :class:`ResolvedLocalPath` **and** the path is not
-    absolute.
-
-    Args:
-        uri: The URI string to check.
-
-    Returns:
-        ``True`` if *uri* is a relative local path, ``False`` otherwise.
-    """
-    resolved = resolve_uri(uri)
-    if not isinstance(resolved, ResolvedLocalPath):
-        return False
-    return not Path(resolved.path).is_absolute()
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
-def resolve_url_in_value(value: Any, base_dir: Path) -> Any:
+def resolve_url_in_value(value: Any, *, base_dir: Path) -> Any:
     """Recursively walk a JSON-like value and resolve relative ``url`` fields.
 
     When a ``dict`` contains a ``"url"`` key whose value is a relative local
@@ -52,20 +34,22 @@ def resolve_url_in_value(value: Any, base_dir: Path) -> Any:
         value_dict = cast("dict[str, Any]", value)
         result: dict[str, Any] = {}
         for key, val in value_dict.items():
-            if key == "url" and isinstance(val, str) and is_relative_local_path(val):
-                result[key] = str(base_dir / val)
+            if key == "url" and isinstance(val, str):
+                # Expand a leading `~`, then resolve a still-relative path against base_dir; an
+                # absolute/remote/scheme url is returned unchanged (as the else-branch did before).
+                result[key] = resolve_local_path_reference(val, base_dir=base_dir)
             else:
-                result[key] = resolve_url_in_value(val, base_dir)
+                result[key] = resolve_url_in_value(val, base_dir=base_dir)
         return result
 
     if isinstance(value, list):
         value_list = cast("list[Any]", value)
-        return [resolve_url_in_value(item, base_dir) for item in value_list]
+        return [resolve_url_in_value(item, base_dir=base_dir) for item in value_list]
 
     return value
 
 
-def resolve_inputs_paths(inputs_dict: dict[str, Any], base_dir: Path) -> dict[str, Any]:
+def resolve_inputs_paths(inputs_dict: dict[str, Any], *, base_dir: Path) -> dict[str, Any]:
     """Resolve relative ``url`` paths in a pipeline inputs dict.
 
     Entry point that applies :func:`resolve_url_in_value` to each top-level
@@ -81,5 +65,5 @@ def resolve_inputs_paths(inputs_dict: dict[str, Any], base_dir: Path) -> dict[st
     """
     resolved: dict[str, Any] = {}
     for key, value in inputs_dict.items():
-        resolved[key] = resolve_url_in_value(value, base_dir)
+        resolved[key] = resolve_url_in_value(value, base_dir=base_dir)
     return resolved

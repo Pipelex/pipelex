@@ -71,10 +71,10 @@ async def render_stuff_viewer(
 
 async def render_stuff_content_viewer(
     stuff_data: str | dict[str, Any] | list[str] | list[dict[str, Any]],
+    *,
     stuff_data_text: str,
     stuff_data_html: str,
     content_type: str | None = None,
-    *,
     title: str = "Stuff Content",
     subtitle: str | None = None,
 ) -> str:

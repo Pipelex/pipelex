@@ -23,6 +23,7 @@ from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
+from pipelex.cli.agent_cli.commands.run.stdin_resolver import ParsedCliInputs
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.tools.log.log_levels import LogLevel
@@ -47,7 +48,7 @@ class TestRunErrorChain:
         mocker.patch(f"{RUN_PIPE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{RUN_PIPE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{RUN_PIPE_MODULE}.resolve_pipe_from_exports", return_value=[])
-        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=None)
+        mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None))
 
         transient_error = LLMCompletionError(WORKER_ERROR_MESSAGE, error_category=InferenceErrorCategory.TRANSIENT)
         # model_handle / backend_name are declared on CogtError; a real worker fills them at
@@ -108,7 +109,13 @@ class TestRunErrorChain:
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """The markdown error output carries the error type, message, hint, and source frames."""
+        """The markdown error output carries the error type, message, hint, and structured details — but no source frames.
+
+        ``error_source`` (the internal Python stack chain — ``PipeRouterError``,
+        ``LLMCompletionError``, etc.) is deliberately stripped from markdown. It's
+        noise for an LLM trying to fix a `.mthds` file. The JSON test above is what
+        pins the wrapping-chain contract.
+        """
         self._invoke_failing_run(mocker, CliOutputFormat.MARKDOWN)
 
         captured = capsys.readouterr()
@@ -118,11 +125,15 @@ class TestRunErrorChain:
         assert markdown.startswith("# Error: PipelineExecutionError")
         assert WORKER_ERROR_MESSAGE in markdown
         assert "💡" in markdown  # hint callout
-        assert "## Error source" in markdown
         assert "error_category" in markdown
         assert "transient" in markdown
-        # The source code block names the wrapping chain.
-        assert "PipeRouterError" in markdown
-        assert "LLMCompletionError" in markdown
+        # The whole stack-trace section is gone. The stack-frame format from
+        # _build_error_source is "<ExceptionType> @ <file>:<line> (in <func>)" —
+        # check the section header and the frame format are both absent.
+        # Note: structured cause fields like ``cause_type`` may legitimately
+        # surface exception names under ``## Details``; that's not a stack frame.
+        assert "## Error source" not in markdown
+        assert " @ pipelex/" not in markdown
+        assert "(in " not in markdown
         with pytest.raises(json.JSONDecodeError):
             json.loads(markdown)

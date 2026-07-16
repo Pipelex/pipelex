@@ -26,6 +26,9 @@ bucket_name = ""
 project_id = ""
 signed_urls_lifespan_seconds = 3600
 
+[pipelex.secrets_config]
+method = "env" # env (built-in); an external plugin may add e.g. vault
+
 [pipelex.observer_config]
 observer_dir = "results/observer"
 
@@ -52,12 +55,8 @@ default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
-[pipelex.feature_config]
-# WIP/Experimental feature flags
-is_reporting_enabled = true
-
 [pipelex.reporting_config]
-is_log_costs_to_console = false
+is_log_costs_to_console = true
 is_generate_cost_report_file_enabled = false
 cost_report_dir_path = "reports"
 cost_report_base_name = "cost_report"
@@ -70,7 +69,17 @@ cost_report_unit_scale = 1.0
 
 [pipelex.log_config]
 default_log_level = "INFO"
-console_log_target = "stdout"
+# console_log_target controls the RichHandler used by the logging system (log.debug/info/...).
+# Logs are diagnostics → stderr.
+console_log_target = "stderr"
+# console_print_target controls the Console returned by get_console(), used for banners,
+# deck notices, and the main `pipelex` CLI's data tables (`show backends`, `show models`,
+# `which`, `doctor`). Tables are data the user pipes to a file → stdout.
+# Note: the agent CLI (`pipelex-agent`) emits its actual JSON/markdown results via bare
+# builtin `print(...)` to sys.stdout, bypassing Rich entirely — so this knob does NOT
+# affect the agent CLI data channel. The agent CLI factory additionally forces both
+# targets to stderr internally to keep its stdout strictly reserved for the success
+# envelope (see `_AGENT_CLI_STDERR_CONSOLE_OVERRIDES` in `agent_cli_factory.py`).
 console_print_target = "stdout"
 is_console_logging_enabled = true
 
@@ -228,7 +237,7 @@ is_sync_mode = false
 [cogt.img_gen_config.img_gen_param_defaults]
 nb_steps = 28           # 28 is a good default for Flux, possible values are [1,2,4,8] for SDXL Lightning
 quality = "low"
-aspect_ratio = "square" # "square", "landscape_4_3", "landscape_16_9", "landscape_21_9", "portrait_3_4", "portrait_9_16", "portrait_9_21"
+aspect_ratio = "square" # "square", "landscape_4_3", "landscape_3_2", "landscape_16_9", "landscape_21_9", "landscape_4_1", "landscape_8_1", "portrait_3_4", "portrait_2_3", "portrait_9_16", "portrait_9_21", "portrait_1_4", "portrait_1_8"
 guidance_scale = 2.5
 background = "auto"
 is_moderated = true
@@ -277,6 +286,17 @@ gemini = { tag_style = "xml" }
 pipe_stack_limit = 20
 
 ####################################################################################################
+# PipeFunc config
+####################################################################################################
+
+[pipelex.pipe_func_config]
+# PipeFunc execution mode, selected from the PipeFuncExecutorRegistry the plugins populate. "direct"
+# (core) imports and runs customer functions in this process; "daytona" (our Daytona sandbox plugin)
+# runs them in a remote box. Any non-"direct" mode carries customer PipeFunc code as source text and
+# executes it only inside an isolated sandbox, never imported here.
+execution_mode = "direct"
+
+####################################################################################################
 # Pipeline execution config
 ####################################################################################################
 
@@ -284,6 +304,7 @@ pipe_stack_limit = 20
 is_normalize_data_urls_to_storage = true
 is_mock_inputs = false
 is_generate_graph = true
+is_generate_usage = true
 
 # Bounded fan-out concurrency for PipeBatch: at most this many branches run at once.
 # A modest default keeps a large workload (one pipe over many items) from overwhelming
@@ -334,7 +355,7 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing config (event log for distributed tracing across Temporal workers)
+# Tracing config (event log for distributed tracing across workers)
 ####################################################################################################
 
 [pipelex.tracing_config]
@@ -348,22 +369,16 @@ traces_dir = ".pipelex/traces"
 table_name = ""
 region = ""
 
-[pipelex.tracing_config.temporal_dynamodb]
-table_name = ""
-region = ""
-
 ####################################################################################################
 # Dry run config
 ####################################################################################################
 
 [pipelex.dry_run_config]
-apply_to_jinja2_rendering = false
 text_gen_truncate_length = 256
 nb_list_items = 3
 nb_extract_pages = 4
 allowed_to_fail_pipes = [
-  "infinite_loop_1", # Loop but only for testing purposes
-  "pipe_builder",    # Still not fully proofed
+  "failing_pipelines.infinite_loop_1", # Loop but only for testing purposes — matched on the namespaced pipe_ref
 ]
 image_urls = [
   "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
@@ -437,219 +452,7 @@ preferred_agent_targets = ["claude", "agents"]
 
 [migration.migration_maps.telemetry]
 
-####################################################################################################
-# Temporal Config
-####################################################################################################
-
-[temporal]
-is_enabled = false
-
-[temporal.search_attributes]
-# Master toggle. When false, workflow starts don't attach any custom search
-# attributes, the worker-boot check is skipped, and the dashboard view falls
-# back to WorkflowType / WorkflowId / StartTime only.
-enabled = true
-# Subset of the five built-in attributes to populate. Names not in this list
-# are skipped at workflow-start time AND not required at worker boot. Pipelex
-# only knows how to populate these five; arbitrary custom names are out of
-# scope (they would require code that knows the value source).
-attributes = ["PipeCode", "PipelineRunId", "SessionId", "UserId", "DomainCode"]
-
-[temporal.payload_codec_config]
-is_enabled = false
-size_threshold = 1_048_576
-storage_prefix = "temporal-payloads/"
-
-[temporal.payload_codec_config.storage_provider_config]
-method = "local"
-
-[temporal.payload_codec_config.storage_provider_config.local]
-uri_format = "{hash}"
-local_storage_path = ".pipelex/temporal-payload-store"
-
-[temporal.worker_config]
-default_task_queue = "temporal_task_queue"
-workflow_execution_timeout = "1:00:00"     # for the workflow itself (NOT used as activity timeout)
-run_timeout = "1:00:00"
-task_timeout = "0:00:10"
-start_delay = "0:00:00"
-rpc_timeout = "1:00:00"
-# Baseline activity timeout used when no per-queue or per-handle overlay applies.
-default_activity_start_to_close_timeout = "0:10:00"
-
-[temporal.worker_config.activity_queues]
-
-[temporal.worker_config.retry_policy_config]
-initial_interval = "0:00:03"
-backoff_coefficient = 2.0
-maximum_interval = "unlimited"
-maximum_attempts = 3
-non_retryable_error_types = [
-  "ExtractHandleNotFoundError",
-  "FileNotFoundError",
-  "ImgGenHandleNotFoundError",
-  "LLMHandleNotFoundError",
-  "ModelNotFoundError",
-  "ValidationError",
-]
-# Per-queue and per-handle overlays contribute `non_retryable_error_types_extra`
-# lists; the dispatch resolver unions them on top of the baseline above. That
-# field belongs only on overlays — adding it here would be silently dropped by
-# the resolver, so the baseline schema (RetryPolicyConfig) deliberately does
-# not accept it.
-
-# Per-queue submitter options. Operators populate this when a backend pool
-# needs its own timeout or retry tuning. See pipelex/kit/configs/pipelex.toml
-# for examples.
-[temporal.queue_options]
-
-# Default cluster-wide rate cap on the worker's home queue. Mirrors the pre-v2
-# hardcoded ``max_task_queue_activities_per_second=1000`` on ``Worker(...)`` so
-# existing deployments on ``temporal_task_queue`` keep the same Temporal-server-
-# enforced cap. Deployments using non-default queue names should add their own
-# ``[temporal.queue_options.<queue>]`` entries. The empty-routing hybrid
-# fallback applies these overlays to activities dispatched without an explicit
-# task_queue too.
-[temporal.queue_options.temporal_task_queue]
-max_task_queue_activities_per_second = 1000
-
-# Named worker-runtime profiles. A worker process selects one via --profile.
-# Defaults are lifted verbatim from the pre-v2 hardcoded Worker(...) construction
-# so out-of-the-box behavior is unchanged.
-[temporal.worker_runtime_profiles]
-default_profile = "default"
-
-[temporal.worker_runtime_profiles.profiles.default]
-tuning_mode = "explicit"
-max_cached_workflows = 10000
-max_concurrent_workflow_tasks = 1000
-max_concurrent_activities = 1000
-max_concurrent_local_activities = 1000
-max_concurrent_workflow_task_polls = 100
-max_concurrent_activity_task_polls = 100
-max_activities_per_second = 1000
-sticky_queue_schedule_to_start_timeout = "0:30:00"
-max_heartbeat_throttle_interval = "1:00:00"
-default_heartbeat_throttle_interval = "1:00:00"
-graceful_shutdown_timeout = "0:30:00"
-
-[temporal.temporal_config]
-selected_server = "local"
-
-[temporal.temporal_config.temporal_server_configs.local]
-description = "default localhost"
-target_host = "localhost:7233"
-namespace = "default"
-api_key_method = "none"
-api_key_id = ""
-
-[temporal.temporal_config.temporal_server_configs.testing]
-description = "Temporal server for testing"
-target_host = "${TESTING_TEMPORAL_TARGET_HOST}"
-namespace = "${TESTING_TEMPORAL_NAMESPACE}"
-api_key_method = "secret_provider"
-api_key_id = "${TESTING_TEMPORAL_MAIN_API_KEY}"
-
-[temporal.temporal_config.temporal_log_config]
-is_workflow_info_on_message = false
-is_workflow_info_on_extra = true
-is_full_workflow_info_on_extra = false
-is_activity_info_on_message = false
-is_activity_info_on_extra = true
-is_full_activity_info_on_extra = false
-is_formatter_enabled = true
-is_prefix_enabled = true
-managed_loggers = [
-  "temporalio.activity",
-  "temporalio.workflow",
-  "temporalio.worker._activity",
-]
-# When true, every workflow.execute_activity dispatch logs the resolved queue +
-# timeout + retry along with the layer each value came from (baseline /
-# queue_options / handle_options). Verbose — enable when debugging mis-tuned
-# timeouts.
-is_dispatch_resolution_traced = false
-
-[temporal.worker_scopes]
-default_scope = "full"
-
-# Default — single worker handling everything.
-[temporal.worker_scopes.scopes.full]
-required_tasks_packs = ["crafting", "pipe"]
-required_workflows = []
-required_activities = []
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = false
-disable_all_activities = false
-
-# Workflow-only worker. Pair with `runner` on the same task queue to force
-# activity dispatch to a different process (deterministic cross-worker hops).
-[temporal.worker_scopes.scopes.router]
-required_tasks_packs = ["crafting", "pipe"]
-required_workflows = []
-required_activities = []
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = false
-disable_all_activities = true
-
-# Activity-only worker. Counterpart to `router`.
-[temporal.worker_scopes.scopes.runner]
-required_tasks_packs = ["crafting", "pipe"]
-required_workflows = []
-required_activities = []
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = true
-disable_all_activities = false
-
-# Specialized activity-only scopes for deployment manifests with one worker pool
-# per backend class. Each registers only the activities its name implies — paired
-# with `--task-queue <q>` so the worker pulls only its class of work.
-#
-# Note: `act_render_page_views` is intentionally listed under BOTH `runner-img-gen`
-# (used by single-image / image-list generation paths that may render a layout view)
-# AND `runner-extract` (used by the `make_extract_pages` two-activity branch that
-# pairs OCR with page-view rendering). Belt-and-suspenders: both scopes can render
-# pages, so neither breaks if routing sends the activity to either.
-
-[temporal.worker_scopes.scopes.runner-llm]
-required_tasks_packs = []
-required_workflows = []
-required_activities = [
-  "act_llm_gen_text",
-  "act_llm_gen_object",
-  "act_llm_gen_object_list",
-]
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = true
-disable_all_activities = false
-
-[temporal.worker_scopes.scopes.runner-img-gen]
-required_tasks_packs = []
-required_workflows = []
-required_activities = ["act_img_gen_images", "act_render_page_views"]
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = true
-disable_all_activities = false
-
-[temporal.worker_scopes.scopes.runner-extract]
-required_tasks_packs = []
-required_workflows = []
-required_activities = ["act_extract_gen_extract_pages", "act_render_page_views"]
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = true
-disable_all_activities = false
-
-[temporal.worker_scopes.scopes.runner-jinja2]
-required_tasks_packs = []
-required_workflows = []
-required_activities = ["act_jinja2_gen_text"]
-excluded_workflows = []
-excluded_activities = []
-disable_all_workflows = true
-disable_all_activities = false
+[plugins]
+# Names of discovered plugins to skip at startup (a denylist). Discovery is the
+# source of truth for which plugins are present; this only turns one off.
+disabled = []

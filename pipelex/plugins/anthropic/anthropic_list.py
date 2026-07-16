@@ -9,7 +9,7 @@ from rich.table import Table
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console
-from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.plugins.model_handle import ModelHandle
 
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo
@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 
 async def list_anthropic_models(
+    *,
     sdk: str,
     backend_name: str,
     backend: InferenceBackend,
@@ -43,10 +44,10 @@ async def list_anthropic_models(
 
     from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models  # noqa: PLC0415
 
-    plugin = Plugin(sdk=sdk, backend=backend_name)
+    model_handle = ModelHandle(sdk=sdk, backend=backend_name)
     try:
         anthropic_models = await anthropic_list_available_models(
-            plugin=plugin,
+            model_handle=model_handle,
             backend=backend,
         )
 
@@ -70,6 +71,7 @@ async def list_anthropic_models(
 
 def _display_anthropic_models_flat(
     models: list[ModelInfo],
+    *,
     sdk: str,
     backend_name: str,
     any_listed: bool,
@@ -86,6 +88,7 @@ def _display_anthropic_models_flat(
 
 def _display_anthropic_models_table(
     models: list[ModelInfo],
+    *,
     sdk: str,
     backend_name: str,
 ) -> None:

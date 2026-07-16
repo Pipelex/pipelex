@@ -5,7 +5,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -18,8 +18,9 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
+from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -161,7 +162,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         }
     """
     result: dict[str, Any] = {
-        "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "llm": {},
         "img_gen": {},
         "text_extractor": {},
@@ -213,7 +214,7 @@ def _load_merged_profiles_config() -> dict[str, Any]:
     # Merge override file if it exists
     if TEST_PROFILES_OVERRIDE_PATH.exists():
         override_config = load_toml_from_path(str(TEST_PROFILES_OVERRIDE_PATH))
-        deep_update(config, override_config)
+        deep_update(config, updates=override_config)
 
     return dict(config)
 
@@ -245,6 +246,7 @@ def _load_test_profile(profile_name: str) -> dict[str, Any]:
 
 def _process_collections_from_toml(
     collections_raw: Any,  # pyright: ignore[reportExplicitAny]
+    *,
     collections: dict[str, dict[str, list[str]]],
 ) -> None:
     """Process raw TOML collections data into typed collections dict.
@@ -282,13 +284,14 @@ def _load_collections() -> dict[str, dict[str, list[str]]]:
         return {}
 
     # Process TOML collections (untyped data at boundary)
-    _process_collections_from_toml(collections_raw, collections)
+    _process_collections_from_toml(collections_raw, collections=collections)
 
     return collections
 
 
 def _resolve_model_list(
     raw_list: list[str],
+    *,
     collections: dict[str, list[str]],
     backend_models: dict[str, list[str]],
     all_known_models: list[str],
@@ -363,6 +366,7 @@ def _resolve_model_list(
 
 def _filter_models_by_profile(
     availability: dict[str, Any],
+    *,
     profile: dict[str, Any],
     collections: dict[str, dict[str, list[str]]],
 ) -> dict[str, list[tuple[str, str]]]:
@@ -493,6 +497,7 @@ def _filter_models_by_profile(
 
 def _generate_fixtures_python(
     combo_pairs: dict[str, list[tuple[str, str]]],
+    *,
     profile_name: str,
 ) -> str:
     """Generate Python module content with pre-computed model/backend pairs.
@@ -504,7 +509,7 @@ def _generate_fixtures_python(
     Returns:
         Python module source code.
     """
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     lines = [
         '"""AUTO-GENERATED - DO NOT EDIT.',
@@ -555,6 +560,7 @@ def _generate_fixtures_python(
 
 def _display_summary(
     availability: dict[str, Any],
+    *,
     combo_pairs: dict[str, list[tuple[str, str]]],
     profile_name: str,
     console: Console,
@@ -604,6 +610,7 @@ def _display_summary(
 
 def preprocess_test_models_cmd(
     profile: str = "dev",
+    *,
     generate_fixtures: bool = False,
     output_json: bool = False,
     quiet: bool = False,
@@ -783,11 +790,11 @@ def preprocess_test_models_cmd(
         sys.exit(1)
 
     collections = _load_collections()
-    combo_pairs = _filter_models_by_profile(availability, test_profile, collections)
+    combo_pairs = _filter_models_by_profile(availability, profile=test_profile, collections=collections)
 
     # Generate fixtures if requested
     if generate_fixtures:
-        fixtures_content = _generate_fixtures_python(combo_pairs, profile)
+        fixtures_content = _generate_fixtures_python(combo_pairs, profile_name=profile)
         GENERATED_FIXTURES_PATH.parent.mkdir(parents=True, exist_ok=True)
         GENERATED_FIXTURES_PATH.write_text(fixtures_content, encoding="utf-8")
 
@@ -797,7 +804,7 @@ def preprocess_test_models_cmd(
     # Display summary
     if not quiet:
         console.print()
-        _display_summary(availability, combo_pairs, profile, console)
+        _display_summary(availability, combo_pairs=combo_pairs, profile_name=profile, console=console)
         console.print()
 
         # Show profile info

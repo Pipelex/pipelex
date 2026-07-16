@@ -1,5 +1,6 @@
+from enum import StrEnum
+
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.types import StrEnum
 
 
 class TokenCategory(StrEnum):
