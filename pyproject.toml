@@ -122,6 +122,7 @@ dev = [
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
   "pytest-timeout>=2.3.1",
+  "pytest-split>=0.10.0",
   "pytest-xdist>= 3.6.1",
   "ruff==0.14.13",
   "types-aioboto3[bedrock,bedrock-runtime]>=13.4.0",
