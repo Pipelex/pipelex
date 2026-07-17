@@ -33,12 +33,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv (with cache)
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
       - name: Install
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
@@ -68,12 +62,6 @@ jobs:
       PIPELEX_NO_DECK_NOTICE: "1"
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install uv (with cache)
-        uses: astral-sh/setup-uv@v7
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
 
       - name: Install
         run: make install
