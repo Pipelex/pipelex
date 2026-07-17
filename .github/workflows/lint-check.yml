@@ -9,16 +9,22 @@ concurrency:
 
 jobs:
 # --------------------------------------------------------------------------
-# 1.  Ruff — single job (target-version = min supported, set in pyproject.toml)
+# 1.  Ruff + plxt — single job (target-version = min supported, in pyproject.toml)
 # --------------------------------------------------------------------------
   lint-ruff-plxt:
     name: Lint (ruff + plxt)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -36,23 +42,40 @@ jobs:
         run: make merge-check-plxt-lint
 
 # --------------------------------------------------------------------------
-# 2.  Type checking — matrix over supported Python versions
+# 2.  Type checking — floor Python version only, incremental mypy cache.
+#     All 4 supported versions run cache-free on PRs to main in
+#     `lint-fresh-check.yml`; here we keep feature PRs fast on py3.11.
 # --------------------------------------------------------------------------
   lint-typecheck:
     name: Typecheck (py${{ matrix.python-version }})
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+
+      - name: Restore mypy cache
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-py${{ matrix.python-version }}-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-${{ github.sha }}
+          restore-keys: |
+            mypy-py${{ matrix.python-version }}-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-
+            mypy-py${{ matrix.python-version }}-${{ runner.os }}-
 
       - name: Run pyright merge check (Python ${{ matrix.python-version }})
         run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-pyright
@@ -65,12 +88,18 @@ jobs:
 # --------------------------------------------------------------------------
   lint-config-sync:
     name: Lint (config-sync)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -83,12 +112,18 @@ jobs:
 # --------------------------------------------------------------------------
   lint-keyword-only:
     name: Lint (keyword-only)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
@@ -104,12 +139,18 @@ jobs:
 # --------------------------------------------------------------------------
   lint-drift:
     name: Lint (drift-contracts)
-    runs-on: [aca-runner-lint]
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
