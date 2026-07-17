@@ -6756,6 +6756,10 @@ rationale = "Transforms the path; single operand."
 param = "path"
 rationale = "Parses/reads the path; single operand."
 
+["pipelex/tools/typing/annotation_utils.py::unwrap_optional"]
+param = "annotation"
+rationale = "Reads as verb-object: unwrap_optional(annotation) takes the one obvious operand, the annotation to unwrap, and call sites pass self-labelling annotation expressions."
+
 ["pipelex/tools/typing/class_utils.py::has_compatible_field"]
 param = "model_cls"
 rationale = "Predicate on the model_cls; single operand."

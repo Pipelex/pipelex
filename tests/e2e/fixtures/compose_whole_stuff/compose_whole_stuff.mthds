@@ -1,0 +1,82 @@
+domain      = "compose_whole_stuff"
+description = "PipeCompose construct pipes that copy a whole native stuff (Text, Text[], Number) into a native-typed field of a structured concept, via { from = \"<stuff_name>\" }"
+main_pipe   = "fill_required_text"
+
+# One holder concept per target-field shape, so each pipe isolates exactly one conversion case.
+
+[concept.RequiredTextHolder]
+description = "A holder with a single required text field"
+
+[concept.RequiredTextHolder.structure]
+title = { type = "text", description = "The title", required = true }
+
+[concept.OptionalTextHolder]
+description = "A holder with a single optional text field"
+
+[concept.OptionalTextHolder.structure]
+note = { type = "text", description = "The note — optional" }
+
+[concept.RequiredTextListHolder]
+description = "A holder with a single required list-of-text field"
+
+[concept.RequiredTextListHolder.structure]
+tags = { type = "list", item_type = "text", description = "The tags", required = true }
+
+[concept.OptionalTextListHolder]
+description = "A holder with a single optional list-of-text field"
+
+[concept.OptionalTextListHolder.structure]
+tags = { type = "list", item_type = "text", description = "The tags — optional" }
+
+[concept.RequiredNumberHolder]
+description = "A holder with a single required number field"
+
+[concept.RequiredNumberHolder.structure]
+score = { type = "number", description = "The score", required = true }
+
+# --- Compose pipes: one per conversion case ---
+
+[pipe.fill_required_text]
+type        = "PipeCompose"
+description = "Copy a whole Text stuff into a required text field (control case: works)"
+inputs      = { text_input = "Text" }
+output      = "RequiredTextHolder"
+
+[pipe.fill_required_text.construct]
+title = { from = "text_input" }
+
+[pipe.fill_optional_text]
+type        = "PipeCompose"
+description = "Copy a whole Text stuff into an optional text field"
+inputs      = { text_input = "Text" }
+output      = "OptionalTextHolder"
+
+[pipe.fill_optional_text.construct]
+note = { from = "text_input" }
+
+[pipe.fill_required_text_list]
+type        = "PipeCompose"
+description = "Copy a whole Text[] stuff into a required list-of-text field"
+inputs      = { texts_input = "Text[]" }
+output      = "RequiredTextListHolder"
+
+[pipe.fill_required_text_list.construct]
+tags = { from = "texts_input" }
+
+[pipe.fill_optional_text_list]
+type        = "PipeCompose"
+description = "Copy a whole Text[] stuff into an optional list-of-text field"
+inputs      = { texts_input = "Text[]" }
+output      = "OptionalTextListHolder"
+
+[pipe.fill_optional_text_list.construct]
+tags = { from = "texts_input" }
+
+[pipe.fill_required_number]
+type        = "PipeCompose"
+description = "Copy a whole Number stuff into a required number field"
+inputs      = { number_input = "Number" }
+output      = "RequiredNumberHolder"
+
+[pipe.fill_required_number.construct]
+score = { from = "number_input" }

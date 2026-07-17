@@ -1,6 +1,6 @@
+import datetime
 import inspect
-import types
-from typing import Any, Union, cast, get_args, get_origin
+from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 
 from pydantic import ValidationError
 
@@ -8,9 +8,12 @@ from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
 from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerTypeError,
@@ -18,8 +21,27 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValueError,
 )
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date
+"""The native Python scalar types a content wrapper can be unwrapped into."""
+
+# The exact native scalar target types (no subclass matching: datetime is a date subclass
+# and bool is an int subclass, and neither cross-kind conversion is wanted).
+NATIVE_SCALAR_TARGET_TYPES: tuple[type[Any], ...] = (str, float, int, bool, datetime.date)
+
+
+class NativeScalarExtraction(NamedTuple):
+    """Result of attempting to extract a native scalar from a content wrapper.
+
+    The explicit `matched` flag distinguishes a genuine extraction from a no-match,
+    because legitimately extracted values can be falsy (False, 0, empty string).
+    """
+
+    matched: bool
+    value: NativeScalarValue | None
 
 
 class StructuredContentComposer:
@@ -146,9 +168,13 @@ class StructuredContentComposer:
         """Resolve a FROM_VAR field by getting value from working memory.
 
         The resolution is type-aware: it checks what the target field expects
-        and converts content accordingly:
+        (unwrapping Optional annotations) and converts content accordingly:
         - TextContent -> str: extract .text
-        - TextContent -> TextContent/subclass: keep object
+        - NumberContent -> float/int: extract .number
+        - YesNoContent -> bool: extract .yes_no
+        - DateContent -> date: extract .date
+        - any wrapper -> its own wrapper class/subclass: keep object
+        - ListContent -> list[native scalar]: extract the scalar from each item
         - ListContent -> list[X]: extract items as dicts
         - ListContent -> ListContent: keep object
 
@@ -280,7 +306,9 @@ class StructuredContentComposer:
         else:
             return current_value  # pyright: ignore[reportUnknownVariableType]
 
-    def _resolve_from_stuff_name(self, name: str, *, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
+    def _resolve_from_stuff_name(
+        self, name: str, *, expected_type: type[Any] | None
+    ) -> StuffContent | list[dict[str, Any]] | list[NativeScalarValue] | NativeScalarValue:
         """Resolve a simple (non-dotted) path and convert content based on expected type.
 
         Args:
@@ -295,11 +323,15 @@ class StructuredContentComposer:
         log.verbose(f"  Stuff '{name}' content type: {type(stuff_content).__name__}")
         return self._convert_for_target_type(stuff_content=stuff_content, expected_type=expected_type)
 
-    def _convert_for_target_type(self, stuff_content: StuffContent, *, expected_type: type[Any] | None) -> StuffContent | list[dict[str, Any]] | str:
+    def _convert_for_target_type(
+        self, stuff_content: StuffContent, *, expected_type: type[Any] | None
+    ) -> StuffContent | list[dict[str, Any]] | list[NativeScalarValue] | NativeScalarValue:
         """Convert content based on the expected target field type.
 
-        Central dispatcher for type-aware conversion. Routes to specific
-        conversion methods based on content type.
+        Central dispatcher for type-aware conversion. Native scalar wrappers are unwrapped
+        first (TextContent -> str, NumberContent -> float/int, YesNoContent -> bool,
+        DateContent -> date) when the target expects the native type; otherwise routes to
+        specific conversion methods based on content type.
 
         Args:
             stuff_content: The content to convert
@@ -308,6 +340,11 @@ class StructuredContentComposer:
         Returns:
             The content, converted as appropriate for the target field type
         """
+        if expected_type is not None:
+            extraction = self._extract_native_scalar(stuff_content=stuff_content, expected_type=expected_type)
+            if extraction.matched and extraction.value is not None:
+                log.verbose(f"  -> Target expects a native scalar, extracted {type(extraction.value).__name__} from {type(stuff_content).__name__}")
+                return extraction.value
         if isinstance(stuff_content, TextContent):
             return self._convert_text_content(text_content=stuff_content, expected_type=expected_type)
         elif isinstance(stuff_content, ListContent):
@@ -321,21 +358,20 @@ class StructuredContentComposer:
             log.verbose(f"  -> Unknown target type, returning {type(stuff_content).__name__} object")
             return stuff_content
 
-    def _convert_text_content(self, text_content: TextContent, *, expected_type: Any) -> TextContent | str:
-        """Convert TextContent based on expected type (str, TextContent, or subclass).
+    def _convert_text_content(self, text_content: TextContent, *, expected_type: Any) -> TextContent:
+        """Convert TextContent based on expected type (TextContent or subclass).
+
+        The str target case is handled upstream by the native scalar extraction
+        in _convert_for_target_type.
 
         Args:
             text_content: The TextContent to convert
             expected_type: The expected type annotation for the target field
 
         Returns:
-            Either the text string, or the TextContent object (potentially converted)
+            The TextContent object (potentially converted to the expected subclass)
         """
-        if self._expects_type(expected_type=expected_type, target_type=str):
-            # Target field expects str, extract the text
-            log.verbose("  -> Target expects str, returning TextContent.text")
-            return text_content.text
-        elif self._expects_type(expected_type=expected_type, target_type=TextContent):
+        if self._expects_type(expected_type=expected_type, target_type=TextContent):
             # Target field expects TextContent or subclass
             converted_text_content = self._convert_content_for_field(stuff_content=text_content, expected_type=expected_type)
             assert isinstance(converted_text_content, TextContent)
@@ -345,9 +381,56 @@ class StructuredContentComposer:
             log.verbose(f"  -> Unknown target type, returning {type(text_content).__name__} object")
             return text_content
 
+    def _extract_native_scalar(self, *, stuff_content: StuffContent, expected_type: type[Any]) -> NativeScalarExtraction:
+        """Extract the native scalar value from a scalar content wrapper when the target expects it.
+
+        Conversion matrix (wrapper -> native target):
+        - TextContent -> str (or str subclass): extract .text
+        - NumberContent -> float or int (never bool, an int subclass): extract .number
+        - YesNoContent -> bool: extract .yes_no
+        - DateContent -> date (exactly, never datetime, a date subclass): extract .date,
+          but only when the Date carries no time of day — truncating a timestamped Date
+          to a bare date would silently drop the time and its UTC offset, so it raises
+
+        A wrapper-typed target (e.g. a NumberContent field) deliberately does not match here:
+        it is handled by the generic StuffContent conversion path so the object is kept.
+
+        Args:
+            stuff_content: The content wrapper to extract from
+            expected_type: The expected type annotation for the target field or list item
+
+        Returns:
+            A NativeScalarExtraction with matched=True and the scalar value when the
+            wrapper/target pair is in the matrix, matched=False otherwise
+
+        Raises:
+            StructuredContentComposerTypeError: If a Date carrying a time of day targets a bare `date`
+        """
+        if isinstance(stuff_content, TextContent):
+            if self._expects_type(expected_type=expected_type, target_type=str):
+                return NativeScalarExtraction(matched=True, value=stuff_content.text)
+        elif isinstance(stuff_content, NumberContent):
+            if expected_type is not bool and (
+                self._expects_type(expected_type=expected_type, target_type=float) or self._expects_type(expected_type=expected_type, target_type=int)
+            ):
+                return NativeScalarExtraction(matched=True, value=stuff_content.number)
+        elif isinstance(stuff_content, YesNoContent):
+            if self._expects_type(expected_type=expected_type, target_type=bool):
+                return NativeScalarExtraction(matched=True, value=stuff_content.yes_no)
+        elif isinstance(stuff_content, DateContent):
+            if expected_type is datetime.date:
+                if stuff_content.time is not None:
+                    msg = (
+                        f"Cannot copy a Date carrying a time of day ({stuff_content.rendered_plain()}) into a bare `date` field: "
+                        "it would silently drop the time and its UTC offset. Target a Date-typed field to keep the time."
+                    )
+                    raise StructuredContentComposerTypeError(msg)
+                return NativeScalarExtraction(matched=True, value=stuff_content.date)
+        return NativeScalarExtraction(matched=False, value=None)
+
     def _convert_list_content(
         self, list_content: ListContent[StuffContent], *, expected_type: type[Any] | None
-    ) -> ListContent[StuffContent] | list[dict[str, Any]]:
+    ) -> ListContent[StuffContent] | list[dict[str, Any]] | list[NativeScalarValue]:
         """Convert ListContent based on expected type (list[X] or ListContent[X]).
 
         Args:
@@ -355,7 +438,7 @@ class StructuredContentComposer:
             expected_type: The expected type annotation for the target field
 
         Returns:
-            Either a list of dicts, or a ListContent object with converted items
+            Either a list of dicts, a list of native scalars, or a ListContent object with converted items
         """
         expected_item_type: type[Any] | None
         if expected_type and self._expects_list_content_type(expected_type=expected_type):
@@ -365,8 +448,12 @@ class StructuredContentComposer:
             converted_items = self._convert_list_items_as_objects(items=list_content.items, expected_item_type=expected_item_type)
             return ListContent(items=converted_items)
         elif expected_type and self._expects_list_type(expected_type=expected_type):
-            # Target expects list[X], extract items as dicts for Pydantic reconstruction
             expected_item_type = self._get_list_item_type(expected_type=expected_type)
+            if expected_item_type is not None and expected_item_type in NATIVE_SCALAR_TARGET_TYPES:
+                # Target expects list of native scalars, extract the scalar from each item wrapper
+                log.verbose(f"  -> Target expects list[{expected_item_type}], extracting native scalars from ListContent items")
+                return self._convert_list_items_as_scalars(items=list_content.items, expected_item_type=expected_item_type)
+            # Target expects list[X] with structured items, extract items as dicts for Pydantic reconstruction
             log.verbose(f"  -> Target expects list[{expected_item_type}], extracting items from ListContent")
             return self._convert_list_items_as_dicts(items=list_content.items, expected_item_type=expected_item_type)
         else:
@@ -377,6 +464,10 @@ class StructuredContentComposer:
     def _get_field_expected_type(self, field_name: str) -> type[Any] | None:
         """Get the expected type annotation for a field from the output class.
 
+        Optional annotations (`Optional[X]` / `X | None`) are unwrapped to their non-None
+        arm, so an optional field converts exactly like its required counterpart. Genuine
+        multi-arm unions are returned unchanged.
+
         Args:
             field_name: The name of the field
 
@@ -385,7 +476,7 @@ class StructuredContentComposer:
         """
         field_info = self.output_class.model_fields.get(field_name)
         if field_info and field_info.annotation:
-            return field_info.annotation
+            return cast("type[Any]", unwrap_optional(field_info.annotation))
         else:
             return None
 
@@ -486,6 +577,9 @@ class StructuredContentComposer:
     def _get_list_item_type(self, expected_type: type[Any]) -> type[Any] | None:
         """Extract the item type from list[X] or ListContent[X].
 
+        A nullable item annotation (`list[X | None]`) is normalized to its non-None arm,
+        so nullable items convert exactly like their non-nullable counterparts.
+
         Args:
             expected_type: The type annotation (e.g., list[Address] or ListContent[TeamMember])
 
@@ -494,7 +588,7 @@ class StructuredContentComposer:
         """
         args = get_args(expected_type)
         if args:
-            return args[0]  # type: ignore[return-value, no-any-return]
+            return cast("type[Any]", unwrap_optional(args[0]))
         else:
             return None
 
@@ -523,6 +617,36 @@ class StructuredContentComposer:
             converted_items.append(item.model_dump(exclude_none=False, serialize_as_any=True))
 
         log.verbose(f"     Returning {len(converted_items)} items as dicts")
+        return converted_items
+
+    def _convert_list_items_as_scalars(self, *, items: list[StuffContent], expected_item_type: type[Any]) -> list[NativeScalarValue]:
+        """Extract native scalar values from list item wrappers.
+
+        Used when target is list[X] with X a native scalar type (str/float/int/bool/date):
+        each item wrapper is unwrapped to its scalar value (e.g. TextContent -> str).
+
+        Args:
+            items: The list of item wrappers to convert
+            expected_item_type: The native scalar type expected for each item
+
+        Returns:
+            List of native scalar values
+
+        Raises:
+            StructuredContentComposerTypeError: If an item is not a wrapper of the expected scalar type
+        """
+        log.verbose(f"     Extracting {len(items)} items as native scalars, expected item type: {expected_item_type}")
+
+        converted_items: list[NativeScalarValue] = []
+        for idx, item in enumerate(items):
+            extraction = self._extract_native_scalar(stuff_content=item, expected_type=expected_item_type)
+            if not extraction.matched or extraction.value is None:
+                expected_type_name = getattr(expected_item_type, "__name__", str(expected_item_type))
+                msg = f"Cannot convert item[{idx}] from {type(item).__name__} to {expected_type_name}: no native scalar extraction applies"
+                raise StructuredContentComposerTypeError(msg)
+            converted_items.append(extraction.value)
+
+        log.verbose(f"     Returning {len(converted_items)} items as native scalars")
         return converted_items
 
     def _convert_list_items_as_objects(self, items: list[StuffContent], *, expected_item_type: type[Any] | None) -> list[StuffContent]:
@@ -584,7 +708,17 @@ class StructuredContentComposer:
                 log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type_name}")
                 return
 
-        # Case 3: Try to validate via dict
+        # Case 3: native scalar item type - a wrapper dump can never validate into a bare scalar,
+        # so fail loudly here instead of letting Pydantic produce a cryptic downstream error.
+        # (The list[native-scalar] path normally extracts scalars before reaching this method.)
+        if expected_type in NATIVE_SCALAR_TARGET_TYPES:
+            msg = (
+                f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: "
+                f"a native scalar item cannot be built from a {actual_type.__name__} dump"
+            )
+            raise StructuredContentComposerTypeError(msg)
+
+        # Case 4: Try to validate via dict
         log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type_name}")
         item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
 
@@ -700,21 +834,7 @@ class StructuredContentComposer:
         # Get the field info from the Pydantic model
         field_info = self.output_class.model_fields.get(field_name)
         if field_info and field_info.annotation:
-            annotation = field_info.annotation
-            # Handle Optional types (both `Optional[X]` and Python 3.10+ `X | None` syntax)
-            # We need to specifically detect Optional types, not all generic types.
-            # - Optional[X] has origin Union and type(None) in args
-            # - X | None (Python 3.10+) has origin types.UnionType and type(None) in args
-            # Other generic types like list[X] should NOT be unwrapped.
-            origin = get_origin(annotation)
-            if origin is Union or origin is types.UnionType:
-                args = get_args(annotation)
-                if type(None) in args:
-                    # It's an Optional type, get the non-None type
-                    non_none_args = [arg for arg in args if arg is not type(None)]
-                    if non_none_args:
-                        annotation = non_none_args[0]
-            return annotation  # type: ignore[return-value]
+            return cast("type[StuffContent]", unwrap_optional(field_info.annotation))
         else:
             msg = f"Cannot determine class for nested field '{field_name}' in {self.output_class.__name__}"
             raise StructuredContentComposerTypeError(msg)

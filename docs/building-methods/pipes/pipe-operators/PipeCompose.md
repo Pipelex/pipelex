@@ -137,6 +137,49 @@ Each field in the `[pipe.name.construct]` section can use one of these methods:
 | Template | `{ template = "text with $var" }` | Generate string using template interpolation |
 | Fixed | `"value"` or `123` or `true` | Use a static value directly |
 
+### Copying Whole Inputs Into Native Fields
+
+The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
+
+Conversion matrix:
+
+| Source input | Native target field | Composed value |
+|---|---|---|
+| `Text` | `type = "text"` | the text string |
+| `Number` | `type = "number"` | the number |
+| `YesNo` | `type = "boolean"` | the boolean |
+| `Date` | `type = "date"` | the date |
+| `Text[]` | `type = "list"`, `item_type = "text"` | the list of strings |
+
+When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
+
+One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp.
+
+Worked example — assembling a report from whole stuffs produced by earlier steps:
+
+```toml
+[concept.ScreeningReport]
+description = "The final screening report"
+
+[concept.ScreeningReport.structure]
+match_score = { type = "number", description = "The match score", required = true }
+rejection_email = { type = "text", description = "The rejection email — optional" }
+interview_questions = { type = "list", item_type = "text", description = "Questions to ask — optional" }
+
+[pipe.assemble_report]
+type = "PipeCompose"
+description = "Assemble the screening report from previously generated pieces"
+inputs = { score = "Number", email = "Text", questions = "Text[]" }
+output = "ScreeningReport"
+
+[pipe.assemble_report.construct]
+match_score = { from = "score" }
+rejection_email = { from = "email" }
+interview_questions = { from = "questions" }
+```
+
+Here `email` is a whole `Text` stuff copied into an optional `text` field, `questions` is a whole `Text[]` stuff copied into an optional `list` of `text` items, and `score` is a whole `Number` stuff copied into a required `number` field. Each lands as its native value (`str`, `list[str]`, `float`).
+
 ### Construct Mode Example
 
 ```toml
