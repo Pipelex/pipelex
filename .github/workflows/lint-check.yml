@@ -42,9 +42,9 @@ jobs:
         run: make merge-check-plxt-lint
 
 # --------------------------------------------------------------------------
-# 2.  Type checking — matrix over supported Python versions
-#     Incremental mypy cache restored from prior runs; fresh runs happen
-#     post-merge in `lint-fresh-check.yml` to catch any incremental drift.
+# 2.  Type checking — floor Python version only, incremental mypy cache.
+#     All 4 supported versions run cache-free on PRs to main in
+#     `lint-fresh-check.yml`; here we keep feature PRs fast on py3.11.
 # --------------------------------------------------------------------------
   lint-typecheck:
     name: Typecheck (py${{ matrix.python-version }})
@@ -52,7 +52,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
