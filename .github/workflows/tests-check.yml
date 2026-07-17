@@ -9,37 +9,49 @@ concurrency:
 
 jobs:
 # --------------------------------------------------------------------------
-# 1.  Tests — floor Python version only.
+# 1.  Tests — floor Python version, sharded across free GitHub-hosted runners.
 #     The full 3.11-3.14 matrix runs post-merge in `tests-full-check.yml`.
-#     Same trade as the mypy cache: fast on PRs, definitive on main. A
-#     version-specific break is caught by the nightly rather than by every
-#     push of every PR, which is what the 4x matrix was actually costing.
+#     Same trade as the mypy cache: fast on PRs, definitive on main.
+#
+#     Sharding: the CPU-bound suite (~2400s of test-time) is split into 8
+#     groups balanced by the committed .test_durations file, each running on a
+#     free ubuntu-latest runner. 8 free 4-vCPU runners beat one paid 8-vCPU
+#     Azure box on wall clock (~2m vs 6m20s) at zero cost — vertical scale is
+#     what Azure sells; horizontal scale is free and unlimited on this plan.
+#     Regenerate .test_durations (`pytest --store-durations`) every few months
+#     or the groups drift out of balance.
 # --------------------------------------------------------------------------
   matrix-test:
-    name: Tests (py${{ matrix.python-version }})
-    runs-on: [aca-runner-test]
+    name: Tests (py3.11, shard ${{ matrix.group }}/8)
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11"]
-    permissions:
-      contents: read
-      id-token: write
+        group: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
-      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}
+      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-shard${{ matrix.group }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
 
+      - name: Install dependencies
+        run: PYTHON_VERSION=3.11 make install
+
+      # Fast install-health canary on one shard only: a broken install fails
+      # every shard identically, so paying the boot smoke test 8x is waste.
       - name: Boot test
+        if: matrix.group == 1
         run: make tp TEST=TestFundamentals
 
-      - name: Run tests
-        run: make gha-tests
+      - name: Run tests (shard ${{ matrix.group }}/8)
+        run: SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
 
       - name: Show hang dumps
         if: failure()
@@ -56,6 +68,7 @@ jobs:
 
 # --------------------------------------------------------------------------
 # 2.  Aggregator job — the *single* required status check
+#     Guards against a silently-dropped shard: fails unless ALL 8 succeed.
 # --------------------------------------------------------------------------
   tests-all:
     name: Tests (all)

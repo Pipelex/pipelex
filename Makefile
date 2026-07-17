@@ -509,12 +509,16 @@ codex-tests: env
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
+# SPLITS/GROUP thread pytest-split through for CI sharding: each shard runs one
+# GROUP of the tests, balanced by the committed .test_durations file, and still
+# uses -n auto within the shard. Both unset (local runs) => the $(if ...) expands
+# to nothing and the whole suite runs as before.
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --dist=worksteal --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --dist=worksteal $(if $(SPLITS),--splits $(SPLITS) --group $(GROUP)) --max-worker-restart=2 --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
