@@ -27,6 +27,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -85,6 +86,17 @@ class TestPipeComposeNativeScalarConversions:
                 "tags",
                 ["alpha", "bravo", "charlie"],
                 id="text_list_to_optional_str_list_field",
+            ),
+            pytest.param(
+                "compose_text_list_to_nullable_str_list",
+                "tag_texts",
+                NativeConceptCode.TEXT,
+                _make_tag_texts(),
+                NativeScalarConversionTestData.TEXT_LIST_TO_STR_LIST_CONSTRUCT,
+                "NullableTagsHolder",
+                "tags",
+                ["alpha", "bravo", "charlie"],
+                id="text_list_to_nullable_item_str_list_field",
             ),
             pytest.param(
                 "compose_number_to_float",
@@ -183,3 +195,50 @@ class TestPipeComposeNativeScalarConversions:
                 assert type(composed_item) is type(expected_item)
 
         pretty_print(main_stuff.content, title=f"{output_concept} - native scalar conversion")
+
+    async def test_compose_timestamped_date_to_date_field_raises(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        load_test_library: Callable[[list[Path]], None],
+        test_library_path: list[Path],
+    ):
+        """A Date carrying a time of day must be rejected by a bare `date` target field instead of silently dropping the time."""
+        load_test_library(test_library_path)
+
+        timestamped_date = DateContent(
+            date=datetime.date(2026, 3, 14),
+            time=datetime.time(15, 40, tzinfo=datetime.timezone(datetime.timedelta(hours=2))),
+        )
+        input_stuff = StuffFactory.make_stuff(
+            concept=get_native_concept(NativeConceptCode.DATE),
+            content=timestamped_date,
+            name="deadline_date",
+        )
+        working_memory = WorkingMemory()
+        working_memory.add_new_stuff(name="deadline_date", stuff=input_stuff)
+
+        pipe_compose_blueprint = PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose DeadlineHolder from a whole timestamped Date stuff",
+                "inputs": {"deadline_date": NativeConceptCode.DATE},
+                "construct": NativeScalarConversionTestData.DATE_TO_DATE_CONSTRUCT,
+                "output": "compose_structured_test.DeadlineHolder",
+            }
+        )
+
+        pipe = PipeFactory[PipeCompose].make_from_blueprint(
+            domain_code="compose_structured_test",
+            pipe_code="compose_timestamped_date_to_date",
+            blueprint=pipe_compose_blueprint,
+        )
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+        )
+
+        with pytest.raises(PipeComposeError, match="time of day"):
+            await get_pipe_router().run(pipe_job=pipe_job)

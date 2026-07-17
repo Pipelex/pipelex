@@ -359,6 +359,12 @@ class OptionalTagsHolder(StructuredContent):
     tags: list[str] | None = Field(default=None, description="The tags, optional")
 
 
+class NullableTagsHolder(StructuredContent):
+    """Holder with a list of nullable str items - should receive item texts extracted."""
+
+    tags: list[str | None] = Field(description="The tags, each possibly null")
+
+
 class ScoreHolder(StructuredContent):
     """Holder with a float field - should receive NumberContent.number extracted."""
 

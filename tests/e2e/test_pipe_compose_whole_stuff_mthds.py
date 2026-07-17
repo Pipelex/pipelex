@@ -17,7 +17,7 @@ _FIXTURE_DIR = Path(__file__).parent / "fixtures" / "compose_whole_stuff"
 _BUNDLE = _FIXTURE_DIR / "compose_whole_stuff.mthds"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="class")
 class TestPipeComposeWholeStuffConstruct:
     """PipeCompose construct `{ from = "<stuff_name>" }` must copy a whole native stuff into a native-typed target field.
 

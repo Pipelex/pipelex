@@ -153,6 +153,8 @@ Conversion matrix:
 
 When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
 
+One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp.
+
 Worked example — assembling a report from whole stuffs produced by earlier steps:
 
 ```toml

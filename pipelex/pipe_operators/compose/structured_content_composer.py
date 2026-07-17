@@ -388,7 +388,9 @@ class StructuredContentComposer:
         - TextContent -> str (or str subclass): extract .text
         - NumberContent -> float or int (never bool, an int subclass): extract .number
         - YesNoContent -> bool: extract .yes_no
-        - DateContent -> date (exactly, never datetime, a date subclass): extract .date
+        - DateContent -> date (exactly, never datetime, a date subclass): extract .date,
+          but only when the Date carries no time of day — truncating a timestamped Date
+          to a bare date would silently drop the time and its UTC offset, so it raises
 
         A wrapper-typed target (e.g. a NumberContent field) deliberately does not match here:
         it is handled by the generic StuffContent conversion path so the object is kept.
@@ -400,6 +402,9 @@ class StructuredContentComposer:
         Returns:
             A NativeScalarExtraction with matched=True and the scalar value when the
             wrapper/target pair is in the matrix, matched=False otherwise
+
+        Raises:
+            StructuredContentComposerTypeError: If a Date carrying a time of day targets a bare `date`
         """
         if isinstance(stuff_content, TextContent):
             if self._expects_type(expected_type=expected_type, target_type=str):
@@ -414,6 +419,12 @@ class StructuredContentComposer:
                 return NativeScalarExtraction(matched=True, value=stuff_content.yes_no)
         elif isinstance(stuff_content, DateContent):
             if expected_type is datetime.date:
+                if stuff_content.time is not None:
+                    msg = (
+                        f"Cannot copy a Date carrying a time of day ({stuff_content.rendered_plain()}) into a bare `date` field: "
+                        "it would silently drop the time and its UTC offset. Target a Date-typed field to keep the time."
+                    )
+                    raise StructuredContentComposerTypeError(msg)
                 return NativeScalarExtraction(matched=True, value=stuff_content.date)
         return NativeScalarExtraction(matched=False, value=None)
 
@@ -566,6 +577,9 @@ class StructuredContentComposer:
     def _get_list_item_type(self, expected_type: type[Any]) -> type[Any] | None:
         """Extract the item type from list[X] or ListContent[X].
 
+        A nullable item annotation (`list[X | None]`) is normalized to its non-None arm,
+        so nullable items convert exactly like their non-nullable counterparts.
+
         Args:
             expected_type: The type annotation (e.g., list[Address] or ListContent[TeamMember])
 
@@ -574,7 +588,7 @@ class StructuredContentComposer:
         """
         args = get_args(expected_type)
         if args:
-            return args[0]  # type: ignore[return-value, no-any-return]
+            return cast("type[Any]", unwrap_optional(args[0]))
         else:
             return None
 
