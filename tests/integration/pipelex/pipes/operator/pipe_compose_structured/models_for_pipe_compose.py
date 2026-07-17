@@ -1,5 +1,7 @@
 """Test StructuredContent models for PipeCompose construct testing."""
 
+from datetime import date
+
 from pydantic import Field
 
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -329,3 +331,47 @@ class DocumentBundle(StructuredContent):
 
     bundle_name: str = Field(description="Bundle name")
     documents: list[DocumentContent] = Field(description="List of documents")
+
+
+# ============================================================================
+# Models for native scalar conversion testing
+# These test whole-stuff copies into native-typed fields: the content wrapper
+# must be unwrapped to the native value (TextContent -> str, NumberContent -> float,
+# YesNoContent -> bool, DateContent -> date), including into Optional fields.
+# ============================================================================
+
+
+class NoteHolder(StructuredContent):
+    """Holder with an optional str field - should receive TextContent.text extracted."""
+
+    note: str | None = Field(default=None, description="The note, optional")
+
+
+class TagsHolder(StructuredContent):
+    """Holder with a required list[str] field - should receive item texts extracted."""
+
+    tags: list[str] = Field(description="The tags")
+
+
+class OptionalTagsHolder(StructuredContent):
+    """Holder with an optional list[str] field - should receive item texts extracted."""
+
+    tags: list[str] | None = Field(default=None, description="The tags, optional")
+
+
+class ScoreHolder(StructuredContent):
+    """Holder with a float field - should receive NumberContent.number extracted."""
+
+    score: float = Field(description="The score")
+
+
+class ApprovalHolder(StructuredContent):
+    """Holder with a bool field - should receive YesNoContent.yes_no extracted."""
+
+    approved: bool = Field(description="Whether approved")
+
+
+class DeadlineHolder(StructuredContent):
+    """Holder with a date field - should receive DateContent.date extracted."""
+
+    deadline: date = Field(description="The deadline date")

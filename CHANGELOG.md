@@ -6,6 +6,10 @@
 
 - **`LibraryManagerAbstract.is_crate_loaded(*, library_id, fingerprint)`** — public query over the per-library crate-fingerprint bookkeeping that already backs `load_from_crate`'s idempotency. A `True` answer means the library's ClassRegistry holds the crate's dynamic classes, so callers (e.g. `pipelex-transport`'s `scoped_library_for_crate`) can hydrate within an existing scope instead of opening a fresh one — preserving dynamic-class identity with instances that scope already produced. This is the core half of the fix for the PipeParallel same-concept combine failing over Temporal with `expected X, got X` pydantic model-type errors.
 
+### Fixed
+
+- **PipeCompose construct: whole-stuff copies into native fields now convert in every promised case.** `{ from = "..." }` referencing a whole native stuff used to hand the content wrapper (`TextContent`, `ListContent`, ...) to the composed field in several cases, failing the dry-run runnable gate on correct methods. Three gaps fixed: optional (non-required) fields never converted (the `Optional[X]` annotation defeated the type detection), list-of-text targets dumped each item as a `{"text": ...}` dict instead of extracting the string, and scalar wrappers other than `Text` were not handled at all. The conversion matrix now covers `Text → text`, `Number → number`, `YesNo → boolean`, and `Date → date`, for both required and optional target fields, scalar and list-item positions. Unconvertible list items now raise a clear `StructuredContentComposerTypeError` instead of surfacing as a cryptic pydantic error downstream.
+
 ## [v0.39.1] - 2026-07-15
 
 ### Changed

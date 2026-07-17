@@ -51,3 +51,11 @@ DataPayload      = "Container for JSONContent"
 MixedMediaReport = "Report with multiple StuffContent types"
 ImageListGallery = "Gallery with a list of ImageContent"
 DocumentBundle   = "Bundle with a list of DocumentContent"
+
+# Native scalar conversion testing concepts (whole-stuff copy into native fields)
+NoteHolder         = "Holder with an optional str field"
+TagsHolder         = "Holder with a required list of str field"
+OptionalTagsHolder = "Holder with an optional list of str field"
+ScoreHolder        = "Holder with a float field"
+ApprovalHolder     = "Holder with a bool field"
+DeadlineHolder     = "Holder with a date field"
