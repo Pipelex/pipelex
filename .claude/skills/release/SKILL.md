@@ -21,6 +21,7 @@ This skill handles the full release cycle for the `pipelex` Python package.
 - **`CHANGELOG.md`** — add `[vX.Y.Z] - YYYY-MM-DD` entry (remove `[Unreleased]` if present)
 - **`uv.lock`** — regenerated via `make li` (lock + install)
 - **`.badges/tests.json`** — test count updated to match actual count
+- **`.test_durations`** — regenerated via `make store-test-durations` so the CI test shards stay balanced (see step 8b)
 
 ## Workflow
 
@@ -112,12 +113,25 @@ Run `make test-count` to get the current number of tests. Then update
 After updating, run `make check-test-badge` to verify the badge matches. If it
 fails, re-check the count and fix the badge file.
 
+### 8b. Refresh the test-duration map
+
+Run `make store-test-durations`. This runs the full test suite once and rewrites
+`.test_durations`, the per-test timing file `pytest-split` uses to balance the 8
+CI test shards on feature PRs. It drifts as tests are added or removed, and a
+stale file silently unbalances the shards (some finish in seconds, one runs
+long), so a release is the natural point to refresh it.
+
+- This runs the whole suite, so it takes a few minutes — expected, not a hang.
+- If it changed the file, `.test_durations` is included in the release commit
+  (step 9). If the suite hasn't changed since the last release it may be a
+  no-op, which is fine — commit it if git shows a diff, skip if not.
+
 ### 9. Commit and push
 
 Stage all release-related changes. This includes at minimum `pyproject.toml`,
-`CHANGELOG.md`, `uv.lock`, and `.badges/tests.json`, plus any other files the
-user chose to include in step 1 (e.g. previously uncommitted work that belongs
-in this release).
+`CHANGELOG.md`, `uv.lock`, and `.badges/tests.json`, plus `.test_durations` if
+step 8b changed it, plus any other files the user chose to include in step 1
+(e.g. previously uncommitted work that belongs in this release).
 
 Commit with the message:
 

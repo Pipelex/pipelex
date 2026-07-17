@@ -513,6 +513,19 @@ codex-tests: env
 # GROUP of the tests, balanced by the committed .test_durations file, and still
 # uses -n auto within the shard. Both unset (local runs) => the $(if ...) expands
 # to nothing and the whole suite runs as before.
+# Regenerate .test_durations: the per-test timing map pytest-split uses to
+# balance the 8 CI shards. Runs the same selection as gha-tests but records how
+# long each test takes instead of sharding. Run at release time (see the release
+# skill) so the shards stay balanced; a stale file silently unbalances them.
+store-test-durations: env
+	$(call PRINT_TITLE,"Storing test durations for pytest-split shard balancing")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
+	@echo "• Running full suite with --store-durations (rewrites .test_durations)"
+	$(VENV_PYTEST) -n auto --dist=worksteal --store-durations --timeout=180 --timeout-method=thread --tb=line -p no:cacheprovider --no-header -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
+
+std: store-test-durations
+
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
 	@echo "• Regenerating test model fixtures with ci profile"
