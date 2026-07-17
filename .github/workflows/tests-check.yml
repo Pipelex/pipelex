@@ -55,38 +55,7 @@ jobs:
           fi
 
 # --------------------------------------------------------------------------
-# 2.  TEMPORARY — head-to-head timing against a free GitHub-hosted runner.
-#     Azure gives 8 vCPU per replica, ubuntu-latest gives 4, and ~87% of this
-#     job is CPU-bound `pytest -n auto`. This measures what that core count is
-#     actually worth so the self-hosting decision rests on a number.
-#     Advisory only (continue-on-error, not in `tests-all`). DELETE once the
-#     runner decision is made — see docs/contribute/ci-runners.md.
-# --------------------------------------------------------------------------
-  bench-github-hosted:
-    name: Bench (py3.11 on ubuntu-latest)
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    env:
-      VIRTUAL_ENV: ${{ github.workspace }}/.venv
-      ENV: dev
-      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-bench
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install uv (with cache)
-        uses: astral-sh/setup-uv@v6
-        with:
-          enable-cache: true
-          cache-dependency-glob: "uv.lock"
-
-      - name: Install dependencies
-        run: PYTHON_VERSION=3.11 make install
-
-      - name: Run tests
-        run: make gha-tests
-
-# --------------------------------------------------------------------------
-# 3.  Aggregator job — the *single* required status check
+# 2.  Aggregator job — the *single* required status check
 # --------------------------------------------------------------------------
   tests-all:
     name: Tests (all)

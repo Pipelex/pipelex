@@ -7,11 +7,6 @@ name: Lint fresh (post-merge guarantee)
 # week on the cron) instead of letting bad state accumulate.
 
 on:
-  # ⛔ TEMPORARY — REMOVE BEFORE MERGING #924 ⛔
-  # Present only so this workflow can be proven on PR #924. It is push/cron-only
-  # by design; leaving this in makes the fresh 4-version typecheck run on every
-  # PR, which is exactly the cost we are cutting.
-  pull_request:
   push:
     branches:
       - dev
@@ -63,13 +58,8 @@ jobs:
       # PRs could read, and every PR's first run type-checked from cold. This
       # workflow runs on dev/main and produces a *fresh* cache, which is the
       # ideal seed. Save only (no restore) keeps this run honest.
-      # ⛔ `|| github.event_name == 'pull_request'` is TEMPORARY — REMOVE BEFORE
-      # MERGING #924. It exists so this step is observed executing on the PR.
-      # Caveat: on a PR the cache saves to the PR's own ref scope, so this
-      # proves the step runs and writes — it CANNOT prove that a PR restores
-      # from a dev-scoped entry. That only happens on a real push to dev.
       - name: Seed mypy cache for PR runs
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push'
         uses: actions/cache/save@v4
         with:
           path: .mypy_cache

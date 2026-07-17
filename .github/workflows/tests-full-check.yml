@@ -12,13 +12,6 @@ name: Tests full (post-merge guarantee)
 # Same shape as `lint-fresh-check.yml`: fast on PRs, definitive post-merge.
 
 on:
-  # ⛔ TEMPORARY — REMOVE BEFORE MERGING #924 ⛔
-  # Present only so this workflow can be proven on PR #924. Without it this file
-  # is completely inert until it reaches main (push:main needs main; cron and
-  # workflow_dispatch both only work from the default branch), i.e. it would
-  # merge untested. Leaving this in runs the full 4-version matrix on every PR —
-  # the exact 4x cost we just removed from tests-check.yml.
-  pull_request:
   push:
     branches:
       - main
