@@ -1,29 +1,26 @@
-name: Tests full (post-merge guarantee)
+name: Tests full (pre-main gate)
 
-# The full Python matrix. PRs run the floor version only (`tests-check.yml`);
-# this is where every supported version gets exercised.
+# The full Python matrix. Feature PRs (to dev) run the floor version only,
+# sharded, in `tests-check.yml`; this is the gate on PRs targeting main (the
+# release PRs, dev -> main) where every supported version gets exercised.
 #
-# Why it is not on PRs: the suite is ~8 min of CPU-bound pytest per version, so
-# a 4-version matrix on every push of every PR was the bulk of the CI bill —
-# for a signal that almost never differs between versions. Here it runs once
-# per merge to main, plus nightly on dev so a version-specific break surfaces
-# within a day rather than at release.
+# Why not on every PR: the suite is CPU-bound pytest per version, so a
+# 4-version matrix on every push of every feature PR was the bulk of the CI
+# bill, for a signal that almost never differs between versions. Running it as
+# a release gate means no version-specific break can reach main, without paying
+# it on day-to-day feature work.
 #
-# Same shape as `lint-fresh-check.yml`: fast on PRs, definitive post-merge.
+# Same shape as `lint-fresh-check.yml`: fast on feature PRs, definitive before main.
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-  schedule:
-    # 03:00 UTC daily — runs against dev (see the checkout ref below).
-    - cron: "0 3 * * *"
   workflow_dispatch:
     inputs:
       ref:
         description: "Branch or SHA to test"
         required: false
-        default: "dev"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -45,11 +42,11 @@ jobs:
       ENV: dev
       PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}
     steps:
-      # Scheduled runs always fire on the default branch (main), but the branch
-      # we actually want nightly coverage on is dev — that is where PRs land.
+      # On a pull_request this checks out the merge ref (dev merged into main),
+      # which is exactly what must be gated. workflow_dispatch can override.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'schedule' && 'dev' || inputs.ref || github.sha }}
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install

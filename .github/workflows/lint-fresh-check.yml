@@ -1,19 +1,15 @@
-name: Lint fresh (post-merge guarantee)
+name: Lint fresh (pre-main gate)
 
-# Runs on push to dev/main and weekly on a cron. No mypy cache restore — a
-# from-scratch type-check that acts as the safety net behind the cached PR
-# checks in lint-check.yml. If incremental mypy ever quietly drifts from what
-# a fresh run would say, this catches it within minutes of merge (or once a
-# week on the cron) instead of letting bad state accumulate.
+# Gate on PRs targeting main (the release PRs, dev -> main). Full Python matrix,
+# NO mypy cache restore — a from-scratch type-check. Feature PRs to dev run the
+# fast cached typecheck in lint-check.yml; before anything reaches main it must
+# also pass a clean, all-versions, cache-free run, so incremental-mypy drift or
+# a version-specific type break can never land on main.
 
 on:
-  push:
+  pull_request:
     branches:
-      - dev
       - main
-  schedule:
-    # Mondays at 04:00 UTC — catches drift even on quiet weeks.
-    - cron: "0 4 * * 1"
   workflow_dispatch:
 
 concurrency:
@@ -50,16 +46,3 @@ jobs:
 
       - name: Run mypy merge check (Python ${{ matrix.python-version }}, fresh)
         run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-mypy
-
-      # Seed the base-branch cache for PRs. Actions caches are scoped by ref: a
-      # PR can restore from its own ref or from the base/default branch, and
-      # `lint-check.yml` is pull_request-only — so nothing ever wrote an entry
-      # PRs could read, and every PR's first run type-checked from cold. This
-      # workflow runs on dev/main and produces a *fresh* cache, which is the
-      # ideal seed. Save only (no restore) keeps this run honest.
-      - name: Seed mypy cache for PR runs
-        if: github.event_name == 'push'
-        uses: actions/cache/save@v4
-        with:
-          path: .mypy_cache
-          key: mypy-py${{ matrix.python-version }}-${{ runner.os }}-${{ hashFiles('uv.lock', 'pyproject.toml') }}-${{ github.sha }}
