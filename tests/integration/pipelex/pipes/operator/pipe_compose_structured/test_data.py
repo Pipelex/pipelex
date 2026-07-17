@@ -69,6 +69,35 @@ class ContentConversionTestData:
     }
 
 
+class NativeScalarConversionTestData:
+    """Test data for native scalar conversion tests (whole-stuff copy into native fields)."""
+
+    # Test case: TextContent to Optional[str] field
+    TEXT_TO_OPTIONAL_STR_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "note": {"from": "note_text"},
+    }
+
+    # Test case: ListContent[TextContent] to list[str] field
+    TEXT_LIST_TO_STR_LIST_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "tags": {"from": "tag_texts"},
+    }
+
+    # Test case: NumberContent to float field
+    NUMBER_TO_FLOAT_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "score": {"from": "score_number"},
+    }
+
+    # Test case: YesNoContent to bool field
+    YES_NO_TO_BOOL_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "approved": {"from": "approval_flag"},
+    }
+
+    # Test case: DateContent to date field
+    DATE_TO_DATE_CONSTRUCT: ClassVar[dict[str, Any]] = {
+        "deadline": {"from": "deadline_date"},
+    }
+
+
 class ClassCompatibilityTestData:
     """Test data for class compatibility tests."""
 

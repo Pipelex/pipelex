@@ -2,7 +2,7 @@
 
 This module is **shipped in the open-core wheel on purpose**. The parity contract spans two
 repos: open core asserts that a failing pipe surfaces a fully classified ``ErrorReport`` on the
-local execution path, and the closed ``pipelex-temporal`` plugin asserts the *same*
+local execution path, and our Temporal plugin asserts the *same*
 classification survives the activity -> workflow -> submitter boundary. Both arms import the
 fixtures below, so the classification a failing pipe surfaces cannot silently diverge between the
 two execution paths — there is one definition, not two hand-synced copies.

@@ -9,13 +9,15 @@ The `PipeCompose` operator composes data from your pipeline's working memory int
 1. **Template mode**: Render templates to produce `Text`-like output
 2. **Construct mode**: Build structured objects by mapping fields from inputs
 
+In both modes, `PipeCompose` produces a single output stuff: the `output` concept cannot carry multiplicity (`output = "Report[]"` is rejected at validation).
+
 ## Template Mode
 
 Template mode uses [Jinja2 templates](https://jinja.palletsprojects.com/) to dynamically generate text by combining data from working memory. This is ideal for creating formatted reports, HTML content, or constructing complex, multi-part prompts for LLMs.
 
 ### How Template Mode Works
 
-`PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output.
+`PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output. In template mode, the `output` concept must refine the native `Text` or `Html` concept — use construct mode for structured outputs.
 
 Template mode supports two syntax variants:
 
@@ -135,7 +137,70 @@ Each field in the `[pipe.name.construct]` section can use one of these methods:
 |--------|--------|-------------|
 | Reference | `{ from = "input.field" }` | Copy value from input variable or nested field |
 | Template | `{ template = "text with $var" }` | Generate string using template interpolation |
-| Fixed | `"value"` or `123` or `true` | Use a static value directly |
+| Fixed | `"value"`, `123`, `true`, or `["a", "b"]` | Use a static value directly (scalars and lists) |
+| Nested | a table with sub-fields (no `from`/`template` key) | Recursively compose a nested structured object |
+
+A nested construct is written as a table whose keys are the sub-object's own field names — each sub-field uses any of the four methods, recursively:
+
+```toml
+[pipe.assemble_invoice.construct]
+customer = { name = { from = "order.customer_name" }, tier = "standard" }
+```
+
+A `from` reference also accepts one modifier, `list_to_dict_keyed_by`: when the target field is a dict, it converts the referenced list into a dict keyed by the named attribute of each item:
+
+```toml
+[pipe.index_products.construct]
+products_by_sku = { from = "products", list_to_dict_keyed_by = "sku" }
+```
+
+The referenced value must be a list, and every item must carry the key attribute with a string value — otherwise the composer raises an error.
+
+### Copying Whole Inputs Into Native Fields
+
+The `from` reference is not limited to dotted paths like `"customer.name"` — it can name a whole input variable. When the referenced input is a native stuff (`Text`, `Number`, `YesNo`, `Date`, or a list of them) and the target field is native-typed, the composer automatically converts the content wrapper into the field's native value. This works for required and optional fields alike.
+
+Conversion matrix:
+
+| Source input | Native target field | Composed value |
+|---|---|---|
+| `Text` | `type = "text"` | the text string |
+| `Number` | `type = "number"` | the number |
+| `YesNo` | `type = "boolean"` | the boolean |
+| `Date` | `type = "date"` | the date |
+| `Text[]` | `type = "list"`, `item_type = "text"` | the list of strings |
+| `Number[]` | `type = "list"`, `item_type = "number"` | the list of numbers |
+| `YesNo[]` | `type = "list"`, `item_type = "boolean"` | the list of booleans |
+| `Date[]` | `type = "list"`, `item_type = "date"` | the list of dates |
+
+When the target field expects a content object rather than a native value (e.g. a field typed with a concept), the object is kept as-is — the conversion only fires when the field expects the native type.
+
+One fidelity guard: a `Date` stuff that carries a time of day cannot be copied into a bare `date` field — that would silently drop the time and its UTC offset, so the composer raises an error instead. Target a `Date`-typed field to keep the full timestamp. The same guard applies per item when copying a `Date[]` into a list of `date` items.
+
+Worked example — assembling a report from whole stuffs produced by earlier steps:
+
+```toml
+[concept.ScreeningReport]
+description = "The final screening report"
+
+[concept.ScreeningReport.structure]
+match_score = { type = "number", description = "The match score", required = true }
+rejection_email = { type = "text", description = "The rejection email — optional" }
+interview_questions = { type = "list", item_type = "text", description = "Questions to ask — optional" }
+
+[pipe.assemble_report]
+type = "PipeCompose"
+description = "Assemble the screening report from previously generated pieces"
+inputs = { score = "Number", email = "Text", questions = "Text[]" }
+output = "ScreeningReport"
+
+[pipe.assemble_report.construct]
+match_score = { from = "score" }
+rejection_email = { from = "email" }
+interview_questions = { from = "questions" }
+```
+
+Here `email` is a whole `Text` stuff copied into an optional `text` field, `questions` is a whole `Text[]` stuff copied into an optional `list` of `text` items, and `score` is a whole `Number` stuff copied into a required `number` field. Each lands as its native value (`str`, `list[str]`, `float`).
 
 ### Construct Mode Example
 

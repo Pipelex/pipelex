@@ -191,9 +191,9 @@ class TestPluginDiscovery:
         disabled_discovery = next(discovery for discovery in registrar.discoveries if discovery.name == "optional")
         assert disabled_discovery.status == PluginStatus.DISABLED
 
-    @pytest.mark.parametrize("plugin_name", ["direct", "storage", "secrets", "openai"])
+    @pytest.mark.parametrize("plugin_name", ["direct", "pipe_func", "storage", "secrets", "openai"])
     def test_disabling_core_unconditional_plugin_raises(self, plugin_name: str) -> None:
-        """Denylisting any plugin core requires unconditionally (storage/secrets included) is a startup error."""
+        """Denylisting any plugin core requires unconditionally (pipe_func/storage/secrets included) is a startup error."""
         with pytest.raises(CoreUnconditionalPluginDisabledError) as exc_info:
             build_registrar(config=_fake_config([plugin_name]))
         assert plugin_name in str(exc_info.value)

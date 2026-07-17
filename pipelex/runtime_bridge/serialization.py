@@ -1,7 +1,7 @@
 """Boundary (de)serialization shared by the orchestrators.
 
-Kept separate from the dispatch entry-point (``run_pipe_via_bridge``, now in the
-closed ``pipelex-transport`` library) so the orchestrator implementations (DIRECT
+Kept separate from the cross-process dispatch entry-point (which lives out of
+tree, with the orchestration plugins) so the orchestrator implementations (DIRECT
 in core, the distributed modes in the plugins) can serialize their ``PipeOutput``
 into the JSON-safe ``PipelexPipeRunOutput`` without pulling the bootstrap path
 (which would form an import cycle). This module is deliberately import-light: core
@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 
 
 # Pipe-execution failures an orchestrator converts into PipelexBridgeDispatchError so a host can catch a
-# single error type regardless of execution mode. The Temporal orchestrators additionally catch
-# WorkflowExecutionError (lazy-imported there to keep temporal off the module import path); wrapping
-# it with ``from exc`` loses no signal — the structured ErrorReport stays reachable via ``__cause__``
-# and is surfaced by PipelexBridgeDispatchError.to_error_report()'s cause-chain enrichment.
+# single error type regardless of execution mode. Distributed orchestrators additionally catch their
+# own workflow-level execution errors; wrapping with ``from exc`` loses no signal — the structured
+# ErrorReport stays reachable via ``__cause__`` and is surfaced by
+# PipelexBridgeDispatchError.to_error_report()'s cause-chain enrichment.
 PIPE_DISPATCH_ERRORS: tuple[type[PipelexError], ...] = (
     PipeRunError,
     PipeJobError,

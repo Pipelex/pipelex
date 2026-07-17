@@ -3552,6 +3552,14 @@ rationale = "Hub setter: installs the observer; single self-labelling operand."
 param = "orchestrator_registry"
 rationale = "Hub setter: installs the orchestrator registry; single self-labelling operand."
 
+["pipelex/hub.py::PipelexHub.set_pipe_func_executor"]
+param = "pipe_func_executor"
+rationale = "Hub setter: installs the pipe-func executor; single self-labelling operand."
+
+["pipelex/hub.py::PipelexHub.set_pipe_func_executor_registry"]
+param = "pipe_func_executor_registry"
+rationale = "Hub setter: installs the pipe-func executor registry; single self-labelling operand."
+
 ["pipelex/hub.py::PipelexHub.set_pipe_library"]
 param = "pipe_library"
 rationale = "Hub setter: installs the pipe library; single self-labelling operand."
@@ -3663,6 +3671,10 @@ rationale = "Context manager scoping to the library named by the id; single oper
 ["pipelex/hub.py::scoped_event_log"]
 param = "event_log"
 rationale = "Context manager scoping the given event log; single self-labelling operand."
+
+["pipelex/hub.py::scoped_pipe_func_executor"]
+param = "pipe_func_executor"
+rationale = "Scoped-binding context manager: binds the pipe-func executor for the block; single self-labelling operand."
 
 ["pipelex/hub.py::scoped_pipe_router"]
 param = "pipe_router"
@@ -4219,6 +4231,10 @@ rationale = "Verb-object: resolves the field blueprint; context stays keyword."
 ["pipelex/pipe_operators/compose/structured_content_composer.py::StructuredContentComposer._validate_item_compatibility"]
 param = "item"
 rationale = "Verb-object: validates the item; expectations stay keyword."
+
+["pipelex/pipe_operators/func/pipe_func_execution_transport.py::pipe_func_execution_result_from_response"]
+param = "response"
+rationale = "Converter: rebinds a transported response into a result; single self-labelling operand."
 
 ["pipelex/pipe_operators/img_gen/img_gen_prompt_blueprint.py::ImgGenPromptBlueprint._extract_direct_image"]
 param = "image_ref"
@@ -5176,6 +5192,14 @@ rationale = "Factory from source: builds the result from the extra_config; singl
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
+["pipelex/plugins/pipe_func/pipe_func_plugin.py::PipeFuncPlugin.register"]
+param = "registrar"
+rationale = "Plugin entrypoint: registers into the registrar; single self-labelling operand, consistent with sibling plugins."
+
+["pipelex/plugins/pipe_func/pipe_func_plugin.py::_make_direct_pipe_func_executor"]
+param = "config"
+rationale = "PipeFuncExecutorFactoryFn implementation: the registry invokes factories positionally via the Callable type."
+
 ["pipelex/plugins/portkey/portkey_completions_factory.py::PortkeyCompletionsFactory.make_portkey_openai_client_for_completions"]
 param = "model_handle"
 rationale = "Factory from source: builds the result from the model_handle; single operand."
@@ -5231,6 +5255,10 @@ rationale = "Registers the factory callable as the sole operand."
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_isolated_execution_probe"]
 param = "factory"
 rationale = "Registers the factory callable as the sole operand."
+
+["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_func_executor"]
+param = "factory"
+rationale = "Registrar claim: claims the pipe-func executor hub slot with a factory; single self-labelling operand, consistent with sibling claims."
 
 ["pipelex/plugins/registrar.py::PluginRegistrar.claim_pipe_router"]
 param = "factory"
@@ -5543,6 +5571,10 @@ rationale = "Derivation from the function; single operand."
 ["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils._register_funcs_in_file"]
 param = "file_path"
 rationale = "Verb-object: registers funcs in the file; options stay keyword."
+
+["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.read_py_sources"]
+param = "folder_path"
+rationale = "Folder reader: captures py sources under the folder; single self-labelling operand, consistent with register_funcs_in_folder."
 
 ["pipelex/system/registries/func_registry_utils.py::FuncRegistryUtils.register_funcs_in_folder"]
 param = "folder_path"
@@ -6723,6 +6755,10 @@ rationale = "Transforms the path; single operand."
 ["pipelex/tools/tabular/csv_codec.py::read_rows"]
 param = "path"
 rationale = "Parses/reads the path; single operand."
+
+["pipelex/tools/typing/annotation_utils.py::unwrap_optional"]
+param = "annotation"
+rationale = "Reads as verb-object: unwrap_optional(annotation) takes the one obvious operand, the annotation to unwrap, and call sites pass self-labelling annotation expressions."
 
 ["pipelex/tools/typing/class_utils.py::has_compatible_field"]
 param = "model_cls"

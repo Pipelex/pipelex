@@ -110,6 +110,45 @@ class FuncRegistryUtils:
             cls._register_funcs_in_file(file_path=python_file)
 
     @classmethod
+    def read_py_sources(
+        cls,
+        folder_path: Path,
+        *,
+        is_recursive: bool = True,
+    ) -> dict[str, str]:
+        """Capture the text of every Python file in a folder WITHOUT importing or executing any of it.
+
+        This is the sandbox-hosted counterpart of ``register_funcs_in_folder``: instead of importing
+        the customer's modules and registering ``@pipe_func`` functions in this process, it reads the
+        raw source so the code can travel (on the crate) to an isolated sandbox where it is registered
+        and run. It performs NO import — ``sys.modules`` is left untouched — which is what keeps the
+        runner/worker from ever executing customer code.
+
+        Discovery mirrors ``register_funcs_in_folder`` (same ``find_files_in_dir`` + ``excluded_dirs``)
+        so the captured set matches what the local path would have imported. Both PipeFunc bodies and
+        structure classes are captured, since the sandbox needs the customer's real classes too.
+
+        Args:
+            folder_path: Path to the folder containing Python files.
+            is_recursive: Whether to search recursively in subdirectories.
+
+        Returns:
+            Mapping of POSIX relpath (relative to ``folder_path``) -> source text.
+        """
+        python_files = find_files_in_dir(
+            dir_path=folder_path,
+            pattern="*.py",
+            is_recursive=is_recursive,
+            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+        )
+
+        sources: dict[str, str] = {}
+        for python_file in python_files:
+            relative_path = python_file.relative_to(folder_path).as_posix()
+            sources[relative_path] = python_file.read_text(encoding="utf-8")
+        return sources
+
+    @classmethod
     def _register_funcs_in_file(
         cls,
         file_path: Path,
