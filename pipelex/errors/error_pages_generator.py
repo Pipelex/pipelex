@@ -84,7 +84,7 @@ def _force_load_all_error_modules() -> None:
         name = path.name
         if name != "exceptions.py" and not name.endswith("_exceptions.py"):
             continue
-        rel = path.relative_to(_PIPELEX_ROOT.parent).with_suffix("")
+        rel= path.relative_to(_PIPELEX_ROOT.parent).with_suffix("")
         dotted = ".".join(rel.parts)
         try:
             importlib.import_module(dotted)
