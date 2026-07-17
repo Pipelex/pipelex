@@ -19,7 +19,7 @@ _MULTIPLICITY = _FIXTURE_DIR / "multi_input_multiplicity.mthds"
 _STRUCTURED = _FIXTURE_DIR / "signature_with_structured_output.mthds"
 
 
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="class")
 class TestSignatureValidationE2E:
     async def test_signature_only_bundle_strict_reports_pending(self) -> None:
         # Signatures are never an error (D-B): strict validation does not raise — it reports the
