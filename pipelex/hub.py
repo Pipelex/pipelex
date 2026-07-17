@@ -950,3 +950,14 @@ def get_console() -> Console:
         return pipelex_hub.get_console()
     else:
         return Console(stderr=True)
+
+
+# ⛔ TEMPORARY — REVERT BEFORE MERGE ⛔
+# Deliberate interface change to the highest-fan-in module in the codebase
+# (pipelex.hub, ~140 direct importers) to measure incremental mypy on a real
+# code PR rather than a YAML-only one. A comment would not do: mypy re-checks
+# dependents only when a module's *interface hash* changes, so this has to add
+# a public symbol to trigger the cascade. Measures the worst case.
+def ci_incremental_probe(*, seed: int = 0) -> int:
+    """Return a constant. Exists only to invalidate hub's interface hash."""
+    return seed
