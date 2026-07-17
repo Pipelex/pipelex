@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -91,6 +92,14 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         concept (and thus its dynamic-class identity), rebound against the receiver's registry.
         """
         workdir = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_"))
+        try:
+            return await self._run_transported_from_workdir(request=request, workdir=workdir)
+        finally:
+            # The imported modules live on in memory; the materialized sources are only needed during
+            # import, so the workdir is removed on every path (success, timeout, failure).
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    async def _run_transported_from_workdir(self, *, request: PipeFuncExecutionRequest, workdir: Path) -> PipeFuncExecutionResponse:
         for relpath, source in request.crate.python_sources.items():
             target = workdir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -125,7 +134,10 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             msg = f"Transported rehydration produced no working memory for pipe '{request.pipe_code}'"
             raise PipeFuncExecutionError(msg)
 
-        # Runaway-code guard: kill the PipeFunc if it runs past the request's (plan-dependent) timeout.
+        # Runaway-code guard: time out the PipeFunc if it runs past the request's (plan-dependent)
+        # deadline. Best-effort in-process — a blocking sync function keeps its worker thread; the
+        # hard kill is the execution boundary's job (the sandbox destroys the box, the subprocess is
+        # terminated).
         try:
             execution_result = await asyncio.wait_for(
                 self.run_pipe_func(

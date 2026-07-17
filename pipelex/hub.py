@@ -514,7 +514,9 @@ def get_required_config() -> ConfigRoot:
 
 
 def get_optional_config() -> ConfigRoot | None:
-    return get_pipelex_hub().get_optional_config()
+    """Non-raising by contract: also covers the no-hub-at-all state, not just hub-without-config."""
+    pipelex_hub = PipelexHub.get_optional_instance()
+    return pipelex_hub.get_optional_config() if pipelex_hub is not None else None
 
 
 def get_secrets_provider() -> SecretsProviderAbstract:
