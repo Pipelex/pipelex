@@ -6,11 +6,18 @@ response must be JSON-serialization-safe (it crosses the Temporal activity bound
 must forbid extras (it is a wire contract).
 """
 
+import pytest
+from pydantic import ValidationError
+
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.func.pipe_func_execution_transport import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
     PipeFuncExecutionRequest,
     PipeFuncExecutionResponse,
 )
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
+from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class TestPipeFuncExecutionTransport:
@@ -30,4 +37,16 @@ class TestPipeFuncExecutionTransport:
         assert "crate" in PipeFuncExecutionRequest.model_fields
         assert "working_memory_raw" in PipeFuncExecutionRequest.model_fields
         assert PipeFuncExecutionRequest.model_fields["timeout_seconds"].default == DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS
-        assert DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS == 5.0
+
+    def test_request_rejects_non_finite_timeout(self) -> None:
+        """A non-finite timeout would disable the runaway-code guard, so the wire contract rejects it."""
+        with pytest.raises(ValidationError):
+            PipeFuncExecutionRequest(
+                crate=LibraryCrate(),
+                working_memory_raw={},
+                pipe_code="my_pipe",
+                function_name="my_func",
+                job_metadata=JobMetadata(user_id="user", pipeline_run_id="run"),
+                pipe_run_params=PipeRunParams(run_mode=PipeRunMode.DRY, pipe_stack_limit=10),
+                timeout_seconds=float("inf"),
+            )

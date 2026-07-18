@@ -1,5 +1,6 @@
 import asyncio
 import inspect
+import shutil
 import sys
 import tempfile
 from pathlib import Path
@@ -91,6 +92,18 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         concept (and thus its dynamic-class identity), rebound against the receiver's registry.
         """
         workdir = Path(tempfile.mkdtemp(prefix="pipelex_pipe_func_"))
+        try:
+            return await self._run_transported_from_workdir(request=request, workdir=workdir)
+        finally:
+            # The imported modules live on in memory; the materialized sources are only needed during
+            # import, so the workdir is removed on every path (success, timeout, failure). The sys.path
+            # entries inserted for that import are pruned too — the mkdtemp path is unique, so removing
+            # exactly the entries under this workdir is safe even with concurrent transported runs
+            # (unlike a snapshot/restore of the whole list).
+            sys.path[:] = [entry for entry in sys.path if not Path(entry).is_relative_to(workdir)]
+            shutil.rmtree(workdir, ignore_errors=True)
+
+    async def _run_transported_from_workdir(self, *, request: PipeFuncExecutionRequest, workdir: Path) -> PipeFuncExecutionResponse:
         for relpath, source in request.crate.python_sources.items():
             target = workdir / relpath
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -102,10 +115,10 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         # file path (spec_from_file_location), which does NOT add its directory to sys.path either — so a
         # top-level `from helpers import ...` between sibling files raises ModuleNotFoundError, the module
         # never finishes importing, and its @pipe_func never registers. A local direct run does not hit
-        # this: its funcs were registered at boot from the real on-disk project already on sys.path. The
-        # box is one-shot and disposable, so mutating sys.path is safe: add workdir (resolves
-        # `from funcs.helpers import ...`) and every subdirectory holding a .py file (resolves the
-        # sibling-relative `from helpers import ...`).
+        # this: its funcs were registered at boot from the real on-disk project already on sys.path. Add
+        # workdir (resolves `from funcs.helpers import ...`) and every subdirectory holding a .py file
+        # (resolves the sibling-relative `from helpers import ...`); the caller's finally prunes these
+        # entries once the import phase is over, so they never outlive the run.
         source_dirs = {workdir} | {py_file.parent for py_file in workdir.rglob("*.py")}
         for source_dir in source_dirs:
             sys.path.insert(0, str(source_dir))
@@ -125,7 +138,10 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             msg = f"Transported rehydration produced no working memory for pipe '{request.pipe_code}'"
             raise PipeFuncExecutionError(msg)
 
-        # Runaway-code guard: kill the PipeFunc if it runs past the request's (plan-dependent) timeout.
+        # Runaway-code guard: time out the PipeFunc if it runs past the request's (plan-dependent)
+        # deadline. Best-effort in-process — a blocking sync function keeps its worker thread; the
+        # hard kill is the execution boundary's job (the sandbox destroys the box, the subprocess is
+        # terminated).
         try:
             execution_result = await asyncio.wait_for(
                 self.run_pipe_func(

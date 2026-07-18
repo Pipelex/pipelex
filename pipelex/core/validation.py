@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 
-from pipelex.hub import PipelexHub
+from pipelex.hub import get_optional_config
 from pipelex.system.configuration.configs import MigrationConfig, PipelexConfig
 from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_error
 
@@ -9,10 +9,9 @@ def report_validation_error(*, category: str, validation_error: ValidationError)
     validation_error_analysis = analyze_pydantic_validation_error(validation_error)
 
     # Doctor calls this from inside its bootstrap, where setup_config may have raised
-    # mid-flight and the hub's _config is still None. Reading via the optional getters
+    # mid-flight and the hub's _config is still None. Reading via the optional getter
     # lets the friendly translation work without a try/except RuntimeError catch-all.
-    pipelex_hub = PipelexHub.get_optional_instance()
-    config = pipelex_hub.get_optional_config() if pipelex_hub is not None else None
+    config = get_optional_config()
     migration_config: MigrationConfig | None
     if isinstance(config, PipelexConfig):
         migration_config = config.migration

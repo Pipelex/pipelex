@@ -68,6 +68,8 @@ own page. Classes are grouped by subsystem.
 - [`PipeComposeError`](pipe-compose-error.md) — Pipe compose
 - [`PipeComposeFactoryError`](pipe-compose-factory-error.md) — Pipe compose factory
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
+- [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution
+- [`PipeFuncTransportError`](pipe-func-transport-error.md) — Pipe func transport
 - [`PipeImgGenFactoryError`](pipe-img-gen-factory-error.md) — Pipe img gen factory
 - [`PipeImgGenRunError`](pipe-img-gen-run-error.md) — Pipe img gen run
 - [`PipeLLMFactoryError`](pipe-llm-factory-error.md) — Pipe LLM factory

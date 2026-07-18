@@ -342,7 +342,10 @@ class LibraryManager(LibraryManagerAbstract):
                 if is_sandbox_hosted:
                     # Sandbox-hosted mode: never import/register the customer's PipeFunc bodies in this
                     # process. Capture every .py as source text (no import) so it can travel to the
-                    # sandbox, where it is registered and executed instead. Accumulate across dirs, but
+                    # sandbox, where it is registered and executed instead. No force-include here (unlike
+                    # the direct branch): the only force-included dir is pipelex's own builder package,
+                    # which must NOT travel in a customer crate — the sandbox has pipelex installed.
+                    # Accumulate across dirs, but
                     # fail loud on a relpath collision: the sandbox writes sources flat by relpath, so two
                     # dirs sharing a path would otherwise silently clobber one customer's code and run the
                     # wrong PipeFunc body.
