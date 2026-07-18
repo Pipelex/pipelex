@@ -1,6 +1,6 @@
-# PipeCompose construct: whole-stuff → native-field conversion fixes
+# PipeCompose construct: whole-stuff → native-field conversion fixes (archived plan)
 
-**Status: GREEN — CHECKPOINT 2 closed. Phases 1+2+3 complete: fix landed and verified (PR #1051 merged to `dev`, shipped in release v0.39.2). Remaining: Phase 4 cross-repo follow-ups — now DE-GATED since v0.39.2 ships the fix.**
+**Status: COMPLETE — all phases done. Phases 1+2+3: fix landed and verified (PR #1051 merged to `dev`, shipped in release v0.39.2). Phase 4 cross-repo follow-ups executed 2026-07-18. Archived from the repo-root `TODOS.md` tracker on completion. Related: [pr-1051-review-notes.md](pr-1051-review-notes.md) (deferred hardening notes from the PR's bot-review triage).**
 
 ## Cold-start state (as of Checkpoint 2, 2026-07-17)
 
@@ -110,7 +110,8 @@ All changes in `pipelex/pipe_operators/compose/structured_content_composer.py` (
 
 ### Phase 4 — cross-repo follow-ups (de-gated by v0.39.2)
 
-- [ ] `pipelex-plugins/skills/pipelex-design/references/writing-mthds.md` (source of truth; per-target copies under `pipelex-plugins/{pipelex,pipelex-vibe,pipelex-codex}/skills/...`): add a worked whole-stuff copy example to the PipeCompose construct section. Do NOT add a "from must reference a structured field" warning — that would enshrine the bug
-- [ ] `mthds-plugins/mthds-dev/skills/shared/mthds-reference.md`: same check — align the construct `from` description if needed
-- [ ] `mcp-demos/wip/pipe-compose-issue/README.md`: annotate §5/§8 — root cause was implementation gaps (fixed in pipelex <version>), not a language rule; the compose-based design the user abandoned is the recommended shape again
-- [ ] Optional (user-facing): the shipped `recruitment_screening` method (`mcp-demos/pipelex-wip/recruitment_screening/`) can revert to the generate → compose two-step design to restore the structural carry-over guarantee — Louis/user's call
+- [x] `pipelex-plugins/skills/pipelex-design/references/writing-mthds.md` (source of truth; per-target copies under `pipelex-plugins/{pipelex,pipelex-vibe,pipelex-codex}/skills/...`): added a worked whole-stuff copy example (ScreeningReport, mirroring the PipeCompose.md docs example) to the PipeCompose construct section; `make build` propagated to all target copies; no warning added
+- [x] `mthds-plugins/templates/skills/shared/mthds-reference.md.j2` (the generated per-target copies come from this template): construct `from` row now reads "Reference a whole input or a nested field" + a note on the whole-native-stuff → native-field automatic conversion; `make build` propagated to all target copies
+- [x] `mcp-demos/wip/pipe-compose-issue/README.md`: annotated — update banner at top, correction blockquote in §5, update blockquote in §8 with the stale takeaways marked inline; root cause = implementation gaps fixed in pipelex v0.39.2, compose-based design recommended again
+
+**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Edits uncommitted in `pipelex-plugins/`, `mthds-plugins/`, `mcp-demos/` (commit per-repo).
