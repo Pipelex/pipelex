@@ -1,9 +1,8 @@
 import json
 import socket
-from unittest.mock import MagicMock
 
 import pytest
-from pytest_mock import MockerFixture
+from pytest_mock import MockerFixture, MockType
 
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
@@ -43,9 +42,9 @@ def _make_main_stuff() -> Stuff:
     )
 
 
-def _make_output_mock(mocker: MockerFixture) -> MagicMock:
+def _make_output_mock(mocker: MockerFixture) -> MockType:
     """A PipeOutput stand-in with the usage fields defaulted to None, like a run with usage assembly off."""
-    mock_output: MagicMock = mocker.MagicMock()
+    mock_output: MockType = mocker.MagicMock()
     mock_output.tokens_usages = None
     mock_output.usage_assembly_error = None
     return mock_output

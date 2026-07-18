@@ -1,7 +1,6 @@
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
@@ -47,16 +46,16 @@ class TestGcpStorageProvider:
         from google.cloud import storage  # type: ignore[import-untyped]  # noqa: PLC0415
 
         # Create mock objects
-        mock_blob = MagicMock()
+        mock_blob = mocker.MagicMock()
         mock_blob.exists.return_value = True
         mock_blob.download_as_bytes.return_value = b""
-        mock_blob.upload_from_string = MagicMock()
+        mock_blob.upload_from_string = mocker.MagicMock()
         mock_blob.generate_signed_url.return_value = "https://storage.googleapis.com/signed-url"
 
-        mock_bucket = MagicMock()
+        mock_bucket = mocker.MagicMock()
         mock_bucket.blob.return_value = mock_blob
 
-        mock_client = MagicMock()
+        mock_client = mocker.MagicMock()
         mock_client.bucket.return_value = mock_bucket
 
         # Patch the Client.from_service_account_json method directly

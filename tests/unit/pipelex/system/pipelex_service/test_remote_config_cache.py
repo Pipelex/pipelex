@@ -23,9 +23,7 @@ from pipelex.system.pipelex_service.remote_config_cache import (
 )
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
-
-    from pytest_mock import MockerFixture
+    from pytest_mock import MockerFixture, MockType
 
 
 def _valid_remote_config_payload(extra: dict[str, object] | None = None) -> dict[str, object]:
@@ -87,7 +85,7 @@ class TestRemoteConfigCache:
     def test_read_corrupted_json_returns_none_and_logs(
         self,
         isolated_cache_dir: Path,
-        mock_log: MagicMock,
+        mock_log: MockType,
     ) -> None:
         cache_path = isolated_cache_dir / "cache" / "remote_config.json"
         cache_path.parent.mkdir(parents=True, exist_ok=True)
