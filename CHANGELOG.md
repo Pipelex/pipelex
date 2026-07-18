@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **Validation errors stay domain-qualified: every raise site that names a `pipe_code` now also carries `domain_code`.** The presentation chain (VS Code extension + mthds-ui) identifies pipes by full pipe ref (`domain_code.pipe_code`); a handful of `PipeValidationError` raise sites (PipeLLM static input checks, PipeStructure input-mismatch, the pipe sorter's circular-dependency error) omitted `domain_code`, degrading node decorations and click-to-navigate for those errors in multi-domain bundles. The sorter gains a `domain_code` parameter threaded from the bundle spec's domain.
+
 ## [v0.39.2] - 2026-07-17
 
 ### Added

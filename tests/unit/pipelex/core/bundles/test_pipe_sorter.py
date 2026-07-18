@@ -4,6 +4,7 @@ import pytest
 
 from pipelex.core.bundles.pipe_sorter import sort_pipes_by_dependencies
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
+from pipelex.core.pipes.exceptions import PipeValidationError
 from tests.unit.pipelex.core.bundles.test_data_pipe_sorter import PipeSorterTestCases
 
 
@@ -63,3 +64,12 @@ class TestSortPipesByDependencies:
             # For test cases with a specific expected order, verify exact match
             if expected_order is not None:
                 assert sorted_codes == expected_order, f"Test '{test_name}': Expected {expected_order}, got {sorted_codes}"
+
+    def test_circular_dependency_error_carries_domain_code(self):
+        """The cycle error must stay domain-qualified: `domain_code` rides alongside
+        `pipe_code` so the wire item can identify the pipe by full ref.
+        """
+        with pytest.raises(PipeValidationError) as exc_info:
+            sort_pipes_by_dependencies(PipeSorterTestCases.CIRCULAR_PIPES, domain_code="cycling_domain")
+        assert exc_info.value.pipe_code is not None
+        assert exc_info.value.domain_code == "cycling_domain"
