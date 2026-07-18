@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, cast
-from unittest.mock import MagicMock
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -14,6 +13,9 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture, MockType
 
 
 class TestConceptGenerateInputRepresentationJson:
@@ -197,75 +199,75 @@ class TestGenerateRunnerCode:
     """Test generate_runner_code function."""
 
     @pytest.fixture
-    def mock_pipe_single_output(self) -> MagicMock:
+    def mock_pipe_single_output(self, mocker: MockerFixture) -> MockType:
         """Create a mock pipe with a single output."""
         text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
         document_concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
 
-        mock_pipe = MagicMock()
+        mock_pipe: MockType = mocker.MagicMock()
         mock_pipe.code = "test_pipe"
         mock_pipe.output = StuffSpec(concept=text_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=document_concept)})
         return mock_pipe
 
     @pytest.fixture
-    def mock_pipe_list_output(self) -> MagicMock:
+    def mock_pipe_list_output(self, mocker: MockerFixture) -> MockType:
         """Create a mock pipe with a list output."""
         text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
         document_concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
 
-        mock_pipe = MagicMock()
+        mock_pipe: MockType = mocker.MagicMock()
         mock_pipe.code = "test_pipe_list"
         mock_pipe.output = StuffSpec(concept=text_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"documents": StuffSpec(concept=document_concept, multiplicity=True)})
         return mock_pipe
 
-    def test_runner_code_includes_imports(self, mock_pipe_single_output: MagicMock) -> None:
+    def test_runner_code_includes_imports(self, mock_pipe_single_output: MockType) -> None:
         """Test that generated runner code includes necessary imports."""
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert "import asyncio" in runner_code
         assert "from pipelex.pipelex import Pipelex" in runner_code
         assert "from pipelex.pipeline.runner import PipelexMTHDSProtocol" in runner_code
 
-    def test_runner_code_includes_structure_imports(self, mock_pipe_single_output: MagicMock) -> None:
+    def test_runner_code_includes_structure_imports(self, mock_pipe_single_output: MockType) -> None:
         """Test that generated runner code includes structure class imports."""
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert "from pipelex.core.stuffs.document_content import DocumentContent" in runner_code
         assert "from pipelex.core.stuffs.text_content import TextContent" in runner_code
 
-    def test_runner_code_single_output_return_type(self, mock_pipe_single_output: MagicMock) -> None:
+    def test_runner_code_single_output_return_type(self, mock_pipe_single_output: MockType) -> None:
         """Test that generated runner code has correct return type for single output."""
         runner_code = generate_runner_code(mock_pipe_single_output, output_multiplicity=False)
         assert "async def run_test_pipe() -> TextContent:" in runner_code
         assert "pipe_output.main_stuff_as(content_type=TextContent)" in runner_code
 
-    def test_runner_code_list_output_return_type(self, mock_pipe_list_output: MagicMock) -> None:
+    def test_runner_code_list_output_return_type(self, mock_pipe_list_output: MockType) -> None:
         """Test that generated runner code has correct return type for list output."""
         runner_code = generate_runner_code(mock_pipe_list_output, output_multiplicity=True)
         assert "async def run_test_pipe_list() -> list[TextContent]:" in runner_code
         assert "pipe_output.main_stuff_as_items(item_type=TextContent)" in runner_code
 
-    def test_runner_code_includes_inputs(self, mock_pipe_single_output: MagicMock) -> None:
+    def test_runner_code_includes_inputs(self, mock_pipe_single_output: MockType) -> None:
         """Test that generated runner code includes input values."""
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert '"document":' in runner_code
         assert '"concept": "native.Document"' in runner_code
         assert "DocumentContent(" in runner_code
 
-    def test_runner_code_includes_main_block(self, mock_pipe_single_output: MagicMock) -> None:
+    def test_runner_code_includes_main_block(self, mock_pipe_single_output: MockType) -> None:
         """Test that generated runner code includes main block."""
         runner_code = generate_runner_code(mock_pipe_single_output)
         assert 'if __name__ == "__main__":' in runner_code
         assert "Pipelex.make()" in runner_code
         assert "asyncio.run(run_test_pipe())" in runner_code
 
-    def test_runner_code_multiplicity_input(self, mock_pipe_list_output: MagicMock) -> None:
+    def test_runner_code_multiplicity_input(self, mock_pipe_list_output: MockType) -> None:
         """Test that generated runner code handles input multiplicity correctly."""
         runner_code = generate_runner_code(mock_pipe_list_output)
         # Should have list-wrapped content for multiplicity input
         assert "[DocumentContent(" in runner_code
 
-    def test_runner_code_custom_class_import_format(self) -> None:
+    def test_runner_code_custom_class_import_format(self, mocker: MockerFixture) -> None:
         """Custom classes import from the single-module types projection (structures/structures.py)."""
         # Create a custom concept (non-native)
         custom_concept = ConceptFactory.make(
@@ -276,7 +278,7 @@ class TestGenerateRunnerCode:
         )
         document_concept = ConceptFactory.make_native_concept(NativeConceptCode.DOCUMENT)
 
-        mock_pipe = MagicMock()
+        mock_pipe = mocker.MagicMock()
         mock_pipe.code = "custom_pipe"
         mock_pipe.output = StuffSpec(concept=custom_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"document": StuffSpec(concept=document_concept)})
@@ -286,7 +288,7 @@ class TestGenerateRunnerCode:
         assert "from structures.structures import CustomOutput" in runner_code
         assert "from .structures" not in runner_code
 
-    def test_runner_code_class_name_overrides_spell_emitted_names(self) -> None:
+    def test_runner_code_class_name_overrides_spell_emitted_names(self, mocker: MockerFixture) -> None:
         """The overrides map re-spells runtime-qualified class names to the emitted (bare) names."""
         custom_concept = ConceptFactory.make(
             domain_code="test_domain",
@@ -296,7 +298,7 @@ class TestGenerateRunnerCode:
         )
         text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
 
-        mock_pipe = MagicMock()
+        mock_pipe = mocker.MagicMock()
         mock_pipe.code = "custom_pipe"
         mock_pipe.output = StuffSpec(concept=custom_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"message": StuffSpec(concept=text_concept)})
@@ -307,12 +309,12 @@ class TestGenerateRunnerCode:
         assert "pipe_output.main_stuff_as(content_type=CustomOutput)" in runner_code
         assert "test_domain__CustomOutput" not in runner_code
 
-    def test_runner_code_anything_output_uses_any_return_type(self) -> None:
+    def test_runner_code_anything_output_uses_any_return_type(self, mocker: MockerFixture) -> None:
         """Test that Anything output concept uses Any return type and main_stuff instead of main_stuff_as."""
         anything_concept = ConceptFactory.make_native_concept(NativeConceptCode.ANYTHING)
         text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
 
-        mock_pipe = MagicMock()
+        mock_pipe = mocker.MagicMock()
         mock_pipe.code = "anything_output_pipe"
         mock_pipe.output = StuffSpec(concept=anything_concept)
         mock_pipe.inputs = InputStuffSpecs(root={"message": StuffSpec(concept=text_concept)})

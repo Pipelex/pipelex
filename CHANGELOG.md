@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Durable runs now persist token usage: the delivery executor writes a `tokens_usages.json` result artifact** (`{"tokens_usages": [...], "usage_assembly_error": null}`) alongside `working_memory.json`, the `main_stuff.*` renders, and the graph outputs. The records use the same per-record `model_dump(mode="json")` wire shape the `/execute` response carries on `pipe_output.tokens_usages` (token counts by category, `unit_costs` in $/1M, model id — for LLM, img-gen, extract, and search calls), so a client polling a durable run's result files can compute costs the same way a sync `/execute` caller does. The artifact is written unconditionally: a run with usage assembly off yields explicit nulls, distinguishable from a pre-artifact run (file absent).
+
 ### Fixed
 
 - **Validation errors stay domain-qualified: every raise site that names a `pipe_code` now also carries `domain_code`.** The presentation chain (VS Code extension + mthds-ui) identifies pipes by full pipe ref (`domain_code.pipe_code`); a handful of `PipeValidationError` raise sites (PipeLLM static input checks, PipeStructure input-mismatch, the pipe sorter's circular-dependency error) omitted `domain_code`, degrading node decorations and click-to-navigate for those errors in multi-domain bundles. The sorter gains a `domain_code` parameter threaded from the bundle spec's domain.

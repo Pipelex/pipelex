@@ -22,9 +22,7 @@ from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
-
-    from pytest_mock import MockerFixture
+    from pytest_mock import MockerFixture, MockType
 
 MODULE = "pipelex.cli.commands.resolve_cmd"
 # The load/normalize/library-manager seams now live in the shared crate-loading helper, so the
@@ -35,7 +33,7 @@ CRATE_LOADING = "pipelex.cli.commands.crate_loading"
 class TestResolveExitCodes:
     """The resolve 0/1/2 exit-code policy, with boot/teardown mocked out."""
 
-    def _neutralize_boot(self, mocker: MockerFixture) -> MagicMock:
+    def _neutralize_boot(self, mocker: MockerFixture) -> MockType:
         boot = mocker.patch(f"{MODULE}.make_pipelex_for_cli")
         mocker.patch(f"{MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{MODULE}.tag")

@@ -25,9 +25,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 
 if TYPE_CHECKING:
-    from unittest.mock import MagicMock
-
-    from pytest_mock import MockerFixture
+    from pytest_mock import MockerFixture, MockType
 
 TYPES = "pipelex.cli.commands.codegen.types_cmd"
 INPUTS = "pipelex.cli.commands.codegen.inputs_cmd"
@@ -36,7 +34,7 @@ INPUTS = "pipelex.cli.commands.codegen.inputs_cmd"
 class TestCodegenCli:
     """The two Phase-1 codegen commands, with boot/teardown and the crate loader mocked out."""
 
-    def _neutralize_boot(self, mocker: MockerFixture, *, module: str) -> MagicMock:
+    def _neutralize_boot(self, mocker: MockerFixture, *, module: str) -> MockType:
         boot = mocker.patch(f"{module}.make_pipelex_for_cli")
         mocker.patch(f"{module}.Pipelex.teardown_if_needed")
         mocker.patch(f"{module}.tag")
