@@ -1,4 +1,6 @@
+import json
 import socket
+from unittest.mock import MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
@@ -6,6 +8,9 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import ErrorDomain, ErrorReport
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.cogt.llm.llm_report import LLMTokensUsage
+from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
@@ -20,6 +25,7 @@ from pipelex.pipe_run.delivery_assignment import (
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 
 
@@ -37,6 +43,14 @@ def _make_main_stuff() -> Stuff:
     )
 
 
+def _make_output_mock(mocker: MockerFixture) -> MagicMock:
+    """A PipeOutput stand-in with the usage fields defaulted to None, like a run with usage assembly off."""
+    mock_output: MagicMock = mocker.MagicMock()
+    mock_output.tokens_usages = None
+    mock_output.usage_assembly_error = None
+    return mock_output
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestDeliveryExecutor:
     async def test_execute_storage_only(self, mocker: MockerFixture) -> None:
@@ -45,7 +59,7 @@ class TestDeliveryExecutor:
         mock_storage.public_url = mocker.Mock(return_value="file:///tmp/results/plr-123")
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
@@ -69,6 +83,7 @@ class TestDeliveryExecutor:
         assert any("test-user/plr-123/main_stuff.json" in key for key in stored_keys)
         assert any("test-user/plr-123/main_stuff.md" in key for key in stored_keys)
         assert any("test-user/plr-123/main_stuff.html" in key for key in stored_keys)
+        assert any("test-user/plr-123/tokens_usages.json" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()
@@ -163,7 +178,7 @@ class TestDeliveryExecutor:
         mock_storage.store = mocker.AsyncMock(side_effect=Exception("S3 down"))
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {}
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
@@ -185,7 +200,7 @@ class TestDeliveryExecutor:
         """A completed run always resolves its declared output — a typed working memory with neither
         a main stuff nor a recorded absence is a contract violation, not an empty envelope.
         """
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
         mock_output.working_memory = WorkingMemory()
         mock_output.graph_spec = None
@@ -195,7 +210,7 @@ class TestDeliveryExecutor:
 
     async def test_generate_result_files_raises_without_main_stuff_raw(self, mocker: MockerFixture) -> None:
         """Same contract on the raw (cross-process) path: neither a raw main stuff nor a recorded absence fails loudly."""
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = {"root": {}, "aliases": {}}
         mock_output.graph_spec = None
 
@@ -215,7 +230,7 @@ class TestDeliveryExecutor:
                 producing_pipe="check_penalty_clause",
             ),
         )
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
         mock_output.working_memory = working_memory
         mock_output.graph_spec = None
@@ -236,7 +251,7 @@ class TestDeliveryExecutor:
         """Same on the raw (cross-process) path: a recorded main absence in the raw ledger delivers
         the absence artifact instead of the contract-violation error.
         """
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = {
             "root": {},
             "aliases": {},
@@ -260,6 +275,70 @@ class TestDeliveryExecutor:
         md_text = files["main_stuff.md"].data.decode("utf-8")
         assert "summarize_penalty" in md_text
         assert "main_stuff.html" in files
+
+    async def test_generate_result_files_writes_usage_artifact_with_records(self, mocker: MockerFixture) -> None:
+        """The tokens_usages.json artifact carries the run's usage records in the same
+        per-record ``model_dump(mode="json")`` wire shape the /execute response uses, so a
+        durable client can compute costs from the polled result files alone.
+        """
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+        mock_output.tokens_usages = [
+            LLMTokensUsage(
+                job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="plr-usage"),
+                inference_model_name="test-model",
+                inference_model_id="test-model-id",
+                nb_tokens_by_category={TokenCategory.INPUT: 15, TokenCategory.OUTPUT: 4},
+                unit_costs={CostCategory.INPUT: 3.0, CostCategory.OUTPUT: 15.0},
+            )
+        ]
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        assert files["tokens_usages.json"].content_type == "application/json"
+        usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
+        assert usage_doc["usage_assembly_error"] is None
+        records = usage_doc["tokens_usages"]
+        assert len(records) == 1
+        record = records[0]
+        assert record["model_type"] == "llm"
+        assert record["inference_model_name"] == "test-model"
+        assert record["inference_model_id"] == "test-model-id"
+        assert record["nb_tokens_by_category"] == {"input": 15, "output": 4}
+        assert record["unit_costs"] == {"input": 3.0, "output": 15.0}
+
+    async def test_generate_result_files_usage_artifact_null_when_usage_off(self, mocker: MockerFixture) -> None:
+        """A run with usage assembly off still writes the artifact with explicit nulls, so a
+        durable client can tell "usage off for this run" (file present, null) from "run
+        delivered before the artifact existed" (file absent).
+        """
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
+        assert usage_doc == {"tokens_usages": None, "usage_assembly_error": None}
+
+    async def test_generate_result_files_usage_artifact_carries_assembly_error(self, mocker: MockerFixture) -> None:
+        """A failed usage assembly surfaces on the artifact instead of silently reading as "usage off"."""
+        mock_output = _make_output_mock(mocker)
+        mock_output.working_memory_raw = None
+        mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
+        mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
+        mock_output.graph_spec = None
+        mock_output.usage_assembly_error = "usage event read failed"
+
+        files = await DeliveryExecutor().generate_result_files(mock_output)
+
+        usage_doc = json.loads(files["tokens_usages.json"].data.decode("utf-8"))
+        assert usage_doc == {"tokens_usages": None, "usage_assembly_error": "usage event read failed"}
 
     async def test_try_local_hydrate_stuff_returns_typed_for_builtin(self) -> None:
         from pipelex.core.stuffs.text_content import TextContent  # noqa: PLC0415
@@ -329,7 +408,7 @@ class TestDeliveryExecutor:
         "</pre><script>..." would break out of the <pre> wrapper and execute
         as live HTML when the stored result file is fetched.
         """
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = {
             "root": {
                 "main_stuff": {
@@ -387,7 +466,7 @@ class TestDeliveryExecutor:
             ),
         )
 
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = {
             "root": {
                 "cv_pages": {
@@ -527,7 +606,7 @@ class TestDeliveryExecutor:
         mock_storage.store = mocker.AsyncMock(return_value="pipelex-storage://test-key")
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
-        mock_output = mocker.MagicMock()
+        mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
         mock_output.working_memory.smart_dump.return_value = {"root": {}, "aliases": {}}
         mock_output.working_memory.resolve_main_stuff.return_value = _make_main_stuff()
