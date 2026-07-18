@@ -75,6 +75,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=the_single_input.concept.concept_ref,
             )

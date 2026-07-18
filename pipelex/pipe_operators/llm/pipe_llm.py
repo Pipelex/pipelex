@@ -76,6 +76,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[input_name],
                     explanation=f"Input '{input_name}' is declared in inputs but not referenced in prompt/system_prompt.",
@@ -88,6 +89,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+                    domain_code=self.domain_code,
                     pipe_code=self.code,
                     variable_names=[variable_path],
                     explanation=f"Variable '{variable_path}' is used in prompt/system_prompt but not declared in inputs.",
@@ -138,6 +140,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
             )
