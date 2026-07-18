@@ -108,6 +108,18 @@ output = "Text"
 prompt = "Write a greeting for $name who lives in $city."
 """
 
+_EXTRANEOUS_INPUT_MTHDS = """
+domain = "structured_extraneous_input"
+main_pipe = "greet_person"
+
+[pipe.greet_person]
+type = "PipeLLM"
+description = "Greeting that declares an input the prompt never uses."
+inputs = { name = "Text", unused_thing = "Text" }
+output = "Text"
+prompt = "Write a greeting for $name."
+"""
+
 _CONCEPT_OWNED_UNRESOLVED_MTHDS = """
 domain = "structured_concept_owned"
 main_pipe = "use_wrapper"
@@ -246,3 +258,27 @@ class TestValidateBundleStructuredErrors:
         assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
         assert item.pipe_code == "greet_person"
         assert item.variable_names == ["city"]
+
+    async def test_pipe_channel_items_stay_domain_qualified(
+        self,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """Every item that carries a `pipe_code` must carry `domain_code` too — the
+        presentation chain identifies pipes by full ref (`domain_code.pipe_code`), so a
+        bare-code item degrades node decorations and click-to-navigate downstream. Pins
+        the report-wide invariant on an extraneous-input bundle (surfaced here by the
+        blueprint categorizer; the operator-raised `PipeValidationError` sites that used
+        to omit `domain_code` are fixed at their raise sites and pinned by the pipe-sorter
+        unit test).
+        """
+        load_empty_library()
+        items = await _validation_errors_for(_EXTRANEOUS_INPUT_MTHDS)
+        extraneous_items = [item for item in items if item.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE]
+        assert extraneous_items, f"Expected an extraneous_input_variable item, got {[(i.category, i.error_type) for i in items]}"
+        item = extraneous_items[0]
+        assert item.pipe_code == "greet_person"
+        assert item.domain_code == "structured_extraneous_input"
+        # The invariant holds across the whole report, not just the pinned channel.
+        for reported in items:
+            if reported.pipe_code is not None:
+                assert reported.domain_code is not None, f"item {reported.error_type} carries pipe_code without domain_code"

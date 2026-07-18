@@ -124,6 +124,34 @@ output           = "PersonSummary[]"
 branch_pipe_code = "summarize_person"
 input_list_name  = "people"
 input_item_name  = "person"
+
+[pipe.summarize_person]
+type = "PipeSequence"
+description = "Summarize one person"
+inputs = { person = "Person" }
+output = "PersonSummary"
+steps = [
+    { pipe = "write_persona", result = "persona" },
+    { pipe = "assemble_summary", result = "summary_row" },
+]
+
+[pipe.write_persona]
+type = "PipeLLM"
+description = "Write a one-sentence persona for the person"
+inputs = { person = "Person" }
+output = "Text"
+prompt = "Write a one-sentence persona summary for $person."
+
+[pipe.assemble_summary]
+type = "PipeCompose"
+description = "Assemble the summary row from selected input fields plus the persona sentence"
+inputs = { person = "Person", persona = "Text" }
+output = "PersonSummary"
+
+[pipe.assemble_summary.construct]
+name    = { from = "person.name" }
+country = { from = "person.country" }
+summary = { from = "persona" }
 ```
 
 ```bash

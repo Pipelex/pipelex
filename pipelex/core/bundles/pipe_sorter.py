@@ -6,6 +6,8 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 
 def sort_pipes_by_dependencies(
     pipes: dict[str, PipeBlueprintUnion],
+    *,
+    domain_code: str | None = None,
 ) -> list[tuple[str, PipeBlueprintUnion]]:
     """Sort pipes by their dependencies using depth-first pre-order traversal.
 
@@ -15,6 +17,8 @@ def sort_pipes_by_dependencies(
 
     Args:
         pipes: Dictionary mapping pipe_code to PipeBlueprintUnion
+        domain_code: Declaring domain of the bundle, carried onto the
+            circular-dependency error so the wire item stays domain-qualified
 
     Returns:
         List of (pipe_code, pipe_blueprint) tuples sorted with controllers before dependencies.
@@ -50,7 +54,12 @@ def sort_pipes_by_dependencies(
             return
         if pipe_code in visiting:
             msg = f"Circular dependency detected involving pipe: {pipe_code}"
-            raise PipeValidationError(message=msg, pipe_code=pipe_code, error_type=PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR)
+            raise PipeValidationError(
+                message=msg,
+                domain_code=domain_code,
+                pipe_code=pipe_code,
+                error_type=PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR,
+            )
         if pipe_code not in pipes:
             # Dependency not in this bundle, skip it
             return

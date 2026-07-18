@@ -21,14 +21,14 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
 -   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
--   [**`PipeCompose`**](./PipeCompose.md): Renders a Jinja2 template using data from the working memory, perfect for creating formatted reports or complex prompts.
+-   [**`PipeCompose`**](./PipeCompose.md): Composes outputs deterministically from working memory — renders Jinja2 templates for formatted reports or complex prompts, or constructs structured objects by mapping fields from inputs, without an LLM.
 
 ## Overview
 
 Pipelex provides the following pipe operators:
 
 - `PipeLLM`: For LLM-based text generation and processing
-- `PipeCompose`: For rendering Jinja2 templates from working memory data
+- `PipeCompose`: For composing text (Jinja2 templates) or structured objects (construct mode) from working memory data
 - `PipeExtract`: For optical character recognition and document processing
 - `PipeFunc`: For executing custom functions
 - `PipeImgGen`: For AI-powered image generation
@@ -46,6 +46,17 @@ Core operator for LLM-based text generation and processing.
 - Multiple output modes
 - System prompt customization
 - LLM configuration
+
+## PipeCompose
+
+Composes outputs deterministically from working memory, without an LLM.
+
+### Key Features
+
+- Template mode: Jinja2 rendering to Text or Html outputs
+- Construct mode: structured objects assembled by field mapping
+- Field methods: references, templates, fixed values, nested constructs
+- Native wrapper unwrapping when copying whole inputs into native fields
 
 ## PipeExtract
 

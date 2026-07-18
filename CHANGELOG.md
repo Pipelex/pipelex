@@ -2,16 +2,22 @@
 
 ## [Unreleased]
 
-### Added
-
-- **`LibraryManagerAbstract.is_crate_loaded(*, library_id, fingerprint)`** — public query over the per-library crate-fingerprint bookkeeping that already backs `load_from_crate`'s idempotency. A `True` answer means the library's ClassRegistry holds the crate's dynamic classes, so callers (e.g. `pipelex-transport`'s `scoped_library_for_crate`) can hydrate within an existing scope instead of opening a fresh one — preserving dynamic-class identity with instances that scope already produced. This is the core half of the fix for the PipeParallel same-concept combine failing over Temporal with `expected X, got X` pydantic model-type errors.
-
 ### Fixed
 
+- **Validation errors stay domain-qualified: every raise site that names a `pipe_code` now also carries `domain_code`.** The presentation chain (VS Code extension + mthds-ui) identifies pipes by full pipe ref (`domain_code.pipe_code`); a handful of `PipeValidationError` raise sites (PipeLLM static input checks, PipeStructure input-mismatch, the pipe sorter's circular-dependency error) omitted `domain_code`, degrading node decorations and click-to-navigate for those errors in multi-domain bundles. The sorter gains a `domain_code` parameter threaded from the bundle spec's domain.
 - **Hosted PipeFunc dry runs now honor output multiplicity.** In sandbox-hosted mode a PipeFunc with a multiplicity output (e.g. `Foo[]`) mocked a single scalar item because the function annotation is unavailable in-process; downstream pipes expecting a list (e.g. `batch_over`) then failed the dry-run/`/validate` of a perfectly valid method. The mock now takes its shape from the declared output multiplicity.
 - **`get_optional_config()` honors its non-raising contract before any hub exists.** It used to raise `RuntimeError: PipelexHub is not initialized` when no hub had been created at all, which broke the documented safe pre-boot path — e.g. constructing a `PipeFunc` in an isolated unit test crashed instead of defaulting to the `direct` execution mode.
 - **PipeFunc transport hardening:** the wire contract now rejects a non-finite `timeout_seconds` (`float("inf")` used to disable the runaway-code guard entirely), and the transported executor removes its materialized source workdir on every path (success, timeout, failure) instead of leaking a temp directory per invocation.
 - **Error reference pages generated for the PipeFunc transport errors** (`PipeFuncTransportError`, `PipeFuncExecutionError`, `DuplicatePipeFuncExecutorError`, `UnknownPipeFuncExecutionModeError`) — their `type_uri`s previously dereferenced to 404s.
+
+## [v0.39.2] - 2026-07-17
+
+### Added
+
+- **`LibraryManagerAbstract.is_crate_loaded(*, library_id, fingerprint)`** — public query over the per-library crate-fingerprint bookkeeping that already backs `load_from_crate`'s idempotency. A `True` answer means the library's ClassRegistry holds the crate's dynamic classes, so callers can hydrate within an existing scope instead of opening a fresh one — preserving dynamic-class identity with instances that scope already produced. This is the core half of the fix for the PipeParallel same-concept combine failing over Temporal with `expected X, got X` pydantic model-type errors.
+
+### Fixed
+
 - **PipeCompose construct: whole-stuff copies into native fields now convert in every promised case.** `{ from = "..." }` referencing a whole native stuff used to hand the content wrapper (`TextContent`, `ListContent`, ...) to the composed field in several cases, failing the dry-run runnable gate on correct methods. Three gaps fixed: optional (non-required) fields never converted (the `Optional[X]` annotation defeated the type detection), list-of-text targets dumped each item as a `{"text": ...}` dict instead of extracting the string, and scalar wrappers other than `Text` were not handled at all. The conversion matrix now covers `Text → text`, `Number → number`, `YesNo → boolean`, and `Date → date`, for both required and optional target fields, scalar and list-item positions — including nullable list items (`list[str | None]`), which normalize like their non-nullable counterparts. Unconvertible list items now raise a clear `StructuredContentComposerTypeError` instead of surfacing as a cryptic pydantic error downstream. One fidelity guard: copying a `Date` that carries a time of day into a bare `date` field raises instead of silently dropping the time and its UTC offset (breaking: this case previously truncated silently).
 
 ## [v0.39.1] - 2026-07-15

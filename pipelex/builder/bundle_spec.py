@@ -143,7 +143,7 @@ class PipelexBundleSpec(StructuredContent):
                     raise PipelexBundleSpecBlueprintError(msg) from exc
 
             # Then, sort blueprints by dependencies
-            sorted_pipe_items = sort_pipes_by_dependencies(pipe_blueprints)
+            sorted_pipe_items = sort_pipes_by_dependencies(pipe_blueprints, domain_code=self.domain)
             # Finally, create the ordered dict
             pipe = dict[str, PipeBlueprintUnion](sorted_pipe_items)
 
