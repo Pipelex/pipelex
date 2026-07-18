@@ -43,7 +43,7 @@ Operators perform concrete actions:
 - **PipeExtract** - Extract content from documents (OCR, parsing)
 - **PipeImgGen** - Generate images
 - **PipeFunc** - Execute custom Python functions
-- **PipeCompose** - Compose content from templates
+- **PipeCompose** - Compose content from templates or construct structured objects
 - **PipeSearch** - Search the web for information
 
 ### Core Domain
