@@ -6,6 +6,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 
 def sort_pipes_by_dependencies(
     pipes: dict[str, PipeBlueprintUnion],
+    *,
     domain_code: str | None = None,
 ) -> list[tuple[str, PipeBlueprintUnion]]:
     """Sort pipes by their dependencies using depth-first pre-order traversal.
