@@ -1,10 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.39.2] - 2026-07-17
 
 ### Added
 
-- **`LibraryManagerAbstract.is_crate_loaded(*, library_id, fingerprint)`** — public query over the per-library crate-fingerprint bookkeeping that already backs `load_from_crate`'s idempotency. A `True` answer means the library's ClassRegistry holds the crate's dynamic classes, so callers (e.g. `pipelex-transport`'s `scoped_library_for_crate`) can hydrate within an existing scope instead of opening a fresh one — preserving dynamic-class identity with instances that scope already produced. This is the core half of the fix for the PipeParallel same-concept combine failing over Temporal with `expected X, got X` pydantic model-type errors.
+- **`LibraryManagerAbstract.is_crate_loaded(*, library_id, fingerprint)`** — public query over the per-library crate-fingerprint bookkeeping that already backs `load_from_crate`'s idempotency. A `True` answer means the library's ClassRegistry holds the crate's dynamic classes, so callers can hydrate within an existing scope instead of opening a fresh one — preserving dynamic-class identity with instances that scope already produced. This is the core half of the fix for the PipeParallel same-concept combine failing over Temporal with `expected X, got X` pydantic model-type errors.
 
 ### Fixed
 
