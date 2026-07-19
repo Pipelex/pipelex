@@ -2,7 +2,7 @@ contract = "config-docs"
 digest = "sha256:5edb794b698cc0513be0e904c3a2f82a1a7ff470e86d05df5e710dd30368ee25"
 reviewed_by = "Claude (Fable 5)"
 reviewed_at = "2026-07-16T09:45:00Z"
-rationale = "Trigger diff is comment-only wording in pipelex.toml + pipe_func_config.py: removed the stale claim of a core 'local_sandbox' execution mode (nobody registers it; core ships only 'direct', our Daytona plugin ships 'daytona') and switched plugin mentions to the 'our Daytona sandbox plugin' style. No field, type, or default changed. Reviewed docs/configuration: pipe_func_config still deliberately has no page (like its internal siblings), library-config.md's @pipe_func registration prose is unaffected, and no configuration doc mentions local_sandbox — nothing to update."
+rationale = "Trigger diff: configs.py wires the new pipe_func section onto the main config model (PipeFuncConfig import + pipe_func_config field on Pipelex), plus comment-only wording in pipelex.toml + pipe_func_config.py: removed the stale claim of a core 'local_sandbox' execution mode (nobody registers it; core ships only 'direct', our Daytona plugin ships 'daytona') and switched plugin mentions to the 'our Daytona sandbox plugin' style. No default changed. Reviewed docs/configuration: pipe_func_config (incl. its new attachment on the root model) deliberately has no page, like its internal siblings; library-config.md's @pipe_func registration prose is unaffected; no configuration doc mentions local_sandbox — nothing to update. (Rationale amended 2026-07-17: the original wrongly described the trigger diff as comment-only, omitting the configs.py field wiring; the reviewed conclusion is unchanged.)"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:fca7b96f9147122b6b8300471cac637b05fed1ee"

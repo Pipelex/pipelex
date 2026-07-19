@@ -1,6 +1,6 @@
-# PipeCompose construct: whole-stuff → native-field conversion fixes
+# PipeCompose construct: whole-stuff → native-field conversion fixes (archived plan)
 
-**Status: GREEN — CHECKPOINT 2 reached (2026-07-17). Phases 1+2+3 complete: fix landed and verified, docs + changelog written. Remaining: Phase 4 cross-repo follow-ups, release-gated — do NOT do them before a pipelex release ships the fix.**
+**Status: COMPLETE — all phases done. Phases 1+2+3: fix landed and verified (PR #1051 merged to `dev`, shipped in release v0.39.2). Phase 4 cross-repo follow-ups executed 2026-07-18. Archived from the repo-root `TODOS.md` tracker on completion. Related: [pr-1051-review-notes.md](pr-1051-review-notes.md) (deferred hardening notes from the PR's bot-review triage).**
 
 ## Cold-start state (as of Checkpoint 2, 2026-07-17)
 
@@ -20,7 +20,7 @@
 
 A user designing a method with `/pipelex-design` used PipeCompose construct mode to copy whole native stuffs into native-typed fields of a structured output — `rejection_email = { from = "email" }` where `email` is a whole `Text` stuff, and `interview_questions = { from = "questions" }` where `questions` is a whole `Text[5]` stuff. Structural validation accepted it; the dry-run runnable gate rejected it because the composed field received the content wrapper object (`TextContent`, `ListContent[...]`) instead of the native value (`str`, `list[str]`). The user's usage was correct: the PipeCompose reference (`docs/building-methods/pipes/pipe-operators/PipeCompose.md`, "Copy value from input variable or nested field") and the composer's own design (`_resolve_from_var` docstring: "TextContent -> str: extract .text", "ListContent -> list[X]: extract items") both promise exactly this conversion. The implementation has gaps. **Verdict: fix pipelex, do not change the language or warn users off the pattern.**
 
-Full analysis with the user's original bundle and reasoning: `/Users/lchoquel/repos/Pipelex/mcp-demos/wip/pipe-compose-issue/README.md` (+ runnable repro under `repro/`). Note: that README's §5/§8 conclude "whole-stuff `from` hands over the wrapper **by design**" — that is a misdiagnosis of these bugs as a language rule; this plan is the correction.
+Full analysis with the user's original bundle and reasoning: `../mcp-demos/wip/pipe-compose-issue/README.md` (workspace sibling repo; + runnable repro under `repro/`). Note: that README's §5/§8 conclude "whole-stuff `from` hands over the wrapper **by design**" — that is a misdiagnosis of these bugs as a language rule; this plan is the correction.
 
 ## Diagnosis — three gaps, all in `pipelex/pipe_operators/compose/structured_content_composer.py`
 
@@ -30,9 +30,9 @@ All verified empirically against the dev tree (v0.39.1 era, branch `dev`):
 2. **List items that are native scalars are not extracted.** Even with a required `list`/`item_type = "text"` target (`List[str]`), `_convert_list_items_as_dicts` (`:501`) dumps each `TextContent` item as a dict `{"text": "..."}` via `model_dump` instead of extracting `.text` → `questions.N: string_type` pydantic errors. Related: `_validate_item_compatibility` (`:555`) silently no-ops when the expected item type has no `model_validate` (e.g. `str`), so the mismatch surfaces as a confusing downstream pydantic error rather than a clear conversion error.
 3. **Scalar wrappers other than `TextContent` are not handled at all.** `_convert_for_target_type` (`:298`) special-cases only `TextContent` and `ListContent`. A whole `Number` stuff into a required `number` field fails with `NumberContent (expected float)`. Same family presumably applies to `YesNo` → `boolean` and `Date` → `date` fields.
 
-Reference matrix of what works vs. breaks today (from the repro):
+Reference matrix of what worked vs. broke PRE-FIX (v0.39.1 behavior, from the repro — every ❌ row is green since the fix):
 
-| Construct source | Target field | Today |
+| Construct source | Target field | Pre-fix (v0.39.1) |
 |---|---|---|
 | `{ from = "score.candidate_name" }` (dotted path to scalar leaf) | any matching native | ✅ works (raw Python value, skips conversion) |
 | literal (`is_fit = true`) | matching native | ✅ works |
@@ -46,7 +46,7 @@ Reference matrix of what works vs. breaks today (from the repro):
 
 - `tests/e2e/test_pipe_compose_whole_stuff_mthds.py` — one dry-run test (`validate_bundle` must pass the runnable gate on every pipe) + one parametrized live test (deterministic PipeCompose execution, no inference, asserts composed values AND exact native types).
 - Fixture bundle: `tests/e2e/fixtures/compose_whole_stuff/compose_whole_stuff.mthds` — one holder concept + one compose pipe per row of the matrix above.
-- Current state: `whole_text_to_required_text_field` (control) passes; the dry-run test and the other live cases fail with the wrapper-mismatch errors quoted in the diagnosis.
+- Pre-fix state (red): `whole_text_to_required_text_field` (control) passed; the dry-run test and the other live cases failed with the wrapper-mismatch errors quoted in the diagnosis. All green since Phase 1 landed.
 - Run it: `.venv/bin/pytest -n auto -m "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api" -o log_level=WARNING --tb=short -q tests/e2e/test_pipe_compose_whole_stuff_mthds.py`
 
 ## Fix design
@@ -106,11 +106,12 @@ All changes in `pipelex/pipe_operators/compose/structured_content_composer.py` (
 - [x] `CHANGELOG.md` `[Unreleased]` → Fixed: PipeCompose construct `{ from = "..." }` now converts whole native stuffs into optional native fields, native-scalar list items, and non-Text scalar wrappers (Number/YesNo/…)
 - [x] Grep `docs/` for other PipeCompose construct mentions that describe or constrain `from` semantics; align them (no other page describes construct `from`; error pages are generated boilerplate — nothing to change)
 
-**CHECKPOINT 2 — ready for PR.** Commit, run the pre-push gates, open PR to `dev`. The cross-repo items below are release-gated — do NOT do them before a pipelex release ships the fix.
+**CHECKPOINT 2 — ✅ CLOSED.** Committed, gates passed, PR #1051 merged to `dev`; the fix shipped in release v0.39.2.
 
-### Phase 4 — cross-repo follow-ups (release-gated)
+### Phase 4 — cross-repo follow-ups (de-gated by v0.39.2)
 
-- [ ] `pipelex-plugins/skills/pipelex-design/references/writing-mthds.md` (source of truth; per-target copies under `pipelex-plugins/{pipelex,pipelex-vibe,pipelex-codex}/skills/...`): add a worked whole-stuff copy example to the PipeCompose construct section. Do NOT add a "from must reference a structured field" warning — that would enshrine the bug
-- [ ] `mthds-plugins/mthds-dev/skills/shared/mthds-reference.md`: same check — align the construct `from` description if needed
-- [ ] `mcp-demos/wip/pipe-compose-issue/README.md`: annotate §5/§8 — root cause was implementation gaps (fixed in pipelex <version>), not a language rule; the compose-based design the user abandoned is the recommended shape again
-- [ ] Optional (user-facing): the shipped `recruitment_screening` method (`mcp-demos/pipelex-wip/recruitment_screening/`) can revert to the generate → compose two-step design to restore the structural carry-over guarantee — Louis/user's call
+- [x] `pipelex-plugins/skills/pipelex-design/references/writing-mthds.md` (source of truth; per-target copies under `pipelex-plugins/{pipelex,pipelex-vibe,pipelex-codex}/skills/...`): added a worked whole-stuff copy example (ScreeningReport, mirroring the PipeCompose.md docs example) to the PipeCompose construct section; `make build` propagated to all target copies; no warning added
+- [x] `mthds-plugins/templates/skills/shared/mthds-reference.md.j2` (the generated per-target copies come from this template): construct `from` row now reads "Reference a whole input or a nested field" + a note on the whole-native-stuff → native-field automatic conversion; `make build` propagated to all target copies
+- [x] `mcp-demos/wip/pipe-compose-issue/README.md`: annotated — update banner at top, correction blockquote in §5, update blockquote in §8 with the stale takeaways marked inline; root cause = implementation gaps fixed in pipelex v0.39.2, compose-based design recommended again
+
+**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Committed per-repo: `pipelex-plugins` 2f97d2d, `mthds-plugins` 4e6288c, `mcp-demos` d422861.

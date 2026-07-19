@@ -284,7 +284,11 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             return_type = hinted_return_type
 
-        # TODO: Support PipeFunc returning with multiplicity. Create an equivalent of TypedNamedInputRequirement for outputs.
+        # Without an annotation (hosted mode), `return_type` is the ITEM structure class, so the
+        # declared output multiplicity decides the mock's shape; with a live annotation the return
+        # type itself already carries the list-ness (`ListContent[...]`), so wrapping again would
+        # double-nest.
+        mock_multiplicity = (self.output.multiplicity or False) if function is None else False
         stuff_spec = TypedNamedStuffSpec(
             variable_name="mock_output",
             concept=ConceptFactory.make(
@@ -294,9 +298,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 structure_class_name=self.output.concept.structure_class_name,
             ),
             structure_class=return_type,
-            multiplicity=False,
+            multiplicity=mock_multiplicity,
         )
-        mock_content = WorkingMemoryFactory.make_mock_content(stuff_spec)
+        mock_content = WorkingMemoryFactory.make_mock_stuff(stuff_spec).content
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

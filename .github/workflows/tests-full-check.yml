@@ -1,16 +1,14 @@
 name: Tests full (pre-main gate)
 
-# The full Python matrix. Feature PRs (to dev) run the floor version only,
-# sharded, in `tests-check.yml`; this is the gate on PRs targeting main (the
-# release PRs, dev -> main) where every supported version gets exercised.
+# The full Python matrix, sharded. Feature PRs (to dev) run the floor version
+# only, sharded, in `tests-check.yml`; this is the gate on PRs targeting main
+# (the release PRs, dev -> main) where every supported version gets exercised.
 #
-# Why not on every PR: the suite is CPU-bound pytest per version, so a
-# 4-version matrix on every push of every feature PR was the bulk of the CI
-# bill, for a signal that almost never differs between versions. Running it as
-# a release gate means no version-specific break can reach main, without paying
-# it on day-to-day feature work.
-#
-# Same shape as `lint-fresh-check.yml`: fast on feature PRs, definitive before main.
+# Sharded across free GitHub-hosted runners: 4 versions x 8 shards = 32 jobs,
+# balanced by the committed .test_durations file, all in parallel. Wall clock
+# ~4 min (faster than the old 8-core Azure box) at zero cost. The single
+# required check is the aggregator `Tests full (all)` — so shard count or
+# Python versions can change without ever touching the branch ruleset.
 
 on:
   pull_request:
@@ -28,19 +26,17 @@ concurrency:
 
 jobs:
   matrix-test-full:
-    name: Tests full (py${{ matrix.python-version }})
-    runs-on: [aca-runner-test]
+    name: Tests full (py${{ matrix.python-version }}, shard ${{ matrix.group }}/8)
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
-    permissions:
-      contents: read
-      id-token: write
+        group: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
-      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}
+      PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}-shard${{ matrix.group }}
     steps:
       # On a pull_request this checks out the merge ref (dev merged into main),
       # which is exactly what must be gated. workflow_dispatch can override.
@@ -48,14 +44,17 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.sha }}
 
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
-      - name: Boot test
-        run: make tp TEST=TestFundamentals
-
-      - name: Run tests
-        run: make gha-tests
+      - name: Run tests (py${{ matrix.python-version }}, shard ${{ matrix.group }}/8)
+        run: SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
 
       - name: Show hang dumps
         if: failure()
@@ -69,3 +68,22 @@ jobs:
           else
             echo "No hang dumps were produced."
           fi
+
+# --------------------------------------------------------------------------
+#  Aggregator — the single required status check for the full-matrix gate.
+#  Green only if all 32 shards across all 4 versions pass.
+# --------------------------------------------------------------------------
+  tests-full-all:
+    name: Tests full (all)
+    runs-on: ubuntu-latest
+    needs: [matrix-test-full]
+    if: always()
+
+    steps:
+      - name: Fail unless every version and shard passed
+        run: |
+          if [ "${{ needs.matrix-test-full.result }}" != "success" ]; then
+            echo "::error::At least one full-matrix shard failed."
+            exit 1
+          fi
+          echo "All full-matrix shards passed."

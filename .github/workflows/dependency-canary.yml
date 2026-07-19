@@ -21,14 +21,11 @@ jobs:
   #    breakage from any floor-only / uncapped dependency the moment it releases.
   latest-within-ranges:
     name: Latest deps within ranges (py${{ matrix.python-version }})
-    runs-on: [aca-runner-test]
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.13"]
-    permissions:
-      contents: read
-      id-token: write
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
@@ -58,10 +55,7 @@ jobs:
   #    the cap on purpose.
   beyond-typer-cap:
     name: Beyond typer cap (real CLI)
-    runs-on: [aca-runner-test]
-    permissions:
-      contents: read
-      id-token: write
+    runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev

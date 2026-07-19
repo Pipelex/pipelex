@@ -15,9 +15,8 @@ from pipelex.cli.commands.init.credentials import (
 
 if TYPE_CHECKING:
     from pathlib import Path
-    from unittest.mock import MagicMock
 
-    from pytest_mock import MockerFixture
+    from pytest_mock import MockerFixture, MockType
 
 
 class TestInitCredentials:
@@ -129,7 +128,7 @@ class TestInitCredentials:
             global_config_dir=tmp_path,
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
-        mock_console: MagicMock = mocker.MagicMock()
+        mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
@@ -151,7 +150,7 @@ class TestInitCredentials:
             "pipelex.cli.commands.init.credentials.Prompt.ask",
             return_value="sk-test-value",
         )
-        mock_console: MagicMock = mocker.MagicMock()
+        mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was written
@@ -181,7 +180,7 @@ class TestInitCredentials:
             "pipelex.cli.commands.init.credentials.Prompt.ask",
             return_value="",
         )
-        mock_console: MagicMock = mocker.MagicMock()
+        mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         # Verify .env was NOT written (no values entered)
@@ -206,7 +205,7 @@ class TestInitCredentials:
             "pipelex.cli.commands.init.credentials.Prompt.ask",
             return_value="sk-new",
         )
-        mock_console: MagicMock = mocker.MagicMock()
+        mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
 
         result = read_env_file(env_path)
@@ -225,6 +224,6 @@ class TestInitCredentials:
             global_config_dir=tmp_path,
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
-        mock_console: MagicMock = mocker.MagicMock()
+        mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
         mock_prompt.assert_not_called()

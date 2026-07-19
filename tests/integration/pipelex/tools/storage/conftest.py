@@ -1,9 +1,8 @@
 from pathlib import Path
 from typing import Any, Literal, cast
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from pytest_mock import MockerFixture
+from pytest_mock import MockerFixture, MockType
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
@@ -39,16 +38,16 @@ def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
     # Storage for mock data
     mock_data_storage: dict[str, bytes] = {}
 
-    def create_mock_stream(key: str) -> AsyncMock:
+    def create_mock_stream(key: str) -> MockType:
         """Create a mock async stream for response body."""
-        stream = AsyncMock()
-        stream.read = AsyncMock(side_effect=lambda: mock_data_storage.get(key, b""))
-        stream.__aenter__ = AsyncMock(return_value=stream)
-        stream.__aexit__ = AsyncMock(return_value=None)
+        stream: MockType = mocker.AsyncMock()
+        stream.read = mocker.AsyncMock(side_effect=lambda: mock_data_storage.get(key, b""))
+        stream.__aenter__ = mocker.AsyncMock(return_value=stream)
+        stream.__aexit__ = mocker.AsyncMock(return_value=None)
         return stream
 
     # Create mock exceptions
-    mock_exceptions = MagicMock()
+    mock_exceptions = mocker.MagicMock()
     mock_exceptions.NoSuchKey = type("NoSuchKey", (Exception,), {})
     mock_exceptions.NoSuchBucket = type("NoSuchBucket", (Exception,), {})
     mock_exceptions.ClientError = type("ClientError", (Exception,), {})
@@ -72,20 +71,20 @@ def s3_mock(mocker: MockerFixture) -> dict[str, Any]:
         return f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}?X-Amz-Signature=mock"
 
     # Create mock client with sync functions wrapped in AsyncMock
-    mock_client = AsyncMock()
-    mock_client.get_object = AsyncMock(side_effect=mock_get_object)
-    mock_client.put_object = AsyncMock(side_effect=mock_put_object)
-    mock_client.generate_presigned_url = AsyncMock(side_effect=mock_generate_presigned_url)
+    mock_client = mocker.AsyncMock()
+    mock_client.get_object = mocker.AsyncMock(side_effect=mock_get_object)
+    mock_client.put_object = mocker.AsyncMock(side_effect=mock_put_object)
+    mock_client.generate_presigned_url = mocker.AsyncMock(side_effect=mock_generate_presigned_url)
     mock_client.exceptions = mock_exceptions
 
     # Create async context manager for client
-    mock_client_context = AsyncMock()
-    mock_client_context.__aenter__ = AsyncMock(return_value=mock_client)
-    mock_client_context.__aexit__ = AsyncMock(return_value=None)
+    mock_client_context = mocker.AsyncMock()
+    mock_client_context.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client_context.__aexit__ = mocker.AsyncMock(return_value=None)
 
     # Create mock session
-    mock_session = MagicMock()
-    mock_session.client = MagicMock(return_value=mock_client_context)
+    mock_session = mocker.MagicMock()
+    mock_session.client = mocker.MagicMock(return_value=mock_client_context)
 
     # Patch aioboto3.Session
     mocker.patch("aioboto3.Session", return_value=mock_session)
@@ -114,8 +113,8 @@ def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
     mock_data_storage: dict[str, bytes] = {}
 
     # Create mock blob that behaves like a real blob
-    def create_mock_blob(key: str) -> MagicMock:
-        blob = MagicMock()
+    def create_mock_blob(key: str) -> MockType:
+        blob: MockType = mocker.MagicMock()
         blob.exists.side_effect = lambda: key in mock_data_storage
         blob.download_as_bytes.side_effect = lambda: mock_data_storage[key]
         blob.upload_from_string.side_effect = lambda data, content_type=None: mock_data_storage.__setitem__(key, data)  # noqa: ARG005  # pyright: ignore[reportUnknownLambdaType,reportUnknownArgumentType]
@@ -123,11 +122,11 @@ def gcp_mock(tmp_path: Path, mocker: MockerFixture) -> dict[str, Any]:
         return blob
 
     # Create mock bucket
-    mock_bucket = MagicMock()
+    mock_bucket = mocker.MagicMock()
     mock_bucket.blob.side_effect = create_mock_blob
 
     # Create mock client
-    mock_client = MagicMock()
+    mock_client = mocker.MagicMock()
     mock_client.bucket.return_value = mock_bucket
 
     # Patch the Client.from_service_account_json method directly

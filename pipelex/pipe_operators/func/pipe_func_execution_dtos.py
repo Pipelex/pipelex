@@ -11,7 +11,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 # can reference these types for its transported seam without closing an import cycle through the hub.
 # The hub-bound builders that produce/consume them live in ``pipe_func_execution_transport``.
 
-# Runaway-code guard: how long a single PipeFunc may run out-of-process before it is killed. Lives on
+# Runaway-code guard: how long a single PipeFunc may run out-of-process before it times out. The
+# in-process guard is best-effort (it cannot interrupt a blocking sync function); the hard kill is
+# the execution boundary's job — the sandbox destroys the box, the subprocess is terminated. Lives on
 # the request (not a process-wide setting) so it can vary per run — e.g. by the user's plan. 5s
 # default; the caller may raise it for a higher tier.
 DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS = 5.0
@@ -39,7 +41,8 @@ class PipeFuncExecutionRequest(BaseModel):
     timeout_seconds: float = Field(
         default=DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
         gt=0,
-        description="Max wall-clock seconds the PipeFunc may run before it is killed (plan-dependent).",
+        allow_inf_nan=False,
+        description="Max wall-clock seconds the PipeFunc may run before it times out (plan-dependent).",
     )
 
 

@@ -20,6 +20,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
@@ -80,7 +81,7 @@ class DeliveryExecutor:
         """Generate the full set of result files from a PipeOutput.
 
         Produces: working_memory.json, main_stuff (json/md/html/viewer),
-        graph outputs (mermaidflow, reactflow, graphspec).
+        tokens_usages.json, graph outputs (mermaidflow, reactflow, graphspec).
 
         Supports two `pipe_output` shapes:
         - Typed: `working_memory` populated (in-process / same-worker path).
@@ -133,11 +134,30 @@ class DeliveryExecutor:
             else:
                 await self._generate_main_stuff_files(main_resolved, files=files)
 
+        files["tokens_usages.json"] = self._generate_usage_file(pipe_output)
+
         graph_spec = pipe_output.graph_spec
         if graph_spec:
             await self._generate_graph_files(graph_spec, files=files)
 
         return files
+
+    @classmethod
+    def _generate_usage_file(cls, pipe_output: PipeOutput) -> ResultFile:
+        """Serialize the run's assembled usage onto the tokens_usages.json artifact.
+
+        Written unconditionally, so a durable client polling the result files can tell
+        "usage assembly was off for this run" (file present, ``tokens_usages`` null) from
+        "run delivered before the artifact existed" (file absent). The records use the
+        client wire shape (``TokensUsageRecord``) — the same shape the ``/execute``
+        response carries on ``pipe_output.tokens_usages`` — never the internal
+        full-fidelity usage models.
+        """
+        usage_doc: dict[str, Any] = {
+            "tokens_usages": dump_tokens_usage_records(pipe_output.tokens_usages),
+            "usage_assembly_error": pipe_output.usage_assembly_error,
+        }
+        return ResultFile(data=clean_json_dumps(usage_doc, indent=2).encode("utf-8"), content_type="application/json")
 
     @classmethod
     def _get_raw_main_stuff_dict(cls, *, working_memory_raw: dict[str, Any]) -> dict[str, Any] | None:
