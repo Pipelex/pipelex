@@ -2320,6 +2320,10 @@ rationale = "Transforms/renders the aggregated; single operand."
 param = "records"
 rationale = "Cost report op on the records; single operand."
 
+["pipelex/cogt/usage/cost_registry.py::compute_tokens_usage_cost"]
+param = "tokens_usage"
+rationale = "Verb-object: compute the cost of one usage record; the single obvious operand is the usage."
+
 ["pipelex/core/bundles/pipe_sorter.py::sort_pipes_by_dependencies"]
 param = "pipes"
 rationale = "Verb-object: sorts the pipes; single operand."
@@ -5339,6 +5343,18 @@ rationale = "Verb-object: reports the search job; single operand."
 ["pipelex/reporting/reporting_protocol.py::ReportingProtocol.report_inference_job"]
 param = "inference_job"
 rationale = "Protocol method: reports the inference job; single operand across implementations."
+
+["pipelex/reporting/usage_records.py::apply_tokens_usage_wire_shape"]
+param = "response_dump"
+rationale = "Verb-object: apply the wire shape to an execute-response dump; the dump being reshaped is the subject."
+
+["pipelex/reporting/usage_records.py::dump_tokens_usage_records"]
+param = "tokens_usages"
+rationale = "Verb-object: dump the run's usage list to wire records; the single obvious operand is the usage list."
+
+["pipelex/reporting/usage_records.py::make_tokens_usage_record"]
+param = "tokens_usage"
+rationale = "Factory verb-object: make the wire record for one usage; the single obvious operand is the usage."
 
 ["pipelex/runtime_bridge/primitives/hydration.py::_hydrate_composite_component"]
 param = "raw_value"

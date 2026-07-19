@@ -20,6 +20,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_class_registry, get_storage_provider
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
@@ -147,15 +148,13 @@ class DeliveryExecutor:
 
         Written unconditionally, so a durable client polling the result files can tell
         "usage assembly was off for this run" (file present, ``tokens_usages`` null) from
-        "run delivered before the artifact existed" (file absent). The records use the same
-        per-usage ``model_dump(mode="json")`` wire shape the ``/execute`` response carries
-        on ``pipe_output.tokens_usages``.
+        "run delivered before the artifact existed" (file absent). The records use the
+        client wire shape (``TokensUsageRecord``) — the same shape the ``/execute``
+        response carries on ``pipe_output.tokens_usages`` — never the internal
+        full-fidelity usage models.
         """
-        tokens_usages_dump: list[dict[str, Any]] | None = None
-        if pipe_output.tokens_usages is not None:
-            tokens_usages_dump = [tokens_usage.model_dump(mode="json") for tokens_usage in pipe_output.tokens_usages]
         usage_doc: dict[str, Any] = {
-            "tokens_usages": tokens_usages_dump,
+            "tokens_usages": dump_tokens_usage_records(pipe_output.tokens_usages),
             "usage_assembly_error": pipe_output.usage_assembly_error,
         }
         return ResultFile(data=clean_json_dumps(usage_doc, indent=2).encode("utf-8"), content_type="application/json")

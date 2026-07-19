@@ -276,9 +276,9 @@ class TestDeliveryExecutor:
         assert "main_stuff.html" in files
 
     async def test_generate_result_files_writes_usage_artifact_with_records(self, mocker: MockerFixture) -> None:
-        """The tokens_usages.json artifact carries the run's usage records in the same
-        per-record ``model_dump(mode="json")`` wire shape the /execute response uses, so a
-        durable client can compute costs from the polled result files alone.
+        """The tokens_usages.json artifact carries the run's usage in the client wire shape
+        (``TokensUsageRecord``): computed ``cost``, no ``unit_costs``, no ``job_metadata`` —
+        so a durable client reads costs from the polled result files alone.
         """
         mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
@@ -307,7 +307,9 @@ class TestDeliveryExecutor:
         assert record["inference_model_name"] == "test-model"
         assert record["inference_model_id"] == "test-model-id"
         assert record["nb_tokens_by_category"] == {"input": 15, "output": 4}
-        assert record["unit_costs"] == {"input": 3.0, "output": 15.0}
+        assert record["cost"] == 15 * (3.0 / 1_000_000) + 4 * (15.0 / 1_000_000)
+        assert "unit_costs" not in record
+        assert "job_metadata" not in record
 
     async def test_generate_result_files_usage_artifact_null_when_usage_off(self, mocker: MockerFixture) -> None:
         """A run with usage assembly off still writes the artifact with explicit nulls, so a

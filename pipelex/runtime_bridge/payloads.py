@@ -60,6 +60,10 @@ class PipelexPipeRunOutput(BaseModel):
     # apart from "assembly was off" (a None graph_spec_dump / tokens_usages_dump). tokens_usages_dump
     # is the JSON-safe dump of the AnyTokensUsage discriminated union so a host can render the
     # end-of-run cost report: None when cost reporting was off, [] when on but no inference happened.
+    # NOTE: this dump is an INTERNAL full-fidelity SPI — the host rehydrates it back into typed
+    # `PipeOutput.tokens_usages` (full `JobMetadata` included). The client wire shape is
+    # `pipelex.reporting.usage_records.TokensUsageRecord`, applied only at the terminal emission
+    # points (the delivery artifact write and the execute-response dump) — never here.
     graph_assembly_error: str | None = None
     tokens_usages_dump: list[dict[str, Any]] | None = None
     usage_assembly_error: str | None = None

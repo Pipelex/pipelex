@@ -24,6 +24,41 @@ TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostR
 CostRegistryRoot = list[TokenCostReport]
 
 
+def compute_tokens_usage_cost(tokens_usage: TokensUsage) -> float | None:
+    """Compute the canonical USD cost of a single inference call, or None when unrated.
+
+    Returns ``None`` when the usage carries no rate table (``unit_costs`` is empty:
+    own-GPU models, dry/mock runs). Otherwise returns the same canonical total the cost
+    table reports for the call — input_non_cached + input_cached + output component
+    costs, with the cached-discount fallback from ``model_cost_per_token``. Categories
+    the cost engine excludes from totals (audio, reasoning, prediction) are excluded
+    here too: one cost engine, one total.
+    """
+    if not tokens_usage.unit_costs:
+        return None
+    nb_tokens_input_joined = tokens_usage.nb_tokens_by_category.get(TokenCategory.INPUT, 0)
+    nb_tokens_input_cached = tokens_usage.nb_tokens_by_category.get(TokenCategory.INPUT_CACHED, 0)
+    nb_tokens_input_non_cached = nb_tokens_input_joined - nb_tokens_input_cached
+    nb_tokens_output = tokens_usage.nb_tokens_by_category.get(TokenCategory.OUTPUT, 0)
+    input_non_cached_cost = nb_tokens_input_non_cached * model_cost_per_token(
+        costs=tokens_usage.unit_costs,
+        cost_category=CostCategory.INPUT_NON_CACHED,
+    )
+    input_cached_cost = nb_tokens_input_cached * model_cost_per_token(
+        costs=tokens_usage.unit_costs,
+        cost_category=CostCategory.INPUT_CACHED,
+    )
+    output_cost = nb_tokens_output * model_cost_per_token(
+        costs=tokens_usage.unit_costs,
+        cost_category=CostCategory.OUTPUT,
+    )
+    return CostRegistry.compute_total_cost(
+        input_non_cached_cost=input_non_cached_cost,
+        input_cached_cost=input_cached_cost,
+        output_cost=output_cost,
+    )
+
+
 class AggregatedCosts(NamedTuple):
     """One run's token usage aggregated for reporting: flat records, per-model groups, and run totals.
 

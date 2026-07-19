@@ -36,3 +36,7 @@ The `--costs` gate is read off the output itself — `tokens_usages` is `None` e
 Implement custom reporting backends via the [Reporting Delegate](advanced-customizations.md) injection point. The reporting protocol receives structured cost events during execution, allowing you to push data to your own analytics, dashboards, or billing systems.
 
 For configuration, see [Reporting Configuration](../configuration/config-practical/reporting-config.md).
+
+## Usage on the API Wire
+
+API clients (the `/execute` response and the durable `tokens_usages.json` result artifact) receive token usage in a trimmed, client-facing record shape with a computed per-call `cost` — not the full internal usage models this page describes. See [TokensUsage Wire Records](../under-the-hood/tokens-usage-wire-records.md).
