@@ -4,6 +4,8 @@
 exploration, 2026-07-18). Live-verified against hosted api-dev. Full findings:
 `~/repos/Fenix/project/designs/a6-cost-measurement.md`.
 
+> **Superseded on the wire shape (2026-07-19):** the "keep it raw records, not a computed $ total" note below was deliberately reversed by the tokens-usage wire contract (workspace `wip/usage/tokens-usage-wire-contract.md`, FINAL). The wire record ships a server-computed `cost` and MUST NOT expose `unit_costs` — rates are the runtime's pricing data, not client contract, and `cost: null` (vs `0.0`) resolves the "zero-cost record" caveat flagged below. Consumers that want a run total sum the per-record `cost` values; the deterministic multiply-and-sum now happens server-side, pinned by parity tests against `CostRegistry`. The artifact/route plumbing described in this doc remains accurate.
+
 ## The gap
 
 The engine assembles per-call usage onto `PipeOutput.tokens_usages` (token counts by category +
