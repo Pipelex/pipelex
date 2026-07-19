@@ -40,7 +40,7 @@ class TestPipeFuncExecutionTransport:
 
     def test_request_rejects_non_finite_timeout(self) -> None:
         """A non-finite timeout would disable the runaway-code guard, so the wire contract rejects it."""
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError, match="timeout_seconds"):
             PipeFuncExecutionRequest(
                 crate=LibraryCrate(),
                 working_memory_raw={},

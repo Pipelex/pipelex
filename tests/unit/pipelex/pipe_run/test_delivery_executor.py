@@ -287,6 +287,7 @@ class TestDeliveryExecutor:
         mock_output.graph_spec = None
         mock_output.tokens_usages = [
             LLMTokensUsage(
+                model_type="llm",
                 job_metadata=JobMetadata(user_id="test-user", pipeline_run_id="plr-usage"),
                 inference_model_name="test-model",
                 inference_model_id="test-model-id",

@@ -47,7 +47,7 @@ The record shape is also invariant to server-side observability settings: teleme
 
 ## Null semantics
 
-- `tokens_usages: null` — usage assembly was off for the run (or, hosted, the run was delivered before the artifact existed, in which case the durable file is absent entirely).
+- `tokens_usages: null` — usage assembly was off for the run. (The durable file is absent entirely when the run failed — a failed run stores no result files — or, hosted, when it was delivered before the artifact existed.)
 - `tokens_usages: []` — assembly on, no inference happened.
 - `usage_assembly_error` non-null — assembly *broke* (event-read failure), distinct from "off". It is a bare diagnostic string, mirroring `graph_assembly_error`.
 

@@ -114,4 +114,4 @@ All changes in `pipelex/pipe_operators/compose/structured_content_composer.py` (
 - [x] `mthds-plugins/templates/skills/shared/mthds-reference.md.j2` (the generated per-target copies come from this template): construct `from` row now reads "Reference a whole input or a nested field" + a note on the whole-native-stuff → native-field automatic conversion; `make build` propagated to all target copies
 - [x] `mcp-demos/wip/pipe-compose-issue/README.md`: annotated — update banner at top, correction blockquote in §5, update blockquote in §8 with the stale takeaways marked inline; root cause = implementation gaps fixed in pipelex v0.39.2, compose-based design recommended again
 
-**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Edits uncommitted in `pipelex-plugins/`, `mthds-plugins/`, `mcp-demos/` (commit per-repo).
+**Phase 4 executed 2026-07-18 — TRACK COMPLETE.** Committed per-repo: `pipelex-plugins` 2f97d2d, `mthds-plugins` 4e6288c, `mcp-demos` d422861.

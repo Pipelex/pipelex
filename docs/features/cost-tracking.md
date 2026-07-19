@@ -39,4 +39,4 @@ For configuration, see [Reporting Configuration](../configuration/config-practic
 
 ## Usage on the API Wire
 
-API clients (the `/execute` response and the durable `tokens_usages.json` result artifact) receive token usage in a trimmed, client-facing record shape with a computed per-call `cost` — not the full internal usage models this page describes. See [TokensUsage Wire Records](../under-the-hood/tokens-usage-wire-records.md).
+API clients (the `/execute` response and the durable `tokens_usages.json` result artifact) receive token usage in a trimmed, client-facing record shape with a computed per-call `cost` (`null` for unrated models) — not the full internal usage models this page describes. See [TokensUsage Wire Records](../under-the-hood/tokens-usage-wire-records.md).

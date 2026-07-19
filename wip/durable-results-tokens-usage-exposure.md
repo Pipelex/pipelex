@@ -27,7 +27,9 @@ But a durable client (`start` + `GET /v1/runs/{id}/results`) never sees it:
 Sync `/execute` is not a workaround for durable clients: the ~30s gateway ceiling rules it out
 for img-gen and parallel-heavy pipes — exactly the runs whose cost matters most.
 
-## Proposed change (smallest that closes it)
+## Proposed change (smallest that closes it) — ✅ BOTH SHIPPED in v0.40
+
+Both halves landed: pipelex writes the artifact (`delivery_executor.generate_result_files`), pipelex-platform serves it (`runs.py`).
 
 1. **pipelex** `delivery_executor.generate_result_files`: also write `tokens_usages.json` —
    `{"tokens_usages": [...], "usage_assembly_error": null}`, same serialization the `/execute`
