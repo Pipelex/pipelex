@@ -4,7 +4,6 @@ from datetime import date, datetime, time
 from enum import Enum
 from typing import Any, List, Literal, Optional, cast
 
-from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
 
 from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
@@ -14,19 +13,12 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.system.registries.class_registry_access import get_class_registry
 
 # Target line length for emitted code (matches the project's ruff config).
 # Each emitted line stays under this so ruff E501 doesn't trigger on long descriptions.
 _MAX_LINE_LENGTH = 150
 _WRAP_WIDTH = 120  # conservative: leaves headroom for indentation and syntax overhead
-
-
-def _get_class_registry() -> ClassRegistryAbstract:
-    """Lazy import to break circular dependency with hub.py."""
-    import importlib  # noqa: PLC0415
-
-    hub = importlib.import_module("pipelex.hub")
-    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class StructureGenerator:
@@ -276,7 +268,7 @@ class StructureGenerator:
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
         elif base_class != "StructuredContent":
             # Cross-package refines: base class lives in another already-installed package — recover its module via the class registry.
-            registered_cls = _get_class_registry().get_class(name=base_class)
+            registered_cls = get_class_registry().get_class(name=base_class)
             if registered_cls is not None and registered_cls.__name__ == base_class and registered_cls.__module__ not in {"__main__", "builtins"}:
                 self.imports.add(f"from {registered_cls.__module__} import {base_class}")
 
@@ -421,7 +413,7 @@ class StructureGenerator:
         if base_class_name:
             if not NativeConceptCode.is_native_structure_class(base_class_name):
                 # Not a native class, provide it from registry
-                custom_base_class = _get_class_registry().get_class(name=base_class_name)
+                custom_base_class = get_class_registry().get_class(name=base_class_name)
                 if custom_base_class is None:
                     msg = f"Base class '{base_class_name}' not found in native classes or class registry"
                     raise ConceptStructureValidationError(msg)

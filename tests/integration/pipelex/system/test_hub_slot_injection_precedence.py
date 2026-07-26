@@ -14,11 +14,12 @@ from typing import TYPE_CHECKING, cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.hub import get_content_generator, get_pipe_router
+from pipelex.method_hub import get_pipe_router
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.pipe_func.pipe_func_plugin import PipeFuncPlugin
 from pipelex.plugins.registrar import HubSlot, PluginOrigin, PluginRegistrar
+from pipelex.service_hub import get_content_generator
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider

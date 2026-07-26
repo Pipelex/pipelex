@@ -12,7 +12,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.method_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome

@@ -15,17 +15,8 @@ from pipelex.cli.error_handlers import (
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import (
-    get_console,
-    get_library_manager,
-    get_pipe_library,
-    get_pipes,
-    get_required_pipe,
-    get_telemetry_manager,
-    resolve_library_dirs,
-    set_current_library,
-)
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.method_hub import get_library_manager, get_pipe_library, get_pipes, get_required_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
 from pipelex.pipelex import Pipelex
@@ -35,6 +26,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 from pipelex.pipeline.optionality_warnings import build_optionality_warnings
 from pipelex.pipeline.validate_bundle import build_pending_signatures, validate_bundle
+from pipelex.service_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version

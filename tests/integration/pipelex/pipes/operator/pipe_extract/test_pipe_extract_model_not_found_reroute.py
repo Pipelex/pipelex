@@ -11,7 +11,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipe_library, get_pipe_router
+from pipelex.method_hub import get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint

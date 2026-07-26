@@ -38,18 +38,16 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import (
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.method_hub import (
     clear_current_library,
     get_current_library,
     get_current_library_id_or_none,
     get_library_manager,
     get_pipe_library,
-    get_telemetry_manager,
-    scoped_content_generator,
     scoped_pipe_router,
     set_current_library,
 )
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -57,6 +55,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
+from pipelex.service_hub import get_telemetry_manager, scoped_content_generator
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants

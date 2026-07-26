@@ -7,7 +7,7 @@ subject is legal only under an explicit grant recorded in ``subject_grants.toml`
 
 The canonical human-readable specification lives in ``docs/contribute/keyword-only-arguments.md``.
 The pure-AST collection logic lives in the stdlib-only ``keyword_only_guard`` module; this module
-is the ``rich``/``pipelex.hub`` presentation layer wired into the ``pipelex-dev`` Typer app
+is the ``rich``/``pipelex.service_hub`` presentation layer wired into the ``pipelex-dev`` Typer app
 (``make check-keyword-only`` / ``make agent-check`` / CI). The ``pipelex/`` source tree is fully
 compliant, so the guard hard-blocks on ANY violation (a bare ``*`` after the subject, a recorded
 subject grant, or a ``# kw-only: ignore`` escape hatch with a justification, is required).
@@ -34,7 +34,7 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     fix_all_violations,
     load_subject_grants,
 )
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 
 if TYPE_CHECKING:
     from pipelex.cli.dev_cli.commands.keyword_only_guard import SubjectGrant
@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 def _package_of(key_or_path: str) -> str:
     """The top-level package of a ``pipelex/...`` path or ``<path>::<qualname>`` key, for report grouping.
 
-    Files sitting directly under the source root (``pipelex/hub.py``) group under ``(root)`` rather than
+    Files sitting directly under the source root (``pipelex/service_hub.py``) group under ``(root)`` rather than
     each filename becoming its own one-off "package" line in the report.
     """
     path = key_or_path.partition("::")[0]

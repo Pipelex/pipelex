@@ -4,8 +4,8 @@ from pipelex import log, pretty_print
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.hub import get_inference_manager
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_inference_manager
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

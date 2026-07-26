@@ -5,7 +5,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.hub import get_img_gen_worker
+from pipelex.service_hub import get_img_gen_worker
 
 
 async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails:

@@ -24,16 +24,10 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    resolve_library_dirs,
-    set_current_library,
-)
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_run.exceptions import DryRunError, PipeRunError
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError

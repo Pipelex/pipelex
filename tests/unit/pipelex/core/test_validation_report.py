@@ -16,7 +16,7 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import PipelexHub
+from pipelex.service_hub import ServiceHub
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -47,7 +47,7 @@ class TestReportValidationError:
         """
         # Ensure the hub singleton is None for this test — mirrors a fresh process
         # where Pipelex.make hasn't run yet.
-        mocker.patch.object(PipelexHub, "_instance", None)
+        mocker.patch.object(ServiceHub, "_instance", None)
 
         validation_error = _make_validation_error()
         report = report_validation_error(category="config", validation_error=validation_error)
@@ -60,8 +60,8 @@ class TestReportValidationError:
         get_optional_config() returns None; migration hints are omitted; the error
         translation still flows.
         """
-        hub_without_config = PipelexHub()
-        mocker.patch.object(PipelexHub, "_instance", hub_without_config)
+        hub_without_config = ServiceHub()
+        mocker.patch.object(ServiceHub, "_instance", hub_without_config)
 
         validation_error = _make_validation_error()
         report = report_validation_error(category="config", validation_error=validation_error)

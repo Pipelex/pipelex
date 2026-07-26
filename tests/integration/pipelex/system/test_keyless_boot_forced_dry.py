@@ -16,12 +16,12 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_content_generator, is_dry_run_forced
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
+from pipelex.service_hub import get_content_generator, is_dry_run_forced
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 

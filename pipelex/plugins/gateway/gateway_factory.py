@@ -13,12 +13,12 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
+from pipelex.service_hub import get_telemetry_manager
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:

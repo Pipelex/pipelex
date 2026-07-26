@@ -18,13 +18,13 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.hub import get_storage_provider
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.service_hub import get_storage_provider
 from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
 
 

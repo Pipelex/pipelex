@@ -1,8 +1,8 @@
 contract = "keyword-only-convention"
-digest = "sha256:2d2a8228601e1fa98d483b5c1d162ddcb8037ac02391d1c0409f8bd48d203571"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-07-11T15:45:25Z"
-rationale = "Phase 5 closed the transitional door: --seed and the seeded field are deleted, the registry schema is strict (param + rationale only). Rewrote the doc's transitional-state section as the post-transitional Registry schema section and fixed the --report description."
+digest = "sha256:413da343c4cab8656b3e5512e4ed7539406c47e4785d725ec55c8c3266aef9a0"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-07-26T02:47:04Z"
+rationale = "The trigger diff in keyword_only_guard.py is docstring-only: two prose references to the deleted pipelex.hub module renamed to pipelex.service_hub by the hub split. No guard behavior changed — no new violation kind, no registry schema change, no carve-out, no CLI flag. Read docs/contribute/keyword-only-arguments.md: it refers to the presentation layer generically as 'Typer/hub import', which stays accurate now that there are two hubs, and it carries no hardcoded grant count. Its 'staleness is symmetric' section already documents that file moves kill grants and force a deliberate re-grant — which is exactly what this change exercised when the 54 pipelex/hub.py grants were re-recorded as 55 under pipelex/service_hub.py and pipelex/method_hub.py. Nothing to update."
 
 [trigger_files]
-"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c998cfc324c7f1096e974133b75db59c6190c117"
+"pipelex/cli/dev_cli/commands/keyword_only_guard.py" = "blob:c0b83b52d1001e16bde6285ffe31d818cdc4df17"

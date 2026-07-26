@@ -3,7 +3,7 @@ import datetime
 from kajson import kajson
 
 from pipelex.core.stuffs.date_content import DateContent
-from pipelex.hub import get_class_registry
+from pipelex.service_hub import get_class_registry
 from tests.unit.pipelex.core.stuffs.date_content.test_data import TestData
 
 

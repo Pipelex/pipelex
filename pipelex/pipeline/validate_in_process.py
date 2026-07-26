@@ -25,12 +25,7 @@ from typing import TYPE_CHECKING
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    set_current_library,
-)
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.controller_taint import collect_controller_taint_analyses

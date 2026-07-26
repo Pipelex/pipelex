@@ -4,8 +4,8 @@ from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
-from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_img_gen_worker
 from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.fixtures.img_gen_fixtures import skip_if_img_gen_params_unsupported
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo

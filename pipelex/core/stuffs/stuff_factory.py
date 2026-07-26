@@ -18,8 +18,9 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_concept_library, get_native_concept, get_required_concept
 from pipelex.libraries.concept.concept_library import ConceptLibraryConceptNotFoundError
+from pipelex.method_hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.service_hub import get_class_registry
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error

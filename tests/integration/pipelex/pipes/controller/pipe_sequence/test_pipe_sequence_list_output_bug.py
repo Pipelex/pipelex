@@ -13,7 +13,7 @@ from typing import ClassVar
 
 import pytest
 
-from pipelex.hub import get_current_library, get_required_pipe
+from pipelex.method_hub import get_current_library, get_required_pipe
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.validate_bundle import validate_bundle
 

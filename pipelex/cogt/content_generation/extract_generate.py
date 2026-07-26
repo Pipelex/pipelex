@@ -4,7 +4,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.hub import get_extract_worker
+from pipelex.service_hub import get_extract_worker
 
 
 async def extract_gen_pages(extract_assignment: ExtractAssignment) -> ExtractOutput:

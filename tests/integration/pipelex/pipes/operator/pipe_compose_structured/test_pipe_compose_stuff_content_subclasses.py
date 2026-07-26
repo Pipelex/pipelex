@@ -28,7 +28,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.method_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory

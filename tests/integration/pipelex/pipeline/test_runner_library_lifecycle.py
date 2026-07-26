@@ -22,12 +22,7 @@ import pytest
 from typing_extensions import override
 
 from pipelex.config import get_config
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    set_current_library,
-)
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol

@@ -17,8 +17,8 @@ from pipelex.cli.commands.init.ui.routing_ui import (
 )
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
-from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
+from pipelex.service_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 

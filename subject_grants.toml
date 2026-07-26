@@ -3480,222 +3480,6 @@ rationale = "Verb-object: validates the graph; single operand."
 param = "graph"
 rationale = "Verb-object: validates the graph spec; single operand."
 
-["pipelex/hub.py::PipelexHub.set_bundle_validator_registry"]
-param = "bundle_validator_registry"
-rationale = "Hub setter: installs the bundle validator registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_class_registry"]
-param = "class_registry"
-rationale = "Hub setter: installs the class registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_concept_library"]
-param = "concept_library"
-rationale = "Hub setter: installs the concept library; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_config"]
-param = "config"
-rationale = "Hub setter: installs the config; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_console"]
-param = "console"
-rationale = "Hub setter: installs the console; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_console_print_target"]
-param = "target"
-rationale = "Hub setter: installs the print target; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_content_generator"]
-param = "content_generator"
-rationale = "Hub setter: installs the content generator; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_default_library_dirs"]
-param = "library_dirs"
-rationale = "Hub setter: installs the default library dirs; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_domain_library"]
-param = "domain_library"
-rationale = "Hub setter: installs the domain library; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_func_registry"]
-param = "func_registry"
-rationale = "Hub setter: installs the func registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_inference_backend_registry"]
-param = "inference_backend_registry"
-rationale = "Hub setter: installs the inference backend registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_inference_manager"]
-param = "inference_manager"
-rationale = "Hub setter: installs the inference manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_instance"]
-param = "pipelex_hub"
-rationale = "Hub setter: installs the hub singleton; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_isolated_execution_probe"]
-param = "probe"
-rationale = "Hub setter: installs the execution probe; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_library_manager"]
-param = "library_manager"
-rationale = "Hub setter: installs the library manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_model_lister_registry"]
-param = "model_lister_registry"
-rationale = "Hub setter: installs the model lister registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_models_manager"]
-param = "models_manager"
-rationale = "Hub setter: installs the models manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_observer"]
-param = "observer"
-rationale = "Hub setter: installs the observer; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_orchestrator_registry"]
-param = "orchestrator_registry"
-rationale = "Hub setter: installs the orchestrator registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipe_func_executor"]
-param = "pipe_func_executor"
-rationale = "Hub setter: installs the pipe-func executor; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipe_func_executor_registry"]
-param = "pipe_func_executor_registry"
-rationale = "Hub setter: installs the pipe-func executor registry; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipe_library"]
-param = "pipe_library"
-rationale = "Hub setter: installs the pipe library; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipe_router"]
-param = "pipe_router"
-rationale = "Hub setter: installs the pipe router; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipe_run"]
-param = "pipe_run"
-rationale = "Hub setter: installs the pipe-run holder; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_pipeline_manager"]
-param = "pipeline_manager"
-rationale = "Hub setter: installs the pipeline manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_report_delegate"]
-param = "reporting_delegate"
-rationale = "Hub setter: installs the reporting delegate; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_sdk_client_manager"]
-param = "sdk_client_manager"
-rationale = "Hub setter: installs the SDK client manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_secrets_provider"]
-param = "secrets_provider"
-rationale = "Hub setter: installs the secrets provider; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_secrets_provider_registry"]
-param = "secrets_provider_registry"
-rationale = "Hub setter: the registry is the operand being installed."
-
-["pipelex/hub.py::PipelexHub.set_storage_provider"]
-param = "storage_provider"
-rationale = "Hub setter: installs the storage provider; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.set_storage_provider_registry"]
-param = "storage_provider_registry"
-rationale = "Hub setter: the registry is the operand being installed."
-
-["pipelex/hub.py::PipelexHub.set_telemetry_manager"]
-param = "telemetry_manager"
-rationale = "Hub setter: installs the telemetry manager; single self-labelling operand."
-
-["pipelex/hub.py::PipelexHub.setup_config"]
-param = "config_cls"
-rationale = "Sets up config from the given config class; single operand."
-
-["pipelex/hub.py::get_extract_worker"]
-param = "extract_handle"
-rationale = "Hub getter keyed by the worker's handle; single operand."
-
-["pipelex/hub.py::get_img_gen_worker"]
-param = "img_gen_handle"
-rationale = "Hub getter keyed by the worker's handle; single operand."
-
-["pipelex/hub.py::get_llm_worker"]
-param = "llm_handle"
-rationale = "Hub getter keyed by the worker's handle; single operand."
-
-["pipelex/hub.py::get_native_concept"]
-param = "native_concept"
-rationale = "Hub getter: the native concept being fetched; single operand."
-
-["pipelex/hub.py::get_optional_domain"]
-param = "domain_code"
-rationale = "Hub getter keyed by the domain code; single operand."
-
-["pipelex/hub.py::get_optional_pipe"]
-param = "pipe_code"
-rationale = "Hub getter keyed by the pipe code; single operand."
-
-["pipelex/hub.py::get_pipe_source"]
-param = "pipe_code"
-rationale = "Hub getter keyed by the pipe code; single operand."
-
-["pipelex/hub.py::get_pipeline"]
-param = "pipeline_run_id"
-rationale = "Hub getter keyed by the pipeline run id; single operand."
-
-["pipelex/hub.py::get_required_concept"]
-param = "concept_ref"
-rationale = "Hub getter keyed by the concept ref; single operand."
-
-["pipelex/hub.py::get_required_domain"]
-param = "domain_code"
-rationale = "Hub getter keyed by the domain code; single operand."
-
-["pipelex/hub.py::get_required_pipe"]
-param = "pipe_code"
-rationale = "Hub getter keyed by the pipe code; single operand."
-
-["pipelex/hub.py::get_secret"]
-param = "secret_id"
-rationale = "Hub getter keyed by the secret id; single operand."
-
-["pipelex/hub.py::resolve_library_dirs"]
-param = "library_dirs"
-rationale = "Verb-object: resolves the given library dirs; single operand."
-
-["pipelex/hub.py::scoped_content_generator"]
-param = "content_generator"
-rationale = "Context manager scoping the given content generator; single self-labelling operand."
-
-["pipelex/hub.py::scoped_current_library"]
-param = "library_id"
-rationale = "Context manager scoping to the library named by the id; single operand."
-
-["pipelex/hub.py::scoped_event_log"]
-param = "event_log"
-rationale = "Context manager scoping the given event log; single self-labelling operand."
-
-["pipelex/hub.py::scoped_pipe_func_executor"]
-param = "pipe_func_executor"
-rationale = "Scoped-binding context manager: binds the pipe-func executor for the block; single self-labelling operand."
-
-["pipelex/hub.py::scoped_pipe_router"]
-param = "pipe_router"
-rationale = "Context manager scoping the given pipe router; single self-labelling operand."
-
-["pipelex/hub.py::set_current_library"]
-param = "library_id"
-rationale = "Module-level setter: selects the library named by the id; single operand."
-
-["pipelex/hub.py::set_pipe_router"]
-param = "pipe_router"
-rationale = "Module-level setter: installs the pipe router; single self-labelling operand."
-
-["pipelex/hub.py::set_pipelex_hub"]
-param = "pipelex_hub"
-rationale = "Module-level setter: installs the hub singleton; single self-labelling operand."
-
 ["pipelex/kit/cursor_rules.py::_is_pipelex_managed"]
 param = "mdc_path"
 rationale = "Predicate on the .mdc file path; single operand."
@@ -4103,6 +3887,110 @@ rationale = "Verb-object: the refs naming the removed pipes; single operand."
 ["pipelex/libraries/visibility_utils.py::_blueprint_to_metadata"]
 param = "blueprint"
 rationale = "Conversion: derives metadata from the blueprint; single operand."
+
+["pipelex/method_hub.py::MethodHub.set_concept_library"]
+param = "concept_library"
+rationale = "Hub setter: installs the concept library; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_default_library_dirs"]
+param = "library_dirs"
+rationale = "Hub setter: installs the default library dirs; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_domain_library"]
+param = "domain_library"
+rationale = "Hub setter: installs the domain library; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_instance"]
+param = "method_hub"
+rationale = "Hub setter: installs the MethodHub singleton; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_library_manager"]
+param = "library_manager"
+rationale = "Hub setter: installs the library manager; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipe_func_executor"]
+param = "pipe_func_executor"
+rationale = "Hub setter: installs the pipe-func executor; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipe_func_executor_registry"]
+param = "pipe_func_executor_registry"
+rationale = "Hub setter: installs the pipe-func executor registry; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipe_library"]
+param = "pipe_library"
+rationale = "Hub setter: installs the pipe library; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipe_router"]
+param = "pipe_router"
+rationale = "Hub setter: installs the pipe router; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipe_run"]
+param = "pipe_run"
+rationale = "Hub setter: installs the pipe-run holder; single self-labelling operand."
+
+["pipelex/method_hub.py::MethodHub.set_pipeline_manager"]
+param = "pipeline_manager"
+rationale = "Hub setter: installs the pipeline manager; single self-labelling operand."
+
+["pipelex/method_hub.py::get_native_concept"]
+param = "native_concept"
+rationale = "Hub getter: the native concept being fetched; single operand."
+
+["pipelex/method_hub.py::get_optional_domain"]
+param = "domain_code"
+rationale = "Hub getter keyed by the domain code; single operand."
+
+["pipelex/method_hub.py::get_optional_pipe"]
+param = "pipe_code"
+rationale = "Hub getter keyed by the pipe code; single operand."
+
+["pipelex/method_hub.py::get_pipe_source"]
+param = "pipe_code"
+rationale = "Hub getter keyed by the pipe code; single operand."
+
+["pipelex/method_hub.py::get_pipeline"]
+param = "pipeline_run_id"
+rationale = "Hub getter keyed by the pipeline run id; single operand."
+
+["pipelex/method_hub.py::get_required_concept"]
+param = "concept_ref"
+rationale = "Hub getter keyed by the concept ref; single operand."
+
+["pipelex/method_hub.py::get_required_domain"]
+param = "domain_code"
+rationale = "Hub getter keyed by the domain code; single operand."
+
+["pipelex/method_hub.py::get_required_pipe"]
+param = "pipe_code"
+rationale = "Hub getter keyed by the pipe code; single operand."
+
+["pipelex/method_hub.py::resolve_library_dirs"]
+param = "library_dirs"
+rationale = "Verb-object: resolves the given library dirs; single operand."
+
+["pipelex/method_hub.py::scoped_current_library"]
+param = "library_id"
+rationale = "Context manager scoping to the library named by the id; single operand."
+
+["pipelex/method_hub.py::scoped_pipe_func_executor"]
+param = "pipe_func_executor"
+rationale = "Scoped-binding context manager: binds the pipe-func executor for the block; single self-labelling operand."
+
+["pipelex/method_hub.py::scoped_pipe_router"]
+param = "pipe_router"
+rationale = "Context manager scoping the given pipe router; single self-labelling operand."
+
+["pipelex/method_hub.py::set_current_library"]
+param = "library_id"
+rationale = "Module-level setter: selects the library named by the id; single operand."
+
+["pipelex/method_hub.py::set_method_hub"]
+param = "method_hub"
+rationale = "Module-level setter: installs the MethodHub singleton; single self-labelling operand."
+
+["pipelex/method_hub.py::set_pipe_router"]
+param = "pipe_router"
+rationale = "Module-level setter: installs the pipe router; single self-labelling operand."
 
 ["pipelex/observer/observer_protocol.py::ObserverProtocol.observe_after_failing_run"]
 param = "payload"
@@ -5383,6 +5271,122 @@ rationale = "Verb-object: serializes the pipe output; workflow_id stays keyword.
 ["pipelex/runtime_bridge/serialization.py::serialize_pipe_output"]
 param = "pipe_output"
 rationale = "Verb-object: serializes the pipe output; single operand."
+
+["pipelex/service_hub.py::ServiceHub.set_bundle_validator_registry"]
+param = "bundle_validator_registry"
+rationale = "Hub setter: installs the bundle validator registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_class_registry"]
+param = "class_registry"
+rationale = "Hub setter: installs the class registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_config"]
+param = "config"
+rationale = "Hub setter: installs the config; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_console"]
+param = "console"
+rationale = "Hub setter: installs the console; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_console_print_target"]
+param = "target"
+rationale = "Hub setter: installs the print target; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_content_generator"]
+param = "content_generator"
+rationale = "Hub setter: installs the content generator; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_func_registry"]
+param = "func_registry"
+rationale = "Hub setter: installs the func registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_inference_backend_registry"]
+param = "inference_backend_registry"
+rationale = "Hub setter: installs the inference backend registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_inference_manager"]
+param = "inference_manager"
+rationale = "Hub setter: installs the inference manager; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_instance"]
+param = "service_hub"
+rationale = "Hub setter: installs the ServiceHub singleton; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_isolated_execution_probe"]
+param = "probe"
+rationale = "Hub setter: installs the execution probe; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_model_lister_registry"]
+param = "model_lister_registry"
+rationale = "Hub setter: installs the model lister registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_models_manager"]
+param = "models_manager"
+rationale = "Hub setter: installs the models manager; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_orchestrator_registry"]
+param = "orchestrator_registry"
+rationale = "Hub setter: installs the orchestrator registry; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_report_delegate"]
+param = "reporting_delegate"
+rationale = "Hub setter: installs the reporting delegate; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_sdk_client_manager"]
+param = "sdk_client_manager"
+rationale = "Hub setter: installs the SDK client manager; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_secrets_provider"]
+param = "secrets_provider"
+rationale = "Hub setter: installs the secrets provider; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_secrets_provider_registry"]
+param = "secrets_provider_registry"
+rationale = "Hub setter: the registry is the operand being installed."
+
+["pipelex/service_hub.py::ServiceHub.set_storage_provider"]
+param = "storage_provider"
+rationale = "Hub setter: installs the storage provider; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.set_storage_provider_registry"]
+param = "storage_provider_registry"
+rationale = "Hub setter: the registry is the operand being installed."
+
+["pipelex/service_hub.py::ServiceHub.set_telemetry_manager"]
+param = "telemetry_manager"
+rationale = "Hub setter: installs the telemetry manager; single self-labelling operand."
+
+["pipelex/service_hub.py::ServiceHub.setup_config"]
+param = "config_cls"
+rationale = "Sets up config from the given config class; single operand."
+
+["pipelex/service_hub.py::get_extract_worker"]
+param = "extract_handle"
+rationale = "Hub getter keyed by the worker's handle; single operand."
+
+["pipelex/service_hub.py::get_img_gen_worker"]
+param = "img_gen_handle"
+rationale = "Hub getter keyed by the worker's handle; single operand."
+
+["pipelex/service_hub.py::get_llm_worker"]
+param = "llm_handle"
+rationale = "Hub getter keyed by the worker's handle; single operand."
+
+["pipelex/service_hub.py::get_secret"]
+param = "secret_id"
+rationale = "Hub getter keyed by the secret id; single operand."
+
+["pipelex/service_hub.py::scoped_content_generator"]
+param = "content_generator"
+rationale = "Context manager scoping the given content generator; single self-labelling operand."
+
+["pipelex/service_hub.py::scoped_event_log"]
+param = "event_log"
+rationale = "Context manager scoping the given event log; single self-labelling operand."
+
+["pipelex/service_hub.py::set_service_hub"]
+param = "service_hub"
+rationale = "Module-level setter: installs the ServiceHub singleton; single self-labelling operand."
 
 ["pipelex/system/configuration/config_loader.py::ConfigLoader._override_files_for_dir"]
 param = "config_dir"

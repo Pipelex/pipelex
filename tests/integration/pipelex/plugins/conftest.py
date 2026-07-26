@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.cogt.exceptions import ModelManagerError
-from pipelex.hub import get_models_manager
+from pipelex.service_hub import get_models_manager
 
 
 def is_backend_available(backend_name: str) -> bool:

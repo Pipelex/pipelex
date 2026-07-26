@@ -6,7 +6,7 @@ import pytest
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
+from pipelex.method_hub import get_concept_library, get_native_concept, get_required_concept
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData

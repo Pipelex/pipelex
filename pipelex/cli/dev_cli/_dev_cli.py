@@ -26,7 +26,7 @@ from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
 

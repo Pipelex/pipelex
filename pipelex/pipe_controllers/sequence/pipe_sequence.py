@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker, is_multiplicity_compatible
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
+from pipelex.method_hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.absence_taint import (
     ForceConsumptionInfo,
     LiftableStepInfo,

@@ -12,7 +12,7 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 from pipelex.urls import URLs
 
 # Default timeout in seconds for HTTP requests

@@ -21,10 +21,10 @@ from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.hub import get_models_manager
 from pipelex.plugins.azure_rest.azure_exceptions import AzureCredentialsError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.service_hub import get_models_manager
 from pipelex.tools.log.log import log
 
 

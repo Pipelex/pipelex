@@ -6,7 +6,7 @@ import pytest
 from rich import box
 from rich.table import Table
 
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 
 warnings.filterwarnings(

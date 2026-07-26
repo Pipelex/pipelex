@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_pipes
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_pipes
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 

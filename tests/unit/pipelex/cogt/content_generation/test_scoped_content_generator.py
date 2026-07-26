@@ -1,4 +1,4 @@
-"""Unit tests for the `scoped_content_generator` ContextVar scope in `pipelex.hub`.
+"""Unit tests for the `scoped_content_generator` ContextVar scope in `pipelex.service_hub`.
 
 The scope lets an in-process run (the validation sweep, the in-process graph dry-run)
 pin an inline content generator so its inference leaves resolve it through
@@ -15,7 +15,7 @@ import pytest
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.hub import get_content_generator, scoped_content_generator
+from pipelex.service_hub import get_content_generator, scoped_content_generator
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 

@@ -5,8 +5,8 @@ import pytest
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.hub import get_current_library, get_pipe_library
 from pipelex.language.mthds_factory import MthdsFactory
+from pipelex.method_hub import get_current_library, get_pipe_library
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sequence.pipe_sequence_blueprint import PipeSequenceBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint

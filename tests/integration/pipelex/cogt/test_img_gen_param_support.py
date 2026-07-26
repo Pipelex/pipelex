@@ -17,7 +17,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import (
 )
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.hub import get_model_deck
+from pipelex.service_hub import get_model_deck
 from pipelex.tools.misc.image_utils import ImageFormat
 
 

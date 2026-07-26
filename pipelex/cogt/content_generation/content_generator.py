@@ -36,8 +36,8 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.hub import get_storage_provider
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_storage_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 

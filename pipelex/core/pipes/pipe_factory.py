@@ -12,7 +12,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeT
 from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
-from pipelex.hub import get_class_registry
+from pipelex.service_hub import get_class_registry
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract

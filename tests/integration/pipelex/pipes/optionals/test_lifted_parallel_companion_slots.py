@@ -16,7 +16,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_library
+from pipelex.method_hub import get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence

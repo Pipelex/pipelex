@@ -24,8 +24,8 @@ from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.service_hub import get_secrets_provider
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 

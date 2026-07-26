@@ -7,7 +7,7 @@ from rich import box
 from rich.table import Table
 
 from pipelex.exceptions import MissingDependencyError
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 
 
 def list_mistral_models(

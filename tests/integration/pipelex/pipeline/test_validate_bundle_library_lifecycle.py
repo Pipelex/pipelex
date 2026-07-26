@@ -30,7 +30,7 @@ import pytest
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.hub import clear_current_library, get_current_library, get_library_manager, set_current_library
+from pipelex.method_hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.pipeline import validate_bundle as validate_bundle_module
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import (

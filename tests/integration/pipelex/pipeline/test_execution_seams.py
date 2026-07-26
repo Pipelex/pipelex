@@ -11,12 +11,7 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    get_required_pipe,
-)
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline import execution_seams as execution_seams_module
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job

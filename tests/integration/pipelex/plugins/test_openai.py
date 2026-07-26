@@ -1,9 +1,9 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.hub import get_models_manager
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
+from pipelex.service_hub import get_models_manager
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 from tests.integration.pipelex.plugins.conftest import is_backend_available
 

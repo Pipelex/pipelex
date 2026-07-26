@@ -52,20 +52,13 @@ from mthds.protocol.pipeline_inputs import PipelineInputs
 from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
-from pipelex.hub import (
-    clear_current_library,
-    get_current_library_id_or_none,
-    get_library_manager,
-    get_pipeline_manager,
-    get_report_delegate,
-    get_telemetry_manager,
-    set_current_library,
-)
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_pipeline_manager, set_current_library
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.reporting_manager import ReportingManager
+from pipelex.service_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.configuration.configs import NdjsonTracingConfig, PipelineExecutionConfig, TracingBackend
 from pipelex.system.telemetry.events import EventName
 

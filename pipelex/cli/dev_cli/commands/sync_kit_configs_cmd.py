@@ -9,8 +9,8 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from pipelex.hub import get_console
 from pipelex.kit.paths import CONFIG_SYNC_EXCLUDED_FILES, GIT_IGNORED_CONFIG_DIRS
+from pipelex.service_hub import get_console
 from pipelex.tools.misc.file_utils import MirrorDirResult, mirror_dir
 
 PIPELEX_DIR = ".pipelex"

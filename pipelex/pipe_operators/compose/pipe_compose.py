@@ -20,13 +20,14 @@ from pipelex.core.pipes.template_guard_lint import lint_optional_input_guards
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_class_registry, get_concept_library, get_native_concept
+from pipelex.method_hub import get_concept_library, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_class_registry
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path

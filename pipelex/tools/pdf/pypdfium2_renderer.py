@@ -12,7 +12,7 @@ from pypdfium2.raw import FPDF_PAGEOBJ_IMAGE, FPDFBitmap_BGRA
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.hub import get_storage_provider
+from pipelex.service_hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.uri.resolved_uri import (

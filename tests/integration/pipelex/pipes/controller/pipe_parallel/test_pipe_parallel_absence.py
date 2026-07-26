@@ -27,7 +27,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_concept_library, get_pipe_library
+from pipelex.method_hub import get_concept_library, get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
@@ -37,6 +37,7 @@ from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_class_registry
 from pipelex.system.registries.func_registry import func_registry
 
 _DOMAIN_CODE = "test_optionals_par"

@@ -2,10 +2,10 @@ from typing import cast
 
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
-from pipelex.hub import get_inference_backend_registry, get_models_manager, get_sdk_client_manager
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.service_hub import get_inference_backend_registry, get_models_manager, get_sdk_client_manager
 
 
 class SearchWorkerFactory:

@@ -18,7 +18,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_native_concept, get_pipe_router
+from pipelex.method_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint

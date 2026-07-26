@@ -9,7 +9,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
-from pipelex.hub import get_class_registry
+from pipelex.service_hub import get_class_registry
 
 
 class StuffContentFactory:

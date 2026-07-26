@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 import pytest
 from pydantic import PydanticUserError
 
-from pipelex.hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.exceptions import PipeIOContractError
 from pipelex.pipeline.pipe_io_contracts import IOMultiplicity, build_pipe_io_contracts
 from pipelex.pipeline.validate_bundle import validate_bundle

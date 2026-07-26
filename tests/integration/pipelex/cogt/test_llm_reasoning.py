@@ -5,8 +5,8 @@ from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.hub import get_llm_worker
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_llm_worker
 from tests.integration.pipelex.cogt.test_data import LLMReasoningTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 

@@ -11,7 +11,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_native_concept, get_pipe_library, get_pipe_router
+from pipelex.method_hub import get_native_concept, get_pipe_library, get_pipe_router
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure

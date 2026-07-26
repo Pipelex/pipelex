@@ -11,7 +11,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_native_concept
+from pipelex.method_hub import get_native_concept
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.urls import URLs

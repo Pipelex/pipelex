@@ -92,6 +92,26 @@ Each plugin translates Pipelex's unified interface into provider-specific API ca
 
 ---
 
+## What Keeps The Layers Apart: The Two Hubs
+
+The two layers above would be a diagram rather than an architecture if nothing enforced the split. What enforces it is the **hub** — the mechanism every component uses to reach a shared dependency (the config, a model deck, the pipe library) without importing the module that owns it.
+
+There are two hubs, and the boundary between them *is* the boundary between the layers:
+
+- [**`pipelex/service_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/service_hub.py) — process-scoped infrastructure. Config, console, secrets, storage, telemetry, the model deck, the inference workers, the content generator, the plugin registries. Configured once at boot; identical for every method the process runs.
+- [**`pipelex/method_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/method_hub.py) — library-scoped method machinery. The library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager, the PipeFunc executor. Tied to the method that is loaded.
+
+One rule governs them:
+
+!!! note "The one arrow"
+    `method_hub` imports `service_hub`. **`service_hub` never imports `method_hub`.**
+
+The practical consequence is that the low-level COGT layer cannot reach the high-level interpreter. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
+
+Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is verified — is in [Hub Layering](../contribute/hub-layering.md).
+
+---
+
 ## How It All Fits Together
 
 ```mermaid

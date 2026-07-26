@@ -11,12 +11,12 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.config import get_config
-from pipelex.hub import get_telemetry_manager
 from pipelex.kit.cursor_rules import remove_cursor_rules, update_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.index_models import KitIndex, Target
 from pipelex.kit.single_file_agent_rules import remove_from_targets, update_single_file_agent_rules
 from pipelex.pipelex import Pipelex
+from pipelex.service_hub import get_telemetry_manager
 from pipelex.system.configuration.configs import AgentTarget
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty

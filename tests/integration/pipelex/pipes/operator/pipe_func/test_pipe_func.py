@@ -9,7 +9,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_router
+from pipelex.method_hub import get_pipe_router
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory

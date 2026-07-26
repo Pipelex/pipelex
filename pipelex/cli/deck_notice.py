@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 
 from pipelex.cogt.models.deck_manifest import is_deck_stale_fast
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 
 DECK_NOTICE_SUPPRESS_ENV_VAR = "PIPELEX_NO_DECK_NOTICE"

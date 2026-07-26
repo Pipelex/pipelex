@@ -1,7 +1,6 @@
 from enum import StrEnum
 from typing import NamedTuple, cast
 
-from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
@@ -19,14 +18,7 @@ from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
-
-
-def _get_class_registry() -> ClassRegistryAbstract:
-    """Lazy import to break circular dependency with hub.py."""
-    import importlib  # noqa: PLC0415
-
-    hub = importlib.import_module("pipelex.hub")
-    return hub.get_class_registry()  # type: ignore[no-any-return]
+from pipelex.system.registries.class_registry_access import get_class_registry
 
 
 class StructureNameAndRefine(NamedTuple):
@@ -358,7 +350,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return qualified_class_name
 
@@ -399,7 +391,7 @@ class ConceptFactory:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=NativeConceptCode.TEXT.concept_ref)
 
@@ -445,7 +437,7 @@ class ConceptFactory:
                 )
                 raise ConceptFactoryError(msg) from exc
 
-            _get_class_registry().register_class(the_generated_class)
+            get_class_registry().register_class(the_generated_class)
             return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 
         # Get the refined concept's structure class name
@@ -476,7 +468,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        _get_class_registry().register_class(the_generated_class)
+        get_class_registry().register_class(the_generated_class)
 
         return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pipelex.hub import (
+from pipelex.method_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,

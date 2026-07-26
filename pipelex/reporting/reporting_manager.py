@@ -12,9 +12,9 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
 from pipelex.graph.trace_context import TraceContext
-from pipelex.hub import is_in_isolated_execution
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.service_hub import is_in_isolated_execution
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.activity_event_log import ActivityEventLogCache
 from pipelex.tracing.event_log_protocol import EventLogProtocol

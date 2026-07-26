@@ -1,6 +1,5 @@
 from typing import Any, Callable
 
-from kajson.class_registry_abstract import ClassRegistryAbstract
 from mthds.protocol.concept import ConceptAbstract
 from pydantic import field_validator
 
@@ -19,16 +18,9 @@ from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.system.registries.class_registry_access import get_class_registry
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
-
-
-def _get_class_registry() -> ClassRegistryAbstract:
-    """Lazy import to break circular dependency between concept.py and hub.py."""
-    import importlib  # noqa: PLC0415
-
-    hub = importlib.import_module("pipelex.hub")
-    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class Concept(ConceptAbstract):
@@ -138,8 +130,8 @@ class Concept(ConceptAbstract):
         # Check class-based compatibility
         # This now works even when one or both concepts have refines, since we generate
         # structure classes that inherit from the refined concept's class
-        concept_1_class = _get_class_registry().get_class(name=concept_1.structure_class_name)
-        concept_2_class = _get_class_registry().get_class(name=concept_2.structure_class_name)
+        concept_1_class = get_class_registry().get_class(name=concept_1.structure_class_name)
+        concept_2_class = get_class_registry().get_class(name=concept_2.structure_class_name)
 
         if concept_1_class is None or concept_2_class is None:
             return False
@@ -165,9 +157,9 @@ class Concept(ConceptAbstract):
 
     @classmethod
     def is_valid_structure_class(cls, structure_class_name: str) -> bool:
-        if _get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
+        if get_class_registry().has_subclass(name=structure_class_name, base_class=StuffContent):
             return True
-        if _get_class_registry().has_class(name=structure_class_name):
+        if get_class_registry().has_class(name=structure_class_name):
             log.warning(f"Concept class '{structure_class_name}' is registered but it's not a subclass of StuffContent")
         return False
 
@@ -177,7 +169,7 @@ class Concept(ConceptAbstract):
         Returns:
             The StuffContent subclass, or None if not found
         """
-        structure_class = _get_class_registry().get_class(name=self.structure_class_name)
+        structure_class = get_class_registry().get_class(name=self.structure_class_name)
         if structure_class is None:
             msg = f"Concept class '{self.structure_class_name}' not found"
             raise ConceptValueError(msg)
@@ -185,7 +177,7 @@ class Concept(ConceptAbstract):
 
     def search_for_nested_image_fields_in_structure_class(self) -> list[str]:
         """Recursively search for image fields in a structure class."""
-        structure_class = _get_class_registry().get_required_subclass(name=self.structure_class_name, base_class=StuffContent)
+        structure_class = get_class_registry().get_required_subclass(name=self.structure_class_name, base_class=StuffContent)
         if not issubclass(structure_class, StuffContent):
             msg = f"Concept class '{self.structure_class_name}' is not a subclass of StuffContent"
             raise PipelexUnexpectedError(msg)

@@ -12,10 +12,10 @@ from rich.traceback import Traceback
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes
+from pipelex.service_hub import get_console
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,

@@ -17,8 +17,8 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.hub import get_storage_provider
 from pipelex.pipeline.exceptions import PipelineInputContentError
+from pipelex.service_hub import get_storage_provider
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract

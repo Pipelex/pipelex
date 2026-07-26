@@ -29,13 +29,13 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.reporting.cost_report_renderer import render_cost_report_for_output
+from pipelex.service_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError

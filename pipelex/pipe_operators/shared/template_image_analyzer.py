@@ -11,7 +11,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_native_concept, get_required_concept
+from pipelex.method_hub import get_native_concept, get_required_concept
 from pipelex.pipe_operators.shared.exceptions import UnusedInputError, WithImagesFilterError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName

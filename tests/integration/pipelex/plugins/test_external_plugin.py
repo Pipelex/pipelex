@@ -14,8 +14,8 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.hub import get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_report_delegate
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 

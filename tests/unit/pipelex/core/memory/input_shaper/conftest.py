@@ -12,7 +12,8 @@ import pytest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.hub import get_class_registry, get_concept_library
+from pipelex.method_hub import get_concept_library
+from pipelex.service_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.memory.input_shaper.data import CONCEPT_DEFS, CONCEPT_REFS, REFINING_CLASSES, SHAPER_TEST_DOMAIN
 

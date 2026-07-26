@@ -15,15 +15,11 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import (
-    get_concept_library,
-    get_content_generator,
-    get_model_deck,
-    get_native_concept,
-)
+from pipelex.method_hub import get_concept_library, get_native_concept
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_content_generator, get_model_deck
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.page_content import PageContent

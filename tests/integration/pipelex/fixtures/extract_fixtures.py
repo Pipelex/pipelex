@@ -6,7 +6,7 @@ import pytest
 
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.hub import get_model_deck
+from pipelex.service_hub import get_model_deck
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 

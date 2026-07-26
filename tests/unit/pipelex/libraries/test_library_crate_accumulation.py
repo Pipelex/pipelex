@@ -5,9 +5,9 @@ from typing import cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.hub import clear_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager import LibraryManager
+from pipelex.method_hub import clear_current_library, get_library_manager, set_current_library
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 
 

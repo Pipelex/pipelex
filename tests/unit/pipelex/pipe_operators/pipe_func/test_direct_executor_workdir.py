@@ -9,8 +9,8 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.method_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.pipe_operators.func import direct_pipe_func_executor
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest

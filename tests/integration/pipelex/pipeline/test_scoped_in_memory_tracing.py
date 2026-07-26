@@ -19,9 +19,9 @@ from pytest_mock import MockerFixture
 
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import scoped_event_log
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.service_hub import scoped_event_log
 from pipelex.system.configuration.configs import NdjsonTracingConfig, TracingBackend
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 

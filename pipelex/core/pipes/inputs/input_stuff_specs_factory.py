@@ -8,7 +8,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecsFactoryError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, PipeInputsRoot
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
-from pipelex.hub import get_required_concept
+from pipelex.method_hub import get_required_concept
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity

@@ -9,7 +9,7 @@ from pipelex.cogt.inference.inference_manager_protocol import InferenceManagerPr
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.llm_worker_factory import LLMWorkerFactory
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.hub import get_models_manager, get_report_delegate
+from pipelex.service_hub import get_models_manager, get_report_delegate
 
 
 class InferenceManager(InferenceManagerProtocol):

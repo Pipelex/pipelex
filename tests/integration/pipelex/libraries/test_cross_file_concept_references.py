@@ -12,8 +12,8 @@ from collections.abc import Callable
 import pytest
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.hub import get_library_manager
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
+from pipelex.method_hub import get_library_manager
 
 CONCEPT_MTHDS = """
 domain = "crossref"

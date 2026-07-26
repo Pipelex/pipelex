@@ -10,8 +10,8 @@ from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.hub import get_img_gen_worker
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.service_hub import get_img_gen_worker
 from pipelex.tools.misc.image_utils import ImageFormat
 from tests.cases import ImageTestCases
 from tests.integration.pipelex.fixtures.img_gen_fixtures import skip_if_img_gen_params_unsupported

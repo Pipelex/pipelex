@@ -17,7 +17,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.handle_pipe_errors import extract_wrapped_pipe_validation_error
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_library
+from pipelex.method_hub import get_pipe_library
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_operators.func.pipe_func import PipeFunc

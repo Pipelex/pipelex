@@ -4,8 +4,8 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.hub import get_library_manager, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.method_hub import get_library_manager, set_current_library
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 
 

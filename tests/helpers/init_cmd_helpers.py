@@ -200,7 +200,7 @@ class MockedInitEnvironment:
         self.mock_console = self.mocker.MagicMock()
 
         # Patch modules that use the Pipelex hub console provider
-        self.mocker.patch("pipelex.hub.get_console", return_value=self.mock_console)
+        self.mocker.patch("pipelex.service_hub.get_console", return_value=self.mock_console)
         self.mocker.patch("pipelex.cli.commands.init.command.get_console", return_value=self.mock_console)
         self.mocker.patch("pipelex.cli.commands.init.backends.get_console", return_value=self.mock_console)
         self.mocker.patch("pipelex.cli.commands.init.routing.get_console", return_value=self.mock_console)

@@ -4,7 +4,7 @@ import pytest
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.hub import get_concept_library
+from pipelex.method_hub import get_concept_library
 from pipelex.pipe_signature.pipe_signature_blueprint import PipeSignatureBlueprint
 
 SIGNATURES_DOMAIN_CODE = "sigtests"

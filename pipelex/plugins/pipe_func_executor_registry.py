@@ -1,8 +1,17 @@
 from collections.abc import Callable
+from typing import TYPE_CHECKING, TypeAlias
 
-from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 from pipelex.plugins.exceptions import UnknownPipeFuncExecutionModeError
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
+
+if TYPE_CHECKING:
+    # Deferred on purpose: the protocol lives under ``pipe_operators`` (the method-interpretation
+    # layer) but this registry is imported from ``pipelex.config``, which the inference layer loads.
+    # A module-level import here would drag the interpreter into every closure that touches
+    # inference — the exact coupling the service_hub / method_hub split removes. The underlying
+    # placement inversion (a ``plugins`` module typed by a ``pipe_operators`` protocol) is recorded
+    # in docs/contribute/hub-layering.md as a known inversion.
+    from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
 
 # The one in-process execution mode core always owns. Every other mode is a remote/sandbox backend
 # contributed by a plugin (e.g. an out-of-tree ``daytona`` backend) and, by the seam's invariant,
@@ -12,7 +21,7 @@ DIRECT_PIPE_FUNC_EXECUTION_MODE = "direct"
 # A plugin's factory for one PipeFunc execution mode: the pipe_func config in, an executor out. The
 # whole ``PipeFuncConfig`` (not a pre-resolved value) is passed so a factory can read whatever it
 # needs at the boot apply-point, never at registration — mirrors ``StorageProviderFactoryFn``.
-PipeFuncExecutorFactoryFn = Callable[[PipeFuncConfig], PipeFuncExecutorProtocol]
+PipeFuncExecutorFactoryFn: TypeAlias = Callable[[PipeFuncConfig], "PipeFuncExecutorProtocol"]
 
 
 class PipeFuncExecutorRegistry:

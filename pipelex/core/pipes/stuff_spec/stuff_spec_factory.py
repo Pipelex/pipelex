@@ -4,7 +4,7 @@ from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.hub import get_required_concept
+from pipelex.method_hub import get_required_concept
 
 
 class StuffSpecFactory:

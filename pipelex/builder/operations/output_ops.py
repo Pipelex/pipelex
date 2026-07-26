@@ -7,7 +7,7 @@ from typing import Any
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.output.output_renderer import render_output
-from pipelex.hub import get_required_pipe
+from pipelex.method_hub import get_required_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 

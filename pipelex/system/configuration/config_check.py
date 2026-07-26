@@ -1,6 +1,6 @@
 from rich.panel import Panel
 
-from pipelex.hub import get_console
+from pipelex.service_hub import get_console
 from pipelex.system.configuration.config_loader import CONFIG_NAME, config_manager
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs

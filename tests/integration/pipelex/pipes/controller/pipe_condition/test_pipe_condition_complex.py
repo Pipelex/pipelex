@@ -12,7 +12,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.inputs.exceptions import PipeRunInputsError
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_pipe_router, get_required_pipe
+from pipelex.method_hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode

@@ -48,7 +48,7 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_concept_library, get_native_concept
+from pipelex.method_hub import get_concept_library, get_native_concept
 from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 

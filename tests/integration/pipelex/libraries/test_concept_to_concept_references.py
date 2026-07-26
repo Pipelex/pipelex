@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.hub import get_library_manager
+from pipelex.method_hub import get_library_manager
 
 
 class TestConceptToConceptReferences:
