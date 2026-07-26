@@ -34,8 +34,10 @@ Two deliberate carve-outs:
 - **``if TYPE_CHECKING:`` blocks are exempt from the layer rule** (but not from the dead-module rule).
   The rule is about what *loads*, and a type-only import loads nothing — deferring a type-only need
   under ``TYPE_CHECKING`` is this repo's sanctioned pattern for it (see the ``pipe_func_executor_registry``
-  note in ``docs/contribute/hub-layering.md``). A ``pipelex.hub`` import stays a violation there,
-  since the module does not exist in any phase.
+  note in ``docs/contribute/hub-layering.md``). Only ``TYPE_CHECKING`` and ``typing.TYPE_CHECKING``
+  open such a block — an attribute of anything else is an ordinary runtime condition and earns no
+  exemption. A ``pipelex.hub`` import stays a violation there, since the module does not exist in any
+  phase.
 - An inline ``# hub-layering: ignore`` comment anywhere on the offending statement suppresses it,
   mirroring the ``# kw-only: ignore`` escape hatch of the sibling keyword-only guard.
 
@@ -120,6 +122,9 @@ ESCAPE_HATCH_MARKER = "# hub-layering: ignore"
 #: The ``typing.TYPE_CHECKING`` flag name, matched bare (``TYPE_CHECKING``) or attributed (``typing.TYPE_CHECKING``).
 TYPE_CHECKING_NAME = "TYPE_CHECKING"
 
+#: The only receiver the attributed form may be rooted at, so an unrelated ``x.TYPE_CHECKING`` earns no exemption.
+TYPING_MODULE_NAME = "typing"
+
 
 class HubLayeringViolationKind(StrEnum):
     """The distinct hub-layering violation kinds — each names its own remedy."""
@@ -194,12 +199,15 @@ def _is_type_checking_test(*, test: ast.expr) -> bool:
     """Whether an ``if`` test is the bare ``TYPE_CHECKING`` / ``typing.TYPE_CHECKING`` flag.
 
     Only the bare forms count: ``if not TYPE_CHECKING:`` guards a *runtime* branch and is not exempt.
+    The attributed form must be rooted at ``typing`` itself — matching the attribute name alone would
+    hand the layer-rule exemption to any ``some_object.TYPE_CHECKING:`` block, which is a runtime
+    condition like any other.
     """
     match test:
         case ast.Name(id=name):
             return name == TYPE_CHECKING_NAME
-        case ast.Attribute(attr=attr):
-            return attr == TYPE_CHECKING_NAME
+        case ast.Attribute(value=ast.Name(id=receiver), attr=attr):
+            return receiver == TYPING_MODULE_NAME and attr == TYPE_CHECKING_NAME
         case _:
             return False
 

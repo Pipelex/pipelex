@@ -46,6 +46,20 @@ RUNTIME_LAYER_ENTRY_POINTS = [
     "pipelex.core.stuffs.stuff_factory",
 ]
 
+#: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`
+#: string, so nothing type-checks or lints the names inside it. A typo in `INTERPRETER_PACKAGES` or
+#: `is_interpreter` would make every entry point above pass *vacuously*, forever, and the suite would
+#: stay green while guarding nothing. This entry point is dirty by definition — the interpreter hub
+#: is the interpreter — so it must come back a failure, *reported as offending modules*, whatever
+#: else changes. Asserting the offender message and not merely the exit code is what pins the
+#: predicate: the `sys.modules` check below would exit 1 for this entry point either way.
+DIRTY_ENTRY_POINT = "pipelex.interpreter_hub"
+
+#: Wall-clock bound on one closure subprocess. Each case spawns a fresh interpreter importing heavy
+#: modules; without a bound, a deadlock presents as a hung suite rather than a failure, which this
+#: repo has a documented history of (`docs/agents/debugging-hanging-pytest-runs.md`).
+SUBPROCESS_TIMEOUT_SECONDS = 300
+
 _CLOSURE_SCRIPT = textwrap.dedent(
     """
     import importlib
@@ -94,19 +108,42 @@ _CLOSURE_SCRIPT = textwrap.dedent(
 )
 
 
-class TestHubImportClosure:
-    @pytest.mark.parametrize("entry_point", RUNTIME_LAYER_ENTRY_POINTS)
-    def test_entry_point_loads_no_interpreter_module(self, entry_point: str) -> None:
-        result = subprocess.run(  # noqa: S603
+def _run_closure(*, entry_point: str) -> subprocess.CompletedProcess[str]:
+    """Import one entry point in a fresh interpreter and return the detector's verdict."""
+    try:
+        return subprocess.run(  # noqa: S603
             [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point],
             capture_output=True,
             text=True,
             check=False,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
-        assert result.returncode == 0, (
-            f"hub import-closure guard failed for {entry_point}.\n"
-            "The runtime layer must load without the method interpreter — see docs/contribute/hub-layering.md "
-            "for how to find the shortest import path to an offender.\n"
+    except subprocess.TimeoutExpired as exc:
+        message = f"the closure subprocess for {entry_point} did not finish within {SUBPROCESS_TIMEOUT_SECONDS}s"
+        raise AssertionError(message) from exc
+
+
+class TestHubImportClosure:
+    @pytest.mark.parametrize(
+        ("entry_point", "expected_returncode"),
+        [
+            *((entry_point, 0) for entry_point in RUNTIME_LAYER_ENTRY_POINTS),
+            # The negative control: same detector, opposite verdict. See DIRTY_ENTRY_POINT above.
+            (DIRTY_ENTRY_POINT, 1),
+        ],
+    )
+    def test_closure_verdict_for_entry_point(self, entry_point: str, expected_returncode: int) -> None:
+        result = _run_closure(entry_point=entry_point)
+        assert result.returncode == expected_returncode, (
+            f"unexpected hub import-closure verdict for {entry_point} (wanted exit {expected_returncode}).\n"
+            "Exit 0 means the entry point loaded no interpreter module; exit 1 means the detector found one. "
+            "A runtime-layer entry point failing is a real breach — see docs/contribute/hub-layering.md for how "
+            "to find the shortest import path to an offender. The dirty entry point passing instead means the "
+            "detector has stopped detecting, and every other case above is now vacuous.\n"
             f"stdout={result.stdout}\nstderr={result.stderr}"
         )
-        assert "closure OK" in result.stdout
+        if expected_returncode == 0:
+            assert "closure OK" in result.stdout
+        else:
+            assert "closure OK" not in result.stdout
+            assert "interpreter module(s)" in result.stdout

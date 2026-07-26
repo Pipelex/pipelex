@@ -107,7 +107,7 @@ PY
 
 `pipelex/core/` is not one layer, and trying to declare it one was the mistake this section records. It holds two different kinds of thing:
 
-- **The data model — runtime.** `core.concepts`, `core.domains`, `core.stuffs`, `core.memory`, the input/output *specs* under `core.pipes.inputs` and `core.pipes.stuff_spec`, and `core.pipes.pipe_output`. These describe what a method's values *are*. Nothing in them needs a loaded method, and each measures **zero** interpreter modules. `pipe_output` reads as Pipe machinery but is not: it names no `Pipe` — it holds the working memory, graph spec and usage a run *produced* — and it sits inside `runtime_hub`'s own closure (the chain under [The class-registry exception](#the-class-registry-exception) passes straight through it). It is a runtime-layer module the [guard's declaration](#the-rule--make-check-hub-layering) does not cover, because that declaration is package-granular and `core.pipes` as a whole is not runtime; the closure test covers it instead, since an `interpreter_hub` import there would fail the `pipelex.runtime_hub` entry point.
+- **The data model — runtime.** `core.concepts`, `core.domains`, `core.stuffs`, `core.memory`, the input/output *specs* under `core.pipes.inputs` and `core.pipes.stuff_spec`, and `core.pipes.pipe_output`. These describe what a method's values *are*. Nothing in them needs a loaded method, and each measures **zero** interpreter modules. `pipe_output` reads as Pipe machinery but is not: it names no `Pipe` — it holds the working memory, graph spec and usage a run *produced* — and it sits inside `runtime_hub`'s own closure (the chain under [The class-registry exception](#the-class-registry-exception) passes straight through it). It is a runtime-layer module the [guard's declaration](#the-rule-make-check-hub-layering) does not cover, because that declaration is package-granular and `core.pipes` as a whole is not runtime; the closure test covers it instead, since an `interpreter_hub` import there would fail the `pipelex.runtime_hub` entry point.
 - **The Pipe machinery — interpreter.** `core.pipes.pipe_abstract`, `pipe_blueprint`, `pipe_factory`, `core.pipes.rendering`, `core.bundles`, `core.interpreter`, and `core.registry_models`. Every one of them names a `Pipe`, and a pipe is the interpreter's own object — they import `pipe_operators` / `pipe_controllers` / `libraries` **directly**, not through a hub. `core.bundles.pipelex_bundle_blueprint` is a discriminated union over every pipe blueprint; `core.registry_models` is a registry of every pipe kind. No amount of dependency injection makes those runtime.
 
 So the runtime-layer declaration lists core's data-model packages by name. `pipelex.core` itself is deliberately *not* a declared package: writing it would claim a property the measurement contradicts.
@@ -191,7 +191,7 @@ The guard resolves relative imports (`from ...interpreter_hub import …`) again
 
 Two deliberate carve-outs:
 
-- **`if TYPE_CHECKING:` blocks are exempt from the layer rule** — the rule is about what *loads*, and a type-only import loads nothing. Its `else` branch is not exempt, nor is `if not TYPE_CHECKING:`, and the dead-module rule applies inside `TYPE_CHECKING` too (a deleted module exists in no phase).
+- **`if TYPE_CHECKING:` blocks are exempt from the layer rule** — the rule is about what *loads*, and a type-only import loads nothing. Only `TYPE_CHECKING` and `typing.TYPE_CHECKING` open such a block: an attribute of any other receiver (`settings.TYPE_CHECKING:`) is an ordinary runtime condition and earns no exemption. The `else` branch is not exempt either, nor is `if not TYPE_CHECKING:`, and the dead-module rule applies inside `TYPE_CHECKING` too (a deleted module exists in no phase).
 - An inline `# hub-layering: ignore` comment anywhere on the offending statement suppresses it, mirroring `# kw-only: ignore`. There is exactly one in the tree, on the guard's own declaration of the forbidden path.
 
 `tests/` is scanned for the dead-module rule only. `tests.*` sits in no declared layer, so a test may freely patch `pipelex.interpreter_hub` — while a stale `pipelex.hub` patch target, the landmine above, still fails the check.
@@ -202,7 +202,9 @@ Two deliberate carve-outs:
 
 Its predicate is stricter than the one-liner above: besides the five interpreter top-level packages it names core's Pipe-machinery modules one by one, because most of them only get caught *transitively* — through the `pipe_operators` / `libraries` they pull in — and `core.pipes.pipe_blueprint` pulls in none of it, so a runtime-layer import of it would otherwise pass. Naming them is what makes the predicate state the boundary rather than approximate it. What the predicate deliberately cannot name yet is `pipeline`, `pipe_run` and `core.bundles.exceptions`: interpreter-named homes whose leaf models already land in every runtime closure — `core.pipes.pipe_output` reaches `pipeline.pipeline_models` for a single leaf constant, for instance. Naming them today would fail every entry point on a placement wart rather than a broken arrow. Move the leaves to a runtime-layer home first, then widen the predicate.
 
-Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons and that the reset really releases the scoping an `InterpreterHub` installed.
+The detector lives inside a `textwrap.dedent` string, so no linter or type checker sees the names in it and a typo would make every entry point pass *vacuously*. A negative control closes that: `pipelex.interpreter_hub` is dirty by definition, and the test asserts it comes back reported as offending modules — so a detector that has stopped detecting fails rather than going quietly green. Each subprocess is time-bounded, because an unbounded one turns a deadlock into a hung suite instead of a failure.
+
+Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons, and that the production `Pipelex.teardown` — not a stand-in calling `class_registry_scoping.reset()` directly — really releases the scoping an `InterpreterHub` installed, and that the next boot re-installs it.
 
 ### This document — the `hub-layering-convention` drift contract
 
@@ -211,7 +213,7 @@ The guard and the closure test keep the *code* honest; neither can tell whether 
 Two checks make that review mechanical rather than a re-read, and are the ones to run:
 
 - Extract every public module-level symbol from `runtime_hub` and `interpreter_hub` and confirm each appears in the partition tables above. An undocumented accessor is the failure mode this contract exists to catch.
-- Import `RUNTIME_LAYER_PACKAGES` from the guard and confirm every declared package is named under [The rule](#the-rule--make-check-hub-layering).
+- Import `RUNTIME_LAYER_PACKAGES` from the guard and confirm every declared package is named under [The rule](#the-rule-make-check-hub-layering).
 
 ## Known inversions
 

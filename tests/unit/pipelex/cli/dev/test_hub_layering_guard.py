@@ -175,6 +175,21 @@ class TestHubLayeringGuard:
         assert _kinds(violations) == {HubLayeringViolationKind.INTERPRETER_HUB_IMPORT}
         assert violations[0].lineno == 5
 
+    def test_type_checking_on_an_unrelated_receiver_is_not_exempt(self) -> None:
+        """The attributed form must be rooted at `typing` — any other receiver is a runtime condition.
+
+        Matching the attribute name alone would let `settings.TYPE_CHECKING:` or a stub module's flag
+        open an exempt block, which is a real import at runtime.
+        """
+        for receiver in ("settings", "compat", "not_typing"):
+            violations = _violate(
+                f"""
+                if {receiver}.TYPE_CHECKING:
+                    from pipelex.interpreter_hub import InterpreterHub
+                """
+            )
+            assert _kinds(violations) == {HubLayeringViolationKind.INTERPRETER_HUB_IMPORT}, receiver
+
     def test_negated_type_checking_is_not_exempt(self) -> None:
         """`if not TYPE_CHECKING:` guards a runtime branch, so it earns no exemption."""
         violations = _violate(

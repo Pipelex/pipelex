@@ -2,9 +2,9 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **PR:** [#1062 → `dev`](https://github.com/Pipelex/pipelex/pull/1062), open.
 
-**Status:** **ALL PHASES DONE + THE RENAME LANDED + PHASE A OF THE REVIEW FOLLOW-UPS APPLIED — all gates green.** PR #1062 is open. **Jump to [Checkpoint A record](#checkpoint-a-record--pr-1062-review-follow-ups) first**, then [▶ Resume here](#-resume-here-the-rename-is-landed) for the state it builds on.
+**Status:** **ALL PHASES DONE + THE RENAME LANDED + PHASES A AND B OF THE REVIEW FOLLOW-UPS APPLIED — all gates green.** PR #1062 is open. **Jump to [Checkpoint B record](#checkpoint-b-record--test-hardening) first**, then [Checkpoint A record](#checkpoint-a-record--pr-1062-review-follow-ups), then [▶ Resume here](#-resume-here-the-rename-is-landed) for the state they build on.
 
-> ⚠ **The `/review` follow-ups are partially applied.** The executable plan is [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. **Phase A (A1's doc-honesty fix + A2–A8) is done**, recorded at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups). **Phase B (test hardening) and Phase C (release-wave additions) are not started**, and neither is the F1 remedy.
+> ⚠ **The `/review` follow-ups are partially applied.** The executable plan is [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. **Phase A (A1's doc-honesty fix + A2–A8) is done**, recorded at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups); **Phase B (test hardening, B1–B7) is done**, recorded at [Checkpoint B](#checkpoint-b-record--test-hardening) — every item mutation-verified. **Phase C (release-wave additions) is not started**, and neither is the F1 remedy.
 >
 > **The defect Phase A documents is still live**, deliberately: the layer rule is enforced only one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package load `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. Re-verified twice — 2026-07-26 by the review, and again at Checkpoint A before publishing the numbers. Three things about it are settled and worth not re-deriving: the blast radius is exactly 4 of 476 declared runtime-layer modules, all in `plugins` (the other ten packages are clean across 345 modules); there are three transitive routes, not just the `runtime_bridge` one named in the first draft, and only two of the four modules are leaves; and **the shipped 0-interpreter-modules headline property is *not* damaged** — the inference layer and `runtime_hub` still measure 0 and never reach the breaching modules. What was false was the doc's *scope claim*, and A1 fixed exactly that.
 >
@@ -569,8 +569,36 @@ Re-taken here rather than copied — see the [H-4 table](#measured-after-1) for 
 #### Not in this checkpoint
 
 - **The F1 remedy** — (d) split the built-ins by layer + (c) teach the guard the transitive check. Its own PR after #1062 merges, per D-R4. Until it lands, Known inversions is the record that keeps the breach visible.
-- **[Phase B](wip/hub/pr-1062-review-followups.md#phase-b--test-hardening)** — test hardening, additive, approved but not started.
 - **[Phase C](wip/hub/pr-1062-review-followups.md#phase-c--release-wave-additions)** — folded into the release-gated cross-repo sweep per D-R1. It adds a governed `docs/specs/` + `conformance/` surface and five consumer repos the [sweep tables](#cross-repo-sweep) below are missing, including `pipelex-transport`, whose `bridge.py` calls a changed signature in production code.
+
+[Phase B](#checkpoint-b-record--test-hardening) followed immediately and is now applied too.
+
+### Checkpoint B record — test hardening
+
+Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,358 files, keyword-only PASSED, hub-layering PASSED) · full `make agent-test` ✅ · `make drift-check` ✅ (one contract re-opened, reviewed and acked — see below).
+
+Phase B of [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) is applied in full: B1–B7. Three new test modules, three hardened ones, one guard fix.
+
+**Every item was verified by mutation.** Watching a new test go green proves nothing about what it pins, and two of these items exist precisely because an existing test *appeared* to pin something it did not. So for each one the pinned behavior was removed, the new test confirmed to fail, and the mutation reverted. What that turned up is worth keeping:
+
+- **B1's mutation is the finding, restated as a fact.** Deleting `class_registry_scoping.reset()` from `Pipelex.teardown` fails the new test and *only* it — the three other tests in the module, including the pre-existing one that calls `reset()` directly under a `# what Pipelex.teardown does` comment, stay green. That comment was the whole safety net. The simulation test is kept, because it does pin `reset()`'s own semantics; its comment now says so instead of overclaiming.
+- **B2 needed a stronger assertion than the plan specified.** The plan said to assert `returncode == 1` on a known-dirty entry point. That would **not** have worked: the closure script's *second* check (`pipelex.interpreter_hub in sys.modules`) exits 1 for `pipelex.interpreter_hub` whatever the offender predicate does, so the control would have passed over a completely broken detector. The test asserts the offender *message* too. Confirmed by mutation: typo-ing `INTERPRETER_PACKAGES` and emptying `INTERPRETER_CORE` fails the control while all eight real entry points pass vacuously — the exact failure mode the item was written against.
+- **B5's mutation reproduces the regression the finding describes.** Making `resolve_input_kind` accept `concept_provider` and then call `get_concept_library()` anyway fails the new test alone, with the other 69 `input_shaper` tests green. Before it, that regression failed nothing anywhere.
+- **B3 and B4** fail 4-of-6 and 2-of-5 respectively when their gates are removed (`sys.exit(1)` deleted from both command paths; the `__pycache__` skip dropped from `iter_source_files`).
+- **B6 is a fix, not just a test.** `_is_type_checking_test` matched `ast.Attribute(attr=...)` with an unconstrained receiver, so `settings.TYPE_CHECKING:` — an ordinary runtime condition — claimed the layer-rule exemption. Tightened to require the receiver to be `typing`. Verified safe before tightening: nothing in `pipelex/` or `tests/` uses the attributed form at all, so there was no alias (`import typing as t`) to break.
+
+**B6 re-opened the `hub-layering-convention` drift contract**, which the plan had said Phase B would not do — `hub_layering_guard.py` is one of its triggers. Reviewed and acked. Both prescribed mechanical checks were re-run (33 + 32 public module-level hub symbols all present in the partition tables; all 12 declared runtime-layer entries named under Enforcement), and `docs/contribute/hub-layering.md` gained the receiver constraint on its `TYPE_CHECKING` bullet.
+
+**One observation from that ack is worth carrying forward.** The read-through caught staleness the contract's triggers structurally cannot see: B1/B2/B7 changed the two test modules the doc has sections on, and neither test file is a trigger — deliberately, per the contract's initial scoping. So the contract fired on the guard, and the review found the spillover. That is not an argument for widening the triggers (the scoping was Louis' call, and the spillover was caught anyway); it is evidence that a review target's value is bounded by what the reviewer reads, not by what opened the contract. Recorded in `wip/drift-contracts/dogfood-log.md` as this contract's second consecutive `real-catch`.
+
+**Two things caught in passing, both fixed here:**
+
+- **The plan's B2 instruction would not have worked as written** — see the bullet above. Recorded because it generalizes: a negative control that asserts only an exit code is only as strong as the *first* thing that can produce it.
+- **Two dead anchor links in `hub-layering.md`**, pre-existing since the page was written and invisible to every gate the branch runs — `make docs-check` reports them as `INFO`, not a failure. The heading is `### The rule — \`make check-hub-layering\``, and Python-Markdown strips the em dash rather than turning it into a second hyphen, so `#the-rule--make-check-hub-layering` never resolved. Confirmed against the built site's real `id`, and confirmed pre-existing by re-running the check with Phase B stashed.
+
+**No CHANGELOG entry.** Phase B adds tests and tightens a `pipelex-dev` guard, and `pipelex/cli/dev_cli` is excluded from both wheel and sdist — nothing here reaches a release consumer.
+
+The measurement is untouched by Phase B — no production module changed except the guard, which is dev-CLI-only and outside every closure. The [Checkpoint A column](#measured-after-1) stands.
 
 ## Exit criteria — measured, not asserted
 

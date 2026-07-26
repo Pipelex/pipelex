@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from pipelex.interpreter_hub import (
     InterpreterHub,
     clear_current_library,
+    get_current_library_id_or_none,
     get_interpreter_hub,
     get_library_manager,
     set_current_library,
@@ -22,10 +23,16 @@ from pipelex.interpreter_hub import (
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub, get_class_registry
 from pipelex.system.registries.class_registry_access import class_registry_scoping
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 
 class LifecycleScopedModel(BaseModel):
     lifecycle_field: str
+
+
+def _test_integration_mode() -> IntegrationMode:
+    """The boot mode the session conftest uses, so a re-boot here matches the one it replaces."""
+    return IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
 
 
 class TestHubLifecycle:
@@ -52,10 +59,11 @@ class TestHubLifecycle:
             library_manager.teardown(library_id=library_id)
 
     def test_reset_releases_the_class_registry_scoping(self) -> None:
-        """The reset teardown performs drops scoping, so a torn-down manager is unreachable.
+        """The reset primitive drops scoping, so a torn-down manager is unreachable.
 
         Without it, a still-pinned library_id would keep routing ``get_class_registry`` through a
-        library manager whose libraries have been released.
+        library manager whose libraries have been released. This pins ``reset()``'s own semantics;
+        that ``Pipelex.teardown`` actually calls it is pinned by the last test in this class.
         """
         library_manager = get_library_manager()
         library_id, library = library_manager.open_library()
@@ -78,3 +86,46 @@ class TestHubLifecycle:
             library_manager.teardown(library_id=library_id)
 
         assert get_class_registry() is KajsonManager.get_class_registry()
+
+    def test_the_real_teardown_releases_scoping_and_a_fresh_boot_reinstalls_it(self) -> None:
+        """The production ``Pipelex.teardown`` path, not a stand-in for it — and the boot that follows.
+
+        The sibling test above calls ``class_registry_scoping.reset()`` directly, which pins the
+        primitive but nothing about the wiring: delete the ``reset()`` line from ``Pipelex.teardown``
+        and every other test still passes, because a stale ``_library_id`` resolves to ``None`` and
+        falls back to the global registry rather than raising. This test is the one that notices, and
+        it also pins the other half — that a fresh boot re-installs the resolver rather than leaving
+        the process permanently unscoped.
+
+        Runs last in this class: it tears the process singleton down and rebuilds it, so it must not
+        run ahead of the tests that read the booted instance.
+        """
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        scoped_registry = ClassRegistry()
+        scoped_registry.register_class(LifecycleScopedModel)
+        library.set_class_registry(scoped_registry)
+        set_current_library(library_id=library_id)
+        assert get_class_registry() is scoped_registry
+
+        Pipelex.teardown_if_needed()
+
+        # Teardown does not clear the contextvar, so the library stays pinned — releasing the
+        # resolver is the whole of what makes the torn-down library unreachable through it.
+        assert get_current_library_id_or_none() == library_id
+        assert get_class_registry() is KajsonManager.get_class_registry()
+
+        clear_current_library()
+        Pipelex.make(integration_mode=_test_integration_mode())
+
+        fresh_manager = get_library_manager()
+        fresh_library_id, fresh_library = fresh_manager.open_library()
+        fresh_registry = ClassRegistry()
+        fresh_registry.register_class(LifecycleScopedModel)
+        fresh_library.set_class_registry(fresh_registry)
+        set_current_library(library_id=fresh_library_id)
+        try:
+            assert get_class_registry() is fresh_registry
+        finally:
+            clear_current_library()
+            fresh_manager.teardown(library_id=fresh_library_id)
