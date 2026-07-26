@@ -30,7 +30,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipelex import Pipelex
-from pipelex.service_hub import get_console, get_model_deck
+from pipelex.runtime_hub import get_console, get_model_deck
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path

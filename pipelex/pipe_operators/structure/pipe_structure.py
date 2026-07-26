@@ -19,12 +19,12 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.method_hub import get_concept_library, get_native_concept
+from pipelex.interpreter_hub import get_concept_library, get_native_concept
 from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.service_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.runtime_hub import get_class_registry, get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.template_category import TemplateCategory
 

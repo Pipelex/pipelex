@@ -1,12 +1,12 @@
-# TODOS — split `pipelex.hub` into `service_hub` + `method_hub`
+# TODOS — split `pipelex.hub` into `runtime_hub` + `interpreter_hub`
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **ALL PHASES DONE — CHECKPOINT H-4 CLOSED, all gates green.** Branch `refactor/Hub`, not pushed. **Jump to [▶ Resume here](#-resume-here-h-4-is-closed-the-rename-is-next) first** — the next piece of work is the settled runtime/interpreter rename.
+**Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub`, not pushed. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
 
-The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the low layer behind injected providers. Every low-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written.
+The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
-**What is left is not a phase** — it is the settled [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md), then the release-gated [cross-repo sweep](#cross-repo-sweep) (now three waves), plus one open decision for Louis (the drift contract).
+**What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (three waves), plus one open decision for Louis (the drift contract).
 
 ### Cold start — read in this order
 
@@ -14,7 +14,7 @@ The split is landed, the boundary is mechanically enforced (`make check-hub-laye
 2. [Checkpoint H-4 record](#checkpoint-h-4-record) — **start here**: why the plan's "all of `core/` goes low" premise was wrong, the `if it names a Pipe, it is high` rule that replaced it, and the injected-provider pattern.
 3. [Checkpoint H-3 record](#checkpoint-h-3-record) — the two type moves, why `TraceContext` had to travel with `JobMetadata`, and why the templating primitives split across two packages.
 4. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
-5. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
+5. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `RuntimeHub`; boot was deliberately not reordered).
 6. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification: the two halves, "Where core splits", enforcement, and "Placement, not coupling".
 
 Three notes for whoever picks this up:
@@ -25,13 +25,15 @@ Three notes for whoever picks this up:
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub/hub-split-refactor.md`](wip/hub/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
-⚠ **The names in this document are superseded.** Louis challenged them at the close of H-4 and settled on a rename: the layers become **runtime** / **interpreter**, and the hubs become `runtime_hub` (`RuntimeHub`) / `interpreter_hub` (`InterpreterHub`). It is scheduled **after** H-4 goes green and **before** the release and the cross-repo sweep — that ordering is load-bearing, because the sweep must rewrite external repos exactly once, straight to the final names. The decision, the rejected alternatives, and the mechanical plan are in [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md). Everything else in this tracker stands; only the names change.
+ℹ **The names in this document are the final ones.** Louis challenged the Phase 0–4 naming at the close of H-4 and settled on a rename, which has since **landed as its own commit**: the layers are **runtime** / **interpreter**, and the hubs are `runtime_hub` (`RuntimeHub`) / `interpreter_hub` (`InterpreterHub`). This tracker has been swept to those names — including the cross-repo tables, so the sweep rewrites external repos exactly once, straight to the final names. The intermediate `service_hub` / `method_hub` names never shipped. The decision, the rejected alternatives, and the mechanical plan are in [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md); [D1](#decisions) keeps the original naming decision's reasoning verbatim.
+
+Note that the prose below still uses "low layer" / "high layer" in the historical checkpoint records (H-1 through H-4), because that was the vocabulary at the time. Read *low* as **runtime** and *high* as **interpreter**; the shipped code, tests, guard and docs use only the new terms.
 
 ## The one rule
 
-`method_hub` may import `service_hub`. **`service_hub` must never import `method_hub`.** That single arrow is the whole architecture, and it is what the Phase 2 guard checks.
+`interpreter_hub` may import `runtime_hub`. **`runtime_hub` must never import `interpreter_hub`.** That single arrow is the whole architecture, and it is what the Phase 2 guard checks.
 
-> At H-1 only the forbidden direction is load-bearing; the permitted one turned out to be unused, because the one low-layer thing `method_hub` needs (the class-registry scoping slot) lives below *both* hubs. Importing either hub loads the other in neither direction — stronger than the rule requires. Phase 2's guard should still check the forbidden direction, not assert the permitted one exists.
+> At H-1 only the forbidden direction is load-bearing; the permitted one turned out to be unused, because the one low-layer thing `interpreter_hub` needs (the class-registry scoping slot) lives below *both* hubs. Importing either hub loads the other in neither direction — stronger than the rule requires. Phase 2's guard should still check the forbidden direction, not assert the permitted one exists.
 
 `pipelex/hub.py` is deleted outright — not kept as an alias for either half. A stale import must fail loudly at import time rather than silently resolve to the wrong layer.
 
@@ -59,17 +61,17 @@ Call-site inventory (`ast`-parsed over `pipelex/` + `tests/`, zero symbols left 
 
 ## Decisions
 
-**D1 — module names. SETTLED: `pipelex/service_hub.py` + `pipelex/method_hub.py`,** both flat at the package root, `pipelex/hub.py` deleted. Rejected: keeping `hub.py` for one half (a stale import would silently succeed); `library_hub` (the high half also holds the router, the runner, and the pipeline manager); a `pipelex/hubs/` package (`pipelex.hubs.services` reads worse than `pipelex.service_hub` at 300+ call sites). Noted for review: `method_hub` borrows the MTHDS noun for a runtime container — acceptable because the object genuinely holds the loaded method's libraries, but it is a conscious call against the brand-boundary rule.
+**D1 — module names. SUPERSEDED by the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md); the modules are now `pipelex/runtime_hub.py` + `pipelex/interpreter_hub.py`.** The original decision, kept because its rejected alternatives are still live reasoning: *SETTLED: `pipelex/service_hub.py` + `pipelex/method_hub.py`, both flat at the package root, `pipelex/hub.py` deleted. Rejected: keeping `hub.py` for one half (a stale import would silently succeed); `library_hub` (the high half also holds the router, the runner, and the pipeline manager); a `pipelex/hubs/` package (`pipelex.hubs.services` reads worse than `pipelex.service_hub` at 300+ call sites). Noted for review: `method_hub` borrows the MTHDS noun for a runtime container — acceptable because the object genuinely holds the loaded method's libraries, but it is a conscious call against the brand-boundary rule.* That last note is exactly what Louis acted on at the close of H-4: the flat-at-the-root shape and the no-alias deletion survive unchanged, only the two names moved. `library_hub` was re-proposed and re-rejected during the rename, on the same grounds plus one more — a library is inert, while the container is active machinery.
 
-**D2 — one container or two. SETTLED: two** — `ServiceHub` and `MethodHub`, each its own singleton, each with its own module-level accessors. One container would have to live in the low module, forcing every high-level slot to a quoted `TYPE_CHECKING` annotation — that keeps the god-object and adds a fig leaf. Two is affordable: the construction surface is five sites total.
+**D2 — one container or two. SETTLED: two** — `RuntimeHub` and `InterpreterHub`, each its own singleton, each with its own module-level accessors. One container would have to live in the low module, forcing every high-level slot to a quoted `TYPE_CHECKING` annotation — that keeps the god-object and adds a fig leaf. Two is affordable: the construction surface is five sites total.
 
-**D3 — where `get_pipe_func_executor_registry` lands. SETTLED: high (`method_hub`).** It is a plugin registry by kind but its protocol lives in `pipe_operators/func/`. The underlying inversion — `pipelex/plugins/pipe_func_executor_registry.py` importing from `pipe_operators/` — is recorded as a follow-up (see [Known inversions](#known-inversions-not-fixed-here)), not fixed here.
+**D3 — where `get_pipe_func_executor_registry` lands. SETTLED: high (`interpreter_hub`).** It is a plugin registry by kind but its protocol lives in `pipe_operators/func/`. The underlying inversion — `pipelex/plugins/pipe_func_executor_registry.py` importing from `pipe_operators/` — is recorded as a follow-up (see [Known inversions](#known-inversions-not-fixed-here)), not fixed here.
 
 **D4 — does `core/` join the low layer now? SETTLED: no, not in Phase 1.** Five `core/` modules use high-hub symbols; converting them means passing resolved concepts in rather than looking them up, which is design work, not mechanical. Phase 4 does it, and the guard's low-layer set widens only when that lands.
 
 **D5 — `get_class_registry` is low but reads the library manager. SETTLED: callable resolver slot, defaulting to "no scoping", installed downward at boot.** Not in the design doc; surfaced while building the partition table. It is the decision that makes Phase 1.6 possible at all, so it is recorded here in full.
 
-> **Amended at implementation (H-1): the slot does not live on `ServiceHub`.** It lives in a new leaf module, `pipelex/system/registries/class_registry_access.py`, reached through the `class_registry_scoping` module singleton. The mechanism, the default, and the downward-at-boot crossing are all exactly as designed below — only the physical home moved, and it was forced by a measured cycle rather than chosen. See [Checkpoint H-1 record → D5 amendment](#d5-amendment-the-resolver-slot-could-not-live-on-servicehub).
+> **Amended at implementation (H-1): the slot does not live on `RuntimeHub`.** It lives in a new leaf module, `pipelex/system/registries/class_registry_access.py`, reached through the `class_registry_scoping` module singleton. The mechanism, the default, and the downward-at-boot crossing are all exactly as designed below — only the physical home moved, and it was forced by a measured cycle rather than chosen. See [Checkpoint H-1 record → D5 amendment](#d5-amendment-the-resolver-slot-could-not-live-on-servicehub).
 
 Today's body reaches straight into the high layer:
 
@@ -85,23 +87,23 @@ def get_class_registry() -> ClassRegistryAbstract:
 
 `get_class_registry` is the single symbol all three `importlib` hacks want, and it has 29 importers spread across both layers — so it must be low, and it must keep its library scoping (Phase 1 is zero-behavior-change).
 
-Resolution: `ServiceHub` grows a `Callable[[], ClassRegistryAbstract | None]` slot — default returns `None`, and boot installs the library-scoped resolver once `MethodHub` is populated. `get_class_registry` calls the slot and falls back to `KajsonManager.get_class_registry()`. The `_library_id` ContextVar stays in `method_hub` with the rest of its family; the resolver closure is what crosses, and it crosses downward at boot, not as an import.
+Resolution: `RuntimeHub` grows a `Callable[[], ClassRegistryAbstract | None]` slot — default returns `None`, and boot installs the library-scoped resolver once `InterpreterHub` is populated. `get_class_registry` calls the slot and falls back to `KajsonManager.get_class_registry()`. The `_library_id` ContextVar stays in `interpreter_hub` with the rest of its family; the resolver closure is what crosses, and it crosses downward at boot, not as an import.
 
 This is not a new pattern — it is exactly how `_isolated_execution_probe` already works (`HubSlot.ISOLATED_EXECUTION_PROBE`, defaulting to `_never_in_isolated_execution`), so the precedent, the naming, and the plugin-claim machinery are all in place.
 
-Alternative considered and rejected: move the whole `_library_id` contextvar family down into `service_hub`. Simpler (no indirection) but it splits the "current library" concept across both modules and makes `pipelex.service_hub` export `set_current_library`, which reads wrong. Also rejected: drop the scoping from `get_class_registry` and expose a separate high `get_scoped_class_registry` — that is a behavior change, and `tests/unit/pipelex/test_hub_class_registry.py` pins the current semantics.
+Alternative considered and rejected: move the whole `_library_id` contextvar family down into `runtime_hub`. Simpler (no indirection) but it splits the "current library" concept across both modules and makes `pipelex.runtime_hub` export `set_current_library`, which reads wrong. Also rejected: drop the scoping from `get_class_registry` and expose a separate high `get_scoped_class_registry` — that is a behavior change, and `tests/unit/pipelex/test_class_registry_scoping.py` pins the current semantics.
 
-`tests/unit/pipelex/test_hub_class_registry.py` is the regression guard for D5 — it must keep passing unmodified except for its import lines.
+`tests/unit/pipelex/test_class_registry_scoping.py` is the regression guard for D5 — it must keep passing unmodified except for its import lines.
 
 ## Symbol partition
 
 Complete and verified: an `ast` sweep of every `from pipelex.hub import …` across `pipelex/` and `tests/` classified every imported name against these two sets with nothing left over.
 
-### → `pipelex/service_hub.py` (low)
+### → `pipelex/runtime_hub.py` (runtime layer)
 
 | group | symbols |
 | --- | --- |
-| container | `ServiceHub`, `get_service_hub`, `set_service_hub` |
+| container | `RuntimeHub`, `get_runtime_hub`, `set_runtime_hub` |
 | config | `get_required_config`, `get_optional_config` |
 | console | `get_console` |
 | secrets | `get_secrets_provider`, `get_secret` |
@@ -116,11 +118,11 @@ Complete and verified: an `ast` sweep of every `from pipelex.hub import …` acr
 | tracing | `scoped_event_log`, `get_event_log_override` |
 | plugin registries | `get_inference_backend_registry`, `get_model_lister_registry`, `get_orchestrator_registry`, `get_bundle_validator_registry`, `get_storage_provider_registry`, `get_secrets_provider_registry` |
 
-### → `pipelex/method_hub.py` (high)
+### → `pipelex/interpreter_hub.py` (interpreter layer)
 
 | group | symbols |
 | --- | --- |
-| container | `MethodHub`, `get_method_hub`, `set_method_hub` |
+| container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
 | library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
@@ -172,7 +174,7 @@ These are the only files that gain a second import line. Everything else is a on
 | `tests/integration/pipelex/system/test_hub_slot_injection_precedence.py` | `get_content_generator` | `get_pipe_router` |
 | `tests/unit/pipelex/core/memory/input_shaper/conftest.py` | `get_class_registry` | `get_concept_library` |
 | `tests/unit/pipelex/core/stuffs/test_stuff_factory_implicit_memory.py` | `get_class_registry` | `get_concept_library` |
-| `tests/unit/pipelex/test_hub_class_registry.py` | `get_class_registry` | `clear_current_library`, `get_library_manager`, `set_current_library` |
+| `tests/unit/pipelex/test_class_registry_scoping.py` | `get_class_registry` | `clear_current_library`, `get_library_manager`, `set_current_library` |
 
 Note the shape of the `pipe_operators/` rows: every one of them straddles for the same reason — `get_class_registry` / `get_content_generator` / `get_model_deck` (low) next to `get_concept_library` / `get_native_concept` (high). That is the D4 boundary showing through, and it is what Phase 4 dissolves.
 
@@ -187,13 +189,13 @@ Note the shape of the `pipe_operators/` rows: every one of them straddles for th
 
 ### Phase 1 — the split ✅
 
-- [x] 1.1 Created `pipelex/service_hub.py`. Module-level imports verified to name nothing from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.concepts`, or `core.pipes`.
-- [x] 1.2 Created `pipelex/method_hub.py`, importing `service_hub`'s layer for the D5 install. `set_method_hub` installs the resolver, so scoping is live exactly when a MethodHub exists and a caller cannot forget to wire it.
+- [x] 1.1 Created `pipelex/runtime_hub.py`. Module-level imports verified to name nothing from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.concepts`, or `core.pipes`.
+- [x] 1.2 Created `pipelex/interpreter_hub.py`, importing `runtime_hub`'s layer for the D5 install. `set_interpreter_hub` installs the resolver, so scoping is live exactly when a InterpreterHub exists and a caller cannot forget to wire it.
 - [x] 1.3 Deleted `pipelex/hub.py`.
 - [x] 1.4 Rewrote all 309 call sites via an `ast` pass over the whole import statement (the 29 parenthesized blocks came through intact). The 36 straddlers each gained a second import line, as predicted. **Two string-literal references the AST pass could not see broke the suite and had to be found by running it** — see the record below.
 - [x] 1.5 Re-wired boot. Both hubs are constructed and installed at the top of `Pipelex.__init__`; every setter was retargeted to its own container. **The setter sequence was deliberately NOT reordered** — see the record below.
-- [x] 1.6 Replaced all three `importlib.import_module("pipelex.hub")` hacks with plain top-level imports and deleted the `_get_class_registry` shims. The import target is the new leaf module, not `service_hub` — that is the D5 amendment.
-- [x] 1.7 `Pipelex.teardown` and the `make()` failure path now release both hubs' process-global state. Pinned by `tests/unit/pipelex/test_hub_lifecycle.py`, which asserts a boot installs both singletons and that the reset really drops the scoping a MethodHub installed.
+- [x] 1.6 Replaced all three `importlib.import_module("pipelex.hub")` hacks with plain top-level imports and deleted the `_get_class_registry` shims. The import target is the new leaf module, not `runtime_hub` — that is the D5 amendment.
+- [x] 1.7 `Pipelex.teardown` and the `make()` failure path now release both hubs' process-global state. Pinned by `tests/unit/pipelex/test_hub_lifecycle.py`, which asserts a boot installs both singletons and that the reset really drops the scoping a InterpreterHub installed.
 
 **CHECKPOINT H-1** — zero behavior change.
 
@@ -213,31 +215,31 @@ Written at the checkpoint so Phase 2 can start cold. Everything below is what ac
 
 The headline property is met exactly: the inference layer now loads **zero** `libraries` / `pipe_operators` / `pipe_controllers` / `codegen` / `builder` modules. The module and SLOC targets were missed, and the reason is that the estimate was wrong rather than the change: those targets were derived from "236 modules / 17,683 SLOC *plus headroom for cogt's own modules*", and the real headroom is ~40 modules / ~3,500 SLOC, not the ~24 / ~1,300 assumed. A low-only hub's own closure measures 235 modules / 17,675 SLOC on this branch — within 1 of the estimate — so the partition is exactly as tight as designed; only the headroom guess was low. **Do not treat the module/SLOC rows as open work.** Squeezing them further means attacking `cogt`'s own dependency weight (`system.telemetry.otel_factory` → `core.pipes.pipe_output` → `core.stuffs.stuff` is the fattest edge), which is Phase 3/4 territory, not the hub boundary.
 
-#### D5 amendment: the resolver slot could not live on `ServiceHub`
+#### D5 amendment: the resolver slot could not live on `RuntimeHub`
 
-D5 assumed `core/concepts/` could reach `get_class_registry` from `pipelex.service_hub`. It cannot. `core.concepts.concept` is **inside `service_hub`'s own import closure**:
+D5 assumed `core/concepts/` could reach `get_class_registry` from `pipelex.runtime_hub`. It cannot. `core.concepts.concept` is **inside `runtime_hub`'s own import closure**:
 
 ```
-service_hub → cogt.llm.llm_worker_abstract → system.telemetry.otel_factory
+runtime_hub → cogt.llm.llm_worker_abstract → system.telemetry.otel_factory
             → core.pipes.pipe_output → core.stuffs.stuff → core.concepts.concept
 ```
 
-so a module-level `from pipelex.service_hub import get_class_registry` in `concept.py` is a hard cycle — and it fails in *both* import orders, which is why it could not simply be ordered around. The design doc's claim that "a hub that does not import `Concept` has no cycle with `concept.py`" was half right: the cycle is not via `Concept`, it is via `cogt → system → core`.
+so a module-level `from pipelex.runtime_hub import get_class_registry` in `concept.py` is a hard cycle — and it fails in *both* import orders, which is why it could not simply be ordered around. The design doc's claim that "a hub that does not import `Concept` has no cycle with `concept.py`" was half right: the cycle is not via `Concept`, it is via `cogt → system → core`.
 
 Resolution, which preserves every property D5 was chosen for:
 
-- `pipelex/system/registries/class_registry_access.py` — a new leaf module importing nothing from `pipelex`. Holds the real `get_class_registry` plus the `class_registry_scoping` slot (a module singleton in the `config_manager` style; the resolver default returns `None`, so a ServiceHub-only process degrades to the global registry rather than raising, exactly as [Risks](#risks-and-containment) requires).
-- `pipelex.service_hub.get_class_registry` delegates to it and stays the **public** accessor — so the symbol partition table above is unchanged and the cross-repo contract is still "low symbols come from `service_hub`".
+- `pipelex/system/registries/class_registry_access.py` — a new leaf module importing nothing from `pipelex`. Holds the real `get_class_registry` plus the `class_registry_scoping` slot (a module singleton in the `config_manager` style; the resolver default returns `None`, so a RuntimeHub-only process degrades to the global registry rather than raising, exactly as [Risks](#risks-and-containment) requires).
+- `pipelex.runtime_hub.get_class_registry` delegates to it and stays the **public** accessor — so the symbol partition table above is unchanged and the cross-repo contract is still "low symbols come from `runtime_hub`".
 - The three `core/concepts/` modules import the leaf directly, because they are the one place the public accessor is unreachable.
-- `method_hub.set_method_hub` installs the library-scoped resolver; `Pipelex.teardown` calls `class_registry_scoping.reset()`.
+- `interpreter_hub.set_interpreter_hub` installs the library-scoped resolver; `Pipelex.teardown` calls `class_registry_scoping.reset()`.
 
-`tests/unit/pipelex/test_hub_class_registry.py` (the D5 regression guard) passes unmodified except for its import lines, as required.
+`tests/unit/pipelex/test_class_registry_scoping.py` (the D5 regression guard) passes unmodified except for its import lines, as required.
 
 #### Boot was not reordered — deliberately
 
-Step 1.5 predicted the setter sequence would "split cleanly at line 475 with no reordering" once the duplicate pair was deleted. It does not, and cannot: **D3 puts the PipeFunc executor on the high hub**, so `set_pipe_func_executor_registry` and `set_pipe_func_executor` are MethodHub calls sitting in the middle of the ServiceHub run, and `set_isolated_execution_probe` is a ServiceHub call sitting after the MethodHub ones.
+Step 1.5 predicted the setter sequence would "split cleanly at line 475 with no reordering" once the duplicate pair was deleted. It does not, and cannot: **D3 puts the PipeFunc executor on the high hub**, so `set_pipe_func_executor_registry` and `set_pipe_func_executor` are InterpreterHub calls sitting in the middle of the RuntimeHub run, and `set_isolated_execution_probe` is a RuntimeHub call sitting after the InterpreterHub ones.
 
-Reordering to force a clean split would have moved setters across documented ordering dependencies (the storage-provider block explicitly resolves *after* secrets is on the hub so the GCP factory's secret read works) — a real behavior risk at a checkpoint whose bar is zero behavior change. So: **both hubs are constructed and installed at the top of `__init__`, and the setter sequence is otherwise byte-identical in order.** That delivers what "populate ServiceHub fully before MethodHub" was actually protecting against — no setter can ever run against a missing hub — without touching execution order. Untangling the interleave belongs with D3's inversion, not here.
+Reordering to force a clean split would have moved setters across documented ordering dependencies (the storage-provider block explicitly resolves *after* secrets is on the hub so the GCP factory's secret read works) — a real behavior risk at a checkpoint whose bar is zero behavior change. So: **both hubs are constructed and installed at the top of `__init__`, and the setter sequence is otherwise byte-identical in order.** That delivers what "populate RuntimeHub fully before InterpreterHub" was actually protecting against — no setter can ever run against a missing hub — without touching execution order. Untangling the interleave belongs with D3's inversion, not here.
 
 #### Findings in passing — both resolved, one bigger than recorded
 
@@ -259,22 +261,22 @@ If Phase 2's guard is meant to catch "the string-literal `importlib.import_modul
 
 #### Housekeeping done at H-1
 
-- **Subject grants migrated**: 54 `pipelex/hub.py::` entries → 55 under `pipelex/service_hub.py::` / `pipelex/method_hub.py::` (`set_instance` and `set_pipelex_hub` each split in two; `set_observer` dropped with the state). `make cko` is green, and staleness is symmetric so a missed entry would have failed.
+- **Subject grants migrated**: 54 `pipelex/hub.py::` entries → 55 under `pipelex/runtime_hub.py::` / `pipelex/interpreter_hub.py::` (`set_instance` and `set_pipelex_hub` each split in two; `set_observer` dropped with the state). `make cko` is green, and staleness is symmetric so a missed entry would have failed.
 - **Doc references swept**: `docs/under-the-hood/{pipe-routing-and-execution,runtime-bridge-and-transport,execution-graph-tracing}.md`, `docs/advanced/{index,observer-provider-injection}.md`, `tests/CLAUDE.md`, and in-code docstrings in `signature_walk.py` / the keyword-only guard modules. CHANGELOG history entries were left alone (they are release records). No live `pipelex.hub` reference remains anywhere in `pipelex/`, `tests/`, or `docs/`.
 
 #### Still open at H-1
 
 - **The CHANGELOG breaking-change note is not written yet** — it stays scheduled at H-4 per the plan, but `pipelex.hub` is *already* gone as of this checkpoint. If this branch is ever merged before H-4, write it first.
 - The **cross-repo sweep** is untouched and still release-gated.
-- One semantic edge worth knowing: `class_registry_scoping` is process-global, so the doctor path (which installs a fresh `ServiceHub` but leaves any existing `MethodHub` in place) now keeps library scoping alive where the single hub would have raised. Strictly more coherent — the MethodHub genuinely is still installed — and unreachable in practice, since doctor runs in its own process. Noted rather than fixed.
+- One semantic edge worth knowing: `class_registry_scoping` is process-global, so the doctor path (which installs a fresh `RuntimeHub` but leaves any existing `InterpreterHub` in place) now keeps library scoping alive where the single hub would have raised. Strictly more coherent — the InterpreterHub genuinely is still installed — and unreachable in practice, since doctor runs in its own process. Noted rather than fixed.
 
 ### Phase 2 — enforce it ✅
 
 - [x] 2.1 Added `pipelex-dev check-hub-layering` — guard in `pipelex/cli/dev_cli/commands/hub_layering_guard.py` (stdlib-only AST core), command in `check_hub_layering_cmd.py` (rich presentation), following the `keyword_only_guard.py` / `check_keyword_only_cmd.py` split exactly. Catches imports **and** string literals, and resolves relative imports against the importing module's own package. **The guard grew a second rule beyond the plan** — see the record below.
 - [x] 2.2 Low layer declared as `pipelex.cogt`, `pipelex.plugins`, `pipelex.reporting`, `pipelex.system`, `pipelex.tools`. All five compliant; the guard hard-blocks with an empty exception list (one escape-hatch marker exists, on the guard's own declaration of the forbidden path).
 - [x] 2.3 Wired into `make agent-check`, the `make check` aggregate, and both CI lint workflows, with the `chl` alias.
-- [x] 2.4 `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` — layer membership, both directions of the arrow, every import spelling (plain / aliased / `from pipelex import method_hub` / relative), both string forms, the prose-is-not-a-reference and `service_hub`-is-not-`hub` boundary cases, the `TYPE_CHECKING` carve-out and its three non-exempt neighbours, the escape hatch, and the dead-module rule across all three layers.
-- [x] 2.5 `tests/unit/pipelex/test_hub_import_closure.py` — imports each low-layer entry point in a subprocess and asserts zero interpreter modules **and** no `pipelex.method_hub` in `sys.modules`. Parametrized over two entry points: the inference layer and `service_hub` itself.
+- [x] 2.4 `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` — layer membership, both directions of the arrow, every import spelling (plain / aliased / `from pipelex import interpreter_hub` / relative), both string forms, the prose-is-not-a-reference and `runtime_hub`-is-not-`hub` boundary cases, the `TYPE_CHECKING` carve-out and its three non-exempt neighbours, the escape hatch, and the dead-module rule across all three layers.
+- [x] 2.5 `tests/unit/pipelex/test_runtime_layer_import_closure.py` — imports each low-layer entry point in a subprocess and asserts zero interpreter modules **and** no `pipelex.interpreter_hub` in `sys.modules`. Parametrized over two entry points: the inference layer and `runtime_hub` itself.
 
 **CHECKPOINT H-2** — boundary declared, enforced, and regression-tested.
 
@@ -284,11 +286,11 @@ Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,352 files, keyword-only 
 
 #### The guard enforces two rules, not one
 
-The plan specified one rule (no `method_hub` in the low layer). The guard ships with a second: **no module anywhere in `pipelex/` or `tests/` may reference `pipelex.hub`.** That is the H-1 note about `mocker.patch` targets, generalized — and generalizing it is what makes it work. The plan framed the string check as an `importlib.import_module` special case; scanning *every* string constant for an exact-or-boundary match on the module path catches `importlib`, `mocker.patch`, `pkgutil.resolve_name`, and any config-driven dotted path in one mechanism, with no call-site special-casing.
+The plan specified one rule (no `interpreter_hub` in the low layer). The guard ships with a second: **no module anywhere in `pipelex/` or `tests/` may reference `pipelex.hub`.** That is the H-1 note about `mocker.patch` targets, generalized — and generalizing it is what makes it work. The plan framed the string check as an `importlib.import_module` special case; scanning *every* string constant for an exact-or-boundary match on the module path catches `importlib`, `mocker.patch`, `pkgutil.resolve_name`, and any config-driven dotted path in one mechanism, with no call-site special-casing.
 
-Scope follows from the two rules being different: `tests/` is scanned for the dead-module rule **only**. `tests.*` is in no declared layer, so a test may still freely patch `pipelex.method_hub` — while a stale `pipelex.hub` patch target, the thing that actually broke 36 tests, now fails the check.
+Scope follows from the two rules being different: `tests/` is scanned for the dead-module rule **only**. `tests.*` is in no declared layer, so a test may still freely patch `pipelex.interpreter_hub` — while a stale `pipelex.hub` patch target, the thing that actually broke 36 tests, now fails the check.
 
-Matching is exact-or-boundary (`==`, or a `.`/`:` suffix), which is why `pipelex.service_hub` does not match `pipelex.hub` and why a docstring that merely *mentions* a module is not a reference. Two in-tree docstrings do exactly that and are correctly ignored. A path assembled at runtime from f-strings is beyond any AST scan; nothing does that today, and it is noted in the module docstring rather than defended against.
+Matching is exact-or-boundary (`==`, or a `.`/`:` suffix), which is why `pipelex.runtime_hub` does not match `pipelex.hub` and why a docstring that merely *mentions* a module is not a reference. Two in-tree docstrings do exactly that and are correctly ignored. A path assembled at runtime from f-strings is beyond any AST scan; nothing does that today, and it is noted in the module docstring rather than defended against.
 
 #### Two carve-outs, both deliberate
 
@@ -402,7 +404,7 @@ Clean (no action): `pipelex-cookbook/`, `cocode/`, `pipelex-worker/`, `pipelex-s
 ### Phase 4 — core's data model joins the low layer ✅
 
 - [x] 4.1 Converted the `core/` straddlers to injected providers. **The plan's premise was wrong** — `core/` is two layers, not one, and only its *data model* can be low. See the H-4 record.
-- [x] 4.2 Widened the guard's low layer with core's six data-model packages, and added six `pipelex.core.*` entry points to `LOW_LAYER_ENTRY_POINTS`.
+- [x] 4.2 Widened the guard's low layer with core's six data-model packages, and added six `pipelex.core.*` entry points to `RUNTIME_LAYER_ENTRY_POINTS`.
 
 **CHECKPOINT H-4** — the boundary is complete, enforced, and measured.
 
@@ -410,9 +412,11 @@ Clean (no action): `pipelex-cookbook/`, `cocode/`, `pipelex-worker/`, `pipelex-s
 
 Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,356 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite, no test edits beyond the mechanical ones recorded below) · `make drift-check` ✅ (both contracts reviewed and acked — see below).
 
-## ▶ Resume here — H-4 is closed; the rename is next
+## ▶ Resume here — the rename is landed
 
-All four phases are landed and **all three gates are green**. The two contracts that were left open on purpose at the pause were reviewed and acked:
+All four phases **and** the runtime/interpreter rename are landed, with all three gates green. The rename's own record is [below](#the-runtimeinterpreter-rename-record); the rest of this section is the H-4 close-out it followed.
+
+The two contracts that were left open on purpose at the H-4 pause were reviewed and acked:
 
 - **`config-docs` — clean-pass.** The only trigger change was one import line in `configs.py` (`TemplatingStyle` moving `cogt.templating` → `tools.templating`, the Phase 3 placement fix); every other trigger file was byte-identical. No config field, default, validator, or TOML key moved. `docs/configuration/` documents no import path, and every Python path the docs *do* cite still resolves.
 - **`cli-docs` — clean-pass.** All 10 triggers changed by exactly one import line each (the Phase 4 renderer regroup). Verified against the **live CLI** rather than by reading alone — `pipelex build inputs pipe`, `pipelex build output pipe`, `pipelex-agent inputs pipe` — arguments, flags, format values and defaults all match `docs/tools/cli/`. The behavior-adjacent half of Phase 4 was checked too: no CLI doc cites a Python import path or calls a factory that gained a required `concept_provider`, and the runner codegen emits none. `agent_cli/CLAUDE.md`'s layout map lists only `agent_cli`'s own modules, none of which moved.
@@ -421,7 +425,32 @@ Also swept `docs/` and `wip/` for stale references to the H-4 moves (`core.pipes
 
 **One observation is worth carrying forward, because it is now a pattern rather than an anecdote.** This refactor opened **four contracts across three different ids**, and every one of them was import-path churn. The narrowing proposed in the earlier `config-docs` dogfood entry (scope the trigger to files that define settings) would **not** have prevented today's opening — `configs.py` is squarely inside that narrowed set. The mechanism that would prevent all four is a content-aware digest that ignores changes confined to import statements (and, for `keyword-only-convention`, to comments/docstrings): one manifest-wide change instead of three separate glob surgeries. Recorded in `wip/drift-contracts/dogfood-log.md` as the thing to weigh before any per-contract narrowing — it is evidence for the pilot's keep/narrow/mechanize verdict, not a change to make now.
 
-**Next: the rename** — [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md), as its own commit, before the release and before the cross-repo sweep. That ordering is load-bearing: the sweep must rewrite external repos exactly once, straight to the final names. After the rename the branch is ready for a PR to `dev`, and the only things outstanding are the release-gated cross-repo sweep (which the rename retargets) and Louis' drift-contract decision.
+**Next: the branch is ready for a PR to `dev`.** The only things outstanding are the release-gated cross-repo sweep (already retargeted to the final names) and Louis' drift-contract decision.
+
+### The runtime/interpreter rename — record
+
+Landed as its own commit after H-4, per [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md). Gates: `make agent-check` ✅ · full `make agent-test` ✅ · `make drift-check` ✅.
+
+**Pre-flight was clean.** Grepping the whole workspace — including the private `pipelex-temporal`, the heaviest consumer — turned up **zero** collisions on `runtime_hub` / `RuntimeHub` / `interpreter_hub` / `InterpreterHub`. The only hits were the plan documents themselves.
+
+**A token substitution was the right tool here, and the plan's AST warning did not apply.** Phase 1 needed an `ast` rewrite because it was *splitting* one module into two: each import line had to be classified symbol by symbol, and 29 parenthesized multi-line blocks were the hazard. This rename is 1:1 — no import splits, no classification — so the question is only whether the four tokens ever appear where they must not. They do not: enumerating every whole word in `pipelex/` and `tests/` containing any of them returned exactly the identifiers that should change (`get_method_hub`, `set_service_hub`, the hub-named test functions, and the bare class names). Substring replacement across 332 files, then a re-parse of every file in both trees, was safer than a formatting-preserving AST rewrite and left zero residuals.
+
+**The string-literal landmine was real again, and pre-enumerated.** The H-1 lesson (a missed `mocker.patch` target is invisible to every import-graph tool) held: `tests/helpers/init_cmd_helpers.py` carried `mocker.patch("pipelex.service_hub.get_console", ...)` — the same file, the same shape that broke 36 tests at H-1. Because the sweep was token-based over the whole file rather than import-based, it was caught for free. The other string references were the guard's own configuration, the closure test's entry-point list, and the guard test's patch-target fixtures.
+
+**What the plan under-specified: the enum members in the *test* file.** Step 4 lists the guard's `HubLayeringViolationKind` renames but step 5 lists only the test's constants and patch targets, so a first pass renamed the members in the source and left `HubLayeringViolationKind.METHOD_HUB_IMPORT` in the test — 7 failures. Mechanical to fix, but worth recording: when an enum member is renamed, its *references* live wherever the enum is asserted on, and the plan's per-file checklists split that pair across two steps.
+
+**Vocabulary, not just identifiers.** `LOW_LAYER_PACKAGES` → `RUNTIME_LAYER_PACKAGES` and `is_low_layer` → `is_runtime_layer` were in the plan; the prose was not, and it was the larger edit. "Low layer" / "high layer" was swept out of the guard, both hub docstrings, `class_registry_access.py`, the guard's success panel (it printed `Low layer: …` to the user), `hub-layering.md`, `architecture-overview.md` and the CHANGELOG. The historical checkpoint records in *this* file deliberately keep the old vocabulary, with a reading key in the header note — rewriting them would falsify what was decided when.
+
+**Judgment calls made while sweeping the docs**, none of them mechanical:
+
+- `hub-layering.md` gained an opening section naming the two layers as the language-implementation split, so a reader meets the vocabulary before the rule. The headline property was restated from "importing the inference layer must not load the interpreter" to **"importing the Pipelex runtime loads zero interpreter modules"** — the same measurement, phrased as the outward-facing claim.
+- The `runtime_bridge` clarifier the plan asked for landed in two places, not one: `hub-layering.md`'s intro and the guard's module docstring, since `plugins → runtime_bridge` appears in that file's Known-inversions list.
+- **D1 was preserved verbatim rather than swept.** Mechanically renaming it would have produced a decision record whose rejected alternatives argued about names that were no longer the subject. It is now marked SUPERSEDED, quotes the original in full, and notes that its own "conscious call against the brand-boundary rule" caveat is precisely what Louis acted on.
+- `.drift/acks/keyword-only-convention.toml` was **left alone** — an ack is an on-the-record review decision, and rewriting the rationale of a past review to mention a module that did not exist at review time would be falsifying the record.
+
+**One trigger file changed, so `keyword-only-convention` re-opened** — `keyword_only_guard.py`'s docstring names the hub. Reviewed and acked as import-path/prose-only; no guard behavior, registry schema, or carve-out changed.
+
+**Cross-repo is retargeted, not extended.** The sweep tables in this file now name `pipelex.runtime_hub` / `pipelex.interpreter_hub` directly. External repos still import `pipelex.hub`, so they are rewritten exactly once — the intermediate names never reach them, and never shipped.
 
 #### The plan's premise was wrong: `core/` is two layers
 
@@ -466,7 +495,7 @@ Louis' call (option A of three): declare core's data-model packages low, leave t
 | pipelex modules loaded | 357 | 275 | 268 | **268** |
 | SLOC loaded | 29,193 | 21,186 | 20,304 | **20,304** |
 
-The inference-layer numbers are unchanged by design — Phase 4 widened *which* modules are guaranteed clean, it did not touch `cogt`'s own weight. The new numbers are the six core entry points, each measured at **0 interpreter modules and no `pipelex.method_hub`**, up from 50 each before this phase:
+The inference-layer numbers are unchanged by design — Phase 4 widened *which* modules are guaranteed clean, it did not touch `cogt`'s own weight. The new numbers are the six core entry points, each measured at **0 interpreter modules and no `pipelex.interpreter_hub`**, up from 50 each before this phase:
 
 | entry point | interpreter modules before → after |
 | --- | --- |
@@ -524,7 +553,7 @@ print("offenders:", interpreter)
 PY
 ```
 
-If Phase 1 lands and `interpreter modules` is not 0, the snippet prints the offenders: something imports the interpreter outside the hub, and the shortest import path to it is what to fix. Swap the imported module to measure any other entry point (`pipelex.pipelex`, `pipelex.service_hub`, …).
+If Phase 1 lands and `interpreter modules` is not 0, the snippet prints the offenders: something imports the interpreter outside the hub, and the shortest import path to it is what to fix. Swap the imported module to measure any other entry point (`pipelex.pipelex`, `pipelex.runtime_hub`, …).
 
 The module/SLOC targets come from importing exactly the types a low-only hub would annotate — 236 modules / 17,683 SLOC with the interpreter subpackages at zero — plus headroom for cogt's own modules.
 
@@ -535,13 +564,13 @@ The module/SLOC targets come from importing exactly the types a low-only hub wou
 Both surfaced while inventorying the boot sequence. Neither is caused by this refactor; both are in its blast radius, and the repo's flag-and-fix rule applies.
 
 - **Duplicate `set_library_manager` in `Pipelex.setup`.** Lines 364–365 and 474–475 are the identical pair `self.library_manager = library_manager or LibraryManager()` + `self.pipelex_hub.set_library_manager(...)`. Nothing between them touches `library_manager` (verified), so when the caller passes no manager the first `LibraryManager()` is constructed, registered, and then silently discarded and replaced by a second instance. Delete the earlier pair — it is dead, and removing it is what makes the low/high boot split clean with no reordering (step 1.5).
-- **`_observer` is write-only state.** `PipelexHub.set_observer` is called at `pipelex.py:503`, but there is no `get_observer` on the container and no module-level accessor — the live observer reaches its consumer directly via `PipeRouter(observer=multi_observer)` at line 531. The design doc lists "observer" among the `method_hub` contents; it should be **deleted rather than moved**. Confirm no external consumer sets it before removing (see [Cross-repo sweep](#cross-repo-sweep)).
+- **`_observer` is write-only state.** `PipelexHub.set_observer` is called at `pipelex.py:503`, but there is no `get_observer` on the container and no module-level accessor — the live observer reaches its consumer directly via `PipeRouter(observer=multi_observer)` at line 531. The design doc lists "observer" among the `interpreter_hub` contents; it should be **deleted rather than moved**. Confirm no external consumer sets it before removing (see [Cross-repo sweep](#cross-repo-sweep)).
 
 ## Risks and containment
 
 - **Big mechanical diff.** Contained by: the rewrite is scriptable from the partition table; `pipelex.hub` ceasing to exist means a missed site is an import error, not a silent wrong-layer resolution; and full `make agent-test` is the zero-behavior-change bar. The 29 multi-line import blocks are the one place a careless script does real damage — rewrite via `ast`, not regex.
 - **Two singletons, two lifecycles, two teardowns.** Contained by the tiny construction surface. Watch `Pipelex.teardown` / `teardown_if_needed` and the fixtures that reset hub state — a half-reset hub between tests is the realistic failure mode, and it surfaces as cross-test pollution rather than a clean failure. Step 1.7 exists for this; make the "both hubs reset" assertion explicit rather than implied.
-- **D5's resolver slot is installed at boot, not imported.** If a consumer builds a `ServiceHub` without ever populating a `MethodHub` (the doctor path, some tests), `get_class_registry` must degrade to the unscoped `KajsonManager` registry rather than raise. Default the slot to a function returning `None`, never to an unset attribute.
+- **D5's resolver slot is installed at boot, not imported.** If a consumer builds a `RuntimeHub` without ever populating a `InterpreterHub` (the doctor path, some tests), `get_class_registry` must degrade to the unscoped `KajsonManager` registry rather than raise. Default the slot to a function returning `None`, never to an unset attribute.
 
 ## Cross-repo sweep
 
@@ -562,6 +591,15 @@ Symbols crossing the repo boundary today, which is the surface whose new home is
 `clear_current_library`, `get_bundle_validator_registry`, `get_class_registry`, `get_console`, `get_content_generator`, `get_current_library`, `get_current_library_id_or_none`, `get_library_manager`, `get_model_deck`, `get_orchestrator_registry`, `get_pipe_func_executor_registry`, `get_pipe_library`, `get_pipe_router`, `get_pipelex_hub`, `get_report_delegate`, `get_required_concept`, `get_required_pipe`, `get_secret`, `get_storage_provider`, `get_storage_provider_registry`, `is_dry_run_forced`, `scoped_current_library`, `set_current_library`
 
 Two notes on that list: `get_pipelex_hub` splits into two accessors, so every external site must pick a half; and `set_pipe_router` / `teardown_current_pipe_router` / `scoped_pipe_router` are documented as depended upon by our Mistral Workflows plugin, so their move is a contract change to announce, not just to make.
+
+**Rewrite straight to the final names — there is no intermediate step.** `service_hub` / `method_hub` never shipped, so external repos go directly from `pipelex.hub` to:
+
+| old | new |
+| --- | --- |
+| `from pipelex.hub import <runtime symbol>` | `from pipelex.runtime_hub import …` — everything in the [`runtime_hub` partition table](#-pipelexruntime_hubpy-runtime-layer) |
+| `from pipelex.hub import <interpreter symbol>` | `from pipelex.interpreter_hub import …` — everything in the [`interpreter_hub` partition table](#-pipelexinterpreter_hubpy-interpreter-layer) |
+| `get_pipelex_hub` | `get_runtime_hub` **or** `get_interpreter_hub` — pick the container the call site actually meant |
+| `PipelexHub` | `RuntimeHub` **or** `InterpreterHub` |
 
 **Phase 3 added a second wave of breakage to the same sweep** — the moved types, not the hub accessors. The per-repo counts and the complete old→new import table are in [Cross-repo impact added by Phase 3](#cross-repo-impact-added-by-phase-3). Do both waves in one pass per repo.
 

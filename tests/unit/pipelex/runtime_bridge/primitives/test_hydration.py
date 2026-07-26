@@ -19,7 +19,7 @@ from pipelex.runtime_bridge.primitives.hydration import (
     _hydrate_list_item,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     hydrate_working_memory,
 )
-from pipelex.service_hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 
 def _make_text_concept() -> Concept:

@@ -13,7 +13,7 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, record_setup_warning
 from pipelex.cogt.exceptions import GatewayUnknownModelError, ModelDeckPresetValidatonError
 from pipelex.pipelex import Pipelex
-from pipelex.service_hub import ServiceHub
+from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
@@ -155,7 +155,7 @@ def apply_agent_cli_output_discipline() -> None:
     """
     log.redirect_to_stderr()
     PrettyPrinter.mode = PrettyPrintMode.SILENT
-    hub = ServiceHub.get_optional_instance()
+    hub = RuntimeHub.get_optional_instance()
     if hub is not None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
@@ -190,7 +190,7 @@ def make_pipelex_for_agent_cli(
          ``~/.pipelex/pipelex.toml`` sets ``pipelex = "DEBUG"``.
       2. ``PrettyPrinter.mode = SILENT`` neutralizes ``pretty_print(...)`` entirely.
       3. Post-init ``log.redirect_to_stderr()`` and
-         ``get_service_hub().set_console_print_target(STDERR)`` defense-in-depth.
+         ``get_runtime_hub().set_console_print_target(STDERR)`` defense-in-depth.
 
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.

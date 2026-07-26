@@ -4,7 +4,7 @@ from rich.table import Table
 
 from pipelex import pretty_print
 from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.environment import all_env_vars_are_set, any_env_var_is_placeholder
 from tests.integration.pipelex.plugins.conftest import is_backend_available
 

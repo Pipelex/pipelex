@@ -8,7 +8,7 @@ from rich.table import Table
 
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.plugins.openai.openai_llms import openai_list_available_models
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 
 if TYPE_CHECKING:
     from openai.types import Model

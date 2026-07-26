@@ -30,7 +30,7 @@ from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.method_hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
     get_concept_library,
     get_current_library_id_or_none,

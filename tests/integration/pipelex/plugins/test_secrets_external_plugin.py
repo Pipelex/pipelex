@@ -19,7 +19,7 @@ from typing_extensions import override
 
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
-from pipelex.service_hub import get_secrets_provider, get_secrets_provider_registry, get_storage_provider
+from pipelex.runtime_hub import get_secrets_provider, get_secrets_provider_registry, get_storage_provider
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract

@@ -24,7 +24,7 @@ from pipelex.config import get_config
 from pipelex.plugins.azure_rest.azure_exceptions import AzureCredentialsError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.service_hub import get_models_manager
+from pipelex.runtime_hub import get_models_manager
 from pipelex.tools.log.log import log
 
 

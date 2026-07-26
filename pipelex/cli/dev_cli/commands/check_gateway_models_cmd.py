@@ -16,7 +16,7 @@ from pipelex.cli.dev_cli.commands.gateway_models_generator import (
     normalize_for_comparison,
 )
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import gateway_models_reference_files
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 
 if TYPE_CHECKING:

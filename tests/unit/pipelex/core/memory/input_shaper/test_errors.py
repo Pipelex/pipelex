@@ -15,7 +15,7 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
 # (test_name, concept_ref, multiplicity, provided_value, expected_exception, error_match)

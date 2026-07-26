@@ -14,7 +14,7 @@ from pipelex.cli.dev_cli.commands.gateway_models_generator import (
     generate_reference_pure_markdown,
     normalize_for_comparison,
 )
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.pipelex_service.exceptions import RemoteConfigUnavailableError, RemoteConfigValidationError
 
 # The reference files live in two places that must stay identical: the repo's

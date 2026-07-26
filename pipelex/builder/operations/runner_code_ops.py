@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
 from pipelex.pipeline.bundle_validator import BundleValidator
 
 

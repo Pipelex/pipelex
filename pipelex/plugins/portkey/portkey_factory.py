@@ -9,7 +9,7 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.plugins.openai.openai_constants import OpenAIBodyKey
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.plugins.portkey.portkey_exceptions import PortkeyCredentialsError
-from pipelex.service_hub import get_telemetry_manager
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 

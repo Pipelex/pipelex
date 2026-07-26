@@ -21,7 +21,7 @@ from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBluepr
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.execution_seams import load_libraries_and_activate, prepare_pipe_job
-from pipelex.service_hub import get_content_generator, is_dry_run_forced
+from pipelex.runtime_hub import get_content_generator, is_dry_run_forced
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 
 

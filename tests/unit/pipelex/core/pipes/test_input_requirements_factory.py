@@ -6,8 +6,8 @@ from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory, InputStuffSpecsFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import PresenceMarker
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
-from pipelex.method_hub import get_concept_library
 from tests.unit.pipelex.core.pipes.data import (
     CONCEPT_CODE_RESOLUTION_TEST_CASES,
     DIFFERENT_CONCEPT_CODES_TEST_CASES,

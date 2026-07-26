@@ -16,7 +16,7 @@ from pipelex.cogt.search.search_report import SearchTokenCostReport, SearchToken
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.costs_per_token import model_cost_per_token
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage

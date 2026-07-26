@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder

@@ -27,7 +27,7 @@ from pipelex.cogt.models.deck_manifest import (
     suggest_x_custom_filename,
     write_manifest,
 )
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.system.configuration.config_loader import config_manager
 
 

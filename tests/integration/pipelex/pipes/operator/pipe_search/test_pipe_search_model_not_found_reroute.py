@@ -7,7 +7,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureErro
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.method_hub import get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.search.pipe_search import PipeSearch
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint

@@ -1,5 +1,5 @@
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.method_hub import get_current_library, get_library_manager
+from pipelex.interpreter_hub import get_current_library, get_library_manager
 from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,

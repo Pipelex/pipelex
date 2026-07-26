@@ -16,12 +16,12 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
-from pipelex.method_hub import get_library_manager, get_required_pipe, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_required_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
-from pipelex.service_hub import get_telemetry_manager
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (

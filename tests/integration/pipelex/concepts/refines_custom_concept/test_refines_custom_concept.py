@@ -4,7 +4,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pipelex.core.concepts.concept import Concept
-from pipelex.method_hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager
 
 
 class TestRefinesCustomConcept:

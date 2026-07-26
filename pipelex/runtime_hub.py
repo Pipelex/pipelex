@@ -1,13 +1,14 @@
-"""The low half of the dependency hub: process-scoped infrastructure services.
+"""The runtime layer's dependency hub: process-scoped infrastructure services.
 
-``ServiceHub`` brokers everything that is configured once at boot and never varies per method:
+``RuntimeHub`` brokers everything that is configured once at boot and never varies per method:
 config, console, secrets, storage, telemetry, the model deck and inference workers, the content
-generator, the reporting delegate, and the plugin registries.
+generator, the reporting delegate, and the plugin registries. That is the machinery present at
+execution time whatever is loaded — hence *runtime*, in the language-implementation sense.
 
-**The one rule:** ``method_hub`` imports ``service_hub``; ``service_hub`` must never import
-``method_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
+**The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
+``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
 ``codegen``, ``builder``, ``core.bundles``, ``core.concepts``, or ``core.pipes`` at module level —
-that is what keeps the inference layer from dragging in the whole method interpreter. See
+that is what makes importing the Pipelex runtime load zero interpreter modules. See
 ``docs/contribute/hub-layering.md``.
 """
 
@@ -64,16 +65,16 @@ def _never_in_isolated_execution() -> bool:
     return False
 
 
-class ServiceHub:
+class RuntimeHub:
     """Central dependency manager for process-scoped infrastructure services.
 
     Provides access to core providers and factories through a singleton instance, allowing
     components to retrieve dependencies based on protocols without direct imports that could
     create cycles. Its counterpart for method-scoped machinery (libraries, router, pipeline) is
-    ``pipelex.method_hub.MethodHub``.
+    ``pipelex.interpreter_hub.InterpreterHub``.
     """
 
-    _instance: ClassVar[Optional["ServiceHub"]] = None
+    _instance: ClassVar[Optional["RuntimeHub"]] = None
 
     def __init__(self):
         # tools
@@ -111,19 +112,19 @@ class ServiceHub:
     ############################################################
 
     @classmethod
-    def get_optional_instance(cls) -> "ServiceHub | None":
+    def get_optional_instance(cls) -> "RuntimeHub | None":
         return cls._instance
 
     @classmethod
-    def get_instance(cls) -> "ServiceHub":
+    def get_instance(cls) -> "RuntimeHub":
         if cls._instance is None:
-            msg = "ServiceHub is not initialized"
+            msg = "RuntimeHub is not initialized"
             raise RuntimeError(msg)
         return cls._instance
 
     @classmethod
-    def set_instance(cls, service_hub: "ServiceHub") -> None:
-        cls._instance = service_hub
+    def set_instance(cls, runtime_hub: "RuntimeHub") -> None:
+        cls._instance = runtime_hub
 
     ############################################################
     # Setters
@@ -373,12 +374,12 @@ class ServiceHub:
 # Shorthand functions for accessing the singleton
 
 
-def get_service_hub() -> ServiceHub:
-    return ServiceHub.get_instance()
+def get_runtime_hub() -> RuntimeHub:
+    return RuntimeHub.get_instance()
 
 
-def set_service_hub(service_hub: ServiceHub):
-    ServiceHub.set_instance(service_hub)
+def set_runtime_hub(runtime_hub: RuntimeHub):
+    RuntimeHub.set_instance(runtime_hub)
 
 
 # root convenience functions
@@ -387,21 +388,21 @@ def set_service_hub(service_hub: ServiceHub):
 
 
 def get_required_config() -> ConfigRoot:
-    return get_service_hub().get_required_config()
+    return get_runtime_hub().get_required_config()
 
 
 def get_optional_config() -> ConfigRoot | None:
     """Non-raising by contract: also covers the no-hub-at-all state, not just hub-without-config."""
-    service_hub = ServiceHub.get_optional_instance()
-    return service_hub.get_optional_config() if service_hub is not None else None
+    runtime_hub = RuntimeHub.get_optional_instance()
+    return runtime_hub.get_optional_config() if runtime_hub is not None else None
 
 
 def get_secrets_provider() -> SecretsProviderAbstract:
-    return get_service_hub().get_required_secrets_provider()
+    return get_runtime_hub().get_required_secrets_provider()
 
 
 def get_storage_provider() -> StorageProviderAbstract:
-    return get_service_hub().get_storage_provider()
+    return get_runtime_hub().get_storage_provider()
 
 
 def get_class_registry() -> ClassRegistryAbstract:
@@ -418,11 +419,11 @@ def get_class_registry() -> ClassRegistryAbstract:
 
 
 def get_func_registry() -> FuncRegistry:
-    return get_service_hub().get_func_registry()
+    return get_runtime_hub().get_func_registry()
 
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:
-    return get_service_hub().get_telemetry_manager()
+    return get_runtime_hub().get_telemetry_manager()
 
 
 def get_otel_tracer() -> "OTelTracer | None":
@@ -433,7 +434,7 @@ def get_otel_tracer() -> "OTelTracer | None":
 
 
 def get_models_manager() -> ModelManagerAbstract:
-    return get_service_hub().get_required_models_manager()
+    return get_runtime_hub().get_required_models_manager()
 
 
 def get_model_deck() -> ModelDeck:
@@ -441,35 +442,35 @@ def get_model_deck() -> ModelDeck:
 
 
 def get_sdk_client_manager() -> SdkClientManager:
-    return get_service_hub().get_sdk_client_manager()
+    return get_runtime_hub().get_sdk_client_manager()
 
 
 def get_inference_backend_registry() -> "InferenceBackendRegistry":
-    return get_service_hub().get_inference_backend_registry()
+    return get_runtime_hub().get_inference_backend_registry()
 
 
 def get_model_lister_registry() -> "ModelListerRegistry":
-    return get_service_hub().get_model_lister_registry()
+    return get_runtime_hub().get_model_lister_registry()
 
 
 def get_orchestrator_registry() -> "OrchestratorRegistry":
-    return get_service_hub().get_orchestrator_registry()
+    return get_runtime_hub().get_orchestrator_registry()
 
 
 def get_bundle_validator_registry() -> "BundleValidatorRegistry":
-    return get_service_hub().get_bundle_validator_registry()
+    return get_runtime_hub().get_bundle_validator_registry()
 
 
 def get_storage_provider_registry() -> "StorageProviderRegistry":
-    return get_service_hub().get_storage_provider_registry()
+    return get_runtime_hub().get_storage_provider_registry()
 
 
 def get_secrets_provider_registry() -> "SecretsProviderRegistry":
-    return get_service_hub().get_secrets_provider_registry()
+    return get_runtime_hub().get_secrets_provider_registry()
 
 
 def get_inference_manager() -> InferenceManagerProtocol:
-    return get_service_hub().get_inference_manager()
+    return get_runtime_hub().get_inference_manager()
 
 
 def get_llm_worker(
@@ -491,12 +492,12 @@ def get_extract_worker(
 
 
 def get_report_delegate() -> ReportingProtocol:
-    return get_service_hub().get_report_delegate()
+    return get_runtime_hub().get_report_delegate()
 
 
 def is_in_isolated_execution() -> bool:
-    """Module-level accessor — see :meth:`ServiceHub.is_in_isolated_execution`."""
-    return get_service_hub().is_in_isolated_execution()
+    """Module-level accessor — see :meth:`RuntimeHub.is_in_isolated_execution`."""
+    return get_runtime_hub().is_in_isolated_execution()
 
 
 _content_generator_override: ContextVar[ContentGeneratorProtocol | None] = ContextVar("content_generator_override", default=None)
@@ -512,7 +513,7 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
     dry-run/validation activity body) wraps itself in this scope with an inline generator so its
     leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
     mock without dispatching and without storage IO. ContextVar-scoped like
-    :func:`pipelex.method_hub.scoped_pipe_router`, so concurrent runs don't cross-contaminate.
+    :func:`pipelex.interpreter_hub.scoped_pipe_router`, so concurrent runs don't cross-contaminate.
     """
     prev = _content_generator_override.get()
     _content_generator_override.set(content_generator)
@@ -524,14 +525,14 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
 
 def is_dry_run_forced() -> bool:
     """True when the boot was keyless (``needs_inference=False``): every run is forced to DRY (D4)."""
-    return get_service_hub().is_dry_run_forced()
+    return get_runtime_hub().is_dry_run_forced()
 
 
 def get_content_generator() -> ContentGeneratorProtocol:
     override = _content_generator_override.get()
     if override is not None:
         return override
-    return get_service_hub().get_required_content_generator()
+    return get_runtime_hub().get_required_content_generator()
 
 
 def get_secret(secret_id: str) -> str:
@@ -558,7 +559,7 @@ def scoped_event_log(event_log: "EventLogProtocol") -> Generator[None, None, Non
     event log's ``close()`` must therefore be safe to call mid-lifecycle — idempotent or a
     no-op, as ``InMemoryEventLog``'s is. Scoping a backend whose ``close()`` releases a real
     resource (NDJSON file handle, DynamoDB client) would break its own assembly read. Mirrors
-    :func:`pipelex.method_hub.scoped_pipe_router`.
+    :func:`pipelex.interpreter_hub.scoped_pipe_router`.
     """
     prev = _event_log_override.get()
     _event_log_override.set(event_log)
@@ -574,8 +575,8 @@ def get_event_log_override() -> "EventLogProtocol | None":
 
 
 def get_console() -> Console:
-    service_hub = ServiceHub.get_optional_instance()
-    if service_hub:
-        return service_hub.get_console()
+    runtime_hub = RuntimeHub.get_optional_instance()
+    if runtime_hub:
+        return runtime_hub.get_console()
     else:
         return Console(stderr=True)

@@ -26,7 +26,7 @@ class TestAgentDoctorCmd:
         """Stub the runtime bootstrap so unit tests don't load real config or mutate
         global logging / PrettyPrinter state.
 
-        ``setup_doctor_runtime`` instantiates a ServiceHub, loads config from disk, and
+        ``setup_doctor_runtime`` instantiates a RuntimeHub, loads config from disk, and
         calls ``log.configure`` (once-per-process). ``apply_agent_cli_output_discipline``
         mutates global PrettyPrinter mode and the hub's console target.
         ``silence_logging_for_agent_cli`` arms ``logging.disable`` at ``sys.maxsize``

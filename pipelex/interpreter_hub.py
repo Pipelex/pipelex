@@ -1,12 +1,13 @@
-"""The high half of the dependency hub: library-scoped method machinery.
+"""The interpreter layer's dependency hub: library-scoped method machinery.
 
-``MethodHub`` brokers everything tied to the *loaded method* rather than to the process: the
+``InterpreterHub`` brokers everything tied to the *loaded method* rather than to the process: the
 library manager and the domain/concept/pipe libraries, the current-library contextvar family, the
-pipe router, the pipe runner, the pipeline manager, and the PipeFunc executor.
+pipe router, the pipe runner, the pipeline manager, and the PipeFunc executor. That is the half
+that reads the program and executes it — hence *interpreter*.
 
-**The one rule:** this module MAY import ``service_hub``; ``service_hub`` must never import this
-one. As it happens the arrow is currently unused — the only low-layer thing this module needs is
-the class-registry scoping slot, which lives below both hubs in
+**The one rule:** this module MAY import ``runtime_hub``; ``runtime_hub`` must never import this
+one. As it happens the arrow is currently unused — the only runtime-layer thing this module needs
+is the class-registry scoping slot, which lives below both hubs in
 ``system.registries.class_registry_access``. See ``docs/contribute/hub-layering.md``.
 """
 
@@ -40,15 +41,15 @@ if TYPE_CHECKING:
     from pipelex.plugins.pipe_func_executor_registry import PipeFuncExecutorRegistry
 
 
-class MethodHub:
+class InterpreterHub:
     """Central dependency manager for the method-interpretation layer.
 
     Holds the libraries of the currently loaded method plus the machinery that runs it. Its
     lifecycle is library-scoped — the ``_library_id`` contextvar below selects which library is
-    current — whereas ``pipelex.service_hub.ServiceHub`` is process-scoped.
+    current — whereas ``pipelex.runtime_hub.RuntimeHub`` is process-scoped.
     """
 
-    _instance: ClassVar[Optional["MethodHub"]] = None
+    _instance: ClassVar[Optional["InterpreterHub"]] = None
 
     def __init__(self):
         # libraries
@@ -70,19 +71,19 @@ class MethodHub:
     ############################################################
 
     @classmethod
-    def get_optional_instance(cls) -> "MethodHub | None":
+    def get_optional_instance(cls) -> "InterpreterHub | None":
         return cls._instance
 
     @classmethod
-    def get_instance(cls) -> "MethodHub":
+    def get_instance(cls) -> "InterpreterHub":
         if cls._instance is None:
-            msg = "MethodHub is not initialized"
+            msg = "InterpreterHub is not initialized"
             raise RuntimeError(msg)
         return cls._instance
 
     @classmethod
-    def set_instance(cls, method_hub: "MethodHub") -> None:
-        cls._instance = method_hub
+    def set_instance(cls, interpreter_hub: "InterpreterHub") -> None:
+        cls._instance = interpreter_hub
 
     ############################################################
     # Setters
@@ -195,19 +196,19 @@ class MethodHub:
 # Shorthand functions for accessing the singleton
 
 
-def get_method_hub() -> MethodHub:
-    return MethodHub.get_instance()
+def get_interpreter_hub() -> InterpreterHub:
+    return InterpreterHub.get_instance()
 
 
-def set_method_hub(method_hub: MethodHub):
-    """Install ``method_hub`` as the process singleton, and hand the low layer its scoping resolver.
+def set_interpreter_hub(interpreter_hub: InterpreterHub):
+    """Install ``interpreter_hub`` as the process singleton, and hand the runtime layer its scoping resolver.
 
     Installing the resolver here rather than at an explicit boot step means library scoping is
-    active exactly when a MethodHub exists — the invariant ``get_class_registry`` relies on, and
+    active exactly when an InterpreterHub exists — the invariant ``get_class_registry`` relies on, and
     one a caller cannot forget to wire. The resolver crosses downward at install time, never as an
-    import from ``service_hub``.
+    import from ``runtime_hub``.
     """
-    MethodHub.set_instance(method_hub)
+    InterpreterHub.set_instance(interpreter_hub)
     class_registry_scoping.install(resolver=_resolve_scoped_class_registry)
 
 
@@ -250,7 +251,7 @@ def get_current_library_id_or_none() -> str | None:
 
 
 def get_default_library_dirs() -> list[Path] | None:
-    return get_method_hub().get_default_library_dirs()
+    return get_interpreter_hub().get_default_library_dirs()
 
 
 def clear_current_library() -> None:
@@ -306,7 +307,7 @@ def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tu
     if library_dirs is not None:
         return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
 
-    hub_defaults = get_method_hub().get_default_library_dirs()
+    hub_defaults = get_interpreter_hub().get_default_library_dirs()
     if hub_defaults is not None:
         return hub_defaults, "instance default"
 
@@ -318,35 +319,35 @@ def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tu
 
 
 def get_library_manager() -> LibraryManagerAbstract:
-    return get_method_hub().get_library_manager()
+    return get_interpreter_hub().get_library_manager()
 
 
 def get_library() -> Library:
-    return get_method_hub().get_library()
+    return get_interpreter_hub().get_library()
 
 
 def get_required_domain(domain_code: str) -> Domain:
-    return get_method_hub().get_required_domain_library().get_required_domain(domain_code=domain_code)
+    return get_interpreter_hub().get_required_domain_library().get_required_domain(domain_code=domain_code)
 
 
 def get_optional_domain(domain_code: str) -> Domain | None:
-    return get_method_hub().get_required_domain_library().get_domain(domain_code=domain_code)
+    return get_interpreter_hub().get_required_domain_library().get_domain(domain_code=domain_code)
 
 
 def get_pipe_library() -> PipeLibraryAbstract:
-    return get_method_hub().get_required_pipe_library()
+    return get_interpreter_hub().get_required_pipe_library()
 
 
 def get_pipes() -> list[PipeAbstract]:
-    return get_method_hub().get_required_pipe_library().get_pipes()
+    return get_interpreter_hub().get_required_pipe_library().get_pipes()
 
 
 def get_required_pipe(pipe_code: str) -> PipeAbstract:
-    return get_method_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
+    return get_interpreter_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
 
 
 def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
-    return get_method_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
+    return get_interpreter_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
 
 
 def get_pipe_source(pipe_code: str) -> str | None:
@@ -359,19 +360,19 @@ def get_pipe_source(pipe_code: str) -> str | None:
         The source the pipe was loaded from — a filesystem path or a logical URI,
         preserved verbatim — or None if unknown.
     """
-    return get_method_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
+    return get_interpreter_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 
 
 def get_concept_library() -> ConceptLibraryAbstract:
-    return get_method_hub().get_library().concept_library
+    return get_interpreter_hub().get_library().concept_library
 
 
 def get_required_concept(concept_ref: str) -> Concept:
-    return get_method_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
+    return get_interpreter_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
 def get_native_concept(native_concept: NativeConceptCode) -> Concept:
-    return get_method_hub().get_required_concept_library().get_native_concept(native_concept=native_concept)
+    return get_interpreter_hub().get_required_concept_library().get_native_concept(native_concept=native_concept)
 
 
 # pipe router
@@ -426,7 +427,7 @@ def get_pipe_router() -> "PipeRouterProtocol":
     override = _current_pipe_router.get()
     if override is not None:
         return override
-    return get_method_hub().get_required_pipe_router()
+    return get_interpreter_hub().get_required_pipe_router()
 
 
 # pipe func
@@ -439,7 +440,7 @@ _pipe_func_executor_override: ContextVar[PipeFuncExecutorProtocol | None] = Cont
 def scoped_pipe_func_executor(pipe_func_executor: PipeFuncExecutorProtocol) -> Generator[None, None, None]:
     """Set ``pipe_func_executor`` as the active executor for the scope, then restore the prior value on exit.
 
-    The PipeFunc counterpart of :func:`pipelex.service_hub.scoped_content_generator`: in a process
+    The PipeFunc counterpart of :func:`pipelex.runtime_hub.scoped_content_generator`: in a process
     whose hub default executor dispatches PipeFunc steps out-of-process (a distributed-orchestrator
     worker), this scope lets an in-process run force a specific executor — e.g. the local one, so
     its PipeFunc steps run here instead of being re-dispatched. ContextVar-scoped like
@@ -457,22 +458,22 @@ def get_pipe_func_executor() -> PipeFuncExecutorProtocol:
     override = _pipe_func_executor_override.get()
     if override is not None:
         return override
-    return get_method_hub().get_required_pipe_func_executor()
+    return get_interpreter_hub().get_required_pipe_func_executor()
 
 
 def get_pipe_func_executor_registry() -> "PipeFuncExecutorRegistry":
-    return get_method_hub().get_pipe_func_executor_registry()
+    return get_interpreter_hub().get_pipe_func_executor_registry()
 
 
 # run
 
 
 def get_pipe_run() -> "PipeRunProtocol":
-    return get_method_hub().get_required_pipe_run()
+    return get_interpreter_hub().get_required_pipe_run()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:
-    return get_method_hub().get_required_pipeline_manager()
+    return get_interpreter_hub().get_required_pipeline_manager()
 
 
 def get_pipeline(pipeline_run_id: str) -> Pipeline:

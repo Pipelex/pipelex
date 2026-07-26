@@ -28,7 +28,7 @@ from pipelex.cli.dev_cli.commands.keyword_only_guard import (
     load_subject_grants,
     module_qname_for,
 )
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.toml_utils import save_toml_to_path
 
 

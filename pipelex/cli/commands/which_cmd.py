@@ -10,9 +10,9 @@ from posthog import tag
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.method_hub import get_library_manager, get_optional_pipe, get_pipe_source, resolve_library_dirs, set_current_library
+from pipelex.interpreter_hub import get_library_manager, get_optional_pipe, get_pipe_source, resolve_library_dirs, set_current_library
 from pipelex.pipelex import Pipelex
-from pipelex.service_hub import get_console, get_telemetry_manager
+from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version

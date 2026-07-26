@@ -13,7 +13,7 @@ from pipelex.cogt.search.search_job import SearchJob
 from pipelex.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.service_hub import is_in_isolated_execution
+from pipelex.runtime_hub import is_in_isolated_execution
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.activity_event_log import ActivityEventLogCache

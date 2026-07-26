@@ -38,9 +38,9 @@ from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
+from pipelex.interpreter_hub import InterpreterHub, set_interpreter_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
-from pipelex.method_hub import MethodHub, set_method_hub
 from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol
@@ -62,7 +62,7 @@ from pipelex.plugins.secrets_provider_registry import SecretsProviderRegistry
 from pipelex.plugins.storage_provider_registry import StorageProviderRegistry
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.service_hub import ServiceHub, set_service_hub
+from pipelex.runtime_hub import RuntimeHub, set_runtime_hub
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import PipelexConfig
@@ -119,24 +119,24 @@ class Pipelex(metaclass=MetaSingleton):
         self.is_ready: bool = False
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
-        # Two hubs, two lifecycles: ServiceHub is process-scoped infrastructure, MethodHub is the
-        # library-scoped method machinery. Service first — installing the MethodHub hands the low
-        # layer its class-registry scoping resolver, which needs a ServiceHub already in place.
-        self.service_hub = ServiceHub()
-        set_service_hub(self.service_hub)
-        self.method_hub = MethodHub()
-        set_method_hub(self.method_hub)
+        # Two hubs, two lifecycles: RuntimeHub is process-scoped infrastructure, InterpreterHub is the
+        # library-scoped method machinery. Runtime first — installing the InterpreterHub hands the
+        # runtime layer its class-registry scoping resolver, which needs a RuntimeHub already in place.
+        self.runtime_hub = RuntimeHub()
+        set_runtime_hub(self.runtime_hub)
+        self.interpreter_hub = InterpreterHub()
+        set_interpreter_hub(self.interpreter_hub)
 
         # tools
         try:
-            self.service_hub.setup_config(config_cls=config_cls or PipelexConfig, config_overrides=config_overrides)
+            self.runtime_hub.setup_config(config_cls=config_cls or PipelexConfig, config_overrides=config_overrides)
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Could not setup config because of: {validation_error_msg}"
             raise PipelexConfigError(msg) from validation_error
 
         log_config = get_config().pipelex.log_config
-        self.service_hub.set_console_print_target(target=log_config.console_print_target)
+        self.runtime_hub.set_console_print_target(target=log_config.console_print_target)
         log.configure(log_config=log_config)
         log.verbose("Logs are configured")
 
@@ -148,7 +148,7 @@ class Pipelex(metaclass=MetaSingleton):
         self._plugin_registrar: PluginRegistrar | None = None
         # cogt
         self.sdk_client_manager = SdkClientManager()
-        self.service_hub.set_sdk_client_manager(self.sdk_client_manager)
+        self.runtime_hub.set_sdk_client_manager(self.sdk_client_manager)
 
         self.reporting_delegate: ReportingProtocol | None = None
         self.telemetry_manager: TelemetryManagerAbstract | None = None
@@ -311,7 +311,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # The built-in SecretsPlugin supplies the "env" method, so there is no separate core default.
         # Resolved here because the telemetry factory just below (and the model setup further down) consume it.
         secrets_provider_registry = SecretsProviderRegistry(plugin_registrar.secrets_providers)
-        self.service_hub.set_secrets_provider_registry(secrets_provider_registry)
+        self.runtime_hub.set_secrets_provider_registry(secrets_provider_registry)
         if secrets_provider is None:
             secrets_config = get_config().pipelex.secrets_config
             secrets_provider = secrets_provider_registry.get_required(method=secrets_config.method)(secrets_config)
@@ -331,17 +331,17 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             injected_telemetry_manager=telemetry_manager,
         )
         self.telemetry_manager.setup(integration_mode=integration_mode)
-        self.service_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
+        self.runtime_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
 
         # --- Tools ----------------------------------------------------------------------------
 
         self.class_registry = class_registry or ClassRegistry()
-        self.service_hub.set_class_registry(self.class_registry)
+        self.runtime_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         self.func_registry = func_registry or FuncRegistry()
-        self.service_hub.set_func_registry(func_registry=self.func_registry)
-        self.service_hub.set_secrets_provider(secrets_provider=secrets_provider)
+        self.runtime_hub.set_func_registry(func_registry=self.func_registry)
+        self.runtime_hub.set_secrets_provider(secrets_provider=secrets_provider)
         # Storage is selected from the config-driven StorageProviderRegistry, built from the plugin
         # registrar (constructed above, just before the telemetry factory). Its resolution and hub-set
         # still happen later at the plugin-derived-registries block — after secrets is on the hub here,
@@ -373,7 +373,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.sdk_client_manager.setup()
 
         self.models_manager: ModelManagerAbstract = models_manager or ModelManager()
-        self.service_hub.set_models_manager(models_manager=self.models_manager)
+        self.runtime_hub.set_models_manager(models_manager=self.models_manager)
 
         try:
             self.models_manager.setup(
@@ -424,23 +424,23 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # accumulated contributions into the hub registries here — after the gateway/model setup checks
         # and before the hub setup points below — the family worker factories look their backends up on
         # these at run time.
-        self.service_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
-        self.service_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
-        self.service_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
-        self.service_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
+        self.runtime_hub.set_inference_backend_registry(InferenceBackendRegistry(plugin_registrar.inference_backends))
+        self.runtime_hub.set_model_lister_registry(ModelListerRegistry(plugin_registrar.model_listers))
+        self.runtime_hub.set_orchestrator_registry(OrchestratorRegistry(plugin_registrar.orchestrators))
+        self.runtime_hub.set_bundle_validator_registry(BundleValidatorRegistry(plugin_registrar.bundle_validators))
         storage_provider_registry = StorageProviderRegistry(plugin_registrar.storage_providers)
-        self.service_hub.set_storage_provider_registry(storage_provider_registry)
+        self.runtime_hub.set_storage_provider_registry(storage_provider_registry)
         pipe_func_executor_registry = PipeFuncExecutorRegistry(plugin_registrar.pipe_func_executors)
-        self.method_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
+        self.interpreter_hub.set_pipe_func_executor_registry(pipe_func_executor_registry)
         # Storage provider precedence: explicit setup() param > config-selected registry factory.
         # The built-in StoragePlugin supplies every method, so there is no separate core default.
         # Resolves here (after secrets is on the hub) so the GCP factory's secret read works.
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
-        self.service_hub.set_storage_provider(storage_provider)
+        self.runtime_hub.set_storage_provider(storage_provider)
 
-        self.service_hub.set_dry_run_forced(is_forced=not needs_inference)
+        self.runtime_hub.set_dry_run_forced(is_forced=not needs_inference)
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
         # A boot-orchestrator plugin (Temporal worker) claims the CONTENT_GENERATOR slot; its thunk runs
         # only here, never at register, so booting a non-worker process imports no host-runtime SDK.
@@ -449,7 +449,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 slot=HubSlot.CONTENT_GENERATOR,
                 default=lambda: ContentGenerator(generated_content_factory=GeneratedContentFactory(storage_provider=storage_provider)),
             )
-        self.service_hub.set_content_generator(content_generator)
+        self.runtime_hub.set_content_generator(content_generator)
 
         # Injection precedence: explicit setup() param > plugin slot-claim thunk > config-selected
         # registry factory. The PipeFunc execution axis is orthogonal to orchestration: a Temporal
@@ -464,32 +464,32 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 slot=HubSlot.PIPE_FUNC_EXECUTOR,
                 default=lambda: pipe_func_executor_registry.get_required(mode=execution_mode)(pipe_func_config),
             )
-        self.method_hub.set_pipe_func_executor(pipe_func_executor)
+        self.interpreter_hub.set_pipe_func_executor(pipe_func_executor)
 
         self.inference_manager = inference_manager or InferenceManager()
-        self.service_hub.set_inference_manager(self.inference_manager)
+        self.runtime_hub.set_inference_manager(self.inference_manager)
 
         # --- Libraries & Registries -------------------------------------------------------------
 
         self.reporting_delegate = reporting_delegate or ReportingManager()
-        self.service_hub.set_report_delegate(self.reporting_delegate)
+        self.runtime_hub.set_report_delegate(self.reporting_delegate)
         self.reporting_delegate.setup()
 
         self.library_manager = library_manager or LibraryManager()
-        self.method_hub.set_library_manager(library_manager=self.library_manager)
+        self.interpreter_hub.set_library_manager(library_manager=self.library_manager)
 
         # Resolve library_dirs: explicit value replaces PIPELEXPATH, otherwise use env var as fallback
         # When library_dirs is explicitly provided (even if empty), it overrides the env var
         if library_dirs is not None:
             resolved_library_dirs = [Path(dir_path) for dir_path in library_dirs]
-            self.method_hub.set_default_library_dirs(resolved_library_dirs)
+            self.interpreter_hub.set_default_library_dirs(resolved_library_dirs)
         else:
             pipelexpath_dirs = get_pipelexpath_dirs()
             if pipelexpath_dirs is not None:
-                self.method_hub.set_default_library_dirs(pipelexpath_dirs)
+                self.interpreter_hub.set_default_library_dirs(pipelexpath_dirs)
 
         self.pipeline_manager = pipeline_manager or PipelineManager()
-        self.method_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
+        self.interpreter_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
 
         self.class_registry.register_classes(CoreRegistryModels.get_all_models())
@@ -523,21 +523,23 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # reports "never isolated", so no wiring is needed here.
         isolated_execution_probe_factory = plugin_registrar.slot_claims.get(HubSlot.ISOLATED_EXECUTION_PROBE)
         if isolated_execution_probe_factory is not None:
-            self.service_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
+            self.runtime_hub.set_isolated_execution_probe(isolated_execution_probe_factory())
 
         # --- Pipe Router -----------------------------------------------------------------------
         # Injection precedence (codex C8): explicit setup() param > plugin slot-claim thunk > core default.
 
         if pipe_router:
-            self.method_hub.set_pipe_router(pipe_router)
+            self.interpreter_hub.set_pipe_router(pipe_router)
         else:
-            self.method_hub.set_pipe_router(self._resolve_hub_slot(slot=HubSlot.PIPE_ROUTER, default=lambda: PipeRouter(observer=multi_observer)))
+            self.interpreter_hub.set_pipe_router(
+                self._resolve_hub_slot(slot=HubSlot.PIPE_ROUTER, default=lambda: PipeRouter(observer=multi_observer))
+            )
 
         # --- Pipe Run --------------------------------------------------------------------------
         # No explicit param for pipe_run: plugin slot-claim thunk > core default.
 
-        self.method_hub.set_pipe_run(
-            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.method_hub.get_required_pipe_router()))
+        self.interpreter_hub.set_pipe_run(
+            self._resolve_hub_slot(slot=HubSlot.PIPE_RUN, default=lambda: PipeRun(pipe_router=self.interpreter_hub.get_required_pipe_router()))
         )
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
@@ -585,10 +587,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         TemplateRegistry.clear()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
-        # Both hubs release their process-global state: the ServiceHub drops its config, and the
-        # class-registry scoping resolver the MethodHub installed at boot goes back to its unscoped
+        # Both hubs release their process-global state: the RuntimeHub drops its config, and the
+        # class-registry scoping resolver the InterpreterHub installed at boot goes back to its unscoped
         # default so a torn-down library manager can never be reached through it.
-        self.service_hub.reset_config()
+        self.runtime_hub.reset_config()
         class_registry_scoping.reset()
         # Clear the singleton instance from metaclass
         if self.__class__ in MetaSingleton.instances:
@@ -716,7 +718,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # partial setup never assigned). Without this the next boot raises "LogConfig is already
             # set" and serves a stale, half-populated class registry (the KajsonManager singleton
             # ignores a fresh registry once created).
-            pipelex_instance.service_hub.reset_config()
+            pipelex_instance.runtime_hub.reset_config()
             class_registry_scoping.reset()
             KajsonManager.teardown()
             TemplateLoader.reset()

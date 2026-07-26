@@ -18,7 +18,7 @@ from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
-from pipelex.service_hub import get_telemetry_manager
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
 if TYPE_CHECKING:

@@ -13,7 +13,7 @@ from __future__ import annotations
 import pytest
 
 from pipelex.builder.operations.runner_code_ops import build_runner_code_for_pipe
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 _LOADED_DOMAIN = "loaded_on_success"

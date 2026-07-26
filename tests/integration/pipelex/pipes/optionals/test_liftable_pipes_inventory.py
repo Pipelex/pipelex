@@ -8,7 +8,7 @@ from typing import Callable
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.method_hub import get_pipe_library
+from pipelex.interpreter_hub import get_pipe_library
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence

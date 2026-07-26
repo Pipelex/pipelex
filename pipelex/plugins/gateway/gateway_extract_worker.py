@@ -24,7 +24,7 @@ from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.service_hub import get_storage_provider
+from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
 
 

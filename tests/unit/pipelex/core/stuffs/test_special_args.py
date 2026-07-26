@@ -12,7 +12,7 @@ from pipelex.core.concepts.concept_structure_blueprint import (
     ConceptStructureBlueprintFieldType,
 )
 from pipelex.core.stuffs.stuff_factory import StuffContentFactory, StuffFactory
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 
 
 class TestSpecialArgsStuff:

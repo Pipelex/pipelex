@@ -156,7 +156,7 @@ make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a 
 make fko                      - Shorthand -> fix-keyword-only
 make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>" RATIONALE="…")
 make sgr                      - Shorthand -> subject-grant
-make check-hub-layering       - Enforce the service_hub / method_hub layering boundary
+make check-hub-layering       - Enforce the runtime_hub / interpreter_hub layering boundary
 make chl                      - Shorthand -> check-hub-layering
 make check-TODOs              - Check for TODOs
 
@@ -359,7 +359,7 @@ sgr: subject-grant
 	@echo "> done: sgr = subject-grant"
 
 check-hub-layering: env
-	$(call PRINT_TITLE,"Enforcing the service_hub / method_hub layering boundary")
+	$(call PRINT_TITLE,"Enforcing the runtime_hub / interpreter_hub layering boundary")
 	$(VENV_PIPELEX_DEV) check-hub-layering --quiet
 
 chl: check-hub-layering

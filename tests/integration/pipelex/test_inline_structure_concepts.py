@@ -10,7 +10,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.service_hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 
 class TestInlineStructureConcepts:

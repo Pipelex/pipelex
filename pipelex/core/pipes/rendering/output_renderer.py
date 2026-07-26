@@ -6,7 +6,7 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeType
-from pipelex.method_hub import get_required_pipe
+from pipelex.interpreter_hub import get_required_pipe
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition

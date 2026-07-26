@@ -14,7 +14,7 @@ from pipelex.core.memory.exceptions import MultiplicityCountMismatchError, Struc
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from pipelex.tools.tabular.exceptions import CsvError
 from tests.unit.pipelex.core.memory.input_shaper.data import ShaperPerson, build_input_specs
 

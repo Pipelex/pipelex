@@ -92,7 +92,7 @@ class TestAgentCliOutputDiscipline:
         mock_redirect = mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.log.redirect_to_stderr")
         mock_hub = mocker.MagicMock()
         mocker.patch(
-            "pipelex.cli.agent_cli.commands.agent_cli_factory.ServiceHub.get_optional_instance",
+            "pipelex.cli.agent_cli.commands.agent_cli_factory.RuntimeHub.get_optional_instance",
             return_value=mock_hub,
         )
 
@@ -108,7 +108,7 @@ class TestAgentCliOutputDiscipline:
         """
         mock_redirect = mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.log.redirect_to_stderr")
         mocker.patch(
-            "pipelex.cli.agent_cli.commands.agent_cli_factory.ServiceHub.get_optional_instance",
+            "pipelex.cli.agent_cli.commands.agent_cli_factory.RuntimeHub.get_optional_instance",
             return_value=None,
         )
 

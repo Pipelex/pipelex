@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.method_hub import resolve_library_dirs
+from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
 

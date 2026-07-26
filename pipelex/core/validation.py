@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 
-from pipelex.service_hub import get_optional_config
+from pipelex.runtime_hub import get_optional_config
 from pipelex.system.configuration.configs import MigrationConfig, PipelexConfig
 from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_error
 

@@ -17,8 +17,8 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.builder.operations.validate_ops import validate_pipe
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 
 _LIFECYCLE_DOMAIN = "validate_pipe_lifecycle"
 _LIFECYCLE_MTHDS = f"""

@@ -3,8 +3,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.interpreter_hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
-from pipelex.method_hub import clear_current_library, get_current_library, get_library_manager, set_current_library
 
 SCORING_MTHDS = """\
 domain = "scoring"

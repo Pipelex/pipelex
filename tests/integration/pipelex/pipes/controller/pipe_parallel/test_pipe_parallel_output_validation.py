@@ -9,7 +9,7 @@ a runtime combine failure.
 import pytest
 
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.method_hub import clear_current_library, get_library_manager
+from pipelex.interpreter_hub import clear_current_library, get_library_manager
 from pipelex.pipeline.execution_seams import acquire_library
 
 _BUNDLE_HEADER = """

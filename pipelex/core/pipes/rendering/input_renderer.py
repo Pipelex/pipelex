@@ -8,7 +8,7 @@ from pipelex.core.memory.input_shaper import InputKind, InputShaper
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 
 
 class InputsTemplateFormat(StrEnum):

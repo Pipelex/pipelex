@@ -1,5 +1,5 @@
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.service_hub import get_inference_manager, get_model_deck
+from pipelex.runtime_hub import get_inference_manager, get_model_deck
 
 
 class TestSetupInferenceWorkers:

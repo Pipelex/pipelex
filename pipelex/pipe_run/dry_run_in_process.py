@@ -18,7 +18,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec, GraphSpecMode
-from pipelex.method_hub import get_library_manager, scoped_pipe_router
+from pipelex.interpreter_hub import get_library_manager, scoped_pipe_router
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
 from pipelex.pipe_run.pipe_router import PipeRouter
@@ -26,7 +26,7 @@ from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execution_seams import prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
-from pipelex.service_hub import scoped_content_generator, scoped_event_log
+from pipelex.runtime_hub import scoped_content_generator, scoped_event_log
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 

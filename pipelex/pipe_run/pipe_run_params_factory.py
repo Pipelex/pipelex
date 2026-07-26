@@ -6,7 +6,7 @@ from pipelex.config import get_config
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
-from pipelex.service_hub import is_dry_run_forced
+from pipelex.runtime_hub import is_dry_run_forced
 
 
 class PipeRunParamsFactory:

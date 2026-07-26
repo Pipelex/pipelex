@@ -8,7 +8,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, 
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_factory import PipeFactory
-from pipelex.method_hub import get_pipe_library, get_pipe_router
+from pipelex.interpreter_hub import get_pipe_library, get_pipe_router
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint

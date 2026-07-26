@@ -2,9 +2,9 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
+from pipelex.interpreter_hub import clear_current_library, get_library_manager, set_current_library
 from pipelex.libraries.library_factory import LibraryFactory
-from pipelex.method_hub import clear_current_library, get_library_manager, set_current_library
-from pipelex.service_hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 
 class ScopedModel(BaseModel):

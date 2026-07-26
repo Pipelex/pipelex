@@ -3,7 +3,7 @@ from pathlib import Path
 from pipelex import log
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.registrar import PluginRegistrar
-from pipelex.service_hub import get_secrets_provider
+from pipelex.runtime_hub import get_secrets_provider
 from pipelex.tools.storage.exceptions import StorageConfigError
 from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider

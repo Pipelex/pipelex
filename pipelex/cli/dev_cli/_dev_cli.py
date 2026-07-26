@@ -27,7 +27,7 @@ from pipelex.cli.dev_cli.commands.subject_grant_cmd import subject_grant_cmd
 from pipelex.cli.dev_cli.commands.sync_kit_configs_cmd import sync_kit_configs_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -255,13 +255,13 @@ def check_mthds_schema_command(
         sys.exit(1)
 
 
-@app.command(name="check-hub-layering", help="Enforce the service_hub / method_hub layering boundary")
+@app.command(name="check-hub-layering", help="Enforce the runtime_hub / interpreter_hub layering boundary")
 def check_hub_layering_command(
     quiet: Annotated[
         bool, typer.Option("--quiet", "-q", help="Light output on success (single line); the full violation list still prints on failure")
     ] = False,
 ) -> None:
-    """Enforce the service_hub / method_hub layering boundary."""
+    """Enforce the runtime_hub / interpreter_hub layering boundary."""
     try:
         check_hub_layering_cmd(quiet=quiet)
     except (typer.Exit, typer.Abort):

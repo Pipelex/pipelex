@@ -20,7 +20,7 @@ from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.codegen.crate_encoding import CrateEncoding, encode_crate
 from pipelex.pipelex import Pipelex
-from pipelex.service_hub import get_telemetry_manager
+from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version

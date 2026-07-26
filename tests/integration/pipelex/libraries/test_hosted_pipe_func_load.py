@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from pipelex.config import get_config
+from pipelex.interpreter_hub import get_library_manager, scoped_current_library
 from pipelex.libraries.exceptions import LibraryError
-from pipelex.method_hub import get_library_manager, scoped_current_library
 from pipelex.system.registries.func_registry import func_registry
 
 HOSTED_DEMO_MTHDS = """\

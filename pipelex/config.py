@@ -1,5 +1,5 @@
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
-from pipelex.service_hub import get_optional_config, get_required_config
+from pipelex.runtime_hub import get_optional_config, get_required_config
 from pipelex.system.configuration.configs import PipelexConfig
 
 

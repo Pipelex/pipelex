@@ -8,7 +8,7 @@ from rich.panel import Panel
 
 from pipelex.errors.error_pages_generator import generate_error_pages
 from pipelex.pipelex import Pipelex
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 
 ERROR_PAGES_DIR = Path("docs/errors")
 

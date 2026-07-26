@@ -19,7 +19,7 @@ from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.service_hub import get_model_deck, get_report_delegate
+from pipelex.runtime_hub import get_model_deck, get_report_delegate
 
 
 def _make_search_worker(search_assignment: SearchAssignment) -> SearchWorkerAbstract:

@@ -19,7 +19,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.service_hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 # Field names that require snake_case format for pipelex bundle specs
 # Note: main_pipe is NOT included here because BundleHeaderSpec.main_pipe has

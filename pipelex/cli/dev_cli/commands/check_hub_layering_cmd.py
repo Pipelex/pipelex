@@ -1,18 +1,18 @@
 """Command enforcing the two-hub layering boundary across ``pipelex/`` source and ``tests/``.
 
-`method_hub` may import `service_hub`; **`service_hub` must never import `method_hub`.** The guard
-checks the forbidden direction — a declared low-layer module may not import or name
-``pipelex.method_hub`` — plus the dead-module rule: nothing anywhere may still reference the deleted
+`interpreter_hub` may import `runtime_hub`; **`runtime_hub` must never import `interpreter_hub`.** The guard
+checks the forbidden direction — a declared runtime-layer module may not import or name
+``pipelex.interpreter_hub`` — plus the dead-module rule: nothing anywhere may still reference the deleted
 ``pipelex.hub``. The canonical human-readable specification lives in ``docs/contribute/hub-layering.md``.
 
 The pure-AST collection logic lives in the stdlib-only ``hub_layering_guard`` module; this module is
-the ``rich``/``pipelex.service_hub`` presentation layer wired into the ``pipelex-dev`` Typer app
+the ``rich``/``pipelex.runtime_hub`` presentation layer wired into the ``pipelex-dev`` Typer app
 (``make check-hub-layering`` / ``make agent-check`` / CI). The tree is fully compliant, so the guard
 hard-blocks on ANY violation; the only sanctioned exceptions are a ``TYPE_CHECKING``-deferred type-only
 import and the inline ``# hub-layering: ignore`` escape hatch.
 
 The guard checks the *rule*. The *property* it protects — importing the inference layer loads zero
-interpreter modules — is pinned separately by ``tests/unit/pipelex/test_hub_import_closure.py``, because
+interpreter modules — is pinned separately by ``tests/unit/pipelex/test_runtime_layer_import_closure.py``, because
 a stray import somewhere else entirely could break the property without touching a hub import.
 """
 
@@ -24,12 +24,12 @@ from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.hub_layering_guard import (
-    LOW_LAYER_PACKAGES,
+    RUNTIME_LAYER_PACKAGES,
     SCAN_ROOTS,
     HubLayeringViolation,
     collect_all_violations,
 )
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 
 # --------------------------------------------------------------------------------------
 # Command entrypoint
@@ -37,7 +37,7 @@ from pipelex.service_hub import get_console
 
 
 def check_hub_layering_cmd(*, quiet: bool = False) -> None:
-    """Enforce the ``service_hub`` / ``method_hub`` layering boundary.
+    """Enforce the ``runtime_hub`` / ``interpreter_hub`` layering boundary.
 
     Args:
         quiet: If True, keep the success output to a single line (for Make targets / CI). Quiet only
@@ -75,11 +75,11 @@ def check_hub_layering_cmd(*, quiet: bool = False) -> None:
 def _print_success_panel() -> None:
     """Verbose success output (no violations)."""
     console = get_console()
-    layers = ", ".join(LOW_LAYER_PACKAGES)
+    layers = ", ".join(RUNTIME_LAYER_PACKAGES)
     console.print()
     console.print(
         Panel(
-            f"[green]✓[/green] No hub-layering violations.\n\n[dim]Low layer: {escape(layers)}[/dim]",
+            f"[green]✓[/green] No hub-layering violations.\n\n[dim]Runtime layer: {escape(layers)}[/dim]",
             title="[bold green]Hub-layering Check: PASSED[/bold green]",
             border_style="green",
             padding=(1, 2),
@@ -95,7 +95,7 @@ def _print_failure_panel(*, violations: list[HubLayeringViolation]) -> None:
     console.print(
         Panel(
             f"[red]✗[/red] {len(violations)} hub-layering violation(s) found.\n\n"
-            "[dim]The low layer must stay importable without loading the method interpreter — "
+            "[dim]The runtime layer must stay importable without loading the method interpreter — "
             "each violation kind below names its remedy.[/dim]",
             title="[bold red]Hub-layering Check: FAILED[/bold red]",
             border_style="red",

@@ -17,11 +17,11 @@ from pathlib import Path
 import typer
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.method_hub import get_library_manager
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 
 

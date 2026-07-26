@@ -16,7 +16,7 @@ from typing_extensions import override
 
 from pipelex.pipelex import Pipelex
 from pipelex.plugins.contract import PLUGIN_API_VERSION
-from pipelex.service_hub import get_storage_provider, get_storage_provider_registry
+from pipelex.runtime_hub import get_storage_provider, get_storage_provider_registry
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 

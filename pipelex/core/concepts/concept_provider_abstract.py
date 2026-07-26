@@ -7,7 +7,7 @@ removing, listing, setup/teardown); that half is the loaded method's concern and
 
 Splitting the two is what lets `core/` state its dependency honestly: a core module declares "I
 need something that can resolve concepts" as a parameter, instead of reaching for
-`method_hub.get_concept_library()` and dragging the whole interpreter into its import closure.
+`interpreter_hub.get_concept_library()` and dragging the whole interpreter into its import closure.
 See ``docs/contribute/hub-layering.md``.
 """
 

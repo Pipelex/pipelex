@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.method_hub import (
+from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
@@ -23,7 +23,7 @@ from pipelex.pipe_run.pipe_run_params import (
 )
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
-from pipelex.service_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
+from pipelex.runtime_hub import get_event_log_override, get_otel_tracer, get_report_delegate, get_telemetry_manager
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.job_metadata import OtelContext

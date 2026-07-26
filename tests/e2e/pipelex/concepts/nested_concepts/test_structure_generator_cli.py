@@ -26,8 +26,8 @@ from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.execution_seams import load_libraries_and_activate
 
 

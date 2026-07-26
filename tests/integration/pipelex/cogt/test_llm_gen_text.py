@@ -9,7 +9,7 @@ from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
-from pipelex.service_hub import get_llm_worker, get_model_deck
+from pipelex.runtime_hub import get_llm_worker, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo

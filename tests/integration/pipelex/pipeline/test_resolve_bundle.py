@@ -13,7 +13,7 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
 

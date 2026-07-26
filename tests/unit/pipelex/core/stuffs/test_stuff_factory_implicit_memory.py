@@ -9,8 +9,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.method_hub import get_concept_library
-from pipelex.service_hub import get_class_registry
+from pipelex.interpreter_hub import get_concept_library
+from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES, DueDate, UrgencyFlag
 

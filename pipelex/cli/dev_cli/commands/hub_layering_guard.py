@@ -1,15 +1,17 @@
 """Pure-stdlib AST core for the two-hub layering boundary guard.
 
-Pipelex has two hubs. `method_hub` may import `service_hub`; **`service_hub` must never import
-`method_hub`**. That single arrow is the whole architecture, and the property it buys is measurable:
-importing the inference layer must not load the method interpreter. The canonical human-readable
-specification lives in ``docs/contribute/hub-layering.md``.
+Pipelex has two layers and one hub each. The **interpreter** layer reads a method and executes it; the
+**runtime** layer is the machinery present at execution time whatever is loaded. `interpreter_hub` may
+import `runtime_hub`; **`runtime_hub` must never import `interpreter_hub`**. That single arrow is the
+whole architecture, and the property it buys is measurable: importing the Pipelex runtime loads zero
+interpreter modules. The canonical human-readable specification lives in
+``docs/contribute/hub-layering.md``.
 
 This module holds the AST collection logic that mechanically enforces two rules:
 
-1. **The layer rule.** A module in the declared low layer (:data:`LOW_LAYER_PACKAGES`) may not import
-   ``pipelex.method_hub``. Since `service_hub`'s own closure is what the low layer is, an import
-   anywhere in it puts the interpreter back into every inference consumer.
+1. **The layer rule.** A module in the declared runtime layer (:data:`RUNTIME_LAYER_PACKAGES`) may not
+   import ``pipelex.interpreter_hub``. Since `runtime_hub`'s own closure is what the runtime layer is,
+   an import anywhere in it puts the interpreter back into every inference consumer.
 2. **The dead-module rule.** *No* scanned module may reference ``pipelex.hub``. That module was
    deleted rather than kept as an alias for either half, precisely so a stale import fails loudly —
    this rule closes the one hole in that guarantee (see below).
@@ -20,9 +22,12 @@ invisible to every import-graph tool and to pyright's module graph. The two form
 occurred in this repo are ``importlib.import_module("pipelex.hub")`` (three of them, hiding a cycle
 from every lint) and ``mocker.patch("pipelex.hub.get_console", ...)`` (which broke a whole CLI test
 suite with an ``AttributeError`` raised nowhere near a hub). Matching is exact-or-dotted-prefix
-against the module path — a docstring or comment that merely *mentions* ``pipelex.method_hub`` in
+against the module path — a docstring or comment that merely *mentions* ``pipelex.interpreter_hub`` in
 prose is not a reference and is not flagged. A path assembled at runtime from f-strings or
 concatenation is out of reach of any AST scan; nothing in the tree does that today.
+
+Note that ``runtime_hub`` is unrelated to the ``pipelex.runtime_bridge`` package despite the shared
+word: the hub is the runtime layer's service container, while ``runtime_bridge`` is a transport.
 
 Two deliberate carve-outs:
 
@@ -38,7 +43,7 @@ The filesystem helpers below are duplicated from ``keyword_only_guard`` on purpo
 that module is also invoked *by file path* under a cold-start budget, so it must not import anything
 from the ``pipelex`` package chain — extracting a shared helper module would defeat it.
 
-This module depends on **stdlib only** — no ``rich``, ``pipelex.service_hub``, or ``typer``. The
+This module depends on **stdlib only** — no ``rich``, ``pipelex.runtime_hub``, or ``typer``. The
 presentation layer wired into the ``pipelex-dev`` Typer app lives in ``check_hub_layering_cmd.py``.
 """
 
@@ -62,30 +67,30 @@ if TYPE_CHECKING:
 SOURCE_ROOT = Path("pipelex")
 
 #: Test root. Scanned for the dead-module rule only — `tests.*` is in no declared layer, so the
-#: layer rule never applies to it and a test may freely patch `pipelex.method_hub`.
+#: layer rule never applies to it and a test may freely patch `pipelex.interpreter_hub`.
 TESTS_ROOT = Path("tests")
 
 #: The roots the full-tree check scans.
 SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 
-#: The declared low layer: packages that must stay importable without loading the method interpreter.
+#: The declared runtime layer: packages that must stay importable without loading the method interpreter.
 #:
 #: `pipelex/core/**` is listed **package by package**, not wholesale, because `core/` is genuinely two
 #: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
-#: low: it describes what a method's values are, and nothing in it needs a loaded method. The
+#: runtime: it describes what a method's values are, and nothing in it needs a loaded method. The
 #: remainder names a `Pipe`, and a pipe is the interpreter's own object: `pipe_abstract`,
 #: `pipe_blueprint`, `pipe_factory`, `registry_models`, `bundles/` (a discriminated union over every
 #: pipe blueprint), `interpreter/`, and `pipes/rendering/` all import the interpreter *directly*, so
-#: declaring them low would be a claim the measurement contradicts. Those modules resolve their
-#: collaborators from the hub and inject them downward into the low half — the one-way arrow the whole
-#: design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
-LOW_LAYER_PACKAGES: tuple[str, ...] = (
+#: declaring them runtime would be a claim the measurement contradicts. Those modules resolve their
+#: collaborators from the hub and inject them downward into the runtime half — the one-way arrow the
+#: whole design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
+RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.plugins",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
-    # core's data model; the Pipe-touching remainder of `core/` stays high
+    # core's data model; the Pipe-touching remainder of `core/` stays in the interpreter layer
     "pipelex.core.concepts",
     "pipelex.core.domains",
     "pipelex.core.memory",
@@ -94,8 +99,8 @@ LOW_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.core.stuffs",
 )
 
-#: The high hub, which no low-layer module may import.
-METHOD_HUB_MODULE = "pipelex.method_hub"
+#: The interpreter layer's hub, which no runtime-layer module may import.
+INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"
 
 #: The single hub that was split and deleted. Every reference to it is dead, in every layer.
 #: The marker below is the escape hatch dogfooding itself: this line *declares* the forbidden path,
@@ -112,26 +117,26 @@ TYPE_CHECKING_NAME = "TYPE_CHECKING"
 class HubLayeringViolationKind(StrEnum):
     """The distinct hub-layering violation kinds — each names its own remedy."""
 
-    METHOD_HUB_IMPORT = "method-hub-import"
-    METHOD_HUB_REFERENCE = "method-hub-reference"
+    INTERPRETER_HUB_IMPORT = "interpreter-hub-import"
+    INTERPRETER_HUB_REFERENCE = "interpreter-hub-reference"
     DEAD_HUB_REFERENCE = "dead-hub-reference"
 
     @property
     def remedy(self) -> str:
         """One actionable sentence naming how to fix this violation kind."""
         match self:
-            case HubLayeringViolationKind.METHOD_HUB_IMPORT:
+            case HubLayeringViolationKind.INTERPRETER_HUB_IMPORT:
                 return (
-                    "a low-layer module may not import `pipelex.method_hub` — take the value as an argument, "
-                    "or have the high layer install it downward at boot (the `class_registry_scoping` pattern)"
+                    "a runtime-layer module may not import `pipelex.interpreter_hub` — take the value as an argument, "
+                    "or have the interpreter layer install it downward at boot (the `class_registry_scoping` pattern)"
                 )
-            case HubLayeringViolationKind.METHOD_HUB_REFERENCE:
+            case HubLayeringViolationKind.INTERPRETER_HUB_REFERENCE:
                 return (
-                    "a low-layer module may not name `pipelex.method_hub` in a string either — a dynamic import "
-                    "or patch target is the same dependency, just invisible to the import graph"
+                    "a runtime-layer module may not name `pipelex.interpreter_hub` in a string either — a dynamic "
+                    "import or patch target is the same dependency, just invisible to the import graph"
                 )
             case HubLayeringViolationKind.DEAD_HUB_REFERENCE:
-                return f"`{DELETED_HUB_MODULE}` no longer exists — point at `pipelex.service_hub` or `pipelex.method_hub`"
+                return f"`{DELETED_HUB_MODULE}` no longer exists — point at `pipelex.runtime_hub` or `pipelex.interpreter_hub`"
 
 
 class HubLayeringViolation(NamedTuple):
@@ -156,21 +161,21 @@ class HubLayeringViolation(NamedTuple):
 def references_module(*, candidate: str, target: str) -> bool:
     """Whether a dotted candidate names ``target`` or something inside it.
 
-    Exact-or-boundary matching, so ``pipelex.service_hub`` never matches ``pipelex.hub`` and a prose
+    Exact-or-boundary matching, so ``pipelex.runtime_hub`` never matches ``pipelex.hub`` and a prose
     sentence mentioning a module is never a reference. The ``:`` form covers ``module:attr`` paths.
     """
     return candidate == target or candidate.startswith((f"{target}.", f"{target}:"))
 
 
-def is_low_layer(*, module_qname: str) -> bool:
-    """Whether a module sits in the declared low layer."""
-    return any(module_qname == package or module_qname.startswith(f"{package}.") for package in LOW_LAYER_PACKAGES)
+def is_runtime_layer(*, module_qname: str) -> bool:
+    """Whether a module sits in the declared runtime layer."""
+    return any(module_qname == package or module_qname.startswith(f"{package}.") for package in RUNTIME_LAYER_PACKAGES)
 
 
 def targets_for(*, module_qname: str) -> frozenset[str]:
-    """The forbidden module paths for one module: the dead hub always, plus the high hub in the low layer."""
-    if is_low_layer(module_qname=module_qname):
-        return frozenset({DELETED_HUB_MODULE, METHOD_HUB_MODULE})
+    """The forbidden module paths for one module: the dead hub always, plus the interpreter hub in the runtime layer."""
+    if is_runtime_layer(module_qname=module_qname):
+        return frozenset({DELETED_HUB_MODULE, INTERPRETER_HUB_MODULE})
     return frozenset({DELETED_HUB_MODULE})
 
 
@@ -207,7 +212,7 @@ class _Collector(ast.NodeVisitor):
     def _active_targets(self) -> frozenset[str]:
         """The targets in force here: inside a ``TYPE_CHECKING`` block the layer rule is lifted, the dead-module rule is not."""
         if self._type_checking_depth > 0:
-            return self.targets - {METHOD_HUB_MODULE}
+            return self.targets - {INTERPRETER_HUB_MODULE}
         return self.targets
 
     def _is_suppressed(self, *, lineno: int, end_lineno: int | None) -> bool:
@@ -248,23 +253,23 @@ class _Collector(ast.NodeVisitor):
 
     @override
     def visit_Import(self, node: ast.Import) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
-        """``import pipelex.method_hub`` / ``import pipelex.method_hub as hub``."""
+        """``import pipelex.interpreter_hub`` / ``import pipelex.interpreter_hub as hub``."""
         for alias in node.names:
             target = self._matched_target(candidate=alias.name)
             if target is not None:
-                self._record(node=node, target=target, detail=f"imports `{alias.name}`", import_kind=HubLayeringViolationKind.METHOD_HUB_IMPORT)
+                self._record(node=node, target=target, detail=f"imports `{alias.name}`", import_kind=HubLayeringViolationKind.INTERPRETER_HUB_IMPORT)
                 return
 
     @override
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
-        """``from pipelex.method_hub import x``, ``from pipelex import method_hub``, and the relative forms."""
+        """``from pipelex.interpreter_hub import x``, ``from pipelex import interpreter_hub``, and the relative forms."""
         base = self._absolute_module_for(node=node)
         if base is None:
             return
         for candidate in [base, *(f"{base}.{alias.name}" for alias in node.names)]:
             target = self._matched_target(candidate=candidate)
             if target is not None:
-                self._record(node=node, target=target, detail=f"imports `{candidate}`", import_kind=HubLayeringViolationKind.METHOD_HUB_IMPORT)
+                self._record(node=node, target=target, detail=f"imports `{candidate}`", import_kind=HubLayeringViolationKind.INTERPRETER_HUB_IMPORT)
                 return
 
     @override
@@ -288,7 +293,7 @@ class _Collector(ast.NodeVisitor):
             return
         target = self._matched_target(candidate=value)
         if target is not None:
-            self._record(node=node, target=target, detail=f'string literal "{value}"', import_kind=HubLayeringViolationKind.METHOD_HUB_REFERENCE)
+            self._record(node=node, target=target, detail=f'string literal "{value}"', import_kind=HubLayeringViolationKind.INTERPRETER_HUB_REFERENCE)
 
 
 # --------------------------------------------------------------------------------------

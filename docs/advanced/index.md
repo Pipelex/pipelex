@@ -29,14 +29,14 @@ This is the supported path. `Pipelex.make()` builds the hubs, applies your overr
 
 Injection happens at boot; *lookup* happens through a hub. Pipelex has two, split by lifecycle:
 
-- `pipelex.service_hub` — process-scoped infrastructure: config, console, secrets, storage, telemetry, the model deck, inference workers, the content generator, the plugin registries.
-- `pipelex.method_hub` — library-scoped method machinery: the library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager.
+- `pipelex.runtime_hub` — process-scoped infrastructure: config, console, secrets, storage, telemetry, the model deck, inference workers, the content generator, the plugin registries.
+- `pipelex.interpreter_hub` — library-scoped method machinery: the library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager.
 
 Read a dependency through the module-level accessor for the half that owns it:
 
 ```python
-from pipelex.method_hub import get_required_pipe
-from pipelex.service_hub import get_model_deck, get_secrets_provider
+from pipelex.interpreter_hub import get_required_pipe
+from pipelex.runtime_hub import get_model_deck, get_secrets_provider
 
 secrets = get_secrets_provider()
 deck = get_model_deck()
@@ -44,7 +44,7 @@ pipe = get_required_pipe(pipe_code="my_domain.my_pipe")
 ```
 
 !!! warning "Don't construct a hub yourself"
-    Building a `ServiceHub()` or `MethodHub()` by hand and calling setters on it has no effect on a running Pipelex — the instance you build is not the one the process resolves. Inject through `Pipelex.make()` instead.
+    Building a `RuntimeHub()` or `InterpreterHub()` by hand and calling setters on it has no effect on a running Pipelex — the instance you build is not the one the process resolves. Inject through `Pipelex.make()` instead.
 
 Contributors adding a new dependency should read [Hub Layering](../contribute/hub-layering.md), which specifies which half a symbol belongs on and why the boundary is enforced.
 

@@ -43,7 +43,7 @@ from pipelex.cli.dev_cli.commands.drift.models import (
     load_manifest,
     save_ack,
 )
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from pipelex.config import get_config
-from pipelex.method_hub import resolve_library_dirs
+from pipelex.interpreter_hub import resolve_library_dirs
 
 
 def _excluded_copy_entries(  # kw-only: ignore - shutil.copytree invokes ignore callbacks positionally

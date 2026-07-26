@@ -13,7 +13,7 @@ from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.method_hub import get_native_concept
+from pipelex.interpreter_hub import get_native_concept
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.urls import URLs

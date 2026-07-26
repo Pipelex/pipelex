@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     # Deferred on purpose: the protocol lives under ``pipe_operators`` (the method-interpretation
     # layer) but this registry is imported from ``pipelex.config``, which the inference layer loads.
     # A module-level import here would drag the interpreter into every closure that touches
-    # inference — the exact coupling the service_hub / method_hub split removes. The underlying
+    # inference — the exact coupling the runtime_hub / interpreter_hub split removes. The underlying
     # placement inversion (a ``plugins`` module typed by a ``pipe_operators`` protocol) is recorded
     # in docs/contribute/hub-layering.md as a known inversion.
     from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutorProtocol

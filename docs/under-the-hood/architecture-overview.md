@@ -98,19 +98,19 @@ The two layers above would be a diagram rather than an architecture if nothing e
 
 There are two hubs, and the boundary between them *is* the boundary between the layers:
 
-- [**`pipelex/service_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/service_hub.py) — process-scoped infrastructure. Config, console, secrets, storage, telemetry, the model deck, the inference workers, the content generator, the plugin registries. Configured once at boot; identical for every method the process runs.
-- [**`pipelex/method_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/method_hub.py) — library-scoped method machinery. The library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager, the PipeFunc executor. Tied to the method that is loaded.
+- [**`pipelex/runtime_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/runtime_hub.py) — process-scoped infrastructure. Config, console, secrets, storage, telemetry, the model deck, the inference workers, the content generator, the plugin registries. Configured once at boot; identical for every method the process runs.
+- [**`pipelex/interpreter_hub.py`**](https://github.com/Pipelex/pipelex/tree/main/pipelex/interpreter_hub.py) — library-scoped method machinery. The library manager and the concept/domain/pipe libraries, the current-library binding, the pipe router, the pipeline manager, the PipeFunc executor. Tied to the method that is loaded.
 
 One rule governs them:
 
 !!! note "The one arrow"
-    `method_hub` imports `service_hub`. **`service_hub` never imports `method_hub`.**
+    `interpreter_hub` imports `runtime_hub`. **`runtime_hub` never imports `interpreter_hub`.**
 
-The practical consequence is that the low-level COGT layer cannot reach the high-level interpreter. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
+The practical consequence is that the runtime layer cannot reach the interpreter layer. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
 
-That is not a convention held up by review: `make check-hub-layering` fails the build if a low-layer module imports — or merely names in a string — the high hub, and an import-closure test pins the property itself in a subprocess.
+That is not a convention held up by review: `make check-hub-layering` fails the build if a runtime-layer module imports — or merely names in a string — the interpreter hub, and an import-closure test pins the property itself in a subprocess.
 
-`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — is low: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** is high, because a pipe is the interpreter's own object.
+`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — belongs to the runtime layer: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** belongs to the interpreter layer, because a pipe is the interpreter's own object.
 
 Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 

@@ -9,7 +9,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import Deadline, Question, ShaperPerson, build_input_specs
 
 # (test_name, concept_ref, multiplicity, provided_value, expected_concept_ref, expected_list_content)

@@ -21,7 +21,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.reporting.reporting_types import AnyTokensUsage
-from pipelex.service_hub import get_event_log_override
+from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError

@@ -9,7 +9,7 @@ from rich.table import Table
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.exceptions import MissingDependencyError
 from pipelex.plugins.model_handle import ModelHandle
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 
 if TYPE_CHECKING:
     from anthropic.types import ModelInfo

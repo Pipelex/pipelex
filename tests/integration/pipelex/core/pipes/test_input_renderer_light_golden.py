@@ -22,7 +22,7 @@ import pytest
 import tomli
 
 from pipelex.core.pipes.rendering.input_renderer import render_inputs, render_inputs_toml
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_pipe, set_current_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:

@@ -20,7 +20,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
-from pipelex.method_hub import get_pipe_router
+from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode

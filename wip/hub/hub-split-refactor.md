@@ -33,18 +33,18 @@ from pipelex.core.concepts.concept import Concept                    # the cycle
 
 Delete `pipelex/hub.py`. Create two modules, each with its own container class and its own module-level accessor functions:
 
-**`pipelex/service_hub.py`** — process-scoped infrastructure. Config, console, secrets provider + `get_secret`, class registry, func registry, storage provider, telemetry manager + OTel tracer, models manager + model deck, SDK client manager, inference manager + the three worker getters, content generator (+ its scoped override), report delegate, the isolated-execution probe, the dry-run-forced flag, the event-log override, and the plugin registries (`inference_backend`, `model_lister`, `orchestrator`, `bundle_validator`, `storage_provider`, `secrets_provider`).
+**`pipelex/runtime_hub.py`** — process-scoped infrastructure. Config, console, secrets provider + `get_secret`, class registry, func registry, storage provider, telemetry manager + OTel tracer, models manager + model deck, SDK client manager, inference manager + the three worker getters, content generator (+ its scoped override), report delegate, the isolated-execution probe, the dry-run-forced flag, the event-log override, and the plugin registries (`inference_backend`, `model_lister`, `orchestrator`, `bundle_validator`, `storage_provider`, `secrets_provider`).
 
-**`pipelex/method_hub.py`** — library-scoped method machinery. Library manager + `Library`, the domain/concept/pipe libraries and their lookups (`get_required_pipe`, `get_native_concept`, …), the current-library contextvar family (`set_current_library`, `scoped_current_library`, `resolve_library_dirs`, `get_default_library_dirs`), the pipe router (+ scoped override), pipe run, pipeline manager, observer, and the pipe-func executor (+ its registry and scoped override).
+**`pipelex/interpreter_hub.py`** — library-scoped method machinery. Library manager + `Library`, the domain/concept/pipe libraries and their lookups (`get_required_pipe`, `get_native_concept`, …), the current-library contextvar family (`set_current_library`, `scoped_current_library`, `resolve_library_dirs`, `get_default_library_dirs`), the pipe router (+ scoped override), pipe run, pipeline manager, observer, and the pipe-func executor (+ its registry and scoped override).
 
-`method_hub` imports `service_hub`; **`service_hub` must never import `method_hub`.** That single arrow is the whole architecture, and it is what the guard checks.
+`interpreter_hub` imports `runtime_hub`; **`runtime_hub` must never import `interpreter_hub`.** That single arrow is the whole architecture, and it is what the guard checks.
 
 Deleting the `pipelex.hub` name entirely — rather than keeping it as an alias for either half — is deliberate: every stale import then fails loudly at import time instead of silently resolving to the wrong layer. It is also consistent with the no-backward-compatibility principle.
 
 ## Decisions to settle before coding
 
-- **D1 — module names.** Recommended: `pipelex/service_hub.py` and `pipelex/method_hub.py`, both flat at the package root, `pipelex/hub.py` deleted. Alternatives considered: keeping `pipelex/hub.py` for one half (rejected — a stale import would silently succeed); `library_hub` for the high one (rejected — it also holds the router, the runner, and the pipeline manager); a `pipelex/hubs/` package (workable, but `pipelex.hubs.services` reads worse than `pipelex.service_hub` at 300+ call sites). Note for review: `method_hub` borrows MTHDS's noun for a runtime container — acceptable here because the object genuinely holds the loaded method's libraries, but worth a conscious nod given the brand-boundary rule.
-- **D2 — one container or two.** Recommended: **two** (`ServiceHub` and `MethodHub`, each its own singleton). One container would have to live in the low module, which forces every high-level slot to a quoted `TYPE_CHECKING` annotation — that keeps the god-object and adds a fig leaf. Two is affordable: `PipelexHub()` is constructed in exactly two production sites (`pipelex/pipelex.py:120`, `pipelex/cli/commands/doctor_cmd.py:774`) and three test sites, and `get_pipelex_hub`/`set_pipelex_hub` appear in five files total.
+- **D1 — module names.** Recommended: `pipelex/runtime_hub.py` and `pipelex/interpreter_hub.py`, both flat at the package root, `pipelex/hub.py` deleted. Alternatives considered: keeping `pipelex/hub.py` for one half (rejected — a stale import would silently succeed); `library_hub` for the high one (rejected — it also holds the router, the runner, and the pipeline manager); a `pipelex/hubs/` package (workable, but `pipelex.hubs.services` reads worse than `pipelex.runtime_hub` at 300+ call sites). Note for review: `interpreter_hub` borrows MTHDS's noun for a runtime container — acceptable here because the object genuinely holds the loaded method's libraries, but worth a conscious nod given the brand-boundary rule.
+- **D2 — one container or two.** Recommended: **two** (`RuntimeHub` and `InterpreterHub`, each its own singleton). One container would have to live in the low module, which forces every high-level slot to a quoted `TYPE_CHECKING` annotation — that keeps the god-object and adds a fig leaf. Two is affordable: `PipelexHub()` is constructed in exactly two production sites (`pipelex/pipelex.py:120`, `pipelex/cli/commands/doctor_cmd.py:774`) and three test sites, and `get_pipelex_hub`/`set_pipelex_hub` appear in five files total.
 - **D3 — where `get_pipe_func_executor_registry` lands.** It is a plugin registry (low by kind) whose protocol lives in `pipe_operators/func/` (high by location). Recommended: **high**, with the underlying inversion — `pipelex/plugins/pipe_func_executor_registry.py` importing from `pipe_operators/` — recorded as a follow-up rather than fixed here.
 - **D4 — does `core/` join the low layer in this change?** Recommended: **no, not in phase 1.** Five `core/` modules use high-hub symbols (`stuff_factory`, `memory/input_shaper`, `pipes/stuff_spec/stuff_spec_factory`, `pipes/inputs/input_stuff_specs_factory`, `pipes/output/output_renderer`); converting them means passing resolved concepts in rather than looking them up, which is design work, not mechanical. Phase 4 does it; the guard's low-layer set widens to include those modules only when it lands.
 
@@ -59,18 +59,18 @@ Deleting the `pipelex.hub` name entirely — rather than keeping it as an alias 
 
 ### Phase 1 — the split
 
-- [ ] 1.1 Create `pipelex/service_hub.py`: the `ServiceHub` container + the low accessors. Verify its module-level imports name nothing from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.concepts`, or `core.pipes`.
-- [ ] 1.2 Create `pipelex/method_hub.py`: the `MethodHub` container + the high accessors, importing `service_hub` for anything it needs.
+- [ ] 1.1 Create `pipelex/runtime_hub.py`: the `RuntimeHub` container + the low accessors. Verify its module-level imports name nothing from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.concepts`, or `core.pipes`.
+- [ ] 1.2 Create `pipelex/interpreter_hub.py`: the `InterpreterHub` container + the high accessors, importing `runtime_hub` for anything it needs.
 - [ ] 1.3 Delete `pipelex/hub.py`.
 - [ ] 1.4 Rewrite the call sites — 309 files, 29 of them with parenthesized multi-line import blocks. Script the rewrite from the symbol→module partition, then hand-review the 36 straddling files, which are the only ones that gain a second import line.
 - [ ] 1.5 Re-wire boot: `Pipelex.setup` constructs and populates both hubs; the low one fully before the high one (today the setter calls interleave). Same for `doctor_cmd` and the three test sites.
-- [ ] 1.6 Replace the three `importlib.import_module("pipelex.hub")` hacks in `core/concepts/` with plain `from pipelex.service_hub import get_class_registry`, and delete the `_get_class_registry` shims.
+- [ ] 1.6 Replace the three `importlib.import_module("pipelex.hub")` hacks in `core/concepts/` with plain `from pipelex.runtime_hub import get_class_registry`, and delete the `_get_class_registry` shims.
 
 **CHECKPOINT H-1** — zero behavior change. Gates: `make agent-check` + **full** `make agent-test` (no test rewrites beyond import lines) + `make drift-check`. Expect the **`cli-docs` drift contract to fire** — 45 CLI files import the hub and `pipelex/cli/**/*.py` is a trigger; review `docs/tools/cli/` and `pipelex/cli/agent_cli/CLAUDE.md`, then `make drift-ack`. Re-take the measurement and record the after.
 
 ### Phase 2 — enforce it
 
-- [ ] 2.1 Add `pipelex-dev check-hub-layering` (guard in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, command in `check_hub_layering_cmd.py`), following the `check-keyword-only` precedent exactly. Rule: a module in the declared low layer may not import `pipelex.method_hub`. It must catch the string-literal `importlib.import_module("pipelex.method_hub")` form too — that is precisely how the current cycle hides.
+- [ ] 2.1 Add `pipelex-dev check-hub-layering` (guard in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, command in `check_hub_layering_cmd.py`), following the `check-keyword-only` precedent exactly. Rule: a module in the declared low layer may not import `pipelex.interpreter_hub`. It must catch the string-literal `importlib.import_module("pipelex.interpreter_hub")` form too — that is precisely how the current cycle hides.
 - [ ] 2.2 Declare the low layer: `pipelex/tools/**`, `pipelex/system/**`, `pipelex/cogt/**`, `pipelex/plugins/**`, `pipelex/reporting/**`. All five are 100% compliant today, so the guard hard-blocks from day one with an empty exception list.
 - [ ] 2.3 Wire into `make agent-check`, the `make check` aggregate, and CI, with a `chl` alias.
 - [ ] 2.4 Unit tests for the guard (positive, negative, and the `importlib` string form), mirroring `tests/unit/pipelex/cli/dev/test_keyword_only_guard_*.py`.
@@ -92,7 +92,7 @@ Neither of these is coupling; both are types living in the wrong package, and ea
 - [ ] 4.1 Convert the five `core/` straddlers to take resolved concepts/pipes as arguments instead of reaching for `get_concept_library` / `get_native_concept` / `get_required_concept` / `get_required_pipe`. Callers that have a library pass the resolved value; callers that do not are, by construction, in the high layer already.
 - [ ] 4.2 Widen the guard's low layer to include `pipelex/core/**`.
 
-**CHECKPOINT H-4 = done** — update `docs/contribute/hub-layering.md` with the final layer set, and the CHANGELOG with a breaking-change note (`pipelex.hub` is gone; importers must choose `pipelex.service_hub` or `pipelex.method_hub`).
+**CHECKPOINT H-4 = done** — update `docs/contribute/hub-layering.md` with the final layer set, and the CHANGELOG with a breaking-change note (`pipelex.hub` is gone; importers must choose `pipelex.runtime_hub` or `pipelex.interpreter_hub`).
 
 ## Exit criteria — measured, not asserted
 
@@ -124,7 +124,7 @@ PY
 | pipelex modules loaded | 357 | ≤ 260 |
 | SLOC loaded | 29,193 | ≤ 19,000 |
 
-The module/SLOC targets come from importing exactly the types a low-only hub would annotate — 236 modules / 17,683 SLOC, with the interpreter subpackages at zero — plus headroom for cogt's own modules. If phase 1 lands and `interpreter modules` is not 0, the snippet prints the offenders: something imports the interpreter outside the hub, and the shortest import path to it is what to fix. Swap the imported module in the snippet to measure any other entry point (`pipelex.pipelex`, `pipelex.service_hub`, …).
+The module/SLOC targets come from importing exactly the types a low-only hub would annotate — 236 modules / 17,683 SLOC, with the interpreter subpackages at zero — plus headroom for cogt's own modules. If phase 1 lands and `interpreter modules` is not 0, the snippet prints the offenders: something imports the interpreter outside the hub, and the shortest import path to it is what to fix. Swap the imported module in the snippet to measure any other entry point (`pipelex.pipelex`, `pipelex.runtime_hub`, …).
 
 ## Risks and containment
 

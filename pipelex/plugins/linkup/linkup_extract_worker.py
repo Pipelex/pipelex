@@ -25,7 +25,7 @@ from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inf
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.service_hub import get_secrets_provider
+from pipelex.runtime_hub import get_secrets_provider
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):

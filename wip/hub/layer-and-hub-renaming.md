@@ -1,6 +1,11 @@
 # Renaming the layers and the hubs — `runtime` / `interpreter`
 
-**Status:** decided, not started. **Do this AFTER H-4 lands green** (see [Sequencing](#sequencing--why-this-window-matters)).
+**Status: EXECUTED.** Landed as its own commit after H-4, with all three gates green. The outcome record — what the plan got right, the two places it under-specified, and the judgment calls made while sweeping the docs — is in [`TODOS.md` → The runtime/interpreter rename, record](../../TODOS.md#the-runtimeinterpreter-rename--record). This document stays as the decision record: it is the *why*, and its old→new tables are deliberately not swept.
+
+Two corrections to the mechanical plan below, for anyone reading it as a template:
+
+- **§2's "rewrite via `ast`, not regex" did not apply.** That warning was inherited from Phase 1, which *split* a module and so had to classify each imported symbol. A 1:1 rename has no classification step, so the safe method is a whole-word audit (enumerate every word in `pipelex/` and `tests/` containing each token, confirm every hit should change) followed by substring replacement and a re-parse of every file. Token-based sweeping also catches the string literals for free, rather than needing §2's separate grep.
+- **§4 and §5 split a pair that must move together.** §4 renames `HubLayeringViolationKind`'s members; §5 lists the test's constants and patch targets but not those members' *references* in `test_hub_layering_guard.py`. Renaming one without the other left 7 failing tests.
 
 Decided by Louis on 2026-07-26, at the close of the hub-split refactor, after challenging the naming that Phases 0–4 shipped. This document is the record of *what* was decided and *why*, plus the mechanical plan. Read [Why](#why-the-current-names-are-wrong) before executing — the rationale is what stops a future session relitigating this or half-applying it.
 

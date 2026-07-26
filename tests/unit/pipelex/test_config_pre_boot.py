@@ -2,19 +2,19 @@ from pytest_mock import MockerFixture
 
 from pipelex.config import get_pipe_func_execution_mode, is_pipe_func_sandbox_hosted
 from pipelex.plugins.pipe_func_executor_registry import DIRECT_PIPE_FUNC_EXECUTION_MODE
-from pipelex.service_hub import ServiceHub, get_optional_config
+from pipelex.runtime_hub import RuntimeHub, get_optional_config
 
 
 class TestConfigPreBoot:
     """The optional config accessors honor their non-raising contract before any hub exists."""
 
     def test_get_optional_config_returns_none_without_hub(self, mocker: MockerFixture):
-        """With no ServiceHub instance at all, the optional getter returns None instead of raising."""
-        mocker.patch.object(ServiceHub, "_instance", None)
+        """With no RuntimeHub instance at all, the optional getter returns None instead of raising."""
+        mocker.patch.object(RuntimeHub, "_instance", None)
         assert get_optional_config() is None
 
     def test_pipe_func_execution_mode_defaults_to_direct_without_hub(self, mocker: MockerFixture):
         """Pre-boot PipeFunc validation must default to direct, not crash on the missing hub."""
-        mocker.patch.object(ServiceHub, "_instance", None)
+        mocker.patch.object(RuntimeHub, "_instance", None)
         assert get_pipe_func_execution_mode() == DIRECT_PIPE_FUNC_EXECUTION_MODE
         assert is_pipe_func_sandbox_hosted() is False

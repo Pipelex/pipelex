@@ -23,7 +23,7 @@ from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.deck_notice import warn_if_deck_stale
 from pipelex.cli.error_handlers import set_traceback_requested
 from pipelex.cli.readiness import check_readiness
-from pipelex.service_hub import get_console
+from pipelex.runtime_hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Core commands in display order (natural ordering doesn't work between Typer groups and commands).

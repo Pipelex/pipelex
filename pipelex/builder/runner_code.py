@@ -22,7 +22,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
-from pipelex.service_hub import get_class_registry
+from pipelex.runtime_hub import get_class_registry
 
 STRUCTURES_MODULE = "structures.structures"
 """Module path of the emitted types projection, relative to the generated script's directory."""

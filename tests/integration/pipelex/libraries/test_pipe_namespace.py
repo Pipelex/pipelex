@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
+from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
-from pipelex.method_hub import get_library_manager
 
 SCORING_MTHDS = """\
 domain = "scoring"

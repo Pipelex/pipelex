@@ -2,7 +2,7 @@ from mistralai.models import Data
 
 from pipelex.plugins.mistral.mistral_exceptions import MistralModelListingError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
-from pipelex.service_hub import get_models_manager
+from pipelex.runtime_hub import get_models_manager
 
 
 def mistral_list_available_models() -> list[Data]:

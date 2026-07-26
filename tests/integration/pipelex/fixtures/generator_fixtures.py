@@ -6,7 +6,7 @@ from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
-from pipelex.service_hub import get_storage_provider_registry
+from pipelex.runtime_hub import get_storage_provider_registry
 from pipelex.tools.storage.storage_config import StorageMethod
 
 S3_TEST_BUCKET = "pipelex-storage-test"

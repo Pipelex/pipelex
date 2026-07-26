@@ -20,10 +20,10 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.validate_bundle import translate_to_validate_bundle_error
 
 

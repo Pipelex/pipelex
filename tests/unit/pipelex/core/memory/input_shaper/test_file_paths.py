@@ -11,7 +11,7 @@ import pytest
 
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.method_hub import get_concept_library
+from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import Exhibit, Photo, build_input_specs
 
 if TYPE_CHECKING:
