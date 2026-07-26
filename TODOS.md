@@ -2,11 +2,15 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **PR:** [#1062 → `dev`](https://github.com/Pipelex/pipelex/pull/1062), open.
 
-**Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub` is pushed and PR #1062 is open. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
+**Status:** **ALL PHASES DONE + THE RENAME LANDED + PHASE A OF THE REVIEW FOLLOW-UPS APPLIED — all gates green.** PR #1062 is open. **Jump to [Checkpoint A record](#checkpoint-a-record--pr-1062-review-follow-ups) first**, then [▶ Resume here](#-resume-here-the-rename-is-landed) for the state it builds on.
 
-> ⚠ **A full `/review` pass has since run against the branch, and its follow-ups are not applied.** They are written up as an executable, cold-startable plan in [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. The headline: the layer rule is enforced only one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package already load `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. That document also carries additions the [cross-repo sweep](#cross-repo-sweep) tables below are missing — five consumer repos, and the `docs/specs/` + `conformance/` governed surface that names `pipelex.hub` explicitly.
+> ⚠ **The `/review` follow-ups are partially applied.** The executable plan is [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. **Phase A (A1's doc-honesty fix + A2–A8) is done**, recorded at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups). **Phase B (test hardening) and Phase C (release-wave additions) are not started**, and neither is the F1 remedy.
 >
-> **Re-verified 2026-07-26.** The defect is confirmed, and the write-up now carries three corrections that change the remedy: the blast radius is exactly 4 of 476 declared runtime-layer modules, all in `plugins` (the other ten packages are clean); there are three transitive routes, not just the `runtime_bridge` one named originally, and only two of the four modules are leaves; and **the shipped 0-interpreter-modules headline property is *not* damaged** — the inference layer and `runtime_hub` still measure 0 and never reach the breaching modules. What is false is the doc's *scope claim*, not the measurement. **D-R4 is DECIDED (2026-07-27): remedy (d) paired with a minimal (c), in its own PR after #1062 merges** — the built-ins split by layer, the two interpreter-touching plugins relocate to a single interpreter-side home (e.g. `pipelex/interpreter_plugins/`), the weld moves to where welding is legal, and the guard learns the transitive check. Simulated: `pipelex.plugins` goes to 0 of 128 breaching with 3 modules relocated, so the declaration keeps its single line and becomes true. #1062 carries only A1's doc-honesty fix; the full decision record and resolutions are in [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) (D-R4 + "Remedy (d) — resolutions"). All of Phase A is now free to proceed.
+> **The defect Phase A documents is still live**, deliberately: the layer rule is enforced only one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package load `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. Re-verified twice — 2026-07-26 by the review, and again at Checkpoint A before publishing the numbers. Three things about it are settled and worth not re-deriving: the blast radius is exactly 4 of 476 declared runtime-layer modules, all in `plugins` (the other ten packages are clean across 345 modules); there are three transitive routes, not just the `runtime_bridge` one named in the first draft, and only two of the four modules are leaves; and **the shipped 0-interpreter-modules headline property is *not* damaged** — the inference layer and `runtime_hub` still measure 0 and never reach the breaching modules. What was false was the doc's *scope claim*, and A1 fixed exactly that.
+>
+> **D-R4 is DECIDED (2026-07-27): remedy (d) paired with a minimal (c), in its own PR after #1062 merges** — the built-ins split by layer, the two interpreter-touching plugins relocate to a single interpreter-side home (e.g. `pipelex/interpreter_plugins/`), the weld moves to where welding is legal, and the guard learns the transitive check. Simulated: `pipelex.plugins` goes to 0 of 128 breaching with 3 modules relocated, so the declaration keeps its single line and becomes true. The full decision record and resolutions are in the plan (D-R4 + "Remedy (d) — resolutions").
+>
+> The plan also carries additions the [cross-repo sweep](#cross-repo-sweep) tables below are missing — five consumer repos, and the `docs/specs/` + `conformance/` governed surface that names `pipelex.hub` explicitly. Those are Phase C, folded into the release-gated sweep per D-R1.
 
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
@@ -340,8 +344,10 @@ Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,354 files, keyword-only 
 | | baseline | H-1 | **after H-3** |
 | --- | --- | --- | --- |
 | interpreter modules loaded by `cogt.content_generation.content_generator` | 50 | 0 | **0** ✅ |
-| pipelex modules loaded | 357 | 275 | **268** |
-| SLOC loaded | 29,193 | 21,186 | **20,304** |
+| pipelex modules loaded | 357 | 275 | **268** † |
+| SLOC loaded | 29,193 | 21,186 | **20,304** † |
+
+† Recorded from a stale run, caught by the PR #1062 review and re-verified at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups): the tree measures **269 / 20,305**, not 268 / 20,304. The baseline and H-1 rows reproduce to the digit, so the method is sound and only the recording was off. The 0-interpreter-modules row — the one that matters — is exact.
 
 Cross-package import statements, the number Phase 3 was actually aimed at:
 
@@ -483,9 +489,9 @@ Louis' call (option A of three): declare core's data-model packages low, leave t
 **Two read-side contracts, new in `core/`:**
 
 - `ConceptProviderAbstract` (`core/concepts/concept_provider_abstract.py`) — `get_required_concept`, `get_native_concept`, `get_required_concept_from_concept_ref_or_code`, `is_compatible`.
-- `PipeProviderAbstract` (`core/pipes/pipe_provider_abstract.py`) — `get_required_pipe`.
+- ~~`PipeProviderAbstract` (`core/pipes/pipe_provider_abstract.py`) — `get_required_pipe`.~~ **Deleted at [Checkpoint A](#checkpoint-a-record--pr-1062-review-follow-ups) (A5)**: it had zero consumers and its docstring described the opposite of what the code does. `get_required_pipe` is back on `PipeLibraryAbstract`.
 
-`ConceptLibraryAbstract` / `PipeLibraryAbstract` now **extend** these, keeping add/remove/list/setup/teardown high. The split is the point: core depends on resolution, never on a library lifecycle. Both abstracts already named only `core` types, so this was an inverted dependency waiting to be undone.
+`ConceptLibraryAbstract` now **extends** the provider abstract, keeping add/remove/list/setup/teardown high. The split is the point: core depends on resolution, never on a library lifecycle. Both abstracts already named only `core` types, so this was an inverted dependency waiting to be undone.
 
 **Injected, not looked up.** `StuffFactory.{make_stuff_from_stuff_content_or_data, make_from_blueprint, make_from_concept_ref}`, `InputShaper.{shape, resolve_input_kind}`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputStuffSpecsFactory.{make_from_blueprint, make_from_string}`, `StuffSpecFactory.make_from_blueprint` all take a required `concept_provider`. Injection happens in the high half: `pipe_factory`, `input_renderer`, `output_renderer` call the hub themselves and hand the result down, as does `pipeline/execution_seams.py`.
 
@@ -498,11 +504,13 @@ Louis' call (option A of three): declare core's data-model packages low, leave t
 
 #### Measured after
 
-| | baseline | H-1 | H-3 | **H-4** |
-| --- | --- | --- | --- | --- |
-| interpreter modules loaded by `cogt.content_generation.content_generator` | 50 | 0 | 0 | **0** ✅ |
-| pipelex modules loaded | 357 | 275 | 268 | **268** |
-| SLOC loaded | 29,193 | 21,186 | 20,304 | **20,304** |
+| | baseline | H-1 | H-3 | H-4 | **Checkpoint A** |
+| --- | --- | --- | --- | --- | --- |
+| interpreter modules loaded by `cogt.content_generation.content_generator` | 50 | 0 | 0 | 0 | **0** ✅ |
+| pipelex modules loaded | 357 | 275 | 268 † | 268 † | **269** |
+| SLOC loaded | 29,193 | 21,186 | 20,304 † | 20,304 † | **20,299** |
+
+† The H-3 / H-4 module and SLOC cells were recorded from a stale run — the same tree measures **269 / 20,305**, confirmed by re-reading every closure module at both revisions. The Checkpoint A column is a fresh measurement after the [Phase A follow-ups](#checkpoint-a-record--pr-1062-review-follow-ups); the 6-SLOC drop is those edits (chiefly A3's deletion in `runtime_hub.py`, which is itself in the closure), not a module leaving it. Baseline and H-1 reproduce to the digit.
 
 The inference-layer numbers are unchanged by design — Phase 4 widened *which* modules are guaranteed clean, it did not touch `cogt`'s own weight. The new numbers are the six core entry points, each measured at **0 interpreter modules and no `pipelex.interpreter_hub`**, up from 50 each before this phase:
 
@@ -537,6 +545,32 @@ The inference-layer numbers are unchanged by design — Phase 4 widened *which* 
 | `pipelex.core.pipes.output.output_renderer` | `pipelex.core.pipes.rendering.output_renderer` |
 
 Plus the signature changes: any external caller of `StuffFactory.make_stuff_from_stuff_content_or_data`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputShaper.shape`, `InputStuffSpecsFactory.make_from_*` or `StuffSpecFactory.make_from_blueprint` must now pass `concept_provider=get_concept_library()`. Do all three waves in one pass per repo.
+
+### Checkpoint A record — PR #1062 review follow-ups
+
+Phase A of [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) is applied: A1's doc-honesty fix plus A2–A8. Per **D-R4** the [F1](wip/hub/pr-1062-review-followups.md#f1--the-layer-rule-is-only-enforced-one-hop-deep) *remedy* is deliberately **not** here — it is its own PR after #1062 merges — so this checkpoint makes the shipped documentation true about a defect that still exists, rather than fixing the defect.
+
+#### What landed
+
+- **A1 — the scope claim is corrected.** `docs/contribute/hub-layering.md`'s "Every declared package is compliant" now says what it means: the declaration is compliant *with the direct-import rule*, which the guard does not follow transitively. Known inversions carries the measurement (the four `pipelex.plugins` modules, their interpreter-module counts, and which two are leaves versus aggregators), states plainly that the headline property is unaffected, and describes the decided fix. Re-measured on the working tree before publishing: 57 / 67 / 67 / 58, reproducing the review exactly.
+- **A2 — `pipelex.runtime_hub` joined `RUNTIME_LAYER_PACKAGES`.** The module at the centre of the rule was exempt from it, since no tuple entry was a prefix of it. Verified zero-risk both ways: still 0 violations tree-wide, and an `interpreter_hub` import injected into `runtime_hub.py` in memory is caught at the injected line. `is_runtime_layer`'s docstring now records that matching is exact-or-dotted-prefix, so a bare module is a legal entry beside the packages.
+- **A3 — write-only `RuntimeHub._class_registry` deleted**, with `set_class_registry`, `get_required_class_registry`, the `pipelex.py` call site and the subject grant. Zero callers here or in any sibling repo. It was the twin of the `_observer` state H-1 deleted for exactly this reason, and a live trap besides: it returned the boot-time global while the module-level `get_class_registry()` returns the library-scoped one, so the two diverged under `scoped_current_library(...)`.
+- **A4 — the loop-invariant `get_concept_library()` in `_delighten_template` is hoisted** above the loop.
+- **A5 — `PipeProviderAbstract` deleted; `get_required_pipe` is back on `PipeLibraryAbstract`.** The follow-up plan left this a two-way choice (delete, or keep for symmetry and rewrite the docstring). Deleted, because the abstract had zero consumers, bought no closure property (`core.pipes` is not runtime-layer), and its docstring asserted the opposite of the code — it claimed core takes pipe resolution as a parameter, while the only two sites that follow a pipe reference (`core/pipes/rendering/output_renderer.py:51` and `:84`) call `interpreter_hub.get_required_pipe` directly. Symmetry with `ConceptProviderAbstract` is not a reason to ship an unused abstraction. The absence is now documented where it will be questioned — on `PipeLibraryAbstract` and in `hub-layering.md` — so the next reader does not "restore" it.
+- **A6 — five accuracy fixes.** `runtime_hub.py`'s docstring stopped forbidding `core.concepts` / `core.pipes` wholesale (`core.concepts` is a *declared runtime-layer package* and sits in `runtime_hub`'s own closure); `pipelex.py`'s boot comment stopped claiming the InterpreterHub install "needs a RuntimeHub already in place" (it stores a lazily-resolved callable and needs nothing); the CHANGELOG names the exact templating modules, since `pipelex.tools.templating.__init__` is 0 bytes and the path it printed raised `ImportError` for the external consumers who read that file; and the low/high vocabulary survivors are swept — **four**, not the two the review found (`concept_library_abstract.py` and `pipe_library_abstract.py` carried "stays here, high" too).
+- **A7 — `make generate-error-pages` re-run.** `job-metadata-error.md` had followed neither of Phase 3's moves; it now reports `pipelex.system.exceptions`, and the generator also re-filed its index entry from "execution and runtime" to "platform and tooling", which is the subsystem grouping following the class.
+- **A8 — the class-registry leaf-import rule is restated.** It said "import the leaf only from inside `runtime_hub`'s import closure", which is false for two of the three in-tree importers (verified: `concept.py` is inside, `concept_factory.py` and `structure_generation/generator.py` are not). The real criterion is a module that must stay import-light *with respect to* `runtime_hub`. As written, the rule invited someone to "fix" `concept_factory.py` into re-coupling `core.concepts` to the whole cogt/plugin stack — and neither gate would have noticed, because the closure test measures interpreter modules, not weight.
+- **Batched in:** the published doc's pointer to `wip/pr-1062-review-notes.md` is folded into an in-place sentence. `wip/` is outside `docs_dir`, so it was unreachable for a reader on docs.pipelex.com and would dangle once the file is archived.
+
+#### The measurement
+
+Re-taken here rather than copied — see the [H-4 table](#measured-after-1) for the full row and the stale-recording footnote. The closure is **269 modules / 20,299 SLOC / 0 interpreter modules**. The 6-SLOC drop against the pre-Phase-A tree is A3's deletion in `runtime_hub.py` (itself in the closure), confirmed by re-reading every closure module at both revisions; no module left the closure.
+
+#### Not in this checkpoint
+
+- **The F1 remedy** — (d) split the built-ins by layer + (c) teach the guard the transitive check. Its own PR after #1062 merges, per D-R4. Until it lands, Known inversions is the record that keeps the breach visible.
+- **[Phase B](wip/hub/pr-1062-review-followups.md#phase-b--test-hardening)** — test hardening, additive, approved but not started.
+- **[Phase C](wip/hub/pr-1062-review-followups.md#phase-c--release-wave-additions)** — folded into the release-gated cross-repo sweep per D-R1. It adds a governed `docs/specs/` + `conformance/` surface and five consumer repos the [sweep tables](#cross-repo-sweep) below are missing, including `pipelex-transport`, whose `bridge.py` calls a changed signature in production code.
 
 ## Exit criteria — measured, not asserted
 

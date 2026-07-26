@@ -7,8 +7,10 @@ execution time whatever is loaded — hence *runtime*, in the language-implement
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
-``codegen``, ``builder``, ``core.bundles``, ``core.concepts``, or ``core.pipes`` at module level —
-that is what makes importing the Pipelex runtime load zero interpreter modules. See
+``codegen``, ``builder``, ``core.bundles``, ``core.interpreter``, or the Pipe-touching modules of
+``core.pipes`` at module level — that is what makes importing the Pipelex runtime load zero
+interpreter modules. Core's data model is *not* on that list: ``core.concepts`` and its siblings are
+declared runtime-layer packages, and this module's own closure runs straight through them. See
 ``docs/contribute/hub-layering.md``.
 """
 
@@ -81,7 +83,6 @@ class RuntimeHub:
         self._config: ConfigRoot | None = None
         self._console: Console | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
-        self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
         self._func_registry: FuncRegistry | None = None
@@ -178,9 +179,6 @@ class RuntimeHub:
     def set_storage_provider(self, storage_provider: StorageProviderAbstract | None):
         self._storage_provider = storage_provider
 
-    def set_class_registry(self, class_registry: ClassRegistryAbstract):
-        self._class_registry = class_registry
-
     def set_telemetry_manager(self, telemetry_manager: TelemetryManagerAbstract):
         self._telemetry_manager = telemetry_manager
 
@@ -274,12 +272,6 @@ class RuntimeHub:
             msg = "Secrets provider is not set. You must initialize Pipelex first."
             raise RuntimeError(msg)
         return self._secrets_provider
-
-    def get_required_class_registry(self) -> ClassRegistryAbstract:
-        if self._class_registry is None:
-            msg = "ClassRegistry is not initialized"
-            raise RuntimeError(msg)
-        return self._class_registry
 
     def get_storage_provider(self) -> StorageProviderAbstract:
         if self._storage_provider is None:

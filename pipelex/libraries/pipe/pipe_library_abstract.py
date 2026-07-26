@@ -1,15 +1,22 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 
 
-class PipeLibraryAbstract(PipeProviderAbstract):
-    """A loaded method's pipe library: resolution (inherited) plus the management half.
+class PipeLibraryAbstract(ABC):
+    """A loaded method's pipe library: pipe resolution plus the management half.
 
-    `get_required_pipe` lives on :class:`PipeProviderAbstract` in `core/`, so a core module can
-    depend on pipe resolution alone. Everything below is library management and stays here, high.
+    There is deliberately no read-side `PipeProviderAbstract` in `core/` mirroring
+    :class:`~pipelex.core.concepts.concept_provider_abstract.ConceptProviderAbstract`: no core module
+    takes pipe resolution as a parameter. The two places that follow a pipe reference found *inside* a
+    pipe graph — a condition's mapped pipes and a sequence's last step, both in
+    `core/pipes/rendering/` — are interpreter-layer and call `interpreter_hub.get_required_pipe`
+    directly. Split the read half out if and when a runtime-layer caller needs it.
     """
+
+    @abstractmethod
+    def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
+        """Resolve a pipe code, raising when it is not known."""
 
     @abstractmethod
     def setup(self) -> None:
