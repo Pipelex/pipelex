@@ -4,6 +4,8 @@
 
 **Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub` is pushed and PR #1062 is open. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
 
+> ⚠ **A full `/review` pass has since run against the branch, and its follow-ups are not applied.** They are written up as an executable, cold-startable plan in [`wip/hub/pr-1062-review-followups.md`](wip/hub/pr-1062-review-followups.md) — read it before touching this branch. The headline: the layer rule is enforced only one hop deep, so four modules of the *declared runtime-layer* `pipelex.plugins` package already load `interpreter_hub` (plus 57–67 interpreter modules) with both gates green. That document also carries additions the [cross-repo sweep](#cross-repo-sweep) tables below are missing — five consumer repos, and the `docs/specs/` + `conformance/` governed surface that names `pipelex.hub` explicitly.
+
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
 **What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (three waves). Nothing else is open.
