@@ -2,8 +2,8 @@
 
 `core/` needs to *resolve* concepts — turn a ref, a code, or a native code into a `Concept`, and
 ask whether two of them are compatible. It has no business *managing* a concept library (adding,
-removing, listing, setup/teardown); that half is the loaded method's concern and stays high, on
-`ConceptLibraryAbstract`, which extends this.
+removing, listing, setup/teardown); that half is the loaded method's concern and stays in the
+interpreter layer, on `ConceptLibraryAbstract`, which extends this.
 
 Splitting the two is what lets `core/` state its dependency honestly: a core module declares "I
 need something that can resolve concepts" as a parameter, instead of reaching for

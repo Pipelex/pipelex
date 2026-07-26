@@ -2988,10 +2988,6 @@ rationale = "Type-directed accessor: the target item type; single operand."
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
 
-["pipelex/core/pipes/pipe_provider_abstract.py::PipeProviderAbstract.get_required_pipe"]
-param = "pipe_code"
-rationale = "Resolver getter keyed by the pipe code; single operand."
-
 ["pipelex/core/pipes/rendering/input_renderer.py::_delighten_entry"]
 param = "entry"
 rationale = "Single-operand transformation of the entry; kind is a mode and stays keyword."
@@ -3979,6 +3975,10 @@ rationale = "Verb-object: adds the pipes; single operand."
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_pipe"]
 param = "pipe_code"
 rationale = "Library getter keyed by the pipe code; single operand."
+
+["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_pipe"]
+param = "pipe_code"
+rationale = "Resolver getter keyed by the pipe code; single operand."
 
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.remove_pipes_by_refs"]
 param = "pipe_refs"
@@ -5271,10 +5271,6 @@ rationale = "Verb-object: serializes the pipe output; single operand."
 ["pipelex/runtime_hub.py::RuntimeHub.set_bundle_validator_registry"]
 param = "bundle_validator_registry"
 rationale = "Hub setter: installs the bundle validator registry; single self-labelling operand."
-
-["pipelex/runtime_hub.py::RuntimeHub.set_class_registry"]
-param = "class_registry"
-rationale = "Hub setter: installs the class registry; single self-labelling operand."
 
 ["pipelex/runtime_hub.py::RuntimeHub.set_config"]
 param = "config"

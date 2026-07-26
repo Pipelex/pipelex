@@ -75,6 +75,11 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 
 #: The declared runtime layer: packages that must stay importable without loading the method interpreter.
 #:
+#: Entries are matched exact-or-dotted-prefix, so a bare *module* is a legal entry alongside the packages.
+#: `pipelex.runtime_hub` is one: the module at the centre of the rule would otherwise be exempt from it,
+#: since nothing in the tuple is a prefix of it. Its closure *is* what the runtime layer means, so an
+#: `interpreter_hub` import there is the one that would break the property outright.
+#:
 #: `pipelex/core/**` is listed **package by package**, not wholesale, because `core/` is genuinely two
 #: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
 #: runtime: it describes what a method's values are, and nothing in it needs a loaded method. The
@@ -90,6 +95,8 @@ RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
+    # the runtime layer's own hub — a module, not a package; see the note above
+    "pipelex.runtime_hub",
     # core's data model; the Pipe-touching remainder of `core/` stays in the interpreter layer
     "pipelex.core.concepts",
     "pipelex.core.domains",
@@ -168,7 +175,11 @@ def references_module(*, candidate: str, target: str) -> bool:
 
 
 def is_runtime_layer(*, module_qname: str) -> bool:
-    """Whether a module sits in the declared runtime layer."""
+    """Whether a module sits in the declared runtime layer.
+
+    Matching is exact-or-dotted-prefix, so despite its name :data:`RUNTIME_LAYER_PACKAGES` may hold a
+    bare module as well as a package — an entry covers itself and everything under it.
+    """
     return any(module_qname == package or module_qname.startswith(f"{package}.") for package in RUNTIME_LAYER_PACKAGES)
 
 

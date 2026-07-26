@@ -129,9 +129,10 @@ def serialize_inputs_template_to_toml(
 def _delighten_template(envelope_template: dict[str, Any], *, input_specs: InputStuffSpecs) -> dict[str, Any]:
     """Transform every envelope entry into its light value, dispatched on the declared concept's kind."""
     light_template: dict[str, Any] = {}
+    concept_provider = get_concept_library()
     for variable_name, entry in envelope_template.items():
         stuff_spec = input_specs.get_required_stuff_spec(variable_name=variable_name)
-        kind = InputShaper.resolve_input_kind(stuff_spec.concept, concept_provider=get_concept_library())
+        kind = InputShaper.resolve_input_kind(stuff_spec.concept, concept_provider=concept_provider)
         light_template[variable_name] = _delighten_entry(entry, kind=kind)
     return light_template
 

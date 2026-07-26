@@ -8,7 +8,8 @@ class ConceptLibraryAbstract(ConceptProviderAbstract):
     """A loaded method's concept library: resolution (inherited) plus the management half.
 
     The resolution methods live on :class:`ConceptProviderAbstract` in `core/`, so a core module can
-    depend on resolution alone. Everything below is library management and stays here, high.
+    depend on resolution alone. Everything below is library management and stays here, in the
+    interpreter layer.
     """
 
     @abstractmethod

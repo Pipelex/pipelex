@@ -120,8 +120,9 @@ class Pipelex(metaclass=MetaSingleton):
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         # Two hubs, two lifecycles: RuntimeHub is process-scoped infrastructure, InterpreterHub is the
-        # library-scoped method machinery. Runtime first — installing the InterpreterHub hands the
-        # runtime layer its class-registry scoping resolver, which needs a RuntimeHub already in place.
+        # library-scoped method machinery. Runtime is constructed first because it is the lower layer,
+        # so it reads first — not because installing the InterpreterHub needs it: that install only
+        # stores the class-registry scoping resolver, which resolves lazily at call time.
         self.runtime_hub = RuntimeHub()
         set_runtime_hub(self.runtime_hub)
         self.interpreter_hub = InterpreterHub()
@@ -336,7 +337,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Tools ----------------------------------------------------------------------------
 
         self.class_registry = class_registry or ClassRegistry()
-        self.runtime_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
 
         self.func_registry = func_registry or FuncRegistry()
