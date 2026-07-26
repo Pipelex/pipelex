@@ -2,7 +2,23 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **CHECKPOINT H-1 reached.** Phases 0 and 1 are complete; the split is landed, the gates are green, and the headline property is measured at 0. Phase 2 (the guard) is next. See [Checkpoint H-1 record](#checkpoint-h-1-record) for what actually happened, including two places where reality forced a change to the plan.
+**Status:** **CHECKPOINT H-1 reached and committed** — `95c46012a`, not pushed, branch `refactor/Hub`, working tree clean.
+
+Phases 0 and 1 are complete: the split is landed, all gates are green, and the headline property is measured at **0 interpreter modules**. **Phase 2 (the guard) is next.**
+
+### Cold start — read in this order
+
+1. [The one rule](#the-one-rule) and [Symbol partition](#symbol-partition) — the settled boundary.
+2. [Checkpoint H-1 record](#checkpoint-h-1-record) — **read this before touching anything.** It carries what actually happened, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered) and the class of bug the AST rewrite could not catch.
+3. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary. Phase 2 rewrites its "Enforcement" section.
+4. Then start at [Phase 2](#phase-2--enforce-it).
+
+Gates as of the checkpoint commit: `make agent-check` ✅ (pyright 0 errors, mypy 2,348 files, keyword-only PASSED) · `make agent-test` ✅ (full suite, no test edits beyond import lines) · `make drift-check` ✅ (three contracts reviewed and acked: `cli-docs`, `config-docs`, `keyword-only-convention` — the third was not predicted by the plan).
+
+Two notes for whoever picks this up:
+
+- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first (see [Still open at H-1](#still-open-at-h-1)).
+- **Phase 2.1 should also scan `mocker.patch` string targets**, not just `importlib.import_module` — that is where the string-literal hub references actually lived in this repo, and one of them broke 36 tests.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub-split-refactor.md`](wip/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
