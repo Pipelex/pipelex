@@ -1,6 +1,6 @@
 # TODOS — split `pipelex.hub` into `runtime_hub` + `interpreter_hub`
 
-**Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
+**Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **PR:** [#1062 → `dev`](https://github.com/Pipelex/pipelex/pull/1062), open.
 
 **Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub`, not pushed. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
 
@@ -427,7 +427,9 @@ Also swept `docs/` and `wip/` for stale references to the H-4 moves (`core.pipes
 
 **One observation is worth carrying forward, because it is now a pattern rather than an anecdote.** This refactor opened **four contracts across three different ids**, and every one of them was import-path churn. The narrowing proposed in the earlier `config-docs` dogfood entry (scope the trigger to files that define settings) would **not** have prevented today's opening — `configs.py` is squarely inside that narrowed set. The mechanism that would prevent all four is a content-aware digest that ignores changes confined to import statements (and, for `keyword-only-convention`, to comments/docstrings): one manifest-wide change instead of three separate glob surgeries. Recorded in `wip/drift-contracts/dogfood-log.md` as the thing to weigh before any per-contract narrowing — it is evidence for the pilot's keep/narrow/mechanize verdict, not a change to make now.
 
-**Next: the branch is ready for a PR to `dev`.** The only thing outstanding is the release-gated cross-repo sweep, already retargeted to the final names. Louis' drift-contract decision is resolved — `hub-layering-convention` is in the manifest, reviewed and acked.
+**Next: [PR #1062](https://github.com/Pipelex/pipelex/pull/1062) is open against `dev`** (base was still exactly `f23fda7a0` at open time, so no merge was needed). The only thing outstanding after it lands is the release-gated cross-repo sweep, already retargeted to the final names. Louis' drift-contract decision is resolved — `hub-layering-convention` is in the manifest, reviewed and acked.
+
+The PR body carries a **reviewer map**, which this diff needs: 528 files, of which ~490 are mechanical import churn. It names the dozen files where the judgment actually lives, and pre-empts the two things that look wrong at a glance — `subject_grants.toml`'s 221/221 re-sort (the registry is machine-written sorted, and was not in sort order before; the parsed mapping is identical modulo renames) and the deliberately un-swept old names in D1, the checkpoint records, and `.drift/acks/`.
 
 ### The runtime/interpreter rename — record
 
