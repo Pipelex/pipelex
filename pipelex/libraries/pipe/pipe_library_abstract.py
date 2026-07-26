@@ -1,9 +1,16 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.pipe_provider_abstract import PipeProviderAbstract
 
 
-class PipeLibraryAbstract(ABC):
+class PipeLibraryAbstract(PipeProviderAbstract):
+    """A loaded method's pipe library: resolution (inherited) plus the management half.
+
+    `get_required_pipe` lives on :class:`PipeProviderAbstract` in `core/`, so a core module can
+    depend on pipe resolution alone. Everything below is library management and stays here, high.
+    """
+
     @abstractmethod
     def setup(self) -> None:
         pass
@@ -16,10 +23,6 @@ class PipeLibraryAbstract(ABC):
     def reset(self) -> None:
         self.teardown()
         self.setup()
-
-    @abstractmethod
-    def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
-        pass
 
     @abstractmethod
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:

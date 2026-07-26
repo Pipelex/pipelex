@@ -69,14 +69,29 @@ TESTS_ROOT = Path("tests")
 SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 
 #: The declared low layer: packages that must stay importable without loading the method interpreter.
-#: `pipelex/core/**` is deliberately absent — five `core/` modules still reach for library lookups, and
-#: converting them is design work, not a mechanical move (see the Known inversions section of the doc).
+#:
+#: `pipelex/core/**` is listed **package by package**, not wholesale, because `core/` is genuinely two
+#: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
+#: low: it describes what a method's values are, and nothing in it needs a loaded method. The
+#: remainder names a `Pipe`, and a pipe is the interpreter's own object: `pipe_abstract`,
+#: `pipe_blueprint`, `pipe_factory`, `registry_models`, `bundles/` (a discriminated union over every
+#: pipe blueprint), `interpreter/`, and `pipes/rendering/` all import the interpreter *directly*, so
+#: declaring them low would be a claim the measurement contradicts. Those modules resolve their
+#: collaborators from the hub and inject them downward into the low half — the one-way arrow the whole
+#: design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 LOW_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
     "pipelex.plugins",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
+    # core's data model; the Pipe-touching remainder of `core/` stays high
+    "pipelex.core.concepts",
+    "pipelex.core.domains",
+    "pipelex.core.memory",
+    "pipelex.core.pipes.inputs",
+    "pipelex.core.pipes.stuff_spec",
+    "pipelex.core.stuffs",
 )
 
 #: The high hub, which no low-layer module may import.

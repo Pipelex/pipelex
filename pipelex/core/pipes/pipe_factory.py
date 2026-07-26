@@ -12,6 +12,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeT
 from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory
+from pipelex.method_hub import get_concept_library
 from pipelex.service_hub import get_class_registry
 
 if TYPE_CHECKING:
@@ -95,11 +96,14 @@ class PipeFactory(Generic[PipeAbstractType]):
 
         # Parse common attributes
         try:
-            parsed_output = StuffSpecFactory.make_from_blueprint(domain_code=domain_code, output_string=blueprint.output)
+            parsed_output = StuffSpecFactory.make_from_blueprint(
+                concept_provider=get_concept_library(), domain_code=domain_code, output_string=blueprint.output
+            )
         except StuffSpecFactoryError as exc:
             msg = f"Error parsing output string '{blueprint.output}': {exc}"
             raise PipeFactoryError(msg) from exc
         parsed_inputs = InputStuffSpecsFactory.make_from_blueprint(
+            concept_provider=get_concept_library(),
             domain_code=domain_code,
             blueprint=blueprint.inputs or {},
         )

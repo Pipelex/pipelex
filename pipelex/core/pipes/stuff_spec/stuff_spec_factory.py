@@ -1,10 +1,10 @@
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
 from pipelex.core.concepts.exceptions import ConceptFactoryError
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 from pipelex.core.pipes.stuff_spec.exceptions import StuffSpecFactoryError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.method_hub import get_required_concept
 
 
 class StuffSpecFactory:
@@ -12,12 +12,15 @@ class StuffSpecFactory:
     def make_from_blueprint(
         cls,
         *,
+        concept_provider: ConceptProviderAbstract,
         domain_code: str,
         output_string: str,
     ) -> StuffSpec:
         """Parse an output string and return a StuffSpec with concept and multiplicity.
 
         Args:
+            concept_provider: Resolves the parsed concept ref. Injected rather than looked up so this
+                module stays out of the method interpreter's import closure (see hub-layering).
             domain_code: The domain code to use for resolving concept codes without domain prefix
             output_string: String in the format "ConceptCode" or "domain.ConceptCode"
                           with optional "[multiplicity]" (e.g., "Text", "Text[]", "Text[3]")
@@ -45,7 +48,7 @@ class StuffSpecFactory:
             msg = f"Error resolving concept from output string '{output_string}': {exc}"
             raise StuffSpecFactoryError(msg) from exc
 
-        concept = get_required_concept(
+        concept = concept_provider.get_required_concept(
             concept_ref=ConceptFactory.make_concept_ref_with_domain(
                 domain_code=domain_and_code.domain_code,
                 concept_code=domain_and_code.concept_code,

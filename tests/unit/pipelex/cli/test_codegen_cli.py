@@ -20,7 +20,7 @@ from pipelex.cli.commands.codegen.types_cmd import codegen_types_cmd
 from pipelex.codegen.emitters.target import CodegenTarget, EmittedFile
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat
+from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 

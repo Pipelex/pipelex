@@ -14,10 +14,10 @@ from collections import Counter
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.codegen.resolved_fields import ResolvedField, resolve_structure_fields
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.resolved_fields import ResolvedField, resolve_structure_fields
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.library_crate import LibraryCrate
 

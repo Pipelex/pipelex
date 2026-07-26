@@ -12,8 +12,8 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.output.output_renderer import render_output
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.rendering.output_renderer import render_output
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.stuffs.image_content import ImageContent
 

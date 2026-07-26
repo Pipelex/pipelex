@@ -1172,27 +1172,27 @@ rationale = "Verb-object: resolves the concept_ref; the rest is context."
 param = "crate"
 rationale = "Factory from source: resolves the whole crate into a library."
 
-["pipelex/codegen/resolved_fields.py::_resolve_concept"]
+["pipelex/core/concepts/resolved_fields.py::_resolve_concept"]
 param = "concept_ref"
 rationale = "Verb-object: resolves the concept_ref; local_domain is context."
 
-["pipelex/codegen/resolved_fields.py::_resolve_list_item"]
+["pipelex/core/concepts/resolved_fields.py::_resolve_list_item"]
 param = "blueprint"
 rationale = "Verb-object: resolves the list-item blueprint; local_domain is context."
 
-["pipelex/codegen/resolved_fields.py::_resolve_scalar_type_name"]
+["pipelex/core/concepts/resolved_fields.py::_resolve_scalar_type_name"]
 param = "type_name"
 rationale = "Verb-object: resolves the type name; the rest is context."
 
-["pipelex/codegen/resolved_fields.py::_resolve_type"]
+["pipelex/core/concepts/resolved_fields.py::_resolve_type"]
 param = "blueprint"
 rationale = "Verb-object: resolves the blueprint's type; local_domain is context."
 
-["pipelex/codegen/resolved_fields.py::iter_imprecision_reasons"]
+["pipelex/core/concepts/resolved_fields.py::iter_imprecision_reasons"]
 param = "resolved_type"
 rationale = "Noun-named derivation: the imprecision reasons of the resolved type; single operand."
 
-["pipelex/codegen/resolved_fields.py::resolve_structure_fields"]
+["pipelex/core/concepts/resolved_fields.py::resolve_structure_fields"]
 param = "structure_blueprint"
 rationale = "Verb-object: resolves the structure blueprint's fields; local_domain is context."
 
@@ -2384,6 +2384,18 @@ rationale = "Factory keyed by the native concept code; single operand."
 param = "refine"
 rationale = "Verb-object: normalizes the refine string; domain stays keyword."
 
+["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_native_concept"]
+param = "native_concept"
+rationale = "Resolver getter: the native concept being fetched; single operand."
+
+["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_concept"]
+param = "concept_ref"
+rationale = "Resolver getter keyed by the concept ref; single operand."
+
+["pipelex/core/concepts/concept_provider_abstract.py::ConceptProviderAbstract.get_required_concept_from_concept_ref_or_code"]
+param = "concept_ref_or_code"
+rationale = "Resolver getter keyed by the ref-or-code; single operand."
+
 ["pipelex/core/concepts/concept_representation_generator.py::ConceptRepresentationGenerator._format_python_value"]
 param = "value"
 rationale = "Transforms the value; single operand."
@@ -2920,43 +2932,43 @@ rationale = "Verb-object: categorizes the pipe error; context stays keyword."
 param = "error"
 rationale = "Verb-object: unwraps the error; single operand."
 
-["pipelex/core/pipes/inputs/input_renderer.py::_delighten_entry"]
+["pipelex/core/pipes/rendering/input_renderer.py::_delighten_entry"]
 param = "entry"
 rationale = "Single-operand transformation of the entry; kind is a mode and stays keyword."
 
-["pipelex/core/pipes/inputs/input_renderer.py::_delighten_template"]
+["pipelex/core/pipes/rendering/input_renderer.py::_delighten_template"]
 param = "envelope_template"
 rationale = "Single-operand transformation of the template; specs stay keyword."
 
-["pipelex/core/pipes/inputs/input_renderer.py::_substitute_none_values"]
+["pipelex/core/pipes/rendering/input_renderer.py::_substitute_none_values"]
 param = "value"
 rationale = "Single-operand transformation of the value."
 
-["pipelex/core/pipes/inputs/input_renderer.py::_to_toml_value"]
+["pipelex/core/pipes/rendering/input_renderer.py::_to_toml_value"]
 param = "value"
 rationale = "Single-operand conversion of the value."
 
-["pipelex/core/pipes/inputs/input_renderer.py::_unwrap_scalar_content"]
+["pipelex/core/pipes/rendering/input_renderer.py::_unwrap_scalar_content"]
 param = "content"
 rationale = "Single-operand unwrap of the content; envelope is context."
 
-["pipelex/core/pipes/inputs/input_renderer.py::build_concept_comments"]
+["pipelex/core/pipes/rendering/input_renderer.py::build_concept_comments"]
 param = "input_specs"
 rationale = "Noun-named derivation: the comments mapping for the input specs; single operand."
 
-["pipelex/core/pipes/inputs/input_renderer.py::build_inputs_template"]
+["pipelex/core/pipes/rendering/input_renderer.py::build_inputs_template"]
 param = "the_pipe"
 rationale = "Noun-named derivation: the inputs template for the pipe; explicit is a mode."
 
-["pipelex/core/pipes/inputs/input_renderer.py::render_inputs"]
+["pipelex/core/pipes/rendering/input_renderer.py::render_inputs"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's inputs; format stays keyword."
 
-["pipelex/core/pipes/inputs/input_renderer.py::render_inputs_toml"]
+["pipelex/core/pipes/rendering/input_renderer.py::render_inputs_toml"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's inputs; explicit is a mode."
 
-["pipelex/core/pipes/inputs/input_renderer.py::serialize_inputs_template_to_toml"]
+["pipelex/core/pipes/rendering/input_renderer.py::serialize_inputs_template_to_toml"]
 param = "template"
 rationale = "Single-operand serialization of the template; options stay keyword."
 
@@ -2976,23 +2988,23 @@ rationale = "Setter: installs the default domain code; single operand."
 param = "named"
 rationale = "Factory from source: builds from the named spec; context stays keyword."
 
-["pipelex/core/pipes/output/output_renderer.py::_collect_possible_outputs"]
+["pipelex/core/pipes/rendering/output_renderer.py::_collect_possible_outputs"]
 param = "the_pipe"
 rationale = "Verb-object: collects from the pipe; single operand."
 
-["pipelex/core/pipes/output/output_renderer.py::_render_json_output"]
+["pipelex/core/pipes/rendering/output_renderer.py::_render_json_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/output/output_renderer.py::_render_python_output"]
+["pipelex/core/pipes/rendering/output_renderer.py::_render_python_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/output/output_renderer.py::_render_schema_output"]
+["pipelex/core/pipes/rendering/output_renderer.py::_render_schema_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; single operand."
 
-["pipelex/core/pipes/output/output_renderer.py::render_output"]
+["pipelex/core/pipes/rendering/output_renderer.py::render_output"]
 param = "the_pipe"
 rationale = "Verb-object: renders the pipe's output; format stays keyword."
 
@@ -3035,6 +3047,10 @@ rationale = "Type-directed accessor: the target item type; single operand."
 ["pipelex/core/pipes/pipe_output.py::PipeOutput.main_stuff_as_list"]
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
+
+["pipelex/core/pipes/pipe_provider_abstract.py::PipeProviderAbstract.get_required_pipe"]
+param = "pipe_code"
+rationale = "Resolver getter keyed by the pipe code; single operand."
 
 ["pipelex/core/pipes/validation.py::is_input_used_by_variables"]
 param = "input_name"
@@ -3612,18 +3628,6 @@ rationale = "Verb-object: adds the concepts; single operand."
 param = "concept"
 rationale = "Verb-object: adds the concept; single operand."
 
-["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.get_native_concept"]
-param = "native_concept"
-rationale = "Library getter: the native concept being fetched; single operand."
-
-["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.get_required_concept"]
-param = "concept_ref"
-rationale = "Library getter keyed by the concept ref; single operand."
-
-["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.get_required_concept_from_concept_ref_or_code"]
-param = "concept_ref_or_code"
-rationale = "Library getter keyed by the ref-or-code; single operand."
-
 ["pipelex/libraries/concept/concept_library_abstract.py::ConceptLibraryAbstract.list_concepts_by_domain"]
 param = "domain_code"
 rationale = "Query keyed by the domain code it lists; single operand."
@@ -3869,10 +3873,6 @@ param = "pipes"
 rationale = "Verb-object: adds the pipes; single operand."
 
 ["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_optional_pipe"]
-param = "pipe_code"
-rationale = "Library getter keyed by the pipe code; single operand."
-
-["pipelex/libraries/pipe/pipe_library_abstract.py::PipeLibraryAbstract.get_required_pipe"]
 param = "pipe_code"
 rationale = "Library getter keyed by the pipe code; single operand."
 

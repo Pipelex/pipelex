@@ -133,9 +133,7 @@ class TestStuffFactoryImplicitMemory:
         log.verbose(f"setup_test_concept: {setup_test_concept}")
 
         result = StuffFactory.make_stuff_from_stuff_content_or_data(
-            name=stuff_name,
-            code=stuff_code,
-            stuff_content_or_data=stuff_content_or_data,
+            name=stuff_name, code=stuff_code, stuff_content_or_data=stuff_content_or_data, concept_provider=get_concept_library()
         )
         pretty_print(result, title=f"Result for test case: {test_name}")
         pretty_print(expected_stuff, title=f"Expected stuff for test case: {test_name}")
@@ -170,6 +168,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
             code=stuff_code,
             stuff_content_or_data=stuff_content_or_data,
             search_domain_codes=search_domain_codes,
+            concept_provider=get_concept_library(),
         )
 
         pretty_print(result, title=f"Result for test case: {test_name}")
@@ -208,4 +207,5 @@ class TestStuffFactoryImplicitMemoryErrors:
                 code=stuff_code,
                 stuff_content_or_data=stuff_content_or_data,
                 search_domain_codes=search_domain_codes,
+                concept_provider=get_concept_library(),
             )

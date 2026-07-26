@@ -32,13 +32,28 @@ def _kinds(violations: list[HubLayeringViolation]) -> set[HubLayeringViolationKi
 
 class TestHubLayeringGuard:
     def test_low_layer_membership(self) -> None:
-        """The declared low layer is matched on package boundaries, and `core`/`pipeline` are outside it."""
+        """The declared low layer is matched on package boundaries, and `pipeline` is outside it."""
         assert is_low_layer(module_qname="pipelex.cogt.llm.llm_worker_abstract")
         assert is_low_layer(module_qname="pipelex.tools")
-        assert not is_low_layer(module_qname="pipelex.core.stuffs.stuff_factory")
         assert not is_low_layer(module_qname="pipelex.pipeline.runner")
         # A package whose name merely starts with a low-layer name is not in the low layer.
         assert not is_low_layer(module_qname="pipelex.toolsmith.thing")
+
+    def test_core_is_split_between_the_layers(self) -> None:
+        """`core/` is declared package by package: its data model is low, its Pipe machinery is not."""
+        assert is_low_layer(module_qname="pipelex.core.stuffs.stuff_factory")
+        assert is_low_layer(module_qname="pipelex.core.concepts.concept_provider_abstract")
+        assert is_low_layer(module_qname="pipelex.core.memory.input_shaper")
+        assert is_low_layer(module_qname="pipelex.core.pipes.inputs.input_stuff_specs_factory")
+        assert is_low_layer(module_qname="pipelex.core.pipes.stuff_spec.stuff_spec_factory")
+        # Everything that names a `Pipe` imports the interpreter directly and stays high.
+        assert not is_low_layer(module_qname="pipelex.core.pipes.pipe_factory")
+        assert not is_low_layer(module_qname="pipelex.core.pipes.rendering.output_renderer")
+        assert not is_low_layer(module_qname="pipelex.core.registry_models")
+        assert not is_low_layer(module_qname="pipelex.core.bundles.pipelex_bundle_blueprint")
+        assert not is_low_layer(module_qname="pipelex.core.interpreter.bundle_elaborator")
+        # `pipelex.core` itself is not a declared package — the split is deliberate, not an omission.
+        assert not is_low_layer(module_qname="pipelex.core.qualified_ref")
 
     def test_low_layer_may_import_service_hub(self) -> None:
         """The permitted direction is never flagged — the low layer lives on `service_hub`."""

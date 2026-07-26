@@ -15,6 +15,7 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.method_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
 # (test_name, concept_ref, multiplicity, provided_value, expected_exception, error_match)
@@ -68,7 +69,7 @@ class TestInputShaperErrors:
         input_specs = build_input_specs([("my_input", concept_ref, multiplicity)])
 
         with pytest.raises(expected_exception, match=error_match) as exc_info:
-            InputShaper.shape({"my_input": provided_value}, input_specs=input_specs)
+            InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library())
 
         # D4 mandates the rendered expected-shape template appears in every shaping-error message.
         assert "Expected shape:" in str(exc_info.value), f"Missing rendered shape for {test_name}"
@@ -78,7 +79,7 @@ class TestInputShaperErrors:
         input_specs = build_input_specs([("question", "native.Text", None)])
 
         with pytest.raises(UnknownInputNameError, match="not declared") as exc_info:
-            InputShaper.shape({"quesion": "typo"}, input_specs=input_specs)
+            InputShaper.shape({"quesion": "typo"}, input_specs=input_specs, concept_provider=get_concept_library())
 
         message = str(exc_info.value)
         assert "'question'" in message, "Unknown-name error should list the declared inputs"

@@ -14,8 +14,8 @@ from pipelex.codegen.emitters.naming import python_class_name
 from pipelex.codegen.emitters.python_common import any_annotation, class_docstring, field_line, order_by_base, python_header
 from pipelex.codegen.emitters.target import EmittedFile
 from pipelex.codegen.resolved_concepts import ResolvedConcept, ResolvedLibrary
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind
 from pipelex.core.qualified_ref import QualifiedRef
 
 _FILENAME = "structures.py"

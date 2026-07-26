@@ -2,27 +2,26 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **CHECKPOINT H-3 reached** — branch `refactor/Hub`, not pushed.
+**Status:** **ALL PHASES CODE-COMPLETE — CHECKPOINT H-4, paused mid-gates.** Branch `refactor/Hub`, not pushed. **Jump to [⏸ Resume here](#-resume-here-h-4-is-code-complete-two-gates-outstanding) first** — `make agent-test` needs re-running and two drift contracts are open by design.
 
-Phases 0 through 3 are complete: the split is landed, the headline property is measured at **0 interpreter modules**, the boundary is mechanically enforced by `make check-hub-layering` plus a subprocess import-closure test, and the two misplaced type clusters are moved (`cogt → pipeline` is now 0 statements; `tools → cogt` is down to 3). **Phase 4 (`core/` joins the low layer) is next** — it is the only remaining phase, and unlike Phase 3 it is real design work, not a `git mv`.
+The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the low layer behind injected providers. Every low-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written.
+
+**What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (now three waves) and one open decision for Louis (the drift contract).
 
 ### Cold start — read in this order
 
 1. [The one rule](#the-one-rule) and [Symbol partition](#symbol-partition) — the settled boundary.
-2. [Checkpoint H-3 record](#checkpoint-h-3-record) — the two type moves, why `TraceContext` had to travel with `JobMetadata`, and why the templating primitives split across two packages.
-3. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
-4. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
-5. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary, including enforcement and the "Placement, not coupling" record of Phase 3.
-6. Then start at [Phase 4](#phase-4--core-joins-the-low-layer).
+2. [Checkpoint H-4 record](#checkpoint-h-4-record) — **start here**: why the plan's "all of `core/` goes low" premise was wrong, the `if it names a Pipe, it is high` rule that replaced it, and the injected-provider pattern.
+3. [Checkpoint H-3 record](#checkpoint-h-3-record) — the two type moves, why `TraceContext` had to travel with `JobMetadata`, and why the templating primitives split across two packages.
+4. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
+5. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
+6. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification: the two halves, "Where core splits", enforcement, and "Placement, not coupling".
 
-Gates at H-3: `make agent-check` ✅ (pyright 0 errors, mypy 2,354 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened).
+Three notes for whoever picks this up:
 
-Four notes for whoever picks this up:
-
-- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first, and note that **Phase 3 added more breaking module moves** to announce (see [Cross-repo impact added by Phase 3](#cross-repo-impact-added-by-phase-3)). The guard enforces that `pipelex.hub` stays gone, which makes the missing release note the only loose end on that front.
+- **The cross-repo sweep is the only substantial work remaining, and it is release-gated.** Three waves now: the `pipelex.hub` split ([table](#cross-repo-sweep)), the Phase 3 type moves ([table](#cross-repo-impact-added-by-phase-3)), and the Phase 4 moves + signature changes ([table](#cross-repo-impact-added-by-phase-4)). Do all three in one pass per repo.
 - **One decision is waiting on Louis**: whether to add a `hub-layering-convention` drift contract. It was built and reverted on purpose — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so).
-- **Phase 4 widens the guard's low layer** to include `pipelex/core/**`. That is a one-line change to `LOW_LAYER_PACKAGES` in `hub_layering_guard.py`, and the guard will tell you immediately whether 4.1 is actually finished.
-- **Phase 4 also has a measurable second prize**: `core.pipes.pipe_output → pipeline.pipeline_models` is one of the two edges still pulling non-inference modules into the inference closure. Fixing 4.1 should take it out.
+- **`core.pipes.pipe_output → pipeline.pipeline_models` was NOT removed.** H-3 predicted Phase 4 would take it out; it did not, because `pipe_output` is on the Pipe-touching (high) side of the core split and was never converted. It remains one of the two edges pulling non-inference modules into the inference closure, which is why the module/SLOC rows are flat at H-4.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub-split-refactor.md`](wip/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
@@ -398,12 +397,126 @@ The import lines to rewrite, in full:
 
 Clean (no action): `pipelex-cookbook/`, `cocode/`, `pipelex-worker/`, `pipelex-starter-python/`, `pipelex-relay/`, `sandbox/`.
 
-### Phase 4 — `core/` joins the low layer
+### Phase 4 — core's data model joins the low layer ✅
 
-- [ ] 4.1 Convert the five `core/` straddlers — `stuffs/stuff_factory.py`, `memory/input_shaper`, `pipes/stuff_spec/stuff_spec_factory`, `pipes/inputs/input_stuff_specs_factory`, `pipes/output/output_renderer` — to take resolved concepts/pipes as arguments instead of reaching for `get_concept_library` / `get_native_concept` / `get_required_concept` / `get_required_pipe`. Callers that have a library pass the resolved value; callers that do not are, by construction, already in the high layer.
-- [ ] 4.2 Widen the guard's low layer: add `pipelex.core` to `LOW_LAYER_PACKAGES` in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, and add `pipelex.core.*` entry points to `LOW_LAYER_ENTRY_POINTS` in `tests/unit/pipelex/test_hub_import_closure.py`.
+- [x] 4.1 Converted the `core/` straddlers to injected providers. **The plan's premise was wrong** — `core/` is two layers, not one, and only its *data model* can be low. See the H-4 record.
+- [x] 4.2 Widened the guard's low layer with core's six data-model packages, and added six `pipelex.core.*` entry points to `LOW_LAYER_ENTRY_POINTS`.
 
-**CHECKPOINT H-4 = done** — update `docs/contribute/hub-layering.md` with the final layer set, and add the CHANGELOG breaking-change note under `[Unreleased]` (`pipelex.hub` is gone; importers choose `pipelex.service_hub` or `pipelex.method_hub`).
+**CHECKPOINT H-4** — the boundary is complete, enforced, and measured.
+
+### Checkpoint H-4 record
+
+Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,356 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ⏳ **not yet confirmed** · `make drift-check` ❌ **two contracts open** — see [Resume here](#-resume-here-h-4-is-code-complete-two-gates-outstanding).
+
+## ⏸ Resume here — H-4 is code-complete, two gates outstanding
+
+Everything in the Phase 4 record below is **written and committed**. `make agent-check` is green. Two things were deliberately **not** done before pausing:
+
+**1. `make agent-test` was still running when the session ended.** Re-run it. Targeted paths if you want a faster first signal (per `tests/CLAUDE.md`, this change spans `core/`, `pipeline/`, `cli/` and root modules, so the full suite is the correct gate before any push):
+
+```bash
+make agent-test
+```
+
+The realistic failure mode is a call site the AST fixer missed in a way pyright cannot see — a `mocker.patch` string target, or a test calling one of the converted factories through `getattr`. Both pyright passes are clean (`pipelex/` and `tests/`, 0 errors), and the guard + closure + hub-lifecycle tests pass, so anything that fails will be behavioral, not structural.
+
+**2. Two drift contracts are open and were left open on purpose** (the user asked to pause before fixing them):
+
+- **`config-docs`** — trigger: `pipelex/system/configuration/configs.py`. Review target: `docs/configuration/**/*.md`. Verify command: `make tb`.
+- **`cli-docs`** — triggers: 10 CLI modules under `pipelex/cli/` (the `build`/`codegen`/`agent_cli` inputs+output command cores). Review targets: `docs/tools/cli/`, `pipelex/cli/agent_cli/CLAUDE.md`.
+
+Use the `drift-review` skill (it performs the review and records the mandatory dogfood observation). **Do the review for real** — do not assume it is import-path-only this time, because unlike H-1 this phase *did* change behavior-adjacent things. Specifically check:
+
+- `config-docs`: `configs.py` changed only via the `resolved_fields` / type-move import swaps as far as this session saw — but confirm no config model field, default, or TOML key moved before acking that.
+- `cli-docs`: the 10 CLI modules changed because `input_renderer` / `output_renderer` moved to `pipelex.core.pipes.rendering`. That is an import path, **not** a command name, flag, help string, or exit code — but verify against `docs/tools/cli/` rather than asserting it. The prior acks for both contracts (quoted in `make drift-plan` output) are good models for the depth of review expected.
+
+Then:
+
+```bash
+make drift-plan
+# review, fix what is stale, git add the trigger files
+make drift-ack CONTRACT=config-docs RATIONALE="…"
+make drift-ack CONTRACT=cli-docs RATIONALE="…"
+```
+
+After both gates are green, H-4 is fully closed and the branch is ready for a PR to `dev`. Nothing else in this plan is outstanding except the release-gated cross-repo sweep and Louis' drift-contract decision.
+
+#### The plan's premise was wrong: `core/` is two layers
+
+Phase 4 assumed all of `pipelex/core/` could join the low layer once five straddlers were converted. Measurement said otherwise, and the correction is the main finding of this checkpoint.
+
+Beyond the five hub straddlers, **seven `core/` modules import the interpreter *directly*** — no hub involved, so no amount of dependency injection touches them:
+
+| module | pulls | why it is irreducible |
+| --- | --- | --- |
+| `core/registry_models.py` | every pipe + factory | it *is* the registry of pipe kinds |
+| `core/bundles/pipelex_bundle_blueprint.py` | 12 pipe blueprints | a discriminated union over every pipe kind |
+| `core/interpreter/bundle_elaborator.py` | 4 pipe blueprints | it is the interpreter |
+| `core/pipes/pipe_abstract.py` | `libraries.library_crate`, `pipe_signature.exceptions` | the base class every pipe extends |
+
+Measured: `pipelex.core.pipes.pipe_abstract` alone loads **30** interpreter modules while importing no hub at all. So the honest boundary is not `pipelex.core` — it is **"if it names a `Pipe`, it is high."**
+
+Louis' call (option A of three): declare core's data-model packages low, leave the Pipe-touching remainder high. Rejected: threading a provider through `PipeFactory.make_from_blueprint` too — that is **337 call sites (332 in tests, ~85 files)** and buys *no* additional closure property, since `pipe_factory` stays interpreter-bound either way.
+
+#### What landed
+
+**Two read-side contracts, new in `core/`:**
+
+- `ConceptProviderAbstract` (`core/concepts/concept_provider_abstract.py`) — `get_required_concept`, `get_native_concept`, `get_required_concept_from_concept_ref_or_code`, `is_compatible`.
+- `PipeProviderAbstract` (`core/pipes/pipe_provider_abstract.py`) — `get_required_pipe`.
+
+`ConceptLibraryAbstract` / `PipeLibraryAbstract` now **extend** these, keeping add/remove/list/setup/teardown high. The split is the point: core depends on resolution, never on a library lifecycle. Both abstracts already named only `core` types, so this was an inverted dependency waiting to be undone.
+
+**Injected, not looked up.** `StuffFactory.{make_stuff_from_stuff_content_or_data, make_from_blueprint, make_from_concept_ref}`, `InputShaper.{shape, resolve_input_kind}`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputStuffSpecsFactory.{make_from_blueprint, make_from_string}`, `StuffSpecFactory.make_from_blueprint` all take a required `concept_provider`. Injection happens in the high half: `pipe_factory`, `input_renderer`, `output_renderer` call the hub themselves and hand the result down, as does `pipeline/execution_seams.py`.
+
+**One import was simply wrong**: `stuff_factory.py` imported `ConceptLibraryConceptNotFoundError` from `libraries.concept.concept_library` — a re-export path. The class already lived in `core/concepts/exceptions.py`. A one-line fix deleted a whole interpreter edge.
+
+**Two placement fixes** (the H-3 pattern again):
+
+- `codegen/resolved_fields.py` → `core/concepts/resolved_fields.py`. It names nothing outside `pipelex.core`, yet put `pipelex.codegen` into the closure of every core module reaching structure generation.
+- `core/pipes/inputs/input_renderer.py` + `core/pipes/output/output_renderer.py` → **`core/pipes/rendering/`**. Both render a `PipeAbstract`, so both are high; leaving `input_renderer` beside the low input-spec modules would have forced the low-layer declaration to enumerate *modules* instead of packages. `core/pipes/output/` is gone. Tests mirrored to `tests/unit/pipelex/core/pipes/rendering/`.
+
+#### Measured after
+
+| | baseline | H-1 | H-3 | **H-4** |
+| --- | --- | --- | --- | --- |
+| interpreter modules loaded by `cogt.content_generation.content_generator` | 50 | 0 | 0 | **0** ✅ |
+| pipelex modules loaded | 357 | 275 | 268 | **268** |
+| SLOC loaded | 29,193 | 21,186 | 20,304 | **20,304** |
+
+The inference-layer numbers are unchanged by design — Phase 4 widened *which* modules are guaranteed clean, it did not touch `cogt`'s own weight. The new numbers are the six core entry points, each measured at **0 interpreter modules and no `pipelex.method_hub`**, up from 50 each before this phase:
+
+| entry point | interpreter modules before → after |
+| --- | --- |
+| `core.stuffs.stuff_factory` | 50 → **0** |
+| `core.memory.input_shaper` | 50 → **0** |
+| `core.memory.working_memory_factory` | 50 → **0** |
+| `core.pipes.stuff_spec.stuff_spec_factory` | 50 → **0** |
+| `core.pipes.inputs.input_stuff_specs_factory` | 50 → **0** |
+| `core.concepts.structure_generation.generator` | 2 → **0** |
+
+#### Housekeeping done at H-4
+
+- **Grants**: 4 new (the provider-abstract getters), recorded **before** any check ran; 6 migrated with `resolved_fields`; 15 migrated with the two renderers; **4 deleted as dead** (`ConceptLibraryAbstract.get_{native_concept,required_concept,required_concept_from_concept_ref_or_code}`, `PipeLibraryAbstract.get_required_pipe`) — those defs moved to the provider abstracts, and staleness is symmetric so `make cko` hard-failed until the registry was cleaned.
+- **Test call sites**: 74 across 12 files gained `concept_provider=get_concept_library()`, applied by an AST-driven fixer keyed off pyright's own `Argument missing` report so no unrelated `make_from_blueprint` was touched. ⚠ The first pass mangled 3 files: for a multi-line call the closing-paren line is whitespace-only, so a "does the preceding text end in a comma?" check must look back **across newlines**, not within the line. Reverted and redone.
+- **Docs**: `docs/contribute/hub-layering.md` gained a "Where core splits" section (the two halves, the `if it names a Pipe, it is high` rule, and the injected-provider pattern), two new "Placement, not coupling" entries, a corrected low-layer list under Enforcement, and a rewritten `core/` bullet under Known inversions. `docs/under-the-hood/architecture-overview.md` gained a paragraph on core straddling the line. `docs/under-the-hood/codegen-projections.md` updated for the `resolved_fields` move.
+- **CHANGELOG**: the breaking-change note that had been deferred since H-1 is now written under `[Unreleased]`, covering all four phases — the `pipelex.hub` split, the moved types, and the injected providers.
+
+#### Still open
+
+- **The cross-repo sweep is still untouched and release-gated.** It now has a **third** wave on top of the `pipelex.hub` split and the Phase 3 type moves — see [Cross-repo impact added by Phase 4](#cross-repo-impact-added-by-phase-4).
+- **The `hub-layering-convention` drift contract decision is still Louis'** — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so). Phase 4 rewrote `hub-layering.md` again, which is exactly the obligation that contract would have mechanized.
+- A plausible sequel, now much cheaper to argue for than at H-2: a general layering ratchet. The remaining measured inversions are in [Known inversions](#known-inversions-not-fixed-here).
+
+#### Cross-repo impact added by Phase 4
+
+| old | new |
+| --- | --- |
+| `pipelex.codegen.resolved_fields` | `pipelex.core.concepts.resolved_fields` |
+| `pipelex.core.pipes.inputs.input_renderer` | `pipelex.core.pipes.rendering.input_renderer` |
+| `pipelex.core.pipes.output.output_renderer` | `pipelex.core.pipes.rendering.output_renderer` |
+
+Plus the signature changes: any external caller of `StuffFactory.make_stuff_from_stuff_content_or_data`, `WorkingMemoryFactory.make_from_pipeline_inputs`, `InputShaper.shape`, `InputStuffSpecsFactory.make_from_*` or `StuffSpecFactory.make_from_blueprint` must now pass `concept_provider=get_concept_library()`. Do all three waves in one pass per repo.
 
 ## Exit criteria — measured, not asserted
 

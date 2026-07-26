@@ -9,7 +9,7 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.method_hub import get_native_concept
+from pipelex.method_hub import get_concept_library, get_native_concept
 from tests.cases.images import ImageTestCases
 
 if TYPE_CHECKING:
@@ -26,7 +26,7 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
 
         assert working_memory is not None
         assert "text_item" in working_memory.root
@@ -62,7 +62,7 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
 
         assert working_memory is not None
         assert "complex_page" in working_memory.root
@@ -111,7 +111,7 @@ class TestWorkingMemoryFactory:
         """Test deserialization of empty compact memory."""
         pipeline_inputs: PipelineInputs = {}
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
 
         assert working_memory is not None
         assert len(working_memory.root) == 0
@@ -130,7 +130,7 @@ class TestWorkingMemoryFactory:
             },
         }
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, concept_provider=get_concept_library())
 
         assert working_memory is not None
         assert len(working_memory.root) == 2
@@ -154,7 +154,9 @@ class TestWorkingMemoryFactory:
         # A bare string is narrower than the PipelineInputs alias formally admits, but flows at runtime.
         pipeline_inputs: dict[str, Any] = {"greeting": "hello"}
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, input_specs=None)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, input_specs=None, concept_provider=get_concept_library()
+        )
 
         stuff = working_memory.root["greeting"]
         assert stuff.concept.code == NativeConceptCode.TEXT
@@ -170,7 +172,9 @@ class TestWorkingMemoryFactory:
         input_specs = InputStuffSpecs(root={"count": StuffSpec(concept=number_concept)})
         pipeline_inputs: dict[str, Any] = {"count": 42}
 
-        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(pipeline_inputs=pipeline_inputs, input_specs=input_specs)
+        working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+            pipeline_inputs=pipeline_inputs, input_specs=input_specs, concept_provider=get_concept_library()
+        )
 
         stuff = working_memory.root["count"]
         assert stuff.concept.code == NativeConceptCode.NUMBER

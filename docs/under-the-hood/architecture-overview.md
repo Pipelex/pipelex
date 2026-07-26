@@ -110,6 +110,8 @@ The practical consequence is that the low-level COGT layer cannot reach the high
 
 That is not a convention held up by review: `make check-hub-layering` fails the build if a low-layer module imports — or merely names in a string — the high hub, and an import-closure test pins the property itself in a subprocess.
 
+`pipelex/core/` sits on both sides of the line, deliberately. Its data model — concepts, domains, stuffs, working memory, the input/output specs — is low: it describes what a method's values *are*, needs no loaded method, and takes the concept or pipe it needs as an injected argument. Everything in `core/` that names a **`Pipe`** is high, because a pipe is the interpreter's own object.
+
 Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 
 ---

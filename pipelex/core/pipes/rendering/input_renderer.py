@@ -8,6 +8,7 @@ from pipelex.core.memory.input_shaper import InputKind, InputShaper
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.method_hub import get_concept_library
 
 
 class InputsTemplateFormat(StrEnum):
@@ -130,7 +131,7 @@ def _delighten_template(envelope_template: dict[str, Any], *, input_specs: Input
     light_template: dict[str, Any] = {}
     for variable_name, entry in envelope_template.items():
         stuff_spec = input_specs.get_required_stuff_spec(variable_name=variable_name)
-        kind = InputShaper.resolve_input_kind(stuff_spec.concept)
+        kind = InputShaper.resolve_input_kind(stuff_spec.concept, concept_provider=get_concept_library())
         light_template[variable_name] = _delighten_entry(entry, kind=kind)
     return light_template
 

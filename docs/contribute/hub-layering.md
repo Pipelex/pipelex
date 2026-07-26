@@ -70,7 +70,7 @@ Placement is decided by *kind*, not by who currently imports it. Several accesso
 
 ## Why the boundary exists
 
-`service_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.concepts`, or `core.pipes` at module level. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
+`service_hub` must not name anything from `libraries`, `pipe_operators`, `pipe_controllers`, `codegen`, `builder`, `core.bundles`, `core.interpreter`, or the Pipe-touching modules of `core.pipes` at module level. Those module-level imports exist only to type the getters, but they are what made a single hub drag the entire method interpreter into every consumer that just wanted `get_console()`.
 
 The property that matters is measurable: **importing the inference layer must not load the interpreter.** Verify it from the repo root on a synced venv:
 
@@ -96,6 +96,30 @@ PY
 
 `interpreter modules` must print **0**. When it does not, the `offenders` list names the modules that leaked, and the shortest import path to one of them is what to fix. Swap the imported module to measure any other entry point.
 
+## Where core splits
+
+`pipelex/core/` is not one layer, and trying to declare it one was the mistake this section records. It holds two different kinds of thing:
+
+- **The data model — low.** `core.concepts`, `core.domains`, `core.stuffs`, `core.memory`, and the input/output *specs* under `core.pipes.inputs` and `core.pipes.stuff_spec`. These describe what a method's values *are*. Nothing in them needs a loaded method, and each measures **zero** interpreter modules.
+- **The Pipe machinery — high.** `core.pipes.pipe_abstract`, `pipe_blueprint`, `pipe_factory`, `pipe_output`, `core.pipes.rendering`, `core.bundles`, `core.interpreter`, and `core.registry_models`. Every one of them names a `Pipe`, and a pipe is the interpreter's own object — they import `pipe_operators` / `pipe_controllers` / `libraries` **directly**, not through a hub. `core.bundles.pipelex_bundle_blueprint` is a discriminated union over every pipe blueprint; `core.registry_models` is a registry of every pipe kind. No amount of dependency injection makes those low.
+
+So the low-layer declaration lists core's data-model packages by name. `pipelex.core` itself is deliberately *not* a declared package: writing it would claim a property the measurement contradicts.
+
+The dividing line is worth stating as a rule of thumb: **if it names a `Pipe`, it is high.**
+
+### Injected providers, not ambient lookups
+
+The data-model half used to reach for `get_concept_library()` / `get_native_concept()` / `get_required_concept()` — ambient lookups into a loaded method, which is exactly what made `core/` inseparable from the interpreter. They now take what they need as a parameter:
+
+- `ConceptProviderAbstract` (`pipelex/core/concepts/concept_provider_abstract.py`) — resolve a ref, a code, or a native code into a `Concept`, and answer compatibility questions.
+- `PipeProviderAbstract` (`pipelex/core/pipes/pipe_provider_abstract.py`) — resolve a pipe code into a `PipeAbstract`.
+
+Both are **read-side only**. Managing a library — adding, removing, listing, setup/teardown — stays high: `ConceptLibraryAbstract` and `PipeLibraryAbstract` now *extend* these, keeping their management half in `libraries/`. Splitting read from write is what lets a core module state its dependency honestly ("I need something that can resolve concepts") without inheriting a library lifecycle it has no business touching.
+
+The injection point is the high layer. `pipe_factory`, `input_renderer` and `output_renderer` — already interpreter-bound, so nothing is lost — call `get_concept_library()` / `get_required_pipe` themselves and pass the result down; `pipeline/execution_seams.py` does the same for `WorkingMemoryFactory`. That is the one-way arrow the whole design rests on, applied inside `core/`: **the half that knows about a loaded method resolves the collaborator and hands it downward.**
+
+When you add a core data-model function that needs a concept or a pipe, add a `concept_provider` / `pipe_provider` parameter. Do not add a hub import — the guard will reject it, and the closure test will tell you which entry point you broke.
+
 ## Placement, not coupling
 
 Splitting the hub removes the *lookups* that crossed the boundary. It does not move a type that was simply filed in the wrong package — and a misfiled type drags its whole package into every closure that names it. Two were resolved this way; both are worth knowing as the pattern to apply to the next one.
@@ -111,7 +135,11 @@ Splitting the hub removes the *lookups* that crossed the boundary. It does not m
 
 What stays in `cogt/templating/` — `TemplateBlueprint`, the sigil preprocessor, the rendering entrypoint — belongs there: a blueprint is language-layer, and the rest imports `tools/jinja2` downward.
 
-The lesson generalizes: when a low-layer package imports a high one, check whether the *type* is misplaced before designing an indirection. Neither of these needed a resolver slot or a protocol — only a `git mv` and an import rewrite.
+**`resolved_fields` moved down into `core/concepts/`.** The neutral resolved-field layer — one structure field becoming a `ResolvedType` tree — lived under `pipelex/codegen/` while `core/concepts/structure_generation/generator.py` imported it, which put `pipelex.codegen` into the closure of every core module that reached structure generation. It names nothing outside `pipelex.core`, so this was misfiling again: it now lives at `pipelex/core/concepts/resolved_fields.py`, and the codegen emitters import it upward.
+
+**The two renderers regrouped into `core/pipes/rendering/`.** `input_renderer` sat in `core/pipes/inputs/` beside genuinely-low modules while `output_renderer` sat alone in `core/pipes/output/`. Both render a `PipeAbstract` for a human or an agent, so both are high — and leaving `input_renderer` where it was would have forced the low-layer declaration to be a list of *modules* rather than packages. Regrouping them made the boundary fall on package lines, which is the difference between a rule you can state and a rule you have to enumerate.
+
+The lesson generalizes: when a low-layer package imports a high one, check whether the *type* is misplaced before designing an indirection. None of these needed a resolver slot or a protocol — only a `git mv` and an import rewrite. And when a package straddles the boundary, moving the odd module out is usually cheaper than teaching the guard about exceptions.
 
 ## The class-registry exception
 
@@ -146,7 +174,7 @@ make check-hub-layering   # alias: make chl
 
 An AST guard (`pipelex-dev check-hub-layering`, core in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`) that runs in `make agent-check`, in the `make check` aggregate, and in CI. It checks two rules over `pipelex/` and `tests/`:
 
-1. **The layer rule.** A module in the declared low layer — `pipelex.cogt`, `pipelex.plugins`, `pipelex.reporting`, `pipelex.system`, `pipelex.tools` — may not import `pipelex.method_hub`. All five packages are compliant, so the guard hard-blocks on **any** violation with an empty exception list.
+1. **The layer rule.** A module in the declared low layer — `pipelex.cogt`, `pipelex.plugins`, `pipelex.reporting`, `pipelex.system`, `pipelex.tools`, plus core's data-model packages `pipelex.core.concepts`, `pipelex.core.domains`, `pipelex.core.memory`, `pipelex.core.pipes.inputs`, `pipelex.core.pipes.stuff_spec` and `pipelex.core.stuffs` — may not import `pipelex.method_hub`. Every declared package is compliant, so the guard hard-blocks on **any** violation with an empty exception list. Why `core/` is listed package by package rather than wholesale is [below](#where-core-splits).
 2. **The dead-module rule.** *No* scanned module may reference `pipelex.hub`. It was deleted rather than aliased so a stale import fails loudly; this closes the one hole in that guarantee.
 
 Both rules match **imports and bare string literals**, and the string half is the load-bearing one. A missed *import* of a deleted module is an immediate `ImportError`; a missed *string* is not, and it is invisible to every import-graph tool and to pyright's module graph. Both forms that actually occurred here were strings: three `importlib.import_module("pipelex.hub")` shims hiding a cycle from every lint, and one `mocker.patch("pipelex.hub.get_console", ...)` that broke a whole CLI test suite with an `AttributeError` raised nowhere near a hub. Matching is exact-or-boundary against the module path, so `pipelex.service_hub` never matches `pipelex.hub` and prose that merely *mentions* a module is not a reference.
@@ -171,7 +199,7 @@ Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot inst
 Named so this document stays honest. None of these import a hub, so a hub-import guard would not flag them — but they mean "`plugins` is a low layer" is not yet unconditionally true.
 
 - `plugins/pipe_func/pipe_func_plugin.py` and `plugins/pipe_func_executor_registry.py` are typed by protocols from `pipe_operators/`; `plugins/direct/direct_plugin.py` imports from `pipeline/`. `pipe_func_executor_registry` defers its import under `TYPE_CHECKING` precisely because `pipelex.config` imports it and the inference layer imports `pipelex.config` — a module-level import there would drag the interpreter back into every inference closure. The placement itself is unfixed.
-- `pipelex/core/**` is not yet in the low layer. Five `core/` modules reach for `get_concept_library` / `get_native_concept` / `get_required_concept` / `get_required_pipe`; converting them to take resolved concepts and pipes as arguments is design work, not a mechanical move. The low layer widens to include `core/` only when that lands.
+- `core/`'s Pipe-touching half — `pipe_abstract`, `pipe_blueprint`, `pipe_factory`, `pipes/rendering/`, `bundles/`, `interpreter/`, `registry_models` — imports the interpreter directly. That is not an inversion to fix but a fact about what a pipe is (see [Where core splits](#where-core-splits)); it is listed here only so nobody re-reads the low-layer declaration as an oversight. Three of those modules import `method_hub` on purpose, to inject downward.
 - Broader measured inversions, out of scope for the hub boundary: `cogt → core`, `system → cogt`, `plugins → runtime_bridge`, and `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. What remains of `tools → cogt` is `tools/pdf/pypdfium2_renderer.py` reaching for `cogt.extract` and `cogt.image` types; the templating half of that cluster is gone (see [Placement, not coupling](#placement-not-coupling)).
 
 ## For consumers outside this repo

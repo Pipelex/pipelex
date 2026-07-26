@@ -5,9 +5,9 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
-from pipelex.core.pipes.output.output_renderer import render_output
+from pipelex.core.pipes.rendering.output_renderer import render_output
 
-GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.output.output_renderer.get_required_pipe"
+GET_REQUIRED_PIPE_TARGET = "pipelex.core.pipes.rendering.output_renderer.get_required_pipe"
 
 
 def _make_anything_condition_pipe(mocker: MockerFixture, mapped_pipe_code: str) -> Any:

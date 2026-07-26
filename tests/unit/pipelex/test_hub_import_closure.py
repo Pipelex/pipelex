@@ -19,10 +19,20 @@ import textwrap
 
 import pytest
 
-#: Entry points that must never load the interpreter: the inference layer, and the low hub itself.
+#: Entry points that must never load the interpreter: the inference layer, the low hub itself, and the
+#: heaviest module of each low-layer `core/` package — the ones that historically reached for a library
+#: and now take a `ConceptProviderAbstract` instead. `core/`'s Pipe-touching remainder is deliberately
+#: absent; it names the interpreter's own object and is high by construction (see the guard's
+#: `LOW_LAYER_PACKAGES` note).
 LOW_LAYER_ENTRY_POINTS = [
     "pipelex.cogt.content_generation.content_generator",
     "pipelex.service_hub",
+    "pipelex.core.concepts.structure_generation.generator",
+    "pipelex.core.memory.input_shaper",
+    "pipelex.core.memory.working_memory_factory",
+    "pipelex.core.pipes.inputs.input_stuff_specs_factory",
+    "pipelex.core.pipes.stuff_spec.stuff_spec_factory",
+    "pipelex.core.stuffs.stuff_factory",
 ]
 
 _CLOSURE_SCRIPT = textwrap.dedent(

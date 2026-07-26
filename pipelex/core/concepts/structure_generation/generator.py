@@ -6,10 +6,10 @@ from typing import Any, List, Literal, Optional, cast
 
 from pydantic import Field
 
-from pipelex.codegen.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, ResolvedTypeKind, resolve_structure_fields
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.stuff_content import StuffContent

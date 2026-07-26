@@ -18,8 +18,8 @@ from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.crate_loading import load_normalized_crate_or_exit
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.core.pipes.inputs.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.method_hub import get_required_pipe
