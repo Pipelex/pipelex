@@ -38,13 +38,13 @@ from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
-from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.system.configuration.configs import PipelineExecutionConfig
+from pipelex.system.job_metadata import JobMetadata, OtelContext
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-    from pipelex.graph.trace_context import TraceContext
+    from pipelex.system.trace_context import TraceContext
 
 
 def acquire_library(

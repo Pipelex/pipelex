@@ -3,8 +3,9 @@
 import pytest
 
 from pipelex.config import get_config
-from pipelex.graph.graph_config import DataInclusionConfig, GraphConfig
-from pipelex.graph.trace_context import TraceContext
+from pipelex.graph.graph_config import GraphConfig
+from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.trace_context import TraceContext
 
 
 def make_defaulted_data_inclusion_config(

@@ -26,7 +26,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 def _dry_object_assignment() -> ObjectAssignment:

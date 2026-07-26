@@ -6,11 +6,11 @@ silent corruption (coroutine objects rendered as strings instead of actual conte
 
 import pytest
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_filters import tag as async_tag_filter
 from pipelex.tools.jinja2.jinja2_filters import text_format as async_text_format_filter
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 CATEGORIES_WITH_ASYNC_FILTERS = [
     TemplateCategory.BASIC,

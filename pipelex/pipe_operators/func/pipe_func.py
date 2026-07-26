@@ -18,8 +18,8 @@ from pipelex.method_hub import get_pipe_func_executor
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_class_registry
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
 

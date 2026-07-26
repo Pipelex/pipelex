@@ -3,8 +3,8 @@ import pytest
 from pipelex import log, pretty_print
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_img_gen_worker
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 

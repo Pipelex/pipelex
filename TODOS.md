@@ -2,25 +2,27 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **CHECKPOINT H-2 reached** — branch `refactor/Hub`, not pushed.
+**Status:** **CHECKPOINT H-3 reached** — branch `refactor/Hub`, not pushed.
 
-Phases 0, 1 and 2 are complete: the split is landed, the headline property is measured at **0 interpreter modules**, and the boundary is now mechanically enforced by `make check-hub-layering` plus a subprocess import-closure test. **Phase 3 (the placement residue) is next** — and unlike Phases 1 and 2 it is genuinely optional: both of its items are types living in the wrong package, and "explicitly deferred with a recorded rationale" is a sanctioned outcome.
+Phases 0 through 3 are complete: the split is landed, the headline property is measured at **0 interpreter modules**, the boundary is mechanically enforced by `make check-hub-layering` plus a subprocess import-closure test, and the two misplaced type clusters are moved (`cogt → pipeline` is now 0 statements; `tools → cogt` is down to 3). **Phase 4 (`core/` joins the low layer) is next** — it is the only remaining phase, and unlike Phase 3 it is real design work, not a `git mv`.
 
 ### Cold start — read in this order
 
 1. [The one rule](#the-one-rule) and [Symbol partition](#symbol-partition) — the settled boundary.
-2. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
-3. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
-4. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary, now including the enforcement it describes.
-5. Then start at [Phase 3](#phase-3--the-placement-residue).
+2. [Checkpoint H-3 record](#checkpoint-h-3-record) — the two type moves, why `TraceContext` had to travel with `JobMetadata`, and why the templating primitives split across two packages.
+3. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
+4. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
+5. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary, including enforcement and the "Placement, not coupling" record of Phase 3.
+6. Then start at [Phase 4](#phase-4--core-joins-the-low-layer).
 
-Gates at H-2: `make agent-check` ✅ (pyright 0 errors, mypy 2,352 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened — `cli-docs` excludes `pipelex/cli/dev_cli/**`).
+Gates at H-3: `make agent-check` ✅ (pyright 0 errors, mypy 2,354 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened).
 
-Three notes for whoever picks this up:
+Four notes for whoever picks this up:
 
-- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first (see [Still open at H-1](#still-open-at-h-1)). The guard now enforces that the module stays gone, which makes the missing release note the only loose end on that front.
+- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first, and note that **Phase 3 added more breaking module moves** to announce (see [Cross-repo impact added by Phase 3](#cross-repo-impact-added-by-phase-3)). The guard enforces that `pipelex.hub` stays gone, which makes the missing release note the only loose end on that front.
 - **One decision is waiting on Louis**: whether to add a `hub-layering-convention` drift contract. It was built and reverted on purpose — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so).
 - **Phase 4 widens the guard's low layer** to include `pipelex/core/**`. That is a one-line change to `LOW_LAYER_PACKAGES` in `hub_layering_guard.py`, and the guard will tell you immediately whether 4.1 is actually finished.
+- **Phase 4 also has a measurable second prize**: `core.pipes.pipe_output → pipeline.pipeline_models` is one of the two edges still pulling non-inference modules into the inference closure. Fixing 4.1 should take it out.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub-split-refactor.md`](wip/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
@@ -310,14 +312,91 @@ A `hub-layering-convention` drift contract (triggers: the guard + both hub modul
 - `docs/contribute/hub-layering.md` — the "Enforcement" section was rewritten from "a guard is the next step" to the shipped two-rule specification: what each rule checks, why the string half is the load-bearing one, both carve-outs, the `tests/` scoping, and the rule-vs-property split.
 - `docs/under-the-hood/architecture-overview.md` — one sentence stating the boundary is mechanically enforced rather than held up by review.
 
-### Phase 3 — the placement residue
+### Phase 3 — the placement residue ✅
 
-Neither item is coupling; both are types living in the wrong package, and each is independently correct.
+Neither item was coupling; both were types living in the wrong package, and each was independently correct. Both are **resolved by moving the type**, not by adding indirection — no resolver slot, no protocol, no `TYPE_CHECKING` deferral was needed for either.
 
-- [ ] 3.1 **`JobMetadata`.** Lives in `pipelex/pipeline/job_metadata.py` but is an argument to essentially every cogt call — it accounts for 17 of the 18 `cogt → pipeline` import statements, and drags `graph.trace_context` → `graph.graph_config` into every closure that touches inference. Move it, and decide whether `trace_context` moves with it or stops depending on `graph_config`. Also move `JobMetadataError` out of `pipeline/exceptions.py` — the sole remaining `cogt → pipeline` edge, in `llm_worker_abstract.py`.
-- [ ] 3.2 **`cogt.templating.*`.** `TemplateCategory`, `TemplatingStyle`, `TextFormat`, and `TagStyle` are imported by eight `tools/jinja2/` and `tools/mermaid/` modules — templating primitives sitting under `cogt/`, making `tools` (the intended bottom layer) depend on `cogt`. Decide: move them down to `tools`, or accept `cogt` as below `tools` and document that.
+- [x] 3.1 **`JobMetadata`** → `pipelex/system/job_metadata.py` (with `JobCategory`, `UnitJobId`); `JobMetadataError` → `pipelex/system/exceptions.py`. `TraceContext` moved with it → `pipelex/system/trace_context.py`, and `DataInclusionConfig` moved down to `pipelex/system/data_inclusion_config.py` so `trace_context` no longer imports `graph_config`. **`cogt → pipeline` is now 0 statements.**
+- [x] 3.2 **`cogt.templating.*`** → moved down to `tools`. `TextFormat` / `TemplatingStyle` / `TagStyle` → `pipelex/tools/templating/`; `TemplateCategory` → `pipelex/tools/jinja2/`. **`tools → cogt` drops from 15 statements to 3** (the `tools/pdf` renderer only).
 
-**CHECKPOINT H-3** — placement residue resolved, or explicitly deferred with a recorded rationale.
+**CHECKPOINT H-3** — placement residue resolved.
+
+### Checkpoint H-3 record
+
+Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,354 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened).
+
+#### Measured after
+
+| | baseline | H-1 | **after H-3** |
+| --- | --- | --- | --- |
+| interpreter modules loaded by `cogt.content_generation.content_generator` | 50 | 0 | **0** ✅ |
+| pipelex modules loaded | 357 | 275 | **268** |
+| SLOC loaded | 29,193 | 21,186 | **20,304** |
+
+Cross-package import statements, the number Phase 3 was actually aimed at:
+
+| edge | before | after |
+| --- | --- | --- |
+| `cogt → pipeline` | 18 | **0** |
+| `tools → cogt` | 15 | **3** |
+| `graph → cogt` | 2 | **0** |
+| `reporting → graph` | 1 | **0** |
+| `system → graph` | 1 | 1 (by design — see below) |
+
+The module/SLOC rows moved only a little because the fat edge was never `cogt → pipeline` alone. Two edges still pull `graph` and `pipeline` modules into the inference closure, and **both are out of Phase 3's scope by construction**:
+
+- `system.configuration.configs → graph.graph_config` (→ `mermaid_config`, `reactflow_config`): the main config model must name every subconfig, and the repo's convention is that submodels live in their own sub-packages. This is inherent to the one-big-config design, not a layering defect. It is the surviving `system → graph` edge.
+- `core.pipes.pipe_output → pipeline.pipeline_models`: a `core → pipeline` edge, which is **Phase 4 territory**.
+
+Together they account for the 7 `graph.*` and 2 `pipeline.*` modules still in the closure. Do not chase them here.
+
+#### 3.1 — where things landed, and why
+
+`JobMetadata` had to go somewhere `cogt` may import, which means a declared low-layer package. `pipelex/system/` is that package and it already houses `telemetry/otel_context.py` — the sibling transport `JobMetadata` carries alongside `TraceContext`.
+
+`TraceContext` moved **with** it rather than staying in `graph/`. Leaving it would only have renamed the inversion: `system/job_metadata.py → pipelex.graph.trace_context` is a `system → graph` edge, exactly the direction being removed. Its one graph dependency was `DataInclusionConfig`, so that class moved down to `pipelex/system/data_inclusion_config.py` and `graph_config.py` now imports it from there. **The TOML shape is unchanged** — the key is still `[pipelex.pipeline_execution_config.graph_config.data_inclusion]`; only the Python class's home moved. `pipelex.system.trace_context` now has a leaf closure: no `graph`, no `pipeline`.
+
+Two homes were considered and rejected for `TraceContext`: `pipelex/tracing/` (would have created a `system ⇄ tracing` package cycle, since `tracing → system` already exists) and `pipelex/system/telemetry/` (that package is OTel + PostHog; `TraceContext` is the pipelex-native node-tree transport, and conflating them would mislead).
+
+#### 3.2 — why the templating primitives split across two packages
+
+None of the three moved modules named anything from `cogt`, so this was pure misfiling. But they could not all land in one new package:
+
+- `TextFormat`, `TemplatingStyle`, `TagStyle` → `pipelex/tools/templating/`. That package imports nothing from `pipelex` beyond its own sibling — a genuine leaf.
+- `TemplateCategory` → `pipelex/tools/jinja2/`, because its entire payload is a map of jinja2 filters (`jinja2_filters`, `jinja2_models`, `jinja2_with_images_filter`). Filing it in `tools/templating/` would have made that package import `tools/jinja2` while `tools/jinja2` imports it back — a cycle inside one layer. As placed, the edges run one way: `tools/mermaid → tools/jinja2 → tools/templating`.
+
+What stays in `cogt/templating/` — `TemplateBlueprint`, the sigil preprocessor, `template_rendering` — belongs there: a blueprint is language-layer, and the rest imports `tools/jinja2` downward.
+
+#### Housekeeping done at H-3
+
+- **Subject grant migrated**: `pipelex/graph/trace_context.py::TraceContext.copy_for_child` → `pipelex/system/trace_context.py::…`. Recorded **before** running any check, per the `fko`-silently-rewrites warning in `CLAUDE.md`. No grants existed for the moved templating modules (the two that do, on `template_preprocessor` / `template_rendering`, did not move).
+- **Tests**: `tests/unit/pipelex/pipeline/test_job_metadata_request_id.py` → `tests/unit/pipelex/system/` (self-contained, so the move is free). The two `TraceContext` test modules **stayed** in `tests/unit/pipelex/graph/` — they consume `make_trace_context` and the `data_inclusion_config` / `graph_config` fixtures from that directory's `conftest.py`, which the graph tests use heavily. Splitting the fixture module to mirror the source move would cost more than the tidiness is worth.
+- **Docs**: `docs/contribute/hub-layering.md` gained a "Placement, not coupling" section recording both moves and the generalizable lesson, and its "Known inversions" bullet was corrected (`tools → cogt` is now the pdf renderer only). `docs/under-the-hood/execution-graph-tracing.md`'s file-reference table was updated for the two moved modules.
+- **`make cleanderived` deletes `tests/integration/pipelex/fixtures/_generated_model_sets.py`**, and pyright then fails on 12 unresolved-import errors that have nothing to do with your change. `make regenerate-test-models-quiet` restores it. Worth knowing before debugging a phantom failure.
+
+#### Cross-repo impact added by Phase 3
+
+These are **new** breakages on top of the `pipelex.hub` split, and they land in the same release-gated sweep:
+
+| repo | files touched by the Phase 3 moves |
+| --- | --- |
+| `pipelex-temporal/` (private) | 22 |
+| `pipelex-mistralai-workflows/` | 6 |
+| `pipelex-api/` | 1 |
+
+The import lines to rewrite, in full:
+
+| old | new |
+| --- | --- |
+| `pipelex.pipeline.job_metadata` | `pipelex.system.job_metadata` |
+| `pipelex.graph.trace_context` | `pipelex.system.trace_context` |
+| `pipelex.graph.graph_config import DataInclusionConfig` | `pipelex.system.data_inclusion_config import DataInclusionConfig` |
+| `pipelex.pipeline.exceptions import JobMetadataError` | `pipelex.system.exceptions import JobMetadataError` |
+| `pipelex.cogt.templating.text_format` | `pipelex.tools.templating.text_format` |
+| `pipelex.cogt.templating.templating_style` | `pipelex.tools.templating.templating_style` |
+| `pipelex.cogt.templating.template_category` | `pipelex.tools.jinja2.template_category` |
+
+Clean (no action): `pipelex-cookbook/`, `cocode/`, `pipelex-worker/`, `pipelex-starter-python/`, `pipelex-relay/`, `sandbox/`.
 
 ### Phase 4 — `core/` joins the low layer
 
@@ -389,10 +468,12 @@ Symbols crossing the repo boundary today, which is the surface whose new home is
 
 Two notes on that list: `get_pipelex_hub` splits into two accessors, so every external site must pick a half; and `set_pipe_router` / `teardown_current_pipe_router` / `scoped_pipe_router` are documented as depended upon by our Mistral Workflows plugin, so their move is a contract change to announce, not just to make.
 
+**Phase 3 added a second wave of breakage to the same sweep** — the moved types, not the hub accessors. The per-repo counts and the complete old→new import table are in [Cross-repo impact added by Phase 3](#cross-repo-impact-added-by-phase-3). Do both waves in one pass per repo.
+
 ## Known inversions — not fixed here
 
 Named so the docs stay honest, not scheduled.
 
 - `plugins/pipe_func/pipe_func_plugin.py` and `plugins/pipe_func_executor_registry.py` import from `pipe_operators/`; `plugins/direct/direct_plugin.py` imports from `pipeline/`. None import the hub, so the guard will not flag them — but they mean "plugins is a low layer" is not yet unconditionally true. This is D3's underlying inversion.
-- A general layering ratchet ("no low module may import any high module", with an allowlist) is out of scope. The measured inversion set is real but larger than this change should carry: `tools → cogt` (15 statements), `cogt → core` (21), `system → cogt` (8), `plugins → runtime_bridge` (6), and one genuine wart — `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. Phase 3 removes the two biggest clusters; the general rule is a sequel worth considering once they are gone.
+- A general layering ratchet ("no low module may import any high module", with an allowlist) is out of scope. The measured inversion set is real but larger than this change should carry. **Re-measured at H-3**, after Phase 3 removed the two biggest clusters: `cogt → core` (21), `system → cogt` (7), `plugins → runtime_bridge` (6), `tools → cogt` (3 — the pdf renderer reaching for `cogt.extract` / `cogt.image` types, the same misfiling pattern Phase 3 fixed elsewhere), and one genuine wart — `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. `cogt → pipeline` (18) is gone. The general rule is now a more plausible sequel than it was at H-2.
 - Eager optional-SDK imports: `pipelex/tracing/event_log_factory.py` imports `dynamodb_event_log` at module level, which runs a module-level `try: import boto3`, so `boto3`/`botocore`/`jmespath`/`dateutil`/`six` load in every process that touches the tracing factory. A three-line fix (import `DynamoDBEventLog` inside the factory branch, the pattern already used for `pypdfium2` in `cogt/content_generation/render_generate.py`), entirely independent of this plan. Most other heavy roots (`posthog`, `pypdfium2`, `pillow`, `polyfactory`, `datamodel-code-generator`) are **base** dependencies, not extras — not the same kind of finding.

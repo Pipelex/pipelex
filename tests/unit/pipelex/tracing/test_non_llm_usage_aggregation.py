@@ -19,8 +19,8 @@ from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.reporting.reporting_types import AnyTokensUsage
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tracing.trace_events import UsageReportEvent
 from pipelex.tracing.usage_aggregator import UsageAggregator
 

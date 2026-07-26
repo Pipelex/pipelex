@@ -4,12 +4,12 @@ from datetime import datetime
 from typing import Any
 
 from pipelex import log
-from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, IOSpec, NodeKind
-from pipelex.graph.trace_context import TraceContext
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
+from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
 
 

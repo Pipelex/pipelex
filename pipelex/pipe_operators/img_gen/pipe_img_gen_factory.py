@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
@@ -12,6 +11,7 @@ from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPrompt
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 if TYPE_CHECKING:
     from pipelex.pipe_operators.shared.image_reference import ImageReference

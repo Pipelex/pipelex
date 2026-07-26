@@ -18,7 +18,7 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 @pytest.mark.dry_runnable

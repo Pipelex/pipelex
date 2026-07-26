@@ -7,7 +7,6 @@ from pydantic import Field, field_validator, model_validator
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
-from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -17,6 +16,7 @@ from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class ConfigPaths:

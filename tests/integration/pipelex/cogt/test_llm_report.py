@@ -6,8 +6,8 @@ from pipelex import pretty_print
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_llm_worker, get_model_deck
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 

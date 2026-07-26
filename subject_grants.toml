@@ -3456,10 +3456,6 @@ rationale = "Verb-object: renders the graph spec to HTML; options stay keyword."
 param = "graphspec"
 rationale = "Verb-object: renders the graph spec to HTML; options stay keyword."
 
-["pipelex/graph/trace_context.py::TraceContext.copy_for_child"]
-param = "child_node_id"
-rationale = "Verb-object: copies the context for the child node; sequence stays keyword."
-
 ["pipelex/graph/validation.py::_validate_edge_references"]
 param = "graph"
 rationale = "Verb-object: validates the graph; single operand."
@@ -5743,6 +5739,10 @@ rationale = "Positional Callable protocol: replaces client.capture_exception, in
 ["pipelex/system/telemetry/telemetry_manager_abstract.py::TelemetryManagerAbstract.track_event"]
 param = "event_name"
 rationale = "Verb-object: tracks the event named; properties stay keyword."
+
+["pipelex/system/trace_context.py::TraceContext.copy_for_child"]
+param = "child_node_id"
+rationale = "Verb-object: copies the context for the child node; sequence stays keyword."
 
 ["pipelex/test_extras/shared_pytest_plugins.py::_cleanup_placeholder_env_vars"]
 param = "env_var_keys"

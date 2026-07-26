@@ -14,8 +14,8 @@ from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.pipeline.exceptions import JobMetadataError
-from pipelex.pipeline.job_metadata import UnitJobId
+from pipelex.system.exceptions import JobMetadataError
+from pipelex.system.job_metadata import UnitJobId
 from pipelex.system.telemetry.otel_constants import (
     GenAISpanAttr,
     LangfuseSpanAttr,

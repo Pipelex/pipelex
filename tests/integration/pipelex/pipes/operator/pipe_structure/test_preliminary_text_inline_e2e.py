@@ -17,8 +17,8 @@ from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_report_delegate
+from pipelex.system.job_metadata import JobMetadata
 
 
 def _count_llm_report_calls(report_spy: MockType) -> int:

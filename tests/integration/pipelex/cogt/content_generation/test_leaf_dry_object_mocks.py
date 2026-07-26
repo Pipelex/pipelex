@@ -28,7 +28,7 @@ from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.config import get_config
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.content_generation.test_data import ConstrainedName
 
 

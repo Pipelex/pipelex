@@ -13,8 +13,8 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
 from pipelex.tracing.trace_events import UsageReportEvent
 

@@ -12,9 +12,9 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.search.search_setting import SearchSetting
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
 class LLMAssignment(BaseModel):

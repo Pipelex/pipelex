@@ -16,7 +16,7 @@ from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFunc
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 # A method whose ONLY custom source is the PipeFunc — its output structure (Greeting) is a concept
 # declared in the .mthds, NOT a shipped .py. The box must regenerate `structures.py` from the crate's

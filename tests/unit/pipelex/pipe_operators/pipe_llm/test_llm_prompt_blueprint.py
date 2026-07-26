@@ -1,6 +1,6 @@
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class TestLLMPromptBlueprintRequiredVariables:

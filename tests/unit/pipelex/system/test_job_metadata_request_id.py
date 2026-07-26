@@ -5,7 +5,7 @@ that rides the workflow input across the Temporal serialization boundary.
 import pytest
 from pydantic import ValidationError
 
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 class TestJobMetadataRequestId:

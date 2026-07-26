@@ -25,7 +25,7 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.execution_seams import prepare_pipe_job
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 
 _DOMAIN_CODE = "test_optionals_seq"

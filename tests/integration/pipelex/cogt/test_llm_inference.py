@@ -7,8 +7,8 @@ from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_inference_manager
+from pipelex.system.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestConstants, LLMVisionTestCases, Person
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 

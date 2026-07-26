@@ -9,8 +9,8 @@ from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbst
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.job_metadata import UnitJobId
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 

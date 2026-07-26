@@ -3,9 +3,9 @@ from typing import Any, Protocol
 
 from typing_extensions import override
 
-from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, GraphSpecMode, IOSpec, NodeKind
-from pipelex.graph.trace_context import TraceContext
+from pipelex.system.data_inclusion_config import DataInclusionConfig
+from pipelex.system.trace_context import TraceContext
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
 

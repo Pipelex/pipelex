@@ -1,8 +1,8 @@
 import jinja2
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateSyntaxError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 def check_jinja2_parsing(

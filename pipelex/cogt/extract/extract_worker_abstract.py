@@ -10,8 +10,8 @@ from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.job_metadata import UnitJobId
 
 
 class ExtractWorkerAbstract(InferenceWorkerAbstract):

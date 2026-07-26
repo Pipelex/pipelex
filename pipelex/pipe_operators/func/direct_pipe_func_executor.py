@@ -22,8 +22,8 @@ from pipelex.pipe_operators.func.exceptions import PipeFuncExecutionError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult, PipeFuncExecutorProtocol
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.primitives.rehydration import rehydrate_library_and_memory
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils

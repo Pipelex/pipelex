@@ -7,12 +7,12 @@ injection, consistent with mermaid rendering.
 
 import json
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.standalone_assets import ELKJS, MTHDS_UI_CSS, MTHDS_UI_JS
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 _REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
 

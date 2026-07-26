@@ -520,7 +520,8 @@ validate_graphspec(graph_spec)
 | `pipelex/graph/graph_tracer.py` | GraphTracer implementation |
 | `pipelex/graph/graph_tracer_manager.py` | Singleton manager for tracers |
 | `pipelex/graph/graph_tracer_protocol.py` | Protocol + NoOp implementation |
-| `pipelex/graph/trace_context.py` | Serializable tracing context |
+| `pipelex/system/trace_context.py` | Serializable tracing context — sits below `graph/` because it rides in every job's metadata |
+| `pipelex/system/data_inclusion_config.py` | Data-capture flags carried by the trace context, surfaced in the TOML under `graph_config.data_inclusion` |
 | `pipelex/graph/graph_analysis.py` | Pre-computed graph analysis |
 | `pipelex/graph/graph_factory.py` | Output generation factory |
 | `pipelex/graph/graph_config.py` | Configuration models |

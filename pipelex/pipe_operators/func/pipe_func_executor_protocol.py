@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 if TYPE_CHECKING:
     # Import from the LEAF dtos module (not the transport builder module, which reaches the hub) so the

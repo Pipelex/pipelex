@@ -5,8 +5,8 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_extract_worker
+from pipelex.system.job_metadata import JobMetadata
 from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 

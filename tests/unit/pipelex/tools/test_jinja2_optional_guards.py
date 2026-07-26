@@ -6,8 +6,8 @@ walker reports each unguarded reference so validation can name the precise fix.
 
 import pytest
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_optional_guards import detect_unguarded_optional_references
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class TestDetectUnguardedOptionalReferences:

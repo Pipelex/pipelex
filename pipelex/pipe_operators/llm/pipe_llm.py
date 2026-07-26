@@ -38,8 +38,8 @@ from pipelex.pipe_run.pipe_run_params import (
     PipeRunParams,
     output_multiplicity_to_apply,
 )
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 

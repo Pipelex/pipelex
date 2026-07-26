@@ -7,7 +7,6 @@ from pipelex.cogt.exceptions import LLMCompletionError
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -25,8 +24,9 @@ from pipelex.pipe_operators.llm.helpers import get_output_structure_prompt
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.service_hub import get_class_registry, get_content_generator, get_model_deck
+from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 
 class PipeStructureOutput(PipeOutput):

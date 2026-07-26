@@ -26,7 +26,7 @@ from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 
 
 def _make_continue_only_condition() -> PipeCondition:

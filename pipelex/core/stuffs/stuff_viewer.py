@@ -8,10 +8,10 @@ from typing import Any
 
 from kajson import dumps
 
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.pretty import PRETTY_WIDTH_FOR_EXPORT
 
 # Template registry key

@@ -1,8 +1,8 @@
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
-from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
+from pipelex.tools.jinja2.template_category import TemplateCategory
 
 PIPE_COMPOSE_WITHOUT_CATEGORY = (
     "pipe_compose_without_category",

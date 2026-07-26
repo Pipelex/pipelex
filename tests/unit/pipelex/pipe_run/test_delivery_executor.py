@@ -24,7 +24,7 @@ from pipelex.pipe_run.delivery_assignment import (
 )
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 
 

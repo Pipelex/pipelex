@@ -57,10 +57,6 @@ class PipeStackOverflowError(PipelexError):
         super().__init__(message)
 
 
-class JobMetadataError(PipelexUnexpectedError):
-    pass
-
-
 class PipelineManagerNotFoundError(PipelexError):
     pass
 

@@ -96,6 +96,23 @@ PY
 
 `interpreter modules` must print **0**. When it does not, the `offenders` list names the modules that leaked, and the shortest import path to one of them is what to fix. Swap the imported module to measure any other entry point.
 
+## Placement, not coupling
+
+Splitting the hub removes the *lookups* that crossed the boundary. It does not move a type that was simply filed in the wrong package — and a misfiled type drags its whole package into every closure that names it. Two were resolved this way; both are worth knowing as the pattern to apply to the next one.
+
+**`JobMetadata` moved to `pipelex/system/`.** It is an argument to essentially every `cogt` call, yet it lived in `pipelex/pipeline/` — which made `cogt → pipeline` the fattest remaining edge and pulled `graph.trace_context` into every closure that touched inference. `JobMetadata`, `JobCategory` and `UnitJobId` now live in `pipelex/system/job_metadata.py`, and `JobMetadataError` moved from `pipeline/exceptions.py` to `pipelex/system/exceptions.py`. `cogt → pipeline` is now **zero statements**.
+
+`TraceContext` moved with it, to `pipelex/system/trace_context.py`: it is the transport `JobMetadata` carries, so leaving it in `graph/` would only have renamed the inversion to `system → graph`. Its one dependency on the graph package — `DataInclusionConfig`, nested under `[...graph_config.data_inclusion]` in the TOML — moved down to `pipelex/system/data_inclusion_config.py`, which `graph_config.py` now imports. The TOML shape is unchanged; only the class's home moved, which is what keeps `trace_context` from re-importing `mermaid_config` and `reactflow_config` through `GraphConfig`.
+
+**The templating primitives moved down into `tools/`.** `TemplateCategory`, `TemplatingStyle`, `TagStyle` and `TextFormat` sat under `cogt/templating/` while eight `tools/jinja2/` and `tools/mermaid/` modules imported them — so `tools`, the intended bottom layer, depended on `cogt`. None of the three modules holding them named anything from `cogt`, so this was pure misfiling:
+
+- `TextFormat` and `TemplatingStyle` / `TagStyle` → `pipelex/tools/templating/`, which imports nothing from `pipelex` beyond its own sibling. It is a leaf.
+- `TemplateCategory` → `pipelex/tools/jinja2/`, because its entire payload is a map of jinja2 filters. Filing it in `tools/templating/` would have made that package import `tools/jinja2` while `tools/jinja2` imports it back — a cycle inside one layer. As placed, the edges run one way: `tools/mermaid → tools/jinja2 → tools/templating`.
+
+What stays in `cogt/templating/` — `TemplateBlueprint`, the sigil preprocessor, the rendering entrypoint — belongs there: a blueprint is language-layer, and the rest imports `tools/jinja2` downward.
+
+The lesson generalizes: when a low-layer package imports a high one, check whether the *type* is misplaced before designing an indirection. Neither of these needed a resolver slot or a protocol — only a `git mv` and an import rewrite.
+
 ## The class-registry exception
 
 `get_class_registry` is the one low-layer accessor that is *not* implemented in `service_hub`. Its implementation lives in `pipelex/system/registries/class_registry_access.py`, and `pipelex.service_hub.get_class_registry` delegates to it.
@@ -155,7 +172,7 @@ Named so this document stays honest. None of these import a hub, so a hub-import
 
 - `plugins/pipe_func/pipe_func_plugin.py` and `plugins/pipe_func_executor_registry.py` are typed by protocols from `pipe_operators/`; `plugins/direct/direct_plugin.py` imports from `pipeline/`. `pipe_func_executor_registry` defers its import under `TYPE_CHECKING` precisely because `pipelex.config` imports it and the inference layer imports `pipelex.config` — a module-level import there would drag the interpreter back into every inference closure. The placement itself is unfixed.
 - `pipelex/core/**` is not yet in the low layer. Five `core/` modules reach for `get_concept_library` / `get_native_concept` / `get_required_concept` / `get_required_pipe`; converting them to take resolved concepts and pipes as arguments is design work, not a mechanical move. The low layer widens to include `core/` only when that lands.
-- Broader measured inversions, out of scope for the hub boundary: `tools → cogt`, `cogt → core`, `system → cogt`, `plugins → runtime_bridge`, and `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`.
+- Broader measured inversions, out of scope for the hub boundary: `cogt → core`, `system → cogt`, `plugins → runtime_bridge`, and `cogt/model_backends/model_lists.py` importing `pipelex.cli.exceptions.PipelexCLIError`. What remains of `tools → cogt` is `tools/pdf/pypdfium2_renderer.py` reaching for `cogt.extract` and `cogt.image` types; the templating half of that cluster is gone (see [Placement, not coupling](#placement-not-coupling)).
 
 ## For consumers outside this repo
 

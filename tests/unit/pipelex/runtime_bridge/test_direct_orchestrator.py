@@ -4,9 +4,9 @@ import pytest
 
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.runtime_bridge.direct_orchestrator import DirectOrchestrator
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
+from pipelex.system.job_metadata import JobMetadata
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract

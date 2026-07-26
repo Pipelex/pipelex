@@ -9,7 +9,7 @@ from pytest_mock import MockerFixture
 from pipelex import log
 from pipelex.method_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipelex_service.pipelex_service_config import (
     PipelexServiceConfig,
 )
