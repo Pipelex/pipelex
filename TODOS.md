@@ -2,11 +2,11 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **ALL PHASES CODE-COMPLETE — CHECKPOINT H-4, paused mid-gates.** Branch `refactor/Hub`, not pushed. **Jump to [⏸ Resume here](#-resume-here-h-4-is-code-complete-two-gates-outstanding) first** — `make agent-test` needs re-running and two drift contracts are open by design.
+**Status:** **ALL PHASES DONE — CHECKPOINT H-4 CLOSED, all gates green.** Branch `refactor/Hub`, not pushed. **Jump to [▶ Resume here](#-resume-here-h-4-is-closed-the-rename-is-next) first** — the next piece of work is the settled runtime/interpreter rename.
 
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the low layer behind injected providers. Every low-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written.
 
-**What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (now three waves) and one open decision for Louis (the drift contract).
+**What is left is not a phase** — it is the settled [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md), then the release-gated [cross-repo sweep](#cross-repo-sweep) (now three waves), plus one open decision for Louis (the drift contract).
 
 ### Cold start — read in this order
 
@@ -408,40 +408,20 @@ Clean (no action): `pipelex-cookbook/`, `cocode/`, `pipelex-worker/`, `pipelex-s
 
 ### Checkpoint H-4 record
 
-Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,356 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ⏳ **not yet confirmed** · `make drift-check` ❌ **two contracts open** — see [Resume here](#-resume-here-h-4-is-code-complete-two-gates-outstanding).
+Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,356 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite, no test edits beyond the mechanical ones recorded below) · `make drift-check` ✅ (both contracts reviewed and acked — see below).
 
-## ⏸ Resume here — H-4 is code-complete, two gates outstanding
+## ▶ Resume here — H-4 is closed; the rename is next
 
-Everything in the Phase 4 record below is **written and committed**. `make agent-check` is green. Two things were deliberately **not** done before pausing:
+All four phases are landed and **all three gates are green**. The two contracts that were left open on purpose at the pause were reviewed and acked:
 
-**1. `make agent-test` was still running when the session ended.** Re-run it. Targeted paths if you want a faster first signal (per `tests/CLAUDE.md`, this change spans `core/`, `pipeline/`, `cli/` and root modules, so the full suite is the correct gate before any push):
+- **`config-docs` — clean-pass.** The only trigger change was one import line in `configs.py` (`TemplatingStyle` moving `cogt.templating` → `tools.templating`, the Phase 3 placement fix); every other trigger file was byte-identical. No config field, default, validator, or TOML key moved. `docs/configuration/` documents no import path, and every Python path the docs *do* cite still resolves.
+- **`cli-docs` — clean-pass.** All 10 triggers changed by exactly one import line each (the Phase 4 renderer regroup). Verified against the **live CLI** rather than by reading alone — `pipelex build inputs pipe`, `pipelex build output pipe`, `pipelex-agent inputs pipe` — arguments, flags, format values and defaults all match `docs/tools/cli/`. The behavior-adjacent half of Phase 4 was checked too: no CLI doc cites a Python import path or calls a factory that gained a required `concept_provider`, and the runner codegen emits none. `agent_cli/CLAUDE.md`'s layout map lists only `agent_cli`'s own modules, none of which moved.
 
-```bash
-make agent-test
-```
+Also swept `docs/` and `wip/` for stale references to the H-4 moves (`core.pipes.output.*`, `codegen.resolved_fields`, `core.pipes.inputs.input_renderer`): every remaining hit is intentional historical prose in `hub-layering.md` or this tracker.
 
-The realistic failure mode is a call site the AST fixer missed in a way pyright cannot see — a `mocker.patch` string target, or a test calling one of the converted factories through `getattr`. Both pyright passes are clean (`pipelex/` and `tests/`, 0 errors), and the guard + closure + hub-lifecycle tests pass, so anything that fails will be behavioral, not structural.
+**One observation is worth carrying forward, because it is now a pattern rather than an anecdote.** This refactor opened **four contracts across three different ids**, and every one of them was import-path churn. The narrowing proposed in the earlier `config-docs` dogfood entry (scope the trigger to files that define settings) would **not** have prevented today's opening — `configs.py` is squarely inside that narrowed set. The mechanism that would prevent all four is a content-aware digest that ignores changes confined to import statements (and, for `keyword-only-convention`, to comments/docstrings): one manifest-wide change instead of three separate glob surgeries. Recorded in `wip/drift-contracts/dogfood-log.md` as the thing to weigh before any per-contract narrowing — it is evidence for the pilot's keep/narrow/mechanize verdict, not a change to make now.
 
-**2. Two drift contracts are open and were left open on purpose** (the user asked to pause before fixing them):
-
-- **`config-docs`** — trigger: `pipelex/system/configuration/configs.py`. Review target: `docs/configuration/**/*.md`. Verify command: `make tb`.
-- **`cli-docs`** — triggers: 10 CLI modules under `pipelex/cli/` (the `build`/`codegen`/`agent_cli` inputs+output command cores). Review targets: `docs/tools/cli/`, `pipelex/cli/agent_cli/CLAUDE.md`.
-
-Use the `drift-review` skill (it performs the review and records the mandatory dogfood observation). **Do the review for real** — do not assume it is import-path-only this time, because unlike H-1 this phase *did* change behavior-adjacent things. Specifically check:
-
-- `config-docs`: `configs.py` changed only via the `resolved_fields` / type-move import swaps as far as this session saw — but confirm no config model field, default, or TOML key moved before acking that.
-- `cli-docs`: the 10 CLI modules changed because `input_renderer` / `output_renderer` moved to `pipelex.core.pipes.rendering`. That is an import path, **not** a command name, flag, help string, or exit code — but verify against `docs/tools/cli/` rather than asserting it. The prior acks for both contracts (quoted in `make drift-plan` output) are good models for the depth of review expected.
-
-Then:
-
-```bash
-make drift-plan
-# review, fix what is stale, git add the trigger files
-make drift-ack CONTRACT=config-docs RATIONALE="…"
-make drift-ack CONTRACT=cli-docs RATIONALE="…"
-```
-
-After both gates are green, H-4 is fully closed. **Then do the rename** — [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md), as its own commit, before the release and before the cross-repo sweep. After that the branch is ready for a PR to `dev`, and the only things outstanding are the release-gated cross-repo sweep (which the rename retargets to the final names) and Louis' drift-contract decision.
+**Next: the rename** — [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md), as its own commit, before the release and before the cross-repo sweep. That ordering is load-bearing: the sweep must rewrite external repos exactly once, straight to the final names. After the rename the branch is ready for a PR to `dev`, and the only things outstanding are the release-gated cross-repo sweep (which the rename retargets) and Louis' drift-contract decision.
 
 #### The plan's premise was wrong: `core/` is two layers
 

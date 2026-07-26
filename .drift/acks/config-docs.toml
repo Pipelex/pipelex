@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:63676f638a8c0c7fa4f7857dd8f43d70759fcb04aceb734b693e5cb103a1427d"
+digest = "sha256:ca490d789c451b17029be3af8ea0d000ba92b150f2062be59bcac6c0abea3507"
 reviewed_by = "Claude (Opus 5)"
-reviewed_at = "2026-07-26T02:45:57Z"
-rationale = "Both triggers (config_check.py, aws_config.py) changed by exactly one line each — the pipelex.hub -> pipelex.service_hub import swap from the hub split. No config model field, setting, default, or TOML key changed (git diff --cached over pipelex/system/configuration/ shows only that import line). Read docs/configuration/: the only 'hub' occurrence is prose about the Model Deck being a 'configuration hub', unrelated to the DI hub, and no page documents an import path. Nothing to update."
+reviewed_at = "2026-07-26T09:05:18Z"
+rationale = "The only trigger change since the last ack is configs.py's TemplatingStyle import moving from pipelex.cogt.templating to pipelex.tools.templating (the Phase 3 placement fix) — one import line; no config field, default, validator or TOML key moved, verified by diffing configs.py against its acked blob, and every other trigger file is byte-identical. Read docs/configuration/: no page documents an import path, and every Python path the docs do cite (system.registries.func_registry, pipeline.runner, core.memory.working_memory, core.stuffs.text_content) still resolves on this branch. The pipe_func example in library-config.md uses only working_memory.get_stuff, which the Phase 4 concept_provider injection did not touch. Nothing to update."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:fca7b96f9147122b6b8300471cac637b05fed1ee"
@@ -13,7 +13,7 @@ rationale = "Both triggers (config_check.py, aws_config.py) changed by exactly o
 "pipelex/system/configuration/config_loader.py" = "blob:af3ba71ed4e589cec42cb197d7d11539cea50ecd"
 "pipelex/system/configuration/config_model.py" = "blob:83b29dc6e93393c9b98c4353636caf0135c80339"
 "pipelex/system/configuration/config_root.py" = "blob:c7d43851270912d17413cfc6a511247d3c7cc160"
-"pipelex/system/configuration/configs.py" = "blob:281f0674f4403d636ad4a99d1954004849939157"
+"pipelex/system/configuration/configs.py" = "blob:99c936343aab7bcd4dee78631164ef10a32ebfe9"
 "pipelex/system/configuration/pipe_func_config.py" = "blob:df1cbd3698d51c96d8fa8a8c6fdf1c6be57e5771"
 "pipelex/system/telemetry/telemetry_config.py" = "blob:b6912e8be8932b65213dab23ac66372b8b45ca58"
 "pipelex/tools/aws/aws_config.py" = "blob:0a223f55aca0545f521cd7ca23326b917ddd2073"
