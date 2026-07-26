@@ -6,7 +6,7 @@
 
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
-**What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (three waves), plus one open decision for Louis (the drift contract).
+**What is left is not a phase** — it is the release-gated [cross-repo sweep](#cross-repo-sweep) (three waves). Nothing else is open.
 
 ### Cold start — read in this order
 
@@ -20,7 +20,7 @@ The split is landed, the boundary is mechanically enforced (`make check-hub-laye
 Three notes for whoever picks this up:
 
 - **The cross-repo sweep is the only substantial work remaining, and it is release-gated.** Three waves now: the `pipelex.hub` split ([table](#cross-repo-sweep)), the Phase 3 type moves ([table](#cross-repo-impact-added-by-phase-3)), and the Phase 4 moves + signature changes ([table](#cross-repo-impact-added-by-phase-4)). Do all three in one pass per repo.
-- **One decision is waiting on Louis**: whether to add a `hub-layering-convention` drift contract. It was built and reverted on purpose — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so).
+- **The `hub-layering-convention` drift contract is now in the manifest.** Louis gave explicit say-so; it was added, reviewed, and acked — see [Proposed, reverted, then landed](#proposed-reverted-then-landed).
 - **`core.pipes.pipe_output → pipeline.pipeline_models` was NOT removed.** H-3 predicted Phase 4 would take it out; it did not, because `pipe_output` is on the Pipe-touching (high) side of the core split and was never converted. It remains one of the two edges pulling non-inference modules into the inference closure, which is why the module/SLOC rows are flat at H-4.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub/hub-split-refactor.md`](wip/hub/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
@@ -306,9 +306,11 @@ Both forms were injected into a real low-layer module (`cogt/content_generation/
 - **The CI aggregator gates on an explicit bash result check, not on `needs`.** Adding `lint-hub-layering` to `lint-all`'s `needs` list is *not* enough — `if: always()` means the aggregator runs regardless, and the `[ "${{ needs.<job>.result }}" != "success" ]` chain is what actually fails the build. Both were updated. A new lint job added without touching that chain would be silently advisory.
 - **A new job, not a step on `lint-keyword-only`.** Folding both AST guards into one job would have meant renaming it, and that job name may be a required status check — a rename silently un-requires it. The repo already runs one job per guard; this follows that.
 
-#### Proposed, then reverted, pending Louis' say-so
+#### Proposed, reverted, then landed
 
-A `hub-layering-convention` drift contract (triggers: the guard + both hub modules; review: `docs/contribute/hub-layering.md`) is the exact analogue of the existing `keyword-only-convention` contract, and it would mechanize the doc obligation Phase 4 already carries. It was added, confirmed to open correctly, then **reverted**: `.claude/skills/drift-review` states that during the pilot the manifest must not grow without the user's explicit say-so, because ack friction is the thing being measured. Left as a decision for Louis rather than a silent addition. Note that `cli-docs` legitimately did not fire on this work — it excludes `pipelex/cli/dev_cli/**`.
+A `hub-layering-convention` drift contract (triggers: the guard + both hub modules; review: `docs/contribute/hub-layering.md`) is the exact analogue of the existing `keyword-only-convention` contract, and it mechanizes the doc obligation Phase 4 and the rename both carried. It was added at H-2, confirmed to open correctly, then **reverted**: `.claude/skills/drift-review` states that during the pilot the manifest must not grow without the user's explicit say-so, because ack friction is the thing being measured. Left as a decision for Louis rather than a silent addition. Note that `cli-docs` legitimately did not fire on this work — it excludes `pipelex/cli/dev_cli/**`.
+
+**Louis approved it after the rename landed, and it is now in `drift.toml`, reviewed and acked.** It carries no verify command, matching `keyword-only-convention`: `check-hub-layering` already gates `make check` and CI, so re-running it before an ack would add the unstaged-file hard error without adding a guarantee. The initial review is mechanical and worth repeating rather than re-reading — extract every public module-level symbol from both hubs and confirm each appears in the doc's partition tables, then import `RUNTIME_LAYER_PACKAGES` from the guard and confirm every declared package is named under Enforcement. The closure test was deliberately left out of the triggers; it is the obvious first addition if the contract ever proves under-triggered.
 
 #### Docs updated
 
@@ -425,7 +427,7 @@ Also swept `docs/` and `wip/` for stale references to the H-4 moves (`core.pipes
 
 **One observation is worth carrying forward, because it is now a pattern rather than an anecdote.** This refactor opened **four contracts across three different ids**, and every one of them was import-path churn. The narrowing proposed in the earlier `config-docs` dogfood entry (scope the trigger to files that define settings) would **not** have prevented today's opening — `configs.py` is squarely inside that narrowed set. The mechanism that would prevent all four is a content-aware digest that ignores changes confined to import statements (and, for `keyword-only-convention`, to comments/docstrings): one manifest-wide change instead of three separate glob surgeries. Recorded in `wip/drift-contracts/dogfood-log.md` as the thing to weigh before any per-contract narrowing — it is evidence for the pilot's keep/narrow/mechanize verdict, not a change to make now.
 
-**Next: the branch is ready for a PR to `dev`.** The only things outstanding are the release-gated cross-repo sweep (already retargeted to the final names) and Louis' drift-contract decision.
+**Next: the branch is ready for a PR to `dev`.** The only thing outstanding is the release-gated cross-repo sweep, already retargeted to the final names. Louis' drift-contract decision is resolved — `hub-layering-convention` is in the manifest, reviewed and acked.
 
 ### The runtime/interpreter rename — record
 
@@ -516,7 +518,7 @@ The inference-layer numbers are unchanged by design — Phase 4 widened *which* 
 #### Still open
 
 - **The cross-repo sweep is still untouched and release-gated.** It now has a **third** wave on top of the `pipelex.hub` split and the Phase 3 type moves — see [Cross-repo impact added by Phase 4](#cross-repo-impact-added-by-phase-4).
-- **The `hub-layering-convention` drift contract decision is still Louis'** — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so). Phase 4 rewrote `hub-layering.md` again, which is exactly the obligation that contract would have mechanized.
+- ~~**The `hub-layering-convention` drift contract decision is still Louis'**~~ — **resolved: approved and landed** after the rename. See [Proposed, reverted, then landed](#proposed-reverted-then-landed).
 - A plausible sequel, now much cheaper to argue for than at H-2: a general layering ratchet. The remaining measured inversions are in [Known inversions](#known-inversions-not-fixed-here).
 
 #### Cross-repo impact added by Phase 4

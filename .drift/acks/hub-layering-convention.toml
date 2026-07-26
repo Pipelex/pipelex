@@ -1,0 +1,10 @@
+contract = "hub-layering-convention"
+digest = "sha256:3c2ca3dc56ceb15fd4a30a7596de94ebb184e5ce4c57fb7cbb74af078b7e87e6"
+reviewed_by = "Claude (Opus 5)"
+reviewed_at = "2026-07-26T09:44:34Z"
+rationale = "Initial review establishing the baseline for a newly added contract (Louis gave explicit say-so to grow the manifest). Verified the doc against all three triggers mechanically, not by reading alone. (1) Symbol partition: extracted every public module-level symbol from both hubs — 33 on runtime_hub, 32 on interpreter_hub — and confirmed each appears in docs/contribute/hub-layering.md; zero undocumented accessors, so the two partition tables are complete. (2) Declared runtime layer: imported RUNTIME_LAYER_PACKAGES from the guard and confirmed all 11 packages are named in the doc's Enforcement section, including core's six data-model packages. (3) Carve-outs: the escape-hatch marker and the deleted-hub module path both appear. The guard's three HubLayeringViolationKind wire values are deliberately NOT in the doc — it specifies the two rules in prose (the layer rule and the dead-module rule, each matching imports and string literals) rather than the CLI's kebab-case grouping labels, which is the right level for a specification and is why this rename's change to those values needed no doc edit. Nothing stale; no update needed."
+
+[trigger_files]
+"pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:181285b219349c4fed2d1c0c5a0ac0f31dff530f"
+"pipelex/interpreter_hub.py" = "blob:4081f279518a8ed82fe425f035a916f8053edd5c"
+"pipelex/runtime_hub.py" = "blob:72f1bfb02332c63ae35873eac2a1c771d5ef4036"

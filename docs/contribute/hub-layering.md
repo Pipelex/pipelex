@@ -199,7 +199,16 @@ Two deliberate carve-outs:
 
 `tests/unit/pipelex/test_runtime_layer_import_closure.py` imports each runtime-layer entry point in a **subprocess** and asserts that zero interpreter modules — and no `pipelex.interpreter_hub` — landed in `sys.modules`. This is the [measurement above](#why-the-boundary-exists), pinned. It exists separately from the lint because the two fail independently: a runtime-layer module reaching directly into `pipe_operators`, without touching a hub, breaks the property while the lint stays green.
 
-Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons and that the reset really releases the scoping a `InterpreterHub` installed.
+Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons and that the reset really releases the scoping an `InterpreterHub` installed.
+
+### This document — the `hub-layering-convention` drift contract
+
+The guard and the closure test keep the *code* honest; neither can tell whether **this page** still describes it. That is a [drift contract](drift-contracts.md): `hub-layering-convention` names the guard and both hub modules as triggers and this document as the review target, so adding or moving a hub accessor — or changing the declared runtime layer — obliges a recorded review here before the change can land. It carries no verify command, because `check-hub-layering` already gates `make check` and CI.
+
+Two checks make that review mechanical rather than a re-read, and are the ones to run:
+
+- Extract every public module-level symbol from `runtime_hub` and `interpreter_hub` and confirm each appears in the partition tables above. An undocumented accessor is the failure mode this contract exists to catch.
+- Import `RUNTIME_LAYER_PACKAGES` from the guard and confirm every declared package is named under [The rule](#the-rule--make-check-hub-layering).
 
 ## Known inversions
 
