@@ -151,10 +151,22 @@ Leave the escape hatch spelling `# hub-layering: ignore` alone — "hub layering
 
 ### 5. Tests
 
+Contents first — every one of these needs its import lines, constants and patch-target strings swept:
+
 - `tests/unit/pipelex/test_hub_import_closure.py` — `LOW_LAYER_ENTRY_POINTS` → `RUNTIME_LAYER_ENTRY_POINTS`; the module docstring states the property.
 - `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` — `test_low_layer_membership` → `test_runtime_layer_membership`; `test_core_is_split_between_the_layers` keeps its name but its assertions call the renamed predicate.
 - `tests/unit/pipelex/test_hub_lifecycle.py`, `tests/unit/pipelex/test_hub_class_registry.py` — import lines and any patch-target strings.
-- Consider renaming the three `test_hub_*.py` modules themselves. Optional; low value, and it costs a `make cleanderived` + collection reset. Prefer leaving them.
+
+**Module renames — Louis' call: rename them as part of this work.** Note first that `test_hub_*` is not *stale*: "hub" survives the rename (there are still two hubs, and `hub_layering_guard.py` / `check-hub-layering` / `hub-layering.md` are all unchanged). So apply the repo's actual convention — a test module mirrors its source module, or else names the property it pins — which moves two and leaves two:
+
+| module | action | why |
+| --- | --- | --- |
+| `test_hub_import_closure.py` | → **`test_runtime_layer_import_closure.py`** | It pins a property, not a module: *the runtime layer loads no interpreter*. Naming the layer makes the file findable from the vocabulary. |
+| `test_hub_class_registry.py` | → **`test_class_registry_scoping.py`** | It is the D5 regression guard for the `class_registry_scoping` slot, not a test of "the hub". The current name has always been imprecise. |
+| `test_hub_lifecycle.py` | **keep** | It pins that a boot installs *both* hub singletons and that teardown drops the scoping one installed. "Hub lifecycle" is exactly what that is, and both hubs still exist. |
+| `cli/dev/test_hub_layering_guard.py` | **keep** | Mirrors its source module `hub_layering_guard.py`, which is not renamed. Moving it would break the mirror. |
+
+⚠ **Renaming test modules needs a cache reset.** Per the repo `CLAUDE.md`, moving or deleting tests confuses pytest collection and the linters — run `make cleanderived` afterwards. That deletes `tests/integration/pipelex/fixtures/_generated_model_sets.py`, after which pyright fails with unresolved-import errors unrelated to your change; `make regenerate-test-models-quiet` restores it. Do this *before* concluding anything failed.
 
 ### 6. `subject_grants.toml`
 
