@@ -108,7 +108,9 @@ One rule governs them:
 
 The practical consequence is that the low-level COGT layer cannot reach the high-level interpreter. Importing the inference stack loads no `libraries`, `pipe_operators`, `pipe_controllers`, or `codegen` module at all — so anything that just wants a secret, the console, or the model deck (a health check, `pipelex --version`, a plugin's registration module) does not pay for the method interpreter, and a change to a pipe blueprint structurally cannot perturb the import graph of `cogt`.
 
-Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is verified — is in [Hub Layering](../contribute/hub-layering.md).
+That is not a convention held up by review: `make check-hub-layering` fails the build if a low-layer module imports — or merely names in a string — the high hub, and an import-closure test pins the property itself in a subprocess.
+
+Contributors: the full specification — what lives on each hub, how to place a new symbol, and how the boundary is enforced — is in [Hub Layering](../contribute/hub-layering.md).
 
 ---
 

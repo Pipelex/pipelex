@@ -156,6 +156,8 @@ make fix-keyword-only         - Auto-fix keyword-only-args violations (insert a 
 make fko                      - Shorthand -> fix-keyword-only
 make subject-grant            - Record a subject grant (FUNC="<path>::<qualname>" RATIONALE="…")
 make sgr                      - Shorthand -> subject-grant
+make check-hub-layering       - Enforce the service_hub / method_hub layering boundary
+make chl                      - Shorthand -> check-hub-layering
 make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
@@ -195,7 +197,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
-    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-rules check-urls cu insert-skeleton \
+    rules rules-claude-standalone up-kit-configs ukc check-config-sync ccs check-keyword-only cko fix-keyword-only fko subject-grant sgr check-hub-layering chl check-rules check-urls cu insert-skeleton \
 	drift-plan dp drift-check dc drift-ack da \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -355,6 +357,13 @@ subject-grant: env
 
 sgr: subject-grant
 	@echo "> done: sgr = subject-grant"
+
+check-hub-layering: env
+	$(call PRINT_TITLE,"Enforcing the service_hub / method_hub layering boundary")
+	$(VENV_PIPELEX_DEV) check-hub-layering --quiet
+
+chl: check-hub-layering
+	@echo "> done: chl = check-hub-layering"
 
 drift-plan: env
 	$(VENV_PIPELEX_DEV) drift plan $(CONTRACT)
@@ -1133,10 +1142,10 @@ cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only drift-check format lint pyright mypy pylint
+check: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema check-keyword-only check-hub-layering drift-check format lint pyright mypy pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only
+agent-check: fix-unused-imports fix-keyword-only format lint pyright mypy check-keyword-only check-hub-layering
 	@echo "> done: agent-check"
 
 v: validate

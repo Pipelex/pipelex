@@ -2,23 +2,25 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **Target:** normal PR back to `dev`.
 
-**Status:** **CHECKPOINT H-1 reached and committed** — `95c46012a`, not pushed, branch `refactor/Hub`, working tree clean.
+**Status:** **CHECKPOINT H-2 reached** — branch `refactor/Hub`, not pushed.
 
-Phases 0 and 1 are complete: the split is landed, all gates are green, and the headline property is measured at **0 interpreter modules**. **Phase 2 (the guard) is next.**
+Phases 0, 1 and 2 are complete: the split is landed, the headline property is measured at **0 interpreter modules**, and the boundary is now mechanically enforced by `make check-hub-layering` plus a subprocess import-closure test. **Phase 3 (the placement residue) is next** — and unlike Phases 1 and 2 it is genuinely optional: both of its items are types living in the wrong package, and "explicitly deferred with a recorded rationale" is a sanctioned outcome.
 
 ### Cold start — read in this order
 
 1. [The one rule](#the-one-rule) and [Symbol partition](#symbol-partition) — the settled boundary.
-2. [Checkpoint H-1 record](#checkpoint-h-1-record) — **read this before touching anything.** It carries what actually happened, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered) and the class of bug the AST rewrite could not catch.
-3. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary. Phase 2 rewrites its "Enforcement" section.
-4. Then start at [Phase 2](#phase-2--enforce-it).
+2. [Checkpoint H-2 record](#checkpoint-h-2-record) — what the guard actually enforces (two rules, not one), its two carve-outs, and two CI wiring traps.
+3. [Checkpoint H-1 record](#checkpoint-h-1-record) — the split itself, including the two places reality forced a change to the plan (the D5 slot could not live on `ServiceHub`; boot was deliberately not reordered).
+4. [`docs/contribute/hub-layering.md`](docs/contribute/hub-layering.md) — the shipped specification of the boundary, now including the enforcement it describes.
+5. Then start at [Phase 3](#phase-3--the-placement-residue).
 
-Gates as of the checkpoint commit: `make agent-check` ✅ (pyright 0 errors, mypy 2,348 files, keyword-only PASSED) · `make agent-test` ✅ (full suite, no test edits beyond import lines) · `make drift-check` ✅ (three contracts reviewed and acked: `cli-docs`, `config-docs`, `keyword-only-convention` — the third was not predicted by the plan).
+Gates at H-2: `make agent-check` ✅ (pyright 0 errors, mypy 2,352 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened — `cli-docs` excludes `pipelex/cli/dev_cli/**`).
 
-Two notes for whoever picks this up:
+Three notes for whoever picks this up:
 
-- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first (see [Still open at H-1](#still-open-at-h-1)).
-- **Phase 2.1 should also scan `mocker.patch` string targets**, not just `importlib.import_module` — that is where the string-literal hub references actually lived in this repo, and one of them broke 36 tests.
+- **`pipelex.hub` is already gone, but the CHANGELOG entry is not written** — the plan schedules it at H-4. If this branch merges earlier, write it first (see [Still open at H-1](#still-open-at-h-1)). The guard now enforces that the module stays gone, which makes the missing release note the only loose end on that front.
+- **One decision is waiting on Louis**: whether to add a `hub-layering-convention` drift contract. It was built and reverted on purpose — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so).
+- **Phase 4 widens the guard's low layer** to include `pipelex/core/**`. That is a one-line change to `LOW_LAYER_PACKAGES` in `hub_layering_guard.py`, and the guard will tell you immediately whether 4.1 is actually finished.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub-split-refactor.md`](wip/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
@@ -263,15 +265,50 @@ If Phase 2's guard is meant to catch "the string-literal `importlib.import_modul
 - The **cross-repo sweep** is untouched and still release-gated.
 - One semantic edge worth knowing: `class_registry_scoping` is process-global, so the doctor path (which installs a fresh `ServiceHub` but leaves any existing `MethodHub` in place) now keeps library scoping alive where the single hub would have raised. Strictly more coherent — the MethodHub genuinely is still installed — and unreachable in practice, since doctor runs in its own process. Noted rather than fixed.
 
-### Phase 2 — enforce it
+### Phase 2 — enforce it ✅
 
-- [ ] 2.1 Add `pipelex-dev check-hub-layering` — guard in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, command in `check_hub_layering_cmd.py`, following the `keyword_only_guard.py` / `check_keyword_only_cmd.py` precedent exactly. Rule: a module in the declared low layer may not import `pipelex.method_hub`. It must catch the string-literal `importlib.import_module("pipelex.method_hub")` form too — that is precisely how the current cycle hides.
-- [ ] 2.2 Declare the low layer: `pipelex/tools/**`, `pipelex/system/**`, `pipelex/cogt/**`, `pipelex/plugins/**`, `pipelex/reporting/**`. All five are 100% compliant today, so the guard hard-blocks from day one with an empty exception list.
-- [ ] 2.3 Wire into `make agent-check`, the `make check` aggregate, and CI, with a `chl` alias.
-- [ ] 2.4 Unit tests for the guard — positive, negative, and the `importlib` string form — mirroring `tests/unit/pipelex/cli/dev/test_keyword_only_guard_*.py`.
-- [ ] 2.5 A closure regression test: import `pipelex.cogt.content_generation.content_generator` in a subprocess and assert no `pipelex.libraries.*`, `pipelex.pipe_operators.*`, `pipelex.pipe_controllers.*`, or `pipelex.codegen.*` module is in `sys.modules`. The lint guards the *rule*; this guards the *property*, which is what actually matters and which a stray import elsewhere could break without touching a hub import.
+- [x] 2.1 Added `pipelex-dev check-hub-layering` — guard in `pipelex/cli/dev_cli/commands/hub_layering_guard.py` (stdlib-only AST core), command in `check_hub_layering_cmd.py` (rich presentation), following the `keyword_only_guard.py` / `check_keyword_only_cmd.py` split exactly. Catches imports **and** string literals, and resolves relative imports against the importing module's own package. **The guard grew a second rule beyond the plan** — see the record below.
+- [x] 2.2 Low layer declared as `pipelex.cogt`, `pipelex.plugins`, `pipelex.reporting`, `pipelex.system`, `pipelex.tools`. All five compliant; the guard hard-blocks with an empty exception list (one escape-hatch marker exists, on the guard's own declaration of the forbidden path).
+- [x] 2.3 Wired into `make agent-check`, the `make check` aggregate, and both CI lint workflows, with the `chl` alias.
+- [x] 2.4 `tests/unit/pipelex/cli/dev/test_hub_layering_guard.py` — layer membership, both directions of the arrow, every import spelling (plain / aliased / `from pipelex import method_hub` / relative), both string forms, the prose-is-not-a-reference and `service_hub`-is-not-`hub` boundary cases, the `TYPE_CHECKING` carve-out and its three non-exempt neighbours, the escape hatch, and the dead-module rule across all three layers.
+- [x] 2.5 `tests/unit/pipelex/test_hub_import_closure.py` — imports each low-layer entry point in a subprocess and asserts zero interpreter modules **and** no `pipelex.method_hub` in `sys.modules`. Parametrized over two entry points: the inference layer and `service_hub` itself.
 
 **CHECKPOINT H-2** — boundary declared, enforced, and regression-tested.
+
+### Checkpoint H-2 record
+
+Gates: `make agent-check` ✅ (pyright 0 errors, mypy 2,352 files, keyword-only PASSED, hub-layering PASSED) · `make agent-test` ✅ (full suite) · `make drift-check` ✅ (no contract opened — see below).
+
+#### The guard enforces two rules, not one
+
+The plan specified one rule (no `method_hub` in the low layer). The guard ships with a second: **no module anywhere in `pipelex/` or `tests/` may reference `pipelex.hub`.** That is the H-1 note about `mocker.patch` targets, generalized — and generalizing it is what makes it work. The plan framed the string check as an `importlib.import_module` special case; scanning *every* string constant for an exact-or-boundary match on the module path catches `importlib`, `mocker.patch`, `pkgutil.resolve_name`, and any config-driven dotted path in one mechanism, with no call-site special-casing.
+
+Scope follows from the two rules being different: `tests/` is scanned for the dead-module rule **only**. `tests.*` is in no declared layer, so a test may still freely patch `pipelex.method_hub` — while a stale `pipelex.hub` patch target, the thing that actually broke 36 tests, now fails the check.
+
+Matching is exact-or-boundary (`==`, or a `.`/`:` suffix), which is why `pipelex.service_hub` does not match `pipelex.hub` and why a docstring that merely *mentions* a module is not a reference. Two in-tree docstrings do exactly that and are correctly ignored. A path assembled at runtime from f-strings is beyond any AST scan; nothing does that today, and it is noted in the module docstring rather than defended against.
+
+#### Two carve-outs, both deliberate
+
+- **`if TYPE_CHECKING:` is exempt from the layer rule, not from the dead-module rule.** The rule is about what *loads*; a type-only import loads nothing, and H-1's own out-of-plan fix used exactly this deferral. Its `else` branch, `if not TYPE_CHECKING:`, and any `pipelex.hub` import inside a `TYPE_CHECKING` block all stay violations — each is pinned by a test.
+- **`# hub-layering: ignore`** mirrors `# kw-only: ignore`. There is exactly one in `pipelex/` and one in the test suite, both on lines that *declare* the forbidden path as data. The guard flagged its own configuration on first run, which is a good sign about the matcher and the reason the hatch exists.
+
+#### Verified by breaking it, not only by unit tests
+
+Both forms were injected into a real low-layer module (`cogt/content_generation/content_generator.py`) and the CLI was confirmed to report them at the right lines with the right kinds, then the file was restored byte-identically. Snippet-level unit tests would not have caught a filesystem-walk or layer-membership mistake.
+
+#### Two wiring traps worth knowing
+
+- **The CI aggregator gates on an explicit bash result check, not on `needs`.** Adding `lint-hub-layering` to `lint-all`'s `needs` list is *not* enough — `if: always()` means the aggregator runs regardless, and the `[ "${{ needs.<job>.result }}" != "success" ]` chain is what actually fails the build. Both were updated. A new lint job added without touching that chain would be silently advisory.
+- **A new job, not a step on `lint-keyword-only`.** Folding both AST guards into one job would have meant renaming it, and that job name may be a required status check — a rename silently un-requires it. The repo already runs one job per guard; this follows that.
+
+#### Proposed, then reverted, pending Louis' say-so
+
+A `hub-layering-convention` drift contract (triggers: the guard + both hub modules; review: `docs/contribute/hub-layering.md`) is the exact analogue of the existing `keyword-only-convention` contract, and it would mechanize the doc obligation Phase 4 already carries. It was added, confirmed to open correctly, then **reverted**: `.claude/skills/drift-review` states that during the pilot the manifest must not grow without the user's explicit say-so, because ack friction is the thing being measured. Left as a decision for Louis rather than a silent addition. Note that `cli-docs` legitimately did not fire on this work — it excludes `pipelex/cli/dev_cli/**`.
+
+#### Docs updated
+
+- `docs/contribute/hub-layering.md` — the "Enforcement" section was rewritten from "a guard is the next step" to the shipped two-rule specification: what each rule checks, why the string half is the load-bearing one, both carve-outs, the `tests/` scoping, and the rule-vs-property split.
+- `docs/under-the-hood/architecture-overview.md` — one sentence stating the boundary is mechanically enforced rather than held up by review.
 
 ### Phase 3 — the placement residue
 
@@ -285,7 +322,7 @@ Neither item is coupling; both are types living in the wrong package, and each i
 ### Phase 4 — `core/` joins the low layer
 
 - [ ] 4.1 Convert the five `core/` straddlers — `stuffs/stuff_factory.py`, `memory/input_shaper`, `pipes/stuff_spec/stuff_spec_factory`, `pipes/inputs/input_stuff_specs_factory`, `pipes/output/output_renderer` — to take resolved concepts/pipes as arguments instead of reaching for `get_concept_library` / `get_native_concept` / `get_required_concept` / `get_required_pipe`. Callers that have a library pass the resolved value; callers that do not are, by construction, already in the high layer.
-- [ ] 4.2 Widen the guard's low layer to include `pipelex/core/**`.
+- [ ] 4.2 Widen the guard's low layer: add `pipelex.core` to `LOW_LAYER_PACKAGES` in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`, and add `pipelex.core.*` entry points to `LOW_LAYER_ENTRY_POINTS` in `tests/unit/pipelex/test_hub_import_closure.py`.
 
 **CHECKPOINT H-4 = done** — update `docs/contribute/hub-layering.md` with the final layer set, and add the CHANGELOG breaking-change note under `[Unreleased]` (`pipelex.hub` is gone; importers choose `pipelex.service_hub` or `pipelex.method_hub`).
 

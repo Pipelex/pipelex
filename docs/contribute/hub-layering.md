@@ -119,13 +119,35 @@ This is the same shape as `HubSlot.ISOLATED_EXECUTION_PROBE`: a defaulted callab
 
 ## Enforcement
 
-Today the boundary is enforced by three things:
+The boundary is enforced mechanically. Two things are checked, because the rule and the property it buys can fail independently.
 
-1. **The import graph itself.** `pipelex.hub` no longer exists, so a stale import is an `ImportError`, not a silent wrong-layer resolution. And because `service_hub` sits inside a cycle with `core.concepts`, a module-level `method_hub` import added to the low layer will typically fail at import time rather than merely degrade.
-2. **The measurement above**, which is the actual property (0 interpreter modules) rather than a proxy for it.
-3. **`tests/unit/pipelex/test_hub_lifecycle.py`**, which pins that a boot installs both singletons and that the reset really releases the scoping a `MethodHub` installed.
+### The rule — `make check-hub-layering`
 
-A mechanical AST guard (`pipelex-dev check-hub-layering`) that forbids `pipelex.method_hub` imports — including the string-literal `importlib.import_module` form — from a declared low layer (`pipelex/tools/**`, `pipelex/system/**`, `pipelex/cogt/**`, `pipelex/plugins/**`, `pipelex/reporting/**`) is the next step; all five packages are compliant today, so it will hard-block from day one with an empty exception list. Until it lands, treat the rule as reviewed by hand and verified by the measurement.
+```bash
+make check-hub-layering   # alias: make chl
+```
+
+An AST guard (`pipelex-dev check-hub-layering`, core in `pipelex/cli/dev_cli/commands/hub_layering_guard.py`) that runs in `make agent-check`, in the `make check` aggregate, and in CI. It checks two rules over `pipelex/` and `tests/`:
+
+1. **The layer rule.** A module in the declared low layer — `pipelex.cogt`, `pipelex.plugins`, `pipelex.reporting`, `pipelex.system`, `pipelex.tools` — may not import `pipelex.method_hub`. All five packages are compliant, so the guard hard-blocks on **any** violation with an empty exception list.
+2. **The dead-module rule.** *No* scanned module may reference `pipelex.hub`. It was deleted rather than aliased so a stale import fails loudly; this closes the one hole in that guarantee.
+
+Both rules match **imports and bare string literals**, and the string half is the load-bearing one. A missed *import* of a deleted module is an immediate `ImportError`; a missed *string* is not, and it is invisible to every import-graph tool and to pyright's module graph. Both forms that actually occurred here were strings: three `importlib.import_module("pipelex.hub")` shims hiding a cycle from every lint, and one `mocker.patch("pipelex.hub.get_console", ...)` that broke a whole CLI test suite with an `AttributeError` raised nowhere near a hub. Matching is exact-or-boundary against the module path, so `pipelex.service_hub` never matches `pipelex.hub` and prose that merely *mentions* a module is not a reference.
+
+The guard resolves relative imports (`from ...method_hub import …`) against the importing module's own package, so the forbidden arrow cannot be spelled around. A path assembled at runtime from f-strings or concatenation is beyond any AST scan; nothing in the tree does that.
+
+Two deliberate carve-outs:
+
+- **`if TYPE_CHECKING:` blocks are exempt from the layer rule** — the rule is about what *loads*, and a type-only import loads nothing. Its `else` branch is not exempt, nor is `if not TYPE_CHECKING:`, and the dead-module rule applies inside `TYPE_CHECKING` too (a deleted module exists in no phase).
+- An inline `# hub-layering: ignore` comment anywhere on the offending statement suppresses it, mirroring `# kw-only: ignore`. There is exactly one in the tree, on the guard's own declaration of the forbidden path.
+
+`tests/` is scanned for the dead-module rule only. `tests.*` sits in no declared layer, so a test may freely patch `pipelex.method_hub` — while a stale `pipelex.hub` patch target, the landmine above, still fails the check.
+
+### The property — the import-closure test
+
+`tests/unit/pipelex/test_hub_import_closure.py` imports each low-layer entry point in a **subprocess** and asserts that zero interpreter modules — and no `pipelex.method_hub` — landed in `sys.modules`. This is the [measurement above](#why-the-boundary-exists), pinned. It exists separately from the lint because the two fail independently: a low-layer module reaching directly into `pipe_operators`, without touching a hub, breaks the property while the lint stays green.
+
+Alongside them, `tests/unit/pipelex/test_hub_lifecycle.py` pins that a boot installs both singletons and that the reset really releases the scoping a `MethodHub` installed.
 
 ## Known inversions
 
