@@ -2,10 +2,21 @@
 
 `pipelex-dev check-hub-layering` guards the *rule* (no runtime-layer module imports `pipelex.interpreter_hub`).
 This guards the *property* the rule exists to buy: importing the inference layer, or the runtime hub
-itself, must pull in zero `libraries` / `pipe_operators` / `pipe_controllers` / `codegen` / `builder`
-modules. The distinction matters because a stray import somewhere else entirely — a runtime-layer module
-reaching into `pipe_operators` directly, without touching a hub — would break the property while the
-lint stays green.
+itself, must pull in zero interpreter modules. The distinction matters because a stray import somewhere
+else entirely — a runtime-layer module reaching into `pipe_operators` directly, without touching a hub —
+would break the property while the lint stays green.
+
+"Interpreter module" is spelled out twice below, because the five interpreter top-level packages alone
+under-state it: core's Pipe-machinery modules are interpreter-layer too, and most of them only get
+caught *transitively*, through the `pipe_operators` / `libraries` they happen to pull in.
+`core.pipes.pipe_blueprint` pulls in none of it, so a runtime-layer import of it would pass a
+package-only predicate. Naming them makes the predicate state the boundary instead of approximating it.
+
+Two documented interpreter homes are deliberately absent, and their absence is a known wart rather than
+an oversight: `pipeline` and `pipe_run` (plus `core.bundles.exceptions`) already leak leaf models into
+every runtime closure — `SpecialPipelineId`, `PipeRunMode`, the bundle validation-error data. Naming
+them here would fail the test over a *placement* problem, not a broken hub arrow. See
+`wip/pr-1062-review-notes.md`.
 
 Run in a subprocess so the closure is exactly what the entry point pulls in: an in-process
 `sys.modules` check would see everything the test session already imported.
@@ -43,8 +54,32 @@ _CLOSURE_SCRIPT = textwrap.dedent(
     target = sys.argv[1]
     importlib.import_module(target)
 
-    INTERPRETER = ("libraries", "pipe_operators", "pipe_controllers", "codegen", "builder")
-    offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and name.split(".")[1] in INTERPRETER)
+    INTERPRETER_PACKAGES = ("libraries", "pipe_operators", "pipe_controllers", "codegen", "builder")
+
+    # Core's Pipe machinery: interpreter-layer by construction, but not under a top-level package of its own.
+    INTERPRETER_CORE = (
+        "pipelex.core.bundles",
+        "pipelex.core.interpreter",
+        "pipelex.core.registry_models",
+        "pipelex.core.pipes.pipe_abstract",
+        "pipelex.core.pipes.pipe_blueprint",
+        "pipelex.core.pipes.pipe_factory",
+        "pipelex.core.pipes.rendering",
+    )
+    # The one straddler: structured bundle validation-error data that `pipeline/` imports, so it lands in
+    # every runtime closure -- dragging the empty `core.bundles` package placeholder in with it. A placement
+    # wart, not a hub violation -- see wip/pr-1062-review-notes.md. Matched exactly, never as a prefix, so
+    # the rest of `core.bundles` stays flagged.
+    INTERPRETER_CORE_EXCLUDED = ("pipelex.core.bundles", "pipelex.core.bundles.exceptions")
+
+    def is_interpreter(name):
+        if name.split(".")[1] in INTERPRETER_PACKAGES:
+            return True
+        if name in INTERPRETER_CORE_EXCLUDED:
+            return False
+        return any(name == module or name.startswith(module + ".") for module in INTERPRETER_CORE)
+
+    offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and is_interpreter(name))
     if offenders:
         print(f"{target} loaded {len(offenders)} interpreter module(s): {offenders}")
         raise SystemExit(1)

@@ -2,7 +2,7 @@
 
 **Worktree:** `_hub/` · **Branch:** `refactor/Hub` (off `origin/dev`, base `f23fda7a0` = v0.40.0) · **PR:** [#1062 → `dev`](https://github.com/Pipelex/pipelex/pull/1062), open.
 
-**Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub`, not pushed. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
+**Status:** **ALL PHASES DONE + THE RENAME LANDED — all gates green.** Branch `refactor/Hub` is pushed and PR #1062 is open. **Jump to [▶ Resume here](#-resume-here-the-rename-is-landed) first.**
 
 The split is landed, the boundary is mechanically enforced (`make check-hub-layering` + a subprocess import-closure test over eight entry points), the misplaced types are moved, and core's data model has joined the runtime layer behind injected providers. Every runtime-layer entry point measures **0 interpreter modules**. Docs and the CHANGELOG breaking-change note are written, and the [runtime/interpreter rename](wip/hub/layer-and-hub-renaming.md) is applied throughout.
 
@@ -21,7 +21,8 @@ Three notes for whoever picks this up:
 
 - **The cross-repo sweep is the only substantial work remaining, and it is release-gated.** Three waves now: the `pipelex.hub` split ([table](#cross-repo-sweep)), the Phase 3 type moves ([table](#cross-repo-impact-added-by-phase-3)), and the Phase 4 moves + signature changes ([table](#cross-repo-impact-added-by-phase-4)). Do all three in one pass per repo.
 - **The `hub-layering-convention` drift contract is now in the manifest.** Louis gave explicit say-so; it was added, reviewed, and acked — see [Proposed, reverted, then landed](#proposed-reverted-then-landed).
-- **`core.pipes.pipe_output → pipeline.pipeline_models` was NOT removed.** H-3 predicted Phase 4 would take it out; it did not, because `pipe_output` is on the Pipe-touching (high) side of the core split and was never converted. It remains one of the two edges pulling non-inference modules into the inference closure, which is why the module/SLOC rows are flat at H-4.
+- **`core.pipes.pipe_output → pipeline.pipeline_models` was NOT removed.** H-3 predicted Phase 4 would take it out; it did not. It remains one of the two edges pulling non-inference modules into the inference closure, which is why the module/SLOC rows are flat at H-4. The reason recorded at H-4 — "`pipe_output` is on the Pipe-touching (high) side of the core split" — was **wrong**, and the PR #1062 review corrected it: `pipe_output` names no `Pipe`, imports zero interpreter modules, and sits inside `runtime_hub`'s own closure. It is runtime-layer. What survives is the edge itself: `SpecialPipelineId` is a leaf constant filed in an interpreter-named package. See [`wip/pr-1062-review-notes.md`](wip/pr-1062-review-notes.md).
+- **The PR #1062 agent-review pass is recorded in [`wip/pr-1062-review-notes.md`](wip/pr-1062-review-notes.md).** It fixed the `pipe_output` misclassification above, widened the import-closure predicate to name core's Pipe machinery (closing a real `core.pipes.pipe_blueprint` blind spot), and deferred one item: `pipeline` / `pipe_run` / `graph` leak leaf models into every runtime closure, so the predicate cannot name them yet.
 
 Design rationale, alternatives considered, and the full measured argument live in [`wip/hub/hub-split-refactor.md`](wip/hub/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
 
