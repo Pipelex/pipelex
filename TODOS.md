@@ -23,7 +23,9 @@ Three notes for whoever picks this up:
 - **One decision is waiting on Louis**: whether to add a `hub-layering-convention` drift contract. It was built and reverted on purpose — see [Proposed, then reverted](#proposed-then-reverted-pending-louis-say-so).
 - **`core.pipes.pipe_output → pipeline.pipeline_models` was NOT removed.** H-3 predicted Phase 4 would take it out; it did not, because `pipe_output` is on the Pipe-touching (high) side of the core split and was never converted. It remains one of the two edges pulling non-inference modules into the inference closure, which is why the module/SLOC rows are flat at H-4.
 
-Design rationale, alternatives considered, and the full measured argument live in [`wip/hub-split-refactor.md`](wip/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
+Design rationale, alternatives considered, and the full measured argument live in [`wip/hub/hub-split-refactor.md`](wip/hub/hub-split-refactor.md). This file is the executable tracker: what to do, in what order, with the concrete tables the work needs. Where the two disagree, this file wins — it carries the settled decisions and the re-measured numbers.
+
+⚠ **The names in this document are superseded.** Louis challenged them at the close of H-4 and settled on a rename: the layers become **runtime** / **interpreter**, and the hubs become `runtime_hub` (`RuntimeHub`) / `interpreter_hub` (`InterpreterHub`). It is scheduled **after** H-4 goes green and **before** the release and the cross-repo sweep — that ordering is load-bearing, because the sweep must rewrite external repos exactly once, straight to the final names. The decision, the rejected alternatives, and the mechanical plan are in [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md). Everything else in this tracker stands; only the names change.
 
 ## The one rule
 
@@ -439,7 +441,7 @@ make drift-ack CONTRACT=config-docs RATIONALE="…"
 make drift-ack CONTRACT=cli-docs RATIONALE="…"
 ```
 
-After both gates are green, H-4 is fully closed and the branch is ready for a PR to `dev`. Nothing else in this plan is outstanding except the release-gated cross-repo sweep and Louis' drift-contract decision.
+After both gates are green, H-4 is fully closed. **Then do the rename** — [`wip/hub/layer-and-hub-renaming.md`](wip/hub/layer-and-hub-renaming.md), as its own commit, before the release and before the cross-repo sweep. After that the branch is ready for a PR to `dev`, and the only things outstanding are the release-gated cross-repo sweep (which the rename retargets to the final names) and Louis' drift-contract decision.
 
 #### The plan's premise was wrong: `core/` is two layers
 
