@@ -25,9 +25,11 @@ This module holds the AST collection logic that mechanically enforces three rule
    models the ancestor ``__init__.py`` files an import executes on the way to its target, so a breach
    in a package init is reached by every importer of anything beneath it.
 
-Rules 1 and 2 match **imports and bare string literals**. The string form is not a nicety: a missed
+All three rules match **imports and bare string literals**. The string form is not a nicety: a missed
 *import* of a deleted module is an immediate ``ImportError``, but a missed *string* is not, and it is
-invisible to every import-graph tool and to pyright's module graph. The two forms that actually
+invisible to every import-graph tool and to pyright's module graph. Rule 3 matches the narrower set —
+only a string naming the interpreter hub, which is a dynamic import in all but name — because an
+arbitrary ``pipelex.*`` string is as likely a plugin name as an import target. The two forms that actually
 occurred in this repo are ``importlib.import_module("pipelex.hub")`` (three of them, hiding a cycle
 from every lint) and ``mocker.patch("pipelex.hub.get_console", ...)`` (which broke a whole CLI test
 suite with an ``AttributeError`` raised nowhere near a hub). Matching is exact-or-dotted-prefix
@@ -119,7 +121,10 @@ RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
 )
 
 #: The interpreter layer's hub, which no runtime-layer module may import — directly or transitively.
-INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"
+#: Marked like :data:`DELETED_HUB_MODULE` below, for the same reason and against a different rule:
+#: this line *declares* the path rather than importing it, so without the marker rule 3 would read the
+#: guard's own configuration as a dynamic import and give the module a phantom edge to the hub.
+INTERPRETER_HUB_MODULE = "pipelex.interpreter_hub"  # hub-layering: ignore
 
 #: The root package the transitive rule builds its import graph over. Imports of anything else
 #: (stdlib, third-party) cannot lead back to a `pipelex` module, so they are not edges.
@@ -426,6 +431,15 @@ class _ImportGraphCollector(ast.NodeVisitor):
       either — otherwise one marker on a direct import would leave the edge in the graph while the
       finding it explains disappears, silently exempting the module from this rule and flagging every
       innocent importer of it in its place.
+
+    One thing beyond imports *is* collected: a module-level **string literal naming the interpreter
+    hub**, because a dynamic import is the same edge with the AST filed off — and the two references
+    that actually occurred in this repo were strings, not imports. Only that one target is matched,
+    exactly as rules 1 and 2 match only their forbidden targets: an arbitrary ``pipelex.*`` string is
+    as likely a plugin name or a config value, but a string that *is* the hub path is an
+    ``import_module`` or patch target in all but name. Rule 1 already catches such a string in a
+    runtime-layer module; what this closes is the same string in an *intermediary*, which sits in no
+    declared layer and so is rule 1's business for the dead hub only.
     """
 
     def __init__(self, *, package_qname: str, source_lines: list[str]) -> None:
@@ -433,10 +447,9 @@ class _ImportGraphCollector(ast.NodeVisitor):
         self.source_lines = source_lines
         self.imports: dict[str, int] = {}
 
-    def _is_suppressed(self, *, node: ast.stmt) -> bool:
-        """Whether the escape-hatch marker sits anywhere on this statement's lines."""
-        end_lineno = node.end_lineno or node.lineno
-        for line_number in range(node.lineno, end_lineno + 1):
+    def _is_suppressed(self, *, lineno: int, end_lineno: int | None) -> bool:
+        """Whether the escape-hatch marker sits anywhere on the offending node's lines."""
+        for line_number in range(lineno, (end_lineno or lineno) + 1):
             index = line_number - 1
             if 0 <= index < len(self.source_lines) and ESCAPE_HATCH_MARKER in self.source_lines[index]:
                 return True
@@ -467,7 +480,7 @@ class _ImportGraphCollector(ast.NodeVisitor):
     @override
     def visit_Import(self, node: ast.Import) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         """``import pipelex.x`` / ``import pipelex.x as y``."""
-        if self._is_suppressed(node=node):
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
             return
         for alias in node.names:
             self._record(candidate=alias.name, lineno=node.lineno)
@@ -475,7 +488,7 @@ class _ImportGraphCollector(ast.NodeVisitor):
     @override
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         """``from pipelex.x import y`` and the relative forms — both the module and each name are candidates."""
-        if self._is_suppressed(node=node):
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
             return
         base = absolute_module_for(node=node, package_qname=self.package_qname)
         if base is None:
@@ -483,6 +496,20 @@ class _ImportGraphCollector(ast.NodeVisitor):
         self._record(candidate=base, lineno=node.lineno)
         for alias in node.names:
             self._record(candidate=f"{base}.{alias.name}", lineno=node.lineno)
+
+    @override
+    def visit_Constant(self, node: ast.Constant) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
+        """A module-level string naming the interpreter hub — a dynamic import is the same edge.
+
+        Matched against the hub alone, never against any ``pipelex.*`` string: see the class
+        docstring for why the narrow target is the point rather than a shortcut.
+        """
+        value = node.value
+        if not isinstance(value, str) or not references_module(candidate=value, target=INTERPRETER_HUB_MODULE):
+            return
+        if self._is_suppressed(lineno=node.lineno, end_lineno=node.end_lineno):
+            return
+        self._record(candidate=value, lineno=node.lineno)
 
 
 class ImportGraph(NamedTuple):

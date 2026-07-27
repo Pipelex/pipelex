@@ -247,6 +247,40 @@ class TestHubLayeringTransitiveRule:
         assert both.lineno == 2
         assert both.detail == f"reaches `{INTERPRETER_HUB}` via pipelex.runtime_bridge.orchestrator → {INTERPRETER_HUB}"
 
+    def test_a_dynamic_import_in_an_intermediary_is_an_edge(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A module-level `import_module("pipelex.interpreter_hub")` loads the hub, so it is an edge.
+
+        Rule 1 catches that string in a runtime-layer module; the gap this closes is the same string
+        in an intermediary, which sits in no declared layer. Both hub references that actually
+        occurred in this repo were strings, not imports.
+        """
+        _make_tree(tmp_path)
+        _write(
+            path=tmp_path / "pipelex" / "runtime_bridge" / "dynamic.py",
+            source='import importlib\n\nhub = importlib.import_module("pipelex.interpreter_hub")\n',
+        )
+        _write(path=tmp_path / "pipelex" / "cogt" / "via_dynamic.py", source="from pipelex.runtime_bridge.dynamic import hub\n")
+        monkeypatch.chdir(tmp_path)
+
+        violations = collect_transitive_violations(root=Path("pipelex"))
+
+        breach = next(violation for violation in violations if violation.relative_path == "pipelex/cogt/via_dynamic.py")
+        assert breach.detail == f"reaches `{INTERPRETER_HUB}` via pipelex.runtime_bridge.dynamic → {INTERPRETER_HUB}"
+
+    def test_a_deferred_dynamic_import_is_not_an_edge(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Inside a function it loads nothing at import time — the same carve-out a deferred `import` gets."""
+        _make_tree(tmp_path)
+        _write(
+            path=tmp_path / "pipelex" / "runtime_bridge" / "deferred.py",
+            source='import importlib\n\n\ndef get_hub():\n    return importlib.import_module("pipelex.interpreter_hub")\n',
+        )
+        _write(path=tmp_path / "pipelex" / "cogt" / "via_deferred.py", source="from pipelex.runtime_bridge.deferred import get_hub\n")
+        monkeypatch.chdir(tmp_path)
+
+        violations = collect_transitive_violations(root=Path("pipelex"))
+
+        assert "pipelex/cogt/via_deferred.py" not in [violation.relative_path for violation in violations]
+
     def test_a_scan_that_cannot_see_the_hub_fails_instead_of_passing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """A detector that has stopped detecting must fail, not report zero.
 
