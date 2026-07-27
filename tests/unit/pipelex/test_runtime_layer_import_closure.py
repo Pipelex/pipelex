@@ -48,7 +48,7 @@ import pytest
 #: `pipelex.plugins`, the largest declared runtime-layer package, had no entry point here. The guard
 #: now follows the import graph, but that is *static* analysis: it cannot see a dynamic import, so the
 #: package that bit us gets a runtime-truth check too. It instantiates every built-in vendor adapter,
-#: so importing it pulls in all seventeen — the broadest single entry point into `pipelex.providers`,
+#: so importing it pulls in every one of them — the broadest single entry point into `pipelex.providers`,
 #: which is where those adapters now live. The plugin *mechanism* it registers through stayed behind
 #: in `pipelex.plugins` and is reached from here, so one entry point still covers both halves.
 RUNTIME_LAYER_ENTRY_POINTS = [

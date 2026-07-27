@@ -100,27 +100,27 @@ class TestHubLayeringGuard:
                 f"shrinks the layer rule's domain instead of failing."
             )
 
-    def test_every_builtin_provider_package_is_declared_runtime_layer(self) -> None:
-        """The vendor adapters are runtime-layer, and this declaration is the only thing that says so.
+    def test_the_plugin_split_left_both_halves_declared(self) -> None:
+        """Splitting one declared package into two must leave two declarations, not one.
 
-        `providers/` was carved out of `plugins/`: the mechanism stayed, the built-in vendor adapters
-        moved. The split moved no boundary — both halves are runtime-layer — but it introduced one
-        silent failure mode, and it runs the opposite way to intuition. Omitting `"pipelex.providers"`
-        from `RUNTIME_LAYER_PACKAGES` does not make the guard complain; it makes the guard go *quiet*.
-        The transitive rule iterates only modules `is_runtime_layer` already accepts, so an undeclared
-        package is excluded from the rule's domain rather than reported by it, and the largest
-        runtime-layer package would stop being checked while every gate stayed green.
+        `plugins/` was carved in half: the mechanism stayed, the built-in adapters became `providers/`.
+        Both halves are runtime-layer, so the split moved no boundary — but it introduced one silent
+        failure mode, and it runs the opposite way to intuition. Omitting an entry does not make the
+        guard complain; it makes the guard go *quiet*. The transitive rule iterates only modules
+        `is_runtime_layer` already accepts, so an undeclared package leaves the rule's domain rather
+        than being reported by it, and the largest runtime-layer package would stop being checked
+        while every gate stayed green. Nothing else in the suite catches that.
 
-        The vendor list is read off disk rather than written down here, so a new adapter is covered
-        the day it lands and this never becomes an inventory to maintain.
+        Membership is the whole assertion, deliberately. `is_runtime_layer` matches by dotted prefix,
+        so once an entry is present it answers True for *any* string beneath it — enumerating the
+        adapters on disk would carry the same one bit as enumerating invented names, and would add a
+        second failure mode (an adapter without an `__init__.py` is importable as a namespace package
+        but would be silently skipped). See `test_core_is_declared_as_one_whole_package` above.
         """
-        providers_root = _REPO_ROOT / "pipelex" / "providers"
-        vendor_packages = sorted(path.name for path in providers_root.iterdir() if (path / "__init__.py").is_file())
-        assert vendor_packages, f"no vendor packages found under {providers_root} — has `providers/` moved again?"
-        for vendor in vendor_packages:
-            assert is_runtime_layer(module_qname=f"pipelex.providers.{vendor}.worker"), (
-                f"pipelex.providers.{vendor} ships a built-in runtime-layer adapter but is not matched by "
-                "RUNTIME_LAYER_PACKAGES. Undeclared means unchecked, not flagged — add the covering entry."
+        for package in ("pipelex.plugins", "pipelex.providers"):
+            assert package in RUNTIME_LAYER_PACKAGES, (
+                f"{package} is one half of the plugin mechanism/adapter split and is not declared "
+                "runtime-layer. Undeclared means unchecked, not flagged — add the covering entry."
             )
 
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
