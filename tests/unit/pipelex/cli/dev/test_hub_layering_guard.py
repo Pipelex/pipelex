@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import textwrap
+from pathlib import Path
 
 from pipelex.cli.dev_cli.commands.hub_layering_guard import (
+    RUNTIME_LAYER_PACKAGES,
     HubLayeringViolation,
     HubLayeringViolationKind,
     find_violations_in_source,
@@ -39,25 +41,50 @@ class TestHubLayeringGuard:
         # A package whose name merely starts with a runtime-layer name is not in the runtime layer.
         assert not is_runtime_layer(module_qname="pipelex.toolsmith.thing")
 
-    def test_core_is_split_between_the_layers(self) -> None:
-        """`core/` is declared package by package: its data model is runtime, its Pipe machinery is not."""
+    def test_core_is_wholly_runtime_layer(self) -> None:
+        """`core/` is declared as one package, because nothing interpreter-layer is left inside it."""
+        # The data model, declared package by package before the interpreter tenants moved out.
         assert is_runtime_layer(module_qname="pipelex.core.stuffs.stuff_factory")
         assert is_runtime_layer(module_qname="pipelex.core.concepts.concept_provider_abstract")
         assert is_runtime_layer(module_qname="pipelex.core.memory.input_shaper")
         assert is_runtime_layer(module_qname="pipelex.core.pipes.inputs.input_stuff_specs_factory")
         assert is_runtime_layer(module_qname="pipelex.core.pipes.stuff_spec.stuff_spec_factory")
-        # Core's interpreter tenants have left `core/` for two top-level packages of their own. Everything
-        # that names a `Pipe` imports the interpreter directly, so both homes are interpreter-layer.
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_factory")
+        # Core's own top level and the runtime half of `core/pipes/` used to be *undeclared* — neither
+        # layer — because the declaration could not name `pipelex.core` while its Pipe machinery lived
+        # there. Collapsing the six entries to one is what brought them in.
+        assert is_runtime_layer(module_qname="pipelex.core.qualified_ref")
+        assert is_runtime_layer(module_qname="pipelex.core.registry_models")
+        assert is_runtime_layer(module_qname="pipelex.core.exceptions")
+        assert is_runtime_layer(module_qname="pipelex.core.pipes.pipe_output")
+        assert is_runtime_layer(module_qname="pipelex.core.pipes.variable_multiplicity")
+
+    def test_the_interpreter_homes_that_left_core_are_not_runtime_layer(self) -> None:
+        """The two packages core's Pipe machinery moved to are interpreter-layer, and stay undeclared."""
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_abstract")
         assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_blueprint")
+        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_factory")
         assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.rendering.output_renderer")
         assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.registry_models")
+        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.parser")
         assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.pipelex_bundle_blueprint")
         assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.bundle_elaborator")
-        # `pipelex.core` itself is not a declared package, so what is left of core's own top level is
-        # undeclared rather than interpreter — the split is deliberate, not an omission.
-        assert not is_runtime_layer(module_qname="pipelex.core.qualified_ref")
-        assert not is_runtime_layer(module_qname="pipelex.core.registry_models")
+
+    def test_declared_runtime_layer_names_only_real_packages(self) -> None:
+        """Every declared entry resolves on disk — `is_runtime_layer` is a string predicate that cannot tell.
+
+        A renamed or deleted package leaves its entry matching nothing, which makes the declaration
+        quietly *narrower* than it reads: the transitive rule filters its domain through this predicate,
+        so an entry that matches nothing removes modules from the check rather than adding them.
+        """
+        source_root = Path(__file__).resolve().parents[5] / "pipelex"
+        for package in RUNTIME_LAYER_PACKAGES:
+            relative = package.removeprefix("pipelex.").replace(".", "/")
+            target = source_root / relative
+            assert target.is_dir() or target.with_suffix(".py").is_file(), (
+                f"RUNTIME_LAYER_PACKAGES names {package!r}, which resolves to neither a package directory "
+                f"nor a module file under {source_root}. A declared entry that matches nothing silently "
+                f"shrinks the layer rule's domain instead of failing."
+            )
 
     def test_runtime_layer_may_import_runtime_hub(self) -> None:
         """The permitted direction is never flagged — the runtime layer lives on `runtime_hub`."""

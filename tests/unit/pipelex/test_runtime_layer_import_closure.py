@@ -26,9 +26,12 @@ Run in a subprocess so the closure is exactly what the entry point pulls in: an 
 
 from __future__ import annotations
 
+import ast
+import re
 import subprocess  # noqa: S404
 import sys
 import textwrap
+from pathlib import Path
 
 import pytest
 
@@ -113,6 +116,24 @@ _CLOSURE_SCRIPT = textwrap.dedent(
 )
 
 
+#: Anchored on `tests/` by name rather than by a parent count — a depth index resolves silently to the
+#: wrong directory when a module moves, which is exactly the failure this whole track kept hitting.
+_TESTS_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests")
+_REPO_ROOT = _TESTS_ROOT.parent
+_HUB_LAYERING_PAGE = _REPO_ROOT / "docs" / "contribute" / "hub-layering.md"
+
+
+def _configured_interpreter_packages() -> tuple[str, ...]:
+    """Read `INTERPRETER_PACKAGES` back out of the detector script.
+
+    The tuple lives inside a `textwrap.dedent` string, so no type checker, linter or import-graph tool
+    sees the names in it. Parsing it back is the only way a test can assert anything about them.
+    """
+    match = re.search(r"INTERPRETER_PACKAGES = \((.*?)\n\)", _CLOSURE_SCRIPT, re.DOTALL)
+    assert match is not None, "could not locate INTERPRETER_PACKAGES in the closure script"
+    return tuple(re.findall(r'"([^"]+)"', match.group(1)))
+
+
 def _run_closure(*, entry_point: str) -> subprocess.CompletedProcess[str]:
     """Import one entry point in a fresh interpreter and return the detector's verdict."""
     try:
@@ -152,3 +173,38 @@ class TestHubImportClosure:
         else:
             assert "closure OK" not in result.stdout
             assert "interpreter module(s)" in result.stdout
+
+    def test_every_configured_interpreter_package_is_real(self) -> None:
+        """Each name in `INTERPRETER_PACKAGES` is a real top-level package under `pipelex/`.
+
+        `DIRTY_ENTRY_POINT` proves that *at least one* configured name matches — it imports the
+        interpreter hub, whose closure contains several of them. It cannot prove that each one does.
+        A typo'd or retired name matches nothing and guards nothing, forever, while the suite stays
+        green; and since the predicate is a membership test, a dead name is invisible rather than loud.
+        """
+        source_root = _REPO_ROOT / "pipelex"
+        for package in _configured_interpreter_packages():
+            assert (source_root / package).is_dir(), (
+                f"INTERPRETER_PACKAGES names {package!r}, which is not a package directory under "
+                f"{source_root}. The predicate is a membership test, so this name silently matches "
+                f"nothing rather than failing — every module it was meant to flag now passes."
+            )
+
+    def test_the_interpreter_package_set_matches_the_documented_one(self) -> None:
+        """The closure predicate and `hub-layering.md`'s verification snippet name the same packages.
+
+        The page publishes a runnable snippet with its own copy of this set, and a reader who runs it
+        with a stale copy measures zero interpreter modules and believes it. The two copies had in fact
+        silently disagreed on `pipe_signature` before anyone compared them by machine.
+        """
+        page = _HUB_LAYERING_PAGE.read_text(encoding="utf-8")
+        match = re.search(r"^INTERPRETER = (\{.*\})$", page, re.MULTILINE)
+        assert match is not None, f"could not locate the INTERPRETER set in {_HUB_LAYERING_PAGE}"
+        documented = set(ast.literal_eval(match.group(1)))
+        configured = set(_configured_interpreter_packages())
+        assert configured == documented, (
+            f"the closure predicate and {_HUB_LAYERING_PAGE.name} disagree on the interpreter packages.\n"
+            f"  only in the closure test: {sorted(configured - documented)}\n"
+            f"  only in the doc snippet:  {sorted(documented - configured)}\n"
+            "Both must gain a new interpreter package together, or one of the two checks passes vacuously."
+        )

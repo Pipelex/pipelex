@@ -94,31 +94,27 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: since nothing in the tuple is a prefix of it. Its closure *is* what the runtime layer means, so an
 #: `interpreter_hub` import there is the one that would break the property outright.
 #:
-#: `pipelex/core/**` is listed **package by package**, not wholesale, because `core/` is genuinely two
-#: layers. Its data model — concepts, domains, stuffs, working memory, the input/output *specs* — is
-#: runtime: it describes what a method's values are, and nothing in it needs a loaded method. The
-#: remainder names a `Pipe`, and a pipe is the interpreter's own object: `pipe_abstract`,
-#: `pipe_blueprint`, `pipe_factory` and `pipes/rendering/` all import the interpreter *directly*, so
-#: declaring them runtime would be a claim the measurement contradicts. (Two of core's interpreter
-#: tenants no longer live here at all: the pipe-kind registration manifest is `pipelex.pipe_machinery`,
-#: and the parser plus its bundle blueprint are `pipelex.mthds_parsing`.) Those modules resolve their
-#: collaborators from the hub and inject them downward into the runtime half — the one-way arrow the
-#: whole design rests on. See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
+#: `pipelex.core` is a single entry, and getting it there was the point of the modularity work. `core/`
+#: used to be genuinely two layers, so this tuple had to name its data-model packages one by one —
+#: concepts, domains, memory, stuffs, and the input/output *specs* under `pipes/` — while excluding the
+#: remainder, which named a `Pipe` and imported the interpreter *directly*. That remainder has left:
+#: the pipe-kind registration manifest is `pipelex.pipe_machinery.registry_models`, the parser and its
+#: bundle blueprint are `pipelex.mthds_parsing`, and the Pipe machinery proper (`pipe_abstract`,
+#: `pipe_blueprint`, `pipe_factory`, `validation`, `template_guard_lint`, `rendering/`) is
+#: `pipelex.pipe_machinery`. What is left in `core/` describes what a method's *values* are, and
+#: nothing in it needs a loaded method — measured: every `pipelex.core.*` module loads zero interpreter
+#: modules. A package-granular declaration is only honest when the packages match the layers; naming
+#: `pipelex.core` wholesale is now a claim the measurement supports rather than contradicts.
+#: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (
     "pipelex.cogt",
+    "pipelex.core",
     "pipelex.plugins",
     "pipelex.reporting",
     "pipelex.system",
     "pipelex.tools",
     # the runtime layer's own hub — a module, not a package; see the note above
     "pipelex.runtime_hub",
-    # core's data model; the Pipe-touching remainder of `core/` stays in the interpreter layer
-    "pipelex.core.concepts",
-    "pipelex.core.domains",
-    "pipelex.core.memory",
-    "pipelex.core.pipes.inputs",
-    "pipelex.core.pipes.stuff_spec",
-    "pipelex.core.stuffs",
 )
 
 #: The interpreter layer's hub, which no runtime-layer module may import — directly or transitively.
