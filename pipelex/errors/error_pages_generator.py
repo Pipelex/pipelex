@@ -397,6 +397,7 @@ _FALLBACK_MACRO_SLUG = "platform-and-tooling"
 # label wording, macro placement, and ordering, never completeness.
 _SUBSYSTEM_SECTIONS: tuple[tuple[str, str, str], ...] = (
     # Authoring & language
+    ("mthds_parsing", "authoring-and-language", "MTHDS parsing"),
     ("core", "authoring-and-language", "Core language"),
     ("pipe_operators", "authoring-and-language", "Pipe operators"),
     ("pipe_controllers", "authoring-and-language", "Pipe controllers"),

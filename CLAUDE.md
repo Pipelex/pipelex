@@ -148,7 +148,7 @@
 
 ### Spec vs Blueprint Architecture
 
-- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into.
+- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/pipe_machinery/`, `pipelex/mthds_parsing/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into. The base `PipeBlueprint` lives in `pipe_machinery/`, the bundle blueprint the parser produces in `mthds_parsing/`, and the concept/domain blueprints in `core/`.
 - **Specs** (`pipelex/builder/pipe/`) are a convenience authoring format for AI agents. Each spec has `to_blueprint()` that transforms it into the corresponding blueprint. Spec-level fields may differ from blueprint-level fields.
 
 When adding validation or fields, decide which layer they belong to. Language rules go on blueprints; authoring convenience goes on specs. See `pipelex/builder/CLAUDE.md` for details.

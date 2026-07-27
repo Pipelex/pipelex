@@ -102,9 +102,4 @@ own page. Classes are grouped by subsystem.
 - [`CodegenLockError`](codegen-lock-error.md) — Codegen lock error
 - [`CodegenStampError`](codegen-stamp-error.md) — Codegen stamp error
 
-## Mthds parsing
-
-- [`BundleElaboratorError`](bundle-elaborator-error.md) — Bundle elaborator
-- [`MthdsParserError`](mthds-parser-error.md) — Mthds parser
-
 [Back to Error Reference](index.md)

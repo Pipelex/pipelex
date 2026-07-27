@@ -37,9 +37,10 @@ import pytest
 
 #: Entry points that must never load the interpreter: the inference layer, the runtime hub itself, the
 #: built-in plugin aggregator, and the heaviest module of each runtime-layer `core/` package — the ones
-#: that historically reached for a library and now take a `ConceptProviderAbstract` instead. `core/`'s
-#: Pipe-touching remainder is deliberately absent; it names the interpreter's own object and belongs to
-#: the interpreter layer by construction (see the guard's `RUNTIME_LAYER_PACKAGES` note).
+#: that historically reached for a library and now take a `ConceptProviderAbstract` instead. There is no
+#: longer a Pipe-touching remainder of `core/` to leave out: all of it moved to `pipe_machinery` and
+#: `mthds_parsing`, which is what let `pipelex.core` be declared wholesale (see the guard's
+#: `RUNTIME_LAYER_PACKAGES` note).
 #:
 #: `plugins.builtins` earns its place by history: it and three neighbours reached `interpreter_hub`
 #: transitively — through `runtime_bridge`, `pipeline` and `pipe_operators` — while both gates stayed
@@ -61,10 +62,11 @@ RUNTIME_LAYER_ENTRY_POINTS = [
 ]
 
 #: The negative control, and the reason it is needed: the detector below is a `textwrap.dedent`
-#: string, so nothing type-checks or lints the names inside it. A typo in `INTERPRETER_PACKAGES` or
-#: `is_interpreter` would make every entry point above pass *vacuously*, forever, and the suite would
-#: stay green while guarding nothing. This entry point is dirty by definition — the interpreter hub
-#: is the interpreter — so it must come back a failure, *reported as offending modules*, whatever
+#: string, so nothing type-checks or lints the *logic* inside it. The package names are no longer at
+#: risk — they are a real module-level constant, passed in as argv — but a broken predicate or a
+#: mis-built offenders comprehension would still make every entry point above pass *vacuously*,
+#: forever, while the suite stayed green. This entry point is dirty by definition — the interpreter
+#: hub is the interpreter — so it must come back a failure, *reported as offending modules*, whatever
 #: else changes. Asserting the offender message and not merely the exit code is what pins the
 #: predicate: the `sys.modules` check below would exit 1 for this entry point either way.
 DIRTY_ENTRY_POINT = "pipelex.interpreter_hub"
@@ -74,32 +76,45 @@ DIRTY_ENTRY_POINT = "pipelex.interpreter_hub"
 #: repo has a documented history of (`docs/agents/debugging-hanging-pytest-runs.md`).
 SUBPROCESS_TIMEOUT_SECONDS = 300
 
+#: The interpreter layer's top-level packages — the set the detector treats as "interpreter module".
+#:
+#: A real module-level constant, handed to the subprocess as argv rather than baked into the script
+#: string below. That is deliberate: while these names lived *inside* the `textwrap.dedent` string,
+#: nothing type-checked, linted or grepped them, and reading them back out took a regex. Two
+#: documented interpreter homes are absent, and their absence is a known wart rather than an
+#: oversight — see this module's docstring.
+INTERPRETER_PACKAGES: tuple[str, ...] = (
+    "libraries",
+    "pipe_operators",
+    "pipe_controllers",
+    "codegen",
+    "builder",
+    # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
+    "interpreter_plugins",
+    # Core's Pipe machinery and the pipe-kind registration manifest, hoisted out of `core/`.
+    "pipe_machinery",
+    # Signature resolution: `signature_walk` imports `interpreter_hub` to resolve pipes by code.
+    "pipe_signature",
+    # The MTHDS parser and its blueprint, hoisted out of `core/`.
+    "mthds_parsing",
+)
+
 _CLOSURE_SCRIPT = textwrap.dedent(
     """
     import importlib
     import sys
 
     target = sys.argv[1]
+    interpreter_packages = frozenset(sys.argv[2:])
+    # An empty set would make every entry point pass while flagging nothing — the exact vacuity this
+    # module exists to prevent. Fail loudly instead, so a caller that drops the argv splat is caught.
+    if not interpreter_packages:
+        print("no interpreter packages passed — the detector would match nothing")
+        raise SystemExit(2)
     importlib.import_module(target)
 
-    INTERPRETER_PACKAGES = (
-        "libraries",
-        "pipe_operators",
-        "pipe_controllers",
-        "codegen",
-        "builder",
-        # The built-ins that adapt interpreter-layer ports; they construct interpreter-layer objects.
-        "interpreter_plugins",
-        # The pipe-kind registration manifest, hoisted out of `core/`.
-        "pipe_machinery",
-        # Signature resolution: `signature_walk` imports `interpreter_hub` to resolve pipes by code.
-        "pipe_signature",
-        # The MTHDS parser and its blueprint, hoisted out of `core/`.
-        "mthds_parsing",
-    )
-
     def is_interpreter(name):
-        return name.split(".")[1] in INTERPRETER_PACKAGES
+        return name.split(".")[1] in interpreter_packages
 
     offenders = sorted(name for name in sys.modules if name.startswith("pipelex.") and is_interpreter(name))
     if offenders:
@@ -123,22 +138,11 @@ _REPO_ROOT = _TESTS_ROOT.parent
 _HUB_LAYERING_PAGE = _REPO_ROOT / "docs" / "contribute" / "hub-layering.md"
 
 
-def _configured_interpreter_packages() -> tuple[str, ...]:
-    """Read `INTERPRETER_PACKAGES` back out of the detector script.
-
-    The tuple lives inside a `textwrap.dedent` string, so no type checker, linter or import-graph tool
-    sees the names in it. Parsing it back is the only way a test can assert anything about them.
-    """
-    match = re.search(r"INTERPRETER_PACKAGES = \((.*?)\n\)", _CLOSURE_SCRIPT, re.DOTALL)
-    assert match is not None, "could not locate INTERPRETER_PACKAGES in the closure script"
-    return tuple(re.findall(r'"([^"]+)"', match.group(1)))
-
-
 def _run_closure(*, entry_point: str) -> subprocess.CompletedProcess[str]:
     """Import one entry point in a fresh interpreter and return the detector's verdict."""
     try:
         return subprocess.run(  # noqa: S603
-            [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point],
+            [sys.executable, "-c", _CLOSURE_SCRIPT, entry_point, *INTERPRETER_PACKAGES],
             capture_output=True,
             text=True,
             check=False,
@@ -181,9 +185,10 @@ class TestHubImportClosure:
         interpreter hub, whose closure contains several of them. It cannot prove that each one does.
         A typo'd or retired name matches nothing and guards nothing, forever, while the suite stays
         green; and since the predicate is a membership test, a dead name is invisible rather than loud.
+        Being a real constant makes the names lint-visible, but no tool checks a string against disk.
         """
         source_root = _REPO_ROOT / "pipelex"
-        for package in _configured_interpreter_packages():
+        for package in INTERPRETER_PACKAGES:
             assert (source_root / package).is_dir(), (
                 f"INTERPRETER_PACKAGES names {package!r}, which is not a package directory under "
                 f"{source_root}. The predicate is a membership test, so this name silently matches "
@@ -201,7 +206,7 @@ class TestHubImportClosure:
         match = re.search(r"^INTERPRETER = (\{.*\})$", page, re.MULTILINE)
         assert match is not None, f"could not locate the INTERPRETER set in {_HUB_LAYERING_PAGE}"
         documented = set(ast.literal_eval(match.group(1)))
-        configured = set(_configured_interpreter_packages())
+        configured = set(INTERPRETER_PACKAGES)
         assert configured == documented, (
             f"the closure predicate and {_HUB_LAYERING_PAGE.name} disagree on the interpreter packages.\n"
             f"  only in the closure test: {sorted(configured - documented)}\n"

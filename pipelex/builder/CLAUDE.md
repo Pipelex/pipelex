@@ -60,7 +60,7 @@ PipeSpec and ConceptSpec subclasses in this directory are a **convenience author
 
 The ground truth is the **blueprint** layer:
 
-- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/core/`) define the actual MTHDS language. They are what `.mthds` files parse into via `MthdsParser.make_pipelex_bundle_blueprint()`.
+- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/pipe_machinery/`, `pipelex/mthds_parsing/`, `pipelex/core/`) define the actual MTHDS language. They are what `.mthds` files parse into via `MthdsParser.make_pipelex_bundle_blueprint()`. The base `PipeBlueprint` is in `pipe_machinery/pipe_blueprint.py`, the `PipelexBundleBlueprint` the parser produces is in `mthds_parsing/pipelex_bundle_blueprint.py`, and the concept/domain blueprints are in `core/`.
 - **Specs** are transformed into blueprints via `to_blueprint()` and then discarded. Spec-level fields (e.g., `PipeComposeSpec.target_format`) may not exist on the corresponding blueprint (e.g., `PipeComposeBlueprint` uses `TemplateBlueprint` with `category` + `templating_style` instead).
 
 When reviewing or modifying code: do not assume that a validation rule on a PipeSpec subclass reflects a rule of the MTHDS language. Check the corresponding blueprint class.

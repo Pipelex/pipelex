@@ -10,6 +10,11 @@ description: "Pipelex error classes in the Authoring & language area, grouped by
 Each error class below has a stable RFC 7807 `type` URI that dereferences to its
 own page. Classes are grouped by subsystem.
 
+## MTHDS parsing
+
+- [`BundleElaboratorError`](bundle-elaborator-error.md) — Bundle elaborator
+- [`MthdsParserError`](mthds-parser-error.md) — MTHDS parser
+
 ## Core language
 
 - [`ConceptCodeError`](concept-code-error.md) — Concept code

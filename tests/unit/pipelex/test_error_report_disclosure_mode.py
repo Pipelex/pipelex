@@ -73,8 +73,8 @@ def _caller_facing_report(message: str = "pipe 'summarize' references unknown co
     return ErrorReport(
         error_type="MthdsParserError",
         message=message,
-        title="Pipelex interpreter error",
-        type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+        title="MTHDS parser",
+        type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
         error_domain=ErrorDomain.INPUT,
         user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail="fix the concept name in your .mthds"),
         caller_facing_message=True,
@@ -405,8 +405,8 @@ class TestErrorReportDisclosureMode:
         caller_facing_report = ErrorReport(
             error_type="MthdsParserError",
             message="pipe references unknown concept",
-            title="Pipelex interpreter error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            title="MTHDS parser",
+            type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
             error_category="capacity",
             error_domain=ErrorDomain.INPUT,
             retryable=False,

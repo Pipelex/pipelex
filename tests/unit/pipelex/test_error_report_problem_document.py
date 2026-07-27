@@ -126,8 +126,8 @@ class TestErrorReportProblemDocument:
         report = ErrorReport(
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
-            title="Pipelex interpreter error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            title="MTHDS parser",
+            type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
             error_domain=ErrorDomain.INPUT,
             caller_facing_message=True,
         )
@@ -161,8 +161,8 @@ class TestErrorReportProblemDocument:
         report = ErrorReport(
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
-            title="Pipelex interpreter error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            title="MTHDS parser",
+            type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
             error_domain=ErrorDomain.INPUT,
             caller_facing_message=True,
             model="gpt-5",
@@ -180,8 +180,8 @@ class TestErrorReportProblemDocument:
         report = ErrorReport(
             error_type="MthdsParserError",
             message="pipe 'summarize' references unknown concept at line 14",
-            title="Pipelex interpreter error",
-            type_uri="https://docs.pipelex.com/latest/errors/pipelex-interpreter-error/",
+            title="MTHDS parser",
+            type_uri="https://docs.pipelex.com/latest/errors/mthds-parser-error/",
             error_domain=ErrorDomain.INPUT,
             caller_facing_message=True,
         )

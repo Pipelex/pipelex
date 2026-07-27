@@ -46,6 +46,11 @@ class MthdsParserError(PipelexError):
     """
 
     error_domain = ErrorDomain.INPUT
+    # Declared rather than auto-derived: `_humanize_class_name` would render the
+    # class name as "Mthds parser", and MTHDS is the open standard's brand, always
+    # uppercase. This string is the RFC 7807 `title` on every ErrorReport, so the
+    # mis-casing would be wire-visible, not merely a docs-heading concern.
+    _declared_title = "MTHDS parser"
     # The parser's messages describe faults in the caller's own .mthds
     # source — caller-facing copy, kept verbatim under STRICT disclosure.
     _authors_caller_facing_message = True

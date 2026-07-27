@@ -102,8 +102,11 @@ SCAN_ROOTS: tuple[Path, ...] = (SOURCE_ROOT, TESTS_ROOT)
 #: bundle blueprint are `pipelex.mthds_parsing`, and the Pipe machinery proper (`pipe_abstract`,
 #: `pipe_blueprint`, `pipe_factory`, `validation`, `template_guard_lint`, `rendering/`) is
 #: `pipelex.pipe_machinery`. What is left in `core/` describes what a method's *values* are, and
-#: nothing in it needs a loaded method — measured: every `pipelex.core.*` module loads zero interpreter
-#: modules. A package-granular declaration is only honest when the packages match the layers; naming
+#: nothing in it needs a loaded method — measured: no `pipelex.core.*` module reaches `interpreter_hub`
+#: or loads a module from any of the packages above. (`core.pipes.pipe_output` does still pull in
+#: `pipeline.pipeline_models` for one leaf constant — the known `pipeline` / `pipe_run` placement wart,
+#: which is why the claim is scoped to those packages rather than to "zero interpreter modules".)
+#: A package-granular declaration is only honest when the packages match the layers; naming
 #: `pipelex.core` wholesale is now a claim the measurement supports rather than contradicts.
 #: See the "Where core splits" section of ``docs/contribute/hub-layering.md``.
 RUNTIME_LAYER_PACKAGES: tuple[str, ...] = (

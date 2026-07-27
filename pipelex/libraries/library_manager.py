@@ -721,13 +721,13 @@ class LibraryManager(LibraryManagerAbstract):
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
-            except MthdsParserError as interpreter_error:
+            except MthdsParserError as parser_error:
                 # Forward BLUEPRINT validation errors from interpreter
-                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {interpreter_error.message}"
+                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {parser_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
-                    blueprint_validation_errors=interpreter_error.validation_errors,
-                ) from interpreter_error
+                    blueprint_validation_errors=parser_error.validation_errors,
+                ) from parser_error
             blueprints.append(blueprint)
 
         # Find manifest and run package visibility validation

@@ -128,11 +128,11 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     """
     try:
         yield
-    except MthdsParserError as interpreter_error:
+    except MthdsParserError as parser_error:
         raise ValidateBundleError(
-            message=interpreter_error.message,
-            pipelex_bundle_blueprint_validation_errors=interpreter_error.validation_errors,
-        ) from interpreter_error
+            message=parser_error.message,
+            pipelex_bundle_blueprint_validation_errors=parser_error.validation_errors,
+        ) from parser_error
     except PipeFactoryError as factory_error:
         factory_error_data = categorize_pipe_factory_error(factory_error=factory_error)
         raise ValidateBundleError(

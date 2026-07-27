@@ -7,11 +7,18 @@ execution time whatever is loaded — hence *runtime*, in the language-implement
 
 **The one rule:** ``interpreter_hub`` imports ``runtime_hub``; ``runtime_hub`` must never import
 ``interpreter_hub``. Nothing here may name ``libraries``, ``pipe_operators``, ``pipe_controllers``,
-``codegen``, ``builder``, ``core.bundles``, ``core.interpreter``, or the Pipe-touching modules of
-``core.pipes`` at module level — that is what makes importing the Pipelex runtime load zero
-interpreter modules. Core's data model is *not* on that list: ``core.concepts`` and its siblings are
-declared runtime-layer packages, and this module's own closure runs straight through them. See
-``docs/contribute/hub-layering.md``.
+``codegen``, ``builder``, ``interpreter_plugins``, ``pipe_machinery``, ``pipe_signature`` or
+``mthds_parsing`` at module level — that is what makes importing the Pipelex runtime load zero
+modules from any of them. That list is the interpreter's top-level packages; it used to have to
+trail "…or the Pipe-touching modules of ``core.pipes``", because some of what it forbids lived under
+a runtime-named package. ``pipelex.core`` is *not* on it at all any more — the whole package is
+declared runtime-layer, and this module's own closure runs straight through it.
+
+Two interpreter-named packages are deliberately absent, and their absence is a known wart: leaf
+models from ``pipeline`` and ``pipe_run`` (``SpecialPipelineId``, ``PipeRunMode``) already land in
+this module's closure. So the property is "zero modules from the packages named above", not "zero
+interpreter modules" outright — the remedy is to move those leaves to a runtime-layer home, then
+widen the list. See ``docs/contribute/hub-layering.md``.
 """
 
 import sys

@@ -12,6 +12,13 @@ from pipelex.cli.dev_cli.commands.hub_layering_guard import (
     find_violations_in_source,
     is_runtime_layer,
 )
+from tests.unit.pipelex.test_runtime_layer_import_closure import INTERPRETER_PACKAGES
+
+#: Anchored on `tests/` by name rather than by a parent count. A depth index is not merely fragile
+#: here, it is *silent*: `parents[6]` is the workspace root, which holds a sibling `pipelex/` checkout,
+#: so a module moved one level shallower would validate the declaration against a different repo and
+#: pass. That is the failure this track already hit once, in the golden-renderer test.
+_REPO_ROOT = next(parent for parent in Path(__file__).resolve().parents if parent.name == "tests").parent
 
 #: A runtime-layer module path, and a interpreter-layer one, for the same snippet.
 RUNTIME_PATH = "pipelex/cogt/sample/worker.py"
@@ -41,33 +48,40 @@ class TestHubLayeringGuard:
         # A package whose name merely starts with a runtime-layer name is not in the runtime layer.
         assert not is_runtime_layer(module_qname="pipelex.toolsmith.thing")
 
-    def test_core_is_wholly_runtime_layer(self) -> None:
-        """`core/` is declared as one package, because nothing interpreter-layer is left inside it."""
-        # The data model, declared package by package before the interpreter tenants moved out.
-        assert is_runtime_layer(module_qname="pipelex.core.stuffs.stuff_factory")
-        assert is_runtime_layer(module_qname="pipelex.core.concepts.concept_provider_abstract")
-        assert is_runtime_layer(module_qname="pipelex.core.memory.input_shaper")
-        assert is_runtime_layer(module_qname="pipelex.core.pipes.inputs.input_stuff_specs_factory")
-        assert is_runtime_layer(module_qname="pipelex.core.pipes.stuff_spec.stuff_spec_factory")
-        # Core's own top level and the runtime half of `core/pipes/` used to be *undeclared* — neither
-        # layer — because the declaration could not name `pipelex.core` while its Pipe machinery lived
-        # there. Collapsing the six entries to one is what brought them in.
-        assert is_runtime_layer(module_qname="pipelex.core.qualified_ref")
-        assert is_runtime_layer(module_qname="pipelex.core.registry_models")
-        assert is_runtime_layer(module_qname="pipelex.core.exceptions")
-        assert is_runtime_layer(module_qname="pipelex.core.pipes.pipe_output")
-        assert is_runtime_layer(module_qname="pipelex.core.pipes.variable_multiplicity")
+    def test_core_is_declared_as_one_whole_package(self) -> None:
+        """`core/` is declared wholesale — one entry, no sub-entries — because nothing interpreter-layer
+        is left inside it.
 
-    def test_the_interpreter_homes_that_left_core_are_not_runtime_layer(self) -> None:
-        """The two packages core's Pipe machinery moved to are interpreter-layer, and stay undeclared."""
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_abstract")
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_blueprint")
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.pipe_factory")
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.rendering.output_renderer")
-        assert not is_runtime_layer(module_qname="pipelex.pipe_machinery.registry_models")
-        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.parser")
-        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.pipelex_bundle_blueprint")
-        assert not is_runtime_layer(module_qname="pipelex.mthds_parsing.bundle_elaborator")
+        Stated as a property of the declaration rather than as a list of member modules. Once
+        `pipelex.core` is a single prefix entry, `is_runtime_layer` answers True for *any* string
+        under it, so asserting ten real module names would carry the same one bit as asserting ten
+        invented ones — an inventory, not an invariant. What is worth pinning is the shape that took
+        the whole M1 track to reach: re-introducing a `pipelex.core.<sub>` entry would mean core has
+        split again, and that is what fails here.
+        """
+        assert "pipelex.core" in RUNTIME_LAYER_PACKAGES
+        resplit = [package for package in RUNTIME_LAYER_PACKAGES if package.startswith("pipelex.core.")]
+        assert not resplit, (
+            f"`pipelex.core` is declared wholesale, but these sub-package entries are declared too: {resplit}. "
+            "A sub-entry means some of `core/` is being carved out again — either move the interpreter-layer "
+            "module to `pipe_machinery`/`mthds_parsing` as M1 did, or record why the split is back."
+        )
+
+    def test_no_interpreter_package_is_declared_runtime_layer(self) -> None:
+        """The two layer declarations are disjoint — derived from both, so neither can drift alone.
+
+        `RUNTIME_LAYER_PACKAGES` (this guard) and `INTERPRETER_PACKAGES` (the import-closure test) are
+        the two halves of one partition, maintained in separate modules and never previously compared.
+        Declaring a package in both would make the guard vouch for a package the closure test flags —
+        each check would keep passing while contradicting the other.
+        """
+        for package in INTERPRETER_PACKAGES:
+            qname = f"pipelex.{package}"
+            assert not is_runtime_layer(module_qname=qname), (
+                f"{qname} is named by the import-closure test's INTERPRETER_PACKAGES *and* matched by "
+                "this guard's RUNTIME_LAYER_PACKAGES. The two declarations describe opposite layers."
+            )
+            assert not is_runtime_layer(module_qname=f"{qname}.some_module")
 
     def test_declared_runtime_layer_names_only_real_packages(self) -> None:
         """Every declared entry resolves on disk — `is_runtime_layer` is a string predicate that cannot tell.
@@ -76,7 +90,7 @@ class TestHubLayeringGuard:
         quietly *narrower* than it reads: the transitive rule filters its domain through this predicate,
         so an entry that matches nothing removes modules from the check rather than adding them.
         """
-        source_root = Path(__file__).resolve().parents[5] / "pipelex"
+        source_root = _REPO_ROOT / "pipelex"
         for package in RUNTIME_LAYER_PACKAGES:
             relative = package.removeprefix("pipelex.").replace(".", "/")
             target = source_root / relative

@@ -23,7 +23,7 @@ def extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidation
 
     Shared by both validation-error categorizers — the pipe categorizer below
     (Pipe/Concept model validation) and the blueprint categorizer
-    (``core.interpreter.validation_error_categorizer``, which unwraps a
+    (``validation_error_categorizer``, its sibling in this package, which unwraps a
     blueprint-stage ``PipeValidationError`` raised by a pydantic validator on the
     blueprint models, e.g. the PipeBatch / SubPipe batch-name collisions). One
     definition so the two categorizers cannot drift on how pydantic wraps the error.
